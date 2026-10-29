@@ -1,9 +1,7 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
-
-import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -11,23 +9,19 @@ import {
   anAddress,
   clockTheNextKey,
   crumbOf,
-  keepsItsWordOffThePage,
   keyShown,
   keystrokesDismissed,
   keystrokesListed,
-  markTheOperator,
   person,
   personMenuOpened,
   provision,
   railOf,
-  refusedDigitsSelected,
   saysARefusal,
   signedInAtHome,
   signIn,
   signInByEmail,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
-import { authAnswering, refusalAnswering } from "../refused-read.ts";
 
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
 
@@ -55,11 +49,6 @@ const removeButton = (page: Page) =>
   authenticatorPart(page).getByRole("button", { name: "Remove", exact: true });
 
 const outcomeOf = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
-
-const keyListed = (listed: Locator, key: string) =>
-  listed.getByRole("term").filter({ hasText: new RegExp(`^${key}$`) });
-
-const aWrongCode = (right: string): string => (right === "000000" ? "111111" : "000000");
 
 const accountFromTheBand = async (page: Page, who: string): Promise<void> => {
   const menu = await personMenuOpened(page, who);
@@ -178,52 +167,6 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   await expect(codesListed(page)).toHaveCount(0);
 });
 
-test("an Admin's only authenticator keeps Remove disabled, saying why", async ({
-  page,
-  request,
-}) => {
-  const workspace = await provision(request, { name: "Pennine Metalwork" });
-  await signedInAtHome(page, request, workspace.admin.email);
-  await accountFromTheBand(page, workspace.admin.name);
-
-  const remove = removeButton(page);
-  await expect(remove).toHaveAttribute("aria-disabled", "true");
-  await expect(remove).toHaveAccessibleDescription(/\S/);
-  await remove.press("Enter");
-  await expect(remove).toBeFocused();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-});
-
-test("a wrong setup code is refused, its digits left selected", async ({ page, request }) => {
-  await accountWithNoWorkspace(page, request);
-  await expect(setUpButton(page)).toBeVisible();
-  await page.keyboard.press("s");
-  await expect(page.getByRole("img", { name: "QR code for your authenticator" })).toBeVisible();
-  const key = await keyShown(page);
-
-  const refused = authAnswering(page, "/authenticator/finish");
-  await codeField(page).fill(aWrongCode(authenticatorCodeAt(key, new Date())));
-
-  expect(await refused).toMatchObject({ status: 400, word: "code-wrong" });
-  await saysARefusal(authenticatorPart(page).getByRole("alert"));
-  await expect(codeField(page)).toHaveAttribute("aria-invalid", "true");
-  await expect(codeField(page)).toBeFocused();
-  await refusedDigitsSelected(codeField(page));
-
-  await page.keyboard.type(authenticatorCodeAt(key, new Date()));
-  await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
-});
-
-test("the keystroke list drops Set up once the setup opens", async ({ page, request }) => {
-  await accountWithNoWorkspace(page, request);
-  await setupOpened(page);
-
-  const listed = await keystrokesListed(page, "Account");
-  await expect(keyListed(listed, "k"), "the list holds no key that copies the key").toBeVisible();
-  await expect(keyListed(listed, "s"), "the list still holds the key that sets up").toHaveCount(0);
-  await keystrokesDismissed(page, listed);
-});
-
 test("a setup's codes land though Set up is pressed mid-finish", async ({ page, request }) => {
   await accountWithNoWorkspace(page, request);
   const key = await setupOpened(page);
@@ -297,29 +240,6 @@ test("replacing the recovery codes shows a new set", async ({ page, request }) =
   ).toEqual([]);
 });
 
-test("a set replaced in another tab is refused at Done", async ({ page, context, request }) => {
-  await accountWithNoWorkspace(page, request);
-  await setUpWithItsCode(page);
-  const other = await context.newPage();
-  await other.goto("/account");
-  await other.getByRole("button", { name: "Replace Recovery Codes" }).click();
-  await other
-    .getByRole("dialog", { name: "Replace Recovery Codes" })
-    .getByRole("button", { name: "Replace", exact: true })
-    .click();
-  await expect(codesListed(other)).toHaveCount(RECOVERY_CODES_IN_A_SET);
-  await other.close();
-
-  await savedBox(page).check();
-  const refused = refusalAnswering(page, "person.acknowledgeRecoveryCodes");
-  await doneButton(page).click();
-
-  expect(await refused).toMatchObject({ word: "changed-meanwhile" });
-  await saysARefusal(codesBlock(page).getByRole("alert"));
-  await keepsItsWordOffThePage(page, "changed-meanwhile");
-  await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
-});
-
 test("a member's Account page sits inside the shell", async ({ page, request }) => {
   await anEditorOnAccount(page, request);
 
@@ -327,45 +247,6 @@ test("a member's Account page sits inside the shell", async ({ page, request }) 
   await expect(crumbOf(page, "Account")).toBeVisible();
   await expect(page.getByRole("link", { name: "Go to better-answers" })).toHaveCount(0);
   await keystrokesDismissed(page, await keystrokesListed(page, "Account"));
-});
-
-test("the operator reaches Account from the console's avatar menu", async ({ page, request }) => {
-  const email = anAddress("operator");
-  const workspace = await provision(request, { name: "Wharfedale Castings", adminEmail: email });
-  await markTheOperator(request, email);
-  await signedInAtHome(page, request, email);
-  await page.goto(HOMES.operator.path);
-  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
-
-  await accountFromTheBand(page, workspace.admin.name);
-  await expect(removeButton(page), "the page does not list the authenticator").toBeVisible();
-});
-
-test("a signed-out visitor signs in and lands back on Account", async ({ page, request }) => {
-  const email = anAddress("returning");
-  await person(request, email);
-  await page.goto("/account");
-  await signIn(page, request, email);
-
-  await expect(accountHeading(page)).toBeVisible();
-  await expect(page).toHaveURL(/\/account$/);
-  await expect(page.getByRole("main")).toMatchAriaSnapshot(`
-    - main:
-      - heading "Account" [level=1]
-      - region "Sign-In":
-        - heading "Sign-In" [level=2]
-        - region "Authenticator":
-          - heading "Authenticator" [level=3]
-          - paragraph
-          - button "Set Up an Authenticator" [expanded=false]
-      - link "Go to better-answers"
-      - button "Sign Out"
-      - button "Keyboard Shortcuts"
-  `);
-
-  const listed = await keystrokesListed(page, "Account");
-  await expect(keyListed(listed, "s"), "the list holds no key that sets up").toBeVisible();
-  await keystrokesDismissed(page, listed);
 });
 
 const passkeyName = (page: Page) => page.getByLabel("Passkey Name");
@@ -404,52 +285,4 @@ test("setup shows one primary, whichever way is open", async ({
   await expect(passkeyName(page)).toBeVisible();
   await expect(primaries(page)).toHaveText(["Add a Passkey"]);
   await expect(authenticatorInstead(page)).toBeFocused();
-});
-
-test("s opens and closes the authenticator on setup", async ({ page, request }) => {
-  await anAdminOnSetup(page, request);
-  await authenticatorInstead(page).focus();
-
-  await page.keyboard.press("s");
-
-  await expect(authenticatorInstead(page)).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("img", { name: "QR code for your authenticator" })).toBeVisible();
-  const listed = await keystrokesListed(page, "Set Up a Second Factor");
-  await expect(keyListed(listed, "s"), "the list holds no key that sets up").toBeVisible();
-  await expect(keyListed(listed, "k"), "the list holds no key that copies the key").toBeVisible();
-  await keystrokesDismissed(page, listed);
-
-  await page.keyboard.press("s");
-
-  await expect(authenticatorInstead(page)).toHaveAttribute("aria-expanded", "false");
-  await expect(passkeyName(page)).toBeVisible();
-});
-
-test("the passkey field and its button share one height", async ({ page, request }) => {
-  await anAdminOnSetup(page, request);
-
-  const [field, button] = await Promise.all([
-    passkeyName(page).boundingBox(),
-    page.getByRole("button", { name: "Add a Passkey" }).boundingBox(),
-  ]);
-
-  expect(field, "the passkey field has no box to measure").not.toBeNull();
-  expect(field?.height, "the passkey field and its button differ in height").toBe(button?.height);
-});
-
-test("the authenticator's code field and its button share one height", async ({
-  page,
-  request,
-}) => {
-  await anAdminOnSetup(page, request);
-  await authenticatorInstead(page).click();
-  await expect(codeField(page)).toBeVisible();
-
-  const [field, button] = await Promise.all([
-    codeField(page).boundingBox(),
-    page.getByRole("button", { name: "Finish Setup" }).boundingBox(),
-  ]);
-
-  expect(field, "the code field has no box to measure").not.toBeNull();
-  expect(field?.height, "the code field and its button differ in height").toBe(button?.height);
 });

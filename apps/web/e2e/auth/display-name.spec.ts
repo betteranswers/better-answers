@@ -4,17 +4,12 @@ import { DISPLAY_NAME_MAX_CHARACTERS } from "@/shared/member/display-name-words.
 
 import { expect, test } from "../browser.ts";
 import {
-  addMember,
   anAddress,
   clockTheNextKey,
   keepsItsWordOffThePage,
-  landedAtHome,
-  person,
-  provision,
   saysSomethingNew,
   saysARefusal,
   signIn,
-  signInHeading,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
 import { refusalAnswering } from "../refused-read.ts";
@@ -30,14 +25,6 @@ const displayNameField = (page: Page) => page.getByLabel("Display Name");
 const saveButton = (page: Page) => page.getByRole("button", { name: "Save and Continue" });
 
 const SET_DISPLAY_NAME = "person.setDisplayName";
-
-const pagesShown = (page: Page): readonly string[] => {
-  const shown: string[] = [];
-  page.on("framenavigated", (frame) => {
-    if (frame === page.mainFrame()) shown.push(new URL(frame.url()).pathname);
-  });
-  return shown;
-};
 
 test("asks a first-time person for a display name before anything", async ({
   page,
@@ -69,42 +56,6 @@ test("asks a first-time person for a display name before anything", async ({
   await theActionLandedWithinItsBudget(page, "display name save");
 
   await expect(noWorkspaceHeading(page)).toBeVisible();
-});
-
-test("credits a new member by their given name, asking once", async ({ page, request }) => {
-  const email = anAddress("named");
-  const who = await person(request, email, { displayName: "" });
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await displayNameField(page).fill("Theo Approver");
-  await saveButton(page).click();
-  await expect(noWorkspaceHeading(page)).toBeVisible();
-
-  const workspace = await provision(request, { name: "Named Ltd" });
-  await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
-  const shown = pagesShown(page);
-  await page.goto("/choose-workspace");
-
-  await landedAtHome(page, "Editor");
-  const bar = page.getByRole("banner");
-  await expect(bar.getByText("Theo Approver", { exact: false })).toBeVisible();
-  expect(shown).not.toContain("/display-name");
-});
-
-test("signs a named member straight into the shell, never asking", async ({ page, request }) => {
-  const email = anAddress("already");
-  const who = await person(request, email, { displayName: "Alys Named" });
-  const workspace = await provision(request, { name: "Already Named" });
-  await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
-  const shown = pagesShown(page);
-
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-
-  await landedAtHome(page, "Editor");
-  expect(shown).not.toContain("/display-name");
-  await page.goto("/display-name");
-  await landedAtHome(page, "Editor");
 });
 
 test("says what to change in a bad name, then saves", async ({
@@ -144,32 +95,4 @@ test("says what to change in a bad name, then saves", async ({
   await displayNameField(page).fill("Priya Shah");
   await saveButton(page).click();
   await expect(noWorkspaceHeading(page)).toBeVisible();
-});
-
-test("sends a signed-out visitor from the display-name page to sign-in", async ({ page }) => {
-  await page.goto("/display-name");
-
-  await expect(signInHeading(page)).toBeVisible();
-  await expect(page).toHaveURL(/\/sign-in$/);
-});
-
-test("refuses a save after the session ended, offering sign-in again", async ({
-  page,
-  context,
-  request,
-}) => {
-  await page.goto("/sign-in");
-  await signIn(page, request, anAddress("ended"));
-  await expect(displayNameHeading(page)).toBeVisible();
-  await context.clearCookies();
-
-  await displayNameField(page).fill("Priya Shah");
-  const refused = refusalAnswering(page, SET_DISPLAY_NAME);
-  await saveButton(page).click();
-
-  expect(await refused).toMatchObject({ class: "unauthenticated" });
-  await saysARefusal(page.getByRole("alert"));
-  await expect(displayNameField(page)).toHaveAttribute("aria-invalid", "false");
-  await page.getByRole("button", { name: "Sign In Again" }).click();
-  await expect(signInHeading(page)).toBeVisible();
 });

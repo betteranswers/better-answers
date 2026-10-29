@@ -1,5 +1,3 @@
-import assert from "node:assert/strict";
-
 import type { Page } from "@playwright/test";
 
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -9,11 +7,9 @@ import { expect, test } from "../browser.ts";
 import {
   anAddress,
   contrastBetween,
-  paintedOver,
   provision,
   signedInAtHome,
   skipLinkReachesThePage,
-  tabOpenedByKeyboard,
   tokenPainted,
 } from "../harness.ts";
 
@@ -132,32 +128,6 @@ for (const [theme, themeKept] of [
   ["", withNoThemeKept],
   [" dark", inTheDark],
 ] as const) {
-  test(`shows${theme} focus at 3:1 on every sign-in page control`, async ({ page }) => {
-    await themeKept(page);
-    await page.goto("/sign-in");
-    await expect(page.getByRole("button", { name: "Send Code" })).toBeVisible();
-
-    await holdsTheRing(page, await walked(page));
-  });
-
-  test(`the primary button's${theme} ring holds 3:1 on its fill`, async ({ page }) => {
-    await themeKept(page);
-    await page.goto("/sign-in");
-    const send = page.getByRole("button", { name: "Send Code" });
-    await send.focus();
-    await page.keyboard.press("Shift+Tab");
-    await page.keyboard.press("Tab");
-    await expect(send).toBeFocused();
-    await focusSettled(page);
-
-    const drawn = await drawnFocus(page, await inkOf(page));
-    assert.ok(drawn !== undefined, "the primary button took no focus");
-    expect(
-      contrastBetween(paintedOver(drawn.ring, drawn.behind), drawn.fill),
-      "the ring disappears into the primary fill",
-    ).toBeGreaterThanOrEqual(NON_TEXT_CONTRAST);
-  });
-
   test(`draws the token's${theme} ring on every shell page control`, async ({ page, request }) => {
     await themeKept(page);
     const email = anAddress("focus");
@@ -170,13 +140,3 @@ for (const [theme, themeKept] of [
     await holdsTheRing(page, await walked(page));
   });
 }
-
-test("keeps one ring on the invitations' counted switch", async ({ page, request }) => {
-  const email = anAddress("focus");
-  await provision(request, { name: "Calder Glazing", adminEmail: email });
-  await signedInAtHome(page, request, email);
-  await tabOpenedByKeyboard(page, MEMBERS.path, "Invitations");
-  await expect(page.getByRole("radiogroup").first()).toBeVisible();
-
-  await holdsTheRing(page, await walked(page));
-});

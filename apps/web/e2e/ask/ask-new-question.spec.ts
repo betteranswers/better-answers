@@ -1,19 +1,13 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { ASK_KEYSTROKES as KEY } from "@/features/ask/ask-state.ts";
-import { ASK, CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
   addMember,
   anAddress,
-  askShowsTheServedAddress,
-  clockTheNextKey,
   inTwoWorkspaces,
   keepsItsWordOffThePage,
-  keyListed,
-  keystrokesDismissed,
-  keystrokesListed,
   landedAtHome,
   modelCallsIn,
   person,
@@ -21,22 +15,16 @@ import {
   railOf,
   releaseTheModel,
   saysARefusal,
-  saysSomethingNew,
   scriptAsking,
   seedConcepts,
-  seedConnectedSources,
   signIn,
   switched,
   tabUntilFocused,
-  theActionLandedWithinItsBudget,
   type AskingScript,
-  requestsSent,
 } from "../harness.ts";
-import { scrolledSideways, windowRefocused } from "../knowledge.ts";
+import { scrolledSideways } from "../knowledge.ts";
 
 const ANSWER_BUDGET_MS = 1000;
-
-const NEW_QUESTION = pageNamed(menuGroupIn(ASK, "ask"), "New Question");
 
 const QUESTIONS_ASKED = pageNamed(menuGroupIn(CONTROL_CENTRE, "questions"), "Questions Asked");
 
@@ -177,76 +165,6 @@ test.describe("Ask › New question", () => {
     await expect(questionBox(page), "focus left the question").toBeFocused();
   });
 
-  test("keeps the related knowledge one disclosure under the fit", async ({ page, request }) => {
-    await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
-    await asked(page);
-    const result = answered(page, "Answered");
-    const disclosure = result.getByRole("button", { name: "Related Knowledge" });
-    await expect(disclosure).toHaveAttribute("aria-expanded", "false");
-
-    await disclosure.click();
-
-    await expect(disclosure).toHaveAttribute("aria-expanded", "true");
-    await expect(result.getByRole("button", { name: SUPPLIER.title, exact: true })).toBeVisible();
-    await expect(result.getByText(SUPPLIER.body)).toHaveCount(0);
-    await expect(result.getByRole("button", { name: POLICY.title, exact: true })).toBeVisible();
-  });
-
-  test("says its phase within the action budget, before the verdict", async ({ page, request }) => {
-    const { workspaceId } = await aViewerAsking(page, request, {
-      judging: { fits: [USERS.title] },
-      holds: "judge",
-    });
-    await questionBox(page).fill(QUESTION);
-
-    await clockTheNextKey(page, { at: "//section[h2='New Question']//output", reads: "." });
-    await questionBox(page).press("Enter");
-    await theActionLandedWithinItsBudget(page, "ask");
-
-    await expect(said(page)).toHaveText(/\S/);
-    const whileReading = await said(page).innerText();
-    await expect.poll(async () => (await modelCallsIn(request, workspaceId)).judge).toBe(1);
-    await saysSomethingNew(said(page), whileReading);
-    await expect(answered(page, "Answered")).toHaveCount(0);
-    const whileJudging = await said(page).innerText();
-    await releaseTheModel(request, workspaceId);
-    await expect(answered(page, "Answered")).toBeVisible();
-    await expect(said(page), "the verdict was never said").not.toHaveText(whileJudging);
-  });
-
-  test("says Judged, listing each judged-no Answer to open", async ({ page, request }) => {
-    await aViewerAsking(page, request, { judging: { fits: [] } });
-
-    await asked(page);
-
-    const result = answered(page, "Related Knowledge");
-    await expect(result.getByText("Judged", { exact: true })).toBeVisible();
-    const audits = collectionIn(result, "audits");
-    for (const { title, body } of [USERS, SUPPLIER]) {
-      await expect(audits.getByRole("button", { name: title, exact: true })).toBeVisible();
-      await expect(audits.getByText(body)).toHaveCount(0);
-    }
-    await expect(answered(page, "Answered")).toHaveCount(0);
-  });
-
-  for (const [script, word] of [
-    [{}, "Not judged"],
-    [{ judging: "fails" }, "Judging failed"],
-  ] as const) {
-    test(`says ${word}, showing each Answer in full`, async ({ page, request }) => {
-      await aViewerAsking(page, request, script);
-
-      await asked(page);
-
-      const result = answered(page, "Related Knowledge");
-      await expect(result.getByText(word, { exact: true })).toBeVisible();
-      const audits = collectionIn(result, "audits");
-      await expect(audits.getByText(USERS.body)).toBeVisible();
-      await expect(audits.getByText(SUPPLIER.body)).toBeVisible();
-      await expect(answered(page, "Answered")).toHaveCount(0);
-    });
-  }
-
   test("shows the first drafted sentence before the stream ends", async ({ page, request }) => {
     const { workspaceId } = await aViewerAsking(page, request, {
       judging: { fits: [] },
@@ -269,29 +187,6 @@ test.describe("Ask › New question", () => {
     await releaseTheModel(request, workspaceId);
     await expect(askButton(page)).not.toHaveAttribute("aria-disabled", "true");
   });
-
-  for (const [how, script, calls] of [
-    ["fails", { judging: { fits: [] }, drafting: "fails" }, { judge: 1, draft: 1 }],
-    ["pauses", { drafting: DRAFTING, limitGbp: "0.001" }, { judge: 0, draft: 0 }],
-  ] as const) {
-    test(`keeps the evidence when drafting ${how}, saying so`, async ({ page, request }) => {
-      const { workspaceId } = await aViewerAsking(page, request, script);
-
-      await asked(page);
-
-      const audits = collectionIn(answered(page, "Related Knowledge"), "audits");
-      await expect(audits.getByRole("button", { name: POLICY.title, exact: true })).toBeVisible();
-      await expect(askButton(page)).not.toHaveAttribute("aria-disabled", "true");
-      expect(await modelCallsIn(request, workspaceId)).toEqual(calls);
-      await expect(audits.getByText(DRAFTED)).toHaveCount(0);
-      await expect(audits).toMatchAriaSnapshot(`
-        - region "audits":
-          - heading "audits" [level=3]
-          - paragraph
-          - list
-      `);
-    });
-  }
 
   test("flags one drafted sentence, storing it and its concept", async ({ page, request }) => {
     const { adminEmail } = await aWorkspaceToAsk(request, {
@@ -323,19 +218,6 @@ test.describe("Ask › New question", () => {
     await expect(record.getByRole("link", { name: POLICY.title })).not.toHaveCount(0);
   });
 
-  test("flags the answer with a reason, showing it was sent", async ({ page, request }) => {
-    await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
-    await asked(page);
-    const result = answered(page, "Answered");
-
-    const flagging = await flagSent(page, result);
-
-    await expect(flagging).toHaveCount(0);
-    await expect(result.getByRole("button", { name: "Flagged" })).toBeVisible();
-    await expect(result.getByRole("button", { name: "Flag This Answer" })).toHaveCount(0);
-    await expect(result.getByRole("status").last()).toHaveText(/\S/);
-  });
-
   test("reopens a refused flag with its draft and the refusal", async ({ page, request }) => {
     await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
     await asked(page);
@@ -351,91 +233,6 @@ test.describe("Ask › New question", () => {
     await expect(result.getByRole("button", { name: "Flagged" })).toHaveCount(0);
     await expect(flagging.getByRole("radio", { name: "Incomplete" })).toBeChecked();
     await expect(flagging.getByRole("textbox", { name: "Note" })).toHaveValue(NOTE);
-  });
-
-  test("asks for a reason before a flag is sent", async ({ page, request }) => {
-    await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
-    await asked(page);
-    const result = answered(page, "Answered");
-    const sent = requestsSent(page, (url) => url.pathname.includes("ask.giveFeedback"));
-
-    await result.getByRole("button", { name: "Flag This Answer" }).click();
-    const flagging = page.getByRole("dialog", { name: "Flag This Answer" });
-    await flagging.getByRole("button", { name: "Send Flag" }).click();
-
-    await saysARefusal(flagging.getByRole("alert"));
-    await expect(flagging.getByRole("radiogroup")).toHaveAttribute("aria-invalid", "true");
-    await flagging.getByRole("radio", { name: "Wrong" }).check();
-    await expect(flagging.getByRole("alert")).toHaveCount(0);
-    expect(
-      sent.map((each) => each.url()),
-      "a flag with no reason was sent",
-    ).toEqual([]);
-  });
-
-  test("shows an Answer in no collection under that word", async ({ page, request }) => {
-    await aViewerAsking(page, request, { judging: { fits: [UNFILED.title] } });
-
-    await asked(page);
-
-    const unfiled = collectionIn(answered(page, "Answered"), "No Collection");
-    await expect(unfiled.getByRole("heading", { level: 4, name: UNFILED.title })).toBeVisible();
-    await expect(unfiled.getByText(UNFILED.body)).toBeVisible();
-  });
-
-  test("leads an Editor from New question to the connect steps", async ({ page, request }) => {
-    const email = anAddress("editor");
-    const editor = await person(request, email, { displayName: "Ed Editor" });
-    const workspace = await provision(request, { name: "Ryedale Editors" });
-    await addMember(request, {
-      workspaceId: workspace.workspaceId,
-      userId: editor.id,
-      role: "Editor",
-    });
-    await page.goto("/sign-in");
-    await signIn(page, request, email);
-    await landedAtHome(page, "Editor");
-    await expect(page).toHaveURL(new RegExp(`${NEW_QUESTION.path}$`));
-
-    await page.getByRole("main").getByRole("link", { name: "connect Claude" }).click();
-
-    await expect(
-      page.getByRole("heading", { level: 2, name: "Connect Claude as Your Assistant" }),
-    ).toBeVisible();
-    await askShowsTheServedAddress(page);
-  });
-
-  test("says the one sentence and its unmapped passages, asking once", async ({
-    page,
-    request,
-  }) => {
-    const { workspaceId } = await aViewerAsking(page, request, {});
-    await seedConnectedSources(request, {
-      workspaceId,
-      connectedSources: [
-        {
-          name: "Loading drive",
-          sensitivity: "Internal",
-          published: true,
-          sync: "done",
-          documents: [
-            {
-              title: "Pallet loading notes",
-              passages: ["Pallet loads leave the warehouse on Fridays."],
-            },
-          ],
-        },
-      ],
-    });
-    const asks = asksCounted(page);
-
-    await asked(page, "When do pallet loads leave?");
-
-    const result = answered(page, "Not Answered");
-    await expect(result.getByRole("button", { name: "Pallet loading notes" })).toBeVisible();
-    await expect(said(page)).toHaveText(/\S/);
-    await windowRefocused(page);
-    expect(asks, "the question was asked again").toEqual(["POST"]);
   });
 
   test("says the spending limit in the refusal's sentence", async ({ page, request }) => {
@@ -487,85 +284,6 @@ test.describe("Ask › New question", () => {
     expect(await modelCallsIn(request, workspaceId)).toEqual({ judge: 1, draft: 0 });
   });
 
-  test("asks nothing again when the window is refocused", async ({ page, request }) => {
-    const { workspaceId } = await aViewerAsking(page, request, {
-      judging: { fits: [USERS.title] },
-    });
-    const asks = asksCounted(page);
-    await asked(page);
-    await expect(answered(page, "Answered")).toBeVisible();
-
-    await windowRefocused(page);
-
-    expect(asks, "the question was asked again").toEqual(["POST"]);
-    expect(await modelCallsIn(request, workspaceId)).toEqual({ judge: 1, draft: 0 });
-  });
-
-  test("offers only the collections the reader can read", async ({ page, request }) => {
-    const asking = await aWorkspaceToAsk(request, {});
-    const insider = await person(request, anAddress("insider"), { displayName: "Ines Insider" });
-    await addMember(request, {
-      workspaceId: asking.workspaceId,
-      userId: insider.id,
-      role: "Viewer",
-    });
-    await seedConcepts(request, {
-      workspaceId: asking.workspaceId,
-      userId: asking.adminId,
-      concepts: [
-        {
-          title: "How do buyers access audit information in the acquisition plans?",
-          collection: "secret-plans",
-          kind: "Answer",
-          body: "Only the insiders read the acquisition plans.",
-          audience: "groups",
-          groupMemberIds: [insider.id],
-        },
-      ],
-    });
-    await signedInAsTheViewer(page, request, asking);
-
-    await asked(page);
-    await expect(answered(page, "Related Knowledge")).toBeVisible();
-
-    const collections = newQuestion(page).getByRole("group", { name: "Collections" });
-    await expect(collections.getByRole("checkbox")).toHaveCount(1);
-    await expect(collections.getByRole("checkbox", { name: "audits" })).toBeVisible();
-  });
-
-  test("asks within the collection the reader ticked", async ({ page, request }) => {
-    const asking = await aWorkspaceToAsk(request, {});
-    await seedConcepts(request, {
-      workspaceId: asking.workspaceId,
-      userId: asking.adminId,
-      concepts: [
-        {
-          title: "How do buyers access audit information in the LMS?",
-          collection: "lms",
-          kind: "Policy",
-          body: "The LMS exports its audit trail to buyers.",
-        },
-      ],
-    });
-    await signedInAsTheViewer(page, request, asking);
-    await asked(page);
-    const result = answered(page, "Related Knowledge");
-    await expect(collectionIn(result, "lms")).toBeVisible();
-
-    await newQuestion(page)
-      .getByRole("group", { name: "Collections" })
-      .getByRole("checkbox", { name: "audits" })
-      .check();
-    const sent = page.waitForRequest((each) => each.url().includes("ask.question"));
-    await askButton(page).click();
-
-    expect((await sent).postData(), "the ask named no collection").toContain(
-      '"collections":["audits"]',
-    );
-    await expect(collectionIn(result, "audits")).toBeVisible();
-    await expect(collectionIn(result, "lms")).toHaveCount(0);
-  });
-
   test("asks nothing for a blank question, saying so", async ({ page, request }) => {
     await aViewerAsking(page, request, {});
     const asks = asksCounted(page);
@@ -596,29 +314,6 @@ test.describe("Ask › New question", () => {
 
     await expect(questionBox(page)).toHaveValue("");
     await expect(answered(page, "Not Answered")).toHaveCount(0);
-  });
-
-  test("lists its keystrokes, each acting on the answer", async ({ page, request }) => {
-    await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
-
-    const listed = await keystrokesListed(page, "New Question");
-    for (const { key } of Object.values(KEY)) {
-      await expect(keyListed(listed, key), `the list holds no ${key}`).toBeVisible();
-    }
-    await keystrokesDismissed(page, listed);
-
-    await page.keyboard.press(KEY.question.key);
-    await expect(questionBox(page)).toBeFocused();
-    await asked(page);
-    const result = answered(page, "Answered");
-    await expect(result).toBeVisible();
-    await result.getByRole("heading", { level: 2 }).click();
-
-    await page.keyboard.press(KEY.helpful.key);
-    await expect(result.getByRole("button", { name: "Marked Helpful" })).toBeVisible();
-    await expect(result.getByRole("status").filter({ hasText: /\S/ })).toHaveCount(1);
-    await page.keyboard.press(KEY.flag.key);
-    await expect(page.getByRole("dialog", { name: "Flag This Answer" })).toBeVisible();
   });
 
   test("opens related knowledge beside the answer, tabbing back out", async ({
@@ -658,40 +353,5 @@ test.describe("Ask › New question", () => {
     await page.keyboard.press("Escape");
     await expect(inline).toHaveCount(0);
     await expect(footnote).toBeFocused();
-  });
-
-  test("draws the answer at 320 px with nothing sideways", async ({ page, request }) => {
-    await page.setViewportSize({ width: 320, height: 720 });
-    await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
-
-    await asked(page);
-
-    const result = answered(page, "Answered");
-    await expect(result.getByText(USERS.body)).toBeVisible();
-    expect(await scrolledSideways(page), "the page scrolls sideways at 320 px").toBe(0);
-    await expect(page.getByRole("main")).toMatchAriaSnapshot(`
-      - main "Page":
-        - heading "Ask" [level=1]
-        - paragraph:
-          - link "connect Claude"
-        - region "New Question":
-          - heading "New Question" [level=2]
-          - textbox "Question"
-          - group "Collections":
-            - checkbox "audits"
-          - button "Ask"
-          - status
-        - region "Answered":
-          - heading "Answered" [level=2]
-          - paragraph
-          - region "audits":
-            - heading "audits" [level=3]
-            - article:
-              - heading ${JSON.stringify(USERS.title)} [level=4]
-              - paragraph
-              - button ${JSON.stringify(`Flag “${USERS.title}”`)}
-          - button "Mark as Helpful"
-          - button "Flag This Answer"
-    `);
   });
 });

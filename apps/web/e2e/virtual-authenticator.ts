@@ -27,8 +27,3 @@ export const aVirtualAuthenticator = async (page: Page) => {
       cdp.send("WebAuthn.setAutomaticPresenceSimulation", { authenticatorId, enabled: true }),
   };
 };
-
-export const withoutWebAuthn = (page: Page) =>
-  page.addInitScript(() => {
-    Object.defineProperty(window, "PublicKeyCredential", { value: undefined });
-  });

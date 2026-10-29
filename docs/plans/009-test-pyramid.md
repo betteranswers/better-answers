@@ -67,7 +67,7 @@ Plan 008 owns the folder restructure and is moving files under `packages/*` and 
   - [ ] BA-269, BA-270 and BA-275 touch `packages/core/` and, for BA-269, `.github/workflows/`. BA-270 also touches the worker's entry module and one api test. BA-275 also touches `apps/api/src/ops/concepts.ts` and `apps/api/tests/ops/concepts.test.ts`.
   - [ ] BA-269, BA-271 and BA-278 each add one row to `PINS` in `packages/devtools/src/scans/test-folders.ts`. The later of two open PRs rebases over the earlier one's row.
   - [ ] BA-271 is the only PR that edits `.github/workflows/check.yml` before BA-278, and the only one that edits `.github/workflows/build.yml`.
-  - [ ] BA-272, BA-277 and BA-278 touch only `apps/web/`, `apps/api/tests/` for moved harness cases, `apps/web/.claude/skills/playwright-specs/` and, for BA-278, `.github/workflows/check.yml` and `PINS`.
+  - [ ] BA-272, BA-277 and BA-278 touch only `apps/web/`, `apps/api/tests/` for moved harness cases, `apps/web/.claude/skills/playwright-specs/` and, for BA-278, `.github/workflows/check.yml`, `PINS`, `docs/operations/CI.md`, `docs/plans/009-test-pyramid/` and the `docs/solutions/` line a deletion makes false.
 - [ ] Hold the review gate. No PR changes an interaction, so none waits for the operator's review.
 
 ### PR mechanics, for every PR
@@ -289,9 +289,9 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
   - [ ] Drive builds state only through the harness's actions over HTTP. It signs in through the product's own sign-in page with the code read back from the captured email transport, and it locates by role and accessible name.
   - [ ] Two drives run side by side on two ports, since each provisions its own workspace and mints its own addresses.
   - [ ] Cleanup stops what the drive started, by process id, and leaves the evidence where the skill names it.
-- [ ] Write a feature file for each area of `apps/web/src/shared/navigation.ts` that names every page in that area, and one for the pages outside the shell, such as sign-in and consent. The generator seeds three to five features. This repository asks for every page, because the plan's lanes drive pages the first five would miss.
+- [ ] Write a feature file for each area of `apps/web/src/shared/navigation/areas.ts` that names every page in that area, and one for the pages outside the shell, such as sign-in and consent. The generator seeds three to five features. This repository asks for every page, because the plan's lanes drive pages the first five would miss.
 - [ ] Move browser-suite's text without rewording it, split by job. The verify skill holds the seam, the launch and the seeding facts, which a drive needs. `apps/web/.claude/skills/playwright-specs/` holds the rules for writing and running a spec. `/maintain-verification-skill` edits only the verify skill's directory, so a spec rule kept there would be rewritten by a pass that never reads a spec.
-- [ ] Write `web-skills.test.ts` to keep the old test's four claims, read over both skills. Every `apps/` path the skills name exists. They name the suite's own modules. They name every helper two or more specs share. They give table rows only to helpers the suite still exports. Add two claims. Every page in `apps/web/src/shared/navigation.ts` appears in a file under `.claude/skills/verify/features/`. The verify skill's frontmatter says `name: verify` and has no `disable-model-invocation`.
+- [ ] Write `web-skills.test.ts` to keep the old test's four claims, read over both skills. Every `apps/` path the skills name exists. They name the suite's own modules. They name every helper two or more specs share. They give table rows only to helpers the suite still exports. Add two claims. Every page in `apps/web/src/shared/navigation/areas.ts` appears in a file under `.claude/skills/verify/features/`. The verify skill's frontmatter says `name: verify` and has no `disable-model-invocation`.
 - [ ] Edit `.agents/playbooks/verification.md`. Delete "This repository has no `verify` skill. Its matching surface is `.claude/skills/browser-suite/SKILL.md`." In the "Reproduce it yourself" change, delete "the driver skill is `browser-suite`" and keep BA-268's lowest-layer rule, because poteto-mode finds `.claude/skills/verify/` without help. In the "Verify on the matching surface." change, add that a change to a page is also driven live through that page's feature file, and that a change to what a page shows updates its feature file in the same PR.
 - [ ] Edit `.agents/playbooks/plan.md`. Delete the change that names `browser-suite` as the web's driver skill, because the bundled step finds `.claude/skills/verify/` without it.
 - [ ] Decide whether `/create-formal-verification-skill` earns a place now. The decision, made on 28/10/2026, is no, and this PR generates no formal skill. Confirm each fact below at the PR's base, and reopen the decision if one no longer holds.
@@ -532,7 +532,7 @@ Changed 29/10/2026. The triage's 70 duplicates were estimates from titles and a 
 **Build.**
 
 - [ ] Delete each of the 11 cases the PR body names. Before deleting, run the named twin and record it in the PR body as `deleted case -> twin`.
-- [ ] Move accessibility-gate to the new project. It needs Chromium for axe and the built pages, and nothing else. The spec stays at `apps/web/e2e/accessibility-gate.spec.ts`, since the project selects it by file and the gate never reads a root file. BA-278 may move it into `e2e/layout/` if its layout project also needs no api.
+- [ ] Move accessibility-gate to the new project. It needs Chromium for axe and the built pages, and nothing else. The spec stays at `apps/web/e2e/accessibility-gate.spec.ts`, since the project selects it by file and the gate never reads a root file. BA-278 leaves it there, since it drops the layout project.
 
 **You see.**
 
@@ -876,60 +876,76 @@ Measured 29/10/2026. Five exclusive interleaved rounds per side. The five specs'
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
 - [ ] The coordinator lands it with `gh pr merge <n> --squash --match-head-commit <sha>`.
 
-## Cut the browser suite to one spec per page plus the cross-page journeys, on one shard (BA-278)
+## Cut the browser suite to the cases a pre-v0.1 product needs, one case per page, on the shard count its wall decides (BA-278)
 
 **Depends on.** BA-277.
 
-Changed 28/10/2026. BA-269's shard-balance lane moved here, into lane 8, because the `full-core` shards were 1.84 to 1 in Appendix E's file times at trunk `12026abc3`, before BA-269 moved a file, and BA-278 is the PR that edits `check.yml`. BA-270 has since balanced them, and `main`'s `build` at `d672b7313` ran them in 186 and 187 s. Lane 8 holds that balance through this PR's own `check.yml` edit.
+Changed 29/10/2026. The owner's direction for BA-278 was "right-size the scope to the project; we're not yet at v0.1, and plan 009 fixes earlier repo rules that led to overkill in what and how we tested." The section's first text kept about 45 browser tests by moving every single-screen claim to a lower layer and giving each deleted case a twin that took its claim. That rule was itself the overkill. At `024336ba6`, after BA-277, the suite held 575 browser cases and the three shards ran 400 to 480 s each.
+
+**The rule.** A browser case keeps a holder only when its claim is HOLD. HOLD is access and sensitivity, sign-in, session and second factor, erasure and consent, irreversible or data-losing actions, refusals a user must act on, a page's budget, accessibility gate and keyboard reach, and a regression from a past bug. Everything else is DROP, which is copy variants, permutations, repeated refusals and focus minutiae. A dropped case is listed with its reason and gets no twin. A HOLD claim has a holder. It is an existing lower test (`held:`), a new one (`new:`), or the browser case that stays (`stays`).
+
+**The page rule.** Each page keeps one browser case that asserts its load budget, the accessibility gate and keyboard reach together. A page keeps a second case only where a fix commit or a `docs/solutions/` doc names a distinct claim. The 320 px reflow case is a second case under the same test.
+
+**The count.** An opus scope agent read all 575 cases and classified each into `docs/plans/009-test-pyramid/ba-278-cases.tsv`, with the columns `spec title class claim holder keep reason pr`. A case is matched by spec and title, never by line. Of the 575, 293 are DROP and 115 are HOLD rows that an existing test already holds. 66 rows need a new lower test, which is 61 in Testing Library, 4 in the api and 1 in core. 101 browser cases stay, which is 31 page cases, 33 second cases, 18 journey cases and the 19 `gate` self-tests. All 12 Appendix F journeys keep a case. Of the 31 page cases, 6 already assert all three facets and 25 need one or two added, which edits an existing case and adds no new test. The scope agent checked all 66 `regression: fix <sha>` reasons against the fix commits, and none failed.
+
+**Layout.** There is no `e2e/layout/` and no layout project. Only 2 of 12 layout cases reach their state without the api, and nothing can stub the api inside a real browser. The 320 px reflow cases are second cases under their pages, or DROP. The `gate` project stays as it is.
+
+**Five PRs.** Each is verifiable alone, and the `pr` column of the cases file assigns every row.
+
+1. Delete the cases that earn no browser test, 355 rows by script, and rewrite this section.
+2. New lower tests for auth, knowledge, ask and sources, 31 rows. They are 27 in Testing Library, 3 in the api and 1 in core. Each deletes the browser case it replaces.
+3. New lower tests for people, the app shell and admin, 35 rows. They are 34 in Testing Library and 1 in the api. Two of the rows share one new case.
+4. Reshape. Fold each page's staying cases into its one page case with the 25 facet edits, keep the second cases, move the journeys to `e2e/journeys/`, and delete the cases the fold leaves and the 12 that PR 1 left in a shared loop.
+5. `check.yml` last, with the shard count the measured wall decides.
+
+PR 1 deletes 355 of the 367 rows its classification first named. Twelve rows sit in a loop or a table that also drives a kept case (`home.spec.ts`, `jump-to.spec.ts`, `sign-in.spec.ts`, `frame.spec.ts`, `focus-ring.spec.ts`, `concept-page.spec.ts` and `knowledge-search.spec.ts`), and a loop's data is not a case, so the script leaves each whole. The cases file moves those 12 rows to PR 4, which edits the loop data.
+
+**Wall.** On CI, the test phase of each shard equals the summed per-test seconds divided by three workers. The 101 staying cases sum to 463 CI seconds, which is 154 s of testing on one job. With the 25 facet edits at a guessed 1 s each, the fixed costs of 61 to 85 s and the last worker's tail of up to 13 s, one job takes 225 to 265 s, centrally about 235 s. Two shards take about 145 to 180 s each. The central estimate sits only about 5 to 10 s under the 240 s line, and the range crosses it. Restoring Playwright's browser from a cache would buy about 15 to 30 s (inferred, not measured), and merging the multi-case journeys about 10 s. PR 5 decides from the median of three CI attempts of the one-job wall. One shard stays when that median is at or under 240 s, and two shards otherwise.
+
+**`full-core` balance.** The 40% box stays with the PR that edits `check.yml`. BA-269's shard-balance lane moved here on 28/10/2026, and BA-270 has since balanced the shards, which `main`'s `build` at `d672b7313` ran in 186 and 187 s. Across eight recent `main` builds the slower core shard ran 1.05 to 1.53 times the faster, and 2 of 8 exceeded 1.40, so `main` already fails the box some of the time. The PR re-balances the shards before it asserts the box.
 
 **Files.**
 
-- [ ] Edit the remaining specs under `apps/web/e2e/`.
-- [ ] Create `apps/web/e2e/journeys/`, one spec per cross-page journey, named for the journey, such as `sign-in-to-shell.spec.ts` and `invite-then-accept.spec.ts`.
-- [ ] Create `apps/web/e2e/layout/` for the 320 and 390px layout cases.
-- [ ] Add two rows to `PINS` in `packages/devtools/src/scans/test-folders.ts`. They are `{ folder: "apps/web/e2e/journeys", kind: "mirror", reason: "docs/specs/route" }`, because a journey's subject is the route and not one feature, and `{ folder: "apps/web/e2e/layout", kind: "run", reason: "the Playwright layout project selects it" }`.
-- [ ] Edit `apps/web/playwright.config.ts` to add a layout project that needs no api, with a `testMatch` that selects `e2e/layout/`.
-- [ ] Edit `apps/web/test/gates/playwright-config.test.ts` to pin the api project's and the layout project's `testMatch`.
-- [ ] Edit `.github/workflows/check.yml`, the `full-web-browser` shard matrix and the `full-core` shards.
-- [ ] Edit `apps/web/.claude/skills/playwright-specs/` and `docs/specs/route/seams.md` if a named spec moves.
+- [ ] PR 1. Create `docs/plans/009-test-pyramid/ba-278-cases.tsv` and `docs/plans/009-test-pyramid/after-table.mjs`. Edit this section and Appendix E's after-table. Delete 355 cases from 45 spec files under `apps/web/e2e/` by script, two of them whole, `knowledge/concept-body-links.spec.ts` and `shared/blueprint-parts.spec.ts`. Delete the e2e helpers and fixtures that only those cases used, as knip finds them, and correct the playwright-specs skill and the `docs/solutions/` line the deletions made false.
+- [ ] PR 2. Add 27 Testing Library tests, 3 api tests and 1 core test, and delete the browser case each replaces, for the `2-new` rows of `ba-278-cases.tsv`.
+- [ ] PR 3. Add 34 Testing Library tests and 1 api test, and delete the browser case each replaces, for the `3-new` rows.
+- [ ] PR 4. Edit the remaining specs under `apps/web/e2e/`. Create `apps/web/e2e/journeys/`, one spec per cross-page journey, named for the journey, such as `sign-in-to-shell.spec.ts` and `invite-then-accept.spec.ts`. Add one row to `PINS` in `packages/devtools/src/scans/test-folders.ts`, `{ folder: "apps/web/e2e/journeys", kind: "mirror", reason: "docs/specs/route" }`, because a journey's subject is the route and not one feature and the gate refuses a folder it has no row for.
+- [ ] PR 5. Edit `.github/workflows/check.yml`, the `full-web-browser` shard matrix and the `full-core` shards. Edit `docs/operations/CI.md`, whose `full-web-browser` entry names three shards, `apps/web/.claude/skills/playwright-specs/` and `docs/specs/route/seams.md` where a named spec moved or a count changed.
 
 **Build.**
 
-- [ ] Move the remaining COMPONENT cases to Testing Library.
-- [ ] Keep one spec per page, about 30, at `e2e/<feature>/<page>.spec.ts`, each asserting its latency budget, the accessibility gate and keyboard reach.
-- [ ] Keep about 12 journeys that cross pages through the real api, the ones Appendix F lists, in `e2e/journeys/`.
-- [ ] Move the 320 and 390px layout cases to `e2e/layout/`, run by the layout project and served by `vite preview` over the stubbed api. Move accessibility-gate in beside them if that project also needs no api.
-- [ ] Move spec files with `node scripts/move-files.mjs`, and paste the `scripts/test-inventory.sh` diff for `apps/web/e2e` in the PR body.
-- [ ] Run one shard. Keep three workers.
-- [ ] Balance the two `full-core` shards, so that neither job's wall exceeds the other's by more than 40%.
+- [ ] PR 1. Write `delete-cases.mjs` under `/tmp/BA-278-1/` and run it. It matches cases by spec and title through `playwright test --list --reporter=json`, deletes only `1-delete` rows, and leaves a loop whole when any of its expansions is kept. Prune the imports, constants and helpers the deletion leaves unused. Run the `scripts/test-inventory.sh` diff at trunk and head, and paste it in the PR body. The removed Playwright lines are exactly the 355 titles, and no other suite's inventory changes.
+- [ ] PR 2 and PR 3. Write each new test at the lowest layer that sees its claim, per the `holder` column. Break the code the claim guards and see the new test fail. Delete the browser case in the same PR, so no claim lapses between PRs.
+- [ ] PR 4. Give each of the 31 page cases its missing facets, and fold the 41 folded cases and the 12 shared-loop cases into them or delete them as the `reason` column says. Add the three optional detail-page cases, a record, a member and a suggestion, only if the measured wall leaves room. Move spec files with `node scripts/move-files.mjs`, and paste the `scripts/test-inventory.sh` diff for `apps/web/e2e` in the PR body.
+- [ ] PR 5. Measure the one-job wall at three CI attempts and set the shard count by the rule. If the one-job median is over 240 s, try the browser cache first, then merging the five multi-case journeys, before a second shard. Balance the two `full-core` shards, so that neither job's wall exceeds the other's by more than 40%.
 
 **You see.**
 
-- [ ] `pnpm check:web:e2e --list` shows about 45 tests in the api project plus the layout project, and `check.yml` has no shard matrix.
+- [ ] `pnpm check:web:e2e --list` shows about 101 tests, 104 with the three optional detail-page cases, and `check.yml` has one `full-web-browser` job when the one-job median is at or under 240 s and two shards otherwise.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] The config test pins the new projects. Run `pnpm check:web:unit`.
+- [ ] Run `pnpm check:web:unit` and `pnpm check:gates`. For PR 5, the config test pins the api project's and the `gate` project's `testMatch`.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on the configured `swarm workers` model at the PR head, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run the browser suite at trunk and head. Save `browser-trunk-head.log` and `home.png`. Pass when both pass.
-- [ ] Lane 2. List every page in `apps/web/src/shared/navigation.ts` and its spec. Save `pages.md`. Pass when every page has a spec with a budget and a gate.
+- [ ] Lane 2. List every page in `apps/web/src/shared/navigation/areas.ts` and its page case. Save `pages.md`. Pass when every page has a case with a budget, a gate and keyboard reach.
 - [ ] Lane 3. Run each journey alone. Save `journeys.log`. Pass when each passes.
-- [ ] Lane 4. Run the layout project with no api. Save `layout.log` and `narrow.png`. Pass when it passes.
-- [ ] Lane 5. Slow one page's procedure past its budget in a scratch edit. Save `budget-breaks.log`. Pass when that page's spec fails.
+- [ ] Lane 4. Run the `gate` project alone with `E2E_GATE_ALONE=1` and no api. Save `gate-alone.log` and `narrow.png`. Pass when its 19 self-tests pass.
+- [ ] Lane 5. Slow one page's procedure past its budget in a scratch edit. Save `budget-breaks.log`. Pass when that page's case fails.
 - [ ] Lane 6. Add a contrast fault to one page in a scratch edit. Save `gate-breaks.log`. Pass when the gate fails.
 - [ ] Lane 7. Run `pnpm lint:workflows`. Save `workflows.log`. Pass when it passes.
-- [ ] Lane 8. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Save `ci-run.json`. Pass when `full-web-browser` runs as one job and is green, and neither `full-core` shard's job wall exceeds the other's by more than 40%.
+- [ ] Lane 8. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Save `ci-run.json`. Pass when `full-web-browser` runs at the shard count the rule names and is green, and, for PR 5, neither `full-core` shard's job wall exceeds the other's by more than 40%.
 - [ ] Lane 9. Run `pnpm check:docs`. Save `docs.log`. Pass when it passes.
-- [ ] Lane 10. Audit that each deleted or moved case is named with the test that keeps its claim. Save `audit.md`. Pass when none is unaccounted for.
+- [ ] Lane 10. Audit that every deleted case is DROP with its reason in `ba-278-cases.tsv`, or is held by a named test that makes its claim. Save `audit.md`. Pass when none is unaccounted for.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Job wall seconds of `full-web-browser`, the slowest shard at trunk and the single job at head.
-- [ ] Probe. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Rerun it with `gh run rerun <id>` until it has three full-lane attempts, each after the last has finished, and read each with `gh run view <id> --attempt <n> --json jobs`. After merge, read the first five `main` `build` runs whose `check` took the full lane.
+- [ ] Metric. Job wall seconds of `full-web-browser`, the slowest shard at trunk and the slowest job at head.
+- [ ] Probe. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Rerun it with `gh run rerun <id>` until it has three full-lane attempts, each after the last has finished, and read each with `gh run view <id> --attempt <n> --json jobs`. After merge, read the first five `main` `build` runs whose `check` took the full lane. PR 1 records the summed CI seconds of its deleted cases from `cases-all.tsv`, the suite wall at trunk and at head with three workers, and its own `full-web-browser` shard walls, with no rule.
 - [ ] Baseline. Record first the slowest shard's median over the five latest full-lane `build` runs on `main`. Over the eleven runs in Appendix E it was 474s, and shard 3 ranged from 332 to 805s.
-- [ ] Rule. Fails if the head's `full-web-browser` median over three attempts exceeds 240s.
+- [ ] Rule. Fails if the head's slowest `full-web-browser` job exceeds 240s at the median of three attempts, at the shard count the PR sets. PR 5 sets one shard when the one-job median is at or under 240s, and two otherwise.
 
 **Review gate.** None. BA-278 is not review-gated.
 
@@ -969,7 +985,7 @@ Changed 28/10/2026. BA-269's shard-balance lane moved here, into lane 8, because
 - **PGlite for repository tests.** Slower per file than the container clone, unable to contend a lock, and silent about a lost role over a pool. See Appendix A.
 - **In-memory store doors behind ports.** The doors are concrete today (`ObjectDoor` holds an S3 client, `GitDoor` a root). A fake Postgres door cannot reproduce RLS, recursive walks or locks, and slices write SQL inline in 93 of 165 source files. A port with one real adapter breaks `deepening.md`, and the triage found no slow test whose cost was the object store. ADR 0029 stays as it is.
 - **Moving every suite to a nightly run.** It would make CI fast by not testing. The owner asked for the tests to sit at the right layer, not to run less often.
-- **Sharding wider.** More shards cut wall but pay boot and install per shard, and leave runner-seconds as they are. BA-278 goes the other way, to one shard.
+- **Sharding wider.** More shards cut wall but pay boot and install per shard, and leave runner-seconds as they are. BA-278 goes the other way, to one shard when the measured wall is at or under 240s and two otherwise.
 - **Deleting the budget readings.** BA-128 and BA-228 show the owner reads these figures. They move to a schedule instead.
 - **A module-mocking layer for unit tests.** The `anti-slop/no-module-mocking` lint and the worker's conftest guard ban it. Pure functions and the existing injected seams carry the unit layer.
 
@@ -978,9 +994,9 @@ Changed 28/10/2026. BA-269's shard-balance lane moved here, into lane 8, because
 - **Plan 008 collides with every PR but BA-268.** It moves `packages/core/test` (BA-259), splits core's postgres store (BA-261), moves and splits the api's tests (BA-264, BA-265), moves the worker's tests (BA-262, BA-263) and the web's (BA-266). Each PR starts after the matching 008 PR merges. The owner watches the 008 ledger before spawning.
 - **A budget regression lands before the nightly run sees it** (BA-269). The scheduled run opens an issue. An owner who touches a budgeted path dispatches `budgets.yml` on the branch.
 - **The worker's tick mode reaches production** (BA-270). The audit lane checks the daemon's path is unchanged.
-- **A deleted browser case was the only guard** (BA-272, BA-277, BA-278). Each deletion names its twin, and lane 2 breaks the behaviour to prove the twin fails.
+- **A deleted browser case was the only guard** (BA-272, BA-277, BA-278). Each deletion in BA-272 and BA-277 names its twin, and lane 2 breaks the behaviour to prove the twin fails. BA-278 deletes by the HOLD and DROP rule instead. A DROP case is the one guard of a claim the owner ruled not worth a test before v0.1, and `ba-278-cases.tsv` lists it with its reason, which lane 10 audits.
 - **The suites run twice per change.** Since PR #917, `check.yml` runs the full suites on every pull request. `build.yml` runs them again on every push to `main`. A change costs about twice the per-run runner-seconds, about 5,400 today on Appendix E's basis, and more when a push cancels a PR run or a perf probe reruns one. The runner-seconds target stays per run, so the per-change target is about 3,200. A new push cancels the PR's run in progress, so only the final head's run is whole, and Appendix E's after-table takes `main`'s `build` runs as its source.
-- **The verify skill drifts from the pages** (BA-288). `web-skills.test.ts` fails when a page in `navigation.ts` has no feature file, and `/maintain-verification-skill` corrects drift the test cannot see.
+- **The verify skill drifts from the pages** (BA-288). `web-skills.test.ts` fails when a page in `navigation/areas.ts` has no feature file, and `/maintain-verification-skill` corrects drift the test cannot see.
 - **`insert-scan`'s factory list moves in plan 008.** A PR that adds a seeding helper adds it to that list in the tree it starts from.
 
 ## Appendix D. Links and reading list
@@ -1082,11 +1098,31 @@ The table places each file in one column. Seven more files in the worker-process
 
 The triage's named pairs include people's "refuses demoting both Admins" against the api's members-procedures case, people-invitations' "sends 50 at once, holding a 51st" against members-invitations, and workspace-switcher's "drops the left workspace's name when the member read fails" against the web's member-change test. BA-272 keeps all three, since each case asserts more than its twin. BA-277 then moves the second, since a page test of the Invitations tab now makes its two focus landings and its second send.
 
-**After-table.** Each merged PR adds a row with the five `main` `build` runs that follow it.
+**After-table.** Each merged PR adds a row with the five `main` `build` runs that follow it. `node docs/plans/009-test-pyramid/after-table.mjs` reads them with `gh` and prints one row per PR in merge order. A run counts when it succeeded and every `check / full-*` job ran, so a docs-lane build is left out. A job's wall is its completion less its start, the critical path is the job with the greatest median over the runs, and the runner-seconds are the sum of every such job's median. A row with fewer than five runs names its count in Runs, and a rerun grows it to five as `main` builds. The rows from BA-271 on include `full-images`, the job that PR split out of the api and worker jobs, so its seconds count against the jobs it relieved. The trunk row is merge-queue history, and the script reads push builds only. The in-process share needs a checkout at each merge, so the rows leave it empty and the close step fills the last row with `classify.mjs`.
 
 | After | Runs | Critical-path job and wall | Runner-seconds, sum of suite-job medians | In-process file share |
 | --- | --- | --- | --- | --- |
 | trunk, `f59a9da35` | 11 | full-web-browser shard 3, 474s | 2,721 | 45% |
+| BA-289 (#931), `6b0df30f6` | 5 | full-web-browser (3), 462s | 2,603 | - |
+| BA-268 (#932), `fc11cb382` | 5 | full-web-browser (3), 462s | 2,603 | - |
+| BA-285 (#933), `b0012489e` | 5 | full-web-browser (3), 462s | 2,603 | - |
+| BA-295 (#936), `be21e5378` | 5 | full-web-browser (3), 462s | 2,708 | - |
+| BA-290 (#937), `c5dd9b02f` | 5 | full-web-browser (2), 423s | 2,747 | - |
+| BA-287 (#934), `df1fb796c` | 5 | full-web-browser (2), 470s | 2,771 | - |
+| BA-296 (#938), `12026abc3` | 5 | full-web-browser (2), 470s | 2,805 | - |
+| BA-293 (#940), `d63175a71` | 5 | full-web-browser (2), 463s | 2,696 | - |
+| BA-271 (#941), `d943d73e0` | 5 | full-web-browser (2), 463s | 2,595 | - |
+| BA-270 (#935), `d672b7313` | 5 | full-web-browser (3), 469s | 2,576 | - |
+| BA-276 (#945), `3f8e9f84f` | 5 | full-web-browser (3), 469s | 2,546 | - |
+| BA-273 (#944), `fdad41fe8` | 5 | full-web-browser (3), 469s | 2,576 | - |
+| BA-269 (#939), `25f3d2d1a` | 5 | full-web-browser (3), 469s | 2,472 | - |
+| BA-291 (#946), `c12e78fef` | 5 | full-web-browser (2), 470s | 2,560 | - |
+| BA-288 (#942), `1dc783a94` | 5 | full-web-browser (2), 455s | 2,507 | - |
+| BA-272 (#948), `61eb0a2fb` | 5 | full-web-browser (2), 430s | 2,436 | - |
+| BA-274 (#949), `ad47d9d64` | 4 | full-web-browser (2), 443s | 2,390 | - |
+| BA-275 (#947), `ff786ccb6` | 3 | full-web-browser (2), 430s | 2,446 | - |
+| BA-286 (#951), `6803b6b51` | 2 | full-web-browser (1), 400s | 2,414 | - |
+| BA-277 (#950), `024336ba6` | 1 | full-web-browser (1), 366s | 2,333 | - |
 
 **Targets.** The critical path falls to 240s or less, set by BA-278's rule. Runner-seconds per run fall to 1,600 or less, as the sum of the suite-job medians like the 2,721 above. On the all-jobs basis of the 2,815 median run, that is about 1,650. A change runs the suites twice, on its pull request and on `main`, so per change the target is about 3,200. The in-process share of test files rises to 65% or more. These targets are estimates from the file times above. Each PR's perf rule checks its own share.
 
@@ -1097,7 +1133,7 @@ The triage's named pairs include people's "refuses demoting both Admins" against
 1. **Unit, in-process.** No store, no process, no network. A pure function's test imports its module by path and calls it. In `packages/core` a test reaches the one `src/` directory its folder mirrors that way, and every other directory through an entry the package's `exports` map names. Web components run through Testing Library over the stubbed api. Lint rules run through their finding functions. This is most of the suite.
 2. **Integration, real store.** The real Postgres, git repository, object store or map, used only where the store is the claim. That covers row-level security and zero-rows, migrations and DDL (ADR 0007), the SQL a slice runs for visibility, walks and sensitivity folds (ADRs 0023, 0032, 0044), ranking, locks and races, governed git commits and history rewrites (ADRs 0012, 0024), the erasure rehearsal, boundary-schema parity (ADR 0028) and the tier contract's SQL agreements (ADR 0031). Each transport keeps one case per route or command through its real entry.
 3. **Process and image.** Images, compose scripts, process lifecycles and the cross-tier worker. These run in their own CI job (BA-271) or with one worker per file (BA-270). The image and process tests sit in the `images/` run folder of their tree.
-4. **Browser.** One spec per page, about 30, with its latency budget, the accessibility gate and keyboard reach. About 12 journeys cross pages through the real api. They are code sign-in to the picker to the shell, two-workspace scoping, invite then accept, consent and OAuth, passkey enrol and sign-in, workspace switch, self-removal to the chooser, source upload to indexed and published, ask with its stream and a flag, console end-sessions, the second factor, and recovery. Layout at 320 and 390px runs in a project with no api.
+4. **Browser.** One case per page, 31 of them, with its latency budget, the accessibility gate and keyboard reach, and a second case only where a fix or a solution names a distinct claim. 18 journey cases cross pages through the real api, over twelve journeys. The journeys are code sign-in to the picker to the shell, two-workspace scoping, invite then accept, consent and OAuth, passkey enrol and sign-in, workspace switch, self-removal to the chooser, source upload to indexed and published, ask with its stream and a flag, console end-sessions, the second factor, and recovery.
 5. **Readings and budgets.** Figures and performance budgets run on a schedule (BA-269), like the readings and mutation runs today. They sit in the `readings/` and `budgets/` run folders of `packages/core/test`.
 
 **Seams.** Every seam is a pure function or an injected seam that exists already. No store door becomes a port.

@@ -10,16 +10,13 @@ import {
   inTwoWorkspaces,
   landedAtHome,
   markTheOperator,
-  navOf,
   person,
-  railOf,
   removeMember,
   saysARefusal,
   signOutFromTheShell,
   switched,
   switcherMenuOf,
   switcherOf,
-  requestsSent,
 } from "../harness.ts";
 import { authAnswering } from "../refused-read.ts";
 
@@ -35,8 +32,6 @@ const readOf =
 const MEMBER_READ = readOf("session.member");
 
 const MEMBERS_READ = readOf("members.list");
-
-const WORKSPACES_READ = readOf("person.workspaces");
 
 const workspacesIn = (menu: Locator): Locator => menu.getByRole("menuitemradio");
 
@@ -104,47 +99,6 @@ test("lists the operator's workspaces and Console, others none", async ({ page, 
   await expect(theirs.getByRole("menuitem")).toHaveText(["All Workspaces"]);
 });
 
-test("lists each workspace with the person's role, the open first", async ({ page, request }) => {
-  const { first, second } = await inTwoWorkspaces(
-    page,
-    request,
-    { first: "Acme Toolworks", second: "Beta Toolworks" },
-    "Viewer",
-  );
-
-  await switcherOf(page, first.name).click();
-
-  const menu = switcherMenuOf(page, first.name);
-  await expect(workspacesIn(menu)).toHaveText([
-    listedAs(first.name, "Admin"),
-    listedAs(second.name, "Viewer"),
-  ]);
-  await expect(workspacesIn(menu).first()).toHaveAttribute("aria-checked", "true");
-});
-
-test("opens the menu on the held list after a switch", async ({ page, request }) => {
-  const { first, second } = await inTwoWorkspaces(
-    page,
-    request,
-    { first: "Swale Ropery", second: "Ure Ropery" },
-    "Viewer",
-  );
-  await switched(page, first.name, second.name);
-  await landedAtHome(page, "Viewer");
-  await expect(switcherOf(page, second.name)).toBeVisible();
-  const release = await heldBack(page, WORKSPACES_READ);
-
-  await switcherOf(page, second.name).click();
-
-  const menu = switcherMenuOf(page, second.name);
-  const both = [listedAs(second.name, "Viewer"), listedAs(first.name, "Admin")];
-  await expect(workspacesIn(menu), "the switch dropped the list it held").toHaveText(both);
-  await expect(saidInTheBand(page), "the band says it reads a list it holds").toBeEmpty();
-
-  release();
-  await expect(workspacesIn(menu)).toHaveText(both);
-});
-
 test("switches to another workspace's home, reading its members", async ({ page, request }) => {
   const { first, second } = await inTwoWorkspaces(page, request, {
     first: "Wharfe Joinery",
@@ -191,33 +145,6 @@ test("switching from a member page lands home, showing no one", async ({ page, r
   );
 });
 
-test("lands a switch on the role's home in that workspace", async ({ page, request }) => {
-  const { first, second } = await inTwoWorkspaces(
-    page,
-    request,
-    { first: "Holme Pressings", second: "Holme Viewing" },
-    "Viewer",
-  );
-
-  await switched(page, first.name, second.name);
-
-  await landedAtHome(page, "Viewer");
-  await expect(switcherOf(page, second.name)).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Control Centre" })).toHaveCount(0);
-});
-
-test("takes All workspaces to the picker", async ({ page, request }) => {
-  const { first } = await inTwoWorkspaces(page, request, {
-    first: "Ribble Wireworks",
-    second: "Hodder Wireworks",
-  });
-
-  await allWorkspacesPicked(page, first.name);
-
-  await expect(page).toHaveURL("/choose-workspace");
-  await expect(page.getByRole("heading", { level: 1, name: "Your Workspaces" })).toBeVisible();
-});
-
 test("drops the left workspace's members when All workspaces picks another", async ({
   page,
   request,
@@ -253,39 +180,6 @@ test("drops the left workspace's members when All workspaces picks another", asy
   await expect(memberLink(page, "Only In Derwent")).toBeVisible();
 });
 
-test("says it reads the list, filling the open menu", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
-  const { email, first, second } = await inTwoWorkspaces(page, request, {
-    first: "Pendle Castings",
-    second: "Bowland Castings",
-  });
-  await markTheOperator(request, email);
-  await page.reload();
-  await expect(switcherOf(page, first.name)).toBeVisible();
-  const release = await heldBack(page, WORKSPACES_READ);
-
-  await switcherOf(page, first.name).click();
-  const menu = switcherMenuOf(page, first.name);
-  await expect(workspacesIn(menu), "the open workspace waits on the list for its role").toHaveText([
-    listedAs(first.name, "Admin"),
-  ]);
-  await expect(menu.getByRole("menuitem")).toHaveText(["All Workspaces", "Console"]);
-  await expect(saidInTheBand(page), "the band says nothing of its read").toHaveText(/\S/);
-  await passesTheAccessibilityGate();
-
-  release();
-
-  await expect(workspacesIn(menu)).toHaveText([
-    listedAs(first.name, "Admin"),
-    listedAs(second.name, "Admin"),
-  ]);
-  await expect(menu).toBeVisible();
-  await expect(saidInTheBand(page)).toBeEmpty();
-});
-
 test("says a refused switch in the band, keeping the page", async ({
   page,
   request,
@@ -319,60 +213,6 @@ test("says a refused switch in the band, keeping the page", async ({
   ]);
 });
 
-test("says a pending switch's refusal, holding others until it answers", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
-  const { email, first, second } = await inTwoWorkspaces(page, request, {
-    first: "Settle Castings",
-    second: "Giggleswick Castings",
-  });
-  await markTheOperator(request, email);
-  await page.reload();
-  await expect(switcherOf(page, first.name)).toBeVisible();
-  const switches = requestsSent(page, (url) => url.pathname.includes("/organization/set-active"));
-  const release = await heldBack(page, "**/organization/set-active");
-
-  const refused = authAnswering(page, "/organization/set-active");
-  await switched(page, first.name, second.name);
-  await expect(saidInTheBand(page), "the band says nothing of the switch").toHaveText(/\S/);
-  const saidOfTheSwitch = await saidInTheBand(page).innerText();
-
-  await switcherOf(page, first.name).click();
-  const menu = switcherMenuOf(page, first.name);
-  await expect(saidInTheBand(page), "opening the menu forgot the pending switch").toHaveText(
-    saidOfTheSwitch,
-  );
-  await expect(workspacesIn(menu)).toHaveText([
-    listedAs(first.name, "Admin"),
-    listedAs(second.name, "Admin"),
-  ]);
-  for (const workspace of await workspacesIn(menu).all()) {
-    await expect(workspace).toHaveAttribute("aria-disabled", "true");
-  }
-  await expect(menu.getByRole("menuitem")).toHaveText(["All Workspaces", "Console"]);
-  for (const wayOut of await menu.getByRole("menuitem").all()) {
-    await expect(wayOut, "a way out of the shell is open mid-switch").toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
-  }
-  await passesTheAccessibilityGate();
-  await page.keyboard.press("Escape");
-
-  await removeMember(request, { workspaceId: second.workspaceId, userId: first.admin.id });
-  release();
-
-  expect(await refused).toMatchObject({ status: 403, code: NOT_A_MEMBER });
-  await expect(refusedInTheBand(page), "the first switch's refusal was lost").toContainText(
-    second.name,
-  );
-  await expect(switcherOf(page, first.name)).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
-  expect(switches, "a second switch started while the first was pending").toHaveLength(1);
-});
-
 const unansweredSwitch = async (page: Page, from: string, to: string): Promise<void> => {
   await page.route("**/organization/set-active", (route) => route.abort());
   await switched(page, from, to);
@@ -389,51 +229,6 @@ test("says an unanswered switch in the band, keeping the page", async ({ page, r
 
   await expect(switcherOf(page, first.name)).toBeFocused();
   await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
-});
-
-/** Layout places each edge to a fraction of a pixel, so two that meet may part by less than one. */
-const SUBPIXEL = 0.5;
-
-const boxOf = async (region: Locator) => {
-  const box = await region.boundingBox();
-  if (box === null) throw new Error(`${String(region)} is not drawn`);
-  return box;
-};
-
-const clearOfTheBand = async (page: Page, region: Locator): Promise<number> => {
-  const [band, drawn] = await Promise.all([boxOf(page.getByRole("banner")), boxOf(region)]);
-  return drawn.y - (band.y + band.height);
-};
-
-test("keeps the rail and nav below the band's refusal", async ({ page, request }) => {
-  const { first, second } = await inTwoWorkspaces(page, request, {
-    first: "Marsden Presswork",
-    second: "Slaithwaite Presswork",
-  });
-  for (let row = 1; row <= 4; row += 1) {
-    await aMemberOnlyOf(request, first.workspaceId, `Row ${String(row)}`);
-  }
-  await page.reload();
-  await expect(memberLink(page, "Row 4")).toBeVisible();
-
-  await unansweredSwitch(page, first.name, second.name);
-
-  await page.setViewportSize({ width: 1280, height: 240 });
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const band = await boxOf(page.getByRole("banner"));
-  await expect
-    .poll(() => page.evaluate(() => window.scrollY), {
-      message: "the page never scrolled past the band",
-    })
-    .toBeGreaterThan(band.height);
-
-  for (const region of [railOf(page), navOf(page, "Control Centre")]) {
-    await expect
-      .poll(() => clearOfTheBand(page, region), {
-        message: `the band's outcome row covers the top of ${String(region)}`,
-      })
-      .toBeGreaterThanOrEqual(-SUBPIXEL);
-  }
 });
 
 test("drops the left workspace's name when the member read fails", async ({ page, request }) => {
@@ -485,21 +280,4 @@ test("drops the left workspace's name while the switch waits offline", async ({
   await context.setOffline(false);
   await landedAtHome(page, "Admin");
   await expect(switcherOf(page, second.name)).toBeVisible();
-});
-
-test("says an unread list, and how to read it again", async ({ page, request }) => {
-  const { first } = await inTwoWorkspaces(page, request, {
-    first: "Lune Toolmaking",
-    second: "Wenning Toolmaking",
-  });
-  await page.reload();
-  await expect(switcherOf(page, first.name)).toBeVisible();
-  await page.route(WORKSPACES_READ, (route) => route.abort());
-
-  await switcherOf(page, first.name).click();
-
-  await saysARefusal(refusedInTheBand(page), { timeout: 15_000 });
-  await expect(workspacesIn(switcherMenuOf(page, first.name))).toHaveText([
-    listedAs(first.name, "Admin"),
-  ]);
 });
