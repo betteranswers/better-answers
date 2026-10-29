@@ -45,9 +45,9 @@ action calls `/__harness`, which `apps/api/tests/support/harness/harness-control
 actions live beside it in `apps/api/tests/support/harness/harness-*.ts`. The same module re-exports the locators
 and browser helpers in `apps/web/e2e/locators.ts`.
 
-A seed the harness refuses answers 400, naming each field and its rule or the constraint it
+A seed the harness refuses usually answers 400, naming each field and its rule or the constraint it
 tripped, and `harness.sh` prints that answer. A refusal inside a slice's own action or an ops
-command answers 500, with its reason only in `server.log`, except the 400s `references/harness.md` names. A seed that a slice's own action
+command can answer 500, with its reason only in `server.log`. A seed that a slice's own action
 writes can leave part of its rows behind when refused part-way; `references/harness.md` says
 which seeds do. Before adding an action, search that
 file for one that already does the job, and before adding a helper, search

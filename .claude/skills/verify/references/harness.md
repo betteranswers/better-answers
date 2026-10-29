@@ -68,20 +68,18 @@ beside `apps/api/tests/support/harness/harness-control.ts`: Sources in `apps/api
 
 ## What a refused seed leaves
 
-A seed the harness cannot write answers 400. A body or a row that a schema refuses names each
-field and its rule, and a write that trips a constraint names the constraint. The action's failure
-carries that answer. Any other fault of the harness stays a 500, with its reason in the server's log.
+A seed the harness refuses usually answers 400, naming each field and its rule or the constraint it
+tripped, and the action's failure carries that answer. A refusal from inside a slice's own action
+or an ops command can answer 500 instead, with its reason only in the server's log.
 
 A body is checked before anything is written. What a refusal after that leaves depends on who
 writes the rows:
 
 - **The harness writes them itself**, in one transaction, so a refused seed leaves nothing behind:
-  `seedModelChoices`, `seedConnectedSources`, `seedQuestions`, `seedConceptIndex` and `moveTheSync`, whose refusals answer 500.
+  `seedModelChoices`, `seedConnectedSources`, `seedQuestions`, `seedConceptIndex` and `moveTheSync`.
 - **A slice's own action, an ops command or the harness one transaction at a time writes them**, so a
-  refusal part-way leaves what was written before it: `makeGroups`, `seedConcepts`,
-  `scriptAsking` and `nameOwners`. Such a refusal answers 500 and its reason is in `server.log`, except
-  `nameOwners`, which answers 400 naming its place in `owners`, and the checks `seedConcepts` makes before its
-  first write. Those answer 400 naming the field: a writer who is no member or no Admin, a title whose
-  file the workspace already holds, and a group member who is no member of the workspace. Any other
-  refusal at one concept leaves the concepts before it whole, and the refused concept's file may already be committed. `scriptAsking` sets its model script before
-  any ops command runs, so the script stays set after a failure.
+  refusal part-way leaves what was written before it: `makeGroups`, `seedConcepts`, `scriptAsking` and
+  `nameOwners`. `seedConcepts` checks its writer, its titles and its group members before its first
+  write, and a refusal there leaves nothing. Any other refusal at one concept leaves the concepts
+  before it whole, and the refused concept's file may already be committed. `scriptAsking` sets its
+  model script before any ops command runs, so the script stays set after a failure.

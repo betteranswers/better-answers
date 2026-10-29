@@ -21,9 +21,9 @@ Preconditions:
 
 - The instance was started by `launch.sh <port>` and `doctor.sh <port>` printed `worth driving`. Put its port where a command says `<port>`, and run every command from the repository root.
 - `<stamp>` is the output of `date +%s`, taken once for this recipe, so this run's names differ from every earlier run's.
-- Take each id and address from the answer of the command that made it. The harness mints each person's address.
+- Take each id and address from the answer of the command that made it.
 
-- **Make the operator.** The operator is a person granted the mark. Run `.claude/skills/verify/scripts/harness.sh <port> POST /workspaces '{"name":"Operators <stamp>"}'`. Note `workspaceId`, `admin.id` and `admin.email`. Then run `.claude/skills/verify/scripts/harness.sh <port> POST /operators '{"email":"<admin.email>","change":"grant"}'`. It answers `{"marked":true}`.
+- **Make the operator.** Run `.claude/skills/verify/scripts/harness.sh <port> POST /workspaces '{"name":"Operators <stamp>"}'`. Note `workspaceId`, `admin.id` and `admin.email`. Then run `.claude/skills/verify/scripts/harness.sh <port> POST /operators '{"email":"<admin.email>","change":"grant"}'`. It answers `{"marked":true}`.
 - **Add a member with a flagged name.** Run `.claude/skills/verify/scripts/harness.sh <port> POST /people '{"displayName":"Priya Shah <stamp>"}'`, which answers her `id` and `email`, and `.claude/skills/verify/scripts/harness.sh <port> POST /members '{"workspaceId":"<workspaceId>","userId":"<priya id>","role":"Editor"}'`. Then the workspace's Admin flags her name. Run `.claude/skills/verify/scripts/harness.sh <port> POST /name-flags '{"workspaceId":"<workspaceId>","adminId":"<admin.id>","personId":"<priya id>"}'`. It answers `{"flagged":true}`.
 - **Sign in.** Run `.claude/skills/verify/scripts/sign-in.sh <port> <admin.email> /console`. It prints a line that ends with the page's address, `http://localhost:<port>/console/workspaces/every-workspace`.
 - **Every Workspace.** Run `.claude/skills/verify/scripts/browse.sh <port> find role searchbox fill "Operators <stamp>" --name "Search by name or short name"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "1 workspace matches"`. The table `Every workspace on the platform.` holds one row, `Operators <stamp>`, with its short name and `2 members`.

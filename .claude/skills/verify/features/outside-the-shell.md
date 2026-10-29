@@ -16,7 +16,7 @@ A person signs in by email code or by an emailed link, names themselves, sets up
 - `choose-workspace` lets a member of more than one workspace pick where to go at `/choose-workspace`.
 - `invitation` lets an invited person join a workspace at `/invitations/$invitationId`, with the invitation's id in place of `$invitationId`.
 - `consent` asks the person to let Claude act for them at `/consent`, the page the api serves in Claude's OAuth flow.
-- `not-found` draws `Page Not Found` for an address no page answers. The recipe below drives it as a Viewer who has picked a workspace, where it holds the link `Go to New Question`.
+- `not-found` draws `Page Not Found` for an address no page answers.
 
 ## How to get to it (user POV)
 
@@ -91,6 +91,6 @@ An invited Editor drives the invitation, consent and the sign-in link.
 
 ## Gotchas
 
-- Passkeys are out of reach. agent-browser has no virtual authenticator, so `Add a Passkey` and `Sign In with a Passkey` cannot finish. Take `Set Up an Authenticator Instead` on `/setup`, and the authenticator code on `/confirm`.
-- One client address may send five email codes in ten minutes. A sixth `Send Code` says `Too many attempts`. `sign-in.sh` sets a client address of its own each time. A sign-in by hand needs its own `set headers` with a number this run has not used.
+- Passkeys are out of reach. agent-browser has no virtual authenticator, so `Add a Passkey` cannot finish. Take `Set Up an Authenticator Instead` on `/setup`, and the authenticator code on `/confirm`.
+- One client address may send five email codes in ten minutes. A sixth `Send Code` says `Too many attempts`.
 - Without the route on Claude's callback, `Connect` sends the browser and a live code to claude.ai.
