@@ -139,9 +139,10 @@ describe("reviewing a connected source's findings", () => {
       review.queryByRole("button", { name: "Keep in Text", description: enabling }),
       "Keep in Text is still described by what enables it",
     ).toBeNull();
-    expect(review.getByRole<HTMLButtonElement>("button", { name: "Keep in Text" }).disabled).toBe(
-      false,
-    );
+    expect(
+      review.getByRole<HTMLButtonElement>("button", { name: "Keep in Text", description: "" })
+        .disabled,
+    ).toBe(false);
   });
 
   it("shows an Admin a kept group an erasure still withholds", async () => {

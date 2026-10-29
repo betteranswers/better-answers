@@ -173,15 +173,21 @@ it("separates an unread workspace list from no workspace, offering retry", async
   api.set("person.workspaces", () => {
     throw new TypeError("the network is down");
   });
+  const unread = heldBack(api, "person.workspaces");
   await openOutsideTheShellAt("/choose-workspace", api);
+  await unread.asked;
 
-  await waitFor(() => expect(refusal()).toMatch(/\S/));
+  await settlingAfter(() => {
+    unread.resolve();
+  });
+
+  expect(refusal()).toMatch(/\S/);
   expect(await thePicker()).toBeDefined();
+  expect(screen.queryByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeNull();
 
   api.set("person.workspaces", () => listed?.());
   fireEvent.click(screen.getByRole("button", { name: PICKER_WORDS.tryAgain }));
 
   expect(await screen.findByRole("button", { name: NORTHERN.name })).toBeDefined();
   expect(screen.getByRole("button", { name: HOLME.name })).toBeDefined();
-  expect(screen.queryByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeNull();
 });
