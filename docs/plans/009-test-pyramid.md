@@ -519,21 +519,24 @@ Changed 28/10/2026. The 60s rule summed file times across parallel files. The me
 
 **Depends on.** BA-266 and BA-288, which lands after BA-268.
 
+Changed 29/10/2026. The triage's 70 duplicates were estimates from titles and a sampled body. Read in full against the tests beneath them, 11 cases are duplicates. They are five in people, four in sources (one of them the harness-refusal case), one in people-invitations and one in console. The other cases of the ten specs each keep a claim that nothing below the browser makes, such as focus, a budget, the gate on an end state, a journey or what a page draws. Sign-in, the Invitations tab, knowledge search, ask and the frame have no Testing Library test of the page, and BA-277 adds those for the single-screen cases. The three pairs the triage named stay. People's "refuses demoting both Admins" also asserts the ticks kept, the refused rows and a key tick that keeps both. People-invitations' "sends 50 at once" is not the api's 51-address refusal, since the page caps the field at 50 and never sends a 51st. Workspace-switcher's "drops the left workspace's name" also asserts Try Again landing home with the second workspace named, and `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md` names it a tripwire. The Verify, perf Rule below is unchanged. At the suite's mean of 4.05s a case, 11 cases are about 45s, so this PR does not meet it, and the PR body holds the measured figure.
+
 **Files.**
 
-- [ ] Edit the people, people-invitations, sources, sign-in, frame, console, console-people, workspace-switcher, knowledge-search and ask-new-question specs under `apps/web/e2e/`.
-- [ ] Edit `apps/web/playwright.config.ts` to add a project with no `webServer` for the accessibility-gate spec.
-- [ ] Edit `apps/api/tests/harness-control.test.ts` to take sources' "tells a spec why the harness refused its seed" case.
-- [ ] Edit `apps/web/.claude/skills/playwright-specs/` wherever it names a deleted case.
+- [ ] Edit the people, people-invitations, sources and console specs under `apps/web/e2e/`.
+- [ ] Edit `apps/web/playwright.config.ts` to add a `gate` project for the accessibility-gate spec. Playwright sets a web server on the config and never on a project, so `E2E_GATE_ALONE=1` leaves the api out and serves the build with `vite preview`.
+- [ ] Edit `apps/web/test/gates/playwright-config.test.ts` to pin the two projects and the gate-alone switch.
+- [ ] Edit `apps/api/tests/support/harness/harness-control.test.ts` so its "answers 400 naming an unreadable reason that holds a space" case also asserts that the refused seed leaves no connected source. That is the claim sources' "tells a spec why the harness refused its seed" made beyond the 400 the api case already asserts.
+- [ ] Edit `apps/web/.claude/skills/playwright-specs/` wherever it names a deleted case or the project list.
 
 **Build.**
 
 - [ ] Delete each DUPLICATE case in Appendix E's browser table. Before deleting, run the named twin and record it in the PR body as `deleted case -> twin`.
-- [ ] Move accessibility-gate to the new project. It needs Chromium for axe and nothing else. The spec stays at `apps/web/e2e/accessibility-gate.spec.ts`, since the project selects it by file and the gate never reads a root file. BA-278 may move it into `e2e/layout/` if its layout project also needs no api.
+- [ ] Move accessibility-gate to the new project. It needs Chromium for axe and the built pages, and nothing else. The spec stays at `apps/web/e2e/accessibility-gate.spec.ts`, since the project selects it by file and the gate never reads a root file. BA-278 may move it into `e2e/layout/` if its layout project also needs no api.
 
 **You see.**
 
-- [ ] `pnpm check:web:e2e --list` counts about 70 fewer tests than trunk's 710.
+- [ ] `pnpm check:web:e2e --list` counts 11 fewer tests than trunk's 710, which is 699.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -544,8 +547,8 @@ Changed 28/10/2026. The 60s rule summed file times across parallel files. The me
 
 - [ ] Lane 1. Regression lane against trunk. Run the full browser suite at trunk and head per the playwright-specs skill's *Running it*. Save `browser-trunk-head.log` and `people.png`. Pass when both pass and head has only the listed cases fewer.
 - [ ] Lane 2. For five deleted cases chosen at random, break the behaviour in a scratch edit and run the twin. Save `twins-break.log`. Pass when each twin fails.
-- [ ] Lane 3. Run the accessibility-gate project alone with no api running. Save `gate.log`. Pass when it passes.
-- [ ] Lane 4. Run the moved harness-refusal case in the api suite. Save `harness.log`. Pass when it passes and asserts the 400 and its reason.
+- [ ] Lane 3. Run the accessibility-gate project alone with no api running, with `E2E_GATE_ALONE=1 pnpm --filter @better-answers/web run e2e`. Save `gate.log`. Pass when it passes and the log shows no api server starting.
+- [ ] Lane 4. Run the harness case "answers 400 naming an unreadable reason that holds a space" in the api suite. Save `harness.log`. Pass when it passes and asserts the 400, its reason and no connected source.
 - [ ] Lane 5. Drive the people page by hand through the verify skill and demote the last Admin. Save `last-admin.png`. Pass when the refusal names each Admin, as the api twin asserts.
 - [ ] Lane 6. Drive workspace-switcher through the verify skill and fail the member read. Save `switcher.png`. Pass when the left workspace's name is dropped.
 - [ ] Lane 7. Run `pnpm check:docs`. Save `docs.log`. Pass when it passes.
