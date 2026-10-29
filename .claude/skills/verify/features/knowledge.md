@@ -71,7 +71,6 @@ Pages not built, as the Admin:
 
 - The instance allows five codes to one address in ten minutes. A sixth sign-in of the same person in that window fails at *Send Code*. Sign in once and drive every recipe from that session.
 - The owner picker is a native select. `.claude/skills/verify/scripts/browse.sh <port> select` with a role or label selector and `.claude/skills/verify/scripts/browse.sh <port> find label "New Owner of policies" fill` both answer *Done* and change nothing. A click opens a popup the keys never reach. Use the page's own `c` key and a typed letter, as the recipe does, or `.claude/skills/verify/scripts/browse.sh <port> select @<ref> "Ifan Morgan"` with the ref a fresh `snapshot -c` gives the picker.
-- Read which picker holds focus in a snapshot before typing a letter on Collections and Owners.
 - A concept's page takes the last part of its IRI, never the whole IRI.
 - Search and a concept's page share one count of reads for each person, which resets each minute of the clock. Past it the api refuses the read until the next minute. Knowledge Base's tree and kind tables take from the same count. A recipe that searches or opens concepts in a tight loop meets it.
 - Several names repeat. *Search* names a menu link, a region and a heading. Keep `--exact` where a recipe gives it.
