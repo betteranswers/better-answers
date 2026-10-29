@@ -1,3 +1,4 @@
+import { err, ok, type Result } from "@better-answers/core/kernel";
 import {
   ORPHANED_UPLOAD_GRACE_HOURS,
   REINDEX,
@@ -8,7 +9,7 @@ import {
 import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
 
 import { doorTold, type Doors } from "../doors.ts";
-import { DONE, REFUSED, USAGE, type OpsIo, type Flags, refused, counted } from "./cli.ts";
+import { DONE, REFUSED, type OpsIo, type Flags, refused, counted } from "./cli.ts";
 
 export const reindexConnectedSources = async (
   doors: Doors,
@@ -28,17 +29,22 @@ export const reindexConnectedSources = async (
   return DONE;
 };
 
+type ObjectStoreOrphansAsked = { readonly list: boolean };
+
+export const objectStoreOrphansAskedOf = (
+  flags: Flags,
+): Result<ObjectStoreOrphansAsked, string> => {
+  const listing = flags.get("list");
+  if (listing !== undefined && listing !== true) return err("--list takes no value");
+  return ok({ list: listing === true });
+};
+
 export const objectStoreOrphans = async (
   doors: Doors,
   workspaceId: string,
-  flags: Flags,
+  { list }: ObjectStoreOrphansAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const listing = flags.get("list");
-  if (listing !== undefined && listing !== true) {
-    io.say("object-store-orphans: --list takes no value");
-    return USAGE;
-  }
   const objects = doorTold(
     doors.objects,
     "no object store is configured (S3_ENDPOINT, S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY on the api service), so the bytes a failed connect left cannot be reached",
@@ -51,13 +57,13 @@ export const objectStoreOrphans = async (
     sweepOrphanedUploads(
       UPLOAD_SWEEP,
       { postgres: doors.postgres, objects: objects.value },
-      { workspaceId, now: doors.clock.now(), dryRun: listing === true },
+      { workspaceId, now: doors.clock.now(), dryRun: list },
     ),
   );
   if (!swept.ok) return refused("object-store-orphans", workspaceId, swept.error, io);
   const past = `past the ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace no document names`;
   io.say(
-    listing === true
+    list
       ? `object-store-orphans: done — ${counted(swept.value.found, "object")} ${past}, removed none`
       : `object-store-orphans: done — removed ${counted(swept.value.removed, "object")} ${past}`,
   );

@@ -1,10 +1,11 @@
 import { MAP_MAINTENANCE, mapCounts, rebuildMap, sweepMap } from "@better-answers/core/concepts";
+import { err, ok, type Result } from "@better-answers/core/kernel";
 import type { RebuildReason } from "@better-answers/core/runs";
 import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
 import { REBUILD_REASONS } from "@better-answers/schema";
 
 import type { Doors } from "../doors.ts";
-import { DONE, USAGE, type OpsIo, type Flags, flagValue, refused, plural, counted } from "./cli.ts";
+import { DONE, type OpsIo, type Flags, flagValue, refused, plural, counted } from "./cli.ts";
 import { waitSecondsOf, waitForJob } from "./job-wait.ts";
 
 export const REBUILD_DEFAULT_REASON = "drill";
@@ -21,27 +22,28 @@ export const mapCountsCommand = async (
   return DONE;
 };
 
-const rebuildReasonOf = (flags: Flags): RebuildReason | undefined => {
+type MapRebuildAsked = {
+  readonly reason: RebuildReason;
+  readonly wait: number | undefined;
+};
+
+export const mapRebuildAskedOf = (flags: Flags): Result<MapRebuildAsked, string> => {
   const given = flagValue(flags, "reason") ?? REBUILD_DEFAULT_REASON;
-  return REBUILD_REASONS.find((reason) => reason === given);
+  const reason = REBUILD_REASONS.find((word) => word === given);
+  if (reason === undefined) return err(`--reason must be one of ${REBUILD_REASONS.join(", ")}`);
+  const wait = waitSecondsOf(flags);
+  if (wait === "malformed") {
+    return err("--wait takes no value; --wait-seconds takes a whole number of seconds");
+  }
+  return ok({ reason, wait });
 };
 
 export const mapRebuildCommand = async (
   doors: Doors,
   workspaceId: string,
-  flags: Flags,
+  { reason, wait }: MapRebuildAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const reason = rebuildReasonOf(flags);
-  if (reason === undefined) {
-    io.say(`map-rebuild: --reason must be one of ${REBUILD_REASONS.join(", ")}`);
-    return USAGE;
-  }
-  const wait = waitSecondsOf(flags);
-  if (wait === "malformed") {
-    io.say("map-rebuild: --wait takes no value; --wait-seconds takes a whole number of seconds");
-    return USAGE;
-  }
   const enqueued = await rebuildMap(MAP_MAINTENANCE, doors.postgres, { workspaceId, reason });
   if (!enqueued.ok) return refused("map-rebuild", workspaceId, enqueued.error, io);
   const { jobId } = enqueued.value;

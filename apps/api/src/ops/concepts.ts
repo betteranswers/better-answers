@@ -120,7 +120,7 @@ type ImportAsked = {
   readonly dryRun: boolean;
 };
 
-const importAskedOf = (flags: Flags): Result<ImportAsked, string> => {
+export const importAskedOf = (flags: Flags): Result<ImportAsked, string> => {
   const from = flagValue(flags, "from");
   const email = flagValue(flags, "as");
   const asked = flagValue(flags, "sensitivity") ?? IMPORT_SENSITIVITY_DEFAULT;
@@ -199,15 +199,9 @@ const memberOf = async (
 export const importBundleCommand = async (
   doors: Doors,
   workspaceId: string,
-  flags: Flags,
+  { from, email, sensitivity, dryRun }: ImportAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const asked = importAskedOf(flags);
-  if (!asked.ok) {
-    io.say(`import-bundle: ${asked.error}`);
-    return USAGE;
-  }
-  const { from, email, sensitivity, dryRun } = asked.value;
   const git = bundleStore(doors, "the bundle the import writes into cannot be opened");
   if (!git.ok) {
     io.say(`import-bundle: REFUSED — ${git.error}`);
@@ -233,9 +227,13 @@ export const importBundleCommand = async (
   return DONE;
 };
 
-type BodyAsked = { readonly iri: string; readonly email: string; readonly run: ConceptBodyRun };
+type BodyAsked = {
+  readonly iri: string;
+  readonly email: string;
+  readonly run: ConceptBodyRun;
+};
 
-const bodyAskedOf = (flags: Flags): Result<BodyAsked, string> => {
+export const bodyAskedOf = (flags: Flags): Result<BodyAsked, string> => {
   const iri = flagValue(flags, "iri");
   const email = flagValue(flags, "as");
   const base = flagValue(flags, "expect");
@@ -317,14 +315,9 @@ const sayBodyUpdate = (io: OpsIo, update: ConceptBodyUpdate): void => {
 export const updateConceptBodyCommand = async (
   doors: Doors,
   workspaceId: string,
-  flags: Flags,
+  asked: BodyAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const asked = bodyAskedOf(flags);
-  if (!asked.ok) {
-    io.say(`update-concept-body: ${asked.error}`);
-    return USAGE;
-  }
   const body = await io.stdin();
   if (body.trim() === "") {
     io.say("update-concept-body: the new body is read from stdin, and stdin was empty");
@@ -335,12 +328,12 @@ export const updateConceptBodyCommand = async (
     io.say(`update-concept-body: REFUSED — ${git.error}`);
     return REFUSED;
   }
-  const { iri, email, run } = asked.value;
+  const { iri, email, run } = asked;
   const principal = await memberOf("update-concept-body", doors, workspaceId, email, io);
   if (!principal.ok) return principal.error;
   const bundle = { git: git.value, postgres: doors.postgres, clock: doors.clock };
   const updated = await updateConceptBody(principal.value, bundle, { iri, body, ...run });
-  if (!updated.ok) return bodyUpdateRefused(workspaceId, updated.error, asked.value, io);
+  if (!updated.ok) return bodyUpdateRefused(workspaceId, updated.error, asked, io);
   sayBodyUpdate(io, updated.value);
   return DONE;
 };

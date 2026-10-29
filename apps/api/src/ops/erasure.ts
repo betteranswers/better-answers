@@ -17,7 +17,6 @@ import { doorTold, type Doors } from "../doors.ts";
 import {
   DONE,
   REFUSED,
-  USAGE,
   type OpsIo,
   parseSince,
   type Flags,
@@ -45,17 +44,21 @@ const erasureDoors = (doors: Doors, log: ErasureLog): Result<ErasureDoors, strin
   });
 };
 
-export const replayErasuresCommand = async (
-  doors: Doors,
-  flags: Flags,
-  io: OpsIo,
-): Promise<number> => {
+type ReplayErasuresAsked = { readonly since: Date };
+
+export const replayErasuresAskedOf = (flags: Flags): Result<ReplayErasuresAsked, string> => {
   const sinceArgument = flagValue(flags, "since");
   const since = sinceArgument === undefined ? undefined : parseSince(sinceArgument);
-  if (since === undefined) {
-    io.say("replay-erasures: --since <dump stamp or ISO instant> is required");
-    return USAGE;
-  }
+  return since === undefined
+    ? err("--since <dump stamp or ISO instant> is required")
+    : ok({ since });
+};
+
+export const replayErasuresCommand = async (
+  doors: Doors,
+  { since }: ReplayErasuresAsked,
+  io: OpsIo,
+): Promise<number> => {
   const requests = getTableName(erasureRequest);
   const present = await tablesPresent(doors.postgres, [requests]);
   if (present.length === 0) {
@@ -130,7 +133,7 @@ type RehearsalAsked =
 
 const WAIT_SECONDS_MALFORMED = "--wait-seconds takes a whole number of seconds";
 
-const rehearsalAskedOf = (flags: Flags): Result<RehearsalAsked, string> => {
+export const rehearsalAskedOf = (flags: Flags): Result<RehearsalAsked, string> => {
   if (flags.get("synthetic") !== true) {
     return err(
       "--synthetic is required — this command creates a synthetic subject and then erases them, and the flag is the caller saying this workspace is somewhere that may happen",
@@ -190,20 +193,14 @@ const erasedToTheReport = async (
 export const erasureRehearsal = async (
   doors: Doors,
   workspaceId: string,
-  flags: Flags,
+  rehearsal: RehearsalAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const asked = rehearsalAskedOf(flags);
-  if (!asked.ok) {
-    io.say(`erasure-rehearsal: ${asked.error}`);
-    return USAGE;
-  }
   const opened = erasureDoors(doors, io.logger);
   if (!opened.ok) {
     io.say(`erasure-rehearsal: REFUSED — ${opened.error}`);
     return REFUSED;
   }
-  const rehearsal = asked.value;
   if (rehearsal.phase === "seed") {
     return seedingToBeDumped(doors, opened.value, workspaceId, rehearsal.waitSeconds, io);
   }

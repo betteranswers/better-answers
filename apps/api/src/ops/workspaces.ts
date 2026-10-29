@@ -1,4 +1,4 @@
-import { attempt, err, ok, type Result } from "@better-answers/core/kernel";
+import { attempt, err, ok, type Result, type Role } from "@better-answers/core/kernel";
 import { initRepository } from "@better-answers/core/store/git";
 import type { PostgresDoor } from "@better-answers/core/store/postgres";
 import {
@@ -17,16 +17,7 @@ import { ROLES, ulid } from "@better-answers/schema";
 
 import type { Doors } from "../doors.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import {
-  DONE,
-  REFUSED,
-  USAGE,
-  type OpsIo,
-  type Flags,
-  flagValue,
-  bundleStore,
-  exitOf,
-} from "./cli.ts";
+import { DONE, REFUSED, type OpsIo, type Flags, flagValue, bundleStore, exitOf } from "./cli.ts";
 
 export const notSignedIn = (email: string): string =>
   `no-such-user: ${email} has not signed in; have them sign in with an email code first, or add them with add-person, then run this again`;
@@ -78,20 +69,28 @@ const provisionRefused = (
   return exitOf(refusal);
 };
 
-export const provisionWorkspaceCommand = async (
-  doors: Doors,
+type ProvisionWorkspaceAsked = {
+  readonly name: string;
+  readonly shortName: string;
+  readonly admin: string;
+};
+
+export const provisionWorkspaceAskedOf = (
   flags: Flags,
-  io: OpsIo,
-): Promise<number> => {
+): Result<ProvisionWorkspaceAsked, string> => {
   const name = flagValue(flags, "name");
   const shortName = flagValue(flags, "short-name");
-  const email = flagValue(flags, "admin");
-  if (name === undefined || shortName === undefined || email === undefined) {
-    io.say(
-      "provision-workspace: --name <name>, --short-name <short name> and --admin <email> are required",
-    );
-    return USAGE;
-  }
+  const admin = flagValue(flags, "admin");
+  return name === undefined || shortName === undefined || admin === undefined
+    ? err("--name <name>, --short-name <short name> and --admin <email> are required")
+    : ok({ name, shortName, admin });
+};
+
+export const provisionWorkspaceCommand = async (
+  doors: Doors,
+  { name, shortName, admin: email }: ProvisionWorkspaceAsked,
+  io: OpsIo,
+): Promise<number> => {
   const git = bundleStore(doors, "the workspace's bundle repository cannot be created");
   if (!git.ok) {
     io.say(`provision-workspace: REFUSED — ${git.error}`);
@@ -139,21 +138,30 @@ const memberReason = (
   }
 };
 
-export const addMemberCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
+type AddMemberAsked = {
+  readonly workspaceId: string;
+  readonly email: string;
+  readonly role: Role;
+};
+
+export const addMemberAskedOf = (flags: Flags): Result<AddMemberAsked, string> => {
   const workspaceId = flagValue(flags, "workspace");
   const email = flagValue(flags, "email");
   const asked = flagValue(flags, "role");
   if (workspaceId === undefined || email === undefined || asked === undefined) {
-    io.say(
-      `add-member: --workspace <id>, --email <email> and --role <${ROLES.join("|")}> are required`,
-    );
-    return USAGE;
+    return err(`--workspace <id>, --email <email> and --role <${ROLES.join("|")}> are required`);
   }
   const role = ROLES.find((word) => word === asked);
-  if (role === undefined) {
-    io.say(`add-member: --role must be one of ${ROLES.join(", ")}`);
-    return USAGE;
-  }
+  return role === undefined
+    ? err(`--role must be one of ${ROLES.join(", ")}`)
+    : ok({ workspaceId, email, role });
+};
+
+export const addMemberCommand = async (
+  doors: Doors,
+  { workspaceId, email, role }: AddMemberAsked,
+  io: OpsIo,
+): Promise<number> => {
   const added = await addMember(BOOTSTRAP, doors.postgres, { workspaceId, email, role });
   if (!added.ok) {
     io.say(`add-member: REFUSED — ${memberReason(added.error, workspaceId, email)}`);
@@ -163,7 +171,7 @@ export const addMemberCommand = async (doors: Doors, flags: Flags, io: OpsIo): P
   return DONE;
 };
 
-const ADD_PERSON_USAGE = "add-person: --email <address> and --name <display name> are required";
+const ADD_PERSON_USAGE = "--email <address> and --name <display name> are required";
 
 const personReason = (refusal: AddPersonRefusal, email: string): string => {
   switch (refusal) {
@@ -191,13 +199,19 @@ const personRefused = (refusal: AddPersonRefusal | Error, email: string, io: Ops
   return exitOf(refusal);
 };
 
-export const addPersonCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
+type AddPersonAsked = { readonly email: string; readonly name: string };
+
+export const addPersonAskedOf = (flags: Flags): Result<AddPersonAsked, string> => {
   const email = flagValue(flags, "email");
   const name = flagValue(flags, "name");
-  if (email === undefined || name === undefined) {
-    io.say(ADD_PERSON_USAGE);
-    return USAGE;
-  }
+  return email === undefined || name === undefined ? err(ADD_PERSON_USAGE) : ok({ email, name });
+};
+
+export const addPersonCommand = async (
+  doors: Doors,
+  { email, name }: AddPersonAsked,
+  io: OpsIo,
+): Promise<number> => {
   const added = await addPerson(IDENTITY_PRINCIPAL, doors.postgres, { email, name });
   if (!added.ok) return personRefused(added.error, email, io);
   const person = added.value;
@@ -219,22 +233,32 @@ const renameReason = (refusal: RenameRefusal | Error, workspaceId: string): stri
   }
 };
 
+type RenameWorkspaceAsked = {
+  readonly workspaceId: string;
+  readonly name: string | undefined;
+  readonly shortName: string | undefined;
+};
+
+export const renameWorkspaceAskedOf = (flags: Flags): Result<RenameWorkspaceAsked, string> => {
+  const workspaceId = flagValue(flags, "workspace");
+  return workspaceId === undefined
+    ? err("--workspace <id> is required, with --name <name>, --short-name <short name> or both")
+    : ok({
+        workspaceId,
+        name: flagValue(flags, "name"),
+        shortName: flagValue(flags, "short-name"),
+      });
+};
+
 export const renameWorkspaceCommand = async (
   doors: Doors,
-  flags: Flags,
+  { workspaceId, name: newName, shortName: newShortName }: RenameWorkspaceAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const workspaceId = flagValue(flags, "workspace");
-  if (workspaceId === undefined) {
-    io.say(
-      "rename-workspace: --workspace <id> is required, with --name <name>, --short-name <short name> or both",
-    );
-    return USAGE;
-  }
   const renamed = await renameWorkspace(BOOTSTRAP, doors.postgres, {
     workspaceId,
-    name: flagValue(flags, "name"),
-    shortName: flagValue(flags, "short-name"),
+    name: newName,
+    shortName: newShortName,
   });
   if (!renamed.ok) {
     io.say(`rename-workspace: REFUSED — ${renameReason(renamed.error, workspaceId)}`);

@@ -1,6 +1,7 @@
 import { getTableName, type Table } from "drizzle-orm";
 
 import { IMPORT_SENSITIVITY_DEFAULT } from "@better-answers/core/concepts";
+import { err, ok, type Result } from "@better-answers/core/kernel";
 import { CHOOSABLE_PROVIDERS, DECISION_PROVIDERS } from "@better-answers/core/llm";
 import { ORPHANED_UPLOAD_GRACE_HOURS } from "@better-answers/core/sources";
 import { tablesPresent } from "@better-answers/core/store/postgres";
@@ -44,30 +45,60 @@ import {
   parseFlags,
   flagValue,
 } from "./cli.ts";
-import { reconcileWatermark, importBundleCommand, updateConceptBodyCommand } from "./concepts.ts";
-import { replayErasuresCommand, erasureRehearsal } from "./erasure.ts";
+import {
+  bodyAskedOf,
+  importAskedOf,
+  importBundleCommand,
+  reconcileWatermark,
+  updateConceptBodyCommand,
+} from "./concepts.ts";
+import {
+  erasureRehearsal,
+  rehearsalAskedOf,
+  replayErasuresAskedOf,
+  replayErasuresCommand,
+} from "./erasure.ts";
 import { WAIT_SECONDS } from "./job-wait.ts";
 import {
   CHOSEN_PURPOSES,
-  setModelKeyCommand,
-  setSpendingLimitCommand,
-  setModelChoiceCommand,
-  setModelPriceCommand,
+  setDecisionThresholdAskedOf,
   setDecisionThresholdCommand,
+  setModelChoiceAskedOf,
+  setModelChoiceCommand,
+  setModelKeyAskedOf,
+  setModelKeyCommand,
+  setModelPriceAskedOf,
+  setModelPriceCommand,
+  setSpendingLimitAskedOf,
+  setSpendingLimitCommand,
 } from "./llm.ts";
 import {
   REBUILD_DEFAULT_REASON,
   mapCountsCommand,
+  mapRebuildAskedOf,
   mapRebuildCommand,
   mapSweepCommand,
 } from "./map.ts";
-import { operatorCommand, restoreSignInCommand } from "./operator.ts";
-import { smoke, dumpGrep } from "./restore-checks.ts";
-import { reindexConnectedSources, objectStoreOrphans } from "./sources.ts";
 import {
-  provisionWorkspaceCommand,
+  operatorAskedOf,
+  operatorCommand,
+  restoreSignInAskedOf,
+  restoreSignInCommand,
+} from "./operator.ts";
+import { dumpGrep, dumpGrepAskedOf, smoke, smokeAskedOf } from "./restore-checks.ts";
+import {
+  objectStoreOrphans,
+  objectStoreOrphansAskedOf,
+  reindexConnectedSources,
+} from "./sources.ts";
+import {
+  addMemberAskedOf,
   addMemberCommand,
+  addPersonAskedOf,
   addPersonCommand,
+  provisionWorkspaceAskedOf,
+  provisionWorkspaceCommand,
+  renameWorkspaceAskedOf,
   renameWorkspaceCommand,
 } from "./workspaces.ts";
 
@@ -150,80 +181,115 @@ exit codes: ${DONE} done · ${REFUSED} refused in no refusal word, stop · ${USA
   a run that names the file or commit it stopped at exits ${REFUSED}, whatever word it names: import-bundle's unsound tree and stopped import, reconcile-watermark's stopped replay
   an import whose manifest commit is refused as malformed exits ${REFUSED} too: only a defect in the import can cause it`;
 
-const sliceCommand = async (
-  command: SliceCommand,
-  doors: Doors,
-  flags: Flags,
-  io: OpsIo,
-): Promise<number> => {
-  const workspaceId = flagValue(flags, "workspace");
-  if (workspaceId === undefined) {
-    io.say(`${command}: --workspace <id> is required`);
-    return USAGE;
-  }
+const notBuiltSaid = async (doors: Doors, command: SliceCommand): Promise<string | undefined> => {
   const tables: readonly Table[] = NEEDS[command];
   const needed = tables.map((table) => getTableName(table));
   const present = await tablesPresent(doors.postgres, needed);
-  if (present.length < needed.length) {
-    io.say(
-      `${command}: not built — ${needed.filter((name) => !present.includes(name)).join(", ")} absent from this schema; the slice that owns them has not landed`,
-    );
-    return NOT_BUILT;
-  }
-  return SLICE_RUNNERS[command](doors, workspaceId, flags, io);
+  return present.length < needed.length
+    ? `${command}: not built — ${needed.filter((name) => !present.includes(name)).join(", ")} absent from this schema; the slice that owns them has not landed`
+    : undefined;
 };
 
-const SLICE_RUNNERS = {
-  "map-rebuild": mapRebuildCommand,
-  "map-sweep": (doors, workspaceId, _flags, io) => mapSweepCommand(doors, workspaceId, io),
-  "map-counts": (doors, workspaceId, _flags, io) => mapCountsCommand(doors, workspaceId, io),
-  "unmapped-passage-rate": (doors, workspaceId, _flags, io) =>
-    unmappedPassageRateCommand(doors, workspaceId, io),
-  "reconcile-watermark": (doors, workspaceId, _flags, io) =>
-    reconcileWatermark(doors, workspaceId, io),
-  "object-store-orphans": objectStoreOrphans,
-  "reindex-connected-sources": (doors, workspaceId, _flags, io) =>
-    reindexConnectedSources(doors, workspaceId, io),
-  "erasure-rehearsal": erasureRehearsal,
-  "import-bundle": importBundleCommand,
-  "update-concept-body": updateConceptBodyCommand,
-  "set-model-key": setModelKeyCommand,
-  "set-spending-limit": setSpendingLimitCommand,
-  "set-model-choice": setModelChoiceCommand,
-} satisfies Readonly<
-  Record<
-    SliceCommand,
-    (doors: Doors, workspaceId: string, flags: Flags, io: OpsIo) => Promise<number>
-  >
->;
+export type OpsCommand = {
+  readonly name: string;
+  readonly asked: object;
+  readonly run: (doors: Doors, io: OpsIo) => Promise<number>;
+};
 
-const SLICELESS_COMMANDS = new Map<
-  string,
-  (doors: Doors, flags: Flags, io: OpsIo) => Promise<number>
->([
-  ["replay-erasures", replayErasuresCommand],
-  ["smoke", (_doors, flags, io) => smoke(flags, io)],
-  ["dump-grep", (_doors, flags, io) => dumpGrep(flags, io)],
-  ["provision-workspace", provisionWorkspaceCommand],
-  ["add-person", addPersonCommand],
-  ["add-member", addMemberCommand],
-  ["rename-workspace", renameWorkspaceCommand],
-  ["set-model-price", setModelPriceCommand],
-  ["set-decision-threshold", setDecisionThresholdCommand],
-  ["operator", operatorCommand],
-  ["restore-sign-in", restoreSignInCommand],
+type Parser = (name: string, flags: Flags) => Result<OpsCommand, string>;
+
+const NO_FLAGS = (): Result<object, string> => ok({});
+
+const parserOf =
+  <Asked extends object>(
+    asked: (flags: Flags) => Result<Asked, string>,
+    run: (doors: Doors, asked: Asked, io: OpsIo) => Promise<number>,
+  ): Parser =>
+  (name, flags) => {
+    const parsed = asked(flags);
+    return parsed.ok
+      ? ok({ name, asked: parsed.value, run: (doors, io) => run(doors, parsed.value, io) })
+      : err(`${name}: ${parsed.error}`);
+  };
+
+const inWorkspaceParserOf =
+  <Asked extends object>(
+    asked: (flags: Flags) => Result<Asked, string>,
+    run: (doors: Doors, workspaceId: string, asked: Asked, io: OpsIo) => Promise<number>,
+  ): Parser =>
+  (name, flags) => {
+    const workspaceId = flagValue(flags, "workspace");
+    if (workspaceId === undefined) return err(`${name}: --workspace <id> is required`);
+    const parsed = asked(flags);
+    return parsed.ok
+      ? ok({
+          name,
+          asked: { workspaceId, ...parsed.value },
+          run: (doors, io) => run(doors, workspaceId, parsed.value, io),
+        })
+      : err(`${name}: ${parsed.error}`);
+  };
+
+const inWorkspaceAloneOf = (
+  run: (doors: Doors, workspaceId: string, io: OpsIo) => Promise<number>,
+): Parser =>
+  inWorkspaceParserOf(NO_FLAGS, (doors, workspaceId, _asked, io) => run(doors, workspaceId, io));
+
+const helpSaid = async (io: OpsIo): Promise<number> => {
+  io.say(USAGE_TEXT);
+  return DONE;
+};
+
+const PARSERS = new Map<string, Parser>([
+  ["help", parserOf(NO_FLAGS, (_doors, _asked, io) => helpSaid(io))],
+  ["replay-erasures", parserOf(replayErasuresAskedOf, replayErasuresCommand)],
+  ["smoke", parserOf(smokeAskedOf, (_doors, asked, io) => smoke(asked, io))],
+  ["dump-grep", parserOf(dumpGrepAskedOf, (_doors, asked, io) => dumpGrep(asked, io))],
+  ["provision-workspace", parserOf(provisionWorkspaceAskedOf, provisionWorkspaceCommand)],
+  ["add-person", parserOf(addPersonAskedOf, addPersonCommand)],
+  ["add-member", parserOf(addMemberAskedOf, addMemberCommand)],
+  ["rename-workspace", parserOf(renameWorkspaceAskedOf, renameWorkspaceCommand)],
+  ["set-model-price", parserOf(setModelPriceAskedOf, setModelPriceCommand)],
+  ["set-decision-threshold", parserOf(setDecisionThresholdAskedOf, setDecisionThresholdCommand)],
+  ["operator", parserOf(operatorAskedOf, operatorCommand)],
+  ["restore-sign-in", parserOf(restoreSignInAskedOf, restoreSignInCommand)],
+  ["map-rebuild", inWorkspaceParserOf(mapRebuildAskedOf, mapRebuildCommand)],
+  ["map-sweep", inWorkspaceAloneOf(mapSweepCommand)],
+  ["map-counts", inWorkspaceAloneOf(mapCountsCommand)],
+  ["unmapped-passage-rate", inWorkspaceAloneOf(unmappedPassageRateCommand)],
+  ["reconcile-watermark", inWorkspaceAloneOf(reconcileWatermark)],
+  ["object-store-orphans", inWorkspaceParserOf(objectStoreOrphansAskedOf, objectStoreOrphans)],
+  ["reindex-connected-sources", inWorkspaceAloneOf(reindexConnectedSources)],
+  ["erasure-rehearsal", inWorkspaceParserOf(rehearsalAskedOf, erasureRehearsal)],
+  ["import-bundle", inWorkspaceParserOf(importAskedOf, importBundleCommand)],
+  ["update-concept-body", inWorkspaceParserOf(bodyAskedOf, updateConceptBodyCommand)],
+  ["set-model-key", inWorkspaceParserOf(setModelKeyAskedOf, setModelKeyCommand)],
+  ["set-spending-limit", inWorkspaceParserOf(setSpendingLimitAskedOf, setSpendingLimitCommand)],
+  ["set-model-choice", inWorkspaceParserOf(setModelChoiceAskedOf, setModelChoiceCommand)],
 ]);
 
+export const parseOpsArgs = (argv: readonly string[]): Result<OpsCommand, string> => {
+  const [typed, ...rest] = argv[0] === "--" ? argv.slice(1) : argv;
+  if (typed === undefined) return err(USAGE_TEXT);
+  const name = typed === "--help" ? "help" : typed;
+  return (
+    PARSERS.get(name)?.(name, parseFlags(rest)) ?? err(`unknown command: ${name}\n${USAGE_TEXT}`)
+  );
+};
+
 export const runOps = async (argv: readonly string[], doors: Doors, io: OpsIo): Promise<number> => {
-  const [command, ...rest] = argv[0] === "--" ? argv.slice(1) : argv;
-  const flags = parseFlags(rest);
-  if (command === undefined || command === "--help" || command === "help") {
-    io.say(USAGE_TEXT);
-    return command === undefined ? USAGE : DONE;
+  const parsed = parseOpsArgs(argv);
+  if (!parsed.ok) {
+    io.say(parsed.error);
+    return USAGE;
   }
-  const run = SLICELESS_COMMANDS.get(command);
-  if (run !== undefined) return run(doors, flags, io);
-  if (isSliceCommand(command)) return sliceCommand(command, doors, flags, io);
-  io.say(`unknown command: ${command}\n${USAGE_TEXT}`);
-  return USAGE;
+  const { name, run } = parsed.value;
+  if (isSliceCommand(name)) {
+    const absent = await notBuiltSaid(doors, name);
+    if (absent !== undefined) {
+      io.say(absent);
+      return NOT_BUILT;
+    }
+  }
+  return run(doors, io);
 };

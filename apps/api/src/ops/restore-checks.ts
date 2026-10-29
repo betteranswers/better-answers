@@ -1,11 +1,22 @@
-import { DONE, REFUSED, USAGE, type OpsIo, type Flags, flagValue } from "./cli.ts";
+import { err, ok, type Result } from "@better-answers/core/kernel";
 
-export const smoke = async (flags: Flags, io: OpsIo): Promise<number> => {
+import { DONE, REFUSED, type OpsIo, type Flags, flagValue } from "./cli.ts";
+
+const BY_HAND = ["find", "guide", "ask"] as const;
+
+type SmokeAsked = {
+  readonly url: string;
+  readonly byHand: readonly (typeof BY_HAND)[number][];
+};
+
+export const smokeAskedOf = (flags: Flags): Result<SmokeAsked, string> => {
   const url = flagValue(flags, "url");
-  if (url === undefined) {
-    io.say("smoke: --url <origin> is required (http://127.0.0.1:3000 inside the stack)");
-    return USAGE;
-  }
+  return url === undefined
+    ? err("--url <origin> is required (http://127.0.0.1:3000 inside the stack)")
+    : ok({ url, byHand: BY_HAND.filter((entry) => flags.get(entry) === true) });
+};
+
+export const smoke = async ({ url, byHand }: SmokeAsked, io: OpsIo): Promise<number> => {
   const origin = url.replace(/\/$/u, "");
 
   const asApp: RequestInit =
@@ -59,9 +70,7 @@ export const smoke = async (flags: Flags, io: OpsIo): Promise<number> => {
     async (response) =>
       response.status === 200 && (response.headers.get("content-type") ?? "").includes("text/html"),
   );
-  for (const entry of ["find", "guide", "ask"] as const) {
-    if (flags.get(entry) !== true) continue;
-
+  for (const entry of byHand) {
     io.say(`note ${entry}: needs a minted token — proved by hand through the connector, not here`);
   }
   return failed === 0 ? DONE : REFUSED;
@@ -113,7 +122,9 @@ const perSectionHits = (
   return hits;
 };
 
-export const dumpGrep = async (flags: Flags, io: OpsIo): Promise<number> => {
+type DumpGrepAsked = { readonly tokens: readonly string[] };
+
+export const dumpGrepAskedOf = (flags: Flags): Result<DumpGrepAsked, string> => {
   const tokens = [
     ...new Set(
       (flagValue(flags, "tokens") ?? "")
@@ -122,10 +133,10 @@ export const dumpGrep = async (flags: Flags, io: OpsIo): Promise<number> => {
         .filter((token) => token.length > 0),
     ),
   ];
-  if (tokens.length === 0) {
-    io.say("dump-grep: --tokens <a,b,…> is required");
-    return USAGE;
-  }
+  return tokens.length === 0 ? err("--tokens <a,b,…> is required") : ok({ tokens });
+};
+
+export const dumpGrep = async ({ tokens }: DumpGrepAsked, io: OpsIo): Promise<number> => {
   const hits = perSectionHits(await io.stdin(), tokens);
   for (const token of tokens) {
     const counted = hits.get(token);
