@@ -28,7 +28,7 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
 const baseURL = `http://localhost:${PORT}`;
 
 const GATE_SPEC = "accessibility-gate.spec.ts";
-/** A config has one web server, not one per project, so the gate alone serves the build with `vite preview` and starts no api. */
+/** Playwright sets a web server on the config, never a project, so the gate alone needs this switch to leave the api out. */
 const gateAlone = process.env["E2E_GATE_ALONE"] === "1";
 const gate = { name: "gate", testMatch: GATE_SPEC, use: { ...devices["Desktop Chrome"] } };
 const chromium = { name: "chromium", testIgnore: GATE_SPEC, use: { ...devices["Desktop Chrome"] } };
@@ -60,7 +60,7 @@ export default defineConfig({
 
         url: `${baseURL}/health`,
 
-        // A cold Testcontainers Postgres pulls its image before it answers anything.
+        // A cold start pulls container images before the api answers anything.
         timeout: 240_000,
         stdout: "pipe",
         stderr: "pipe",
