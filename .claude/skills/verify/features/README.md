@@ -6,7 +6,7 @@ This directory is the maintained source for verifying what a person sees in bett
 
 - Launch with `.claude/skills/verify/scripts/launch.sh <port>` and require `.claude/skills/verify/scripts/doctor.sh <port>` to print `worth driving`.
 - Use `http://localhost:<port>`, never `127.0.0.1`.
-- Each recipe provisions its own workspace through `.claude/skills/verify/scripts/harness.sh`. Nothing is seeded before a recipe runs.
+- Recipes provision their workspaces through `.claude/skills/verify/scripts/harness.sh`. Nothing is seeded before a recipe runs.
 - Sign in with `.claude/skills/verify/scripts/sign-in.sh <port> <email> [path]`. It also switches from one person to another.
 - Never drive an instance this run did not launch.
 
@@ -17,7 +17,7 @@ This directory is the maintained source for verifying what a person sees in bett
 - Locate by role and accessible name, or by a field's label. Never by CSS class, coordinates or tab order.
 - Treat every command as literal. Keep quoted names and flags unchanged, and put the instance's port where a recipe says `<port>`.
 - Wait on a condition with `browse.sh <port> wait --fn` or `browse.sh <port> wait --text`, never for a fixed time.
-- A page whose navigation entry says `built: false` is not built yet. The menu leaves it out, and its address draws the not-found page. Its recipe proves exactly that.
+- A page whose navigation entry says `built: false` is not built yet. Its address draws the not-found page. Its recipe proves exactly that.
 
 ## Proof and skip reporting
 
@@ -33,7 +33,7 @@ This directory is the maintained source for verifying what a person sees in bett
 Each feature file starts with an H1 title and one paragraph describing what a person can do there. It then uses exactly four H2 sections, in this order.
 
 1. `Sub-features` lists one short ID for each page or behaviour, with its address.
-2. `How to get to it (user POV)` lists the ways the file's recipes reach the area's pages.
+2. `How to get to it (user POV)` lists ways a person reaches the area's pages.
 3. `Driving it with agent-browser` starts with `Preconditions:` and uses labelled bullets that pair each action with its exact command and the result a person sees.
 4. `Gotchas` lists traps that waste or invalidate a run.
 

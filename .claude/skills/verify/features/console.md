@@ -12,7 +12,7 @@ The Console is the platform operator's view across every workspace. The operator
 ## How to get to it (user POV)
 
 - The operator lands on `/console/workspaces/every-workspace` after signing in at `/console`.
-- Choose `Everyone`, `Names Waiting` or `Every Workspace` in the `navigation` named `Console`.
+- Choose `Everyone` or `Names Waiting` in the Console menu.
 - Open any of the addresses above with `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port><path>`.
 
 ## Driving it with agent-browser

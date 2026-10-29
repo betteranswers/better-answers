@@ -9,7 +9,7 @@ Inbox is where a person decides the changes other members suggest to concepts. A
 
 ## How to get to it (user POV)
 
-- As the Admin the setup signs in, choose *Inbox* in the rail, the `navigation` named *Areas*. It opens `/inbox/waiting-on-you`.
+- As the Admin the setup signs in, choose *Inbox* in the rail. It opens `/inbox/waiting-on-you`.
 - Choose a suggestion's title in the list. Its page opens.
 
 ## Driving it with agent-browser

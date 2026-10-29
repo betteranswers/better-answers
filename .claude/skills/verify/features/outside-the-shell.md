@@ -23,7 +23,7 @@ A person signs in by email code or by an emailed link, names themselves, sets up
 - Open `/sign-in`.
 - Open `/sign-in/link` with the token of an emailed link.
 - Sign in for the first time with no display name, which opens `/display-name`.
-- Sign in as a person in no workspace, which opens `/no-workspace`.
+- Save a display name on `/display-name`, which opens `/no-workspace` for a person in no workspace.
 - Choose the `Account` link on `/no-workspace`.
 - Sign in as an Admin with no second factor, which opens `/setup`.
 - Sign in by email as an Admin holding a second factor, which opens `/confirm`. Choose `Use a Recovery Code` there for `/recovery`.

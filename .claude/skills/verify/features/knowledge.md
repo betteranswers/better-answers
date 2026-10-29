@@ -12,7 +12,7 @@ Knowledge is where a person finds and reads the workspace's concepts. A person s
 
 ## How to get to it (user POV)
 
-- As the Admin the setup signs in, choose *Knowledge* in the rail, the `navigation` named *Areas*. It opens `/knowledge/search`.
+- As the Admin the setup signs in, choose *Knowledge* in the rail. It opens `/knowledge/search`.
 - Choose a page in the menu, the `navigation` named *Knowledge*. Under *BROWSE* it lists *Search* and *Knowledge Base*. Under *CURATION* it lists *Collections and Owners*.
 - Type in *Search by a word or a question* and choose a concept in the *Matches* list. Its page opens.
 - Choose *Back to Search* on a concept's page.
