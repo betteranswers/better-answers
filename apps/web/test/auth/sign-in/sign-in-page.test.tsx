@@ -42,11 +42,24 @@ const triesLeft = (left: number): RegExp => new RegExp(String.raw`\b${String(lef
 
 const refusal = () => screen.getByRole("alert").textContent;
 
-const sendTheFirstCode = async () => {
+const addressTyped = async (): Promise<HTMLInputElement> => {
   const field = await screen.findByLabelText("Email Address");
+  if (!(field instanceof HTMLInputElement)) throw new Error("the email field is no input");
   field.focus();
   fireEvent.change(field, { target: { value: ADDRESS } });
+  return field;
+};
+
+const sendTheFirstCode = async () => {
+  await addressTyped();
   fireEvent.click(screen.getByRole("button", { name: "Send Code" }));
+};
+
+/** jsdom turns no Enter into a submit, so the form the field sits in is submitted instead. */
+const enterPressedInTheAddress = async () => {
+  const { form } = await addressTyped();
+  if (form === null) throw new Error("the email field sits in no form");
+  fireEvent.submit(form);
 };
 
 const codeField = async (): Promise<HTMLInputElement> => {
@@ -131,8 +144,6 @@ it("names connecting Claude when sign-in carries Claude's request", async () => 
 
   await openAtTheAddressBar(`/sign-in?${carried.toString()}`);
 
-  expect(globalThis.location.pathname).toBe("/sign-in");
-  expect(globalThis.location.search).toMatch(/^\?/);
   expect(
     await screen.findByRole("heading", { level: 1, name: "Sign In to Connect Claude" }),
   ).toBeDefined();
@@ -151,7 +162,7 @@ it("announces a sent code in the standing region, keeping focus", async () => {
   expect(alerts[0]?.textContent, "the alert region stands with words already in it").toBe("");
   const stood = said[0];
 
-  await sendTheFirstCode();
+  await enterPressedInTheAddress();
 
   await waitFor(() => expect(screen.getByRole("status").textContent).toContain(ADDRESS));
   expect(

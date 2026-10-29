@@ -152,10 +152,18 @@ export const openAt = async (path: string, api: Api) => {
   return router;
 };
 
-/** A page outside the shell draws no switcher, so this waits for none. */
-export const openOutsideTheShellAt = async (path: string, api: Api) => {
+/** A page outside the shell draws no switcher, so none is awaited. `watching` sees each ask, a write's body included. */
+export const openOutsideTheShellAt = async (
+  path: string,
+  api: Api,
+  watching?: (asked: Asked, init?: RequestInit) => void,
+) => {
   server.asks = [];
-  server.answer = answering(api);
+  const answer = answering(api);
+  server.answer = (asked, init) => {
+    watching?.(asked, init);
+    return answer(asked, init);
+  };
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
   const { router } = await openApp(path, clients);

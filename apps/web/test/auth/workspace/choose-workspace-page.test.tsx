@@ -1,9 +1,11 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
-import { HOMES } from "@/shared/navigation.ts";
-import type { Api } from "@test/stubbed-api.ts";
+import { HOMES, type Role } from "@/shared/navigation.ts";
+import type { Asked } from "@test/stub-server.ts";
+import { addressOf, type Api } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -47,11 +49,27 @@ const holding = (workspaces: readonly unknown[]): Api => {
   return api;
 };
 
-const picksOpenAsAdmin = (api: Api) => {
+const picksOpenAs = (api: Api, role: Role) => {
   api.set(SET_ACTIVE, () => {
-    api.set("session.member", () => adaAt("Admin"));
+    api.set("session.member", () => adaAt(role));
+    api.set("/get-session", () => ({
+      ...SIGNED_IN_WITH_NONE_OPEN,
+      session: { id: "s", activeOrganizationId: NORTHERN.id },
+    }));
     return {};
   });
+};
+
+const pickBody = z.object({ organizationId: z.string() });
+
+const watchingPicks = () => {
+  const picked: string[] = [];
+  const watching = (asked: Asked, init?: RequestInit) => {
+    if (addressOf(asked).pathname !== SET_ACTIVE) return;
+    const body = typeof init?.body === "string" ? init.body : "";
+    picked.push(pickBody.parse(JSON.parse(body)).organizationId);
+  };
+  return { picked, watching };
 };
 
 const picksRefused = (api: Api): (() => number) => {
@@ -69,8 +87,9 @@ const refusal = () => screen.getByRole("alert").textContent;
 
 it("shows a member of two workspaces their role in each", async () => {
   const api = holding([NORTHERN_ROW, HOLME_ROW]);
-  picksOpenAsAdmin(api);
-  const router = await openOutsideTheShellAt("/choose-workspace", api);
+  picksOpenAs(api, "Admin");
+  const { picked, watching } = watchingPicks();
+  const router = await openOutsideTheShellAt("/choose-workspace", api, watching);
 
   const list = await within(screen.getByRole("main")).findByRole("list");
 
@@ -91,6 +110,25 @@ it("shows a member of two workspaces their role in each", async () => {
   await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Admin.path));
   expect(await screen.findByRole("heading", { level: 1, name: "People" })).toBeDefined();
   expect(await switcher(NORTHERN)).toBeDefined();
+  expect(picked, "the button opened another workspace than its own").toEqual([NORTHERN.id]);
+});
+
+it("skips the picker for a workspace joined after sign-in", async () => {
+  const api = holding([{ workspace: NORTHERN, role: "Editor" }]);
+  picksOpenAs(api, "Editor");
+  const { picked, watching } = watchingPicks();
+  const router = await openOutsideTheShellAt("/choose-workspace", api, watching);
+
+  await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Editor.path));
+  expect(await screen.findByRole("heading", { level: 1, name: "Ask" })).toBeDefined();
+  expect(await switcher(NORTHERN)).toBeDefined();
+  const you = within(screen.getByRole("banner")).getByRole("button", { name: ADA.displayName });
+  fireEvent.keyDown(you, { key: "Enter" });
+  expect((await screen.findByRole("menu", { name: ADA.displayName })).textContent).toContain(
+    "Editor",
+  );
+  expect(screen.queryByRole("heading", { level: 1, name: PICKER_WORDS.heading })).toBeNull();
+  expect(picked, "the sole workspace was opened by another id").toEqual([NORTHERN.id]);
 });
 
 it("stops at one refused pick of a sole workspace", async () => {
