@@ -2,9 +2,8 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { asked, rowOf, SAM } from "@test/people/members-roster.ts";
 import { ADA, adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
-
-import { asked, rowOf, SAM } from "./members-roster.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

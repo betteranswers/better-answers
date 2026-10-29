@@ -3,9 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConnectedSourceWidened } from "@/features/sources/sources-api.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack } from "@test/stubbed-api.ts";
-import { aRefusalAnswer, read } from "@test/two-workspaces.ts";
-
 import {
   aConnectedSource,
   anAdminWith,
@@ -21,7 +18,9 @@ import {
   saidIn,
   thePanelOf,
   connectedSourcesRegion,
-} from "./stubbed-sources.ts";
+} from "@test/sources/stubbed-sources.ts";
+import { heldBack } from "@test/stubbed-api.ts";
+import { aRefusalAnswer, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

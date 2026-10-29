@@ -3,10 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { BULK_WORDS, NO_LONGER_LISTED } from "@/features/people/member-action-words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { asked, listed, outcome, PRIYA, rowOf, SAM } from "@test/people/members-roster.ts";
 import { heldBack } from "@test/stubbed-api.ts";
 import { ADA, adaAnAdmin, GRACE, openAt, read } from "@test/two-workspaces.ts";
-
-import { asked, listed, outcome, PRIYA, rowOf, SAM } from "./members-roster.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

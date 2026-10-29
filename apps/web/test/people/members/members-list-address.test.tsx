@@ -3,9 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { joined, listed, outcome, PRIYA } from "@test/people/members-roster.ts";
 import { ADA, adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
-
-import { joined, listed, outcome, PRIYA } from "./members-roster.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

@@ -2,8 +2,6 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { read } from "@test/two-workspaces.ts";
-
 import {
   aConnectedSource,
   aGroupOfFindings,
@@ -18,7 +16,8 @@ import {
   rowAction,
   rowOf,
   supplierFormsFindings,
-} from "./stubbed-sources.ts";
+} from "@test/sources/stubbed-sources.ts";
+import { read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

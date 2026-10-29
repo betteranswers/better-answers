@@ -4,8 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import { PEOPLE_KEYSTROKES, PEOPLE_SELECT_FIRST } from "@/features/people/people-state.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { adaAnAdmin, adaAt, openAt, openTab } from "@test/two-workspaces.ts";
-
 import {
   actionBesideKey,
   addressField,
@@ -28,7 +26,8 @@ import {
   shownUnder,
   statusChoice,
   tickOf,
-} from "./invitations-stubbed.ts";
+} from "@test/people/invitations-stubbed.ts";
+import { adaAnAdmin, adaAt, openAt, openTab } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

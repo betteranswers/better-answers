@@ -3,8 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack } from "@test/stubbed-api.ts";
-
 import {
   addressOf,
   anInvitation,
@@ -27,7 +25,8 @@ import {
   statusChoice,
   tickOf,
   ticked,
-} from "./invitations-stubbed.ts";
+} from "@test/people/invitations-stubbed.ts";
+import { heldBack } from "@test/stubbed-api.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

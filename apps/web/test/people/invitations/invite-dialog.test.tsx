@@ -4,8 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import { INVITE_REFUSED, INVITE_WORDS } from "@/features/people/invitation-words.ts";
 import { MOST_AT_ONCE } from "@/features/people/invitations/invite-addresses.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack } from "@test/stubbed-api.ts";
-
 import {
   addressField,
   addressOf,
@@ -37,7 +35,8 @@ import {
   tooManyAttempts,
   typed,
   anInvitation,
-} from "./invitations-stubbed.ts";
+} from "@test/people/invitations-stubbed.ts";
+import { heldBack } from "@test/stubbed-api.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

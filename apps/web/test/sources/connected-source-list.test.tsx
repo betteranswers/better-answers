@@ -3,9 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { NEEDS_OCR } from "@/features/sources/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { server } from "@test/stub-server.ts";
-import { adaAnAdmin, adaAt, read } from "@test/two-workspaces.ts";
-
 import {
   aConnectedSource,
   anAdminWith,
@@ -16,7 +13,9 @@ import {
   openSources,
   press,
   rowOf,
-} from "./stubbed-sources.ts";
+} from "@test/sources/stubbed-sources.ts";
+import { server } from "@test/stub-server.ts";
+import { adaAnAdmin, adaAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

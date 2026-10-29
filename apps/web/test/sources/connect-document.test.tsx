@@ -2,8 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-
-import { anAdminWith, openSources, press } from "./stubbed-sources.ts";
+import { anAdminWith, openSources, press } from "@test/sources/stubbed-sources.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
