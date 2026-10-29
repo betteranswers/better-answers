@@ -1,12 +1,18 @@
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { CodeRefused } from "@/features/auth/auth-hooks.ts";
 import { usePasskeySignIn } from "@/features/auth/passkey-hooks.ts";
+import { PASSKEY_SIGN_IN_REFUSED } from "@/features/auth/refusal-words.ts";
+import { openApp } from "@test/open-app.tsx";
 import { A_CHALLENGE, A_CREDENTIAL } from "@test/second-factor-api.ts";
+import { server, type Asked } from "@test/stub-server.ts";
 import { addressOf, answered } from "@test/stubbed-api.ts";
+
+await vi.hoisted(() => import("@test/stub-server.ts"));
 
 afterEach(() => {
   cleanup();
@@ -69,5 +75,73 @@ describe("signing in with a passkey from the email field", () => {
       expect(result.current.failure).toBeInstanceOf(CodeRefused);
     });
     expect(result.current.failure).toMatchObject({ word: "passkey-unknown" });
+  });
+});
+
+const ADDRESS = "ada@example.test";
+
+const NOTHING_GIVEN = () => Promise.resolve(null);
+
+const aDevicePressedAs = (...presses: readonly (() => Promise<null>)[]) => {
+  const waiting = [...presses];
+  return vi.fn<(options: CredentialRequestOptions) => Promise<unknown>>((options) =>
+    options.mediation === "conditional"
+      ? waitingUntilAborted(options.signal)
+      : (waiting.shift() ?? NOTHING_GIVEN)(),
+  );
+};
+
+const onlyThePasskeyOptions = (asked: Asked): Promise<Response> =>
+  addressOf(asked).pathname === "/passkeys/sign-in-options"
+    ? answered(A_CHALLENGE)
+    : Promise.resolve(Response.json(null));
+
+describe("signing in with a passkey from the email step", () => {
+  it("a cancelled passkey prompt leaves the email step unchanged", async () => {
+    const prompt = Promise.withResolvers<null>();
+    const device = aDevicePressedAs(() => prompt.promise, NOTHING_GIVEN);
+    server.answer = onlyThePasskeyOptions;
+    vi.stubGlobal(
+      "PublicKeyCredential",
+      Object.assign(() => undefined, { isConditionalMediationAvailable: async () => true }),
+    );
+    Object.defineProperty(navigator, "credentials", {
+      value: { get: device },
+      configurable: true,
+    });
+    const user = userEvent.setup();
+    await openApp("/sign-in");
+    const field = await screen.findByLabelText("Email Address");
+    await user.type(field, ADDRESS);
+    const press = screen.getByRole("button", { name: "Sign In with a Passkey" });
+    const alert = () => screen.getByRole("alert", { hidden: true });
+
+    await user.click(press);
+
+    await waitFor(() => {
+      expect(press.getAttribute("aria-disabled")).toBe("true");
+    });
+    expect(press, "a natively disabled button drops the focus it holds").toHaveProperty(
+      "disabled",
+      false,
+    );
+    expect(document.activeElement).toBe(press);
+
+    prompt.reject(new DOMException("cancelled", "NotAllowedError"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toMatch(/no passkey was used/i);
+    });
+    expect(press.getAttribute("aria-disabled")).toBe("false");
+    expect(alert().textContent, "an unused passkey read as a refusal").toBe("");
+    expect(field).toHaveProperty("value", ADDRESS);
+    expect(document.activeElement, "focus left the passkey button").toBe(press);
+
+    await user.click(press);
+
+    await waitFor(() => {
+      expect(alert().textContent).toBe(PASSKEY_SIGN_IN_REFUSED);
+    });
+    expect(field).toHaveProperty("value", ADDRESS);
   });
 });
