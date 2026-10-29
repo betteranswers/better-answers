@@ -7,6 +7,7 @@ import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { heldBack, type Api } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -18,7 +19,6 @@ import {
   drawnWithNoWorkspace,
   GRACE,
   HEDY,
-  heldBack,
   HOLME,
   LOST,
   NORTHERN,
@@ -28,7 +28,6 @@ import {
   switcher,
   switcherDrawn,
   tickOf,
-  type Api,
 } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -272,7 +271,7 @@ describe("a tab whose workspace the session has left", () => {
     await screen.findByRole("tab", { name: "Members" });
     expect(router.state.location.pathname).toBe(MEMBERS);
     expect(tickOf(GRACE.displayName), "a refused change put the left rows back").toBeNull();
-    expect(screen.getByText(MEMBERS_LOADING)).toBeDefined();
+    expect(await screen.findByText(MEMBERS_LOADING)).toBeDefined();
 
     list.resolve();
     await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());

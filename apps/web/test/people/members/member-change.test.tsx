@@ -6,6 +6,7 @@ import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { ROLE_UNREAD } from "@/features/people/members/self-action.tsx";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { type Api } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -21,7 +22,6 @@ import {
   read,
   switcher,
   switcherDrawn,
-  type Api,
 } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));

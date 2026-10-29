@@ -823,20 +823,22 @@ On 28/10/2026 the first rule, a 20s drop in `pnpm check:worker`, summed case tim
 
 **Depends on.** BA-272.
 
+Changed 29/10/2026. The web already had a partial hold, `heldBack` in `two-workspaces.ts`, which could resolve and not reject. It now lives in `stubbed-api.ts` with `reject`, a `pending` flag and an ask count, and `openAt` and `openOutsideTheShellAt` in `two-workspaces.ts` record each procedure asked, with its input, in `server.asks`. A test that opens the app another way records none. Each of the five specs' 221 cases was read in full against its helpers, and a case moved only when a Testing Library test over the stubbed api makes every claim it makes, or when a named kept browser case or lower-layer test makes the one claim jsdom cannot. 124 cases left the five specs, against Appendix E's estimate of about 110. 123 of them moved to Testing Library tests under their titles. The 124th, sign-in's "draws a row of secondary actions in one treatment", is now a computed-style comparison of the row's buttons inside the kept "a new code sent from the code step signs in", since jsdom cannot see a treatment. They are 30 of people's 68, 30 of people-invitations' 35, 21 of sources' 36, 31 of knowledge-search's 45 and 12 of sign-in's 37. The other 97 keep a claim that only a real browser or the real api makes. These are a latency budget, layout at 320 or 390 px or a computed style, the accessibility gate run on a page's end state, a native Tab or Enter that jsdom does not do, a second tab or a hidden one, a real email code, upload or clipboard, and what the api decides, such as a Viewer's search withholding a Restricted match. People-invitations' "sends 50 at once, holding a 51st in the field" moves. BA-272 kept it because it asserts two focus landings and the second send, which the api's case does not, and no page test of the tab existed. Its page test now asserts both. Its Enter on Invite a Person, and the Enter on Remove in "removal hands focus to the row before, then the field", are pressed through `@testing-library/user-event`, which clicks a native `<button>` on Enter and does nothing on a `<div role="button">`. Every helper the moved cases share sits in `apps/web/test/support/`, in a subfolder per feature, because `apps/web/AGENTS.md` puts every web test helper there and `apps/web/test/support/` held 14 files at trunk, so the helpers go in a subfolder per feature, and the folder stops at the cap of 15 with this PR's `stubbed-api.test.ts`. A moved case that checks nothing happened drains the app's and the stub's timers in virtual time through `settlingAfter` in `stubbed-api.ts`, and waits on no sleep. "acts on no member paged out of view by key" mounted the app six times in one test and timed out at 5 s under load, so it is now a describe of that name holding one case per key, and a fifth case, "acts on a member paged back only once focused".
+
 **Files.**
 
-- [ ] Edit the web's stubbed api, today `apps/web/test/support/stubbed-api.ts`.
-- [ ] Create component test files beside each feature's tests for people, people-invitations, sources, knowledge-search and sign-in. They go in `apps/web/test/people/`, `test/people/invitations/`, `test/sources/`, `test/knowledge/` and `test/auth/sign-in/`, which exist and mirror `src/features/`.
-- [ ] Edit those five specs under `apps/web/e2e/` to drop the moved cases.
+- [ ] Edit the web's stubbed api, `apps/web/test/support/stubbed-api.ts`, and `stub-server.ts` and `two-workspaces.ts`, which feed and answer it. Add `apps/web/test/support/stubbed-api.test.ts` for the hold.
+- [ ] Create component test files in the folders that mirror `src/features/`. They are `apps/web/test/people/`, `test/people/members/`, `test/people/invitations/`, `test/sources/`, `test/knowledge/`, `test/auth/sign-in/` and `test/auth/workspace/`. Their helpers go in `test/support/people/`, `test/support/sources/` and `test/support/knowledge/`.
+- [ ] Edit those five specs under `apps/web/e2e/` to drop the moved cases, and `apps/web/e2e/knowledge.ts` to drop the helpers only they used.
 
 **Build.**
 
 - [ ] Let a test hold a stubbed procedure and resolve or reject it when it chooses. This replaces the `page.route` holds the browser cases use.
-- [ ] Move each COMPONENT case in Appendix E's browser table for the five specs to Testing Library, keeping its title. About 110 cases move.
+- [ ] Move each browser case of the five specs whose every claim a Testing Library test makes, keeping its title. 123 cases move and one becomes a check in a kept case. Each is named in the PR body.
 
 **You see.**
 
-- [ ] The five specs hold their journey, budget, gate and layout cases only.
+- [ ] `pnpm check:web:e2e --list` counts 124 fewer tests than trunk's 699, which is 575, and the unit run holds each of the 123 moved titles. The five specs hold the cases whose claim a real browser or the real api makes.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -858,10 +860,12 @@ On 28/10/2026 the first rule, a 20s drop in `pnpm check:worker`, summed case tim
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Summed per-test seconds of the browser suite, and wall seconds of `pnpm check:web:unit`.
-- [ ] Probe. Run both at trunk and head, interleaved, twice each.
+- [ ] Metric. Summed per-test seconds of the five edited specs.
+- [ ] Probe. Five interleaved rounds per side inside `suite-slot.sh --exclusive`.
 - [ ] Baseline. Record the trunk values first.
-- [ ] Rule. Fails if the browser sum is not at least 400s below trunk's, or if web-unit's wall grows by more than 60s.
+- [ ] Rule. Fails unless every head round is lower than every trunk round. Record the browser wall and `check:web:unit`'s wall at trunk and head as figures.
+
+Measured 29/10/2026. Five exclusive interleaved rounds per side. The five specs' summed per-test seconds fell from a median of 567.9s at trunk to 283.6s at head with the ranges apart, and their browser wall fell from 197s to 105s. `check:web:unit`'s wall rose from 40s to 62s, which is 22s more locally, and it took 196s to 213s on CI against 77s to 140s on earlier runs. The likely cause is module import, which vitest reports as 55% of its time, but this is not established. CI's browser sum varies by about 540s across `main` runs, so one sample cannot judge the earlier 400s rule.
 
 **Review gate.** None. BA-277 is not review-gated.
 
@@ -1076,7 +1080,7 @@ The table places each file in one column. Seven more files in the worker-process
 | workspace-switcher | 97 | 16 | 3 | 9 | 4 | 0 |
 | ask-new-question | 91 | 27 | 3 | 13 | 4 | 5 |
 
-The triage's named pairs include people's "refuses demoting both Admins" against the api's members-procedures case, people-invitations' "sends 50 at once, holding a 51st" against members-invitations, and workspace-switcher's "drops the left workspace's name when the member read fails" against the web's member-change test. BA-272 keeps all three, since each case asserts more than its twin.
+The triage's named pairs include people's "refuses demoting both Admins" against the api's members-procedures case, people-invitations' "sends 50 at once, holding a 51st" against members-invitations, and workspace-switcher's "drops the left workspace's name when the member read fails" against the web's member-change test. BA-272 keeps all three, since each case asserts more than its twin. BA-277 then moves the second, since a page test of the Invitations tab now makes its two focus landings and its second send.
 
 **After-table.** Each merged PR adds a row with the five `main` `build` runs that follow it.
 

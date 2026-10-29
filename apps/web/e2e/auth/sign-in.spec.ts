@@ -3,19 +3,15 @@ import assert from "node:assert/strict";
 import type { APIRequestContext, Locator, Page, Route } from "@playwright/test";
 import { z } from "zod";
 
-import type { CarriedOn } from "@/features/auth/sign-in/sign-in-words.ts";
-
 import { expect, test } from "../browser.ts";
 import {
   addMember,
   ageTheCode,
   anAddress,
-  claudesAuthorizeUrl,
   clockTheNextKey,
   codeSentTo,
   confirmedWhenAsked,
   drawnMarks,
-  invite,
   keystrokesButton,
   keystrokesDismissed,
   keystrokesListed,
@@ -28,7 +24,6 @@ import {
   saysARefusal,
   saysTheWait,
   signedInAtHome,
-  signedInWithNoWorkspace,
   signIn,
   signInHeading,
   theActionLandedWithinItsBudget,
@@ -169,39 +164,7 @@ const memberOfTwoWorkspaces = async (
 
 const LIST_BUDGET_MS = 1000;
 
-const theWorkspacesRead = (url: URL): boolean => url.pathname.includes("person.workspaces");
-
 const rowsOf = (page: Page) => page.getByRole("main").getByRole("listitem");
-
-test("shows a member of two workspaces their role in each", async ({ page, request }) => {
-  const email = anAddress("roles");
-  const { first, second } = await memberOfTwoWorkspaces(request, email, {
-    first: "Acme Fabrication",
-    second: "Beta Fabrication",
-  });
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-
-  await expect(page.getByRole("main").getByRole("list")).toMatchAriaSnapshot(`
-    - list:
-      - listitem:
-        - button ${JSON.stringify(first.name)}
-      - listitem:
-        - button ${JSON.stringify(second.name)}
-  `);
-  await expect(rowsOf(page), "a row does not show the role held there").toContainText([
-    "Admin",
-    "Viewer",
-  ]);
-  const acme = page.getByRole("button", { name: first.name, exact: true });
-  await expect(acme, "a screen reader hears no role with the button").toHaveAccessibleDescription(
-    "Admin",
-  );
-
-  await acme.click();
-  await landedAtHome(page, "Admin");
-  await expect(page.getByRole("banner").getByText(first.name)).toBeVisible();
-});
 
 const linesOf = (button: Locator): Promise<number> =>
   button.evaluate((drawn) => {
@@ -330,18 +293,6 @@ test("ends the chooser with Account, Sign out and Keyboard shortcuts", async ({
   await expect(workspaces.first()).toBeFocused();
 });
 
-test("offers one way on to a person in no workspace", async ({ page, request }) => {
-  await signedInWithNoWorkspace(page, request, "nobody");
-
-  await expect(page.getByRole("region", { name: "Ask to Join a Workspace" })).toBeVisible();
-
-  await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /create/i })).toHaveCount(0);
-
-  await page.getByRole("button", { name: "Sign Out" }).click();
-  await expect(signInHeading(page)).toBeVisible();
-});
-
 test("names the product in tab and banner, beside its logo", async ({ page }) => {
   await page.goto("/sign-in");
 
@@ -427,19 +378,6 @@ test("keeps the framed sign-in page inside 320 pixels", async ({ page }) => {
   expect(sideways, "the page scrolls sideways at 320px").toBe(0);
 });
 
-test("draws a row of secondary actions in one treatment", async ({ page, request }) => {
-  const email = anAddress("row");
-  await provision(request, { name: "Row", adminEmail: email });
-  await page.goto("/sign-in");
-  await sendTheFirstCode(page, email);
-
-  const row = page.getByRole("button", { name: "Send a New Code" }).locator("..");
-  const treatments = await row
-    .getByRole("button")
-    .evaluateAll((buttons) => [...new Set(buttons.map((button) => button.dataset["variant"]))]);
-  expect(treatments, "the row mixes its treatments").toEqual(["outline"]);
-});
-
 test("names the wait when one client asks too many codes", async ({ page }) => {
   await page.goto("/sign-in");
   for (let asked = 0; asked < 5; asked += 1) {
@@ -447,42 +385,6 @@ test("names the wait when one client asks too many codes", async ({ page }) => {
   }
 
   await theSendIsRefusedNamingItsWait(page, anAddress("sixth"));
-});
-
-const invitedTo = async (request: APIRequestContext, name: string): Promise<string> => {
-  const workspace = await provision(request, { name });
-  const invited = await invite(request, {
-    workspaceId: workspace.workspaceId,
-    email: anAddress("invited"),
-    inviterId: workspace.admin.id,
-    role: "Editor",
-  });
-  return `/invitations/${invited.id}`;
-};
-
-const namesWhereItCarries = async (page: Page, carriedOn: CarriedOn): Promise<void> => {
-  await expect(page).toHaveURL(/\/sign-in\?/);
-  await expect(signInHeading(page, carriedOn)).toBeVisible();
-};
-
-test("names joining a workspace when sign-in carries an invitation", async ({ page, request }) => {
-  await page.goto(await invitedTo(request, "Joining Ltd"));
-
-  await namesWhereItCarries(page, "joining");
-  await expect(page.getByRole("main")).toMatchAriaSnapshot(`
-    - main:
-      - heading "Sign In to Join a Workspace" [level=1]
-      - paragraph
-      - textbox "Email Address"
-      - button "Send Code"
-  `);
-});
-
-test("names connecting Claude when sign-in carries Claude's request", async ({ page, baseURL }) => {
-  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
-  await page.goto(claudesAuthorizeUrl(baseURL, { prompt: "consent" }));
-
-  await namesWhereItCarries(page, "connecting");
 });
 
 test("a new code sent from the code step signs in", async ({
@@ -513,6 +415,20 @@ test("a new code sent from the code step signs in", async ({
       - button "Use a Different Email Address"
       - button "Keyboard Shortcuts"
   `);
+  const row = page.getByRole("button", { name: "Send a New Code" }).locator("..");
+  const treatments = await Promise.all(
+    (await row.getByRole("button").all()).map((button) =>
+      button.evaluate((element) => {
+        const { backgroundColor, borderTopColor, borderTopWidth, color } =
+          getComputedStyle(element);
+        return { backgroundColor, borderTopColor, borderTopWidth, color };
+      }),
+    ),
+  );
+  expect(treatments, "the row draws its three buttons").toHaveLength(3);
+  for (const treatment of treatments) {
+    expect(treatment, "the row mixes its treatments").toEqual(treatments[0]);
+  }
   await passesTheAccessibilityGate();
   await codeField(page).fill(await codeSentTo(request, email));
 
@@ -553,32 +469,6 @@ test("names the wait when a new code meets the ceiling", async ({
   await expect(page.getByLabel("Email Address")).toHaveValue(email);
 });
 
-test("announces a sent code in the standing region, keeping focus", async ({ page, request }) => {
-  const email = anAddress("stood");
-  await person(request, email);
-
-  await page.goto("/sign-in");
-  await expect(signInHeading(page)).toBeVisible();
-
-  const said = page.getByRole("status", { includeHidden: true });
-  const refused = page.getByRole("alert", { includeHidden: true });
-  await expect(said, "the sign-in page stands no status region").toHaveCount(1);
-  await expect(said, "the status region stands with words already in it").toBeEmpty();
-  await expect(refused, "the sign-in page stands no alert region").toHaveCount(1);
-  await expect(refused, "the alert region stands with words already in it").toBeEmpty();
-  const stood = await said.elementHandle();
-
-  await page.getByLabel("Email Address").fill(email);
-  await page.getByLabel("Email Address").press("Enter");
-
-  await expect(said).toContainText(email);
-  const sameRegion = await said.evaluate((now, then) => now === then, stood);
-  expect(sameRegion, "the code step said the code went in a status region of its own").toBe(true);
-  await expect(refused, "the code step stood an alert region of its own").toHaveCount(1);
-  await expect(refused, "the code step's alert region holds words").toBeEmpty();
-  await expect(codeField(page), "sending the code took focus from the field").toBeFocused();
-});
-
 for (const [named, between] of [
   ["a space", " "],
   ["a dash", "-"],
@@ -610,31 +500,6 @@ test("drops letters, and five digits never sign in", async ({ page, request }) =
 
   await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
   expect(sent, "five digits were sent").toHaveLength(1);
-});
-
-test("sends a wrong code once, selected, naming two tries left", async ({ page, request }) => {
-  const email = anAddress("wrong");
-  await person(request, email);
-  await atTheCodeStep(page, email);
-  const code = await codeSentTo(request, email);
-  const sent = codesSentFrom(page);
-
-  const refused = authAnswering(page, SIGN_IN_PATH);
-  await codeField(page).fill(notTheCode(code, 1));
-  expect(await refused).toMatchObject({ status: 400, code: "INVALID_OTP" });
-  await expect(page.getByRole("alert")).toHaveText(triesLeft(2));
-  await expect(codeField(page)).toBeFocused();
-  await expect(codeField(page)).toHaveAttribute("aria-invalid", "true");
-  const selected = await codeField(page).evaluate((field: HTMLInputElement) => [
-    field.selectionStart,
-    field.selectionEnd,
-  ]);
-  expect(selected, "the refused digits are not selected").toEqual([0, 6]);
-
-  await page.keyboard.press("Enter");
-  await page.keyboard.type(notTheCode(code, 2));
-  await expect(page.getByRole("alert")).toHaveText(triesLeft(1));
-  expect(sent, "the refused code was sent again").toHaveLength(2);
 });
 
 const anotherCodeSignsIn = async (page: Page, request: APIRequestContext, email: string) => {
@@ -799,23 +664,6 @@ test("a shown tab waits for a sign-in of its own", async ({ page, request }) => 
   expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);
 });
 
-const joinedAfterSigningIn = async (page: Page, request: APIRequestContext, name: string) => {
-  const who = await signedInWithNoWorkspace(page, request, "later");
-  const workspace = await provision(request, { name });
-  await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
-  return workspace;
-};
-
-test("skips the picker for a workspace joined after sign-in", async ({ page, request }) => {
-  const workspace = await joinedAfterSigningIn(page, request, "Arrived Late");
-  await page.goto("/choose-workspace");
-
-  await landedAtHome(page, "Editor");
-  await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
-  await expect(await personMenuOpened(page, "Test person")).toContainText("Editor");
-  await expect(thePicker(page)).toHaveCount(0);
-});
-
 test("drops and names a workspace the person was removed from", async ({
   page,
   request,
@@ -847,74 +695,6 @@ test("drops and names a workspace the person was removed from", async ({
 
   await page.keyboard.press("Enter");
   await landedAtHome(page, "Admin");
-});
-
-test("stops at one refused pick of a sole workspace", async ({ page, request }) => {
-  await joinedAfterSigningIn(page, request, "Out Of Reach");
-  let picks = 0;
-  await page.route("**/organization/set-active", async (route) => {
-    picks += 1;
-    await route.abort();
-  });
-  await page.goto("/choose-workspace");
-
-  await saysARefusal(page.getByRole("alert"));
-  await expect(thePicker(page)).toBeVisible();
-  expect(picks, "a refused pick was asked again").toBe(1);
-});
-
-test("keeps the list, saying so, when a pick is refused", async ({ page, request }) => {
-  const email = anAddress("pickfails");
-  const { first, second } = await memberOfTwoWorkspaces(request, email, {
-    first: "Kept Listed",
-    second: "Did Not Open",
-  });
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await page.route("**/organization/set-active", (route) => route.abort());
-
-  const picked = page.getByRole("button", { name: second.name });
-  await picked.click();
-
-  await saysARefusal(page.getByRole("alert"));
-  await expect(picked).toBeFocused();
-  await expect(page.getByRole("button", { name: first.name })).toBeVisible();
-});
-
-test("sends a non-member from the picker to the refused page", async ({ page, request }) => {
-  await signedInWithNoWorkspace(page, request, "none");
-
-  await page.goto("/choose-workspace");
-
-  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign Out" })).toBeVisible();
-});
-
-test("separates an unread workspace list from no workspace, offering retry", async ({
-  page,
-  request,
-}) => {
-  const email = anAddress("listfails");
-  const { first, second } = await memberOfTwoWorkspaces(request, email, {
-    first: "First List Failure",
-    second: "Second List Failure",
-  });
-
-  await page.route(theWorkspacesRead, (route) => route.abort());
-
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-
-  await saysARefusal(page.getByRole("alert"), { timeout: 15_000 });
-  await expect(thePicker(page)).toBeVisible();
-
-  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toHaveCount(0);
-
-  await page.unroute(theWorkspacesRead);
-  await page.getByRole("button", { name: "Try Again" }).click();
-
-  await expect(page.getByRole("button", { name: first.name })).toBeVisible();
-  await expect(page.getByRole("button", { name: second.name })).toBeVisible();
 });
 
 test("makes the pages outside the shell keyboard-operable, landmarked and labelled", async ({

@@ -6,7 +6,7 @@ import { FilterRow } from "@/shared/list/filter-row.tsx";
 import { GridTable, RowLink } from "@/shared/list/grid-table.tsx";
 import { ListPages } from "@/shared/list/list-pages.tsx";
 import { rowInFocus } from "@/shared/list/row-focus.ts";
-import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { choosing, placedWithoutMeasuring } from "@test/measuring.ts";
 import { BareList, LIST_SAYS, MEMBERS, MembersList } from "@test/members-list.tsx";
 
 placedWithoutMeasuring();
@@ -38,17 +38,7 @@ const escape = () => {
 
 /** The registry's select opens on a key, and a touch or a key picks a choice. */
 const picked = (filter: string, choice: string) => {
-  // jsdom lays nothing out, and the select scrolls its chosen choice into view as it opens.
-  Object.defineProperty(Element.prototype, "scrollIntoView", {
-    value: () => undefined,
-    configurable: true,
-  });
-  try {
-    fireEvent.keyDown(screen.getByRole("combobox", { name: filter }), { key: "Enter" });
-    fireEvent.click(screen.getByRole("option", { name: choice }));
-  } finally {
-    Reflect.deleteProperty(Element.prototype, "scrollIntoView");
-  }
+  choosing(screen.getByRole("combobox", { name: filter }), choice);
 };
 
 const pickRole = (role: string) => {

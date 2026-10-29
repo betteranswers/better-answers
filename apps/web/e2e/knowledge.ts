@@ -1,11 +1,4 @@
-import {
-  expect,
-  type APIRequestContext,
-  type Locator,
-  type Page,
-  type Response,
-  type Route,
-} from "@playwright/test";
+import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { z } from "zod";
 
 import {
@@ -21,57 +14,6 @@ import {
 export const isAFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
 
 export const isAnOpen = (url: URL): boolean => url.pathname.includes("knowledge.open");
-
-type Answer = Readonly<Record<string, unknown>>;
-
-const anAnswer = z.record(z.string(), z.unknown());
-
-const batched = z.array(z.object({ result: z.object({ data: anAnswer }) }));
-
-const answeredWith =
-  (changed: (data: Answer) => Answer) =>
-  async (route: Route): Promise<void> => {
-    const response = await route.fetch();
-    const answers = batched.parse(await response.json());
-    await route.fulfill({
-      response,
-      json: answers.map(({ result }) => ({ result: { data: changed(result.data) } })),
-    });
-  };
-
-const matchesIn = z.object({ matches: z.array(anAnswer) });
-
-const matchesOf = (data: Answer): readonly Answer[] | undefined =>
-  matchesIn.safeParse(data).data?.matches;
-
-export const matchesAnswered = async (response: Response): Promise<readonly Answer[]> =>
-  batched.parse(await response.json()).flatMap(({ result }) => matchesOf(result.data) ?? []);
-
-export const matchesBecome = (changed: (matches: readonly Answer[]) => readonly Answer[]) =>
-  answeredWith((data) => {
-    const matches = matchesOf(data);
-    return matches === undefined ? data : { ...data, matches: changed(matches) };
-  });
-
-const passageIn = z.object({ passage: anAnswer });
-
-export const passageBecomes = (changed: Answer) =>
-  answeredWith((data) => {
-    const passage = passageIn.safeParse(data).data?.passage;
-    return passage === undefined ? data : { ...data, passage: { ...passage, ...changed } };
-  });
-
-export const refusedAtACeiling = (route: Route): Promise<void> => {
-  const calls = new URL(route.request().url()).pathname.split(",");
-  const refusal = {
-    error: {
-      message: "Too many requests.",
-      code: -32_029,
-      data: { code: "TOO_MANY_REQUESTS", httpStatus: 429, retryAfterSeconds: 60 },
-    },
-  };
-  return route.fulfill({ status: 429, json: calls.map(() => refusal) });
-};
 
 export const heldBack = async (page: Page, named: (url: URL) => boolean) => {
   const held = Promise.withResolvers<void>();

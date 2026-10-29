@@ -1,3 +1,4 @@
+import { act } from "@testing-library/react";
 import { TRPCClientError } from "@trpc/client";
 import { vi } from "vitest";
 
@@ -55,9 +56,66 @@ export const answeringAs =
     );
   };
 
+export type Api = Map<string, () => unknown>;
+
+export type Held = {
+  readonly asked: Promise<void>;
+  readonly pending: boolean;
+  readonly asks: number;
+  readonly resolve: (answer?: unknown) => void;
+  readonly reject: (refusal: unknown) => void;
+};
+
+export const heldBack = (api: Api, procedure: string, answer?: unknown): Held => {
+  const asked = Promise.withResolvers<void>();
+  const gate = Promise.withResolvers<() => unknown>();
+  const before = api.get(procedure);
+  let waiting = 0;
+  let asks = 0;
+  api.set(procedure, () => {
+    asks += 1;
+    waiting += 1;
+    asked.resolve();
+    return gate.promise.then((answering) => {
+      waiting -= 1;
+      return answering();
+    });
+  });
+  return {
+    asked: asked.promise,
+    get pending() {
+      return waiting > 0;
+    },
+    get asks() {
+      return asks;
+    },
+    resolve: (given) => {
+      gate.resolve(() => given ?? answer ?? before?.());
+    },
+    reject: (refusal) => {
+      gate.resolve(() => refusal);
+    },
+  };
+};
+
 export const withTheApiDown = () => {
   vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the network is down")));
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
   return clients;
+};
+
+const SETTLES_WITHIN_MS = 1000;
+
+/** Drains the app's and the stub's timers in virtual time, so a check that nothing happened waits for the app. */
+export const settlingAfter = async (happens: () => void): Promise<void> => {
+  vi.useFakeTimers();
+  try {
+    await act(async () => {
+      happens();
+      await vi.advanceTimersByTimeAsync(SETTLES_WITHIN_MS);
+    });
+  } finally {
+    vi.useRealTimers();
+  }
 };

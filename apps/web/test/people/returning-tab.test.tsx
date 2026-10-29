@@ -6,6 +6,7 @@ import { MEMBERS_LOADING } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { heldBack, type Api } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -15,7 +16,6 @@ import {
   band,
   GRACE,
   HEDY,
-  heldBack,
   HOLME,
   openAt,
   openTab,
@@ -23,7 +23,6 @@ import {
   switcher,
   switcherDrawn,
   tickOf,
-  type Api,
 } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -82,7 +81,7 @@ describe("a tab shown again after a switch in another tab", () => {
 
     await switcher(HOLME);
     expect(tickOf(GRACE.displayName), "a row of the workspace left is drawn").toBeNull();
-    expect(screen.getByText(MEMBERS_LOADING)).toBeDefined();
+    expect(await screen.findByText(MEMBERS_LOADING)).toBeDefined();
     expect(router.state.location.pathname).toBe(MEMBERS);
     await waitFor(() => expect(band().getByRole("status").textContent).toBe(SAID));
 

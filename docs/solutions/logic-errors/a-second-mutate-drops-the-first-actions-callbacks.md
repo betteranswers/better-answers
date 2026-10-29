@@ -66,7 +66,7 @@ So an action whose per-call callbacks carry its answer must not let a second cal
 - `apps/web/src/features/people/members/member-page.tsx`, `useRemoval`'s `remove()`: `if (removeMember.isPending) return;`, the same guard `CredentialsRevoker` already used in `member-sections.tsx`, with the confirm button marked `aria-disabled` while pending so focus stays on it.
 - `apps/web/src/features/people/members/member-bulk-actions.tsx`, `useMemberBulkActions`: an `acting` flag set when an action is sent and cleared first thing when it succeeds or fails. While it is set, the bar's actions and their keystrokes refuse to open another action and say "The previous action is still in progress. Please try again when it has finished.", and `command()` sends nothing. It blocks every kind of action, not only the same kind, so two actions' outcome lines cannot overwrite each other.
 
-The browser specs in `apps/web/e2e/people/people.spec.ts` hold the first request's answer back and press again; both failed on the unguarded code.
+Two cases hold the first request's answer back and press again; both failed on the unguarded code. "removing yourself, pressed twice, asks once and still leaves" in `apps/web/test/people/members/own-member-actions.test.tsx` covers the removal. "a second action waits on the first, whose refusal lands" in `apps/web/e2e/people/people.spec.ts` covers the bulk bar.
 
 ## Why This Works
 
