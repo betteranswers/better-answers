@@ -9,6 +9,7 @@ import { setActiveWorkspace } from "../support/flow.ts";
 import type { TestClient } from "../support/harness/harness.ts";
 import { signedInClient } from "../support/provoke.ts";
 import { appForSuite } from "../support/suite-app.ts";
+import { webClientOf } from "../support/web-client.ts";
 
 const app = appForSuite();
 
@@ -68,6 +69,7 @@ type KeptScene = {
   readonly home: string;
   readonly other: string;
   readonly invitationId: string;
+  readonly adminId: string;
   readonly client: TestClient;
 };
 
@@ -125,7 +127,13 @@ const aKeptScene = async (): Promise<KeptScene> => {
   });
   const client = await signedInClient(app(), home.admin.email);
   expect((await setActiveWorkspace(client, home.workspaceId)).status).toBe(200);
-  return { home: home.workspaceId, other: other.workspaceId, invitationId: invited.id, client };
+  return {
+    home: home.workspaceId,
+    other: other.workspaceId,
+    invitationId: invited.id,
+    adminId: home.admin.id,
+    client,
+  };
 };
 
 const identityRows = async () => {
@@ -183,6 +191,21 @@ describe("the organisation plugin's kept endpoints", () => {
 
     const session = await (await scene.client.fetch("/get-session")).json();
     expect(session).toMatchObject({ session: { activeOrganizationId: scene.other } });
+  });
+
+  it("refuses a switch to a workspace the person left", async () => {
+    const scene = await aKeptScene();
+    await app().removeMember(scene.other, scene.adminId);
+
+    const refused = await setActiveWorkspace(scene.client, scene.other);
+
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({
+      code: "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION",
+    });
+    expect(await webClientOf(scene.client).api.person.workspaces.query()).toEqual([
+      { workspace: { id: scene.home, name: "Home" }, role: "Admin" },
+    ]);
   });
 
   it("answers an Admin no for every organisation write", async () => {
