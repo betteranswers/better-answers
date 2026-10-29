@@ -395,6 +395,21 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await pricesHeld(served())).toEqual(before);
     });
 
+    it("answers usage with a rate missing, writing nothing", async () => {
+      const before = await pricesHeld(served());
+
+      const run = await ops(served(), [
+        "set-model-price",
+        "--provider",
+        "anthropic",
+        "--model",
+        SONNET,
+      ]);
+
+      expect(run.exitCode).toBe(2);
+      expect(await pricesHeld(served())).toEqual(before);
+    });
+
     it("names both spend commands in the usage", async () => {
       const run = await ops(served(), ["help"]);
 
@@ -476,6 +491,26 @@ describe("pnpm ops — the restore scripts' commands", () => {
         exitCode: 7,
         lines: [
           "set-decision-threshold: REFUSED — not-a-decision-model: anthropic speaks no decision shape; only cloudflare take a threshold; nothing changed",
+        ],
+      });
+      expect(await thresholdsHeld(served(), model)).toEqual([]);
+    });
+
+    it("answers usage with the threshold missing, writing nothing", async () => {
+      const model = aModel();
+
+      const run = await ops(served(), [
+        "set-decision-threshold",
+        "--provider",
+        "cloudflare",
+        "--model",
+        model,
+      ]);
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 2,
+        lines: [
+          "set-decision-threshold: --provider <cloudflare>, --model <model> and --threshold <probability> are required",
         ],
       });
       expect(await thresholdsHeld(served(), model)).toEqual([]);
@@ -641,6 +676,20 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(absent.lines).toEqual([
         `set-model-choice: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
       ]);
+    });
+
+    it("answers usage with the model missing, writing nothing", async () => {
+      const { workspaceId } = await served().provision();
+
+      const run = await ops(served(), ["set-model-choice", "--workspace", workspaceId]);
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 2,
+        lines: [
+          "set-model-choice: --workspace <id>, --purpose <extraction|enrichment|answering|judging>, --provider <provider> and --model <model> are required",
+        ],
+      });
+      expect(await choicesHeld(served(), workspaceId)).toEqual([]);
     });
 
     it("names the command in the usage", async () => {

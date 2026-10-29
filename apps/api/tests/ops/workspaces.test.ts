@@ -234,6 +234,20 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await workspacesWithShortName(served(), shortName)).toBe(0);
     });
 
+    it("answers usage to a missing --name, writing nothing", async () => {
+      const admin = await served().person();
+      const shortName = aShortName();
+
+      const run = await provisioning(served(), ["--short-name", shortName, "--admin", admin.email]);
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual([
+        "provision-workspace: --name <name>, --short-name <short name> and --admin <email> are required",
+      ]);
+      expect(await workspacesWithShortName(served(), shortName)).toBe(0);
+      expect(await workspaceCountOf(served(), admin.id)).toBe(0);
+    });
+
     it("names both commands in the usage", async () => {
       const run = await ops(served(), ["help"]);
 
@@ -520,6 +534,20 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([matching.stringMatching(/^add-person: REFUSED — .*pool/i)]);
+    });
+
+    it("answers usage to a missing --name, writing nothing", async () => {
+      const email = aVerifier();
+      const before = await addedRowCount(served());
+
+      const run = await addingPerson(served(), ["--email", email]);
+
+      expect(run).toMatchObject({
+        exitCode: 2,
+        lines: ["add-person: --email <address> and --name <display name> are required"],
+      });
+      expect(await personsAt(served(), email)).toEqual([]);
+      expect(await addedRowCount(served())).toBe(before);
     });
 
     it("names the command in the usage", async () => {

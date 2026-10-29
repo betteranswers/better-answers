@@ -788,6 +788,18 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
     });
 
+    it("answers usage to a --dry-run carrying a value, writing nothing", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(served());
+
+      const run = await importing(served(), workspaceId, admin.email, {
+        flags: ["--dry-run", "yes"],
+      });
+
+      expect(run.exitCode).toBe(2);
+      expect(await commitsOf(served(), workspaceId)).toEqual([]);
+      expect(await indexRowsOf(served(), workspaceId)).toEqual([]);
+    });
+
     it("lands in a workspace provision-workspace and add-member stood up", async () => {
       const owner = await served().person(undefined, "Liam Owner");
       const provisioned = await provisioning(served(), [

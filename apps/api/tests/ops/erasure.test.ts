@@ -438,6 +438,31 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
+    it("answers usage to a wait not in seconds, queueing nothing", async () => {
+      const { workspaceId } = await aWorkspaceToDrillIn();
+
+      const run = await opsWith(
+        served(),
+        [
+          "erasure-rehearsal",
+          "--workspace",
+          workspaceId,
+          "--synthetic",
+          "--seed",
+          "--wait-seconds",
+          "a minute",
+        ],
+        {},
+      );
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual([
+        "erasure-rehearsal: --wait-seconds takes a whole number of seconds",
+      ]);
+      expect(await jobsOf(served(), workspaceId)).toEqual([]);
+      expect(await indexJobsIn(served(), workspaceId)).toEqual([]);
+    });
+
     it("erases the subject, writes the routine's report, reprints the tokens", async () => {
       const { workspaceId, admin } = await aWorkspaceToDrillIn();
       const file = await reportPath();
