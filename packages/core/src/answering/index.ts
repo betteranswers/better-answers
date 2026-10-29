@@ -1,22 +1,6 @@
-import type {
-  ConceptIri,
-  CorpusCounts,
-  JudgeState,
-  MatchStrength,
-  QuestionVerdict,
-} from "@better-answers/schema";
+import type { ConceptIri } from "@better-answers/schema";
 
-import type { ConceptRead, Frontmatter } from "../concepts/index.ts";
-import {
-  conceptCountsOf,
-  findConcepts,
-  readConcept,
-  trustOf,
-  trustWords,
-  ukLongDate,
-  type OpenedConcept,
-  type Trust,
-} from "../concepts/index.ts";
+import { readConcept } from "../concepts/index.ts";
 import {
   admit,
   ANY_ROLE,
@@ -28,40 +12,25 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import {
-  findPassagesWithOpening,
-  parseLocator,
-  passageAt,
-  passageCountsOf,
-  type PassageMatchWithOpening,
-} from "../sources/index.ts";
+import { parseLocator, passageAt } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import {
-  askInput,
-  findInput,
-  openInput,
-  passageViewOf,
-  type AskInput,
-  type Evidence,
-  type FindInput,
-  type OpenInput,
-  type PassageView,
-} from "./boundary.ts";
-import { cursorOf, type FindPosition, type FindRun } from "./cursor.ts";
+import { askInput, openInput, passageViewOf, type AskInput, type OpenInput } from "./boundary.ts";
 import { judgedBy, type JudgeRefusal, type JudgeSteps } from "./judge.ts";
 import {
-  ANSWER_KIND,
   answerPlanned,
   ASK_CAPS,
   type AskCaps,
-  type MapState,
   type PlannedAnswer,
-  type PreviewedConcept,
   type ReadStep,
-  type RelatedConcept,
-  type ReturnedConcept,
 } from "./plan.ts";
 import type { RecordCompletion, RecordOpening } from "./record.ts";
+import type { OpenResult, AnswerResult } from "./results.ts";
+
+export { NOT_COMPANY_KNOWLEDGE } from "./results.ts";
+export type { FindMatch, FindResult, OpenView, OpenResult, AnswerResult } from "./results.ts";
+export { find } from "./find.ts";
+export type { FindRefusal } from "./find.ts";
+export { renderFind, renderOpen, mapWords, renderAnswer } from "./render.ts";
 
 export {
   answerOutputWith,
@@ -122,86 +91,7 @@ export {
   type TrustStatus,
 } from "../concepts/index.ts";
 
-export const NOT_COMPANY_KNOWLEDGE = "Not company knowledge";
-
-const NO_COLLECTION = "No collection";
-
-type ConceptMatch<Iri extends string> = {
-  readonly layer: "bundles";
-  readonly iri: Iri;
-  readonly kind: string;
-  readonly title: string;
-  readonly trust: Trust;
-  readonly trustWords: string;
-  readonly collection: string | null;
-  readonly tags: readonly string[];
-};
-
-type DocumentMatch = {
-  readonly layer: "sources";
-  readonly kind: "document";
-  readonly title: string;
-  readonly locator: string;
-  readonly sensitivity: string;
-  readonly openingLine: string;
-};
-
-export type FindMatch<Iri extends string = ConceptIri> = ConceptMatch<Iri> | DocumentMatch;
-
-export type FindResult<Iri extends string = ConceptIri> = {
-  readonly query: string;
-  readonly matches: readonly FindMatch<Iri>[];
-
-  readonly nextCursor?: string;
-};
-
 export type { FrontmatterValue } from "../concepts/index.ts";
-
-type ConceptView<Iri extends string> = {
-  readonly iri: Iri;
-  readonly frontmatter: Frontmatter;
-  readonly body: string;
-  readonly relations: readonly {
-    readonly kind: string;
-    readonly target: Iri;
-    readonly title: string;
-  }[];
-  readonly bodyLinks?: readonly {
-    readonly ordinal: number;
-    readonly address: string;
-    readonly target: Iri;
-  }[];
-  readonly trust: Trust;
-  readonly trustWords: string;
-  readonly evidence: readonly Evidence<Iri>[];
-};
-
-type Opened<Iri extends string, View> =
-  | {
-      readonly found: true;
-      readonly concept?: View | undefined;
-      readonly passage?: PassageView | undefined;
-    }
-  | {
-      readonly found: false;
-      readonly iri?: Iri | undefined;
-      readonly locator?: string | undefined;
-    };
-
-export type OpenView<Iri extends string = ConceptIri> = Opened<Iri, ConceptView<Iri>>;
-
-type PaneWords = Pick<ConceptRead["pane"], "access" | "lead" | "next">;
-
-export type OpenResult<Iri extends string = ConceptIri> = Opened<
-  Iri,
-  ConceptView<Iri> & PaneWords & Required<Pick<ConceptView<Iri>, "bodyLinks">>
->;
-
-export type AnswerResult<Iri extends string = ConceptIri> = PlannedAnswer<Iri> & {
-  readonly recordId: string;
-};
-
-const NOT_ANSWERED = "Not answered from the company's knowledge.";
 
 export { FEEDBACK_REASONS, FEEDBACK_VERDICTS } from "@better-answers/schema";
 export {
@@ -212,182 +102,6 @@ export {
   type FeedbackReason,
   type FeedbackReceipt,
 } from "./feedback.ts";
-
-const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
-  const tags = frontmatter["tags"];
-  return Array.isArray(tags) ? tags.filter((tag) => typeof tag === "string") : [];
-};
-
-type Positioned<Match> = { readonly match: Match; readonly position: FindPosition };
-
-type RunReader<Match> = (
-  limit: number,
-  after: FindPosition | undefined,
-) => Promise<Result<readonly Positioned<Match>[]>>;
-
-type Search = {
-  readonly principal: UserPrincipal;
-  readonly tx: Tx;
-  readonly query: string;
-};
-
-type Counted = () => Promise<Result<CorpusCounts>>;
-
-const countedOnce = (
-  runs: readonly FindRun[],
-  after: FindPosition | undefined,
-  count: Counted,
-): Counted => {
-  let held: Promise<Result<CorpusCounts>> | undefined;
-  return () => {
-    held ??=
-      after !== undefined && runs.includes(after.run) ? Promise.resolve(ok(after.counts)) : count();
-    return held;
-  };
-};
-
-const conceptRun =
-  (
-    { principal, tx, query }: Search,
-    run: MatchStrength,
-    counted: Counted,
-  ): RunReader<OpenedConcept> =>
-  async (limit, after) => {
-    const counts = await counted();
-    if (!counts.ok) return err(counts.error);
-    const found = await findConcepts(principal, tx, {
-      query,
-      strength: run,
-      limit,
-      after: after?.run === run ? after.bound : undefined,
-      counts: counts.value,
-    });
-    if (!found.ok) return err(found.error);
-    return ok(
-      found.value.map(({ concept, bound }) => ({
-        match: concept,
-        position: { run, bound, counts: counts.value },
-      })),
-    );
-  };
-
-const passageRun =
-  ({ principal, tx, query }: Search, counted: Counted): RunReader<PassageMatchWithOpening> =>
-  async (limit, after) => {
-    const counts = await counted();
-    if (!counts.ok) return err(counts.error);
-    const found = await findPassagesWithOpening(principal, tx, {
-      query,
-      limit,
-      after: after?.run === "passages" ? after.bound : undefined,
-      counts: counts.value,
-    });
-    if (!found.ok) return err(found.error);
-    return ok(
-      found.value.map(({ passage, bound }) => ({
-        match: passage,
-        position: { run: "passages" as const, bound, counts: counts.value },
-      })),
-    );
-  };
-
-type Page<Match> = { readonly matches: readonly Match[]; readonly next: FindPosition | undefined };
-
-const pageOf = async <Match>(
-  runs: readonly (readonly [FindRun, RunReader<Match>])[],
-  limit: number,
-  after: FindPosition | undefined,
-): Promise<Result<Page<Match>>> => {
-  const read: Positioned<Match>[] = [];
-  const from = after === undefined ? 0 : runs.findIndex(([run]) => run === after.run);
-  for (const [, reader] of runs.slice(from)) {
-    if (read.length > limit) break;
-    // oxlint-disable-next-line eslint/no-await-in-loop -- each run is asked only for what the runs before it left of the page
-    const more = await reader(limit + 1 - read.length, after);
-    if (!more.ok) return err(more.error);
-    read.push(...more.value);
-  }
-  const page = read.slice(0, limit);
-  return ok({
-    matches: page.map(({ match }) => match),
-    next: read.length > limit ? page.at(-1)?.position : undefined,
-  });
-};
-
-const mappedRun =
-  <From, To>(reader: RunReader<From>, to: (from: From) => To): RunReader<To> =>
-  async (limit, after) => {
-    const read = await reader(limit, after);
-    if (!read.ok) return err(read.error);
-    return ok(read.value.map(({ match, position }) => ({ match: to(match), position })));
-  };
-
-const findAction = declareAction({
-  admits: ANY_ROLE,
-  input: findInput,
-  refuses: ["role-forbids"],
-});
-
-export type FindRefusal = RefusalOf<typeof findAction> | Error;
-
-/**
- * Concepts holding at least half the query's words, then passages, then concepts holding fewer.
- * `now` decides which concepts are past their shelf life.
- */
-export const find = async (
-  principal: UserPrincipal,
-  tx: Tx,
-  input: FindInput,
-  now: Date,
-): Promise<Result<FindResult, FindRefusal>> => {
-  const admitted = admit(findAction, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-
-  const search = { principal: admitted.value, tx, query: input.query };
-  const toConcept = (concept: OpenedConcept) => conceptMatchOf(concept, now);
-  const concepts = countedOnce(["strong", "weak"], input.cursor, () =>
-    conceptCountsOf(search.principal, tx, search.query),
-  );
-  const passages = countedOnce(["passages"], input.cursor, () =>
-    passageCountsOf(search.principal, tx, search.query),
-  );
-  const page = await pageOf<FindMatch>(
-    [
-      ["strong", mappedRun(conceptRun(search, "strong", concepts), toConcept)],
-      ["passages", mappedRun(passageRun(search, passages), documentMatchOf)],
-      ["weak", mappedRun(conceptRun(search, "weak", concepts), toConcept)],
-    ],
-    input.limit,
-    input.cursor,
-  );
-  if (!page.ok) return err(page.error);
-  const { matches, next } = page.value;
-  const found: FindResult = { query: input.query, matches };
-  return ok(next === undefined ? found : { ...found, nextCursor: cursorOf(next) });
-};
-
-const conceptMatchOf = (concept: OpenedConcept, now: Date): ConceptMatch<ConceptIri> => {
-  const trust = trustOf(concept, now);
-  return {
-    layer: "bundles",
-    iri: concept.iri,
-    kind: concept.kind,
-    title: concept.title,
-    trust,
-    trustWords: trustWords(trust),
-    collection: concept.collection,
-    tags: tagsOf(concept.frontmatter),
-  };
-};
-
-const documentMatchOf = (match: PassageMatchWithOpening): DocumentMatch => ({
-  layer: "sources",
-  kind: "document",
-  title: match.title,
-  locator: match.locator,
-  sensitivity: match.sensitivity,
-  openingLine: match.openingLine,
-});
 
 const openAction = declareAction({
   admits: ANY_ROLE,
@@ -536,162 +250,3 @@ export const ask = async <Refused = never>(
   if (!completed.ok) return completed;
   return ok({ ...answer, recordId });
 };
-
-const conceptLine = (
-  concept: Pick<PreviewedConcept<string>, "kind" | "title" | "collection" | "trustWords" | "iri">,
-): string =>
-  `${concept.kind} · ${concept.title} · ${concept.collection ?? NO_COLLECTION} · ${concept.trustWords} · ${concept.iri}`;
-
-const findLine = (match: FindMatch<string>): string =>
-  match.layer === "bundles"
-    ? conceptLine(match)
-    : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator} · ${JSON.stringify(match.openingLine)}`;
-
-export const renderFind = (result: FindResult<string>): string => {
-  if (result.matches.length === 0) return "Nothing in the company's knowledge matches that.";
-  const lines = result.matches.map(findLine);
-  return result.nextCursor === undefined
-    ? lines.join("\n")
-    : [...lines, "", `More follow: call find again with cursor ${result.nextCursor}`].join("\n");
-};
-
-const quoted = (text: string): readonly string[] => text.split(/\r?\n/u).map((line) => `> ${line}`);
-
-export const renderOpen = (result: OpenView<string>): string => {
-  if (!result.found) {
-    return result.iri === undefined
-      ? `No passage at ${result.locator ?? "that link"}.`
-      : `No concept at ${result.iri}.`;
-  }
-  if (result.passage !== undefined) {
-    const { passage } = result;
-    return [
-      ...quoted(passage.text),
-      "",
-      `— ${passage.source} (${passage.locator}) · ${passage.sensitivity}`,
-    ].join("\n");
-  }
-  return result.concept === undefined ? "Nothing to show." : conceptText(result.concept);
-};
-
-const listed = (heading: string, lines: readonly string[]): readonly string[] =>
-  lines.length === 0 ? [] : ["", heading, ...lines];
-
-const evidenceLines = (evidence: readonly Evidence<string>[]): readonly string[] =>
-  evidence.map(({ source, at, locator, iri }) => {
-    const named = at === undefined ? source : `${source}, ${at}`;
-    const opens = locator ?? iri;
-    return opens === undefined ? `- ${named}` : `- ${named} (${opens})`;
-  });
-
-const conceptText = (concept: ConceptView<string>): string => {
-  const title =
-    typeof concept.frontmatter["title"] === "string" ? concept.frontmatter["title"] : concept.iri;
-  const evidence = evidenceLines(concept.evidence);
-  const related = concept.relations.map(
-    ({ kind, title: named, target }) => `- ${kind} · ${named} · ${target}`,
-  );
-  const linked = new Map((concept.bodyLinks ?? []).map(({ address, target }) => [address, target]));
-  return [
-    `# ${title}`,
-    "",
-    concept.body.trimEnd(),
-    "",
-    `_${concept.trustWords}_`,
-    ...listed("Evidence:", evidence),
-    ...listed("Related:", related),
-    ...listed(
-      "Links in the body:",
-      [...linked].map(([address, target]) => `- ${address} · ${target}`),
-    ),
-  ].join("\n");
-};
-
-export const mapWords = (map: MapState): string => {
-  switch (map.state) {
-    case "live":
-      return "map as of now";
-    case "unavailable_since":
-      return `map unavailable since ${ukLongDate(map.since)}`;
-  }
-};
-
-const VERDICT_LINES = {
-  ok: "**Answered from the company's knowledge.**",
-  warn: "**Answered with a warning for your role.**",
-  refuse: `**${NOT_ANSWERED}**`,
-  related:
-    "**Related knowledge, not an answer.** Write only what these concepts state, naming each one you use, and quote an `Answer` word for word, opening one given as a line first.",
-} satisfies Record<QuestionVerdict, string>;
-
-const JUDGE_WORDS = {
-  "not-judged": "Not judged",
-  judged: "Judged",
-  "judging-failed": "Judging failed",
-} satisfies Record<JudgeState, string>;
-
-const namedOrNone = (collections: readonly string[]): string =>
-  collections.length === 0 ? "none" : collections.join(", ");
-
-const returnedText = (heading: string, concept: ReturnedConcept<string>): readonly string[] => [
-  "",
-  `## ${heading}${concept.kind} · ${concept.collection ?? NO_COLLECTION}`,
-  concept.kind === ANSWER_KIND ? `Question: ${concept.title}` : concept.title,
-  `_${concept.trustWords}_`,
-  "",
-  concept.body.trimEnd(),
-  ...listed("Evidence:", evidenceLines(concept.evidence)),
-  "",
-  concept.iri,
-];
-
-const RELATED_HEADING = "Related knowledge · ";
-
-const PREVIEWS_HEADING =
-  "Also bearing on the question, one line each: read one with `open` and its iri before writing from it.";
-
-const relatedText = (related: readonly RelatedConcept<string>[]): readonly string[] => [
-  ...related.flatMap((concept) =>
-    "body" in concept ? returnedText(RELATED_HEADING, concept) : [],
-  ),
-  ...listed(
-    PREVIEWS_HEADING,
-    related.flatMap((concept) => ("body" in concept ? [] : [`- ${conceptLine(concept)}`])),
-  ),
-];
-
-const FITS_HEADING = "Answers that fit, each word for word below:";
-
-const fitLine = (fit: ReturnedConcept<string>): string =>
-  `- ${fit.collection ?? NO_COLLECTION} · ${fit.title} · ${fit.iri}`;
-
-const unmappedText = (passage: PassageView): readonly string[] => [
-  "",
-  `${NOT_COMPANY_KNOWLEDGE} · ${passage.sensitivity}`,
-  ...quoted(passage.text),
-  `— ${passage.source} (${passage.locator})`,
-];
-
-const FITS_THEN_RELATED =
-  "**Related knowledge, which the judge did not pass as answering the question as asked.**";
-
-const answeredText = (answer: PlannedAnswer<string>): readonly string[] =>
-  answer.answers.length === 0
-    ? relatedText(answer.related)
-    : [
-        ...answer.answers.flatMap((fit) => returnedText("", fit)),
-        ...(answer.related.length === 0 ? [] : ["", FITS_THEN_RELATED]),
-        ...relatedText(answer.related),
-      ];
-
-export const renderAnswer = (answer: AnswerResult<string>): string =>
-  [
-    VERDICT_LINES[answer.verdict],
-    `Record of this question: ${answer.recordId}`,
-    ...(answer.answers.length === 0 ? [] : [FITS_HEADING, ...answer.answers.map(fitLine)]),
-    `_${JUDGE_WORDS[answer.judgeState]} · ${mapWords(answer.map)}_`,
-    `Collections considered: ${namedOrNone(answer.collections)}`,
-    `Collections you may name: ${namedOrNone(answer.readableCollections)}`,
-    ...answeredText(answer),
-    ...answer.unmappedPassages.flatMap(unmappedText),
-  ].join("\n");
