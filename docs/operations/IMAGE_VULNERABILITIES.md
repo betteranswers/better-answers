@@ -84,7 +84,7 @@ Every critical and high alert open that day. The medium ones were assessed on 30
 
 ### `image-api`
 
-The service is `node apps/api/src/main.ts` as uid 1000, and `pnpm migrate` from the same image. It spawns `git`, which runs local plumbing on bare repositories and never a remote (`packages/core/src/store/git/index.ts`), and `git filter-repo` in the erasure routine. The healthcheck runs `wget`.
+The service is `node apps/api/src/main.ts` as uid 1000, and `pnpm migrate` from the same image. It spawns `git`, which runs local plumbing on bare repositories and never a remote (`packages/core/src/store/git/door.ts`), and `git filter-repo` in the erasure routine. The healthcheck runs `wget`.
 
 - **util-linux**: `util-linux`, `mount`, `login`, `bsdutils`, `libmount1`, `libblkid1`, `libsmartcols1`, `liblastlog2-2`, `libuuid1`. CVE-2026-76642, CVE-2026-78408, CVE-2026-78409 and CVE-2026-78410, 36 alerts. Debian's base system, and `libuuid1` for `wget` and Python's `_uuid` as well. Each flaw needs a user mount that `/etc/fstab` authorises, through the setuid `mount` and its `X-mount.*` options, or a privileged operator running `nsenter --join-cgroup`. The fstab is Debian's unconfigured stub, nothing calls `mount` or `nsenter`, and no compose file adds a capability, so the container has no `CAP_SYS_ADMIN` to mount with.
 - **`libacl1`**: CVE-2026-54369, 1 alert. For coreutils, `sed`, `tar` and `passwd`. The symlink flaw needs a privileged caller on a path an attacker controls. Only `cp`, `mv`, `install`, `sed`, `tar`, `useradd` and `usermod` link it, and the api runs none of them.
