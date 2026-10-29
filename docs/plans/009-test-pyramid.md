@@ -865,7 +865,7 @@ Changed 29/10/2026. The web already had a partial hold, `heldBack` in `two-works
 - [ ] Baseline. Record the trunk values first.
 - [ ] Rule. Fails unless every head round is lower than every trunk round. Record the browser wall and `check:web:unit`'s wall at trunk and head as figures.
 
-Measured 29/10/2026. Five exclusive interleaved rounds per side: the five specs' summed per-test seconds fell from a median of 567.9s at trunk to 283.6s at head with the ranges apart, and their browser wall fell from 197s to 105s. `check:web:unit`'s wall rose from 40s to 62s, which is 22s more locally, and it took 196s to 213s on CI against 77s to 140s on earlier runs. The likely cause is module import, which vitest reports as 55% of its time, but this is not established. CI's browser sum varies by about 540s across `main` runs, so one sample cannot judge the earlier 400s rule.
+Measured 29/10/2026. Five exclusive interleaved rounds per side. The five specs' summed per-test seconds fell from a median of 567.9s at trunk to 283.6s at head with the ranges apart, and their browser wall fell from 197s to 105s. `check:web:unit`'s wall rose from 40s to 62s, which is 22s more locally, and it took 196s to 213s on CI against 77s to 140s on earlier runs. The likely cause is module import, which vitest reports as 55% of its time, but this is not established. CI's browser sum varies by about 540s across `main` runs, so one sample cannot judge the earlier 400s rule.
 
 **Review gate.** None. BA-277 is not review-gated.
 
