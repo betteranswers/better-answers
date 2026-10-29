@@ -57,12 +57,12 @@ describe("the People page's Invitations tab", () => {
 
     await dialogOpened();
     typed(member);
-    pressEnter(addressField());
+    await pressEnter(addressField());
 
     expect(heldAddresses()).toHaveLength(1);
     expect(removeOf(member, INVITE_WORDS.flag["already-a-member"])).toBeDefined();
     expect(sendButton().getAttribute("aria-disabled")).toBe("true");
-    pressEnter(addressField());
+    await pressEnter(addressField());
     await focused(removeOf(member));
     expect(alertIn(inviteDialog())).toBe(INVITE_REFUSED.flagged);
     pressedOn("Escape");
@@ -95,7 +95,7 @@ describe("the People page's Invitations tab", () => {
 
     await dialogOpened();
     typed(`${ana}, not-an-address, ${ben}`);
-    pressEnter(addressField());
+    await pressEnter(addressField());
 
     expect(heldAddresses()).toHaveLength(3);
     expect(removeOf("not-an-address", INVITE_WORDS.flag.malformed)).toBeDefined();
@@ -106,12 +106,12 @@ describe("the People page's Invitations tab", () => {
       "the dialog counts two ready and one flagged",
     ).toContainEqual(expect.stringMatching(/\b2\b\D+\b1\b/));
     expect(sendButton().getAttribute("aria-disabled")).toBe("true");
-    pressEnter(addressField());
+    await pressEnter(addressField());
     await focused(removeOf("not-an-address"));
     expect(alertIn(inviteDialog())).toBe(INVITE_REFUSED.flagged);
     expect(asksOf("members.invite"), "the flagged send asked the api nothing").toEqual([]);
 
-    pressEnter(removeOf("not-an-address"));
+    await pressEnter(removeOf("not-an-address"));
     expect(heldAddresses()).toHaveLength(2);
     await focused(removeOf(ben));
     expect(sendButton().getAttribute("aria-disabled")).toBe("false");
@@ -134,13 +134,12 @@ describe("the People page's Invitations tab", () => {
 
     await dialogOpened();
     typed(`${ana}, ${ben}`);
-    pressEnter(addressField());
+    await pressEnter(addressField());
     expect(heldAddresses()).toHaveLength(2);
 
-    removeOf(ben).focus();
-    pressEnter(removeOf(ben));
+    await pressEnter(removeOf(ben));
     await focused(removeOf(ana));
-    pressEnter(removeOf(ana));
+    await pressEnter(removeOf(ana));
 
     expect(heldAddresses()).toHaveLength(0);
     await focused(addressField());
@@ -155,7 +154,7 @@ describe("the People page's Invitations tab", () => {
 
     await dialogOpened();
     typed([...fifty, late].join(", "));
-    pressEnter(addressField());
+    await pressEnter(addressField());
 
     expect(heldAddresses()).toHaveLength(MOST_AT_ONCE);
     expect(addressField().value).toBe(late);
@@ -174,7 +173,7 @@ describe("the People page's Invitations tab", () => {
     ]);
     const next = within(inviteDialog()).getByRole("button", { name: INVITE });
     await focused(next);
-    pressEnter(next);
+    await pressEnter(next);
     await focused(addressField());
     expect(addressField().value, "the next invite starts from what was left").toBe(late);
     fireEvent.click(sendButton());

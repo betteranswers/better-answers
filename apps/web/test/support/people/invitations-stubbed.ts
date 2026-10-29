@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { expect } from "vitest";
 import { z } from "zod";
 
@@ -173,11 +174,12 @@ export const tooManyAttempts = (retryAfterSeconds: number) => ({
   },
 });
 
-/** jsdom runs no default action for a key, so the one Enter has on a field or a button is run here. */
-export const pressEnter = (element: HTMLElement) => {
-  if (!fireEvent.keyDown(element, { key: "Enter" })) return;
-  if (element instanceof HTMLInputElement) element.form?.requestSubmit();
-  else fireEvent.click(element);
+/** user-event runs Enter's default action on a field or a native button, and none on a `div` with a button role. */
+export const pressEnter = async (element: HTMLElement): Promise<void> => {
+  act(() => {
+    element.focus();
+  });
+  await userEvent.keyboard("{Enter}");
 };
 
 export const found = <Item>(item: Item | undefined): Item => {

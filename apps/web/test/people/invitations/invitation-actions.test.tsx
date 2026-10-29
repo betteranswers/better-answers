@@ -227,7 +227,7 @@ describe("the People page's Invitations tab", () => {
     const action = selectionAction("Cancel");
     expect(action.getAttribute("aria-disabled")).toBe("true");
     action.focus();
-    pressEnter(action);
+    await pressEnter(action);
     const saidWaiting = outcomeIn()?.textContent;
     expect(saidWaiting).toMatch(/\S/);
     expect(saidWaiting, "the second press said nothing of its own").not.toBe(saidPending);
