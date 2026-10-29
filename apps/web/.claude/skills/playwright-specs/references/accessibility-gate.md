@@ -26,7 +26,7 @@ stands aside where the test has already failed so the real error is the one repo
   on a side that hugs the field's own, and its fill only when one of its sides does. A wordless
   box that hugs on no side is a layout's, so the field is measured against that box's own fill. An
   ancestor's opacity dims edge and fill alike. `controlEdges` and `contrastBetween`, in
-  `references/harness.md`, are the measures.
+  `references/helpers.md`, are the measures.
 - **Both themes are audited.** The audit runs in the page's own theme, then sets `data-theme` on
   `<html>` to the other theme, audits again and puts the page's theme back, so every state a test
   leaves is held in dark as well as light. A failure names the theme it was found in. A spec about

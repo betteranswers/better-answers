@@ -37,7 +37,7 @@ Appendix B's key technical decisions bind wherever an earlier note differs from 
 - [ ] Read these from the installed plugin at program start. Re-read them at every tick.
   - [ ] `skills/poteto-mode/playbooks/orchestrate.md`
   - [ ] `skills/swarm/SKILL.md`
-  - [ ] `.claude/skills/browser-suite/SKILL.md`, this repository's driver skill
+  - [ ] `.claude/skills/verify/SKILL.md`, this repository's driver skill
   - [ ] `skills/poteto-mode/playbooks/opening-a-pr.md`
   - [ ] `skills/how/SKILL.md`, `skills/architect/SKILL.md`, `skills/interrogate/SKILL.md`, `skills/thermos/SKILL.md` and `skills/show-me-your-work/SKILL.md`
   - [ ] The mutation-testing skill, which is not in the plugin. It is `~/.claude/skills/synced/346a4f5f-03ca-49d6-a920-066649535294_409d7498-c5fc-4152-b2cc-fb60980effbe/mutation-testing/SKILL.md`. If that folder has moved, find it with `ls ~/.claude/skills/synced/*/mutation-testing/SKILL.md`.
@@ -86,7 +86,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 
 - [ ] `git fetch origin <head-branch> && git checkout <head SHA>`.
 - [ ] `pnpm install --frozen-lockfile`. Confirm `docker ps` lists no other session's mutation run or whole browser suite, and wait if one is going (BA-190).
-- [ ] A lane on a page drives the served build through `.claude/skills/browser-suite/SKILL.md`. Build with `pnpm --filter @better-answers/web run build`, then run the lane's spec with `pnpm --filter @better-answers/web exec playwright test e2e/<spec>.spec.ts --project chromium`. The api's test harness starts Postgres, the object store and the SPA, and seeds through its harness actions. Playwright's trace and the accessibility gate are the read-only diagnostics.
+- [ ] A lane on a page drives the served build through `.claude/skills/verify/SKILL.md` and writes its spec per `apps/web/.claude/skills/playwright-specs/SKILL.md`. Build with `pnpm --filter @better-answers/web run build`, then run the lane's spec with `pnpm --filter @better-answers/web exec playwright test e2e/<spec>.spec.ts --project chromium`. The api's test harness starts Postgres, the object store and the SPA, and seeds through its harness actions. Playwright's trace and the accessibility gate are the read-only diagnostics.
 - [ ] A lane on a PR with no page drives the core interface on a migrated database and a bare repository, through the named vitest scenario with `pnpm --filter <workspace> exec vitest run <file> -t "<title>"`, or the MCP surface through the api's harness. Its screenshot is a capture of the terminal showing the command and its output. `psql` against the run's cloned database and `git log --format='%an <%ae>%n%b'` on the bare repository are the read-only diagnostics.
 - [ ] Save every screenshot to `/tmp/swarm-<pr-id>/worker-<n>/<slug>.png` and return the paths with the report.
 
@@ -305,7 +305,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `apps/web/test/shared/navigation.test.ts`.
 - [ ] Edit `apps/web/e2e/harness.ts`.
 - [ ] Create `apps/web/e2e/knowledge/collections-and-owners.spec.ts`.
-- [ ] Edit `.claude/skills/browser-suite/references/harness.md`.
+- [ ] Edit `.claude/skills/verify/references/harness.md`.
 - [ ] Edit `docs/specs/route/s3.md` where this unit moves a page. Edit `docs/solutions/architecture-patterns/adr-0051.md` only if the navigation-list decision itself changes.
 
 **Build.**
@@ -322,7 +322,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
   - [ ] An Admin names or clears a collection's owner with a native select of every member, Viewers included, since a Viewer may own (ADR 0051). It applies optimistically, announces the outcome in a live region, and invalidates the member query so the Admin's own rail updates at their next move.
   - [ ] An owner who is not an Admin reads the same list with no picker.
   - [ ] The page serves the Founder-Operator, who hands domains off "until someone else takes them" (`docs/personas/personas.md:45`), so each row shows who owns it now and an unowned collection says Admins decide. It serves the Knowledge Curator, for whom "unclear who owns a concept" is a cut (`:205`), so each override count is on the row. It serves the Occasional Expert, a Viewer who owns (`:218`), so the picker lists Viewers and the read-only view uses no product word without its explanation.
-- [ ] Add the harness action `nameOwners`, the program's one owner seed. It writes collection-default and per-concept owner rows. Its function goes in `apps/api/tests/support/harness/harness-knowledge.ts` and calls `nameOwner` as the workspace's Admin. Its route goes in `apps/api/tests/support/harness/harness-control.ts`, beside the routes at `harness-control.ts:161-177`, and its wrapper in `apps/web/e2e/harness.ts`. BA-232 and BA-236 reuse it. List it in `.claude/skills/browser-suite/references/harness.md`.
+- [ ] Add the harness action `nameOwners`, the program's one owner seed. It writes collection-default and per-concept owner rows. Its function goes in `apps/api/tests/support/harness/harness-knowledge.ts` and calls `nameOwner` as the workspace's Admin. Its route goes in `apps/api/tests/support/harness/harness-control.ts`, beside the routes at `harness-control.ts:161-177`, and its wrapper in `apps/web/e2e/harness.ts`. BA-232 and BA-236 reuse it. List it in `.claude/skills/verify/references/harness.md`.
 - [ ] An Editor who owns nothing sees no Curation group, and `/knowledge/collections-and-owners` shows the not-found page through `hides` (`navigation.ts:578-579`) and `Seen` (`router.tsx:346-349`). This is the brief's third Done when check.
 - [ ] Record in `docs/specs/route/s3.md` that ownership has landed. A page is seen by role, by owning a collection, or, for Waiting on You, by owning any concept. An ownership change takes effect at the person's next move, like a role change. Hiding is navigation only, and the api refuses by role or by ownership.
 - [ ] Leave `apps/web/e2e/app/frame.spec.ts:52` and `apps/web/test/shared/navigation.test.ts:60-80` unedited. Waiting on You stays unbuilt, so `shownOf` still drops Inbox from every rail, and no page is declared or renamed. `AREA_NAMES` changes in BA-232, and the outline in BA-239. The cases at `navigation.test.ts:240-270` and the `aPage` helper (`:48-55`) change, since `owns` and `owners` change shape.
@@ -486,7 +486,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 
 **Depends on.** BA-95.
 
-**Rules and comments read.** `apps/web/AGENTS.md` line 3 (WCAG 2.2 AA, a named `textbox`, each outcome announced, GOV.UK warning text for the consequence), line 4 (each action has a keystroke listed under `?`) and line 5 (page text in the glossary's reader words). `packages/design-system/readme.md` section 2 (trust words verbatim, UK long-form dates). `.claude/skills/better-answers-design/readme.md`, *Disclosure, not layers* (a modal only for an irreversible action, so the editor and its ask draw in place). `CODING_STANDARDS.md` Dependencies lines 31 and 32 (Tiptap's and CodeMirror's versions from Context7, named in the PR, pinned once). `.agents/playbooks/verification.md` (the existing concept page specs pass with no assertion edits). `.claude/skills/browser-suite/SKILL.md`. ADR 0015 L38 with archived ADR 0015 L8, L19 and L27 (source mode, explicit save, a client draft, Tiptap 3 and CodeMirror 6). BA-144's comment of 20/10/2026 says criteria 1 and 2 shipped in #825 (`c537c16e6`) and that `apps/web/test/shared/page/page-head.test.tsx` refuses an `h1` outside `PageHead`. This PR closes criterion 3 and the issue with `Fixes BA-144`, and leaves that test unchanged. The same comment says Search has no primary action. This PR keeps it that way and offers a new concept from Search's no-match state instead. BA-144's comment of 19/10/2026 says criterion 3 waits on S3, which this PR is.
+**Rules and comments read.** `apps/web/AGENTS.md` line 3 (WCAG 2.2 AA, a named `textbox`, each outcome announced, GOV.UK warning text for the consequence), line 4 (each action has a keystroke listed under `?`) and line 5 (page text in the glossary's reader words). `packages/design-system/readme.md` section 2 (trust words verbatim, UK long-form dates). `.claude/skills/better-answers-design/readme.md`, *Disclosure, not layers* (a modal only for an irreversible action, so the editor and its ask draw in place). `CODING_STANDARDS.md` Dependencies lines 31 and 32 (Tiptap's and CodeMirror's versions from Context7, named in the PR, pinned once). `.agents/playbooks/verification.md` (the existing concept page specs pass with no assertion edits). `.claude/skills/verify/SKILL.md` and `apps/web/.claude/skills/playwright-specs/SKILL.md`. ADR 0015 L38 with archived ADR 0015 L8, L19 and L27 (source mode, explicit save, a client draft, Tiptap 3 and CodeMirror 6). BA-144's comment of 20/10/2026 says criteria 1 and 2 shipped in #825 (`c537c16e6`) and that `apps/web/test/shared/page/page-head.test.tsx` refuses an `h1` outside `PageHead`. This PR closes criterion 3 and the issue with `Fixes BA-144`, and leaves that test unchanged. The same comment says Search has no primary action. This PR keeps it that way and offers a new concept from Search's no-match state instead. BA-144's comment of 19/10/2026 says criterion 3 waits on S3, which this PR is.
 
 **Files.**
 
@@ -1537,6 +1537,6 @@ These key technical decisions (KTD) bind the program. Each names what lost and w
 - `CODING_STANDARDS.md` and the `AGENTS.md` of `packages/schema/`, `packages/core/`, `apps/api/`, `apps/web/` and `apps/worker/`.
 - The *Workflow* section of `AGENTS.md`, `docs/agents/mutation-triage.md` and `docs/agents/issue-tracker.md`.
 - `docs/personas/personas.md`, for every page.
-- `.claude/skills/browser-suite/SKILL.md` and `.claude/skills/better-answers-design/SKILL.md`.
+- `.claude/skills/verify/SKILL.md`, `apps/web/.claude/skills/playwright-specs/SKILL.md` and `.claude/skills/better-answers-design/SKILL.md`.
 - The body-link plan, `docs/plans/2026-10-10-1629-feat-body-link-targets-plan.md`, for KTD1 of that plan, which BA-233 keeps.
 - BA-231, BA-233, BA-234 and BA-235 run `skills/how/SKILL.md` before code and `skills/interrogate/SKILL.md` before merge. Each PR keeps a decision trail per `skills/show-me-your-work/SKILL.md`.

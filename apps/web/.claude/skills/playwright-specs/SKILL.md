@@ -1,67 +1,33 @@
- ---
-name: browser-suite
-description: How this repository drives a browser: the served-build seam, the client-address fixtures, the harness's actions and helpers, locators, waiting and the accessibility gate. Use when writing, debugging or running a Playwright spec under apps/web/e2e, when a spec fails, flakes or hangs, when the gate refuses a page, when a spec needs state no harness action makes, or when a change renames a page's label, heading or accessible name.
+---
+name: playwright-specs
+description: This skill should be used when asked to "write a browser spec", "add a Playwright test", "run the e2e suite", "debug a flaky spec" or "test a passkey in the browser", when a spec under apps/web/e2e fails, flakes or hangs, when the accessibility gate refuses a page, or when a change renames a page's label, heading or accessible name. It covers the client-address fixtures, the virtual authenticator, locators, waiting, refusals, latency budgets, the shared helpers, the gate and the run commands.
 ---
 
-# The browser suite
+# Playwright specs
 
 The browser suite drives `apps/web`'s **served build in a browser**. A spec here covers what
 only the served build shows: a page, with its latency budget, the accessibility gate and
 keyboard reach, or a journey that crosses pages through the real api. A page's single-screen
-behaviour is a component test through Testing Library, not a spec (AGENTS.md, *Testing*).
+behaviour is a component test through Testing Library, not a spec (the root `AGENTS.md`, *Testing*).
 Everything below is what the suite already is; `apps/web/e2e/model-choices/models-and-spend.spec.ts` is the fullest worked example.
 
 Two reference files hold the detail. Open the one a task needs:
 
-- **`references/harness.md`**: every harness action and helper, what a refused seed leaves
-  behind, the ceilings a spec runs into, and the readers of the api's answers. Open it before
-  writing set-up, before reaching for a helper (sign-in, shell locators, keyboard, latency clocks,
-  Claude's part in OAuth, the knowledge pages' module), and before adding an action or a helper,
-  which may already exist.
+- **`references/helpers.md`**: the helpers the specs share, and the readers of the api's
+  answers. Open it before reaching for a helper (sign-in, shell locators, keyboard, latency clocks,
+  Claude's part in OAuth, the knowledge pages' module), and before adding a helper, which may
+  already exist.
 - **`references/accessibility-gate.md`**: what the audit checks, and how the gate proves itself.
   Open it when the gate refuses a page, when a spec is about one theme, or when a change touches
   the gate.
 
-## The seam
-
-The server under the browser is the api's own integration harness, `startApp` in
-`apps/api/tests/support/harness/harness.ts`, over the Testcontainers Postgres and the Garage
-object store that the api's integration tests use. A claim about a store itself, such as
-row-level security, a migration or a lock, is proven in those integration tests, never in a
-spec. The email
-transport captures codes, Claude's client metadata document is served in process, and a model wire
-answers each workspace's model calls as its spec scripted them and fails any call no script
-answers. Playwright starts it as a **process**, not an import: `apps/web` imports nothing from
-`apps/api` at runtime, so launching it is the only way the browser suite reaches the real server.
-`apps/api/tests/serve.ts` takes a port as its one argument and listens on it, with the harness's
-control paths (`apps/api/tests/support/harness/harness-control.ts`) mounted in front of the api and served
-nowhere in `apps/api/src`.
-
-One origin carries the SPA, sign-in, consent and `/oauth2/*`, which is why the consent
-flow is provable in a browser at all. It is `http://localhost:<port>`, never `127.0.0.1`: a
-passkey's relying party must be a domain, and WebAuthn refuses an IP address.
-
-A spec that makes or uses a passkey attaches a virtual authenticator to its page first, through
-`aVirtualAuthenticator` in `apps/web/e2e/virtual-authenticator.ts`, which drives Chromium's
-WebAuthn domain over the DevTools protocol. It verifies its user and answers every prompt with no
-prompt shown, the email field's autofill included: a page opening the sign-in page while the
-device holds a passkey the platform keeps is signed in at once. Its `leftUnattended` leaves every
-prompt waiting, so that page signs in by email, and `attendedAgain` answers prompts again.
-`withoutWebAuthn` is a browser with none. `apps/web/e2e/auth/passkeys.spec.ts` is the worked example,
-and `apps/web/e2e/auth/confirm-recovery.spec.ts` signs in by email while the device holds a passkey.
-
-`apps/web/playwright.config.ts` holds the port, the `webServer` command (`node tests/serve.ts`
-run in `apps/api`, handed that port) and `/health` as the readiness URL. `/health` answers only
-once the database is migrated and the authorization server has initialised. `serve.ts` binds its
-port before it starts the harness and answers 503 until then, so a port another server holds
-fails the run at once. The api's `serve:e2e`
-script is the same command for a person to run by hand. Playwright never goes through it: pnpm
-11.27 and later start a script in a process group of its own, which Playwright's kill never
-reaches, so the server outlives the suite and the run hangs on its open output.
-
-The port is 3100 in CI. On a developer's machine the runner takes a free port and hands it to its
-workers in `E2E_PORT`, so two worktrees can run the suite at once. Set `E2E_PORT` to choose the
-port yourself.
+`webServer` in `apps/web/playwright.config.ts` starts `apps/api/tests/serve.ts` as a process, and a
+comment there says why it is not `pnpm run`. A spec builds its state through the harness actions in
+`apps/web/e2e/harness.ts`, each of which calls `/__harness`, which
+`apps/api/tests/support/harness/harness-control.ts` mounts. Search both before adding an action.
+The actions include `provision`, `addMember`, `removeMember`, `endEverySignInAndToken`, `markTheOperator`,
+`invite`, `restored`, `seedModelChoices`, `seedConnectedSources`, `nameOwners`, `seedQuestions`,
+`makeGroups` and `askToJoin`.
 
 ## The fixture module
 
@@ -87,24 +53,18 @@ address of its own, a caller shares one bucket with every other caller in the ru
 trips a ceiling partway through. Both addresses come from RFC 2544's benchmarking block, keyed by
 worker index and a per-run count. The header's name is written out in `browser.ts` rather than
 imported, because `apps/web` takes nothing from `apps/api` at runtime. A spec that means to prove a ceiling names which ceiling it
-proves and reaches it from the side that counts; `references/harness.md` lists the three.
+proves and reaches it from the side that counts. The per-email and per-address rules are in `apps/api/src/auth/constants.ts`, and `personCeiling` in `apps/api/src/trpc/base.ts` counts a person's calls.
 
-## Building state
+## A virtual authenticator
 
-State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Each
-action calls `/__harness`, which `apps/api/tests/support/harness/harness-control.ts` mounts, and an area's own
-actions live beside it in `apps/api/tests/support/harness/harness-*.ts`. The same module re-exports the locators
-and browser helpers in `apps/web/e2e/locators.ts`. Most specs sign in with `signIn` or
-`signedInAtHome`, which pass through the product's own sign-in page and its second-factor gate,
-never around them. Each spec provisions its own workspace with `provision` and mints its own
-address with `anAddress`, so two specs running together never share state.
-
-A seed the harness cannot write answers 400, naming each field and its rule, and the action's
-failure carries that answer, so read the reason there and not in the server's log. A seed that a
-slice's own action writes can leave part of its rows behind when refused part-way;
-`references/harness.md` says which seeds do. Before adding an action or a helper, search that
-file for one that already does the job.
+A spec that makes or uses a passkey attaches a virtual authenticator to its page first, through
+`aVirtualAuthenticator` in `apps/web/e2e/virtual-authenticator.ts`, which drives Chromium's
+WebAuthn domain over the DevTools protocol. It verifies its user and answers every prompt with no
+prompt shown, the email field's autofill included: a page opening the sign-in page while the
+device holds a passkey the platform keeps is signed in at once. Its `leftUnattended` leaves every
+prompt waiting, so that page signs in by email, and `attendedAgain` answers prompts again.
+`withoutWebAuthn` is a browser with none. `apps/web/e2e/auth/passkeys.spec.ts` is the worked example,
+and `apps/web/e2e/auth/confirm-recovery.spec.ts` signs in by email while the device holds a passkey.
 
 ## Writing a spec
 
@@ -166,7 +126,7 @@ file for one that already does the job.
   through `JSON.stringify`, which quotes it as the snapshot takes it.
 - **Tell which refusal happened from where it was decided.** Where the api answered, read its
   answer with `refusalAnswering` or `authAnswering` from `../refused-read.ts`
-  (`references/harness.md` says what each answers), then check the alert with `saysARefusal`.
+  (`references/helpers.md` says what each answers), then check the alert with `saysARefusal`.
   Ask for the answer before the action that calls and await it afterwards, because an answer can
   land before anything waits for it. A streamed answer is the exception, `ask.question`'s today
   (`STREAMED_PATH` in `apps/web/src/shared/api/link.ts`). Chromium keeps no body for it, so read
@@ -262,7 +222,7 @@ pnpm --filter @better-answers/web exec playwright test --list
 
 This workspace's `check` runs types, the vitest suite and then the whole browser suite, so a
 spec left broken fails `check:web` and the root `check` with it. Lint is the root's `check:gates`.
-The merge queue runs the browser suite as three shards of `check:web:e2e`, with three workers each.
+The `check` workflow runs the browser suite as three shards of `check:web:e2e`, with three workers each.
 
 `test.only` is allowed while debugging and refused under CI by `forbidOnly`. The specs import
 `test` from the fixture module, so oxlint's vitest rules never see them and this is the only
