@@ -1,10 +1,12 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { noLongerAMember } from "@/features/auth/refusal-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
-import type { Asked } from "@test/stub-server.ts";
+import { server, type Asked } from "@test/stub-server.ts";
 import { addressOf, type Api, heldBack, settlingAfter } from "@test/stubbed-api.ts";
 import {
   ADA,
@@ -65,6 +67,21 @@ const watchingPicks = () => {
     picked.push(pickBody.parse(JSON.parse(body)).organizationId);
   };
   return { picked, watching };
+};
+
+const removedFrom = (workspace: { readonly id: string }) => {
+  const answering = server.answer;
+  server.answer = async (asked, init) => {
+    const answered = await answering(asked, init);
+    const body = typeof init?.body === "string" ? init.body : "";
+    return addressOf(asked).pathname === SET_ACTIVE &&
+      pickBody.parse(JSON.parse(body)).organizationId === workspace.id
+      ? Response.json(
+          { code: "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION", message: "not a member" },
+          { status: 403 },
+        )
+      : answered;
+  };
 };
 
 const picksRefused = (api: Api): (() => number) => {
@@ -190,4 +207,33 @@ it("separates an unread workspace list from no workspace, offering retry", async
 
   expect(await screen.findByRole("button", { name: NORTHERN.name })).toBeDefined();
   expect(screen.getByRole("button", { name: HOLME.name })).toBeDefined();
+});
+
+it("drops and names a workspace the person was removed from", async () => {
+  const api = holding([NORTHERN_ROW, HOLME_ROW]);
+  picksOpenAs(api, "Admin");
+  const { picked, watching } = watchingPicks();
+  const router = await openOutsideTheShellAt("/choose-workspace", api, watching);
+  const taken = await screen.findByRole("button", { name: HOLME.name });
+  removedFrom(HOLME);
+  api.set("person.workspaces", () => read([NORTHERN_ROW]));
+  taken.focus();
+
+  fireEvent.click(taken);
+
+  await waitFor(() => expect(refusal()).toBe(noLongerAMember(HOLME.name)));
+  expect(await thePicker()).toBeDefined();
+  expect(screen.queryByRole("button", { name: HOLME.name })).toBeNull();
+  const stillMine = screen.getByRole("button", { name: NORTHERN.name });
+  expect(document.activeElement, "focus was not left on what the reader can do next").toBe(
+    stillMine,
+  );
+
+  await userEvent.keyboard("{Enter}");
+
+  await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Admin.path));
+  expect(picked, "Enter opened another workspace than the one left").toEqual([
+    HOLME.id,
+    NORTHERN.id,
+  ]);
 });
