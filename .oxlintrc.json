@@ -585,12 +585,6 @@
       }
     },
     {
-      "files": ["packages/core/src/sources/connected-source.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 599, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["packages/core/src/store/git/index.ts"],
       "rules": {
         "max-lines": ["error", { "max": 633, "skipBlankLines": true, "skipComments": true }]

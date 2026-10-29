@@ -44,8 +44,6 @@ export {
 export {
   connectUpload,
   connectUploadFields,
-  publishConnectedSource,
-  publishConnectedSourceInput,
   reprocessConnectedSource,
   reprocessConnectedSourceAction,
   reprocessConnectedSourceInput,
@@ -56,6 +54,7 @@ export {
   type ReprocessConnectedSourceInput,
   type ReprocessConnectedSourceRefusal,
 } from "./connected-source.ts";
+export { publishConnectedSource, publishConnectedSourceInput } from "./publish-connected-source.ts";
 export {
   ORPHANED_UPLOAD_GRACE_HOURS,
   sweepOrphanedUploads,
