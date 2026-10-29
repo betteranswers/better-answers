@@ -66,16 +66,18 @@ export {
 export { reindexEveryConnectedSource, REINDEX } from "./reindex.ts";
 export { restoreFinding, restoreFindingInput } from "./findings.ts";
 export {
-  dismissAsNotSpecialCategory,
-  dismissAsNotSpecialCategoryInput,
   groupOfFindingsKey,
   findingsOf,
   findingsOfInput,
   keepInText,
   keepInTextInput,
+} from "./review.ts";
+export {
+  dismissAsNotSpecialCategory,
+  dismissAsNotSpecialCategoryInput,
   narrowDocuments,
   narrowDocumentsInput,
-} from "./review.ts";
+} from "./review-documents.ts";
 export {
   dpiaInputFor,
   dpiaReadInput,
