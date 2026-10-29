@@ -27,6 +27,12 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
 /** The api's own public address: a passkey's relying party must be a domain, never an IP. */
 const baseURL = `http://localhost:${PORT}`;
 
+const GATE_SPEC = "accessibility-gate.spec.ts";
+/** A config has one web server, not one per project, so the gate alone serves the build with `vite preview` and starts no api. */
+const gateAlone = process.env["E2E_GATE_ALONE"] === "1";
+const gate = { name: "gate", testMatch: GATE_SPEC, use: { ...devices["Desktop Chrome"] } };
+const chromium = { name: "chromium", testIgnore: GATE_SPEC, use: { ...devices["Desktop Chrome"] } };
+
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
@@ -39,18 +45,24 @@ export default defineConfig({
   ...(inCi ? { workers: 3 } : {}),
   reporter: [["list"], ["./e2e/run-summary.ts"]],
   use: { baseURL, trace: "on-first-retry" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
-    // Not `pnpm run`: pnpm 11.27 gives a script its own process group, which Playwright's
-    // kill misses, and the orphan's open pipe hangs the run.
-    command: `node tests/serve.ts ${PORT}`,
-    cwd: path.join(repositoryRoot, "apps/api"),
+  projects: gateAlone ? [gate] : [chromium, gate],
+  webServer: gateAlone
+    ? {
+        command: `node ./node_modules/vite/bin/vite.js preview --port ${PORT} --strictPort --host localhost`,
+        url: `${baseURL}/`,
+        timeout: 60_000,
+      }
+    : {
+        // Not `pnpm run`: pnpm 11.27 gives a script its own process group, which Playwright's
+        // kill misses, and the orphan's open pipe hangs the run.
+        command: `node tests/serve.ts ${PORT}`,
+        cwd: path.join(repositoryRoot, "apps/api"),
 
-    url: `${baseURL}/health`,
+        url: `${baseURL}/health`,
 
-    // A cold Testcontainers Postgres pulls its image before it answers anything.
-    timeout: 240_000,
-    stdout: "pipe",
-    stderr: "pipe",
-  },
+        // A cold Testcontainers Postgres pulls its image before it answers anything.
+        timeout: 240_000,
+        stdout: "pipe",
+        stderr: "pipe",
+      },
 });

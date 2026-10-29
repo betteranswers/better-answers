@@ -3,7 +3,7 @@
 import type { PlaywrightTestConfig } from "@playwright/test";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
-const SETTINGS = ["CI", "E2E_PORT"] as const;
+const SETTINGS = ["CI", "E2E_PORT", "E2E_GATE_ALONE"] as const;
 type Settings = Partial<Record<(typeof SETTINGS)[number], string>>;
 
 const before: Settings = Object.fromEntries(SETTINGS.map((name) => [name, process.env[name]]));
@@ -101,5 +101,31 @@ describe("the browser suite's port", () => {
     assert(server !== undefined, "the config starts a web server");
     expect(server.command).toMatch(new RegExp(` ${port}$`));
     expect(server.url).toBe(`http://localhost:${port}/health`);
+  });
+});
+
+describe("the accessibility gate's project", () => {
+  const GATE_SPEC = "accessibility-gate.spec.ts";
+
+  it("keeps the gate's spec in a project of its own", async () => {
+    const { projects } = await configUnder(undefined);
+
+    expect(projects).toEqual([
+      expect.objectContaining({ name: "chromium", testIgnore: GATE_SPEC }),
+      expect.objectContaining({ name: "gate", testMatch: GATE_SPEC }),
+    ]);
+  });
+
+  it("serves the gate alone from the build, with no api", async () => {
+    const config = await configWith({ E2E_GATE_ALONE: "1" });
+    const server = config.webServer;
+    const port = portOf(config);
+
+    expect(config.projects?.map((project) => project.name)).toEqual(["gate"]);
+    assert(!Array.isArray(server), "the config starts one web server");
+    assert(server !== undefined, "the config starts a web server");
+    expect(server.command).toContain("vite.js preview");
+    expect(server.command).not.toContain("serve.ts");
+    expect(server.command).toMatch(new RegExp(`--port ${port} `));
   });
 });
