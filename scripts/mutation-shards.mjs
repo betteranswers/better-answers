@@ -8,18 +8,7 @@ import { repositoryRoot } from "../packages/devtools/src/paths.ts";
 /** @type {ReadonlyMap<string, import("../packages/devtools/src/mutation/mutation-shards.ts").Leg>} */
 export const legs = new Map([
   ["api", { root: path.join(repositoryRoot, "apps/api"), mutate: apiStryker.mutate }],
-  [
-    "core",
-    {
-      root: path.join(repositoryRoot, "packages/core"),
-      mutate: coreStryker.mutate,
-      // Each of these files alone outran a shard's ceiling when it was 120 minutes.
-      split: new Map([
-        ["src/store/git/index.ts", 4],
-        ["src/store/map/index.ts", 2],
-      ]),
-    },
-  ],
+  ["core", { root: path.join(repositoryRoot, "packages/core"), mutate: coreStryker.mutate }],
 ]);
 
 if (import.meta.main) {

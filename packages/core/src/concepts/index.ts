@@ -16,18 +16,20 @@ export {
 export {
   conceptToEdit,
   conceptToEditInput,
-  saveConcept,
-  saveConceptInput,
   standingOnConcept,
+  type ConceptToEdit,
+} from "./writes/edit.ts";
+/** @public S3 */
+export type { ConceptParts } from "./writes/edit.ts";
+export { saveConcept, saveConceptInput, type SaveConceptInput } from "./writes/save-concept.ts";
+/** @public S3 */
+export type { ConceptSaved, SaveConceptRefusal } from "./writes/save-concept.ts";
+export {
   updateConceptBody,
   type ConceptBodyRun,
   type ConceptBodyUpdate,
-  type ConceptToEdit,
-  type SaveConceptInput,
   type UpdateConceptBodyRefusal,
-} from "./writes/edit.ts";
-/** @public S3 */
-export type { ConceptParts, ConceptSaved, SaveConceptRefusal } from "./writes/edit.ts";
+} from "./writes/update-concept-body.ts";
 export { foldKind } from "../bundle/index.ts";
 export { carryVerificationsOntoRewrite, mergeKeyOf, moveBundleCommits } from "./import/landing.ts";
 export {

@@ -44,8 +44,6 @@ export {
 export {
   connectUpload,
   connectUploadFields,
-  publishConnectedSource,
-  publishConnectedSourceInput,
   reprocessConnectedSource,
   reprocessConnectedSourceAction,
   reprocessConnectedSourceInput,
@@ -56,6 +54,7 @@ export {
   type ReprocessConnectedSourceInput,
   type ReprocessConnectedSourceRefusal,
 } from "./connected-source.ts";
+export { publishConnectedSource, publishConnectedSourceInput } from "./publish-connected-source.ts";
 export {
   ORPHANED_UPLOAD_GRACE_HOURS,
   sweepOrphanedUploads,
@@ -66,16 +65,18 @@ export {
 export { reindexEveryConnectedSource, REINDEX } from "./reindex.ts";
 export { restoreFinding, restoreFindingInput } from "./findings.ts";
 export {
-  dismissAsNotSpecialCategory,
-  dismissAsNotSpecialCategoryInput,
   groupOfFindingsKey,
   findingsOf,
   findingsOfInput,
   keepInText,
   keepInTextInput,
+} from "./review.ts";
+export {
+  dismissAsNotSpecialCategory,
+  dismissAsNotSpecialCategoryInput,
   narrowDocuments,
   narrowDocumentsInput,
-} from "./review.ts";
+} from "./review-documents.ts";
 export {
   dpiaInputFor,
   dpiaReadInput,

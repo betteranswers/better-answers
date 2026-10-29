@@ -461,7 +461,7 @@
       }
     },
     {
-      "files": ["packages/core/src/store/git/index.ts"],
+      "files": ["packages/core/src/store/git/door.ts"],
       "rules": {
         "node/no-process-env": "off"
       }
@@ -510,7 +510,7 @@
     {
       "files": ["apps/api/src/auth/auth.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 674, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 522, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": [
           "error",
           { "max": 364, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
@@ -529,17 +529,10 @@
     {
       "files": ["apps/api/src/auth/routes.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 533, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": [
           "error",
           { "max": 153, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
         ]
-      }
-    },
-    {
-      "files": ["apps/web/src/app/router.tsx"],
-      "rules": {
-        "max-lines": ["error", { "max": 528, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -558,66 +551,6 @@
           "error",
           { "max": 155, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
         ]
-      }
-    },
-    {
-      "files": ["apps/web/src/shared/navigation.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 572, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/core/src/answering/index.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 612, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/core/src/concepts/writes/edit.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 674, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/core/src/erasure/routine/routine.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 556, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/core/src/sources/connected-source.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 599, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/core/src/sources/review.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 543, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/core/src/store/git/index.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 633, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/core/src/store/map/index.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 539, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/core/src/workspaces/index.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 626, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/devtools/src/comments/comment-inventory.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 567, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

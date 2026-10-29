@@ -8,7 +8,7 @@ component: tier-contract
 severity: medium
 applies_when:
   - "Decoding a percent-encoded address in the worker that the api or the page also decodes"
-  - "Changing `targetOf` in `packages/core/src/store/map/index.ts` or `_target_of` in `apps/worker/src/better_answers_worker/concepts/links/targets.py`"
+  - "Changing `targetOf` in `packages/core/src/store/map/write.ts` or `_target_of` in `apps/worker/src/better_answers_worker/concepts/links/targets.py`"
   - "Adding a percent-encoded case to `contracts/links/cases.json`"
 symptoms:
   - "One body link makes a LINKS_TO edge in the api's live map and none in the worker's rebuild, or the reverse"

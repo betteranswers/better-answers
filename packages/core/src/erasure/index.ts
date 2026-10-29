@@ -15,7 +15,8 @@ export type { ErasureRehearsed, RehearsalRefusal } from "./rehearsal.ts";
 export { replayCopiesSince } from "./replay.ts";
 export { replayableErasures, replayErasures } from "./replay-erasures.ts";
 export type { ReplayedErasure } from "./replay-erasures.ts";
-export { beyondUseFrom, ERASURE, runErasure } from "./routine/routine.ts";
+export { beyondUseFrom, runErasure } from "./routine/routine.ts";
+export { ERASURE } from "./routine/vocabulary.ts";
 export type {
   ErasureDoors,
   ErasureLog,
@@ -23,7 +24,7 @@ export type {
   QuestionsLogLine,
   ErasureRun,
   RunErasureRefusal,
-} from "./routine/routine.ts";
+} from "./routine/vocabulary.ts";
 export { deadlineOf, dueDateOf, recordSubjectRequest, subjectRequestFor } from "./requests.ts";
 export { suppressInTheWorkspace } from "./suppressions.ts";
 export { ERASURE_REFUSALS } from "./vocabulary.ts";

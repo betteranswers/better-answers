@@ -30,7 +30,7 @@ retire_when: "better-auth past 1.7.5 changes any of: disabledPaths, the rate lim
 
 ## Context
 
-The api's Better Auth 1.7.5 instance (`createAuth` in `apps/api/src/auth/auth.ts`) registers the authenticator plugin (`twoFactor` in `auth.ts`) and the passkey plugin (`passkeyPlugin` in `auth.ts`). Every path the two plugins mount is closed through `disabledPaths` (`auth.ts`), from the lists `CLOSED_FACTOR_PATHS` (`auth.ts`) and `CLOSED_SESSION_PATHS` (`auth.ts`). The comment above the factor list, as `9e6f06db5` holds it, gives the reason. Each path adds, removes, reveals or spends a factor past our gate, and our routes call the few they need as server functions (`CLOSED_FACTOR_PATHS` in `auth.ts`).
+The api's Better Auth 1.7.5 instance (`createAuth` in `apps/api/src/auth/auth.ts`) registers the authenticator plugin (`twoFactor` in `auth.ts`) and the passkey plugin (`passkeyPlugin` in `auth.ts`). Every path the two plugins mount is closed through `disabledPaths` (`auth.ts`), from the lists `CLOSED_FACTOR_PATHS` (`closed-paths.ts`) and `CLOSED_SESSION_PATHS` (`closed-paths.ts`). The comment above the factor list, as `9e6f06db5` holds it, gives the reason. Each path adds, removes, reveals or spends a factor past our gate, and our routes call the few they need as server functions (`CLOSED_FACTOR_PATHS` in `closed-paths.ts`).
 
 U6 (passkeys) and U7 (authenticator, recovery codes) of the plan wrote those routes in `apps/api/src/auth/second-factor/` (`passkeys.ts`, `authenticator.ts`, and `confirm.ts` for re-confirming). They call `auth.api.enableTwoFactor`, `auth.api.verifyTOTP` and the passkey endpoints directly, each behind `fenced.asThePerson` (`person-routes.ts`), which carries a per-person rate rule, `sameOriginOnly` and the second-factor gate. This doc records what such a call carries and what it loses, read from the installed library. It also records two schema facts that the U5 change for BA-28 settled on the way.
 
@@ -58,7 +58,7 @@ The 404 is not the only thing that lives in the router. A server-function call a
 Some things still run, because they belong to the endpoint or to the dispatch rather than to the router:
 
 - The endpoint's own `use` middlewares, such as `sessionMiddleware`, `sensitiveSessionMiddleware` and `freshSessionMiddleware`. better-call runs them inside every call of the endpoint (`createInternalContext` in `better-call 1.4.0 dist/context.mjs`, reached from `internalHandler` in `dist/endpoint.mjs`).
-- `hooks.before` and `hooks.after`, ours and every plugin's (the comment on `toAuthEndpoints` in `dist/api/to-auth-endpoints.mjs`; the comment on `dispatchAuthEndpoint` in `dist/api/dispatch.mjs`, and its `runBeforeHooks` and `runAfterHooks` calls). Our audit hook in `createAuth` (`hooks` in `auth.ts`) therefore fires on a server call too. It records only the paths in `AUDITED_PATHS` (`auth.ts`, looked up by `auditedEvent`).
+- `hooks.before` and `hooks.after`, ours and every plugin's (the comment on `toAuthEndpoints` in `dist/api/to-auth-endpoints.mjs`; the comment on `dispatchAuthEndpoint` in `dist/api/dispatch.mjs`, and its `runBeforeHooks` and `runAfterHooks` calls). Our audit hook in `createAuth` (`hooks` in `auth.ts`) therefore fires on a server call too. It records only the paths in `AUDITED_PATHS` (`audit-line.ts`, looked up by `auditedEvent`).
 
 The comment on `dispatchAuthEndpoint` in `dist/api/dispatch.mjs` says that calling an endpoint as a plain function skips hooks. That means calling the raw endpoint object. `auth.api.*` is not that: it is the wrapped endpoint, and hooks run.
 
