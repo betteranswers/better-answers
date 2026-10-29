@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
+import { CODE_NOT_SENT, codeWrong } from "@/features/auth/refusal-words.ts";
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in/sign-in-words.ts";
 import { openApp } from "@test/open-app.tsx";
 import { server } from "@test/stub-server.ts";
@@ -24,6 +25,12 @@ const SIGN_IN = "/sign-in/email-otp";
 const ADDRESS = "ada@example.test";
 
 const sent = () => Response.json({ success: true });
+
+const askedTooOften = (waitSeconds: number) => () =>
+  Response.json(
+    { code: "TOO_MANY_REQUESTS", message: "Too many requests" },
+    { status: 429, headers: { "retry-after": String(waitSeconds) } },
+  );
 
 const refused = (code: string) => () => Response.json({ code, message: code }, { status: 400 });
 
@@ -174,4 +181,42 @@ it("sends a wrong code once, selected, naming two tries left", async () => {
 
   await waitFor(() => expect(refusal()).toMatch(triesLeft(1)));
   expect(asked(SIGN_IN), "the refused code was sent again").toBe(2);
+});
+
+it("names the wait when one client asks too many codes", async () => {
+  const asked = wire({ [SEND]: askedTooOften(61) });
+  await openApp("/sign-in");
+
+  await sendTheFirstCode();
+
+  await waitFor(() => expect(refusal()).toMatch(/\b2 minutes\b/));
+  expect(refusal(), "the wait was read as a code the address could not take").not.toBe(
+    CODE_NOT_SENT,
+  );
+  expect(asked(SEND)).toBe(1);
+  expect(
+    screen.getByRole("heading", { level: 1, name: "Sign In" }),
+    "a refused send left the email step",
+  ).toBeDefined();
+  expect(screen.queryByLabelText("Verification Code", { exact: true })).toBeNull();
+});
+
+it("an expired code reads as spent, handing focus to another", async () => {
+  const asked = wire({ [SEND]: sent, [SIGN_IN]: refused("OTP_EXPIRED") });
+  await openApp("/sign-in");
+  await sendTheFirstCode();
+  const field = await codeField();
+  await waitFor(() => expect(document.activeElement).toBe(field));
+
+  fireEvent.change(field, { target: { value: "000001" } });
+
+  await waitFor(() => expect(refusal()).toBe(codeWrong(0)));
+  const another = screen.getByRole("button", { name: SIGN_IN_WORDS.sendAgain });
+  expect(document.activeElement, "focus was not handed to sending another code").toBe(another);
+
+  fireEvent.click(another);
+
+  await waitFor(() => expect(asked(SEND)).toBe(2));
+  await waitFor(() => expect(document.activeElement).toBe(field));
+  expect(field.value, "the spent digits outlived the new code").toBe("");
 });
