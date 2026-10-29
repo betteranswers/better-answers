@@ -19,6 +19,15 @@ export const joined = (
   groups,
 });
 
+export const MEMBERS = "/people/members";
+
+export const siteLeads = (memberCount: number) => ({
+  id: "01JSITE0000000000000000001",
+  name: "Site leads",
+  origin: "admin-curated",
+  memberCount,
+});
+
 export const PRIYA = joined("01JPRYA", "Priya Shah", "Editor");
 
 export const SAM = joined("01JSAM", "Sam Okoro", "Viewer");

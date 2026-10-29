@@ -32,8 +32,6 @@ import {
   saysARefusal,
   signIn,
   skipLinkReachesThePage,
-  switcherMenuOf,
-  switcherOf,
   tabUntilFocused,
   theActionLandedWithinItsBudget,
   theActionsLandedWithinTheirBudget,
@@ -1326,7 +1324,7 @@ test.describe("the People page's words", () => {
 
 const PAGE_OF_ROWS = 25;
 
-const tickOf = (page: Page, name: string): Locator =>
+const tickOf = (page: Page, name: string) =>
   membersRegion(page).getByRole("checkbox", { name: `Select ${name}`, exact: true });
 
 const selectionAction = (page: Page, action: string): Locator =>

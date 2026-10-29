@@ -2,21 +2,14 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { asked, rowOf, SAM } from "@test/people/members-roster.ts";
+import { asked, MEMBERS, rowOf, SAM, siteLeads } from "@test/people/members-roster.ts";
 import { ADA, adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
-const MEMBERS = "/people/members";
-
-const SITE_LEADS = {
-  id: "01JSITE0000000000000000001",
-  name: "Site leads",
-  origin: "admin-curated",
-  memberCount: 0,
-};
+const SITE_LEADS = siteLeads(0);
 
 const apiOf = () => {
   const api = adaAnAdmin();

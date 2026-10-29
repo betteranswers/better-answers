@@ -2,22 +2,15 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { describe, expect, it, vi } from "vitest";
 
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
-import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { joined, listed, outcome, PRIYA } from "@test/people/members-roster.ts";
+import { choosing, placedWithoutMeasuring } from "@test/measuring.ts";
+import { joined, listed, MEMBERS, outcome, PRIYA, siteLeads } from "@test/people/members-roster.ts";
 import { ADA, adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
-const MEMBERS = "/people/members";
-
-const SITE_LEADS = {
-  id: "01JSITE0000000000000000001",
-  name: "Site leads",
-  origin: "admin-curated",
-  memberCount: 1,
-};
+const SITE_LEADS = siteLeads(1);
 
 const SAM = joined("01JSAM", "Sam Okoro", "Viewer", [
   { groupId: SITE_LEADS.id, name: SITE_LEADS.name },
@@ -49,17 +42,7 @@ const memberLink = (name: string) => listed().getByRole("link", { name });
 const pages = () => screen.getByRole("navigation", { name: "Pages of Members" });
 
 const picked = (filter: string, choice: string) => {
-  // jsdom lays nothing out, and the select scrolls its chosen choice into view as it opens.
-  Object.defineProperty(Element.prototype, "scrollIntoView", {
-    value: () => undefined,
-    configurable: true,
-  });
-  try {
-    fireEvent.keyDown(listed().getByRole("combobox", { name: filter }), { key: "Enter" });
-    fireEvent.click(screen.getByRole("option", { name: choice }));
-  } finally {
-    Reflect.deleteProperty(Element.prototype, "scrollIntoView");
-  }
+  choosing(listed().getByRole("combobox", { name: filter }), choice);
 };
 
 const pressed = (key: string) => {

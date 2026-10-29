@@ -3,8 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { idOf, PRIYA, SAM, TEST_PERSON } from "@test/people/member-pages.ts";
 import { server } from "@test/stub-server.ts";
-import { ADA, adaAnAdmin, adaAt, GRACE, openAt, read } from "@test/two-workspaces.ts";
+import { adaAnAdmin, adaAt, GRACE, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
@@ -15,27 +16,6 @@ const people = menuGroupIn(CONTROL_CENTRE, "people");
 const MEMBERS_PAGE = pageNamed(people, "Members").path;
 
 const GROUPS_PAGE = pageNamed(people, "Groups").path;
-
-const idOf = (seed: string): string => `01J${seed}`.padEnd(26, "0");
-
-const PRIYA = {
-  ...GRACE,
-  personId: idOf("PRYA"),
-  displayName: "Priya Shah",
-  address: "priya@calder.example.test",
-  role: "Editor",
-};
-
-const SAM = {
-  ...GRACE,
-  personId: idOf("SAM"),
-  displayName: "Sam Okoro",
-  address: "sam@calder.example.test",
-  role: "Viewer",
-  joinedAt: "2026-04-17T09:00:00.000Z",
-};
-
-const TEST_PERSON = { ...ADA, displayName: "Test person", address: "admin@calder.example.test" };
 
 const A_STRANGER = {
   ...GRACE,

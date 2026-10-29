@@ -5,16 +5,9 @@ import { homeNowSaid } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { anAdminOver, membersRegion, personHeading, thePage } from "@test/people/member-pages.ts";
 import { heldBack, type Api } from "@test/stubbed-api.ts";
-import {
-  ADA,
-  adaAnAdmin,
-  adaAt,
-  aRefusalAnswer,
-  HEDY,
-  openAt,
-  read,
-} from "@test/two-workspaces.ts";
+import { ADA, adaAt, aRefusalAnswer, HEDY, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
@@ -26,26 +19,7 @@ const NOT_A_MEMBER = aRefusalAnswer("not-a-member", "unauthenticated", 401);
 
 const ROLE_CHANGED = read({ personId: ADA.personId, previousRole: "Admin", role: "Editor" });
 
-const anAdminBesideAnother = (): Api => {
-  const api = adaAnAdmin();
-  api.set("members.list", () => read([ADA, HEDY]));
-  api.set("members.groups", () => read([]));
-  api.set("members.activity", () => read({ events: [], nextCursor: null }));
-  return api;
-};
-
-const thePage = () => within(screen.getByRole("main"));
-
-const membersRegion = () => within(screen.getByRole("region", { name: "Members" }));
-
-const personHeading = (name: string) =>
-  waitFor(() => {
-    const heading = thePage()
-      .getAllByRole("heading", { level: 2 })
-      .find((each) => each.textContent === name);
-    expect(heading, `no heading for ${name}`).toBeDefined();
-    return heading ?? document.body;
-  });
+const anAdminBesideAnother = () => anAdminOver([ADA, HEDY]);
 
 const openedByName = async (name: string) => {
   fireEvent.click(await waitFor(() => membersRegion().getByRole("link", { name })));
@@ -58,6 +32,11 @@ const backToMembers = async (router: Awaited<ReturnType<typeof openAt>>) => {
   });
   await waitFor(() => expect(router.state.location.pathname).toBe(MEMBERS_PAGE));
   await waitFor(() => membersRegion().getByRole("heading", { level: 2, name: "Members" }));
+};
+
+const leftForNoWorkspace = async (router: Awaited<ReturnType<typeof openAt>>) => {
+  await waitFor(() => expect(router.state.location.pathname).toBe("/no-workspace"));
+  expect(await screen.findByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeDefined();
 };
 
 const describing = (control: HTMLElement): string =>
@@ -160,10 +139,7 @@ describe("removing a member from their page", () => {
     ).not.toBe(ofAnother);
     fireEvent.click(confirm);
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/no-workspace"));
-    expect(
-      await screen.findByRole("heading", { level: 1, name: "No Workspace Yet" }),
-    ).toBeDefined();
+    await leftForNoWorkspace(router);
   });
 
   it("removing yourself, pressed twice, asks once and still leaves", async () => {
@@ -184,10 +160,7 @@ describe("removing a member from their page", () => {
     fireEvent.click(confirm);
     removal.resolve();
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/no-workspace"));
-    expect(
-      await screen.findByRole("heading", { level: 1, name: "No Workspace Yet" }),
-    ).toBeDefined();
+    await leftForNoWorkspace(router);
     expect(removal.asks, "the second press asked the api again").toBe(1);
   });
 });

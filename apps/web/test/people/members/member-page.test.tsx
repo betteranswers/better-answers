@@ -5,32 +5,24 @@ import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { PEOPLE_KEYSTROKES, PEOPLE_SELECT_FIRST } from "@/features/people/people-state.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import {
+  anAdminOver,
+  idOf,
+  membersRegion,
+  personHeading,
+  PRIYA,
+  SAM,
+  TEST_PERSON,
+  thePage,
+} from "@test/people/member-pages.ts";
 import { server } from "@test/stub-server.ts";
-import { ADA, adaAnAdmin, GRACE, openAt, read, tickOf } from "@test/two-workspaces.ts";
+import { GRACE, openAt, read, tickOf } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
 const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
-
-const idOf = (seed: string): string => `01J${seed}`.padEnd(26, "0");
-
-const PRIYA = {
-  ...GRACE,
-  personId: idOf("PRYA"),
-  displayName: "Priya Shah",
-  address: "priya@calder.example.test",
-  role: "Editor",
-};
-
-const SAM = {
-  ...GRACE,
-  personId: idOf("SAM"),
-  displayName: "Sam Okoro",
-  address: "sam@calder.example.test",
-  role: "Viewer",
-};
 
 const UNNAMED = {
   ...GRACE,
@@ -40,28 +32,7 @@ const UNNAMED = {
   role: "Viewer",
 };
 
-const TEST_PERSON = { ...ADA, displayName: "Test person", address: "admin@calder.example.test" };
-
-const aWorkspaceOfThree = () => {
-  const api = adaAnAdmin();
-  api.set("members.list", () => read([PRIYA, SAM, TEST_PERSON, UNNAMED]));
-  api.set("members.groups", () => read([]));
-  api.set("members.activity", () => read({ events: [], nextCursor: null }));
-  return api;
-};
-
-const thePage = () => within(screen.getByRole("main"));
-
-const membersRegion = () => within(screen.getByRole("region", { name: "Members" }));
-
-const personHeading = (name: string) =>
-  waitFor(() => {
-    const heading = thePage()
-      .getAllByRole("heading", { level: 2 })
-      .find((each) => each.textContent === name);
-    expect(heading, `no heading for ${name}`).toBeDefined();
-    return heading ?? document.body;
-  });
+const aWorkspaceOfThree = () => anAdminOver([PRIYA, SAM, TEST_PERSON, UNNAMED]);
 
 const alertsSaid = (region: HTMLElement): number =>
   within(region)
