@@ -64,7 +64,7 @@ Plan 008 owns the folder restructure and is moving files under `packages/*` and 
   - [ ] BA-268 touches only `AGENTS.md` "Testing", `docs/solutions/architecture-patterns/`, `.agents/playbooks/verification.md`, `.claude/skills/survey-architecture/references/deepening.md`, `.claude/skills/browser-suite/` and `docs/operations/local-gates.md`.
   - [ ] BA-287 touches only `packages/devtools/`, `scripts/test-folders.mjs`, root `package.json`, `lefthook.yml`, `AGENTS.md` "Where a file goes", `apps/web/AGENTS.md`, the test files it moves and the path mentions `scripts/move-files.mjs` rewrites.
   - [ ] BA-288 touches only `.claude/skills/browser-suite/`, `.claude/skills/verify/`, `apps/web/.claude/skills/playwright-specs/`, `apps/web/test/gates/`, root `package.json`, `packages/devtools/test/ci/docs-lane.test.ts`, `.agents/playbooks/verification.md`, `.agents/playbooks/plan.md`, `docs/solutions/integration-issues/chromium-keeps-no-body-for-a-streamed-trpc-answer.md` and `docs/plans/007-s3-concepts-and-guides.md`.
-  - [ ] BA-269, BA-270 and BA-275 touch `packages/core/` and, for BA-269, `.github/workflows/`. BA-270 also touches the worker's entry module and one api test.
+  - [ ] BA-269, BA-270 and BA-275 touch `packages/core/` and, for BA-269, `.github/workflows/`. BA-270 also touches the worker's entry module and one api test. BA-275 also touches `apps/api/src/ops/concepts.ts` and `apps/api/tests/ops/concepts.test.ts`.
   - [ ] BA-269, BA-271 and BA-278 each add one row to `PINS` in `packages/devtools/src/scans/test-folders.ts`. The later of two open PRs rebases over the earlier one's row.
   - [ ] BA-271 is the only PR that edits `.github/workflows/check.yml` before BA-278, and the only one that edits `.github/workflows/build.yml`.
   - [ ] BA-272, BA-277 and BA-278 touch only `apps/web/`, `apps/api/tests/` for moved harness cases, `apps/web/.claude/skills/playwright-specs/` and, for BA-278, `.github/workflows/check.yml` and `PINS`.
@@ -267,7 +267,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 **Depends on.** BA-268 and BA-287.
 
-**Order.** BA-288 lands before BA-272, not after BA-278. The verify skill holds the seam, the launch, the harness's seeding actions and a feature file for every page. BA-272, BA-277 and BA-278 change none of these. They delete, move and regroup specs, and no PR in this plan changes a page or an interaction. What they change is the spec-writing text, which this PR moves out of browser-suite unchanged. Each of them then edits that text once, in its new home, where a late BA-288 would move three PRs' edits a second time. Landing it first also sends eleven drives across BA-272, BA-274, BA-275 and BA-277 through the verify skill, so the skill is driven again before the program closes.
+**Order.** BA-288 lands before BA-272, not after BA-278. The verify skill holds the seam, the launch, the harness's seeding actions and a feature file for every page. BA-272, BA-277 and BA-278 change none of these. They delete, move and regroup specs, and no PR in this plan changes a page or an interaction. What they change is the spec-writing text, which this PR moves out of browser-suite unchanged. Each of them then edits that text once, in its new home, where a late BA-288 would move three PRs' edits a second time. Landing it first also sends ten drives across BA-272, BA-274, BA-275 and BA-277 through the verify skill, so the skill is driven again before the program closes.
 
 **Files.**
 
@@ -723,18 +723,19 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on the configured `swarm workers` model at the PR head, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Run `pnpm check:core:suite` at trunk and head. Save `core-trunk-head.log`. Pass when both pass.
+- [ ] Lane 1. Regression lane against trunk. Run `pnpm check:core:suite` at trunk and head. Save `core-trunk.log` and `core-head.log`. Pass when both pass.
 - [ ] Lane 2. Run an erasure rehearsal with `pnpm ops` against a seeded local database. Save `erasure.log`. Pass when the report matches trunk's for the same seed.
 - [ ] Lane 3. Edit a concept with a folded kind through the api's `knowledge.saveConcept` on a server the verify skill launches, and read it back on the Knowledge Base page. Save `kind-fold.png`. Pass when the stored kind matches trunk's.
 - [ ] Lane 4. Seed a guide from a template through `seedGuide` at trunk and head. Save `guide-trunk.json` and `guide-head.json`. Pass when coverage and marks match.
 
-Changed 29/10/2026. No page edits a concept, and no page or api reaches guides, so lanes 3 and 4 name the surfaces that do.
 - [ ] Lane 5. Import a bundle with analyse held off. Save `import.log`. Pass when import reports landed, as trunk does.
 - [ ] Lane 6. Run `pnpm check:gates`. Save `gates.log`. Pass when import-direction and table-ownership pass.
 - [ ] Lane 7. Run `pnpm check:api`. Save `api.log`. Pass when it passes.
 - [ ] Lane 8. Run `pnpm check:worker`. Save `worker.log`. Pass when the tier contract still passes.
 - [ ] Lane 9. Diff titles at trunk and head. Save `titles.diff`. Pass when every removed seeded title names its pure replacement.
 - [ ] Lane 10. Audit each extracted function for SQL or a door. Save `audit.md`. Pass when none takes a `Tx`, a pool or a door.
+
+Changed 29/10/2026. No page edits a concept, and no page or api reaches guides, so lanes 3 and 4 name the surfaces that do.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
