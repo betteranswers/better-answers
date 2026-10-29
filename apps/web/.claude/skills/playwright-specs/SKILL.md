@@ -144,7 +144,7 @@ and `apps/web/e2e/auth/confirm-recovery.spec.ts` signs in by email while the dev
   left for a code), no answer says which refusal it was, so `saysARefusal` is the whole check and
   a number the alert shows is matched by pattern. No spec imports a refusal's sentence, and the
   page gains no marker for a test's sake. `apps/web/e2e/people/people.spec.ts` reads a batched answer,
-  `apps/web/e2e/sources/sources.spec.ts` one sent alone and a refusal the page raises itself,
+  `apps/web/e2e/sources/sources.spec.ts` one sent alone,
   `apps/web/e2e/auth/sign-in.spec.ts` Better Auth's, and `apps/web/e2e/knowledge/knowledge-search.spec.ts` a
   dropped request.
 - **A latency budget is measured, annotated and asserted**: `test.info().annotations.push(…)`
