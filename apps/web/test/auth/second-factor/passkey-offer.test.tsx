@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Providers } from "@/app/providers.tsx";
+import { useSignInEmailOtp } from "@/features/auth/auth-hooks.ts";
 import { usePasskeySignIn } from "@/features/auth/passkey-hooks.ts";
 import { forgetThePasskeyOfferShown } from "@/features/auth/session-memory.ts";
 import { HOMES } from "@/shared/navigation.ts";
@@ -16,6 +17,14 @@ import {
   sessionStanding,
   withPasskeysHere,
 } from "@test/second-factor-api.ts";
+
+/** The auth library keeps the `fetch` it found when made, so it is given one that asks whichever stub stands now. */
+vi.hoisted(() => {
+  const original = globalThis.fetch;
+  const forwarding: typeof fetch = (input, init) =>
+    globalThis.fetch === forwarding ? original(input, init) : globalThis.fetch(input, init);
+  globalThis.fetch = forwarding;
+});
 
 const SHOWN_UNDER = "better-answers.passkey-offer-shown";
 
@@ -51,6 +60,7 @@ const SHELL_READS = new Map<string, () => unknown>([
 const PASSKEY_SIGN_IN = new Map([
   ["/passkeys/sign-in-options", answering(A_CHALLENGE)],
   ["/passkeys/sign-in", answering({ displayNameGiven: true })],
+  ["/sign-in/email-otp", answering({ user: { name: "Ada" } })],
 ]);
 
 const kept = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
@@ -101,6 +111,11 @@ const switchedOnTheOffer = async () => {
 };
 
 type Loaded = Awaited<ReturnType<typeof loadedOnTheOffer>>;
+
+const providedWith = (clients: Loaded["clients"]) =>
+  function Provided(properties: { readonly children: ReactNode }) {
+    return <Providers clients={clients}>{properties.children}</Providers>;
+  };
 
 const movedTo = async (router: Loaded["router"], href: string) => {
   await act(() => router.navigate({ href }));
@@ -185,10 +200,9 @@ describe("the passkey offer", () => {
     const { clients, rendered } = await loadedOnTheOffer();
     rendered.unmount();
     const signedIn = vi.fn<() => void>();
-    const wrapper = (properties: { readonly children: ReactNode }) => (
-      <Providers clients={clients}>{properties.children}</Providers>
-    );
-    const signingIn = renderHook(() => usePasskeySignIn(false, signedIn), { wrapper });
+    const signingIn = renderHook(() => usePasskeySignIn(false, signedIn), {
+      wrapper: providedWith(clients),
+    });
 
     act(() => {
       signingIn.result.current.signIn();
@@ -196,6 +210,26 @@ describe("the passkey offer", () => {
 
     await waitFor(() => {
       expect(signedIn).toHaveBeenCalledOnce();
+    });
+    signingIn.unmount();
+    await openApp(FIRST_PAGE, clients);
+
+    expect(await offerDrawn()).toBeDefined();
+  });
+
+  it("a Viewer is offered a passkey once per sign-in", async () => {
+    const { clients, router, rendered } = await loadedOnTheOffer();
+    expect(globalThis.localStorage.getItem(SHOWN_UNDER)).not.toBeNull();
+    expect(await movedTo(router, NEXT_PAGE)).toStrictEqual({ at: NEXT_PAGE, offer: null });
+    rendered.unmount();
+    const signingIn = renderHook(() => useSignInEmailOtp(), { wrapper: providedWith(clients) });
+
+    act(() => {
+      signingIn.result.current.mutate({ email: "ada@example.test", otp: "123456" });
+    });
+
+    await waitFor(() => {
+      expect(signingIn.result.current.isSuccess).toBe(true);
     });
     signingIn.unmount();
     await openApp(FIRST_PAGE, clients);
