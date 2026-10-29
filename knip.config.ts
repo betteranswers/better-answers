@@ -42,9 +42,14 @@ const config: KnipConfig = {
     },
 
     "packages/core": {
-      // Stryker names the second by string and a script the third, so nothing imports them.
+      // Stryker names the second by string and a script names each of the last two, so nothing imports them.
       vitest: {
-        config: ["vitest.config.ts", "vitest.stryker.config.ts", "vitest.readings.config.ts"],
+        config: [
+          "vitest.config.ts",
+          "vitest.stryker.config.ts",
+          "vitest.readings.config.ts",
+          "vitest.budgets.config.ts",
+        ],
       },
     },
 

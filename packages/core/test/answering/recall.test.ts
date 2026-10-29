@@ -6,150 +6,55 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ASK_CAPS, askInput, planAnswer } from "../../src/answering/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
+import { ASK_CAPS } from "../../src/answering/index.ts";
 import { visibilitySuite } from "../fixtures/sourced-concept.ts";
 import { theReuseSet } from "../readings/reuse-set.ts";
-import { recordFigures, type Figure } from "../support/figures.ts";
-import { inputOf } from "../support/suite-input.ts";
-import { answered } from "../support/suite-postgres.ts";
 import {
   answersOf,
-  conceptsFoundBy,
-  landRecallSet,
-  paraphrasesOf,
+  bothSetsOf,
+  rankedOverTheRecallSet,
   readBuyerQuestions,
   readRecallSet,
   recallAt,
   RECALL_DEPTH,
   theBuyerQuestions,
   theRecallSet,
-  worded,
   type BuyerQuestions,
   type RecallAnswer,
   type RecallQuestion,
-  type Recalls,
-  type RecallSet,
 } from "./recall.ts";
 
-const { arrange, reading, db } = visibilitySuite();
-
-const NOW = new Date("2026-10-09T12:00:00.000Z");
-
-type Ranking = Promise<readonly string[]>;
-
-const kept = <Asking extends readonly unknown[]>(rank: (...asking: Asking) => Ranking) => {
-  const held = new Map<string, Ranking>();
-  return (...asking: Asking): Ranking => {
-    const key = JSON.stringify(asking);
-    const ranking = held.get(key) ?? rank(...asking);
-    held.set(key, ranking);
-    return ranking;
-  };
-};
-
-const conceptsFound = (person: UserPrincipal) => kept(conceptsFoundBy(reading, person, NOW));
-
-const conceptsPlanned = (person: UserPrincipal) =>
-  kept(async (question: string, collection: string | undefined) => {
-    const asking = { question, collections: collection === undefined ? [] : [collection] };
-    const planned = answered(
-      await reading(person, (reader, tx) =>
-        planAnswer(reader, (work) => work(tx), inputOf(askInput, asking), NOW, ASK_CAPS),
-      ),
-    );
-    return planned.related.map(({ iri }) => iri);
-  });
+const suite = visibilitySuite();
+const { db } = suite;
 
 const carryingACollection = (
   question: RecallQuestion,
 ): question is RecallQuestion & { readonly collection: string } =>
   question.collection !== undefined;
 
-const figuresOf = (
-  read: string,
-  { byAnswer, everyAnswer, anyAnswer }: Recalls,
-): readonly Figure[] => [
-  [`${read}, by Answer named`, worded(byAnswer, "Answers named")],
-  [`${read}, questions reaching every Answer named`, worded(everyAnswer, "questions")],
-  [`${read}, questions reaching at least one`, worded(anyAnswer, "questions")],
-];
-
 describe("recall over the synthetic set", () => {
-  let set: RecallSet;
-  let landed: ReadonlyMap<string, string>;
-  let workspaceId: string;
-  let found: ReturnType<typeof conceptsFound>;
-  let planned: ReturnType<typeof conceptsPlanned>;
+  let rankings: Awaited<ReturnType<typeof rankedOverTheRecallSet>>;
 
   beforeAll(async () => {
-    set = await theRecallSet();
-    const scenario = await arrange();
-    landed = await landRecallSet(scenario, set);
-    workspaceId = scenario.workspaceId;
-    found = conceptsFound(scenario.viewer);
-    planned = conceptsPlanned(scenario.viewer);
+    rankings = await rankedOverTheRecallSet(suite);
   }, 300_000);
 
-  const bothSets = async () =>
-    [
-      ["paraphrases", paraphrasesOf(set)],
-      ["buyer-worded questions", (await theBuyerQuestions(set)).questions],
-    ] as const;
-
-  it("reports each set's recall and fails no build", async () => {
-    const entryCap = ASK_CAPS.entryPoints;
-    const byFind = ({ question }: RecallQuestion) => found(question);
-    const unnamed = ({ question }: RecallQuestion) => planned(question, undefined);
-    const named = ({ question, collection }: RecallQuestion) => planned(question, collection);
-    const byAsk = `ask's first ${entryCap} entry points`;
-
-    const figures: Figure[] = [];
-    for (const [name, questions] of await bothSets()) {
-      const carrying = questions.filter(({ collection }) => collection !== undefined);
-      const readings = [
-        [`${name} in find's first ${RECALL_DEPTH} concepts`, questions, byFind, RECALL_DEPTH],
-        [`${name} in ${byAsk}`, questions, unnamed, entryCap],
-        [`${name} carrying a collection in ${byAsk}, none named`, carrying, unnamed, entryCap],
-        [`${name} carrying a collection in ${byAsk}, theirs named`, carrying, named, entryCap],
-      ] as const;
-      for (const [label, asked, ranked, depth] of readings) {
-        const recalls = await recallAt(asked, landed, ranked, depth);
-        figures.push(...figuresOf(label, recalls));
-
-        const { byAnswer, everyAnswer, anyAnswer } = recalls;
-        expect([byAnswer.asked, everyAnswer.asked, anyAnswer.asked]).toEqual([
-          asked.flatMap(({ answers }) => answers).length,
-          asked.length,
-          asked.length,
-        ]);
-      }
-    }
-
-    const wider = set.groups.filter(({ answers }) => answers.length > entryCap).length;
-    await recordFigures("Recall over the synthetic set", [
-      ...figures,
-      [
-        "collections holding more Answers than the entry cap, which alone it can cut",
-        `${wider} of ${set.groups.length}`,
-      ],
-      ["the corpus", `${landed.size} synthetic Answers`],
-      ["the route's threshold, reported and never enforced", "90 %"],
-    ]);
-    expect(landed.size).toBe(answersOf(set).length);
-  }, 300_000);
+  const bothSets = () => bothSetsOf(rankings.set);
 
   it("lands a set whose walk adds no concept", async () => {
     const { rows } = await db().pool.query<{ edges: number }>(
       "SELECT count(*)::int AS edges FROM map_edge WHERE workspace_id = $1",
-      [workspaceId],
+      [rankings.workspaceId],
     );
 
     expect(rows).toEqual([{ edges: 0 }]);
   });
 
   it("keeps a narrowed reading inside the collection named", async () => {
-    const groupOf = new Map(answersOf(set).map(({ key, group }) => [landed.get(key), group]));
+    const { set, landed, planned } = rankings;
+    const groupOf = new Map<string | undefined, string>(
+      answersOf(set).map(({ key, group }) => [landed.get(key), group]),
+    );
     const narrowed = (await bothSets())
       .flatMap(([, questions]) => questions)
       .filter(carryingACollection);
@@ -168,6 +73,7 @@ describe("recall over the synthetic set", () => {
   }, 300_000);
 
   it("ranks ask's plan step as find ranks", async () => {
+    const { found, planned } = rankings;
     const depth = Math.min(RECALL_DEPTH, ASK_CAPS.entryPoints);
     const readings: { question: string; byFind: string; byAsk: string; found: number }[] = [];
     for (const [, questions] of await bothSets()) {

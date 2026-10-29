@@ -347,6 +347,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 - [ ] Create `packages/core/vitest.budgets.config.ts`, modelled on `vitest.readings.config.ts`, including `test/budgets/*.budget.ts`. The folder is the rule, and the suffix is how vitest selects it.
 - [ ] Move the core write-budget, edit-budget, find-budget, map-budget and guide-seed-budget tests, the analysed-map test and recall's "reports each set's recall" case to `packages/core/test/budgets/`. At `24d4d18aa` they are `test/answering/find-budget.test.ts`, `test/concepts/map-budget.test.ts`, `test/concepts/writes/edit-budget.test.ts`, `test/concepts/writes/write-budget.test.ts`, `test/guides/guide-seed-budget.test.ts`, `test/answering/analysed-map.test.ts` and the case in `test/answering/recall.test.ts`. Move the files with `node scripts/move-files.mjs`, and paste the `scripts/test-inventory.sh` diff in the PR body.
+- [ ] Move the figure and budget tests left in `check` to `packages/core/test/budgets/` as well, since AGENTS.md "Testing" runs them on the schedule. They are `test/concepts/reading/browse-budget.test.ts`, `test/guides/guide-read-budget.test.ts` and `test/store/map/reader-linear.perf.test.ts`, moved whole, and waiting-on-you's "answers 50 waiting suggestions within its budget" case, split into `waiting-on-you.budget.ts`.
 - [ ] Add the row `{ folder: "packages/core/test/budgets", kind: "run", reason: "vitest.budgets.config.ts selects it" }` to `PINS` in `packages/devtools/src/scans/test-folders.ts`.
 - [ ] Edit `packages/core/package.json` to add a `budgets` script.
 - [ ] Create `.github/workflows/budgets.yml`, scheduled nightly with `workflow_dispatch`, modelled on `mutation.yml`.
@@ -359,7 +360,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 **You see.**
 
-- [ ] `pnpm --filter @better-answers/core exec vitest list` lists none of the moved files, and `pnpm --filter @better-answers/core run budgets` runs all seven.
+- [ ] `pnpm --filter @better-answers/core exec vitest list` lists none of the moved files, and `pnpm --filter @better-answers/core run budgets` runs all eleven.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -369,7 +370,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on the configured `swarm workers` model at the PR head, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run `pnpm check:core:suite` at trunk and head. Save `core-trunk-head.log`. Pass when both pass and only the moved cases are absent at head.
-- [ ] Lane 2. Run `vitest list --shard=1/2` and `--shard=2/2` at head and sum Appendix E's file times per shard. Save `shards.log`. Pass when neither shard's sum exceeds the other by more than 40%.
+- [ ] Lane 2. List core's default files at head with `pnpm --filter @better-answers/core exec vitest list --filesOnly`, and search each for `recordFigures` and for a time held by `toBeLessThan`. Save `figures.log`. Pass when no listed file records figures or holds a time budget.
 - [ ] Lane 3. Run the budgets config at head. Save `budgets.log`. Pass when every budget passes and every reading prints its figures.
 - [ ] Lane 4. In a scratch edit, set find-budget's threshold to 1 ms and run the budgets config. Save `budget-breaks.log`. Pass when it fails naming find-budget.
 - [ ] Lane 5. Run `pnpm lint:workflows`. Save `workflows.log`. Pass when actionlint, zizmor and shellcheck pass on `budgets.yml`.
@@ -384,7 +385,9 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Metric. Wall seconds of `pnpm check:core:suite --shard=1/2` and `--shard=2/2`, summed.
 - [ ] Probe. Run both shards at trunk and head, interleaved, three times each, against one shared Postgres.
 - [ ] Baseline. Record the trunk median first.
-- [ ] Rule. The moved files held 326s of CI file time. Fails if the head median is not at least 60s below trunk.
+- [ ] Rule. Fails unless every head round is faster than every trunk round. Record the median gain and name the file that bounds each shard.
+
+Changed 28/10/2026. The 60s rule summed file times across parallel files. The measured median gain on trunk `d672b7313` was 50.6s, bounded by two 45s files, `import-direction.test.ts` and `erasure-routine.test.ts`. The rule now asks that the two ranges not overlap, which a real gain passes and no gain fails.
 
 **Review gate.** None. BA-269 is not review-gated.
 
@@ -859,6 +862,8 @@ On 28/10/2026 the first rule, a 20s drop in `pnpm check:worker`, summed case tim
 
 **Depends on.** BA-277.
 
+Changed 28/10/2026. BA-269's shard-balance lane moved here, into lane 8, because the `full-core` shards were 1.84 to 1 in Appendix E's file times at trunk `12026abc3`, before BA-269 moved a file, and BA-278 is the PR that edits `check.yml`. BA-270 has since balanced them, and `main`'s `build` at `d672b7313` ran them in 186 and 187 s. Lane 8 holds that balance through this PR's own `check.yml` edit.
+
 **Files.**
 
 - [ ] Edit the remaining specs under `apps/web/e2e/`.
@@ -867,7 +872,7 @@ On 28/10/2026 the first rule, a 20s drop in `pnpm check:worker`, summed case tim
 - [ ] Add two rows to `PINS` in `packages/devtools/src/scans/test-folders.ts`. They are `{ folder: "apps/web/e2e/journeys", kind: "mirror", reason: "docs/specs/route" }`, because a journey's subject is the route and not one feature, and `{ folder: "apps/web/e2e/layout", kind: "run", reason: "the Playwright layout project selects it" }`.
 - [ ] Edit `apps/web/playwright.config.ts` to add a layout project that needs no api, with a `testMatch` that selects `e2e/layout/`.
 - [ ] Edit `apps/web/test/gates/playwright-config.test.ts` to pin the api project's and the layout project's `testMatch`.
-- [ ] Edit `.github/workflows/check.yml`, the `full-web-browser` shard matrix.
+- [ ] Edit `.github/workflows/check.yml`, the `full-web-browser` shard matrix and the `full-core` shards.
 - [ ] Edit `apps/web/.claude/skills/playwright-specs/` and `docs/specs/route/seams.md` if a named spec moves.
 
 **Build.**
@@ -878,6 +883,7 @@ On 28/10/2026 the first rule, a 20s drop in `pnpm check:worker`, summed case tim
 - [ ] Move the 320 and 390px layout cases to `e2e/layout/`, run by the layout project and served by `vite preview` over the stubbed api. Move accessibility-gate in beside them if that project also needs no api.
 - [ ] Move spec files with `node scripts/move-files.mjs`, and paste the `scripts/test-inventory.sh` diff for `apps/web/e2e` in the PR body.
 - [ ] Run one shard. Keep three workers.
+- [ ] Balance the two `full-core` shards, so that neither job's wall exceeds the other's by more than 40%.
 
 **You see.**
 
@@ -896,7 +902,7 @@ On 28/10/2026 the first rule, a 20s drop in `pnpm check:worker`, summed case tim
 - [ ] Lane 5. Slow one page's procedure past its budget in a scratch edit. Save `budget-breaks.log`. Pass when that page's spec fails.
 - [ ] Lane 6. Add a contrast fault to one page in a scratch edit. Save `gate-breaks.log`. Pass when the gate fails.
 - [ ] Lane 7. Run `pnpm lint:workflows`. Save `workflows.log`. Pass when it passes.
-- [ ] Lane 8. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Save `ci-run.json`. Pass when `full-web-browser` runs as one job and is green.
+- [ ] Lane 8. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Save `ci-run.json`. Pass when `full-web-browser` runs as one job and is green, and neither `full-core` shard's job wall exceeds the other's by more than 40%.
 - [ ] Lane 9. Run `pnpm check:docs`. Save `docs.log`. Pass when it passes.
 - [ ] Lane 10. Audit that each deleted or moved case is named with the test that keeps its claim. Save `audit.md`. Pass when none is unaccounted for.
 

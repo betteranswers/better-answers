@@ -5,14 +5,16 @@ import { z } from "zod";
 
 import type { ConceptIri } from "@better-answers/schema";
 
-import { find } from "../../src/answering/index.ts";
+import { ASK_CAPS, askInput, find, planAnswer } from "../../src/answering/index.ts";
 import { writeConcept } from "../../src/concepts/index.ts";
 import { attempt, err, ok, type Result, type UserPrincipal } from "../../src/kernel/index.ts";
 import type { visibilitySuite } from "../fixtures/sourced-concept.ts";
 import { doorsOf, type Scenario } from "../fixtures/workspace-with-bundle.ts";
+import { inputOf } from "../support/suite-input.ts";
 import { answered } from "../support/suite-postgres.ts";
 
-type ReadingAs = ReturnType<typeof visibilitySuite>["reading"];
+type Suite = ReturnType<typeof visibilitySuite>;
+type ReadingAs = Suite["reading"];
 
 export const conceptsFoundBy =
   (reading: ReadingAs, person: UserPrincipal, now: Date) =>
@@ -24,6 +26,44 @@ export const conceptsFoundBy =
     );
     return found.matches.flatMap((match) => (match.layer === "bundles" ? [match.iri] : []));
   };
+
+const NOW = new Date("2026-10-09T12:00:00.000Z");
+
+type Ranking = Promise<readonly string[]>;
+
+const kept = <Asking extends readonly unknown[]>(rank: (...asking: Asking) => Ranking) => {
+  const held = new Map<string, Ranking>();
+  return (...asking: Asking): Ranking => {
+    const key = JSON.stringify(asking);
+    const ranking = held.get(key) ?? rank(...asking);
+    held.set(key, ranking);
+    return ranking;
+  };
+};
+
+const conceptsPlannedBy =
+  (reading: ReadingAs, person: UserPrincipal, now: Date) =>
+  async (question: string, collection: string | undefined): Ranking => {
+    const asking = { question, collections: collection === undefined ? [] : [collection] };
+    const planned = answered(
+      await reading(person, (reader, tx) =>
+        planAnswer(reader, (work) => work(tx), inputOf(askInput, asking), now, ASK_CAPS),
+      ),
+    );
+    return planned.related.map(({ iri }) => iri);
+  };
+
+export const rankedOverTheRecallSet = async ({ arrange, reading }: Suite) => {
+  const set = await theRecallSet();
+  const scenario = await arrange();
+  return {
+    set,
+    landed: await landRecallSet(scenario, set),
+    workspaceId: scenario.workspaceId,
+    found: kept(conceptsFoundBy(reading, scenario.viewer, NOW)),
+    planned: kept(conceptsPlannedBy(reading, scenario.viewer, NOW)),
+  };
+};
 
 export const worded = ({ recall, recalled, asked }: Recall, counted: string): string =>
   `${(recall * 100).toFixed(1)} %, for ${recalled} of ${asked} ${counted}`;
@@ -201,6 +241,12 @@ export const paraphrasesOf = (set: RecallSet): readonly RecallQuestion[] =>
   answersOf(set).flatMap(({ key, group, paraphrases }) =>
     paraphrases.map((question) => ({ question, collection: group, answers: [key] })),
   );
+
+export const bothSetsOf = async (set: RecallSet) =>
+  [
+    ["paraphrases", paraphrasesOf(set)],
+    ["buyer-worded questions", (await theBuyerQuestions(set)).questions],
+  ] as const;
 
 export type Recalls = {
   readonly everyAnswer: Recall;

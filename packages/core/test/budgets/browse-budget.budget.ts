@@ -2,13 +2,13 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { conceptIndexRows, testData } from "@better-answers/schema/testing";
 
-import { readKindConcepts, readKnowledgeTree } from "../../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../../src/kernel/index.ts";
-import { withMember, type PostgresDoor } from "../../../src/store/postgres/index.ts";
-import { principalFor } from "../../fixtures/workspace-with-bundle.ts";
-import { inMs, percentile, recordFigures } from "../../support/figures.ts";
-import { provisionedWorkspace } from "../../support/platform.ts";
-import { answered, postgresForSuite, seedingWith } from "../../support/suite-postgres.ts";
+import { readKindConcepts, readKnowledgeTree } from "../../src/concepts/index.ts";
+import type { UserPrincipal } from "../../src/kernel/index.ts";
+import { withMember, type PostgresDoor } from "../../src/store/postgres/index.ts";
+import { principalFor } from "../fixtures/workspace-with-bundle.ts";
+import { inMs, percentile, recordFigures } from "../support/figures.ts";
+import { provisionedWorkspace } from "../support/platform.ts";
+import { answered, postgresForSuite, seedingWith } from "../support/suite-postgres.ts";
 
 const db = postgresForSuite();
 

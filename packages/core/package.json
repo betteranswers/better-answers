@@ -42,6 +42,7 @@
     "typecheck": "tsc --noEmit",
     "reading:reuse": "pnpm run test --config vitest.readings.config.ts reuse.reading",
     "reading:decision": "pnpm run test --config vitest.readings.config.ts decision.reading",
+    "budgets": "pnpm run test --config vitest.budgets.config.ts",
     "test": "node ./node_modules/vitest/vitest.mjs run",
     "mutation": "node ./node_modules/@stryker-mutator/core/bin/stryker.js run",
     "check": "node ../../scripts/check.mjs typecheck test"

@@ -269,7 +269,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] Metric. The median wall time of one governed `writeConcept` re-write and one single-decision `acceptSuggestions`, at 250 concepts, at trunk and head. The work the diff adds is one indexed read of `concept_owner` inside the act.
-- [ ] Probe. A case in `packages/core/test/concepts/map-budget.test.ts`, `times one governed write beside its owner read`, seeds 250 concepts with `seedingWith` and times 30 re-writes and 30 acceptances by the collection's Editor, recorded with `recordFigures` (`packages/core/test/support/figures.ts`). Copy the case into a trunk worktree, where any Editor writes, and run trunk, head, trunk, head, trunk, head.
+- [ ] Probe. A case in `packages/core/test/budgets/map-budget.budget.ts`, `times one governed write beside its owner read`, seeds 250 concepts with `seedingWith` and times 30 re-writes and 30 acceptances by the collection's Editor, recorded with `recordFigures` (`packages/core/test/support/figures.ts`). Copy the case into a trunk worktree, where any Editor writes, and run trunk, head, trunk, head, trunk, head.
 - [ ] Baseline. The trunk medians, measured first, beside the readings row of about 0.9 s for one governed write (`docs/operations/readings.md`).
 - [ ] Rule. Fail when either head median exceeds its trunk median by more than 50 ms, or when `EXPLAIN` of the `ownerOf` statement shows a sequential scan on `concept_owner`.
 
@@ -397,7 +397,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `apps/api/tests/support/harness/harness-knowledge.ts`.
 - [ ] Edit `packages/core/test/fixtures/sourced-concept.ts`.
 - [ ] Create `packages/core/test/concepts/writes/concept-edit.test.ts`.
-- [ ] Create `packages/core/test/concepts/writes/edit-budget.test.ts`.
+- [ ] Create `packages/core/test/budgets/edit-budget.budget.ts`.
 - [ ] Edit `packages/core/test/concepts/reading/concept-read.test.ts`.
 - [ ] Edit `packages/core/test/concepts/writes/reconciler.test.ts`.
 - [ ] Edit `packages/core/test/concepts/writes/suggestions.test.ts`.
@@ -469,7 +469,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] Metric. The median and p95 wall time, in ms, of one direct `writeConcept` edit on a knowledge base of 250 concepts at trunk and at head. At head alone, the `saveConcept` round trip and the `placesUsing` count, timed apart, because trunk has neither.
-- [ ] Probe. `packages/core/test/concepts/writes/edit-budget.test.ts` seeds 250 concepts with `seedingWith` and a committed tree, as `seedWideMap` in `packages/core/test/answering/analysed-map.test.ts` does, then times 20 edits and reports through `recordFigures` (`packages/core/test/support/figures.ts`) under the heading `the governed edit at 250 concepts`. Copy its `writeConcept` case alone into the trunk worktree. Run `pnpm --filter @better-answers/core exec vitest run test/concepts/writes/edit-budget.test.ts` in the trunk worktree and the head worktree in turn, three times each.
+- [ ] Probe. `packages/core/test/budgets/edit-budget.budget.ts` seeds 250 concepts with `seedingWith` and a committed tree, as `seedWideMap` in `packages/core/test/budgets/analysed-map.budget.ts` does, then times 20 edits and reports through `recordFigures` (`packages/core/test/support/figures.ts`) under the heading `the governed edit at 250 concepts`. Copy its `writeConcept` case alone into the trunk worktree. Run `pnpm --filter @better-answers/core exec vitest run test/concepts/writes/edit-budget.test.ts` in the trunk worktree and the head worktree in turn, three times each.
 - [ ] Baseline. Measure trunk first. Record its median beside the reading in `docs/operations/readings.md`, which puts one governed write at about 0.9 s.
 - [ ] Rule. Fail when head's median `writeConcept` exceeds trunk's by more than 10%, when the median `saveConcept` exceeds 1,100 ms, or when the p95 of `placesUsing` exceeds 20 ms.
 
@@ -694,7 +694,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `apps/worker/tests/concepts/test_links.py`.
 - [ ] Edit `packages/core/test/store/map/map.test.ts`.
 - [ ] Edit `packages/core/test/concepts/rebuild-equivalence.test.ts`.
-- [ ] Create `packages/core/test/concepts/writes/write-budget.test.ts`.
+- [ ] Create `packages/core/test/budgets/write-budget.budget.ts`.
 - [ ] Edit `docs/operations/readings.md`.
 - [ ] Edit `docs/specs/route/s3.md`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0032.md`.
@@ -704,7 +704,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 **Build.**
 
 - [ ] Every test and probe here writes concepts as the scenario's Editor only where BA-231's fixtures make that Editor the collection's owner, and as the Admin otherwise, because BA-231 refuses a direct write by an Editor who owns nothing (KTD2).
-- [ ] Commit `packages/core/test/concepts/writes/write-budget.test.ts` first, alone, so the perf lane's trunk is `main` plus that one commit. It imports only `writeConcept`, `writeConceptDelta`, `seedingWith` and `recordFigures`, which trunk already has.
+- [ ] Commit `packages/core/test/budgets/write-budget.budget.ts` first, alone, so the perf lane's trunk is `main` plus that one commit. It imports only `writeConcept`, `writeConceptDelta`, `seedingWith` and `recordFigures`, which trunk already has.
 - [ ] Declare `mapUnresolvedReference` in `packages/schema/src/knowledge/map-tables.ts` as the table `map_unresolved_reference`, `withRLS` on `workspace_id`. Its columns are `workspace_id`, `gen` (not null), `from_uid` (the citing concept's IRI), `relation` (`link` or `lineage`, by CHECK), `ordinal` (an integer of 0 or more, by CHECK) and `target_path`. It is unique on `(workspace_id, gen, from_uid, relation, ordinal)` and indexed on `(workspace_id, gen, target_path)`. It carries no readable columns, because no person reads it. Only the delta and the rebuild do. KTD16's catalogue test therefore does not probe it.
 - [ ] The row carries no `section` or `sentence`, unlike the unit sketch in the design (KTD19). Promotion re-derives the citing concept through `resolveOutgoing`, which computes both, so storing them would be a second copy that could disagree with the rebuild.
 - [ ] Write the migration's hand-written tail. Add the `map_row_generation_guard` trigger `BEFORE INSERT` on the table, as `map_edge` has (`0067_the-map.sql:54`). Revoke all from `worker_rt`, then grant it `SELECT, INSERT`, on the precedent of `0022_the-queue-substrate.sql:94-95`.
@@ -764,7 +764,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] Metric. Two figures at 3,000 concepts, at trunk and at head. The whole write is the wall time of one `writeConcept` that lands a concept at a path three seeded bodies link, as median and p95 over 20 writes per run. The backfill is the wall time of one `writeConceptDelta` for a newly landed concept at such a path, inside a transaction the probe rolls back, as the median over 20 calls. At trunk the backfill holds the regex scan, and at head the keyed lookup. Both re-derive the same three citers. Seeding is the same code at both trees. The probe seeds 3,000 `concept_index` rows with `seedingWith`, 300 of them with forward links, then runs `writeConceptDelta` for each seeded row, untimed, so each tree reaches the timed writes over the map its own delta built. At trunk each seeding delta scans every body, so the seed takes minutes. The case sets its own timeout, `WRITE_BUDGET_TIMEOUT_MS = 600_000`, as `map-budget.test.ts` sets `REBUILD_BUDGET_MS`.
-- [ ] Probe. `packages/core/test/concepts/writes/write-budget.test.ts`, case "records the governed write at 3,000 concepts". Run `pnpm --filter @better-answers/core exec vitest run test/concepts/writes/write-budget.test.ts` in a trunk worktree at `main` plus the probe commit, and in the head worktree, alternately, trunk first, five runs each. Each run records through `recordFigures` under `The governed write at 3,000 concepts`. Each timed write asserts that its concept has three inbound `LINKS_TO` edges at the live generation, so a run that skipped the backfill fails instead of reporting a fast number.
+- [ ] Probe. `packages/core/test/budgets/write-budget.budget.ts`, case "records the governed write at 3,000 concepts". Run `pnpm --filter @better-answers/core exec vitest run test/concepts/writes/write-budget.test.ts` in a trunk worktree at `main` plus the probe commit, and in the head worktree, alternately, trunk first, five runs each. Each run records through `recordFigures` under `The governed write at 3,000 concepts`. Each timed write asserts that its concept has three inbound `LINKS_TO` edges at the live generation, so a run that skipped the backfill fails instead of reporting a fast number.
 - [ ] Baseline. The five trunk runs, measured first, give the trunk medians. The readings row of 2026-09-10 (about 0.9 s, scan 31 to 42 ms) is context only, because it came from an unmerged probe.
 - [ ] Rule. Fail when head's median whole write exceeds trunk's by more than 5%, or head's median backfill exceeds trunk's. Vet the figures with `pstack:benchmark-checklist` before reporting them. Write the trunk and head figures as the new readings rows the Build box names, and keep the two archived probe rows.
 
@@ -806,7 +806,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `packages/core/src/erasure/records.ts`.
 - [ ] Edit `packages/core/test/erasure/erasure-map.test.ts`.
 - [ ] Edit `packages/core/test/erasure/routine/erasure-routine.test.ts`.
-- [ ] Create `packages/core/test/guides/guide-read-budget.test.ts`.
+- [ ] Create `packages/core/test/budgets/guide-read-budget.budget.ts`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0014.md`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0015.md`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0035.md`.
@@ -814,7 +814,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 
 **Build.**
 
-- [ ] Commit `packages/core/test/guides/guide-read-budget.test.ts` first, alone, so the perf lane's trunk is `main` plus that commit. It uses only `footnotesOf`, `erasureMapOf` and factory entries that trunk has.
+- [ ] Commit `packages/core/test/budgets/guide-read-budget.budget.ts` first, alone, so the perf lane's trunk is `main` plus that commit. It uses only `footnotesOf`, `erasureMapOf` and factory entries that trunk has.
 - [ ] Add `versionColumns()` to `packages/schema/src/column-helpers.ts`. It returns `version` (an integer of 1 or more), `actor` (an `ActorId`, not null), `at` (`stamp`, not null, default now) and `note` (nullable). Each version table declares its own key and its typed content beside it.
 - [ ] Every version table carries no status and no current flag. The latest `version` is the current one (ADR 0014, *a version table with a mutable flag is not append-only*).
 - [ ] The migration revokes `UPDATE` and `DELETE` on `write_up_version` and `guide_definition_version` from `app_rt`, and all privileges on every new table from `worker_rt`, on the precedent of `0009_ledger-substrate.sql`.
@@ -879,7 +879,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] Metric. Two figures at trunk and head. The first is the median time of `footnotesOf` as the scenario's Viewer, for one write-up with 25 includes over 3,000 seeded concepts, over 50 calls per run. The include row grows by three columns, so this is the read the change can slow. The second is the median time of `erasureMapOf` for a subject who holds nothing in the new families, over 20 calls per run. That isolates the three finders the diff adds.
-- [ ] Probe. `packages/core/test/guides/guide-read-budget.test.ts`, case "records the footnote read and the erasure map". Run `pnpm --filter @better-answers/core exec vitest run test/guides/guide-read-budget.test.ts` in a trunk worktree at `main` plus the probe commit and in the head worktree, alternately, trunk first, five runs each. Each run records through `recordFigures` and asserts `footnotesOf` returned 25 footnotes.
+- [ ] Probe. `packages/core/test/budgets/guide-read-budget.budget.ts`, case "records the footnote read and the erasure map". Run `pnpm --filter @better-answers/core exec vitest run test/guides/guide-read-budget.test.ts` in a trunk worktree at `main` plus the probe commit and in the head worktree, alternately, trunk first, five runs each. Each run records through `recordFigures` and asserts `footnotesOf` returned 25 footnotes.
 - [ ] Baseline. The five trunk runs, measured first.
 - [ ] Rule. Fail when head's median `footnotesOf` exceeds trunk's by more than 10%, or head's median `erasureMapOf` exceeds trunk's by more than 5 ms. Vet the figures with `pstack:benchmark-checklist`.
 
@@ -928,8 +928,8 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/core/test/concepts/writes/reconciler.test.ts`.
 - [ ] Edit `packages/core/test/erasure/routine/erasure-routine.test.ts`.
 - [ ] Edit `packages/core/test/gates/face-admission.test.ts`.
-- [ ] Edit `packages/core/test/concepts/writes/write-budget.test.ts`.
-- [ ] Create `packages/core/test/guides/guide-seed-budget.test.ts`.
+- [ ] Edit `packages/core/test/budgets/write-budget.budget.ts`.
+- [ ] Create `packages/core/test/budgets/guide-seed-budget.budget.ts`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0004.md`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0012.md`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0029.md`.
@@ -1032,7 +1032,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] Metric. One figure at trunk and head, and two absolute budgets for what trunk lacks. The governed write at 3,000 concepts, from BA-233's probe, now runs with eight seeded write-ups including the written concept, so the head pays the `needs_review` update. The absolute budgets are the median time of `seedGuide` for the bid-library template over the Northgate fixture among 3,000 concepts, skeleton commit included, and the median time of `coverageOf` for that guide.
-- [ ] Probe. `packages/core/test/concepts/writes/write-budget.test.ts` gains the case "records the governed write over citing write-ups", committed first, alone, so trunk is `main` plus that commit. `packages/core/test/guides/guide-seed-budget.test.ts`, case "records seeding a guide and reading its coverage", is new and runs at head alone, over ten seeds and 50 coverage reads. Run `pnpm --filter @better-answers/core exec vitest run test/concepts/writes/write-budget.test.ts` at trunk and head alternately, trunk first, five runs each, then `pnpm --filter @better-answers/core exec vitest run test/guides/guide-seed-budget.test.ts` five times at head. Each timed write asserts the eight write-ups it touched, and each seed asserts 24 includes.
+- [ ] Probe. `packages/core/test/budgets/write-budget.budget.ts` gains the case "records the governed write over citing write-ups", committed first, alone, so trunk is `main` plus that commit. `packages/core/test/budgets/guide-seed-budget.budget.ts`, case "records seeding a guide and reading its coverage", is new and runs at head alone, over ten seeds and 50 coverage reads. Run `pnpm --filter @better-answers/core exec vitest run test/concepts/writes/write-budget.test.ts` at trunk and head alternately, trunk first, five runs each, then `pnpm --filter @better-answers/core exec vitest run test/guides/guide-seed-budget.test.ts` five times at head. Each timed write asserts the eight write-ups it touched, and each seed asserts 24 includes.
 - [ ] Baseline. The five trunk runs of the write case, measured first.
 - [ ] Rule. Fail when head's median write exceeds trunk's by more than 5%, when the median seed exceeds 1.5 s, or when the median coverage read exceeds 50 ms. Vet the figures with `pstack:benchmark-checklist`.
 
@@ -1344,7 +1344,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. In the new `packages/core/test/concepts/curation-budget.test.ts`, the time in ms for `readAllKnowledge`'s first page, for `readKinds`, and for `exportBundleSnapshot`, at 3,000 concepts. The index rows are seeded with `seedingWith` as `seedWideMap` does in `packages/core/test/concepts/map-budget.test.ts`, and the snapshot runs on a bare repository of 3,000 files. Each figure is written by `recordFigures`. In the browser, the All Knowledge first page's render time.
+- [ ] Metric. In the new `packages/core/test/concepts/curation-budget.test.ts`, the time in ms for `readAllKnowledge`'s first page, for `readKinds`, and for `exportBundleSnapshot`, at 3,000 concepts. The index rows are seeded with `seedingWith` as `seedWideMap` does in `packages/core/test/budgets/map-budget.budget.ts`, and the snapshot runs on a bare repository of 3,000 files. Each figure is written by `recordFigures`. In the browser, the All Knowledge first page's render time.
 - [ ] Probe. Run `pnpm --filter @better-answers/core exec vitest run test/concepts/map-budget.test.ts test/concepts/curation-budget.test.ts` in a trunk and a head lane worktree, five rounds, alternating. Run `pnpm --filter @better-answers/web exec playwright test e2e/knowledge/all-knowledge.spec.ts -g "within its budget" --project chromium` at head, five rounds.
 - [ ] Baseline. Measure trunk first. The control is `map-budget.test.ts`'s recorded figures at trunk. Trunk lacks the three reads, so they carry absolute budgets.
 - [ ] Rule. Fail when the All Knowledge first page or Kinds reaches 200 ms at 3,000 concepts, when the snapshot reaches 5,000 ms, when the page's render median reaches 1,000 ms, or when any `map-budget.test.ts` figure at head exceeds trunk's by more than 10%.
@@ -1381,7 +1381,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `packages/core/src/concepts/reading/browse.ts`.
 - [ ] Edit `packages/core/src/concepts/index.ts`.
 - [ ] Create `packages/core/test/concepts/reading/browse.test.ts`.
-- [ ] Create `packages/core/test/concepts/reading/browse-budget.test.ts`.
+- [ ] Create `packages/core/test/budgets/browse-budget.budget.ts`.
 - [ ] Edit `apps/api/tests/trpc/knowledge-procedures.test.ts`.
 - [ ] Edit `apps/api/tests/support/harness/harness-knowledge.ts`.
 - [ ] Edit `apps/web/e2e/harness.ts`.
@@ -1438,7 +1438,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. In the new `packages/core/test/concepts/reading/browse-budget.test.ts`, the time in ms for `readKnowledgeTree` and for one page of `readKnowledgeBranch` at 3,000 concepts, seeded as `seedWideMap` does and written by `recordFigures`. The page's render time in the browser at 3,000 concepts. The web build's gzipped JavaScript size at trunk and head, which proves composition added no dependency weight.
+- [ ] Metric. In the new `packages/core/test/budgets/browse-budget.budget.ts`, the time in ms for `readKnowledgeTree` and for one page of `readKnowledgeBranch` at 3,000 concepts, seeded as `seedWideMap` does and written by `recordFigures`. The page's render time in the browser at 3,000 concepts. The web build's gzipped JavaScript size at trunk and head, which proves composition added no dependency weight.
 - [ ] Probe. Run `pnpm --filter @better-answers/core exec vitest run test/concepts/map-budget.test.ts test/concepts/reading/browse-budget.test.ts` in a trunk and a head lane worktree, five rounds, alternating. Run `pnpm --filter @better-answers/web run build` at trunk and at head and sum the gzipped sizes of `apps/web/dist/assets/*.js`. Run `pnpm --filter @better-answers/web exec playwright test e2e/knowledge/knowledge-base.spec.ts -g "within its budget" --project chromium` at head, five rounds.
 - [ ] Baseline. Measure trunk first. The controls are `map-budget.test.ts`'s figures and the build's gzipped size at trunk. Trunk lacks the page and its reads, so they carry absolute budgets.
 - [ ] Rule. Fail when `readKnowledgeTree` or a branch page reaches 200 ms at 3,000 concepts, when the page's render median reaches 1,000 ms, when the build grows by more than 15 kB gzipped, or when any `map-budget.test.ts` figure at head exceeds trunk's by more than 10%.
