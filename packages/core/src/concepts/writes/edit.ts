@@ -42,6 +42,7 @@ import {
 import { heldByIri, mergeKeyOf, placesUsingReadableOrNot, type Held } from "../import/landing.ts";
 import { ownerAdmits, ownerOf, standingConcept, type OwnedConcept } from "../owners.ts";
 import { resolvedSourcesOf, type PassageReader } from "../reading/read.ts";
+import { mergeKeyMovedBy } from "./merge-key.ts";
 import { submitSuggestionSet, type SubmitSuggestionSetRefusal } from "./suggestions.ts";
 import {
   SAVED_NEW,
@@ -508,7 +509,7 @@ const savingOver = async (
   return ok({
     iri,
     path: held.path,
-    mergeKey: mergeKeyAfter(held, input.parts),
+    mergeKey: mergeKeyMovedBy(held, input.parts) ?? held.mergeKey,
     heldKey: held.mergeKey,
     storedBody: stored.body,
     base: held.contentHash,
@@ -520,11 +521,6 @@ const savingOver = async (
     reuse: input.reuse,
     message: `Edit ${held.path}`,
   });
-};
-
-const mergeKeyAfter = (held: Held, parts: ConceptParts): string => {
-  const edited = mergeKeyOf(foldKind(parts.kind), parts.title);
-  return edited === mergeKeyOf(held.kind, held.title) ? held.mergeKey : edited;
 };
 
 const savingNew = async (
