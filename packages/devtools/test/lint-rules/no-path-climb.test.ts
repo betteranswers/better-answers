@@ -1,8 +1,14 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { pluginConfigFor, readOxlintConfig } from "@better-answers/devtools/oxlint-config";
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
+
+import { ROOTS_OF } from "../../lint-rules/shared/path-climb.ts";
 
 const RULE = "better-answers/no-path-climb";
 
@@ -141,5 +147,12 @@ describe("the no-path-climb rule in the real config", () => {
 
   it("is lifted by one override", () => {
     expect(lifting).toHaveLength(1);
+  });
+
+  it("names only helper files the tree holds", () => {
+    const files = [...ROOTS_OF.values()].filter((helper) => !helper.startsWith("@"));
+
+    expect(files.filter((helper) => !existsSync(path.join(repositoryRoot, helper)))).toEqual([]);
+    expect(files).toHaveLength(4);
   });
 });

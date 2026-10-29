@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const webRoot = path.resolve(import.meta.dirname, "..");
+import { workspaceRoot } from "@test/roots.ts";
 
 const tsc = (() => {
   const manifest = createRequire(import.meta.url).resolve("typescript/package.json");
@@ -25,7 +25,7 @@ const AUTH_FILES_THE_WEB_MAY_PULL = new Set(["verify.ts", "constants.ts"]);
 describe("the AppRouter seam", () => {
   it("pulls nothing of the auth server into the web program", () => {
     const listing = execFileSync(process.execPath, [tsc, "--noEmit", "--listFiles"], {
-      cwd: webRoot,
+      cwd: workspaceRoot,
       encoding: "utf8",
       maxBuffer: LISTING_BUFFER_BYTES,
     });
