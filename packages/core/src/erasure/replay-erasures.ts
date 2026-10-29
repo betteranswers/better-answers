@@ -6,12 +6,8 @@ import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.t
 import { workspaceIds } from "../workspaces/index.ts";
 import { replayCopiesSince, type ReplayCopy } from "./replay.ts";
 import { dueDateOf } from "./requests.ts";
-import {
-  beyondUseFrom,
-  runErasure,
-  type ErasureDoors,
-  type ErasurePrincipal,
-} from "./routine/routine.ts";
+import { beyondUseFrom, runErasure } from "./routine/routine.ts";
+import type { ErasureDoors, ErasurePrincipal } from "./routine/vocabulary.ts";
 
 const REPLAY_ACTIONS = declareActions("platform", {
   replayed: action("platform.erasure.replayed", {

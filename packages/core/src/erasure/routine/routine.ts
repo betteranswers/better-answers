@@ -1,78 +1,43 @@
 import { boundarySchemas } from "@better-answers/schema";
 
 import { action, declareActions, record, type DetailOf } from "../../audit/index.ts";
-import { withBundleFenceAs } from "../../bundle/index.ts";
-import { carryVerificationsOntoRewrite, moveBundleCommits } from "../../concepts/index.ts";
-import {
-  attempt,
-  err,
-  ok,
-  processActorId,
-  ulid,
-  type Clock,
-  type PlatformPrincipal,
-  type Result,
-} from "../../kernel/index.ts";
-import { rewriteHistory, type GitDoor, type Pseudonymisation } from "../../store/git/index.ts";
-import type { ObjectDoor } from "../../store/objects/index.ts";
-import {
-  withScope,
-  withSessionLock,
-  type PostgresDoor,
-  type Tx,
-} from "../../store/postgres/index.ts";
+import { attempt, err, ok, ulid, type Result } from "../../kernel/index.ts";
+import { withScope, withSessionLock, type Tx } from "../../store/postgres/index.ts";
 import { erasureMapOf, type ErasureFamily, type ErasureMap } from "../map.ts";
 import { subjectNamedBy, type SubjectNamed } from "../needles.ts";
 import { writeReplayCopy } from "../replay.ts";
-import {
-  erasureReportOf,
-  type ErasureAction,
-  type ErasureActions,
-  type ErasureRecord,
-} from "../report.ts";
+import { erasureReportOf, type ErasureActions, type ErasureRecord } from "../report.ts";
 import { monthsOn, type SubjectRequest } from "../requests.ts";
-import { suppressInTheWorkspace, type Suppressed } from "../suppressions.ts";
-import { eraseFromTheActors, inEverySweep, type ActorsSwept } from "./actors.ts";
-import { eraseFromTheIdentitySet, type IdentityArm, type IdentitySwept } from "./identity.ts";
-import { eraseFromTheQuestions, type QuestionsSwept } from "./questions.ts";
-import { rederiveAfterErasure, type Rederived } from "./rederive.ts";
-
-const ERASURE_ACTOR = processActorId("erasure");
-
-export type ErasurePrincipal = PlatformPrincipal & {
-  readonly actorId: typeof ERASURE_ACTOR;
-};
-
-export const ERASURE: ErasurePrincipal = { kind: "platform", actorId: ERASURE_ACTOR };
-
-export type ErasureLogLine = {
-  readonly actor: typeof ERASURE_ACTOR;
-  readonly erasure_request_id: string;
-  readonly arm: IdentityArm;
-  readonly pseudonymised: number;
-  readonly sessions_deleted: number;
-  readonly verifications_deleted: number;
-  readonly accounts_deleted: number;
-  readonly invitations_deleted_here: number;
-  readonly invitations_deleted: number;
-  readonly passkeys_deleted: number;
-  readonly authenticators_deleted: number;
-  readonly recovery_codes_deleted: number;
-  readonly confirm_failures_deleted: number;
-  readonly last_active_deleted: number;
-};
-
-export type QuestionsLogLine = {
-  readonly actor: typeof ERASURE_ACTOR;
-  readonly erasure_request_id: string;
-  readonly records_rewritten: number;
-  readonly questions_removed: number;
-  readonly feedback_rewritten: number;
-};
-
-export type ErasureLog = {
-  readonly info: (line: ErasureLogLine | QuestionsLogLine, message: string) => void;
-};
+import { suppressInTheWorkspace } from "../suppressions.ts";
+import { eraseFromTheActors, inEverySweep } from "./actors.ts";
+import { eraseFromTheIdentitySet } from "./identity.ts";
+import { eraseFromTheQuestions } from "./questions.ts";
+import { rederiveAfterErasure } from "./rederive.ts";
+import {
+  conceptsNaming,
+  namedInTheBundle,
+  pathsNaming,
+  rewritingTheBundle,
+  logTheSweep,
+  questionsStepLineOf,
+  identityStepLineOf,
+  afterTheMembersEnd,
+  inBothPasses,
+  withTheQuestionsStep,
+  withTheDocumentsStep,
+  withTheIdentityStep,
+  withTheActorsStep,
+  withTheVerificationsMoved,
+  withTheGitStep,
+  foundPerFamily,
+  inBothSweeps,
+} from "./steps.ts";
+import type {
+  RunErasureRefusal,
+  ErasurePrincipal,
+  ErasureDoors,
+  ErasureRun,
+} from "./vocabulary.ts";
 
 const QUESTIONS_STEP_LOGGED = "erasure: what the questions step rewrote and removed";
 
@@ -94,23 +59,8 @@ const ERASURE_ACTIONS = declareActions("people", {
 
 type CompletedDetail = DetailOf<(typeof ERASURE_ACTIONS)["completed"]["detail"]>;
 
-export type RunErasureRefusal = "malformed" | "no-such-request" | "not-an-erasure" | "no-address";
-
-export type ErasureRun = {
-  readonly workspaceId: string;
-  readonly subjectRequestId: string;
-  readonly erasureRequestId: string;
-
-  readonly anchoredAt: Date;
-  readonly completedAt: Date;
-  readonly report: string;
-
-  readonly map: ErasureMap;
-
-  readonly auditEventId: string;
-};
-
 const HOUR_MS = 60 * 60 * 1000;
+
 const DAY_MS = 24 * HOUR_MS;
 
 const BEYOND_USE = { hourlyHours: 48, dailyDays: 30, weeklyWeeks: 8, monthlyMonths: 6 } as const;
@@ -214,190 +164,6 @@ const openTheRoutine = async (
   });
 };
 
-const CONCEPT_FILE: ErasureFamily = "concept-file";
-
-const pathsNaming = (map: ErasureMap): readonly string[] => [
-  ...new Set(
-    (map.find((entry) => entry.family === CONCEPT_FILE)?.locations ?? [])
-      .filter((location) => location.includes(":"))
-      .map((location) => location.slice(location.indexOf(":") + 1)),
-  ),
-];
-
-const namedInTheBundle = (map: ErasureMap): boolean =>
-  (map.find((entry) => entry.family === CONCEPT_FILE)?.locations ?? []).length > 0;
-
-const conceptsNaming = async (
-  tx: Tx,
-  workspaceId: string,
-  map: ErasureMap,
-): Promise<readonly string[]> => {
-  const paths = pathsNaming(map);
-  if (paths.length === 0) return [];
-  const found = await tx.query<{ iri: string }>(
-    "SELECT DISTINCT iri FROM concept_index WHERE workspace_id = $1 AND path = ANY($2)",
-    [workspaceId, paths],
-  );
-  return found.rows.map((row) => row.iri);
-};
-
-const foundPerFamily = (map: ErasureMap): ErasureActions => {
-  const actions: Partial<Record<ErasureFamily, ErasureAction>> = {};
-  for (const entry of map) actions[entry.family] = { found: entry.locations.length };
-  return actions;
-};
-
-const BUNDLE_COMMIT: ErasureFamily = "bundle-commit";
-
-type GitStep = {
-  readonly rewritten: number;
-  readonly moved: number;
-  readonly carried: { readonly concepts: number; readonly verifications: number };
-};
-
-const inBothPasses = (first: GitStep, second: GitStep): GitStep => ({
-  rewritten: first.rewritten + second.rewritten,
-  moved: first.moved + second.moved,
-  carried: {
-    concepts: first.carried.concepts + second.carried.concepts,
-    verifications: first.carried.verifications + second.carried.verifications,
-  },
-});
-
-const withTheGitStep = (actions: ErasureActions, step: GitStep): ErasureActions => ({
-  ...actions,
-  [CONCEPT_FILE]: { ...actions[CONCEPT_FILE], rewritten: step.rewritten },
-  [BUNDLE_COMMIT]: { ...actions[BUNDLE_COMMIT], moved: step.moved },
-});
-
-const CONCEPT_VERIFICATION: ErasureFamily = "concept-verification";
-
-const withTheVerificationsMoved = (
-  actions: ErasureActions,
-  carried: GitStep["carried"],
-): ErasureActions => ({
-  ...actions,
-  [CONCEPT_FILE]: { ...actions[CONCEPT_FILE], reindexed: carried.concepts },
-  [CONCEPT_VERIFICATION]: { ...actions[CONCEPT_VERIFICATION], rehashed: carried.verifications },
-});
-
-const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): ErasureActions => {
-  const taken = { ...actions };
-  for (const [family, counts] of swept) taken[family] = { ...taken[family], ...counts };
-  return taken;
-};
-
-const rewritingTheBundle = (
-  platform: ErasurePrincipal,
-  doors: ErasureDoors,
-  workspaceId: string,
-  who: Pseudonymisation & { readonly paths: readonly string[] },
-): Promise<Result<GitStep>> =>
-  attempt(() =>
-    withBundleFenceAs(platform, doors, workspaceId, "exclusive", async () => {
-      const { moved, paths } = await rewriteHistory(platform, doors.git, workspaceId, who);
-      const rows = await withScope(platform, doors.postgres, workspaceId, async (tx) => ({
-        moved: await moveBundleCommits(platform, tx, moved),
-        carried: await carryVerificationsOntoRewrite(platform, tx, doors.git, {
-          workspaceId,
-          paths: [...new Set([...who.paths, ...paths])],
-        }),
-      }));
-      return { rewritten: moved.length, moved: rows.moved, carried: rows.carried };
-    }),
-  );
-
-const afterTheMembersEnd = async (
-  platform: ErasurePrincipal,
-  doors: ErasureDoors,
-  subject: Pseudonymisation & {
-    readonly workspaceId: string;
-    readonly paths: readonly string[];
-  },
-): Promise<Result<{ readonly git: GitStep; readonly actors: ActorsSwept }>> => {
-  const { workspaceId, addresses, people, pseudonym } = subject;
-  const git = await rewritingTheBundle(platform, doors, workspaceId, subject);
-  if (!git.ok) return err(git.error);
-  const actors = await attempt(() =>
-    eraseFromTheActors(platform, doors.postgres, {
-      workspaceId,
-      needles: { addresses, people },
-      pseudonym,
-    }),
-  );
-  return actors.ok ? ok({ git: git.value, actors: actors.value }) : err(actors.error);
-};
-
-const withTheIdentityStep = (actions: ErasureActions, swept: IdentitySwept): ErasureActions => ({
-  ...actions,
-  "identity-user": { ...actions["identity-user"], membershipsEnded: swept.membersEnded },
-  "concept-owner": { ...actions["concept-owner"], deleted: swept.ownersDeleted },
-});
-
-const identityStepLineOf = (
-  platform: ErasurePrincipal,
-  erasureRequestId: string,
-  swept: IdentitySwept,
-): ErasureLogLine => ({
-  actor: platform.actorId,
-  erasure_request_id: erasureRequestId,
-  arm: swept.arm,
-  pseudonymised: swept.pseudonymised,
-  sessions_deleted: swept.sessions,
-  verifications_deleted: swept.verifications,
-  accounts_deleted: swept.accounts,
-  invitations_deleted_here: swept.invitationsHere,
-  invitations_deleted: swept.invitationsEverywhere,
-  passkeys_deleted: swept.passkeys,
-  authenticators_deleted: swept.authenticators,
-  recovery_codes_deleted: swept.recoveryCodes,
-  confirm_failures_deleted: swept.confirmFailures,
-  last_active_deleted: swept.lastActive,
-});
-
-const SOURCE_DOCUMENT: ErasureFamily = "source-document";
-
-const withTheDocumentsStep = (
-  actions: ErasureActions,
-  documents: Suppressed & Pick<Rederived, "connectedSourcesToReprocess">,
-): ErasureActions => ({
-  ...actions,
-  [SOURCE_DOCUMENT]: {
-    ...actions[SOURCE_DOCUMENT],
-    bindingsReindexed: documents.connectedSourcesToReprocess.length,
-    identifiersWithheld: documents.identifiersWithheld,
-  },
-});
-
-const QUESTION_ASKED: ErasureFamily = "question-asked";
-
-const withTheQuestionsStep = (actions: ErasureActions, swept: QuestionsSwept): ErasureActions => ({
-  ...actions,
-  [QUESTION_ASKED]: { ...actions[QUESTION_ASKED], ...swept },
-});
-
-const questionsStepLineOf = (
-  platform: ErasurePrincipal,
-  erasureRequestId: string,
-  swept: QuestionsSwept,
-): QuestionsLogLine => ({
-  actor: platform.actorId,
-  erasure_request_id: erasureRequestId,
-  records_rewritten: swept.rewritten,
-  questions_removed: swept.questionsRemoved,
-  feedback_rewritten: swept.feedbackRewritten,
-});
-
-const logTheSweep = (log: ErasureLog, line: QuestionsLogLine, message: string): void => {
-  if (line.records_rewritten + line.feedback_rewritten > 0) log.info(line, message);
-};
-
-const inBothSweeps = (step: QuestionsSwept, since: QuestionsSwept): QuestionsSwept => ({
-  rewritten: step.rewritten + since.rewritten,
-  questionsRemoved: step.questionsRemoved + since.questionsRemoved,
-  feedbackRewritten: step.feedbackRewritten + since.feedbackRewritten,
-});
-
 const IDENTITY_USER: ErasureFamily = "identity-user";
 
 const personTheMapFound = (map: ErasureMap): string | null =>
@@ -412,14 +178,6 @@ const detailOf = (request: SubjectRequest, map: ErasureMap): CompletedDetail => 
 };
 
 type CompletionRow = { readonly completed_at: Date | null; readonly report: string | null };
-
-export type ErasureDoors = {
-  readonly git: GitDoor;
-  readonly postgres: PostgresDoor;
-  readonly objects: ObjectDoor;
-  readonly clock: Clock;
-  readonly log: ErasureLog;
-};
 
 type ErasureOpened = {
   readonly request: SubjectRequest;

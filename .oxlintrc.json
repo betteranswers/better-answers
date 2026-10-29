@@ -573,12 +573,6 @@
       }
     },
     {
-      "files": ["packages/core/src/erasure/routine/routine.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 556, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["packages/core/src/store/git/index.ts"],
       "rules": {
         "max-lines": ["error", { "max": 633, "skipBlankLines": true, "skipComments": true }]
