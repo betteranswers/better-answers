@@ -23,6 +23,8 @@ const SEEDED = "apps/api/tests/deploy/probe.test.ts";
 
 const reading = (file: string, code: string): Tree => ({ ...REPOSITORY, [file]: `${code}\n` });
 
+const TEMPLATE_CLIMB = "`" + "${import.meta.dirname}" + "/../../..`";
+
 const CLIMB = 'export const script = path.resolve(import.meta.dirname, "../../../../deploy/x.sh");';
 
 const lint = oxlintOver(pluginConfigFor({ [RULE]: "error" }), {
@@ -43,7 +45,7 @@ describe("the no-path-climb rule", () => {
 
     expect(output).toContain("better-answers(no-path-climb)");
     expect(output).toContain(
-      "`../../../../deploy/x.sh` climbs to the root of `apps/api` or out of it, so the path breaks when this file moves. Import `repositoryRoot` or `workspaceRoot` from `apps/api/tests/support/roots/roots.ts` and join the path from there.",
+      '`path.resolve(import.meta.dirname, "../../../../deploy/x.sh")` climbs to the root of `apps/api` or out of it, so a move breaks the path. Import `repositoryRoot` or `workspaceRoot` from `apps/api/tests/support/roots/roots.ts` and join the path from there.',
     );
   });
 
@@ -57,6 +59,18 @@ describe("the no-path-climb rule", () => {
     ["a URL against import.meta.url", 'new URL("../../..", import.meta.url)'],
     ["a climb hidden in a template literal", "path.join(import.meta.dirname, `../../..`)"],
     ["a climb followed by a name", 'path.join(import.meta.dirname, "../../..", name)'],
+    ["a template literal around the folder", TEMPLATE_CLIMB],
+    [
+      "an anchor read from the file URL",
+      'path.join(path.dirname(new URL(import.meta.url).pathname), "../../../..")',
+    ],
+    [
+      "an anchor made by fileURLToPath",
+      'path.join(path.dirname(fileURLToPath(import.meta.url)), "../..")',
+    ],
+    ["a join from the parent of the folder", 'path.join(path.dirname(import.meta.dirname), "..")'],
+    ["a parent of a parent of the folder", "path.dirname(path.dirname(import.meta.dirname))"],
+    ["a file read from the working directory", 'readFileSync("../../AGENTS.md", "utf8")'],
   ])("refuses %s", (_what, expression) => {
     const file = "apps/api/tests/deploy/probe.test.ts";
 
@@ -87,7 +101,7 @@ describe("the no-path-climb rule", () => {
     };
 
     expect(lint.output(tree)).toContain(
-      "`../../..` climbs to the root of `packages/devtools` or out of it, so the path breaks when this file moves. Import `repositoryRoot` from `packages/devtools/src/paths.ts` and join the path from there.",
+      '`path.join(import.meta.dirname, "../../..")` climbs to the root of `packages/devtools` or out of it, so a move breaks the path. Import `repositoryRoot` from `packages/devtools/src/paths.ts` and join the path from there.',
     );
   });
 
@@ -96,7 +110,7 @@ describe("the no-path-climb rule", () => {
     const code = 'export const at = path.join(import.meta.dirname, "../..");';
 
     expect(lint.output(reading(file, code))).toContain(
-      "`../..` climbs to the root of `packages/design-system` or out of it, so the path breaks when this file moves. `packages/design-system` has no roots helper yet, so add one beside its tests and join the path from there.",
+      '`path.join(import.meta.dirname, "../..")` climbs to the root of `packages/design-system` or out of it, so a move breaks the path. `packages/design-system` has no roots helper yet, so add one beside its tests and join the path from there.',
     );
   });
 });
@@ -109,6 +123,16 @@ describe("the no-path-climb rule stays silent", () => {
       'path.resolve(import.meta.dirname, "../support/seed.ts")',
     ],
     ["the folder itself", "path.resolve(import.meta.dirname)"],
+    ["the parent of the folder inside the workspace", "path.dirname(import.meta.dirname)"],
+    [
+      "the folder of a file URL",
+      'path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures")',
+    ],
+    [
+      "a template literal inside the workspace",
+      "`" + "${import.meta.dirname}" + "/../support/x.ts`",
+    ],
+    ["a read below the working directory", 'readFileSync("fixtures/x.json", "utf8")'],
     ["a path from a root helper", 'path.join(workspaceRoot, "..", "..", "deploy")'],
     ["a path under a root helper", 'path.join(repositoryRoot, "deploy/x.sh")'],
     ["a string that only reads like a climb", '"../sources/bid-library.md"'],
@@ -132,6 +156,36 @@ describe("the no-path-climb rule stays silent", () => {
 
     expect(lint.flagged(reading(file, code))).toEqual([]);
   });
+});
+
+describe("the no-path-climb rule on the toolchain root", () => {
+  const IMPORT = 'import { repositoryRoot } from "@better-answers/devtools/paths";';
+  const file = "apps/api/tests/ops/probe.test.ts";
+
+  it("sends a workspace to its own roots helper", () => {
+    expect(lint.output(reading(file, `${IMPORT}\nexport const at = repositoryRoot;`))).toContain(
+      "`apps/api` takes `repositoryRoot` from its roots helper, so import `repositoryRoot` or `workspaceRoot` from `apps/api/tests/support/roots/roots.ts`, not from `@better-answers/devtools/paths`.",
+    );
+  });
+
+  it.each([
+    ["another export of the toolchain module", "workspacePackages", "apps/api"],
+    ["a workspace that has no helper", "repositoryRoot", "packages/design-system"],
+  ])("stays silent over %s", (_what, name, workspace) => {
+    const probe = `${workspace}/tests/probe.test.ts`;
+    const code = `import { ${name} } from "@better-answers/devtools/paths";\nexport const at = ${name};`;
+
+    expect(lint.flagged(reading(probe, code))).toEqual([]);
+  });
+
+  it.each(["packages/devtools/test/probe.test.ts", "apps/api/tests/support/roots/roots.ts"])(
+    "stays silent over the helper's own file %s",
+    (probe) => {
+      expect(lint.flagged(reading(probe, `${IMPORT}\nexport const at = repositoryRoot;`))).toEqual(
+        [],
+      );
+    },
+  );
 });
 
 describe("the no-path-climb rule in the real config", () => {
