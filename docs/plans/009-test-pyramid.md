@@ -519,19 +519,19 @@ Changed 28/10/2026. The 60s rule summed file times across parallel files. The me
 
 **Depends on.** BA-266 and BA-288, which lands after BA-268.
 
-Changed 29/10/2026. The triage's 70 duplicates were estimates from titles and a sampled body. Read in full against the tests beneath them, 11 cases are duplicates. They are five in people, four in sources (one of them the harness-refusal case), one in people-invitations and one in console. The other cases of the ten specs each keep a claim that nothing below the browser makes, such as focus, a budget, the gate on an end state, a journey or what a page draws. Sign-in, the Invitations tab, knowledge search and ask have no Testing Library test of the page, and BA-277 moves single-screen cases there. The three pairs the triage named stay. People's "refuses demoting both Admins" also asserts the ticks kept, the refused rows and a key tick that keeps both. People-invitations' "sends 50 at once" is not the api's 51-address refusal, since the page caps the field at 50 and never sends a 51st. Workspace-switcher's "drops the left workspace's name" also asserts Try Again landing home with the second workspace named, and `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md` names it a tripwire. The Verify, perf block below changed on 29/10/2026. Its 200s rule assumed about 70 duplicates, and 11 exist until BA-277 adds page tests for sign-in, invitations, knowledge search and ask. The 11 cases cost 19.1s of the four edited specs' 382.2s, measured with every suite slot held, and CI's browser sum varies by 470s across `main` runs, so no single CI sample can judge 200s.
+Changed 29/10/2026. The triage's 70 duplicates were estimates from titles and a sampled body. Read in full against the tests beneath them, 11 cases have a twin. They are five in people, four in sources (one of them the harness-refusal case), one in people-invitations and one in console. The other cases of the ten specs each keep a claim that nothing below the browser makes, such as focus, a budget, the gate on an end state, a journey or what a page draws. Sign-in, the Invitations tab, knowledge search and ask have no Testing Library test of the page, and BA-277 moves single-screen cases there. The three pairs the triage named stay. People's "refuses demoting both Admins" also asserts the ticks kept, the refused rows and a key tick that keeps both. People-invitations' "sends 50 at once" is not the api's 51-address refusal, since the page caps the field at 50 and never sends a 51st. Workspace-switcher's "drops the left workspace's name" also asserts Try Again landing home with the second workspace named, and `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md` names it a tripwire. The Verify, perf block below changed on 29/10/2026. Its 200s rule assumed about 70 duplicates, and 11 exist until BA-277 adds page tests for sign-in, invitations, knowledge search and ask. The 11 cases cost 19.1s of the four edited specs' 382.2s, measured with every suite slot held, and CI's browser sum varies by 470s across `main` runs, so no single CI sample can judge 200s.
 
 **Files.**
 
 - [ ] Edit the people, people-invitations, sources and console specs under `apps/web/e2e/`.
 - [ ] Edit `apps/web/playwright.config.ts` to add a `gate` project for the accessibility-gate spec. Playwright sets a web server on the config and never on a project, so `E2E_GATE_ALONE=1` leaves the api out and serves the build with `vite preview`.
 - [ ] Edit `apps/web/test/gates/playwright-config.test.ts` to pin the two projects and the gate-alone switch.
-- [ ] Edit `apps/api/tests/support/harness/harness-control.test.ts` so its "answers 400 naming an unreadable reason that holds a space" case also asserts that the refused seed leaves no connected source. That is the claim sources' "tells a spec why the harness refused its seed" made beyond the 400 the api case already asserts.
+- [ ] Edit `apps/api/tests/support/harness/harness-control.test.ts` so its "answers 400 naming an unreadable reason that holds a space" case also asserts that the refused seed leaves no connected source. Sources' "tells a spec why the harness refused its seed" made that claim beyond the 400 the api case asserts, and the seed call's error naming the status, field and rule. Add `apps/web/test/gates/harness-refusal.test.ts` for the second.
 - [ ] Edit `apps/web/.claude/skills/playwright-specs/` wherever it names a deleted case or the project list.
 
 **Build.**
 
-- [ ] Delete each DUPLICATE case in Appendix E's browser table. Before deleting, run the named twin and record it in the PR body as `deleted case -> twin`.
+- [ ] Delete each of the 11 cases the PR body names. Before deleting, run the named twin and record it in the PR body as `deleted case -> twin`.
 - [ ] Move accessibility-gate to the new project. It needs Chromium for axe and the built pages, and nothing else. The spec stays at `apps/web/e2e/accessibility-gate.spec.ts`, since the project selects it by file and the gate never reads a root file. BA-278 may move it into `e2e/layout/` if its layout project also needs no api.
 
 **You see.**
@@ -558,10 +558,12 @@ Changed 29/10/2026. The triage's 70 duplicates were estimates from titles and a 
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Summed per-test seconds of the edited spec files, parsed from the Playwright list reporter.
-- [ ] Probe. Run five interleaved rounds per side, trunk and head, inside `suite-slot.sh --exclusive` at `--workers=3`.
-- [ ] Baseline. Record the trunk rounds first. The trunk median was 382.2s over five exclusive rounds (381.0 to 423.8s).
-- [ ] Rule. Fails unless every head round is lower than every trunk round. Record the CI browser sum at the head as a figure.
+- [ ] Metric. Record the summed per-test seconds of the deleted cases at trunk, from the probe's reporter.
+- [ ] Probe. None. A deletion saves exactly its cases' time, and this machine's noise is larger than that saving.
+- [ ] Baseline. None.
+- [ ] Rule. None.
+
+Measured 29/10/2026. The deleted cases sum to 19.1s. Five exclusive rounds per side overlapped, trunk 380.2 to 424.9s and head 360.9 to 411.0s, so no timing rule judges the saving.
 
 **Review gate.** None. BA-272 is not review-gated.
 
@@ -1065,7 +1067,7 @@ The table places each file in one column. Seven more files in the worker-process
 | workspace-switcher | 97 | 16 | 3 | 9 | 4 | 0 |
 | ask-new-question | 91 | 27 | 3 | 13 | 4 | 5 |
 
-The triage's named duplicates include people's "refuses demoting both Admins" against the api's members-procedures case, people-invitations' "sends 50 at once, holding a 51st" against members-invitations, and workspace-switcher's "drops the left workspace's name when the member read fails" against the web's member-change test. BA-272 lists every pair.
+The triage's named pairs include people's "refuses demoting both Admins" against the api's members-procedures case, people-invitations' "sends 50 at once, holding a 51st" against members-invitations, and workspace-switcher's "drops the left workspace's name when the member read fails" against the web's member-change test. BA-272 keeps all three, since each case asserts more than its twin.
 
 **After-table.** Each merged PR adds a row with the five `main` `build` runs that follow it.
 

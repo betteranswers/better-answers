@@ -248,8 +248,9 @@ The suite started from Onyx's Playwright skill and leaves these of its practices
   what the browser sees is what a person would see.
 - **A worker-user pool.** The two client-address fixtures keep parallel workers apart, and
   people are minted per spec.
-- **A second, serial project for slow specs.** `gate` is the one project besides `chromium`, and
-  it exists to run without the api. Nothing yet needs a lane of its own for slow specs.
+- **A second, serial project for slow specs.** `gate` is the one project besides `chromium`. It
+  holds the accessibility gate's spec, shares the api's server in a normal run, and runs alone
+  without the api under `E2E_GATE_ALONE=1`. Nothing yet needs a lane of its own for slow specs.
 - **The Page Object Model.** A page is located by role and accessible name where it is used, so
   the spec says the words a person would hear rather than a name only the suite knows.
 - **An import alias for the suite.** A spec sits one folder below the suite's modules and imports
