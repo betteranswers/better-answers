@@ -510,7 +510,7 @@
     {
       "files": ["apps/api/src/auth/auth.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 674, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 522, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": [
           "error",
           { "max": 364, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
