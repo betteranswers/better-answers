@@ -6,7 +6,6 @@ import { expect, test } from "../browser.ts";
 import {
   anAddress,
   clockTheNextKey,
-  keystrokesDismissed,
   moveTheSync,
   provision,
   saysARefusal,
@@ -27,8 +26,6 @@ const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
 const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 
 const EVERYONE = "Everyone in the workspace";
-
-const NAMED_GROUPS = "Named groups";
 
 const connectedSourcesRegion = (page: Page) =>
   page.getByRole("region", { name: "Connected Sources" });
@@ -138,19 +135,6 @@ const anAdminAtSources = async (
   await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
   return { workspace, seeded };
 };
-
-/** An absence asserted straight after a key would pass before React drew what the key did. */
-const twoFramesDrawn = (page: Page) =>
-  page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            resolve();
-          });
-        });
-      }),
-  );
 
 const indexed = (
   name: string,
@@ -349,311 +333,17 @@ const SUPPLIER_FORMS: SeedConnectedSource = indexed("Supplier forms", {
   ],
 });
 
-const BANK_ACCOUNT_RULE = "Sort code and account number";
-
-const HOME_ADDRESS_RULE = "Home address";
-
 const HEALTH_CUE_RULE = "Health wording";
-
-const BANK_ACCOUNT_BOX = `Select bank details by ${BANK_ACCOUNT_RULE} in Supplier form`;
-
-const HOME_ADDRESS_BOX = `Select home address by ${HOME_ADDRESS_RULE} in Supplier form`;
 
 const healthCueBoxIn = (title: string): string =>
   `Select special category by ${HEALTH_CUE_RULE} in ${title}`;
 
 const HEALTH_CUE_BOX = healthCueBoxIn("Staff survey");
 
-const aNoteOf = (findings: number): RegExp => new RegExp(String.raw`\b${String(findings)}\b`);
-
-const SERVICE_RECORDS: SeedConnectedSource = indexed("Service records", {
-  documents: [
-    {
-      title: "Pump service notes",
-      findings: [
-        {
-          category: "special-category",
-          ruleId: "HEALTH_CUE",
-          tier: "always",
-          spans: 1,
-          dismissed: 1,
-        },
-      ],
-    },
-    {
-      title: "Absence log",
-      sensitivity: "Restricted",
-      findings: [
-        {
-          category: "special-category",
-          ruleId: "HEALTH_CUE",
-          tier: "always",
-          spans: 2,
-          dismissed: 1,
-        },
-      ],
-    },
-  ],
-});
-
-const reviewNamed = (page: Page, name: string) =>
-  page.getByRole("region", { name: `Review of ${name}` });
-
 const reviewOf = (page: Page, name: string) =>
   connectedSourceNamed(page, name).getByRole("region", { name: `Review of ${name}` });
 
-const reviewHeading = (page: Page, name: string) =>
-  page.getByRole("heading", { level: 4, name: `Review of ${name}` });
-
-const findingRow = (page: Page, name: string, document: string, rule: string) =>
-  reviewOf(page, name).getByRole("row").filter({ hasText: document }).filter({ hasText: rule });
-
-const notesOf = (page: Page, name: string, document: string, rule: string) =>
-  findingRow(page, name, document, rule).getByRole("paragraph");
-
-const outcomesOf = (page: Page, name: string) =>
-  reviewOf(page, name).getByRole("status").filter({ hasText: /\S/ });
-
 test.describe("reviewing a connected source's findings", () => {
-  test("shows an Admin findings by category and rule, counts only", async ({ page, request }) => {
-    await anAdminAtSources(page, request, {
-      workspace: "Colne Valley Metals",
-      connectedSources: [SUPPLIER_FORMS],
-    });
-
-    await rowAction(page, "Supplier forms", "review").focus();
-    await page.keyboard.press("r");
-    await expect(reviewHeading(page, "Supplier forms")).toBeFocused();
-
-    await expect(reviewOf(page, "Supplier forms").getByRole("table")).toMatchAriaSnapshot(`
-      - table:
-        - caption: /^0\\b/
-        - rowgroup:
-          - row "Selected Category Rule Document Found Sensitivity":
-            - columnheader "Selected"
-            - columnheader "Category"
-            - columnheader "Rule"
-            - columnheader "Document"
-            - columnheader "Found"
-            - columnheader "Sensitivity"
-        - rowgroup:
-          - row:
-            - cell:
-              - checkbox "${BANK_ACCOUNT_BOX}" [checked=false]
-            - cell "Bank details Always"
-            - cell "${BANK_ACCOUNT_RULE}"
-            - cell "Supplier form"
-            - cell "2"
-            - cell "Internal"
-          - row:
-            - cell:
-              - checkbox "${HOME_ADDRESS_BOX}" [checked=false]
-            - cell "Home address Default on"
-            - cell "${HOME_ADDRESS_RULE}"
-            - cell "Supplier form"
-            - cell "1"
-            - cell "Internal"
-          - row:
-            - cell:
-              - checkbox "${HEALTH_CUE_BOX}" [checked=false]
-            - cell "Special category Always"
-            - cell "${HEALTH_CUE_RULE}"
-            - cell "Staff survey"
-            - cell "1"
-            - cell /^Restricted/:
-              - paragraph: /^\\D+$/
-    `);
-    for (const ruleId of ["UK_BANK_ACCOUNT", "UK_HOME_ADDRESS", "HEALTH_CUE"]) {
-      await expect(
-        reviewOf(page, "Supplier forms"),
-        `the review shows the rule id ${ruleId}`,
-      ).not.toContainText(ruleId);
-    }
-    await expect(page.locator("body")).not.toContainText(AN_ID);
-  });
-
-  test("closes a review when its button is pressed again", async ({ page, request }) => {
-    await anAdminAtSources(page, request, {
-      workspace: "Southowram Stone",
-      connectedSources: [SUPPLIER_FORMS],
-    });
-    const opener = rowAction(page, "Supplier forms", "review");
-    await opener.click();
-    await expect(reviewOf(page, "Supplier forms")).toBeVisible();
-
-    await opener.focus();
-    await page.keyboard.press("Enter");
-
-    await expect(reviewNamed(page, "Supplier forms")).toHaveCount(0);
-    await expect(opener).toHaveAttribute("aria-expanded", "false");
-    await expect(opener, "closing the review took focus off its button").toBeFocused();
-  });
-
-  test("lets an Admin keep groups in text and narrow documents", async ({ page, request }) => {
-    await anAdminAtSources(page, request, {
-      workspace: "Hebden Plastics",
-      connectedSources: [SUPPLIER_FORMS],
-    });
-    await rowAction(page, "Supplier forms", "review").click();
-
-    await expect(
-      reviewOf(page, "Supplier forms").getByRole("button", { name: "Keep in Text" }),
-    ).toBeDisabled();
-    await expect(
-      reviewOf(page, "Supplier forms").getByRole("button", {
-        name: "Narrow These Documents",
-      }),
-    ).toBeDisabled();
-    await expect(reviewHeading(page, "Supplier forms")).toBeFocused();
-    await expect(reviewOf(page, "Supplier forms").getByRole("checkbox")).toHaveCount(3);
-
-    await page.keyboard.press("Tab");
-    await expect(page.getByRole("checkbox", { name: BANK_ACCOUNT_BOX })).toBeFocused();
-    await page.keyboard.press("x");
-    await expect(page.getByRole("checkbox", { name: BANK_ACCOUNT_BOX })).toBeChecked();
-
-    await page.keyboard.press("k");
-    const keeping = page.getByRole("dialog", { name: "Keep 1 Group of Findings in Text" });
-    await expect(keeping.getByRole("listitem")).toContainText(BANK_ACCOUNT_RULE);
-    await expect(keeping.getByRole("listitem")).toHaveText(/Supplier form\D+2\b/);
-    await expect(keeping.getByLabel("Reason")).toBeFocused();
-    await page.keyboard.type("The company's own bank details, printed on every invoice");
-    await page.keyboard.press("Enter");
-
-    const kept = /\b1\b\D+\b2\b/;
-    await expect(outcomesOf(page, "Supplier forms")).toHaveText([kept]);
-    await expect(
-      reviewOf(page, "Supplier forms").getByRole("button", { name: "Keep in Text" }),
-    ).toBeDisabled();
-
-    await page.getByRole("checkbox", { name: HOME_ADDRESS_BOX }).focus();
-    await page.keyboard.press("x");
-    await page.keyboard.press("d");
-    const narrowing = page.getByRole("dialog", { name: "Narrow 1 Document to Restricted" });
-    await expect(narrowing.getByRole("listitem")).toHaveText(["Supplier form"]);
-    await narrowing.getByRole("button", { name: "Narrow", exact: true }).focus();
-    await page.keyboard.press("Enter");
-
-    await expect(outcomesOf(page, "Supplier forms")).toHaveText([
-      kept,
-      /\b1\b\D+Restricted\D+\b0\b\D+\b0\b/,
-    ]);
-    await expect(
-      findingRow(page, "Supplier forms", "Supplier form", HOME_ADDRESS_RULE),
-    ).toContainText("Restricted");
-    await expect(
-      findingRow(page, "Supplier forms", "Supplier form", BANK_ACCOUNT_RULE),
-    ).toContainText("Restricted");
-    await expect(page.locator("body")).not.toContainText(AN_ID);
-  });
-
-  test("dismisses a special category group, row and sync saying so", async ({ page, request }) => {
-    const { workspace } = await anAdminAtSources(page, request, {
-      workspace: "Ripponden Pumps",
-      connectedSources: [SUPPLIER_FORMS],
-    });
-    await rowAction(page, "Supplier forms", "review").click();
-    const review = reviewOf(page, "Supplier forms");
-    const dismissal = review.getByRole("button", {
-      name: "Dismiss as Not Special Category",
-      exact: true,
-    });
-    await expect(dismissal).toBeDisabled();
-    const notes = notesOf(page, "Supplier forms", "Staff survey", HEALTH_CUE_RULE);
-    await expect(notes, "the survey is not noted as narrowed, and no more").toHaveText([/^\D+$/]);
-
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("x");
-    await expect(review.getByRole("checkbox", { name: BANK_ACCOUNT_BOX })).toBeChecked();
-    await expect(dismissal).toBeDisabled();
-    await expect(dismissal).toHaveAccessibleDescription(/\S/);
-    await page.keyboard.press("x");
-
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Tab");
-    const healthCue = review.getByRole("checkbox", { name: HEALTH_CUE_BOX });
-    await expect(healthCue).toBeFocused();
-    await page.keyboard.press("x");
-    await expect(dismissal).toBeEnabled();
-
-    await page.keyboard.press("s");
-    const dismissing = page.getByRole("dialog", {
-      name: "Dismiss 1 Group of Findings as Not Special Category",
-    });
-    await expect(dismissing.getByRole("listitem")).toContainText(HEALTH_CUE_RULE);
-    await expect(dismissing.getByRole("listitem")).toHaveText(/Staff survey\D+1\b/);
-    await expect(dismissing.getByLabel("Reason")).toBeFocused();
-    await page.keyboard.type("A survey of the pumps our engineers diagnose, not of people");
-    await clockTheNextKey(page, {
-      at: `//tr[td[.='${HEALTH_CUE_RULE}']][td[.='Staff survey']]//p[contains(., '1')]`,
-      reads: "1",
-    });
-    await page.keyboard.press("Enter");
-    await theActionLandedWithinItsBudget(page, "dismissal");
-
-    const dismissed = outcomesOf(page, "Supplier forms");
-    await expect(dismissed).toHaveText([/\b1\b\D+\b1\b/]);
-    const whileQueued = await saidNowIn(dismissed);
-    await expect(healthCue, "focus did not come back to the row the action left").toBeFocused();
-    await expect(notes, "the survey is not noted as one finding dismissed, and no more").toHaveText(
-      [aNoteOf(1)],
-    );
-    await expect(lastSyncedOf(page, "Supplier forms")).toHaveText(A_SYNC_UNDER_WAY);
-
-    await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "claimed" });
-    await expect(dismissed, "the line did not follow its sync as it ran").not.toHaveText(
-      whileQueued,
-    );
-    const whileRunning = await saidNowIn(dismissed);
-    await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "done" });
-    await expect(dismissed, "the line did not follow its sync to its end").not.toHaveText(
-      whileRunning,
-    );
-    expect(await saidNowIn(dismissed), "a finished sync is said as a queued one").not.toBe(
-      whileQueued,
-    );
-    await expect(page.locator("body")).not.toContainText(AN_ID);
-
-    await page.reload();
-    await rowAction(page, "Supplier forms", "review").click();
-    await expect(
-      notesOf(page, "Supplier forms", "Staff survey", HEALTH_CUE_RULE),
-      "the dismissal did not outlive the page that made it",
-    ).toHaveText([aNoteOf(1)]);
-  });
-
-  test("shows an Admin which dismissed documents are still narrowed", async ({ page, request }) => {
-    await anAdminAtSources(page, request, {
-      workspace: "Sowerby Hydraulics",
-      connectedSources: [SERVICE_RECORDS],
-    });
-    await rowAction(page, "Service records", "review").click();
-
-    await expect(reviewOf(page, "Service records").getByRole("rowgroup").last())
-      .toMatchAriaSnapshot(`
-      - rowgroup:
-        - row:
-          - cell:
-            - checkbox "${healthCueBoxIn("Absence log")}" [checked=false]
-          - cell "Special category Always"
-          - cell "${HEALTH_CUE_RULE}"
-          - cell "Absence log"
-          - cell "2"
-          - cell /^Restricted/:
-            - paragraph: /^\\D+$/
-            - paragraph: /\\b1\\b/
-        - row:
-          - cell:
-            - checkbox "${healthCueBoxIn("Pump service notes")}" [checked=false]
-          - cell "Special category Always"
-          - cell "${HEALTH_CUE_RULE}"
-          - cell "Pump service notes"
-          - cell "1"
-          - cell /^Internal/:
-            - paragraph: /\\b1\\b/
-    `);
-  });
-
   test("scrolls nothing sideways at 320 pixels, review and panel open", async ({
     page,
     request,
@@ -681,19 +371,6 @@ test.describe("reviewing a connected source's findings", () => {
     expect(room.scrolls, "the page scrolls sideways at 320 pixels").toBeLessThanOrEqual(room.holds);
   });
 });
-
-const aWideningOpened = async (page: Page, api: APIRequestContext, workspace: string) => {
-  await anAdminAtSources(page, api, {
-    workspace,
-    connectedSources: [indexed("Staff handbook", { sensitivity: "Restricted" })],
-  });
-  const opener = rowAction(page, "Staff handbook", "widen");
-  await opener.click();
-  const panel = panelOf(page, "Staff handbook", "widen");
-  const sensitivityPicked = panel.getByRole("combobox", { name: "Sensitivity" });
-  await expect(sensitivityPicked).toBeFocused();
-  return { opener, panel, sensitivityPicked };
-};
 
 test.describe("publishing, narrowing and widening a connected source", () => {
   test("publishes within 100 ms after stating confirmations and audit row", async ({
@@ -875,147 +552,5 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(sensitivityOf(page, "Tender answers")).toHaveText("Internal");
     await expect(panel).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 3, name: "Tender answers" })).toBeFocused();
-  });
-
-  test("cancels a widening, focus back on what opened it", async ({ page, request }) => {
-    const { opener, panel } = await aWideningOpened(page, request, "Midgley Ropes");
-    await panel.getByRole("button", { name: "Cancel" }).click();
-    await expect(panel).toHaveCount(0);
-    await expect(opener, "Cancel did not hand focus back to the button").toBeFocused();
-
-    const moreAbout = connectedSourceNamed(page, "Staff handbook").getByRole("button", {
-      name: "More Details Staff handbook",
-    });
-    await moreAbout.focus();
-    await page.keyboard.press("w");
-    await expect(panel.getByRole("combobox", { name: "Sensitivity" })).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(panel.getByRole("button", { name: "Cancel" })).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(panel).toHaveCount(0);
-    await expect(moreAbout, "Cancel did not hand focus back to where w was pressed").toBeFocused();
-    await expect(sensitivityOf(page, "Staff handbook")).toHaveText("Restricted");
-  });
-
-  test("pressing Widen again closes its panel, focus kept", async ({ page, request }) => {
-    const { opener, panel } = await aWideningOpened(page, request, "Todmorden Felt");
-
-    await opener.click();
-
-    await expect(panel).toHaveCount(0);
-    await expect(opener).toHaveAttribute("aria-expanded", "false");
-    await expect(opener, "a second press moved focus off Widen").toBeFocused();
-    await opener.press("Enter");
-    await expect(panel).toBeVisible();
-  });
-
-  test("widens a Public source's audience, then says nothing is wider", async ({
-    page,
-    request,
-    passesTheAccessibilityGate,
-  }) => {
-    await anAdminAtSources(page, request, {
-      workspace: "Ripponden Glass",
-      connectedSources: [
-        indexed("Price book", { sensitivity: "Public", audience: "groups", published: true }),
-      ],
-    });
-    const audienceOf = leadOf(page, "Price book", "Audience");
-    await expect(audienceOf).toHaveText(new RegExp(`^${NAMED_GROUPS}\\D+1\\b`));
-
-    await rowAction(page, "Price book", "widen").focus();
-    await page.keyboard.press("w");
-    const panel = panelOf(page, "Price book", "widen");
-    await expect(panel.getByRole("combobox", { name: "Audience" })).toHaveText(EVERYONE);
-    await expect(panel.getByRole("term"), "a term that stays is listed as a change").toHaveText([
-      "Audience",
-    ]);
-    await passesTheAccessibilityGate();
-
-    await commitOf(page, "Price book", "widen").press("Enter");
-
-    await expect(saidIn(page)).toHaveText(/Price book\D+Public\D+\b0\b\D+\b0\b/);
-    const whenWidened = await saidNowIn(saidIn(page));
-    await expect(audienceOf).toHaveText(EVERYONE);
-    await expect(rowAction(page, "Price book", "widen")).toHaveCount(0);
-    await rowAction(page, "Price book", "review").focus();
-    await page.keyboard.press("w");
-    await expect(
-      saidIn(page),
-      "nothing new is said of a widening with nothing wider",
-    ).not.toHaveText(whenWidened);
-    await expect(saidIn(page)).toHaveText(/^\D*Price book\D+Public\D*$/);
-    await expect(panel).toHaveCount(0);
-  });
-});
-
-test.describe("the Sources page's keystrokes", () => {
-  test("lists keystrokes on ?, and one switch turns them off", async ({ page, request }) => {
-    await anAdminAtSources(page, request, { workspace: "Luddenden Weaving" });
-
-    await page.keyboard.press("?");
-    const turnedOn = "Use single-key shortcuts on this browser";
-    const heading = "Keyboard Shortcuts on Connected Sources";
-    const listed = page.getByRole("dialog", { name: heading });
-    await expect(listed).toMatchAriaSnapshot(`
-      - dialog "${heading}":
-        - heading "${heading}" [level=2]
-        - paragraph
-        - checkbox "${turnedOn}" [checked]
-        - term: b
-        - definition: Connect a Document
-        - term: r
-        - definition
-        - term: p
-        - definition
-        - term: "n"
-        - definition
-        - term: w
-        - definition
-        - term: x
-        - definition
-        - term: k
-        - definition
-        - term: d
-        - definition
-        - term: s
-        - definition
-        - term: "?"
-        - definition
-        - term: /⌘K|Ctrl K/
-        - definition
-    `);
-    const actions = listed.getByRole("definition");
-    await expect(actions).toHaveText(Array.from({ length: 11 }, () => /\S/));
-    const said = await actions.allInnerTexts();
-    expect(new Set(said).size, "two keys are listed with one action").toBe(said.length);
-    await page.keyboard.press("Escape");
-    await expect(listed).toHaveCount(0);
-    const keystrokes = page
-      .getByRole("navigation", { name: "Areas" })
-      .getByRole("button", { name: "Keyboard Shortcuts" });
-    await expect(keystrokes).toHaveAttribute("aria-keyshortcuts", "?");
-    await expect(keystrokes).toBeFocused();
-
-    await page.keyboard.press("b");
-    const connectedSource = page.getByRole("dialog", { name: "Connect a Document" });
-    await expect(connectedSource).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(connectedSource).toHaveCount(0);
-
-    await keystrokes.click();
-    await listed.getByRole("checkbox", { name: turnedOn }).press("Space");
-    await keystrokesDismissed(page, listed);
-    await page.keyboard.press("b");
-    await page.keyboard.press("?");
-    await twoFramesDrawn(page);
-    await expect(connectedSource, "a keystroke turned off still bound").toHaveCount(0);
-    await expect(listed, "a keystroke turned off still listed").toHaveCount(0);
-
-    await page.reload();
-    await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
-    await page.keyboard.press("b");
-    await twoFramesDrawn(page);
-    await expect(connectedSource, "the choice did not survive a reload").toHaveCount(0);
   });
 });

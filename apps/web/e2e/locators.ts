@@ -160,14 +160,6 @@ export const landedAtHome = async (page: Page, role: Role): Promise<void> => {
   ).toBeVisible();
 };
 
-export const askShowsTheServedAddress = async (page: Page): Promise<string> => {
-  const answer = await page.request.get("/.well-known/oauth-protected-resource/mcp");
-  expect(answer.ok(), `the protected-resource document answered ${answer.status()}`).toBe(true);
-  const { resource } = z.object({ resource: z.string() }).parse(await answer.json());
-  await expect(page.getByRole("main").getByText(resource, { exact: true })).toBeVisible();
-  return resource;
-};
-
 export const notFoundOfferingHome = async (page: Page, role: Role): Promise<void> => {
   await expect(page.getByRole("heading", { level: 1, name: "Page Not Found" })).toBeVisible();
   await expect(page.getByRole("link", { name: HOME_NAMES[role].link })).toBeVisible();
@@ -320,13 +312,6 @@ const KEY_IN_FOURS = /^[A-Z2-7]{4}(?: [A-Z2-7]{1,4})+$/;
 export const keyShown = async (page: Page): Promise<string> =>
   (await page.getByText(KEY_IN_FOURS).innerText()).replaceAll(" ", "");
 
-export const refusedDigitsSelected = async (field: Locator): Promise<void> => {
-  const selected = await field.evaluate((input) =>
-    input instanceof HTMLInputElement ? [input.selectionStart, input.selectionEnd] : [],
-  );
-  expect(selected, "the refused digits are not selected for retyping").toEqual([0, 6]);
-};
-
 export const tokenPainted = (page: Page, token: string, property: string): Promise<string> =>
   page.evaluate(
     ([name, painted]) => {
@@ -380,15 +365,6 @@ export type ControlEdge = {
   readonly edges: readonly string[];
   readonly fill: string;
   readonly behind: string;
-};
-
-export const paintedOver = (top: string, under: string): string => {
-  const [alpha = 1] = (/rgba\([^)]*?([\d.]+)\)$/.exec(top)?.slice(1) ?? []).map(Number);
-  const below = channels(under);
-  const mixed = channels(top).map((channel, at) =>
-    Math.round(channel * alpha + (below[at] ?? 0) * (1 - alpha)),
-  );
-  return `rgb(${mixed.join(", ")})`;
 };
 
 export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
@@ -488,13 +464,4 @@ export const requestsSent = (page: Page, matches: (url: URL) => boolean): Reques
     if (matches(new URL(request.url()))) sent.push(request);
   });
   return sent;
-};
-
-/** Each body is read as its answer lands: the page's next navigation discards it. */
-export const answersRead = (page: Page, matches: (url: URL) => boolean): Promise<string>[] => {
-  const read: Promise<string>[] = [];
-  page.on("response", (response) => {
-    if (matches(new URL(response.url()))) read.push(response.text());
-  });
-  return read;
 };

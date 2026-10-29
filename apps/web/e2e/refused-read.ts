@@ -1,37 +1,9 @@
 import type { Page } from "@playwright/test";
 import { z } from "zod";
 
-import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
-
-const WITHOUT_THE_MARK = {
-  error: {
-    message: NOT_THE_OPERATOR,
-    code: -32_003,
-    data: {
-      code: "FORBIDDEN",
-      httpStatus: 403,
-      refusal: { word: NOT_THE_OPERATOR, class: "forbidden" },
-    },
-  },
-};
-
 /** A batch's address names its procedures in the order of its answers; a call sent alone names one. */
 export const askedAt = (url: string): readonly string[] =>
   new URL(url).pathname.replace("/trpc/", "").split(",");
-
-export const refusedFromNowOn = (page: Page, procedure: string) =>
-  page.route(
-    (url) => askedAt(url.href).includes(procedure),
-    async (route) => {
-      const answered = await route.fetch();
-      const asked = askedAt(route.request().url());
-      const answers = z.array(z.unknown()).parse(await answered.json());
-      await route.fulfill({
-        response: answered,
-        json: answers.map((answer, at) => (asked[at] === procedure ? WITHOUT_THE_MARK : answer)),
-      });
-    },
-  );
 
 const aRefusedCall = z.object({
   error: z.object({

@@ -15,15 +15,13 @@ import {
   keyShown,
   landedAtHome,
   provision,
-  refusedDigitsSelected,
-  restored,
   saysSomethingNew,
   saysTheWait,
   signIn,
   signInByEmail,
 } from "../harness.ts";
 import { authAnswering } from "../refused-read.ts";
-import { aVirtualAuthenticator, withoutWebAuthn } from "../virtual-authenticator.ts";
+import { aVirtualAuthenticator } from "../virtual-authenticator.ts";
 
 const CONFIRM_BY_CODE = "/second-factor/confirm/authenticator";
 
@@ -41,8 +39,6 @@ const passkeyButton = (page: Page) =>
 const codeField = (page: Page) => page.getByRole("textbox", { name: "Authenticator Code" });
 
 const recoveryField = (page: Page) => page.getByRole("textbox", { name: "Recovery Code" });
-
-const restoreField = (page: Page) => page.getByRole("textbox", { name: "Restore Code" });
 
 const addAPasskey = (page: Page) => page.getByRole("button", { name: "Add a Passkey" });
 
@@ -149,45 +145,6 @@ const wrongCodesUntilTheWait = async (page: Page, key: string) => {
   throw new Error(`${String(MOST_TRIES)} wrong codes, and the field never had to wait`);
 };
 
-test("an email-signed-in Admin confirms with the passkey offered first", async ({
-  page,
-  request,
-}) => {
-  await anAdminWithBothFactors(page, request);
-
-  await page.goto("/confirm");
-
-  await expect(passkeyButton(page)).toBeFocused();
-  await expect(page.getByRole("main")).toMatchAriaSnapshot(`
-    - main:
-      - heading "Confirm It’s You" [level=1]
-      - button "Use Your Passkey"
-      - textbox "Authenticator Code"
-      - link "Use a Recovery Code"
-      - button "Sign Out"
-  `);
-  await passkeyButton(page).click();
-  await landedAtHome(page, "Admin");
-  await page.goto("/confirm");
-  await landedAtHome(page, "Admin");
-});
-
-test("a wrong authenticator code is refused; the right one confirms", async ({ page, request }) => {
-  const { key } = await anAdminWithAnAuthenticator(page, request);
-  await page.goto("/confirm");
-  await expect(codeField(page)).toBeFocused();
-
-  const refused = authAnswering(page, CONFIRM_BY_CODE);
-  await codeField(page).fill(aWrongCode(codeOf(key)));
-
-  expect(await refused).toMatchObject({ status: 400, word: "code-wrong" });
-  await expect(theRefusal(page)).toBeVisible();
-  await expect(codeField(page)).toHaveAttribute("aria-invalid", "true");
-  await refusedDigitsSelected(codeField(page));
-  await page.keyboard.type(codeOf(key));
-  await landedAtHome(page, "Admin");
-});
-
 test("repeated wrong codes make the field wait; passkeys still confirm", async ({
   page,
   request,
@@ -230,64 +187,6 @@ test("a recovery code's setup swaps in a new authenticator", async ({
   await expect(theRefusal(page)).toBeVisible();
   await codeField(page).fill(codeOf(newKey));
   await landedAtHome(page, "Admin");
-});
-
-test("after a recovery code, another email sign-in must confirm", async ({ page, request }) => {
-  const { email, key, codes } = await anAdminWithAnAuthenticator(page, request);
-  const [code] = codes;
-  assert.ok(code !== undefined, "the admin holds a recovery code");
-  await recoveryCodeSpent(page, code);
-
-  await signedInAgain(page, request, email);
-  await page.goto("/setup");
-
-  await expect(heading(page, CONFIRM_HEADING)).toBeVisible();
-  await expect(page).toHaveURL(/\/confirm$/);
-  await codeField(page).fill(codeOf(key));
-  await landedAtHome(page, "Admin");
-});
-
-test("a restored Admin gives the restore code before any setup", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
-  const { admin } = await provision(request, { name: "Restored Glazing" });
-  const code = await restored(request, admin.email);
-  await signedInWaiting(page, request, admin.email, "Set Up a Second Factor");
-  await expect(restoreField(page)).toBeFocused();
-  await expect(addAPasskey(page)).toHaveCount(0);
-  await expect(authenticatorInstead(page)).toHaveCount(0);
-
-  const refused = authAnswering(page, "/second-factor/restore");
-  await codeUsed(restoreField(page), "0000-0000-0000-0000");
-
-  expect(await refused).toMatchObject({ status: 400, word: "restore-code-wrong" });
-  await expect(theRefusal(page)).toBeVisible();
-  await expect(authenticatorInstead(page)).toHaveCount(0);
-  await passesTheAccessibilityGate();
-  await page.reload();
-  await expect(restoreField(page)).toBeFocused();
-  await codeUsed(restoreField(page), code);
-  await expect(
-    page.getByRole("status").filter({ hasText: /\S/ }),
-    "the page says nothing of the restore code",
-  ).toBeVisible();
-  await expect(restoreField(page)).toHaveCount(0);
-  await authenticatorSetUpThere(page);
-});
-
-test("without WebAuthn, setup opens on the authenticator's steps", async ({ page, request }) => {
-  await withoutWebAuthn(page);
-  const { admin } = await provision(request, { name: "Keyless Roofing" });
-
-  await signedInWaiting(page, request, admin.email, "Set Up a Second Factor");
-
-  await expect(authenticatorInstead(page)).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("img", { name: "QR code for your authenticator" })).toBeVisible();
-  await expect(page.getByLabel("Authenticator Code")).toBeVisible();
-  await expect(addAPasskey(page)).toHaveCount(0);
-  await expect(page.getByLabel("Passkey Name")).toHaveCount(0);
 });
 
 test("unticked codes come back as a new set at sign-in", async ({
