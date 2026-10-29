@@ -5,9 +5,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { repositoryRoot } from "@test/roots.ts";
-
 import { EVERY_AREA, pagesOf } from "@/shared/navigation.ts";
+import { repositoryRoot } from "@test/roots.ts";
 
 const verifyDirectory = ".claude/skills/verify";
 const specsDirectory = "apps/web/.claude/skills/playwright-specs";
