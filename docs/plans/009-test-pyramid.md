@@ -519,7 +519,7 @@ Changed 28/10/2026. The 60s rule summed file times across parallel files. The me
 
 **Depends on.** BA-266 and BA-288, which lands after BA-268.
 
-Changed 29/10/2026. The triage's 70 duplicates were estimates from titles and a sampled body. Read in full against the tests beneath them, 11 cases are duplicates. They are five in people, four in sources (one of them the harness-refusal case), one in people-invitations and one in console. The other cases of the ten specs each keep a claim that nothing below the browser makes, such as focus, a budget, the gate on an end state, a journey or what a page draws. Sign-in, the Invitations tab, knowledge search and ask have no Testing Library test of the page, and BA-277 moves single-screen cases there. The three pairs the triage named stay. People's "refuses demoting both Admins" also asserts the ticks kept, the refused rows and a key tick that keeps both. People-invitations' "sends 50 at once" is not the api's 51-address refusal, since the page caps the field at 50 and never sends a 51st. Workspace-switcher's "drops the left workspace's name" also asserts Try Again landing home with the second workspace named, and `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md` names it a tripwire. The Verify, perf Rule below is unchanged. At the suite's mean of 4.05s a case, 11 cases are about 45s, so this PR does not meet it. Measured with every suite slot held, the 11 cases cost 19.1s of the four edited specs' 382.2s.
+Changed 29/10/2026. The triage's 70 duplicates were estimates from titles and a sampled body. Read in full against the tests beneath them, 11 cases are duplicates. They are five in people, four in sources (one of them the harness-refusal case), one in people-invitations and one in console. The other cases of the ten specs each keep a claim that nothing below the browser makes, such as focus, a budget, the gate on an end state, a journey or what a page draws. Sign-in, the Invitations tab, knowledge search and ask have no Testing Library test of the page, and BA-277 moves single-screen cases there. The three pairs the triage named stay. People's "refuses demoting both Admins" also asserts the ticks kept, the refused rows and a key tick that keeps both. People-invitations' "sends 50 at once" is not the api's 51-address refusal, since the page caps the field at 50 and never sends a 51st. Workspace-switcher's "drops the left workspace's name" also asserts Try Again landing home with the second workspace named, and `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md` names it a tripwire. The Verify, perf block below changed on 29/10/2026. Its 200s rule assumed about 70 duplicates, and 11 exist until BA-277 adds page tests for sign-in, invitations, knowledge search and ask. The 11 cases cost 19.1s of the four edited specs' 382.2s, measured with every suite slot held, and CI's browser sum varies by 470s across `main` runs, so no single CI sample can judge 200s.
 
 **Files.**
 
@@ -558,10 +558,10 @@ Changed 29/10/2026. The triage's 70 duplicates were estimates from titles and a 
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Summed per-test seconds of the browser suite, parsed from the Playwright list reporter.
-- [ ] Probe. Run the full suite at trunk and head, interleaved, twice each, with three workers.
-- [ ] Baseline. Record the trunk sum first. It was 2,878s in CI run 40599189016.
-- [ ] Rule. Fails if the head sum is not at least 200s below trunk's.
+- [ ] Metric. Summed per-test seconds of the edited spec files, parsed from the Playwright list reporter.
+- [ ] Probe. Run five interleaved rounds per side, trunk and head, inside `suite-slot.sh --exclusive` at `--workers=3`.
+- [ ] Baseline. Record the trunk rounds first. The trunk median was 382.2s over five exclusive rounds (381.0 to 423.8s).
+- [ ] Rule. Fails unless every head round is lower than every trunk round. Record the CI browser sum at the head as a figure.
 
 **Review gate.** None. BA-272 is not review-gated.
 
