@@ -537,12 +537,6 @@
       }
     },
     {
-      "files": ["apps/web/src/app/router.tsx"],
-      "rules": {
-        "max-lines": ["error", { "max": 528, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["apps/web/src/features/people/groups/groups-page.tsx"],
       "rules": {
         "max-lines-per-function": [
