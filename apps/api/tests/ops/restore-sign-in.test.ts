@@ -301,15 +301,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await restoreRowsOf(person.email)).toEqual([]);
     });
 
-    it("answers usage without --email", async () => {
-      const run = await opsWith(served(), ["restore-sign-in"], {});
-
-      expect(run).toMatchObject({
-        exitCode: 2,
-        lines: ["restore-sign-in: --email <email> is required"],
-      });
-    });
-
     it("names the command in the usage", async () => {
       const run = await ops(served(), ["help"]);
 

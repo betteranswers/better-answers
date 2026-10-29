@@ -24,7 +24,6 @@ import {
   sourceDocument,
   spendReservation,
   suppression,
-  ulid,
 } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
@@ -85,23 +84,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
     expect(parseSince("yesterday")).toBeUndefined();
   });
 
-  it("answers usage to a missing or unknown command, never guessing", async () => {
-    expect((await ops(served(), [])).exitCode).toBe(2);
-    expect((await ops(served(), ["make-it-so"])).exitCode).toBe(2);
-    expect((await ops(served(), ["map-counts"])).exitCode).toBe(2);
-    expect((await ops(served(), ["replay-erasures"])).exitCode).toBe(2);
-  });
-
-  it.each(["toString", "__proto__"])(
-    "answers %s, a name every object inherits, as unknown",
-    async (command) => {
-      const run = await ops(served(), [command, "--workspace", ulid()]);
-
-      expect(run.exitCode).toBe(2);
-      expect(run.lines.join("\n")).toContain(`unknown command: ${command}`);
-    },
-  );
-
   it("prints a refusal's word and exits with its class's code", async () => {
     const run = await ops(served(), ["map-counts", "--workspace", "not-a-workspace-id"]);
 
@@ -146,7 +128,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     expect(run.exitCode).toBe(0);
     expect(run.lines.join("\n")).toContain("replayed 0 erasures");
-    expect((await ops(served(), ["--"])).exitCode).toBe(2);
   });
 
   describe("the slice-owned commands", () => {

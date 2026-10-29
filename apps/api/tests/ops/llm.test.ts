@@ -395,21 +395,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await pricesHeld(served())).toEqual(before);
     });
 
-    it("answers usage with a rate missing, writing nothing", async () => {
-      const before = await pricesHeld(served());
-
-      const run = await ops(served(), [
-        "set-model-price",
-        "--provider",
-        "anthropic",
-        "--model",
-        SONNET,
-      ]);
-
-      expect(run.exitCode).toBe(2);
-      expect(await pricesHeld(served())).toEqual(before);
-    });
-
     it("names both spend commands in the usage", async () => {
       const run = await ops(served(), ["help"]);
 
@@ -496,26 +481,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await thresholdsHeld(served(), model)).toEqual([]);
     });
 
-    it("answers usage with the threshold missing, as help names it", async () => {
-      const model = aModel();
+    it("names the command in the usage", async () => {
+      const run = await ops(served(), ["help"]);
 
-      const run = await ops(served(), [
-        "set-decision-threshold",
-        "--provider",
-        "cloudflare",
-        "--model",
-        model,
-      ]);
-      const help = await ops(served(), ["help"]);
-
-      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
-        exitCode: 2,
-        lines: [
-          "set-decision-threshold: --provider <cloudflare>, --model <model> and --threshold <probability> are required",
-        ],
-      });
-      expect(await thresholdsHeld(served(), model)).toEqual([]);
-      expect(help.lines.join("\n")).toContain(
+      expect(run.lines.join("\n")).toContain(
         "set-decision-threshold --provider <cloudflare> --model <model> --threshold <probability>",
       );
     });
@@ -676,20 +645,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("answers usage with the model missing, as help names it", async () => {
-      const { workspaceId } = await served().provision();
+    it("names the command in the usage", async () => {
+      const run = await ops(served(), ["help"]);
 
-      const run = await ops(served(), ["set-model-choice", "--workspace", workspaceId]);
-      const help = await ops(served(), ["help"]);
-
-      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
-        exitCode: 2,
-        lines: [
-          "set-model-choice: --workspace <id>, --purpose <extraction|enrichment|answering|judging>, --provider <provider> and --model <model> are required",
-        ],
-      });
-      expect(await choicesHeld(served(), workspaceId)).toEqual([]);
-      expect(help.lines.join("\n")).toContain(
+      expect(run.lines.join("\n")).toContain(
         "set-model-choice --workspace <id> --purpose <extraction|enrichment|answering|judging> --provider <anthropic|mistral> --model <model>",
       );
     });

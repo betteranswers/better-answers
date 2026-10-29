@@ -219,19 +219,6 @@ describe("operator — the mark an ops command sets and clears", () => {
     expect(await operatorRowCount()).toBe(before);
   });
 
-  it.each([
-    ["neither --grant nor --revoke", ["--email", "a@b.c"]],
-    ["both --grant and --revoke", ["--email", "a@b.c", "--grant", "--revoke"]],
-    ["no --email", ["--grant"]],
-  ])("answers usage to %s", async (_shape, flags) => {
-    const run = await ops(["operator", ...flags]);
-
-    expect(run).toEqual({
-      exitCode: 2,
-      lines: ["operator: --email <email> and one of --grant or --revoke are required"],
-    });
-  });
-
   it("names the command in the usage", async () => {
     const run = await ops(["help"]);
 

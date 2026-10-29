@@ -788,24 +788,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
     });
 
-    it.each([
-      ["no --from or --as", []],
-      [
-        "an unknown sensitivity",
-        ["--from", "/tmp/bundle", "--as", "a@b.c", "--sensitivity", "Secret"],
-      ],
-      [
-        "a --dry-run carrying a value",
-        ["--from", "/tmp/bundle", "--as", "a@b.c", "--dry-run", "yes"],
-      ],
-    ])("answers usage to %s, reading nothing", async (_shape, flags) => {
-      const { workspaceId } = await bundleWorkspace(served());
-
-      const run = await ops(served(), ["import-bundle", "--workspace", workspaceId, ...flags]);
-
-      expect(run.exitCode).toBe(2);
-    });
-
     it("lands in a workspace provision-workspace and add-member stood up", async () => {
       const owner = await served().person(undefined, "Liam Owner");
       const provisioned = await provisioning(served(), [

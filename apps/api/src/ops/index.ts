@@ -190,7 +190,7 @@ const notBuiltSaid = async (doors: Doors, command: SliceCommand): Promise<string
     : undefined;
 };
 
-export type OpsCommand = {
+type OpsCommand = {
   readonly name: string;
   readonly asked: object;
   readonly run: (doors: Doors, io: OpsIo) => Promise<number>;

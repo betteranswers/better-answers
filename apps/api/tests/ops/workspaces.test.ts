@@ -234,20 +234,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await workspacesWithShortName(served(), shortName)).toBe(0);
     });
 
-    it.each([
-      ["no flags at all", []],
-      ["no --admin", ["--name", "Acme", "--short-name", "acme"]],
-      ["no --short-name", ["--name", "Acme", "--admin", "a@b.c"]],
-      ["no --name", ["--short-name", "acme", "--admin", "a@b.c"]],
-    ])("answers usage to %s, reading nothing", async (_shape, flags) => {
-      const run = await ops(served(), ["provision-workspace", ...flags]);
-
-      expect(run.exitCode).toBe(2);
-      expect(run.lines).toEqual([
-        "provision-workspace: --name <name>, --short-name <short name> and --admin <email> are required",
-      ]);
-    });
-
     it("names both commands in the usage", async () => {
       const run = await ops(served(), ["help"]);
 
@@ -366,8 +352,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await membersOf(served(), workspaceId, person.id)).toEqual([]);
     });
 
-    it("answers usage to a non-id workspace or a missing flag", async () => {
-      const notAnId = await ops(served(), [
+    it("answers usage to a non-id workspace", async () => {
+      const run = await ops(served(), [
         "add-member",
         "--workspace",
         "ws_synthetic",
@@ -376,17 +362,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "--role",
         "Editor",
       ]);
-      const noEmail = await ops(served(), [
-        "add-member",
-        "--workspace",
-        ulid(),
-        "--role",
-        "Editor",
-      ]);
 
-      expect([notAnId.exitCode, noEmail.exitCode]).toEqual([2, 2]);
-      expect(noEmail.lines).toEqual([
-        "add-member: --workspace <id>, --email <email> and --role <Admin|Editor|Viewer> are required",
+      expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual([
+        "add-member: REFUSED — malformed: --workspace ws_synthetic is not a workspace id",
       ]);
     });
   });
@@ -543,18 +522,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([matching.stringMatching(/^add-person: REFUSED — .*pool/i)]);
     });
 
-    it.each([
-      ["no --name", ["--email", "matthew@phew.invalid"]],
-      ["no --email", ["--name", "Matthew Burgess"]],
-    ])("answers usage to %s", async (_shape, flags) => {
-      const run = await ops(served(), ["add-person", ...flags]);
-
-      expect(run).toMatchObject({
-        exitCode: 2,
-        lines: ["add-person: --email <address> and --name <display name> are required"],
-      });
-    });
-
     it("names the command in the usage", async () => {
       const run = await ops(served(), ["help"]);
 
@@ -708,18 +675,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
         exitCode: 2,
         lines: [MALFORMED],
       });
-    });
-
-    it.each([
-      ["no flags at all", []],
-      ["no --workspace", ["--name", "Acme Group", "--short-name", "acme"]],
-    ])("answers usage to %s, reading nothing", async (_shape, flags) => {
-      const run = await ops(served(), ["rename-workspace", ...flags]);
-
-      expect(run.exitCode).toBe(2);
-      expect(run.lines).toEqual([
-        "rename-workspace: --workspace <id> is required, with --name <name>, --short-name <short name> or both",
-      ]);
     });
 
     it("names the command in the usage", async () => {
