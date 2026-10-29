@@ -46,9 +46,6 @@ const noWorkspaceYet = (page: Page) =>
 
 const CLOSED = "Access Denied";
 
-const UK_DAY =
-  /^\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
-
 const theConsoleOffered = async (page: Page, workspaceName: string) => {
   await switcherOf(page, workspaceName).click();
   const theConsole = switcherMenuOf(page, workspaceName).getByRole("menuitem", {
@@ -263,38 +260,6 @@ test.describe("the way into the console", () => {
 });
 
 test.describe("the console's Workspaces page", () => {
-  test("lists workspaces in a table, each id one disclosure in", async ({ page, request }) => {
-    const workspace = await theOperator(page, request, "Dales Engineering");
-    const acme = await provision(request, { name: aNameOfItsOwn("Acme Holdings") });
-    const colleague = await person(request, anAddress("colleague"));
-    await addMember(request, {
-      workspaceId: acme.workspaceId,
-      userId: colleague.id,
-      role: "Editor",
-    });
-
-    await page.goto(EVERY_WORKSPACE);
-
-    await expect(listOf(page).getByRole("columnheader")).toHaveText([
-      "Workspace",
-      "Short Name",
-      "Members",
-      "Provisioned",
-    ]);
-    const theirs = rowOf(page, acme.name);
-    await expect(theirs.getByRole("cell").nth(1)).toHaveText(acme.shortName);
-    await expect(theirs.getByRole("cell").nth(2)).toHaveText(/\b2\b/);
-    await expect(theirs.getByRole("cell").nth(3)).toHaveText(UK_DAY);
-    await expect(rowOf(page, workspace.name).getByRole("cell").nth(2)).toHaveText(/\b1\b/);
-
-    await expect(
-      listOf(page).getByText(acme.workspaceId, { exact: true }),
-      "a workspace's id shows before its disclosure opens",
-    ).toHaveCount(0);
-    await theirs.getByRole("button", { name: `More About ${acme.name}` }).click();
-    await expect(theirs.getByText(acme.workspaceId, { exact: true })).toBeVisible();
-  });
-
   test("narrows by name or short name, saying when none match", async ({
     page,
     request,

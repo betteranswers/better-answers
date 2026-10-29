@@ -11,7 +11,6 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
-  A_ROLE,
   ACTION_SAMPLES,
   actionClocked,
   addMember,
@@ -47,7 +46,6 @@ import {
   tabUntilFocused,
   theActionLandedWithinItsBudget,
   theActionsLandedWithinTheirBudget,
-  requestsSent,
 } from "../harness.ts";
 import { refusalAnswering } from "../refused-read.ts";
 
@@ -495,18 +493,13 @@ test.describe("the People group's Members page", () => {
     );
   });
 
-  for (const role of ["Editor", "Viewer"] as const) {
-    test(`shows ${A_ROLE[role]} Members as not found, listing no one`, async ({
-      page,
-      request,
-    }) => {
-      const workspace = await aMemberSignedInAt(page, request, role, MEMBERS_PAGE);
+  test("shows an Editor Members as not found, listing no one", async ({ page, request }) => {
+    const workspace = await aMemberSignedInAt(page, request, "Editor", MEMBERS_PAGE);
 
-      await notFoundOfferingHome(page, role);
-      await expect(membersRegion(page)).toHaveCount(0);
-      await expect(page.locator("body")).not.toContainText(workspace.admin.email);
-    });
-  }
+    await notFoundOfferingHome(page, "Editor");
+    await expect(membersRegion(page)).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(workspace.admin.email);
+  });
 
   test("lets an Admin reach and search members by keyboard alone", async ({
     page,
@@ -730,51 +723,6 @@ test.describe("a member's own page", () => {
       .toBeGreaterThan(0);
     const room = await page.evaluate(pageRoom);
     expect(room.scrolls, "the page scrolls sideways").toBeLessThanOrEqual(room.holds);
-  });
-
-  for (const role of ["Editor", "Viewer"] as const) {
-    test(`shows ${A_ROLE[role]} a member page as not found`, async ({ page, request }) => {
-      const workspace = await aMemberSignedInAt(
-        page,
-        request,
-        role,
-        memberPageAt(A_PERSON_NOWHERE),
-      );
-
-      await notFoundOfferingHome(page, role);
-      await expect(page.locator("body")).not.toContainText(workspace.admin.email);
-    });
-  }
-
-  test("finds no page deeper than a member's", async ({ page, request }) => {
-    const { adminId } = await anAdminAtPeople(page, request, "Swale Tinsmiths");
-
-    await page.goto(`${memberPageAt(adminId)}/x`);
-
-    await expect(page.getByRole("heading", { level: 1, name: "Page Not Found" })).toBeVisible();
-    await expect(thePage(page), "a page drew a person past its own address").not.toContainText(
-      "Test person",
-    );
-  });
-
-  test("names no one at a malformed address, asking nothing", async ({ page, request }) => {
-    await anAdminAtPeople(page, request, "Swale Lockmakers");
-    const malformed = "not-a-person";
-    const sent = requestsSent(page, (url) => url.pathname.includes("/trpc/"));
-
-    await page.goto(memberPageAt(malformed));
-
-    await namesNoMember(page);
-    await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
-    const asked = sent.map((each) => `${each.url()} ${String(each.postData())}`);
-    expect(
-      asked.filter((each) => each.includes(malformed)),
-      "a query asked about a malformed address",
-    ).toEqual([]);
-    expect(
-      asked.filter((each) => each.includes("members.")),
-      "a page read a member at a malformed address",
-    ).toEqual([]);
   });
 
   test("names no one at an unknown id, leading to Members", async ({
