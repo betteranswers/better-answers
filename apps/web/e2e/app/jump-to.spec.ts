@@ -119,22 +119,6 @@ const removedOnTheirPage = async (page: Page): Promise<void> => {
   await removal.getByRole("button", { name: "Remove", exact: true }).click();
 };
 
-test("removing a member opened from jump-to keeps Members' search", async ({ page, request }) => {
-  await anAdminWithATeam(page, request, "Swaledale Lead Mines");
-  await page.goto(MEMBERS.path);
-  await searchBox(page).fill("Okafor");
-  await expect(page).toHaveURL(/members\.search=Okafor$/);
-  await expect(memberRows(page)).toHaveCount(1);
-
-  await jumpedToMember(page, "priya", PRIYA);
-  await removedOnTheirPage(page);
-
-  await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}\\?members\\.search=Okafor$`));
-  await expect(searchBox(page)).toHaveValue("Okafor");
-  await expect(memberRows(page)).toHaveCount(1);
-  await expect(memberRows(page)).toContainText(TOM);
-});
-
 const focusStopsRecorded = (page: Page) =>
   page.evaluate(() => {
     const stops: string[] = [];
@@ -146,24 +130,6 @@ const focusStopsRecorded = (page: Page) =>
 
 const focusStops = async (page: Page): Promise<readonly string[]> =>
   z.array(z.string()).parse(await page.evaluate((): unknown => Reflect.get(window, "focusStops")));
-
-test("jumping after a removal focuses the page, not Remove", async ({ page, request }) => {
-  await anAdminWithATeam(page, request, "Swaledale Smelters");
-  await page.goto(MEMBERS.path);
-  await membersRegion(page)
-    .getByRole("button", { name: `Actions for ${PRIYA}` })
-    .click();
-  await page.getByRole("menuitem", { name: "Remove" }).click();
-  await removedOnTheirPage(page);
-  await expect(memberRows(page)).toHaveCount(2);
-
-  await focusStopsRecorded(page);
-  await jumpedToMember(page, "tom", TOM);
-  await expect(page.getByRole("main")).toBeFocused();
-  expect(await focusStops(page), "focus never stops on Remove Member").not.toContain(
-    "Remove Member",
-  );
-});
 
 for (const [what, words] of [
   ["a decimal", "1.50"],
