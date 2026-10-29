@@ -12,8 +12,9 @@ import pytest
 
 from better_answers_worker.pipeline import PASSAGE_TABLE, Table
 from support.pg_harness import migrated_postgres
+from support.roots import WORKER_ROOT
 
-WORKER_PACKAGE = Path(__file__).resolve().parents[1] / "src" / "better_answers_worker"
+WORKER_PACKAGE = WORKER_ROOT / "src" / "better_answers_worker"
 
 # The psycopg and asyncpg methods whose first argument is a statement.
 SENDS = frozenset(

@@ -1,11 +1,9 @@
 import { execFile } from "node:child_process";
-import path from "node:path";
 
 import { expect, it } from "vitest";
 
 import { heldPort, released } from "./support/loopback-port.ts";
-
-const api = path.resolve(import.meta.dirname, "..");
+import { workspaceRoot } from "./support/roots/roots.ts";
 
 /** Well under the harness's start-up, so only a server that binds before it starts can exit in time. */
 const BEFORE_START_UP_MS = 3000;
@@ -17,7 +15,7 @@ const servedOn = (port: number): Promise<Exit> =>
     execFile(
       process.execPath,
       ["tests/serve.ts", String(port)],
-      { cwd: api, timeout: BEFORE_START_UP_MS, killSignal: "SIGKILL" },
+      { cwd: workspaceRoot, timeout: BEFORE_START_UP_MS, killSignal: "SIGKILL" },
       (error, stdout, stderr) => {
         resolve({ code: error === null ? 0 : error.code, output: stdout + stderr });
       },

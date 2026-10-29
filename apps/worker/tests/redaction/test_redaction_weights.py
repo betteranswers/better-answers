@@ -9,8 +9,9 @@ from better_answers_worker.redaction.pins import (
     GLINER_MODEL_ID_MEASURED,
 )
 from better_answers_worker.redaction.weights import WEIGHTS, copy_out
+from support.roots import WORKER_ROOT
 
-DOCKERFILE = Path(__file__).resolve().parents[2] / "Dockerfile"
+DOCKERFILE = WORKER_ROOT / "Dockerfile"
 
 
 AN_ENCODER = "an-org/an-encoder"

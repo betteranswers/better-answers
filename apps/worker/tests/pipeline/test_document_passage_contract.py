@@ -1,6 +1,5 @@
 import json
 import re
-from pathlib import Path
 from typing import Any, cast
 
 from better_answers_worker.pipeline import (
@@ -13,8 +12,9 @@ from better_answers_worker.pipeline import (
 from better_answers_worker.pipeline import (
     passage_id_of as the_workers_passage_id,
 )
+from support.roots import REPOSITORY_ROOT
 
-CONTRACTS_DIR = Path(__file__).resolve().parents[4] / "contracts"
+CONTRACTS_DIR = REPOSITORY_ROOT / "contracts"
 
 
 DOCUMENT_ID = re.compile(r"[0-9A-HJKMNP-TV-Z]{26}")

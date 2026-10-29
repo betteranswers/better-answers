@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { ConceptBody } from "@/shared/knowledge/concept-body.tsx";
 import { openPages } from "@test/address-router.tsx";
+import { repositoryRoot } from "@test/roots.ts";
 
 afterEach(cleanup);
 
@@ -23,12 +24,7 @@ const linksCase = z.object({
 const fixture = z
   .object({ cases: z.array(linksCase).min(1) })
   .parse(
-    JSON.parse(
-      readFileSync(
-        path.resolve(import.meta.dirname, "../../../../../contracts/links/cases.json"),
-        "utf8",
-      ),
-    ),
+    JSON.parse(readFileSync(path.resolve(repositoryRoot, "contracts/links/cases.json"), "utf8")),
   );
 
 type Evidence = Parameters<typeof ConceptBody>[0]["evidence"];

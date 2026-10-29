@@ -6,9 +6,10 @@ from pathlib import Path
 
 import pytest
 
-WORKER_ROOT = Path(__file__).resolve().parents[2]
+from support.roots import REPOSITORY_ROOT, WORKER_ROOT
+
 WORKER_CONFIG = WORKER_ROOT / "pyproject.toml"
-DEVTOOLS_CONFIG = WORKER_ROOT.parents[1] / "packages/devtools/python/ruff.toml"
+DEVTOOLS_CONFIG = REPOSITORY_ROOT / "packages/devtools/python/ruff.toml"
 
 RULE = "C901"
 

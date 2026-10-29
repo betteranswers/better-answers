@@ -18,11 +18,12 @@ from psycopg import errors
 from psycopg.sql import SQL, Identifier, Literal
 from testcontainers.community.postgres import PostgresContainer
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
-MIGRATIONS_DIR = REPO_ROOT / "packages" / "schema" / "migrations"
+from support.roots import REPOSITORY_ROOT
+
+MIGRATIONS_DIR = REPOSITORY_ROOT / "packages" / "schema" / "migrations"
 
 
-_IMAGE_SOURCE = REPO_ROOT / "packages" / "schema" / "src" / "postgres-image.ts"
+_IMAGE_SOURCE = REPOSITORY_ROOT / "packages" / "schema" / "src" / "postgres-image.ts"
 
 
 @cache

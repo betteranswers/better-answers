@@ -3,7 +3,9 @@ import path from "node:path";
 
 import { z } from "zod";
 
-const contractsDir = path.resolve(import.meta.dirname, "../../../../contracts");
+import { repositoryRoot } from "../support/roots/roots.ts";
+
+const contractsDir = path.resolve(repositoryRoot, "contracts");
 
 export const contractFixture = <Schema extends z.ZodType>(
   agreement: string,

@@ -4,11 +4,12 @@ import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { ACTION_HEADLINES, declarations } from "../src/audit/index.ts";
 import { loadEveryEntryPoint } from "../test/audit/entry-points.ts";
+import { repositoryRoot } from "../test/support/roots/roots.ts";
 
 /** The web never imports core, so it reads the actions core declares from this copy. */
 export const AUDIT_ACTIONS_MODULE = path.resolve(
-  import.meta.dirname,
-  "../../../apps/web/src/shared/audit/audit-actions.ts",
+  repositoryRoot,
+  "apps/web/src/shared/audit/audit-actions.ts",
 );
 
 const GENERATE = "pnpm --filter @better-answers/core run generate:audit-actions";

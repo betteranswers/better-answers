@@ -1,7 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
-const CORE_SRC = path.resolve(import.meta.dirname, "../../src");
+import { workspaceRoot } from "./roots/roots.ts";
+
+const CORE_SRC = path.resolve(workspaceRoot, "src");
 
 export const coreSourceFiles = (): readonly string[] =>
   readdirSync(CORE_SRC, { recursive: true, withFileTypes: true })

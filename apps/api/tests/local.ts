@@ -1,10 +1,11 @@
-import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 import { serve } from "@hono/node-server";
 
 import { hostnameOfUrl, originOfUrl } from "../src/ingress/hostnames.ts";
 import { PRODUCT_NAME } from "../src/product-name.ts";
 import { codeIn, startApp } from "./support/harness/harness.ts";
+import { repositoryRoot } from "./support/roots/roots.ts";
 
 const PORT = 3200;
 const LOOPBACK_URL = `http://127.0.0.1:${PORT}`;
@@ -39,7 +40,7 @@ if (hostnames.app === hostnames.agent || hostnames.app === hostnames.apex) {
 }
 
 const app = await startApp({
-  webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
+  webRoot: path.join(repositoryRoot, "apps/web/dist"),
   publicUrl,
   hostnames,
   onEmail: (message) => {

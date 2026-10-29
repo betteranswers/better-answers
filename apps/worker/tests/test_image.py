@@ -25,14 +25,14 @@ from support.planted_page import (
     spans_withheld_under,
     typed_placeholders_under,
 )
+from support.roots import REPOSITORY_ROOT
 
 pytestmark = pytest.mark.image
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-WORKSPACE = REPO_ROOT / "apps" / "worker"
-BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yml"
-CHECK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "check.yml"
-STORES_COMPOSE = REPO_ROOT / "deploy" / "stores.compose.yaml"
+WORKSPACE = REPOSITORY_ROOT / "apps" / "worker"
+BUILD_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "build.yml"
+CHECK_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "check.yml"
+STORES_COMPOSE = REPOSITORY_ROOT / "deploy" / "stores.compose.yaml"
 REDACTION = WORKSPACE / "src" / "better_answers_worker" / "redaction"
 PINS = REDACTION / "pins.py"
 PIPELINE = WORKSPACE / "src" / "better_answers_worker" / "pipeline"
@@ -51,7 +51,7 @@ DISTROLESS_CC = "gcr.io/distroless/cc-debian13"
 PINNED_BASE = re.compile(r"[\w.-]+(?:/[\w.-]+)*:[\w.-]+@sha256:[0-9a-f]{64}")
 
 
-RENOVATE = REPO_ROOT / "renovate.json"
+RENOVATE = REPOSITORY_ROOT / "renovate.json"
 
 
 ABSENT_TOOLS = (
@@ -986,7 +986,7 @@ def _build_the_image(leg: Mapping[str, str]) -> str:
         iidfile = Path(scratch) / "image-id"
         built = subprocess.run(
             _build_command(leg, cache=cache, iidfile=iidfile),
-            cwd=REPO_ROOT,
+            cwd=REPOSITORY_ROOT,
             check=True,
             capture_output=True,
             text=True,
@@ -1540,7 +1540,7 @@ def _gates_of(lines: list[str]) -> list[str]:
 
 def _root_scripts() -> dict[str, str]:
     manifest: dict[str, dict[str, str]] = json.loads(
-        (REPO_ROOT / "package.json").read_text("utf-8")
+        (REPOSITORY_ROOT / "package.json").read_text("utf-8")
     )
     return manifest.get("scripts", {})
 

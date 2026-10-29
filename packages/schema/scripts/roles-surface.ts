@@ -6,8 +6,9 @@ import { byCodeUnit } from "../src/code-unit.ts";
 import { listed } from "../src/column-helpers.ts";
 import { DEFINER_REACH_NOTE } from "../src/definer-reach.ts";
 import { testData } from "../test/support/factory.ts";
+import { workspaceRoot } from "../test/support/roots/roots.ts";
 
-export const rolesSurfacePath = path.resolve(import.meta.dirname, "../roles-surface.json");
+export const rolesSurfacePath = path.resolve(workspaceRoot, "roles-surface.json");
 
 export const MIGRATOR = "<migrator>";
 

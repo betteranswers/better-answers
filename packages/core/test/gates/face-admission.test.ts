@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { facesAdmittingNobody } from "@better-answers/devtools/face-admission";
 
+import { workspaceRoot } from "../support/roots/roots.ts";
 import {
   asSliceRelative,
   coreSourceFiles,
@@ -68,9 +69,7 @@ const SRC = "./src/";
 const exportedFaces = (): readonly string[] => {
   const manifest = z
     .object({ exports: z.record(z.string(), z.string()) })
-    .parse(
-      JSON.parse(readFileSync(path.resolve(import.meta.dirname, "../../package.json"), "utf8")),
-    );
+    .parse(JSON.parse(readFileSync(path.resolve(workspaceRoot, "package.json"), "utf8")));
   return Object.values(manifest.exports)
     .filter((target) => target.startsWith(SRC))
     .map((target) => target.slice(SRC.length));

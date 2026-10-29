@@ -1,12 +1,10 @@
 import json
 import subprocess
 import tomllib
-from pathlib import Path
 
 import pytest
 
-WORKER_ROOT = Path(__file__).resolve().parents[2]
-
+from support.roots import WORKER_ROOT
 
 BANNED_API = "TID251"
 

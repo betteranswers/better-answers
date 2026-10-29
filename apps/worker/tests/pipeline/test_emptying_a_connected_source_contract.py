@@ -1,10 +1,10 @@
 import json
-from pathlib import Path
 from typing import Any, cast
 
 from better_answers_worker.pipeline import REASONS_EMPTYING_THE_CONNECTED_SOURCE
+from support.roots import REPOSITORY_ROOT
 
-CONTRACTS_DIR = Path(__file__).resolve().parents[4] / "contracts"
+CONTRACTS_DIR = REPOSITORY_ROOT / "contracts"
 
 
 def read_emptying_a_connected_source() -> dict[str, Any]:

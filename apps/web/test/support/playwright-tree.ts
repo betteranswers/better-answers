@@ -9,11 +9,10 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const web = fileURLToPath(new URL("../..", import.meta.url));
+import { workspaceRoot } from "./roots.ts";
 
-export const moduleAt = (file: string): string => JSON.stringify(path.join(web, file));
+export const moduleAt = (file: string): string => JSON.stringify(path.join(workspaceRoot, file));
 
 type Ran = {
   readonly status: number | null;
@@ -28,7 +27,7 @@ const playwrightIn = (tree: string, env: Readonly<Record<string, string>>): Prom
   new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      [path.join(web, "node_modules", "@playwright", "test", "cli.js"), "test"],
+      [path.join(workspaceRoot, "node_modules", "@playwright", "test", "cli.js"), "test"],
       { cwd: tree, env: { ...process.env, ...env } },
     );
     const stdout: string[] = [];
@@ -51,7 +50,7 @@ export const playwrightOver = async (
 ): Promise<Ran> => {
   const tree = realpathSync(mkdtempSync(path.join(tmpdir(), "playwright-tree-")));
   try {
-    symlinkSync(path.join(web, "node_modules"), path.join(tree, "node_modules"));
+    symlinkSync(path.join(workspaceRoot, "node_modules"), path.join(tree, "node_modules"));
     for (const [name, content] of Object.entries(files)) {
       writeFileSync(path.join(tree, name), content);
     }

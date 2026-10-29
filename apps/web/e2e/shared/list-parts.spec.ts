@@ -1,4 +1,9 @@
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
+
+import { workspaceRoot } from "@test/roots.ts";
 
 import { expect, test } from "../browser.ts";
 import { bundledHarness, harnessDrawn } from "../drawn-parts.ts";
@@ -9,7 +14,7 @@ let parts: string | undefined;
 test.beforeAll(async () => {
   parts = await bundledHarness({
     name: "list-parts",
-    file: new URL("../../test/support/members-list.tsx", import.meta.url),
+    file: pathToFileURL(path.join(workspaceRoot, "test/support/members-list.tsx")),
     component: "MembersList",
     props: { pageSize: 2 },
   });

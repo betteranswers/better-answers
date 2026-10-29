@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import {
   hookScript,
   recordsItsArgv,
@@ -13,7 +14,7 @@ import {
   type HookRun,
 } from "@better-answers/devtools/worktree-hooks";
 
-const script = path.join(import.meta.dirname, "../../../../scripts/jdocmunch-watch-cap.sh");
+const script = path.join(repositoryRoot, "scripts/jdocmunch-watch-cap.sh");
 const hook = hookScript("watch-cap-hook");
 
 const scratch = scratchRoot("jdocmunch-watch-cap");

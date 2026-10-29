@@ -40,6 +40,7 @@ from better_answers_worker.pipeline import (
 )
 from better_answers_worker.redaction import Restore
 from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
+from support.roots import REPOSITORY_ROOT, WORKER_ROOT
 
 WORKSPACE = "01M2Q3R4S5T6V7W8X9YZAB0000"
 CONNECTED_SOURCE = "01M2B1ND1NGAAAAAAAAAAAAAAA"
@@ -97,10 +98,10 @@ A_ROTA_ERASED = (
     "Rota changes go to [withheld] by Thursday, and are\nsigned off by [withheld].\n"
 )
 
-CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
+CONTRACTS = REPOSITORY_ROOT / "contracts"
 
 
-CONVERSION_FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "conversion"
+CONVERSION_FIXTURES = WORKER_ROOT / "tests" / "fixtures" / "conversion"
 
 
 A_POLICY_ID = "01M2Q3R4S5T6V7W8X9YZAB0003"
@@ -606,7 +607,7 @@ def test_the_memoised_functions_identity_is_six_facts() -> None:
     assert getattr(pipeline, THE_MEMOS_IDENTITY["qualified_name"]) is detected
 
 
-THE_TIERS_SOURCE = Path(__file__).resolve().parents[2] / "src"
+THE_TIERS_SOURCE = WORKER_ROOT / "src"
 
 
 def test_the_detector_is_the_only_function_the_estate_memoises() -> None:

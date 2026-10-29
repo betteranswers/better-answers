@@ -4,9 +4,11 @@ import { pathToFileURL } from "node:url";
 
 import { z } from "zod";
 
+import { workspaceRoot } from "../support/roots/roots.ts";
+
 const manifestShape = z.object({ exports: z.record(z.string(), z.string()) });
 
-const PACKAGE_JSON = path.resolve(import.meta.dirname, "../../package.json");
+const PACKAGE_JSON = path.resolve(workspaceRoot, "package.json");
 
 export const loadEveryEntryPoint = async (): Promise<void> => {
   const manifest = manifestShape.parse(JSON.parse(readFileSync(PACKAGE_JSON, "utf8")));

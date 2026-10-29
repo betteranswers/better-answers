@@ -1,7 +1,6 @@
 import json
 import re
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -9,8 +8,9 @@ import pytest
 from better_answers_worker.redaction import redact
 from better_answers_worker.redaction.engine import spans_detected
 from better_answers_worker.schema_view import TABLES
+from support.roots import REPOSITORY_ROOT
 
-CONTRACTS_DIR = Path(__file__).resolve().parents[4] / "contracts"
+CONTRACTS_DIR = REPOSITORY_ROOT / "contracts"
 
 
 SPOKEN_TIERS = ["always", "default-on", "default-off"]

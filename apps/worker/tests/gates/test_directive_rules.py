@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
-MANIFEST = Path(__file__).resolve().parents[2] / "pyproject.toml"
+from support.roots import WORKER_ROOT
+
+MANIFEST = WORKER_ROOT / "pyproject.toml"
 
 A_REASON = "the loader imports it by name"
 

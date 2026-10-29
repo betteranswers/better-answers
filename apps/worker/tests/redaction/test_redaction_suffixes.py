@@ -7,8 +7,9 @@ from better_answers_worker.redaction.suffixes import (
     copy_out,
     warmed_entries,
 )
+from support.roots import WORKER_ROOT
 
-DOCKERFILE = Path(__file__).resolve().parents[2] / "Dockerfile"
+DOCKERFILE = WORKER_ROOT / "Dockerfile"
 
 
 A_NAMESPACE = "publicsuffix.org-tlds"
