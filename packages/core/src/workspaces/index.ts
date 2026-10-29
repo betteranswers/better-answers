@@ -7,23 +7,13 @@ export {
   personIdByEmail,
   addMember,
 } from "./writes.ts";
-export type {
-  BootstrapPrincipal,
-  ProvisionWorkspaceInput,
-  ProvisionRefusal,
-  RenameWorkspaceInput,
-  RenameRefusal,
-  AddMemberInput,
-  AddMemberRefusal,
-  MemberAdded,
-} from "./writes.ts";
+export type { ProvisionRefusal, RenameRefusal, AddMemberRefusal } from "./writes.ts";
 export {
   endEverySignInAndTokenInput,
   endEverySignInAndToken,
   endWorkspaceTokens,
   revokeWorkspaceTokens,
 } from "./credentials.ts";
-export type { EndEverySignInAndTokenRefusal, RevokeWorkspaceTokensInput } from "./credentials.ts";
 export {
   workspacesHeldBy,
   readWorkspacesHeld,
@@ -32,7 +22,6 @@ export {
   readMember,
   principalOfMember,
 } from "./lookup.ts";
-export type { Member, MemberReadRefusal } from "./lookup.ts";
 
 export { WORKSPACE_REFUSALS } from "./vocabulary.ts";
 export { addPerson } from "./add-person.ts";

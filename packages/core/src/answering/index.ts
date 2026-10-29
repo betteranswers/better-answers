@@ -29,7 +29,6 @@ import type { OpenResult, AnswerResult } from "./results.ts";
 export { NOT_COMPANY_KNOWLEDGE } from "./results.ts";
 export type { FindMatch, FindResult, OpenView, OpenResult, AnswerResult } from "./results.ts";
 export { find } from "./find.ts";
-export type { FindRefusal } from "./find.ts";
 export { renderFind, renderOpen, mapWords, renderAnswer } from "./render.ts";
 
 export {
@@ -40,14 +39,12 @@ export {
   openInput,
   openOutputWith,
   type AskInput,
-  type FindInput,
   type OpenInput,
 } from "./boundary.ts";
 export { findCursor, type FindPosition } from "./cursor.ts";
 export {
   ASK_CAPS,
   type AskCaps,
-  type MapState,
   type PlannedAnswer,
   type PreviewedConcept,
   type ReadStep,

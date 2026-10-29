@@ -1,5 +1,5 @@
 export { targetOf, writeConceptDelta, writeConceptVisibility } from "./write.ts";
-export type { ConceptDelta, ConceptVisibility } from "./write.ts";
+export type { ConceptDelta } from "./write.ts";
 export {
   MAP_WALK_DEPTH,
   walkFromEntries,
