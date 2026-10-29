@@ -274,6 +274,7 @@ describe("seeding a guide from a template", () => {
 
     const coverage = await coverageAs(ng.viewer, guideId);
 
+    expect(coverage.collection).toBe("company");
     expect(statesOf(coverage)[2]).toEqual([
       "Insurance and financial standing",
       [

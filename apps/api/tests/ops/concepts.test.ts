@@ -389,6 +389,28 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
+    it("analyses the map for the planner once landed", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(served());
+      const superuser = served().database.superuser;
+      for (const table of ["map_node", "map_edge"]) {
+        await superuser.query(`ALTER TABLE ${table} SET (autovacuum_enabled = false)`);
+      }
+
+      await importing(served(), workspaceId, admin.email);
+
+      const estimated = await superuser.query<{ table: string; rows: number }>(
+        `SELECT relname AS "table", reltuples::int AS rows FROM pg_class
+          WHERE relnamespace = 'public'::regnamespace AND relname IN ('map_edge', 'map_node')
+          ORDER BY relname`,
+      );
+      const held = await superuser.query<{ table: string; rows: number }>(
+        `SELECT 'map_edge' AS "table", count(*)::int AS rows FROM map_edge
+         UNION ALL SELECT 'map_node', count(*)::int FROM map_node`,
+      );
+      expect(held.rows.every((table) => table.rows > 0)).toBe(true);
+      expect(estimated.rows).toEqual(held.rows);
+    });
+
     it("commits the manifest first, then each concept, landing their rows", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
 

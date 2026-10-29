@@ -54,6 +54,22 @@ describe("the erasure report", () => {
     );
   });
 
+  it("sets each paragraph apart with one blank line", () => {
+    expect(NOTHING_DONE.split("\n\n").map((paragraph) => paragraph.slice(0, 20))).toEqual([
+      "Erasure report for s",
+      "Every actor identifi",
+      "Backup copies taken ",
+      "The anchor above is ",
+      "Names inside concept",
+      "Where this person wa",
+      "A person's sign-in i",
+      "Invitations sent to ",
+      "The original files i",
+      "Exports already issu",
+    ]);
+    expect(NOTHING_DONE.endsWith("None have been issued.\n")).toBe(true);
+  });
+
   it("says its anchor is the lock, not the last dump", () => {
     expect(NOTHING_DONE).toContain(
       "The anchor above is the instant this routine took the erasure lock, not the stamp of the " +
