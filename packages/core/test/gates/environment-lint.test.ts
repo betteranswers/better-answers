@@ -45,7 +45,7 @@ describe("the environment lint fires on a setting read in source", () => {
 const EXCUSED: readonly (readonly [string, string])[] = [
   ["the api's config module", "apps/api/src/config.ts"],
   ["the browser suite's configuration", "apps/web/playwright.config.ts"],
-  ["the git store door's pass-through", "packages/core/src/store/git/index.ts"],
+  ["the git store door's pass-through", "packages/core/src/store/git/door.ts"],
   ["a repository script", "scripts/check.mjs"],
   ["the gate tooling", "packages/devtools/src/throwaway-tree.ts"],
   ["a test", "packages/core/test/store/git/git.test.ts"],
@@ -81,14 +81,14 @@ describe("the configuration the repository commits", () => {
   it("excuses config modules, the pass-through, tooling and suites, nothing wider", () => {
     expect(excused.map((override) => override.files)).toEqual([
       ["apps/api/src/config.ts", "apps/web/playwright.config.ts"],
-      ["packages/core/src/store/git/index.ts"],
+      ["packages/core/src/store/git/door.ts"],
       ["scripts/**", "packages/devtools/src/**"],
       ["**/*.test.ts", "**/*.test.tsx", "**/test/**", "**/tests/**", "**/e2e/**"],
     ]);
   });
 });
 
-const DOOR = "packages/core/src/store/git/index.ts";
+const DOOR = "packages/core/src/store/git/door.ts";
 const UNEXCUSED_DOOR = "packages/core/src/store/git/probe.ts";
 
 describe("the git store door, the one excused source file", () => {
