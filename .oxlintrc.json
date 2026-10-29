@@ -567,12 +567,6 @@
       }
     },
     {
-      "files": ["packages/devtools/src/comments/comment-inventory.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 567, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["packages/schema/scripts/roles-surface.ts"],
       "rules": {
         "max-lines-per-function": [
