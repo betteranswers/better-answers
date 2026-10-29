@@ -183,7 +183,9 @@ const importing = (
   principal: UserPrincipal,
   input: ImportBundleInput,
   log: ImportLog = SILENT,
-): ReturnType<typeof importBundle> => importBundle(principal, { ...doorsOf(scenario), log }, input);
+  analyse: () => Promise<void> = doorsOf(scenario).analyse,
+): ReturnType<typeof importBundle> =>
+  importBundle(principal, { ...doorsOf(scenario), log, analyse }, input);
 
 const imported = async (
   scenario: Scenario,
@@ -431,17 +433,17 @@ describe("importing the bundle", () => {
     const { scenario, verifiers } = await arranged();
     const { log, warnings } = warningsKept();
 
-    const run = await analyseHeldOff(() =>
-      importing(scenario, scenario.admin, { tree: soundBundle(verifiers) }, log),
+    const run = await importing(
+      scenario,
+      scenario.admin,
+      { tree: soundBundle(verifiers) },
+      log,
+      () => Promise.reject(new Error("the map is busy")),
     );
 
     expect(run).toMatchObject({ ok: true, value: { landed: PATHS_IN_ORDER, dryRun: false } });
     expect(warnings).toEqual([
-      {
-        workspace_id: scenario.workspaceId,
-        bundle_id: BUNDLE_ID,
-        error: "canceling statement due to lock timeout",
-      },
+      { workspace_id: scenario.workspaceId, bundle_id: BUNDLE_ID, error: "the map is busy" },
     ]);
   });
 
@@ -456,7 +458,13 @@ describe("importing the bundle", () => {
     );
 
     expect(stopped).toEqual(STOPPED_WHERE_THE_CONCEPT_MOVED);
-    expect(warnings).toHaveLength(1);
+    expect(warnings).toEqual([
+      {
+        workspace_id: scenario.workspaceId,
+        bundle_id: BUNDLE_ID,
+        error: "canceling statement due to lock timeout",
+      },
+    ]);
   });
 
   it("commits the manifest, then each concept in path order", async () => {

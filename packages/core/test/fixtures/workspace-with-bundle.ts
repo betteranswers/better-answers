@@ -1,6 +1,7 @@
 import type pg from "pg";
 
 import { initRepository, type GitDoor } from "@better-answers/core/store/git";
+import { analyseMap } from "@better-answers/core/store/map";
 import { testData, type MigratedPostgres } from "@better-answers/schema/testing";
 
 import { nameOwner, type NameOwnerInput } from "../../src/concepts/index.ts";
@@ -65,6 +66,7 @@ export const doorsOf = (scenario: Scenario) => ({
   git: scenario.git,
   postgres: scenario.postgres,
   clock: systemClock(),
+  analyse: () => analyseMap(scenario.postgres.pool),
 });
 
 export const suiteWithBundles = () => {
