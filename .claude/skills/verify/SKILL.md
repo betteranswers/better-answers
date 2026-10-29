@@ -28,7 +28,7 @@ It prints `worth driving:` and exits 0, or prints `not worth driving:` with the 
 
 ## Drive
 
-Build state only through the harness, and act only through the page. Write every command out in full, with literal values: a worktree-isolated agent's hook refuses a command that carries a value computed at runtime.
+Build state only through the harness, and act only through the page. Write every command out in full, with literal values, one command to a call: a worktree-isolated agent's hook refuses a chained or compound command.
 
 1. **Build state.** `scripts/harness.sh <port> <METHOD> <path> [json body]` calls `/__harness<path>` and prints the answer. A refusal prints its status and reasons and exits 1. `references/harness.md` lists the routes the recipes call.
 
@@ -36,9 +36,7 @@ Build state only through the harness, and act only through the page. Write every
    .claude/skills/verify/scripts/harness.sh 4610 POST /workspaces '{"name":"Verify people"}'
    ```
 
-2. **Sign in.** `scripts/sign-in.sh <port> <email> [path]` signs in through the product's own page, through the second-factor step, and switches from one person to another. It prints a line that ends with the page's address.
-
-   With no path, a new Admin of one workspace lands on `/people/members`, an Editor or a Viewer of one on `/ask/new-question`, and a person in several workspaces on the workspace picker. With the path `/console`, the operator lands on `/console/workspaces/every-workspace`.
+2. **Sign in.** `scripts/sign-in.sh <port> <email> [path]` signs in a person the harness seeded, through the product's own page and its second-factor step, and switches from one person to another. It prints a line that ends with the page's address. Each recipe names the page its sign-in lands on.
 
 3. **Drive the page.** `scripts/browse.sh <port> <agent-browser command>` runs agent-browser in the session `verify-<port>`.
 

@@ -1,6 +1,6 @@
 # Control Centre
 
-An Admin runs the workspace: members, invitations, groups, audit log, connected sources, model choices, questions asked.
+An Admin runs the workspace: members, invitations, groups, audit log, connected sources, questions asked, and sees its model choices.
 
 `<stamp>` is `date +%s`, taken once for this file. Setup runs once in a fresh workspace, then any recipe in any order.
 
