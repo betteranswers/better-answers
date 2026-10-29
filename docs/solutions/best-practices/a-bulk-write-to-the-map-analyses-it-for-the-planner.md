@@ -22,7 +22,7 @@ tags: [map, walk, analyze, statistics, autovacuum, security-definer, rebuild, im
 
 ## Context
 
-The map walk (`walkStatement` in `packages/core/src/store/map/index.ts`) is a recursive CTE that hops `map_edge` into `map_node` by `workspace_id` and `uid`, under a two-second `statement_timeout`. The planner picks its join order from the tables' statistics. A generation the worker has just rebuilt, or a bundle the api has just imported, is a bulk write that autovacuum has not yet analysed. In that window the planner estimates one row for the workspace's nodes and nested-loops every live node against every step of the walk.
+The map walk (`walkStatement` in `packages/core/src/store/map/walk.ts`) is a recursive CTE that hops `map_edge` into `map_node` by `workspace_id` and `uid`, under a two-second `statement_timeout`. The planner picks its join order from the tables' statistics. A generation the worker has just rebuilt, or a bundle the api has just imported, is a bulk write that autovacuum has not yet analysed. In that window the planner estimates one row for the workspace's nodes and nested-loops every live node against every step of the walk.
 
 BA-151 measured a forty-entry walk over a two-thousand-node map with six links each, on the same rows before and after `ANALYZE`: 40 to 51 s and 32 million buffer hits before, with the planner estimating one node row against the 2,000 it read on each of five iterations, and 25 to 50 ms and 867 buffer hits after. An `ask` in that window answers from its entry points alone and reads "map unavailable since". Core's tests did not show it because `asked` in `packages/core/test/answering/asking.ts` runs `ANALYZE map_node, map_edge` before it asks. `askedAsIs` analyses nothing.
 

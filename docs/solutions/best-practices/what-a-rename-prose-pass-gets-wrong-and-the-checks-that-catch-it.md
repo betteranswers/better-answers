@@ -96,7 +96,7 @@ The globs leave out the archive, plans and dogfood reports dated before 2026-10-
 
 **11. A noun that grows a word pushes test titles past their cap.** `MOST_WORDS = 10` (`packages/schema/test/support/test-title.ts`), and the Python suite holds the same cap. *Binding* to *connected source* put about sixty titles over it. Run every suite's title check before committing.
 
-**12. Redirect a renamed page only if it is built.** When the page has `built: true` in `apps/web/src/shared/navigation.ts`, add each old address to its `movedFrom` and to the `MOVED` list in `apps/web/test/shared/navigation.test.ts` in the same commit, and watch the test fail before the address is right. An unbuilt page was never routed, so it gets neither: "routes every moved address, each leading to a built page" (`apps/web/test/app/shell/frame.test.tsx`) refuses a moved address whose pages are all unbuilt.
+**12. Redirect a renamed page only if it is built.** When the page has `built: true` in `apps/web/src/shared/navigation/areas.ts`, add each old address to its `movedFrom` and to the `MOVED` list in `apps/web/test/shared/navigation.test.ts` in the same commit, and watch the test fail before the address is right. An unbuilt page was never routed, so it gets neither: "routes every moved address, each leading to a built page" (`apps/web/test/app/shell/frame.test.tsx`) refuses a moved address whose pages are all unbuilt.
 
 **13. Pin a new accessible name with `exact: true` when it sits inside another.** Playwright matches a `getByRole` name as a case-insensitive substring unless `exact: true` is set. U7 titled the narrow layout's sheet "Menu", and the toggle reads "Hide the menu", so `getByRole("button", { name: "Menu" })` found both.
 
