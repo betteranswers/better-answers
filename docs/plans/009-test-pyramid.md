@@ -691,25 +691,26 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 
 **Files.**
 
-- [ ] Edit core's erasure slice, today `packages/core/src/erasure/`, and its routine test.
+- [ ] Edit the routine test of core's erasure slice, today `packages/core/src/erasure/`, and leave the slice's source as it is.
 - [ ] Edit core's concepts slice write path, today `packages/core/src/concepts/writes/write.ts` and `edit.ts`, and the concepts test.
 - [ ] Edit core's guides slice and its test.
 - [ ] Edit core's bundle import, today under `packages/core/src/concepts/import/`, and the import-bundle test. Leave the fence wrappers in `packages/core/src/bundle/index.ts` as they are.
+- [ ] Edit the api's import command, `apps/api/src/ops/concepts.ts`, to pass the analyse step, and add its case to `apps/api/tests/ops/concepts.test.ts`.
 - [ ] Add no name to a face or to `packages/core/package.json` `exports` for a test's sake; a face names what a sibling or a transport calls.
 
 **Build.**
 
 - [ ] Erasure. Test the report through `erasure/report.ts`, which is already pure, and the backup expiry dates through `beyondUseFrom` in `erasure/routine/routine.ts`. Keep the git-step and rewrite cases on real git.
-- [ ] Concepts. Extract kind folding and the merge-key shape from the write path as pure functions. Keep commit authorship and no-partial-rows on Postgres and git.
+- [ ] Concepts. Extract the merge-key shape from the write path as a pure function. Keep commit authorship and no-partial-rows on Postgres and git.
 - [ ] Guides. Extract coverage and marking as functions over rows already read.
 - [ ] Import. Pass the analyse step to import as a function, so "reports a landed import when the analyse fails" runs with a failing step. Keep the lock-timeout case real.
 - [ ] Delete each seeded case whose claim a new pure case now makes, and list it in the PR body.
-- [ ] Put each new in-process file in the mirror folder of the slice whose module it drives, named for the behaviour, with no `PINS` row.
+- [ ] Put each new in-process file in the mirror folder of the slice whose module it drives, named for the behaviour or the one source file it checks, with no `PINS` row.
   - [ ] Erasure's report test goes in `packages/core/test/erasure/report.test.ts`, and the expiry dates in `test/erasure/routine/beyond-use.test.ts`.
   - [ ] The merge key goes in `test/concepts/writes/`.
   - [ ] Kind folding goes where the entry that exports it is mirrored. `src/bundle/index.ts` already exports `foldKind`, so its test is `test/bundle/fold-kind.test.ts`, a new one-file mirror folder. A function extracted into the concepts write path is tested in `test/concepts/writes/`.
   - [ ] Guide coverage and marking go in `test/guides/`.
-  - [ ] Import's analyse step goes in `test/concepts/import/`, beside `import-bundle.test.ts`. The gate accepts the folder because `src/concepts/import/` exists.
+  - [ ] Import's analyse cases stay inside `test/concepts/import/import-bundle.test.ts`. The gate accepts the folder because `src/concepts/import/` exists.
 
 **You see.**
 
@@ -718,14 +719,16 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] Each extracted function has an in-process test that imports its module from its slice's mirror folder. Run `pnpm check:core:suite`.
-- [ ] Mutants in each extracted function are killed. Run a scoped Stryker run per the mutation-testing skill.
+- [ ] Mutants in each extracted function are killed, or each survivor is explained. Run a scoped Stryker run per the mutation-testing skill.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on the configured `swarm workers` model at the PR head, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run `pnpm check:core:suite` at trunk and head. Save `core-trunk-head.log`. Pass when both pass.
 - [ ] Lane 2. Run an erasure rehearsal with `pnpm ops` against a seeded local database. Save `erasure.log`. Pass when the report matches trunk's for the same seed.
-- [ ] Lane 3. Edit a concept with a folded kind through the verify skill. Save `kind-fold.png`. Pass when the stored kind matches trunk's.
-- [ ] Lane 4. Seed a guide from a template through the verify skill. Save `guide.png`. Pass when coverage and marks match trunk's.
+- [ ] Lane 3. Edit a concept with a folded kind through the api's `knowledge.saveConcept` on a server the verify skill launches, and read it back on the Knowledge Base page. Save `kind-fold.png`. Pass when the stored kind matches trunk's.
+- [ ] Lane 4. Seed a guide from a template through `seedGuide` at trunk and head. Save `guide-trunk.json` and `guide-head.json`. Pass when coverage and marks match.
+
+Changed 29/10/2026. No page edits a concept, and no page or api reaches guides, so lanes 3 and 4 name the surfaces that do.
 - [ ] Lane 5. Import a bundle with analyse held off. Save `import.log`. Pass when import reports landed, as trunk does.
 - [ ] Lane 6. Run `pnpm check:gates`. Save `gates.log`. Pass when import-direction and table-ownership pass.
 - [ ] Lane 7. Run `pnpm check:api`. Save `api.log`. Pass when it passes.
@@ -740,7 +743,7 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 - [ ] Baseline. Record the trunk rounds first.
 - [ ] Rule. Fails unless every head round is lower than every trunk round. Record `check:core:suite`'s wall at trunk and head as a figure.
 
-Changed 28/10/2026. The first rule asked `check:core:suite` to run 30s faster, but six workers share each shard's wall, so this unit's saving of about 8 CPU-seconds is about 1.3s of wall. Five interleaved runs per side gave a trunk median of 80.4s and a head median of 83.6s.
+Changed 28/10/2026. The first rule asked `check:core:suite` to run 30s faster, but six workers share each shard's wall, so this unit's saving of about 8 CPU-seconds is about 1.3s of wall. Five interleaved runs per side gave a trunk median of 80.4s and a head median of 83.6s, both shards' walls summed.
 
 Measured 29/10/2026 by the verifier. The four files run alone took 62.40 to 68.10s at trunk and 56.24 to 61.69s at head. `check:core:suite`'s wall had a trunk median of 73.6s and a head median of 77.3s, head slower in all five rounds. The likely cause, not established, is the per-file overhead of the six new test files.
 
