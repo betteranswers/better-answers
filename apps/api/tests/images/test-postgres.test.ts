@@ -7,11 +7,11 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { repositoryRoot } from "@better-answers/devtools/paths";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
 import { freePort } from "../support/loopback-port.ts";
+import { repositoryRoot } from "../support/roots/roots.ts";
 import {
   containersOf,
   imagesOf,

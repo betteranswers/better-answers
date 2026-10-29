@@ -3,10 +3,9 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { repositoryRoot } from "@better-answers/devtools/paths";
-
 import { consentPage, REFUSAL_PAGES, refusedPage, signInPage } from "../src/auth/pages.ts";
 import { senderAt } from "../src/product-name.ts";
+import { repositoryRoot } from "./support/roots/roots.ts";
 
 const LOGO = readFileSync(
   path.join(repositoryRoot, "packages/design-system/assets/logo.svg"),

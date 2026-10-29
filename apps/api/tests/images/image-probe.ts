@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { repositoryRoot } from "@better-answers/devtools/paths";
+import { repositoryRoot } from "../support/roots/roots.ts";
 
 const run = promisify(execFile);
 
