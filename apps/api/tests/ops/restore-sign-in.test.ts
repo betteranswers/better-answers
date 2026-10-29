@@ -14,7 +14,7 @@ import { servedApp } from "../support/suite-app.ts";
 import { webClientOf } from "../support/web-client.ts";
 
 const objects = objectStoreForSuite();
-const { ops, opsWith } = opsRunner(objects);
+const { help, opsWith } = opsRunner(objects);
 
 describe("pnpm ops — the restore scripts' commands", () => {
   const served = servedApp();
@@ -302,9 +302,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("names the command in the usage", async () => {
-      const run = await ops(served(), ["help"]);
-
-      expect(run.lines.join("\n")).toContain("restore-sign-in --email <email>");
+      expect(await help(served())).toContain("restore-sign-in --email <email>");
     });
   });
 });
