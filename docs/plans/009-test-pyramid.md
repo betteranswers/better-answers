@@ -296,7 +296,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Edit `.agents/playbooks/plan.md`. Delete the change that names `browser-suite` as the web's driver skill, because the bundled step finds `.claude/skills/verify/` without it.
 - [ ] Decide whether `/create-formal-verification-skill` earns a place now. The decision, made on 28/10/2026, is no, and this PR generates no formal skill. Confirm each fact below at the PR's base, and reopen the decision if one no longer holds.
   - [ ] The strongest target is the bundle fence. `withBundleWrite` and `withBundleFenceAs` in `packages/core/src/bundle/index.ts` take the in-process repository lock, then one of `FENCE_HOLDERS_PER_POOL` (3) slots for the pool, then a shared or exclusive advisory lock on a connection of their own, then the work's transaction. `runErasure` in `packages/core/src/erasure/routine/routine.ts` takes `withSessionLock(DUMP_LOCK)` outside the exclusive fence, and the sweeps take `SWEEP_LOCK` outside the cap. The promise is plan 006's R2 and R4. A rewrite never interleaves with a write in any process, and the pool is never exhausted. Tests reach it poorly. `packages/core/test/concepts/bundle-fence.test.ts` holds eight cases, each one schedule on real Postgres, and the fence took a second fix on the day it landed (`eed49a597`, a reconciler tick queued behind a waiting writer).
-  - [ ] Erasure's own logic is covered another way. The erasure-match contract sweeps every code point, which is exhaustive over its input, and BA-275 gives the report and the pseudonym in-process tests. Erasure's concurrency is the fence's.
+  - [ ] Erasure's own logic is covered another way. The erasure-match contract sweeps every code point, which is exhaustive over its input, and BA-275 gives the report and the backup expiry dates in-process tests. Erasure's concurrency is the fence's.
   - [ ] The session locks, keys 41 and 42, are single keys with no nesting except `DUMP_LOCK` around the fence. They belong inside the fence's model, not in a model of their own.
   - [ ] No PR in this plan changes the target. No Build box edits `packages/core/src/store/postgres/locks.ts`, the fence wrappers in `packages/core/src/bundle/index.ts`, `packages/core/src/sweeps/index.ts` or the lock order in `runErasure`. BA-275 extracts pure functions beside them and keeps import's lock-timeout case real. A model written now checks no change this program makes. It would also bring a JVM for TLC into a program whose goal is a faster suite, and the plan author's machine has none (`java -version` found no runtime on 28/10/2026).
   - [ ] File a Linear issue for the target, related to BA-288, and link it in the PR body. It models the fence's slots, the advisory fence, `DUMP_LOCK` and `SWEEP_LOCK` against `POSTGRES_POOL_MAX` in `apps/api/src/doors.ts` across several processes. The property is that no holder waits forever and the pool never runs dry. It runs `/create-formal-verification-skill` as `.claude/skills/bundle-fence/` when the cap, the pool size or a lock family changes, or when production logs a wait for a pool connection. The issue names the worker's claim and lease protocol as the next target, which took five fixes in two days (#809, #821, #822, #838 and #840).
@@ -692,20 +692,20 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 **Files.**
 
 - [ ] Edit core's erasure slice, today `packages/core/src/erasure/`, and its routine test.
-- [ ] Edit core's concepts slice write path, today `packages/core/src/concepts/write.ts` and `edit.ts`, and the concepts test.
+- [ ] Edit core's concepts slice write path, today `packages/core/src/concepts/writes/write.ts` and `edit.ts`, and the concepts test.
 - [ ] Edit core's guides slice and its test.
 - [ ] Edit core's bundle import, today under `packages/core/src/concepts/import/`, and the import-bundle test. Leave the fence wrappers in `packages/core/src/bundle/index.ts` as they are.
 - [ ] Add no name to a face or to `packages/core/package.json` `exports` for a test's sake; a face names what a sibling or a transport calls.
 
 **Build.**
 
-- [ ] Erasure. Test the report and the pseudonym through `erasure/report.ts` and `erasure/identifiers.ts`, which are already pure. Keep the git-step and rewrite cases on real git.
+- [ ] Erasure. Test the report through `erasure/report.ts`, which is already pure, and the backup expiry dates through `beyondUseFrom` in `erasure/routine/routine.ts`. Keep the git-step and rewrite cases on real git.
 - [ ] Concepts. Extract kind folding and the merge-key shape from the write path as pure functions. Keep commit authorship and no-partial-rows on Postgres and git.
-- [ ] Guides. Extract coverage and marking as functions over rows already read. Share one seeded northgate fixture for the cases that stay.
+- [ ] Guides. Extract coverage and marking as functions over rows already read.
 - [ ] Import. Pass the analyse step to import as a function, so "reports a landed import when the analyse fails" runs with a failing step. Keep the lock-timeout case real.
 - [ ] Delete each seeded case whose claim a new pure case now makes, and list it in the PR body.
 - [ ] Put each new in-process file in the mirror folder of the slice whose module it drives, named for the behaviour, with no `PINS` row.
-  - [ ] Erasure's report and pseudonym tests go in `packages/core/test/erasure/`, as `report.test.ts` and `identifiers.test.ts`, since each checks one source file.
+  - [ ] Erasure's report test goes in `packages/core/test/erasure/report.test.ts`, and the expiry dates in `test/erasure/routine/beyond-use.test.ts`.
   - [ ] The merge key goes in `test/concepts/writes/`.
   - [ ] Kind folding goes where the entry that exports it is mirrored. `src/bundle/index.ts` already exports `foldKind`, so its test is `test/bundle/fold-kind.test.ts`, a new one-file mirror folder. A function extracted into the concepts write path is tested in `test/concepts/writes/`.
   - [ ] Guide coverage and marking go in `test/guides/`.
@@ -713,7 +713,7 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 
 **You see.**
 
-- [ ] The 7 erasure-routine cases whose claim a pure test can make run in a new in-process file. The 108 cases that assert rows, git history, locks, audit events or stored copies stay.
+- [ ] The 7 erasure-routine cases whose claim a pure test can make run in two new in-process files. The 108 cases that assert rows, git history, locks, audit events or stored copies stay.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -735,12 +735,14 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. The summed test-body seconds of the four touched test files at trunk and head, from vitest's JSON reporter.
+- [ ] Metric. The summed test-body seconds of the four touched test files, run alone at trunk and head, from vitest's JSON reporter.
 - [ ] Probe. Five interleaved runs per side inside `suite-slot.sh --exclusive`.
 - [ ] Baseline. Record the trunk rounds first.
 - [ ] Rule. Fails unless every head round is lower than every trunk round. Record `check:core:suite`'s wall at trunk and head as a figure.
 
 Changed 28/10/2026. The first rule asked `check:core:suite` to run 30s faster, but six workers share each shard's wall, so this unit's saving of about 8 CPU-seconds is about 1.3s of wall. Five interleaved runs per side gave a trunk median of 80.4s and a head median of 83.6s.
+
+Measured 29/10/2026 by the verifier. The four files run alone took 62.40 to 68.10s at trunk and 56.24 to 61.69s at head. `check:core:suite`'s wall had a trunk median of 73.6s and a head median of 77.3s, head slower in all five rounds. The likely cause, not established, is the per-file overhead of the six new test files.
 
 **Review gate.** None. BA-275 is not review-gated.
 
@@ -1014,7 +1016,7 @@ The table places each file in one column. Seven more files in the worker-process
 
 1. Readings that assert no threshold, or budgets that belong on a schedule. Write-budget 88s, map-budget 59s, analysed-map 47s, find-budget 43s, edit-budget 37s and guide-seed-budget 18s. Recall's file took 65s, but only its report case, about 34s, moves. That is 326s of core file time in all.
 2. Process launches in series. cross-tier-document 185s for 16 worker launches. backup-image 94s and image 82s for image builds. Four lint-rule files, 164s, for one oxlint or knip process per case. `test_image.py` 291s locally in one xdist group.
-3. Seeding loops. erasure-routine 58s at about 0.5s per case for an arrange and a git rewrite. guides 29s for a northgate import per case, now one shared seed. ops 53s over 199 cases through the real app.
+3. Seeding loops. erasure-routine 58s at about 0.5s per case for an arrange and a git rewrite. guides 29s for 7 northgate imports, 6 after BA-275. ops 53s over 199 cases through the real app.
 4. Browser test count. 710 tests at a mean of 4.05s, of which the triage marks about 70 as duplicates and about 150 in the ten slowest specs as single-screen.
 
 **Slowest files, with class.** BOUNDARY means the real store is the claim. INCIDENTAL means the logic reaches it only through the harness. READING means a figure with no threshold or a budget for the schedule.
@@ -1040,7 +1042,7 @@ The table places each file in one column. Seven more files in the worker-process
 | core import-bundle | 37 | two 5s lock-timeout waits | mixed | BA-275 |
 | api ask | 31 | provision, seed and connect per case | INCIDENTAL | BA-274 |
 | api lint-rules | 30 | oxlint per case | INCIDENTAL | BA-273 |
-| core guides | 29 | one shared northgate seed | INCIDENTAL | BA-275 |
+| core guides | 29 | 7 northgate imports, 6 after BA-275 | INCIDENTAL | BA-275 |
 | api mcp-cross-tier | 28 | one worker launch | duplicate | BA-270 |
 | api local-database | 28 | container restarts | BOUNDARY | BA-271 |
 | api stop | 28 | a fixed 10s deadline | BOUNDARY | BA-271 |
@@ -1086,7 +1088,7 @@ The triage's named duplicates include people's "refuses demoting both Admins" ag
 
 **Seams.** Every seam is a pure function or an injected seam that exists already. No store door becomes a port.
 
-- Pure decide functions per slice, over rows already read. Today's examples are `kernel/admission.ts`, `concepts/trust.ts`, `erasure/identifiers.ts`, `concepts/file.ts` and `members/sets.ts`. BA-275 adds kind folding, the merge key, guide coverage and marking, and import's analyse step. BA-274 adds `parseOpsArgs`.
+- Pure decide functions per slice, over rows already read. Today's examples are `kernel/admission.ts`, `concepts/trust.ts`, `erasure/identifiers.ts`, `concepts/file.ts` and `members/sets.ts`. BA-275 adds the merge key, guide coverage and marking, and import's analyse step. BA-274 adds `parseOpsArgs`.
 - The injected seams that exist today. `Clock`, `fetchModel` (ADR 0049), `sendEmail`, the Better Auth seam (ADR 0009) and `Doors`. BA-276 adds a clock to the worker loop.
 - The web's stubbed api, which BA-277 lets hold a request.
 - A rule's finding functions, which BA-273 calls directly.
