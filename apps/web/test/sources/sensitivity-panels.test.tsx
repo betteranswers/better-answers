@@ -19,6 +19,7 @@ import {
   thePanelOf,
   connectedSourcesRegion,
 } from "@test/sources/stubbed-sources.ts";
+import { server } from "@test/stub-server.ts";
 import { heldBack } from "@test/stubbed-api.ts";
 import { aRefusalAnswer, read } from "@test/two-workspaces.ts";
 
@@ -46,6 +47,11 @@ const A_PUBLICATION = "2026-10-07T09:05:00.000Z";
 
 const textsOf = (elements: readonly HTMLElement[]): (string | null)[] =>
   elements.map((each) => each.textContent);
+
+const aMomentPasses = () =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, 50);
+  });
 
 const commitIn = (panel: HTMLElement, label: "Narrow" | "Widen") =>
   within(panel).getByRole("button", { name: label });
@@ -169,7 +175,7 @@ describe("publishing, narrowing and widening a connected source", () => {
   });
 
   it("closes a widening on Escape, focus back on Widen", async () => {
-    const { row, opener, panel } = await aWideningOpened();
+    const { opener, panel } = await aWideningOpened();
     const commit = commitIn(panel, "Widen");
     commit.focus();
 
@@ -177,7 +183,11 @@ describe("publishing, narrowing and widening a connected source", () => {
 
     expect(panelOf("widen", "Staff handbook")).toBeNull();
     expect(document.activeElement, "Escape did not hand focus back to the button").toBe(opener);
-    expect(leadOf(row, "Sensitivity").textContent).toBe("Restricted");
+    await aMomentPasses();
+    expect(
+      server.asks.filter((ask) => ask.procedure === "sources.widen"),
+      "Escape asked the api to widen",
+    ).toEqual([]);
   });
 
   it("Escape closes an open select, not the panel", async () => {
