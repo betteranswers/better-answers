@@ -55,6 +55,54 @@ export const answeringAs =
     );
   };
 
+export type Api = Map<string, () => unknown>;
+
+export type Held = {
+  /** Settles when the app first asks for the procedure. */
+  readonly asked: Promise<void>;
+  /** True from an ask until its answer goes back, so a test sees the page's pending state. */
+  readonly pending: boolean;
+  /** Every ask the procedure has had, answered or not. */
+  readonly asks: number;
+  /** Answers every waiting ask with `answer`, else with the answer the table held before. */
+  readonly resolve: (answer?: unknown) => void;
+  /** Answers every waiting ask with `refusal`, a tRPC error envelope. */
+  readonly reject: (refusal: unknown) => void;
+};
+
+/** Holds a procedure of the table: each ask waits until the test resolves or rejects it. */
+export const heldBack = (api: Api, procedure: string, answer?: unknown): Held => {
+  const asked = Promise.withResolvers<void>();
+  const gate = Promise.withResolvers<() => unknown>();
+  const before = api.get(procedure);
+  let waiting = 0;
+  let asks = 0;
+  api.set(procedure, () => {
+    asks += 1;
+    waiting += 1;
+    asked.resolve();
+    return gate.promise.then((answering) => {
+      waiting -= 1;
+      return answering();
+    });
+  });
+  return {
+    asked: asked.promise,
+    get pending() {
+      return waiting > 0;
+    },
+    get asks() {
+      return asks;
+    },
+    resolve: (given) => {
+      gate.resolve(() => given ?? answer ?? before?.());
+    },
+    reject: (refusal) => {
+      gate.resolve(() => refusal);
+    },
+  };
+};
+
 export const withTheApiDown = () => {
   vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the network is down")));
   const clients = createAppClients();

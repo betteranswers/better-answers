@@ -7,6 +7,7 @@ import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { heldBack, type Api } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -18,7 +19,6 @@ import {
   drawnWithNoWorkspace,
   GRACE,
   HEDY,
-  heldBack,
   HOLME,
   LOST,
   NORTHERN,
@@ -28,7 +28,6 @@ import {
   switcher,
   switcherDrawn,
   tickOf,
-  type Api,
 } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));

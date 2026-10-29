@@ -1,12 +1,13 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect } from "vitest";
+import { z } from "zod";
 
 import { createAppClients } from "@/app/providers.tsx";
 import type { Role } from "@/shared/navigation.ts";
 
 import { openApp } from "./open-app.tsx";
 import { server, type Asked } from "./stub-server.ts";
-import { addressOf, answered } from "./stubbed-api.ts";
+import { addressOf, answered, type Api } from "./stubbed-api.ts";
 
 export const NORTHERN = { id: "w", name: "Northern Tooling" };
 
@@ -58,8 +59,6 @@ export const adaAt = (role: Role, workspace = NORTHERN) =>
     role,
   });
 
-export type Api = Map<string, () => unknown>;
-
 export const adaAnAdmin = (): Api =>
   new Map<string, () => unknown>([
     ["session.member", () => adaAt("Admin")],
@@ -81,29 +80,30 @@ export const aSwitchInAnotherTab = (api: Api, role: Role, members = [ADA, HEDY])
   api.set("members.invitations", () => read([]));
 };
 
-export const heldBack = (api: Api, procedure: string, answer: unknown) => {
-  const asked = Promise.withResolvers<void>();
-  const held = Promise.withResolvers<void>();
-  api.set(procedure, () => {
-    asked.resolve();
-    return held.promise.then(() => answer);
-  });
-  return { asked: asked.promise, resolve: held.resolve };
-};
-
 const aTurnLater = () =>
   new Promise<void>((resolve) => {
     setTimeout(resolve);
   });
 
+/** A batch carries its inputs keyed by position, in the address of a read and the body of a write. */
+const inputsOf = (address: URL, init?: RequestInit): Readonly<Record<string, unknown>> => {
+  const raw = address.searchParams.get("input") ?? init?.body;
+  return typeof raw === "string" ? z.record(z.string(), z.unknown()).parse(JSON.parse(raw)) : {};
+};
+
 const answering =
   (api: Api) =>
-  async (asked: Asked): Promise<Response> => {
-    const { pathname } = addressOf(asked);
+  async (asked: Asked, init?: RequestInit): Promise<Response> => {
+    const address = addressOf(asked);
+    const { pathname } = address;
     await aTurnLater();
     if (!pathname.startsWith("/trpc/")) return answered(api.get(pathname)?.() ?? A_SESSION);
 
     const names = pathname.replace("/trpc/", "").split(",");
+    const inputs = inputsOf(address, init);
+    for (const [at, procedure] of names.entries()) {
+      server.asks.push({ procedure, input: inputs[String(at)] });
+    }
     const answers = names.map((name) => Promise.resolve(api.get(name)?.() ?? FORBIDDEN));
     return answered(await Promise.all(answers));
   };
@@ -143,6 +143,7 @@ export const drawnWithNoWorkspace = async () => {
 };
 
 export const openAt = async (path: string, api: Api) => {
+  server.asks = [];
   server.answer = answering(api);
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
