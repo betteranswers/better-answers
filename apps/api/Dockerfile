@@ -23,7 +23,7 @@
 # glibc today; an image is the wrong place to change a libc. Debian 13 (trixie) rather than
 # 12, because 12 has passed from Debian's security team to its long-term-support team, which
 # patches fewer packages.
-FROM node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c AS base
+FROM node:24.22.2-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446 AS base
 
 # pnpm's version is the root manifest's `packageManager` field and nowhere else:
 # `corepack install` with no argument reads it, so this image cannot carry a second pin that
