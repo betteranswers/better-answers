@@ -48,33 +48,6 @@ reviews:
       - .claude/settings.json
       - packages/schema/migrations/meta/**
 
-  custom_rules:
-    - name: Enforce Strict Maintainability Standards
-      description: |-
-        Review changes for structural maintainability regressions. Behavior-correct code can still violate this rule if it makes the codebase harder to understand, extend, or decompose.
-
-        Be ambitious about structural simplification. Look for reframings that delete whole branches, helpers, modes, conditionals, or layers instead of adding more of them. Prefer solutions that remove complexity rather than rearrange it.
-
-        Flag PRs that:
-        - Add ad-hoc conditionals, scattered special cases, one-off booleans, nullable modes, or flags into already busy shared flows instead of a dedicated abstraction, helper, state machine, policy object, or separate module.
-        - Introduce thin wrappers, identity abstractions, or pass-through helpers that add indirection without reducing complexity.
-        - Use brittle, ad-hoc, or "magic" mechanisms that hide simple data-shape assumptions.
-        - Rely on unnecessary casts, any, unknown, or optional parameters when a clearer type boundary or explicit model would simplify control flow.
-        - Use silent fallbacks to paper over unclear invariants instead of making the boundary explicit.
-        - Leak feature-specific logic into general-purpose or shared paths.
-        - Handle narrow edge cases in the middle of an already busy function.
-        - Refactor in ways that move complexity around without reducing the number of concepts a reader must hold in their head.
-        - Add "temporary" branching that is likely to become permanent debt.
-        - Serialize obviously independent work or leave related updates in a non-atomic shape when a cleaner structure is available.
-
-        Prioritize findings in this order:
-        1. Structural code-quality regressions
-        2. Missed opportunities for dramatic simplification
-        3. Spaghetti or branching complexity increases
-        4. Boundary, abstraction, or type-contract problems
-        5. File-size and decomposition concerns
-        6. Modularity and legibility concerns
-
 pr_descriptions:
   generate: false
   cubic_review_link: false
