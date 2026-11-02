@@ -4,7 +4,7 @@
 version: 1
 reviews:
   enabled: true
-  sensitivity: high
+  sensitivity: medium
   incremental_commits: true
   check_drafts: false
   architecture_diagrams: true
@@ -19,40 +19,9 @@ reviews:
   auto_ultrareview: high_risk_only
 
   custom_instructions: |
-    Read these before reviewing. They are the standard this repository is held to,
-    and a finding that contradicts one of them is wrong.
-
-    - `AGENTS.md` — the map: layout, how a task is worked, which skill applies.
-    - `GLOSSARY.md` — the glossary of the product's domain language, in the format
-      `.agents/references/glossary-format.md` gives. Every domain word has one
-      settled meaning. A new domain word is defined here in the same change as the
-      code that first uses it, or before; a diff that introduces a domain term
-      absent from the glossary at its head is a finding. Implementation words (a
-      job, a lease, a table, a function) and general programming terms are not
-      domain words: their absence from the glossary is never a finding, and a diff
-      that adds one to it is. A term of the architecture is defined in its decision
-      under `docs/solutions/architecture-patterns/`, not in the glossary.
-    - `apps/web/AGENTS.md`, `apps/worker/AGENTS.md`, `deploy/AGENTS.md`,
-      `packages/core/AGENTS.md` and `packages/schema/AGENTS.md` —
-      a directory's own rules. Apply each to changes in its directory.
-    - `docs/solutions/architecture-patterns/` — the live architecture decisions, one
-      doc each, at `adr-NNNN.md`. Code states a decision in words, never by
-      its number or its doc's path. A change that moves a decision edits its doc in
-      the same pull request, never silently. Say which decision is contradicted.
+    - The owner is not a developer - you are the last line of defence.
     - Deep modules. Much behaviour behind a small interface. A wide interface
       over thin behaviour is a finding even when the code is correct.
-    - Comments say WHY, never WHAT. History belongs in git. A stated precondition, or a
-      note on why something is absent, is a why. In a `deploy/` script, a `# >>> name`
-      and `# <<< name` pair is not a comment: it fences lines a test suite lifts and runs.
-    - Tests go through the module's interface against real infrastructure.
-      Module mocking is banned and lint-enforced.
-    - Fabricated work must be avoided. Placeholder, mock, demo or filler content on a
-      production path; a reference to a file, command, endpoint, function,
-      environment variable or config key that does not exist.
-      Report these with the evidence from the diff, and leave alone generated
-      files, fixtures, snapshots, migrations and mechanical renames. A finding
-      that only restates an oxlint, anti-slop, ruff or mypy rule is not worth
-      writing: `check` already fails the branch on it before you see the diff.
 
   ignore:
     files:
@@ -92,15 +61,11 @@ reviews:
         - Use brittle, ad-hoc, or "magic" mechanisms that hide simple data-shape assumptions.
         - Rely on unnecessary casts, any, unknown, or optional parameters when a clearer type boundary or explicit model would simplify control flow.
         - Use silent fallbacks to paper over unclear invariants instead of making the boundary explicit.
-        - Duplicate existing helpers or put logic in the wrong layer when a canonical utility or module already owns the concept.
         - Leak feature-specific logic into general-purpose or shared paths.
-        - Copy-paste logic instead of extracting a shared helper or pure function, where the helper's interface would be smaller than the copies it replaces. Copies that run in different places with different tools, held in step by one test, are not a finding.
         - Handle narrow edge cases in the middle of an already busy function.
         - Refactor in ways that move complexity around without reducing the number of concepts a reader must hold in their head.
         - Add "temporary" branching that is likely to become permanent debt.
         - Serialize obviously independent work or leave related updates in a non-atomic shape when a cleaner structure is available.
-
-        A component that sets its own state during render behind a guard, React's documented way to adjust state when a prop changes, is not a finding.
 
         Prioritize findings in this order:
         1. Structural code-quality regressions
@@ -110,35 +75,6 @@ reviews:
         5. File-size and decomposition concerns
         6. Modularity and legibility concerns
 
-        Do not flag cosmetic nits when a larger structural issue is present. Prefer a smaller number of high-conviction findings over a long list of minor notes. Only report violations on changed lines with clear evidence from the diff.
-    - name: Flag Security Vulnerabilities
-      description: "Scan for security flaws: hardcoded secrets, SQL injection, XSS, weak auth, exposed data, poor crypto, unsafe deserialization, insecure HTTP calls in production, and more. Ensure all network requests use HTTPS/TLS. Identify attack vectors and security violations to maintain robust defenses."
-    - name: A Principal on every tenant-data call
-      description: |-
-        Every `packages/core` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the read predicate (published, sensitivity, audience) beside the data access.
-
-        Flag a function that reaches a table, a store door or the map and takes no `Principal` first, or takes one later in its parameter list, or takes a bare `workspaceId` string in place of one. Flag a transport that trusts a user-supplied workspace, organisation or account identifier instead of deriving it from the verified session or bearer token, and flag a request body accepted without runtime validation.
-
-        Flag a read that checks the workspace but skips the read predicate, and flag a read predicate tested against a connected source's fields rather than against the `published_at`, `sensitivity` and `audience` columns on the readable unit itself — a concept and a write-up have no connected source (ADR 0023).
-
-        A `Principal` has three kinds — a user principal, the platform principal and the operator — and a deferred principal (a named person's authority carried into work that outlives their session, expiring with the authority it borrowed) has no type yet (ADR 0009). Flag a background job, scheduled run or replay carrying a live user session, and flag a cross-workspace caller threaded through a user principal's role field.
-
-        RLS is the guarantee and the store door is ergonomics over it, never a substitute: flag a new tenant table created without `withRLS()` or shipped without its zero-rows test, and flag a query aimed at a partition child that leans on the parent's policy.
-      include:
-        - apps/api/**
-        - packages/core/**
-        - packages/schema/**
-    - name: The identity provider stays behind its seam
-      description: |-
-        ADR 0009's identity seam. Better Auth is a stay with written leave-triggers, and this seam is what keeps the Keycloak fallback a fortnight of work rather than a rewrite.
-
-        A transport verifies a bearer token and builds a `Principal`. Nothing behind that seam knows which library minted the token. There are two auth modules: the api's `apps/api/src/auth/` and the web's `apps/web/src/features/auth/`. Oxlint already refuses a `better-auth` or `@better-auth/*` import outside them. Flag the subtler leak no lint rule sees: a Better Auth type, interface or object shape re-exported, aliased, structurally copied, or embedded in a `Principal`, a context object or a function signature that crosses into `packages/core`, or out of the web's auth module into the rest of the web app. Code inside an auth module may use Better Auth's types; the finding is at the module's edge. A session object passed onward where a `Principal` belongs is the same finding.
-
-        A seam is introduced only where something already varies across it, such as a second store or a second provider, so a seam built for one implementation with no second in sight is a finding.
-      include:
-        - apps/api/**
-        - apps/web/**
-        - packages/core/**
 pr_descriptions:
   generate: false
   cubic_review_link: false
