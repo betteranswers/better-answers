@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 
 import { pathWithAppleGit } from "@better-answers/schema/testing/apple-git";
 
+import { BySize } from "./test/support/shard/by-size.ts";
+
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
@@ -23,6 +25,7 @@ export default defineConfig({
 
     maxWorkers: 6,
 
+    sequence: { sequencer: BySize },
     isolate: false,
   },
 });
