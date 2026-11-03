@@ -137,10 +137,13 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
             webRequest.method === "HEAD" || BODY_FORBIDDEN_RESPONSE_STATUSES.has(status)
               ? null
               : Readable.toWeb(response);
-          // Guard: `Response` throws on a status outside 200–599, and a throw in this callback
-          // is uncaught, so it would end the process.
+          // A throw in this callback is uncaught and ends the process. @hono/node-server's global
+          // `Response` defers its status check, so the range is checked here.
           let reply: Response;
           try {
+            if (status < 200 || status > 599) {
+              throw new RangeError(`status ${status} is outside 200–599`);
+            }
             reply = new Response(body, {
               headers: responseHeaders(response.headers),
               status,

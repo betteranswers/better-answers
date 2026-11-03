@@ -26,5 +26,6 @@ export default defineConfig({
     maxWorkers: 6,
 
     sequence: { sequencer: BySize },
+    isolate: false,
   },
 });

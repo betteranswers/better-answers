@@ -26,5 +26,9 @@ export default mergeConfig(base, {
     env: { GITHUB_STEP_SUMMARY: "" },
 
     sequence: { sequencer: FailedThenShortest },
+
+    // Stryker runs every file in one worker, and a static mutant is live only in a module evaluated
+    // after Stryker activates it.
+    isolate: true,
   },
 });
