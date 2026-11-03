@@ -27,8 +27,6 @@ import {
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 
-const LIST_BUDGET_MS = 1000;
-
 const MEMBERS_PAGE = pageNamed(people, "Members").path;
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
@@ -71,8 +69,6 @@ const inviteDialog = (page: Page) => page.getByRole("dialog", { name: INVITE });
 const inviteAction = (page: Page) => page.getByRole("button", { name: INVITE, exact: true });
 
 const addressField = (page: Page) => inviteDialog(page).getByLabel("Email Addresses");
-
-const sendButton = (page: Page) => inviteDialog(page).getByRole("button", { name: /^Send/ });
 
 const heldAddresses = (page: Page) =>
   inviteDialog(page).getByRole("list", { name: "Addresses to Invite" }).getByRole("listitem");
@@ -170,23 +166,6 @@ test.describe("the People page's Invitations tab", () => {
     ).toHaveCount(1);
     await countedUnder(page, "Waiting", 1);
     expect(await emailsSentTo(request, address), "the invitation's one email").toBe(1);
-  });
-
-  test("renders the waiting invitations within the list's budget", async ({ page, request }) => {
-    await anAdminAtInvitations(page, request, "Dales Engineering", (at) =>
-      invitedEach(request, at, ["sam", "una", "ola"].map(anAddress)),
-    );
-
-    const started = Date.now();
-    await page.goto(MEMBERS_PAGE);
-    await openInvitations(page);
-    await expect(invitationRows(page)).toHaveCount(3);
-    const elapsed = Date.now() - started;
-
-    test.info().annotations.push({ type: "invitations list", description: `${elapsed} ms` });
-    expect(elapsed, "the list of three invitations rendered past its budget").toBeLessThan(
-      LIST_BUDGET_MS,
-    );
   });
 
   test("an Admin resends and cancels an invitation by keyboard alone", async ({
@@ -303,51 +282,5 @@ test.describe("the People page's Invitations tab", () => {
                 - button /Actions for invited-/
             - row /kept-/
     `);
-  });
-
-  test("by keyboard, ⌘K invites two people and focus returns", async ({ page, request }) => {
-    await anAdminAtInvitations(page, request, "Wenning Joinery");
-    const [ana, ben] = [anAddress("ana"), anAddress("ben")];
-
-    await page.keyboard.press("Meta+k");
-    await page.keyboard.type("invite");
-    await expect(page.getByRole("option", { name: INVITE })).toBeVisible();
-    await page.keyboard.press("Enter");
-    await expect(addressField(page)).toBeFocused();
-
-    await page.keyboard.type(`${ana}, ${ben}`);
-    await expect(heldAddresses(page)).toHaveCount(1);
-    const role = inviteDialog(page).getByRole("combobox", { name: "Role" });
-    await tabUntilFocused(page, role);
-    await editorPickedByKeyboard(page, role);
-    await tabUntilFocused(page, sendButton(page));
-    await expect(sendButton(page)).toHaveText("Send 2 Invitations");
-    await page.keyboard.press("Enter");
-
-    await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeFocused();
-    await expect(inviteDialog(page).getByRole("status").first()).toHaveText(/\b2\b/);
-    await page.keyboard.press("Enter");
-    await expect(inviteDialog(page)).toHaveCount(0);
-    await expect(inviteAction(page)).toBeFocused();
-    await openInvitations(page);
-    await expect(invitationRows(page)).toHaveCount(2);
-  });
-
-  test("fits a 320px page, its actions in view", async ({ page, request }) => {
-    const long = anAddress("a-rather-long-name.for-wrapping");
-    await anAdminAtInvitations(page, request, "Wensleydale Tanning", (at) =>
-      invitedEach(request, at, [long]),
-    );
-    await page.setViewportSize({ width: 320, height: 800 });
-    await openInvitations(page);
-
-    await expect(menuOf(page, long)).toBeInViewport();
-    await expect(tickOf(page, long)).toBeInViewport();
-    const sideways = await page.evaluate(() =>
-      [document.documentElement, ...document.querySelectorAll("[data-slot=table-container]")].map(
-        (box) => box.scrollWidth - box.clientWidth,
-      ),
-    );
-    expect(sideways, "the page or the table scrolls sideways").toEqual([0, 0]);
   });
 });

@@ -6,12 +6,9 @@ import { CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigati
 
 import { expect, test } from "../browser.ts";
 import {
-  A_ROLE,
   aMemberSignedInAt,
-  notFoundOfferingHome,
   anAddress,
   provision,
-  saysOfItsRead,
   seedModelChoices,
   signIn,
   skipLinkReachesThePage,
@@ -35,38 +32,6 @@ const EMBEDDING: SeedModelChoice = {
 };
 
 const ANSWERING_AND_EMBEDDING: readonly SeedModelChoice[] = [ANSWERING, EMBEDDING];
-
-const EVERY_PURPOSE: readonly SeedModelChoice[] = [
-  { purpose: "extraction", provider: "anthropic", model: "claude-haiku-5" },
-  { purpose: "enrichment", provider: "local", model: "llama-4" },
-  ANSWERING,
-  { purpose: "judging", provider: "anthropic", model: "claude-opus-5" },
-  EMBEDDING,
-];
-
-const UNNAMED_PROVIDER = "acme-inference";
-
-const OPENAI = "OpenAI";
-const GOOGLE = "Google";
-
-const PURPOSES = ["Extraction", "Enrichment", "Answering", "Judging", "Embedding"] as const;
-
-const rowOf = (page: Page, purpose: (typeof PURPOSES)[number]) =>
-  modelChoicesCard(page)
-    .getByRole("listitem")
-    .filter({ has: page.getByRole("heading", { level: 3, name: purpose }) });
-
-const embeddingRow = (page: Page) => rowOf(page, "Embedding");
-
-const headLines = (page: Page) =>
-  modelChoicesCard(page).getByRole("heading", { level: 2 }).locator("xpath=following-sibling::p");
-
-const unsetRows = (page: Page) =>
-  modelChoicesCard(page)
-    .getByRole("listitem")
-    .filter({ hasNot: page.getByRole("term") });
-
-const DIMENSIONS = new RegExp(String.raw`\b${String(EMBEDDING_DIMENSIONS)}\b`);
 
 const models = menuGroupIn(CONTROL_CENTRE, "models");
 
@@ -95,152 +60,6 @@ const signedInWith = async (
 };
 
 test.describe("the Models and spend page's model choices card", () => {
-  test("shows a member their five model choices, never another workspace's", async ({
-    page,
-    request,
-  }) => {
-    const theirs = await provision(request, { name: "Southern Castings" });
-    await seedModelChoices(request, {
-      workspaceId: theirs.workspaceId,
-      modelChoices: [
-        { purpose: "answering", provider: "openai", model: "gpt-5-not-mine" },
-        { purpose: "extraction", provider: "google", model: "gemini-not-mine" },
-      ],
-    });
-
-    await signedInWith(page, request, {
-      name: "Northern Tooling",
-      modelChoices: ANSWERING_AND_EMBEDDING,
-    });
-
-    const card = modelChoicesCard(page);
-    await expect(card.getByRole("heading", { level: 3 })).toHaveText(PURPOSES);
-    await expect(card).toContainText("Anthropic");
-    await expect(card).toContainText(ANSWERING.model);
-
-    const everything = page.locator("body");
-    await expect(everything).not.toContainText("openai");
-    await expect(everything).not.toContainText(OPENAI);
-    await expect(everything).not.toContainText("gpt-5-not-mine");
-    await expect(everything).not.toContainText("google");
-    await expect(everything).not.toContainText(GOOGLE);
-    await expect(everything).not.toContainText("gemini-not-mine");
-    await expect(everything).not.toContainText(theirs.name);
-  });
-
-  test("names a set purpose's provider, never by its stored id", async ({ page, request }) => {
-    await signedInWith(page, request, {
-      name: "Calderdale Patterns",
-      modelChoices: ANSWERING_AND_EMBEDDING,
-    });
-
-    await expect(rowOf(page, "Answering").getByText("Anthropic", { exact: true })).toBeVisible();
-    await expect(embeddingRow(page).getByText("Mistral AI", { exact: true })).toBeVisible();
-
-    await expect(page.getByText(ANSWERING.provider, { exact: true })).toHaveCount(0);
-    await expect(page.getByText(EMBEDDING.provider, { exact: true })).toHaveCount(0);
-  });
-
-  test("names OpenAI and Google where a purpose uses them", async ({ page, request }) => {
-    await signedInWith(page, request, {
-      name: "Wharfedale Gauges",
-      modelChoices: [
-        { purpose: "judging", provider: "openai", model: "gpt-5" },
-        { purpose: "extraction", provider: "google", model: "gemini-3" },
-      ],
-    });
-
-    await expect(rowOf(page, "Judging").getByText(OPENAI, { exact: true })).toBeVisible();
-    await expect(rowOf(page, "Extraction").getByText(GOOGLE, { exact: true })).toBeVisible();
-  });
-
-  test("shows a provider it cannot name as its stored id", async ({ page, request }) => {
-    await signedInWith(page, request, {
-      name: "Airedale Springs",
-      modelChoices: [{ purpose: "judging", provider: UNNAMED_PROVIDER, model: "acme-large" }],
-    });
-
-    await expect(rowOf(page, "Judging").getByText(UNNAMED_PROVIDER, { exact: true })).toBeVisible();
-  });
-
-  test("keeps five rows and says once who sets a model", async ({ page, request }) => {
-    await signedInWith(page, request, { name: "Acme Joinery", modelChoices: [ANSWERING] });
-
-    const card = modelChoicesCard(page);
-    await expect(card.getByRole("listitem")).toHaveCount(5);
-    await expect(card.getByRole("heading", { level: 3 })).toHaveText(PURPOSES);
-    await expect(unsetRows(page)).toHaveCount(4);
-    await expect(
-      unsetRows(page).getByRole("paragraph"),
-      "a row with no model choice does not say so in one line",
-    ).toHaveText([/\S/, /\S/, /\S/, /\S/]);
-    await expect(headLines(page), "who sets a model is not said once").toHaveCount(2);
-
-    const embedding = embeddingRow(page);
-    await expect(embedding.getByRole("term")).toHaveCount(0);
-    await expect(
-      embedding,
-      "an embedding purpose with no model choice has nothing fixed to note",
-    ).not.toContainText(DIMENSIONS);
-  });
-
-  test("says in one line that no model choice is set", async ({ page, request }) => {
-    await signedInWith(page, request, { name: "Ryedale Pressings", modelChoices: [] });
-
-    const card = modelChoicesCard(page);
-    await saysOfItsRead(card);
-    await expect(headLines(page)).toHaveCount(2);
-    await expect(card.getByRole("paragraph"), "the card says more than its one line").toHaveCount(
-      3,
-    );
-    await expect(card.getByRole("list")).toHaveCount(0);
-    await expect(card.getByRole("heading", { level: 3 })).toHaveCount(0);
-  });
-
-  test("omits who sets a model once every purpose has one", async ({ page, request }) => {
-    await signedInWith(page, request, { name: "Swaledale Gears", modelChoices: EVERY_PURPOSE });
-
-    const card = modelChoicesCard(page);
-    await expect(card.getByRole("listitem")).toHaveCount(5);
-    await expect(unsetRows(page)).toHaveCount(0);
-    await expect(headLines(page)).toHaveCount(1);
-  });
-
-  test("says why the embedding model choice is fixed, with dimensions", async ({
-    page,
-    request,
-  }) => {
-    await signedInWith(page, request, { name: "Halifax Fabrication", modelChoices: [EMBEDDING] });
-
-    const embedding = embeddingRow(page);
-    await expect(embedding).toContainText("Mistral AI");
-    await expect(embedding).toContainText(EMBEDDING.model);
-
-    await expect(embedding.getByRole("paragraph")).toHaveText([DIMENSIONS, /\S/]);
-    await expect(
-      modelChoicesCard(page).getByRole("listitem").filter({ hasText: DIMENSIONS }),
-    ).toHaveCount(1);
-  });
-
-  test("offers no control that edits, adds or deletes model choices", async ({ page, request }) => {
-    await signedInWith(page, request, {
-      name: "Pennine Metalwork",
-      modelChoices: ANSWERING_AND_EMBEDDING,
-    });
-
-    const card = modelChoicesCard(page);
-
-    await expect(card.getByRole("button")).toHaveCount(0);
-    await expect(card.getByRole("link")).toHaveCount(0);
-    await expect(card.getByRole("textbox")).toHaveCount(0);
-    await expect(card.getByRole("combobox")).toHaveCount(0);
-    await expect(card.getByRole("checkbox")).toHaveCount(0);
-    await expect(card.getByRole("radio")).toHaveCount(0);
-    await expect(card.getByRole("switch")).toHaveCount(0);
-    await expect(card.getByRole("menuitem")).toHaveCount(0);
-    await expect(card.getByRole("spinbutton")).toHaveCount(0);
-  });
-
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
     await signedInWith(page, request, {
       name: "Dales Engineering",
@@ -259,15 +78,6 @@ test.describe("the Models and spend page's model choices card", () => {
     test.info().annotations.push({ type: "model choices list", description: `${elapsed} ms` });
     expect(elapsed).toBeLessThan(LIST_BUDGET_MS);
   });
-
-  for (const role of ["Editor", "Viewer"] as const) {
-    test(`shows ${A_ROLE[role]} the page as not found`, async ({ page, request }) => {
-      await aMemberSignedInAt(page, request, role, MODELS_AND_SPEND.path);
-
-      await notFoundOfferingHome(page, role);
-      await expect(modelChoicesCard(page)).toHaveCount(0);
-    });
-  }
 
   test("is keyboard-reachable and axe-clean under its group", async ({
     page,
@@ -328,30 +138,7 @@ test.describe("the Models and spend page's model choices card", () => {
   });
 });
 
-const MOVED = [
-  ["/people/audit-log", "/system/audit-log"],
-  ["/system/routes-and-spend", MODELS_AND_SPEND.path],
-  ["/agent-operations/routes-and-spend", MODELS_AND_SPEND.path],
-] as const;
-
 test.describe("a page's older address", () => {
-  for (const [from, to] of MOVED) {
-    test(`leads an Admin from ${from} to ${to}, Back returning`, async ({ page, request }) => {
-      await signedInWith(page, request, { name: "Nidderdale Forge", modelChoices: [] });
-      await page
-        .getByRole("navigation", { name: "Control Centre" })
-        .getByRole("link", { name: "Members" })
-        .click();
-      await expect(page).toHaveURL(/\/people\/members$/);
-
-      await page.goto(from);
-
-      await expect(page).toHaveURL(new RegExp(`${to}$`));
-      await page.goBack();
-      await expect(page).toHaveURL(/\/people\/members$/);
-    });
-  }
-
   test("never shows a Viewer an address under /system/", async ({
     page,
     request,

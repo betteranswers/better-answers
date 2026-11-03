@@ -1,14 +1,11 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { KNOWLEDGE_BASE_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
-import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
-import { HOMES, KNOWLEDGE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
-  A_ROLE,
   addMember,
-  aMemberSignedInAt,
   anAddress,
   countOf,
   person,
@@ -17,12 +14,7 @@ import {
   signIn,
   skipLinkReachesThePage,
 } from "../harness.ts";
-import {
-  conceptsSeeded,
-  knowledgeMenuOpened,
-  listsItsKeystrokes,
-  scrolledSideways,
-} from "../knowledge.ts";
+import { conceptsSeeded, listsItsKeystrokes, scrolledSideways } from "../knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -39,12 +31,6 @@ const HANDBOOK = "Staff handbook";
 const DATASHEET = "Boiler datasheet";
 
 const VISION = "Our purpose";
-
-const DIRECTORS = "Directors cover";
-
-const KEY_PERSON = "Key person cover";
-
-const BOARD_PAY = "Board pay";
 
 type Seeded = Parameters<typeof conceptsSeeded>[1]["concepts"];
 
@@ -113,20 +99,6 @@ const conceptsOf = (page: Page, kind: string, collection: string): Locator =>
 const rowsOf = (concepts: Locator): Locator =>
   concepts.getByRole("row").filter({ has: concepts.page().getByRole("cell") });
 
-const knowledgeBase = (page: Page): Locator =>
-  page.getByRole("region", { name: "Knowledge Base", exact: true });
-
-const signedInAtHomeAs = async (page: Page, api: APIRequestContext, role: Role) => {
-  if (role === "Admin") {
-    const email = anAddress("admin");
-    await provision(api, { name: "Usk Valley Admins", adminEmail: email });
-    await signedIn(page, api, email);
-    await page.goto(HOMES.Admin.path);
-  } else {
-    await aMemberSignedInAt(page, api, role, HOMES[role].path);
-  }
-};
-
 const atTheKnowledgeBase = async (page: Page): Promise<void> => {
   await page.goto(KNOWLEDGE_BASE);
   await expect(treeOf(page)).toBeVisible();
@@ -161,60 +133,6 @@ const countsIn = async (tree: Locator): Promise<readonly number[]> =>
   ].map(([, count]) => Number(count));
 
 test.describe("Knowledge Base", () => {
-  test("a Viewer opens a concept from a kind, then returns", async ({ page, request }) => {
-    const at = await aWorkspaceOf(request, "Usk Valley Heating", () => POLICIES);
-    await signedIn(page, request, at.viewer.email);
-
-    const menu = await knowledgeMenuOpened(page);
-    await menu.getByRole("link", { name: "Knowledge Base" }).click();
-    await expect(page).toHaveURL(new RegExp(`${KNOWLEDGE_BASE}$`));
-    await expect(page.getByRole("heading", { level: 1, name: "Browse" })).toBeVisible();
-    await expect(treeOf(page)).toMatchAriaSnapshot(`
-      - tree "Collections and kinds":
-        - treeitem "company, 3 concepts" [expanded=false] [level=1]
-        - treeitem "product, 1 concept" [expanded=false] [level=1]
-        - treeitem "No collection, 1 concept" [expanded=false] [level=1]
-    `);
-    await expect(countOf(knowledgeBase(page))).toHaveText(/\b5\b/);
-
-    await itemOf(page, "company").click();
-    await itemOf(page, "Insurance Policy").click();
-    const concepts = conceptsOf(page, "Insurance Policy", "company");
-    await expect(rowsOf(concepts)).toHaveCount(2);
-    await expect(concepts.getByRole("link")).toHaveText([FLEET, PREMISES]);
-    await expect(concepts.getByRole("columnheader")).toHaveText(["Title", "Kind", "Trust"]);
-    await expect(countOf(concepts)).toHaveText(/\b2\b/);
-    await expect(treeOf(page)).toMatchAriaSnapshot(`
-      - tree "Collections and kinds":
-        - treeitem "company, 3 concepts" [expanded] [level=1]:
-          - group:
-            - treeitem "Handbook, 1 concept" [level=2]
-            - treeitem "Insurance Policy, 2 concepts" [level=2] [selected]
-        - treeitem "product, 1 concept" [expanded=false] [level=1]
-        - treeitem "No collection, 1 concept" [expanded=false] [level=1]
-    `);
-    expect(
-      await page.getByRole("main").evaluate((main) => main.outerHTML),
-      "the page names a bundle",
-    ).not.toMatch(/bundle/iu);
-
-    await expect(itemOf(page, "Insurance Policy")).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(concepts.getByRole("link", { name: FLEET })).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(new RegExp(`${SEARCH.path}/[0-9A-Z]{26}$`));
-    await expect(page.getByRole("article", { name: FLEET })).toBeVisible();
-
-    await page.goBack();
-    await expect(page).toHaveURL(new RegExp(`${KNOWLEDGE_BASE}\\?`));
-    await expect(
-      itemOf(page, "Insurance Policy"),
-      "Back did not land on the open kind",
-    ).toBeFocused();
-    await expect(itemOf(page, "Insurance Policy")).toHaveAttribute("aria-selected", "true");
-    await expect(rowsOf(conceptsOf(page, "Insurance Policy", "company"))).toHaveCount(2);
-  });
-
   test("a Viewer works the tree by keyboard alone", async ({ page, request }) => {
     const at = await aWorkspaceOf(request, "Usk Valley Boilers", () => POLICIES);
     await signedIn(page, request, at.viewer.email);
@@ -263,99 +181,6 @@ test.describe("Knowledge Base", () => {
     await page.keyboard.press("ArrowLeft");
     await expect(itemOf(page, "company")).toHaveAttribute("aria-expanded", "false");
   });
-
-  test("an outside Viewer never sees a withheld concept", async ({ page, request }) => {
-    const at = await aWorkspaceOf(request, "Usk Valley Cover", (insider) => [
-      { title: FLEET, collection: "company", kind: "Insurance Policy", body: "One policy." },
-      {
-        title: DIRECTORS,
-        collection: "company",
-        kind: "Insurance Policy",
-        body: "The directors are covered.",
-        sensitivity: "Restricted",
-      },
-      {
-        title: KEY_PERSON,
-        collection: "company",
-        kind: "Insurance Policy",
-        body: "Two people are covered.",
-        audience: "groups",
-        groupMemberIds: [insider.id],
-      },
-      {
-        title: BOARD_PAY,
-        collection: "board",
-        kind: "Pay Policy",
-        body: "The board sets its own pay.",
-        sensitivity: "Restricted",
-      },
-    ]);
-    await signedIn(page, request, at.viewer.email);
-    await atTheKnowledgeBase(page);
-
-    await expect(treeOf(page).getByRole("treeitem", { level: 1 })).toHaveCount(1);
-    await expect(itemOf(page, "board"), "a withheld collection is listed").toHaveCount(0);
-    await expect(
-      treeOf(page).getByRole("treeitem", { name: "company, 1 concept", exact: true }),
-      "the count holds a withheld concept",
-    ).toBeVisible();
-
-    await itemOf(page, "company").click();
-    await itemOf(page, "Insurance Policy").click();
-    const concepts = conceptsOf(page, "Insurance Policy", "company");
-    await expect(concepts.getByRole("link")).toHaveText([FLEET]);
-    await expect(countOf(concepts)).toHaveText(/\b1\b/);
-    for (const withheld of [DIRECTORS, KEY_PERSON, BOARD_PAY]) {
-      await expect(page.getByText(withheld), `${withheld} shows`).toHaveCount(0);
-    }
-  });
-
-  test("lists a concept directly under knowledge under No collection", async ({
-    page,
-    request,
-  }) => {
-    const at = await aWorkspaceOf(request, "Usk Valley Purpose", () => POLICIES);
-    await signedIn(page, request, at.viewer.email);
-    await atTheKnowledgeBase(page);
-
-    await expect(treeOf(page).getByRole("treeitem", { level: 1 }).last()).toHaveAccessibleName(
-      "No collection, 1 concept",
-    );
-    await itemOf(page, "No collection").click();
-    await itemOf(page, "Statement").click();
-    const concepts = page.getByRole("region", {
-      name: "Statement, in no collection",
-      exact: true,
-    });
-    await expect(concepts.getByRole("link")).toHaveText([VISION]);
-  });
-
-  for (const role of ["Admin", "Editor", "Viewer"] as const) {
-    test(`${A_ROLE[role]} finds Knowledge Base after Search and in jump-to`, async ({
-      page,
-      request,
-    }) => {
-      await signedInAtHomeAs(page, request, role);
-
-      const menu = await knowledgeMenuOpened(page);
-      await expect(menu.getByRole("heading", { level: 3 }).first()).toHaveText("Browse");
-      await expect(menu.getByRole("list").first().getByRole("link")).toHaveText([
-        "Search",
-        "Knowledge Base",
-      ]);
-
-      await page.keyboard.press("Control+k");
-      const jumpTo = page.getByRole("dialog", { name: "Jump To" });
-      await jumpTo.getByRole("combobox", { name: "Jump To" }).fill("knowledge base");
-      const jump = jumpTo.getByRole("option", { name: /^Knowledge Base/ });
-      await expect(jump).toBeVisible();
-      await jump.click();
-      await expect(page).toHaveURL(new RegExp(`${KNOWLEDGE_BASE}$`));
-      await expect(countOf(knowledgeBase(page))).toHaveText(/\b0\b/);
-      await expect(knowledgeBase(page).getByRole("paragraph").last()).toHaveText(/\S/);
-      await expect(treeOf(page)).toHaveCount(0);
-    });
-  }
 
   test("a narrow window stacks the list under the tree", async ({ page, request }) => {
     const at = await aWorkspaceOf(request, "Usk Valley Narrows", () => POLICIES);

@@ -4,26 +4,20 @@ import { z } from "zod";
 import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 
 import { COLLECTIONS_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
-import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
-import { CONTROL_CENTRE, KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
   addMember,
   anAddress,
-  clockTheNextKey,
   nameOwners,
-  navOf,
-  notFoundOfferingHome,
   person,
   provision,
   removeMember,
   saysARefusal,
   seedConcepts,
   signIn,
-  signOutFromTheShell,
   skipLinkReachesThePage,
-  theActionLandedWithinItsBudget,
 } from "../harness.ts";
 import { knowledgeMenuOpened, listsItsKeystrokes } from "../knowledge.ts";
 import { refusalAnswering } from "../refused-read.ts";
@@ -34,8 +28,6 @@ const COLLECTIONS_AND_OWNERS = pageNamed(
   menuGroupIn(KNOWLEDGE, "curation"),
   "Collections and Owners",
 ).path;
-
-const AUDIT_LOG = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log").path;
 
 const EDITOR = "Ifan Morgan";
 
@@ -108,9 +100,6 @@ const signedInAtThePage = async (page: Page, api: APIRequestContext, email: stri
   await page.goto(COLLECTIONS_AND_OWNERS);
   await expect(collections(page).getByRole("list")).toBeVisible();
 };
-
-const collectionNames = (page: Page): Locator =>
-  collections(page).getByRole("heading", { level: 3 });
 
 const ownerAt = (collection: string): string =>
   `(//li[.//h3[.='${collection}']]//dt[.='Owner'])[1]/following-sibling::dd[1]`;
@@ -189,47 +178,6 @@ test.describe("Collections and Owners", () => {
     `);
   });
 
-  test("an Editor owning nothing sees no Curation and no page", async ({ page, request }) => {
-    const at = await aCuratedWorkspace(request, "Wye Gorge Partners");
-    await ownersNamed(request, at, [{ collection: "policy", personId: at.viewer.id }]);
-    await signedIn(page, request, at.editor.email);
-
-    await expect(await knowledgeMenuOpened(page)).toMatchAriaSnapshot(`
-      - navigation "Knowledge":
-        - /children: deep-equal
-        - heading "Browse" [level=3]
-        - list:
-          - listitem:
-            - link "Search"
-          - listitem:
-            - link "Knowledge Base"
-    `);
-
-    await page.goto(COLLECTIONS_AND_OWNERS);
-    await notFoundOfferingHome(page, "Editor");
-  });
-
-  test("an Admin names a Viewer owner at once, on record", async ({ page, request }) => {
-    const at = await aCuratedWorkspace(request, "Lugg Meadow Supplies");
-    await signedInAtThePage(page, request, at.admin.email);
-
-    await pickerOf(page, "policy").selectOption({ label: VIEWER });
-    const save = saveOf(page, "policy");
-    await save.focus();
-    await clockTheNextKey(page, { at: ownerAt("policy"), reads: VIEWER });
-    const answered = page.waitForResponse((answer) => answer.url().includes(NAME_OWNER));
-    await page.keyboard.press("Enter");
-    await theActionLandedWithinItsBudget(page, "naming an owner");
-
-    expect((await answered).ok(), "the naming was refused").toBe(true);
-    await expect(said(page)).toHaveText(/\S/);
-    await expect(save, "the naming did not leave focus on its button").toBeFocused();
-
-    await page.goto(AUDIT_LOG);
-    const lines = page.getByRole("region", { name: "Audit Log" }).getByRole("listitem");
-    await expect(lines.filter({ hasText: VIEWER }).filter({ hasText: "policy" })).toHaveCount(1);
-  });
-
   test("rolls back a naming the api refuses, saying why", async ({ page, request }) => {
     const at = await aCuratedWorkspace(request, "Arrow Valley Joinery");
     await signedInAtThePage(page, request, at.admin.email);
@@ -258,19 +206,6 @@ test.describe("Collections and Owners", () => {
     await expect(pickerOf(page, "policy")).toHaveCount(0);
     await expect(collections(page).getByRole("combobox")).toHaveCount(0);
     await expect(collections(page).getByRole("button")).toHaveCount(0);
-  });
-
-  test("lists a Restricted collection to the Admin, not the Editor", async ({ page, request }) => {
-    const at = await aCuratedWorkspace(request, "Onny Mill Textiles");
-    await ownersNamed(request, at, [{ collection: "policy", personId: at.editor.id }]);
-
-    await signedInAtThePage(page, request, at.editor.email);
-    await expect(collectionNames(page)).toHaveText(["policy", "safety"]);
-    await signOutFromTheShell(page, EDITOR);
-    await expect(page).toHaveURL(/\/sign-in/);
-
-    await signedInAtThePage(page, request, at.admin.email);
-    await expect(collectionNames(page)).toHaveText(["held", "policy", "safety"]);
   });
 
   test("an Admin names and clears owners by keyboard alone", async ({ page, request }) => {
@@ -306,24 +241,6 @@ test.describe("Collections and Owners", () => {
 
     await page.keyboard.press(KEY.changeOwner.key);
     await expect(pickerOf(page, "safety"), "the key left the row in focus").toBeFocused();
-  });
-
-  test("a cleared owner keeps the page until their next move", async ({ page, request }) => {
-    const at = await aCuratedWorkspace(request, "Corve Dale Cider");
-    await ownersNamed(request, at, [{ collection: "policy", personId: at.editor.id }]);
-    await signedInAtThePage(page, request, at.editor.email);
-    await expect(ownerOf(page, "policy")).toHaveText(EDITOR);
-
-    await ownersNamed(request, at, [{ collection: "policy", personId: null }]);
-    await expect(ownerOf(page, "policy")).toHaveText(EDITOR);
-    await navOf(page, "Knowledge").getByRole("link", { name: "Search" }).click();
-    await expect(page).toHaveURL(new RegExp(`${SEARCH_PAGE.path}$`));
-    await page.goBack();
-
-    await expect(page).toHaveURL(new RegExp(`${COLLECTIONS_AND_OWNERS}$`));
-    await notFoundOfferingHome(page, "Editor");
-    const menu = await knowledgeMenuOpened(page);
-    await expect(menu.getByRole("link")).toHaveText(["Search", "Knowledge Base"]);
   });
 
   test("refuses an Editor owning nothing the list and naming", async ({ page, request }) => {

@@ -28,7 +28,7 @@ comment there says why it is not `pnpm run`. A spec builds its state through the
 `apps/web/e2e/harness.ts`, each of which calls `/__harness`, which
 `apps/api/tests/support/harness/harness-control.ts` mounts. Search both before adding an action.
 The actions include `provision`, `addMember`, `removeMember`, `endEverySignInAndToken`, `markTheOperator`,
-`invite`, `restored`, `seedModelChoices`, `seedConnectedSources`, `nameOwners`, `seedQuestions`,
+`invite`, `seedModelChoices`, `seedConnectedSources`, `nameOwners`, `seedQuestions`,
 `makeGroups` and `askToJoin`.
 
 ## The fixture module
@@ -65,8 +65,8 @@ WebAuthn domain over the DevTools protocol. It verifies its user and answers eve
 prompt shown, the email field's autofill included: a page opening the sign-in page while the
 device holds a passkey the platform keeps is signed in at once. Its `leftUnattended` leaves every
 prompt waiting, so that page signs in by email, and `attendedAgain` answers prompts again.
-`withoutWebAuthn` is a browser with none. `apps/web/e2e/auth/passkeys.spec.ts` is the worked example,
-and `apps/web/e2e/auth/confirm-recovery.spec.ts` signs in by email while the device holds a passkey.
+`apps/web/e2e/auth/passkeys.spec.ts` is the worked example, and `apps/web/e2e/auth/confirm-recovery.spec.ts`
+signs in by email while the device holds a passkey.
 
 ## Writing a spec
 
@@ -169,8 +169,7 @@ and `apps/web/e2e/auth/confirm-recovery.spec.ts` signs in by email while the dev
   every `.tsx` it loads with its own JSX runtime, so React cannot render a component a spec imports.
   `apps/web/e2e/drawn-parts.ts` builds a unit-suite harness through Vite from a virtual entry
   with `bundledHarness`, once per file, and `harnessDrawn` draws it on the SPA's origin under the
-  served stylesheets; `apps/web/e2e/shared/list-parts.spec.ts` and
-  `apps/web/e2e/shared/blueprint-parts.spec.ts` use it. The page carries only the served build's
+  served stylesheets; `apps/web/e2e/shared/list-parts.spec.ts` uses it. The page carries only the served build's
   stylesheet, so a class that appears in the harness alone is missing from it, with no error.
 
 ## The accessibility gate

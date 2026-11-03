@@ -123,9 +123,6 @@ const confirmationAged = z.object({ aged: z.boolean() });
 export const ageTheConfirmation = (api: APIRequestContext, userId: string) =>
   ask(api, "/confirmations/aged", { userId }, confirmationAged);
 
-export const ageThePendingHour = (api: APIRequestContext, userId: string) =>
-  ask(api, "/pending-sessions/aged", { userId }, confirmationAged);
-
 export const ageTheCode = (api: APIRequestContext, email: string) =>
   ask(api, "/codes/aged", { email }, confirmationAged);
 
@@ -153,9 +150,6 @@ export const enrolledWith = (
 
 export const withAnAuthenticator = async (api: APIRequestContext, email: string) =>
   (await enrolledWith(api, email)).key;
-
-export const restored = async (api: APIRequestContext, email: string) =>
-  (await ask(api, "/restores", { email }, codeSent)).code;
 
 export const CLAUDES_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback";
 
@@ -232,16 +226,6 @@ export const claudeRefreshes = async (
   expect(refreshed.ok(), `the refresh answered ${refreshed.status()}`).toBe(true);
   const tokens = z.object({ refresh_token: z.string() }).parse(await refreshed.json());
   return { refreshToken: tokens.refresh_token };
-};
-
-export const claudeDisconnects = async (
-  api: APIRequestContext,
-  refreshToken: string,
-): Promise<void> => {
-  const revoked = await api.post("/oauth2/revoke", {
-    form: { client_id: CLAUDE.client_id, token: refreshToken, token_type_hint: "refresh_token" },
-  });
-  expect(revoked.ok(), `the revocation answered ${revoked.status()}`).toBe(true);
 };
 
 export type SeedModelChoice = {
@@ -399,17 +383,6 @@ export const seedEditSuggestion = (
   api: APIRequestContext,
   input: { workspaceId: string; userId: string; iri: string; title?: string; body?: string },
 ) => ask(api, "/suggestions", input, editSuggested);
-
-const commitAuthors = z.object({ authors: z.array(z.string()) });
-
-export const commitAuthorsOf = async (
-  api: APIRequestContext,
-  input: { workspaceId: string; iri: string },
-) => {
-  const answered = await api.get(`${HARNESS}/commit-authors`, { params: input });
-  expect(answered.ok(), `the commit authors answered ${answered.status()}`).toBe(true);
-  return commitAuthors.parse(await answered.json());
-};
 
 type SeedFlag = {
   readonly reason: (typeof FEEDBACK_REASONS)[number];

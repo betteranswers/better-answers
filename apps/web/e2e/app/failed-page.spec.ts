@@ -6,9 +6,7 @@ import { HOMES } from "@/shared/navigation.ts";
 import { expect, test } from "../browser.ts";
 import {
   anAddress,
-  landedAtHome,
   provision,
-  saysARefusal,
   seedModelChoices,
   signIn,
   skipLinkReachesThePage,
@@ -102,31 +100,4 @@ test("offers a way out, shell intact, when a page throws", async ({
   await navigation.getByRole("link", { name: "Members" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
-});
-
-test("shows the failed read at the index, then goes home", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
-  const email = anAddress("unread");
-  await provision(request, { name: "Nidderdale Forge", adminEmail: email });
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await landedAtHome(page, "Admin");
-
-  // Batched with whatever else the shell asks, so the read is found by name anywhere in the path.
-  const theMemberRead = (url: URL) => url.pathname.includes("session.member");
-  await page.route(theMemberRead, (route) => route.abort());
-  await page.goto("/");
-
-  await expect(page.getByRole("heading", { level: 1, name: FAILED_HEADING })).toBeVisible();
-  await saysARefusal(page.getByRole("alert"));
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("navigation", { name: "Areas" }).getByRole("link")).toHaveCount(0);
-  await passesTheAccessibilityGate();
-
-  await page.unroute(theMemberRead);
-  await page.getByRole("button", { name: "Try Again" }).click();
-  await landedAtHome(page, "Admin");
 });

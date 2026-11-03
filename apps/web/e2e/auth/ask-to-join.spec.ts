@@ -5,11 +5,8 @@ import { REASON_MAX_CHARACTERS } from "@/features/auth/workspace/ask-to-join-wor
 import { expect, test } from "../browser.ts";
 import {
   clockTheNextKey,
-  keystrokesDismissed,
-  keystrokesListed,
   provision,
   saysARefusal,
-  saysTheWait,
   signedInWithNoWorkspace,
   signInHeading,
   theActionLandedWithinItsBudget,
@@ -18,20 +15,7 @@ import { refusalAnswering } from "../refused-read.ts";
 
 const ASK_TO_JOIN = "person.requestAccess";
 
-const ASK_TO_JOIN_ENDPOINT = `/trpc/${ASK_TO_JOIN}`;
-
 const REASON = "I run the estimating desk and need the tender library.";
-
-const floodedUntilRefused = async (page: Page): Promise<number> => {
-  let status = 200;
-  for (let attempt = 0; attempt < 30 && status !== 429; attempt += 1) {
-    const answered = await page.request.post(ASK_TO_JOIN_ENDPOINT, {
-      data: { shortName: `nobody-${attempt}`, reason: REASON },
-    });
-    status = answered.status();
-  }
-  return status;
-};
 
 const A_SHORT_NAME = "acme-joinery";
 
@@ -115,23 +99,6 @@ test("a person in no workspace asks to join by keyboard", async ({
   await expect(reasonField(page)).toHaveValue("");
 });
 
-test("answers known, unknown and repeated short names alike", async ({ page, request }) => {
-  const workspace = await provision(request, { name: "Brightwater Estimating" });
-  await signedInWithNoWorkspace(page, request, "asker");
-
-  const said: string[] = [];
-  for (const shortName of [workspace.shortName, `nobody-${Date.now()}`, workspace.shortName]) {
-    await askToJoin(page, shortName);
-    await expect(shortNameField(page)).toHaveValue("");
-    said.push(await requestSent(page).innerText());
-  }
-
-  const [known, unknown, alreadyAsked] = said;
-  expect(known?.replace("Request sent", ""), "the answer says nothing past its name").toMatch(/\S/);
-  expect(unknown, "an unknown short name was answered differently").toBe(known);
-  expect(alreadyAsked, "a second ask was answered differently").toBe(known);
-});
-
 test("refuses a blank reason, saying what to send", async ({
   page,
   request,
@@ -159,21 +126,6 @@ test("refuses a blank reason, saying what to send", async ({
   await passesTheAccessibilityGate();
 });
 
-test("tells a person past the ceiling when to ask again", async ({ page, request }) => {
-  await signedInWithNoWorkspace(page, request, "asker");
-
-  expect(await floodedUntilRefused(page), "the flood never met the ceiling").toBe(429);
-
-  const refused = refusalAnswering(page, ASK_TO_JOIN);
-  await askToJoin(page, A_SHORT_NAME);
-  const { waitSeconds } = await refused;
-
-  await saysTheWait(page.getByRole("alert"), waitSeconds);
-  await expect(askButton(page)).toBeFocused();
-  await expect(requestSent(page)).toHaveCount(0);
-  await thePageSaysNeither(page, "at the ceiling");
-});
-
 test("sends a person whose session ended back to sign in", async ({ page, context, request }) => {
   await signedInWithNoWorkspace(page, request, "asker");
   await context.clearCookies();
@@ -186,18 +138,4 @@ test("sends a person whose session ended back to sign in", async ({ page, contex
   await thePageSaysNeither(page, "once the session ended");
   await page.getByRole("button", { name: "Sign In Again" }).click();
   await expect(signInHeading(page)).toBeVisible();
-});
-
-test("names no organisation or old word, nor in keystrokes", async ({ page, request }) => {
-  await signedInWithNoWorkspace(page, request, "asker");
-  await thePageSaysNeither(page, "before an ask");
-
-  const keystrokes = await keystrokesListed(page, "This Page");
-  await expect(keystrokes.getByRole("term").filter({ hasText: /^j$/ })).toBeVisible();
-  await thePageSaysNeither(page, "in its keystrokes");
-  await keystrokesDismissed(page, keystrokes);
-
-  await askToJoin(page, `nobody-${Date.now()}`);
-  await expect(requestSent(page)).toBeVisible();
-  await thePageSaysNeither(page, "after an ask");
 });

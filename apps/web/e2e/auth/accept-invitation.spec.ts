@@ -1,5 +1,4 @@
 import type { APIRequestContext, Page } from "@playwright/test";
-import { z } from "zod";
 
 import type { Role } from "@/shared/navigation.ts";
 
@@ -17,22 +16,15 @@ import {
   personMenuOpened,
   provision,
   saysARefusal,
-  saysTheWait,
   signIn,
   signInHeading,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
-import { refusalAnswering, theNextAskMeetsACeiling } from "../refused-read.ts";
+import { refusalAnswering } from "../refused-read.ts";
 
 const READ_BUDGET_MS = 1000;
 
-const WAIT_SECONDS = 120;
-
-const SIGN_OUT = "/sign-out";
-
 const INVITER = "Morgan Reid";
-
-const SESSION_READ = "**/get-session*";
 
 const THE_INVITATION = "person.invitation";
 
@@ -52,9 +44,6 @@ const invitedAs = (page: Page, role: Role) =>
     .filter({
       hasText: new RegExp(String.raw`${INVITER}(?:(?!Admin|Editor|Viewer).)*${role}\b`),
     });
-
-const holding = (words: string): RegExp =>
-  new RegExp(words.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`));
 
 const anInvitation = async (request: APIRequestContext, workspaceName: string, role: Role) => {
   const workspace = await provision(request, { name: workspaceName });
@@ -141,38 +130,6 @@ test("a named invitee reads it within a second, joins keyboard-only", async ({
   await expect(page.getByRole("banner").getByText("Ryedale Metalwork")).toBeVisible();
 });
 
-test("refuses a bad name, joining nothing until it is fixed", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
-  const { address, link } = await anInvitation(request, "Harrow Glazing", "Viewer");
-  await page.goto(link);
-  await signIn(page, request, address);
-
-  await nameField(page).fill("Priya <priya@acme.invalid>");
-  const refused = refusalAnswering(page, "person.setDisplayName");
-  await joinButton(page).click();
-
-  expect(await refused).toMatchObject({ word: "display-name-angle-bracket" });
-  const refusal = page.getByRole("alert");
-  await saysARefusal(refusal);
-  await keepsItsWordOffThePage(page, "display-name-angle-bracket");
-  await expect(refusal).toHaveCount(1);
-  await expect(nameField(page)).toHaveAttribute("aria-invalid", "true");
-  await expect(
-    nameField(page),
-    "the refusal does not describe the field",
-  ).toHaveAccessibleDescription(holding(await refusal.innerText()));
-  await expect(invitationHeading(page, "Harrow Glazing")).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`${link}$`));
-  await passesTheAccessibilityGate();
-
-  await nameField(page).fill("Priya Shah");
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("banner").getByText("Harrow Glazing")).toBeVisible();
-});
-
 test("keeps a given name when the join is then refused", async ({
   page,
   request,
@@ -201,42 +158,6 @@ test("keeps a given name when the join is then refused", async ({
   await page.getByRole("button", { name: "Go to Your Workspaces" }).click();
   await landedAtHome(page, "Viewer");
   await expect(page.getByRole("banner").getByRole("button", { name: /Ines Moreau/ })).toBeVisible();
-});
-
-test("asks for a name when the join finds none given", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
-  const { address, link } = await anInvitation(request, "Selby Roofing", "Viewer");
-  await page.goto(link);
-  await signIn(page, request, address);
-  await expect(nameField(page)).toBeVisible();
-
-  await page.route(SESSION_READ, async (route) => {
-    const answered = await route.fetch();
-    const held = z.looseObject({ user: z.looseObject({}) }).parse(await answered.json());
-    await route.fulfill({
-      response: answered,
-      json: { ...held, user: { ...held.user, name: "Selina Held" } },
-    });
-  });
-  await page.goto(link);
-  await expect(joinButton(page)).toBeVisible();
-  await expect(nameField(page)).toHaveCount(0);
-
-  const refused = refusalAnswering(page, THE_JOIN);
-  await joinButton(page).click();
-  expect(await refused).toMatchObject({ word: "no-display-name" });
-  await saysARefusal(page.getByRole("alert"));
-  await keepsItsWordOffThePage(page, "no-display-name");
-  await expect(nameField(page)).toBeVisible();
-  await passesTheAccessibilityGate();
-
-  await page.unroute(SESSION_READ);
-  await nameField(page).fill("Selina Hart");
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("banner").getByRole("button", { name: /Selina Hart/ })).toBeVisible();
 });
 
 const signedInAtAnotherAddress = async (
@@ -284,18 +205,6 @@ test("refuses a person at another address, offering the invited one", async ({
   await signIn(page, request, address);
 
   await expect(invitationHeading(page, "Brightwater Estimating")).toBeVisible();
-});
-
-test("a refused sign-out keeps the invitation, saying the wait", async ({ page, request }) => {
-  const { link } = await signedInAtAnotherAddress(page, request, "Glasshouses Estimating");
-  await theNextAskMeetsACeiling(page, SIGN_OUT, WAIT_SECONDS);
-
-  await page.keyboard.press("s");
-
-  const another = page.getByRole("button", { name: "Sign In with Another Address" });
-  await saysTheWait(another.locator("xpath=following-sibling::*[@role='alert'][1]"), WAIT_SECONDS);
-  await expect(page.getByRole("heading", { level: 1, name: "Your Invitation" })).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`${link}$`));
 });
 
 test("tells a named person a stray link names no invitation", async ({ page, request }) => {

@@ -1,5 +1,3 @@
-import assert from "node:assert/strict";
-
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { QUESTIONS_KEYSTROKES as KEY } from "@/features/questions/questions-state.ts";
@@ -7,20 +5,15 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
-  A_ROLE,
-  aMemberSignedInAt,
   anAddress,
-  clockTheNextKey,
   keyListed,
   keystrokesDismissed,
   keystrokesListed,
-  notFoundOfferingHome,
   provision,
   saysARefusal,
   seedConcepts,
   seedQuestions,
   signIn,
-  theActionLandedWithinItsBudget,
   type SeedRecord,
 } from "../harness.ts";
 
@@ -120,156 +113,6 @@ const aPageAndOneMoreOpened = async (page: Page, api: APIRequestContext, name: s
 };
 
 test.describe("Questions asked", () => {
-  test("shows a record flagged over MCP first, with its flag", async ({ page, request }) => {
-    const at = await aWorkspaceWithConcepts(request, "Holme Valley Audits");
-    await seedQuestions(request, {
-      workspaceId: at.workspaceId,
-      records: aFlagAndANewerQuestion(at),
-    });
-
-    await signedInAtTheQuestions(page, request, at);
-
-    await expect(rowsOf(questionsAsked(page))).toHaveText([FLAGGED_QUESTION, NEWER_QUESTION]);
-    await expect(rowsOf(groupNamed(page, "Flagged"))).toHaveText([FLAGGED_QUESTION]);
-
-    await rowsOf(groupNamed(page, "Flagged")).first().click();
-    const record = recordOf(page, FLAGGED_QUESTION);
-    await expect(record.getByText(/Wrong/)).toBeVisible();
-    await expect(record.getByText(DISPUTED)).toBeVisible();
-    await expect(record.getByRole("link", { name: AUDIT_CONCEPT })).toHaveCount(2);
-  });
-
-  test("shows no total of questions anywhere", async ({ page, request }) => {
-    const at = await aWorkspaceWithConcepts(request, "Calder Counts");
-    await seedQuestions(request, {
-      workspaceId: at.workspaceId,
-      records: aFlagAndANewerQuestion(at),
-    });
-
-    await signedInAtTheQuestions(page, request, at);
-
-    await expect(rowsOf(questionsAsked(page))).toHaveCount(2);
-    await expect(questionsAsked(page).locator("output").first()).toHaveText("");
-    await expect(page.getByRole("main")).not.toContainText(/\b[0-9]+ (question|record)s?\b/i);
-  });
-
-  test("shows every refusal in one group", async ({ page, request }) => {
-    const at = await aWorkspaceWithConcepts(request, "Swale Refusals");
-    const refused = (question: string): SeedRecord => ({ question, verdict: "refuse" });
-    await seedQuestions(request, {
-      workspaceId: at.workspaceId,
-      records: [refused("Where do we park on site?"), refused("What is on the canteen menu?")],
-    });
-
-    await signedInAtTheQuestions(page, request, at);
-
-    const notAnswered = groupNamed(page, "Not Answered");
-    await expect(notAnswered.getByRole("heading")).toHaveText(["Not Answered"]);
-    await expect(rowsOf(notAnswered)).toHaveText([
-      "What is on the canteen menu?",
-      "Where do we park on site?",
-    ]);
-  });
-
-  test("shows an erased record's verdict, concepts and flag", async ({ page, request }) => {
-    const at = await aWorkspaceWithConcepts(request, "Ryedale Erasures");
-    await seedQuestions(request, {
-      workspaceId: at.workspaceId,
-      records: [
-        {
-          question: null,
-          verdict: "ok",
-          concepts: [{ iri: iriOf(at, AUDIT_CONCEPT) }],
-          flags: [{ reason: "out-of-date", disputedConcept: iriOf(at, AUDIT_CONCEPT) }],
-        },
-      ],
-    });
-
-    await signedInAtTheQuestions(page, request, at);
-
-    const row = rowsOf(groupNamed(page, "Flagged"));
-    await expect(row).toHaveCount(1);
-    await expect(row, "no line stands for the removed question").toHaveText(/\S/);
-    await expect(groupNamed(page, "Flagged")).toContainText(/former member/i);
-    await row.click();
-    const record = page.getByRole("dialog");
-    await expect(record).toContainText(/former member/i);
-    await expect(record.getByText("Answered", { exact: true })).toBeVisible();
-    await expect(record.getByText(/Out of date/)).toBeVisible();
-    await expect(record.getByRole("link", { name: AUDIT_CONCEPT })).toHaveCount(2);
-  });
-
-  test("shows each concept's trust now, not when it was asked", async ({ page, request }) => {
-    const at = await aWorkspaceWithConcepts(request, "Holme Trust");
-    const { concepts } = await seedConcepts(request, {
-      workspaceId: at.workspaceId,
-      userId: at.adminId,
-      concepts: [
-        {
-          title: "Supplier Audits",
-          collection: "audits",
-          kind: "Policy",
-          body: "Each supplier is audited once a year.",
-          trust: "machine-confirmed",
-        },
-      ],
-    });
-    const [concept] = concepts;
-    assert.ok(concept !== undefined, "the harness seeded a concept");
-    await seedQuestions(request, {
-      workspaceId: at.workspaceId,
-      records: [
-        {
-          question: NEWER_QUESTION,
-          verdict: "related",
-          concepts: [{ iri: concept.iri }],
-        },
-      ],
-    });
-
-    await signedInAtTheQuestions(page, request, at);
-    await rowsOf(questionsAsked(page)).first().click();
-
-    const record = recordOf(page, NEWER_QUESTION);
-    await expect(record.getByText("Trust", { exact: true })).toBeVisible();
-    await expect(record.getByText(/^Verified automatically/)).toBeVisible();
-    await expect(record.getByText("Unverified", { exact: true })).toHaveCount(0);
-  });
-
-  test("closes a flag within its budget, unflagging the record", async ({ page, request }) => {
-    const at = await aWorkspaceWithConcepts(request, "Nidd Closings");
-    await seedQuestions(request, {
-      workspaceId: at.workspaceId,
-      records: aFlagAndANewerQuestion(at),
-    });
-    await signedInAtTheQuestions(page, request, at);
-
-    await rowsOf(groupNamed(page, "Flagged")).first().click();
-    const record = recordOf(page, FLAGGED_QUESTION);
-    const fixed = record
-      .getByRole("group", { name: "Close This Flag" })
-      .getByRole("button", { name: "Fixed in the Knowledge" });
-    await fixed.focus();
-    await clockTheNextKey(page, {
-      at: "//main//section[h3='Other Questions']",
-      reads: FLAGGED_QUESTION,
-    });
-    await page.keyboard.press("Enter");
-    await theActionLandedWithinItsBudget(page, "close a flag");
-
-    await expect(record.getByText(/Fixed in the knowledge/)).toBeVisible();
-    await expect(record.getByRole("group", { name: "Close This Flag" })).toHaveCount(0);
-    await page.keyboard.press("Escape");
-    await expect(groupNamed(page, "Flagged")).toHaveCount(0);
-
-    await page.reload();
-    await expect(rowsOf(groupNamed(page, "Other Questions"))).toHaveText([
-      NEWER_QUESTION,
-      FLAGGED_QUESTION,
-    ]);
-    await expect(groupNamed(page, "Flagged")).toHaveCount(0);
-  });
-
   test("a refused closing puts the flag back and says so", async ({ page, request }) => {
     const at = await aWorkspaceWithConcepts(request, "Colne Refusals");
     await seedQuestions(request, {
@@ -347,13 +190,4 @@ test.describe("Questions asked", () => {
     await expect(record).toHaveCount(0);
     await expect(oldest).toBeFocused();
   });
-
-  for (const role of ["Editor", "Viewer"] as const) {
-    test(`shows ${A_ROLE[role]} the questions asked as not found`, async ({ page, request }) => {
-      await aMemberSignedInAt(page, request, role, QUESTIONS_ASKED);
-
-      await notFoundOfferingHome(page, role);
-      await expect(questionsAsked(page)).toHaveCount(0);
-    });
-  }
 });

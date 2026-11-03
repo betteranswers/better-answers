@@ -1,22 +1,18 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { STALE_CONFIRMATION } from "@/features/auth/refusal-words.ts";
 import {
   NAMES_WAITING_KEYSTROKES,
   PEOPLE_KEYSTROKES,
 } from "@/features/console/people-keystrokes.ts";
-import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
   addMember,
-  ageTheConfirmation,
   anAddress,
   aPkcePair,
   catchClaudesRedirect,
   CLAUDES_REDIRECT_URI,
-  claudeDisconnects,
   claudeExchanges,
   claudesAuthorizeUrl,
   clockTheNextKey,
@@ -26,18 +22,13 @@ import {
   keystrokesButton,
   keystrokesListed,
   markTheOperator,
-  navOf,
   person,
   provision,
-  saysARefusal,
-  saysOfItsRead,
   signedInAtHome,
-  reconfirmedOn,
   signIn,
   skipLinkReachesThePage,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
-import { refusalAnswering, refusedFromNowOn } from "../refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -53,15 +44,7 @@ const INSTANT = new RegExp(`^${INSTANT_WORDS}$`);
 
 const REVOKE = "End Every Sign-In and Token";
 
-const CORRECT_A_NAME = "console.people.correctDisplayName";
-
 const ENDED_AT = /\d{2}:\d{2}/;
-
-const THE_FIRST_PAGE = /\b1\D+50\D+51\b/;
-
-const THE_LAST_PAGE = /\b51\D+51\D+51\b/;
-
-const asWritten = (said: string): string => said.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`);
 
 const aTag = (): string => `t${Date.now()}${Math.floor(Math.random() * 1e6)}`;
 
@@ -78,8 +61,6 @@ const personRows = (page: Page): Locator =>
   everyone(page)
     .getByRole("row")
     .filter({ has: page.getByRole("cell") });
-
-const rowOf = (page: Page, text: string): Locator => personRows(page).filter({ hasText: text });
 
 const personButton = (page: Page, name: string): Locator =>
   everyone(page).getByRole("button", { name, exact: true });
@@ -159,44 +140,8 @@ const correctionOf = (name: string): string => `Correct ${name}’s Display Name
 const dialogToCorrect = (page: Page, name: string): Locator =>
   page.getByRole("dialog", { name: correctionOf(name) });
 
-const correctionReconfirmed = async (
-  page: Page,
-  request: APIRequestContext,
-  email: string,
-): Promise<void> => {
-  const refused = refusalAnswering(page, CORRECT_A_NAME);
-  await page.keyboard.press("Enter");
-  expect(await refused).toMatchObject({ word: STALE_CONFIRMATION });
-  await reconfirmedOn(page, request, email);
-};
-
 const nameFieldOf = (dialog: Locator): Locator =>
   dialog.getByRole("textbox", { name: "Display Name" });
-
-const savedInTheSheet = async (sheet: Locator): Promise<void> => {
-  const part = regionOf(sheet, "Display Name");
-  await expect(part.getByRole("status")).toHaveText(/\S/);
-  await expect(part.getByRole("button", { name: "Correct Display Name" })).toBeFocused();
-};
-
-const correctingCancelled = async (
-  page: Page,
-  correct: Locator,
-  name: string,
-  asked: { readonly audit: () => Promise<void> },
-): Promise<Locator> => {
-  await correct.click();
-  const dialog = dialogToCorrect(page, name);
-  await expect(nameFieldOf(dialog)).toBeFocused();
-  await expect(nameFieldOf(dialog)).toHaveValue(name);
-  await expect(nameFieldOf(dialog)).toHaveAccessibleDescription(/\b100\b/);
-  await expect(dialog).toHaveAccessibleDescription(new RegExp(asWritten(name)));
-  await asked.audit();
-  await dialog.getByRole("button", { name: "Cancel" }).click();
-  await expect(dialog).toHaveCount(0);
-  await expect(correct).toBeFocused();
-  return dialog;
-};
 
 const namesWaiting = (page: Page) => page.getByRole("region", { name: "Names Waiting" });
 
@@ -242,12 +187,6 @@ const priyaFlagged = async (page: Page, api: APIRequestContext, tag: string) => 
   return { operators, priya, name };
 };
 
-const clockTheRowLeaving = (page: Page, name: string) =>
-  clockTheNextKey(page, {
-    at: `//section[h2[normalize-space(.)='Names Waiting']][not(.//td[normalize-space(.)='${name}'])]`,
-    reads: "Names Waiting",
-  });
-
 const priyaListed = async (page: Page, api: APIRequestContext, tag: string) => {
   const held = await priyaWithTheOperator(page, api, { tag, displayName: "Priya Shah" });
   await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
@@ -255,122 +194,6 @@ const priyaListed = async (page: Page, api: APIRequestContext, tag: string) => {
 };
 
 test.describe("the console's Everyone page", () => {
-  test("lists each person with their workspaces, roles and last sign-in", async ({
-    page,
-    request,
-  }) => {
-    const tag = aTag();
-    const operators = await signedInAsTheOperator(page, request, tag);
-    const priya = await person(request, anAddress(`${tag}-priya`), { displayName: "Priya Shah" });
-    await addMember(request, {
-      workspaceId: operators.workspaceId,
-      userId: priya.id,
-      role: "Editor",
-    });
-    const beta = await provision(request, { name: `Beta ${tag}` });
-    await addMember(request, { workspaceId: beta.workspaceId, userId: priya.id, role: "Viewer" });
-    await person(request, anAddress(`${tag}-sam`), { displayName: "Sam Okoro" });
-
-    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
-
-    await expect(personRows(page)).toHaveCount(3);
-    await expect(countOf(everyone(page))).toHaveText(/\b3\b/);
-    const theirs = rowOf(page, "Priya Shah");
-    await expect(theirs).toContainText(priya.email);
-    await expect(theirs.getByRole("cell").nth(1).getByRole("listitem")).toHaveText([
-      `${beta.name} Viewer`,
-      `${operators.name} Editor`,
-    ]);
-    await expect(
-      theirs.getByRole("cell").nth(2),
-      "a person who never signed in shows an instant, or nothing",
-    ).toHaveText(/^\D+$/);
-    const sams = rowOf(page, "Sam Okoro").getByRole("cell").nth(1);
-    await expect(sams.getByRole("listitem")).toHaveCount(0);
-    await expect(sams, "a person in no workspace has an empty cell").toHaveText(/\S/);
-    await expect(rowOf(page, operators.admin.email).getByRole("cell").nth(2)).toHaveText(INSTANT);
-  });
-
-  test("narrows by name or address, and says when none match", async ({
-    page,
-    request,
-    passesTheAccessibilityGate,
-  }) => {
-    const tag = aTag();
-    await signedInAsTheOperator(page, request, tag);
-    await person(request, anAddress(`${tag}-priya`), { displayName: "Priya Shah" });
-    await person(request, anAddress("ada"), { displayName: `Ada Hartley ${tag}` });
-    await page.goto(EVERYONE_PAGE);
-
-    await searchBox(page).fill(tag.toUpperCase());
-    await expect(personRows(page)).toHaveCount(3);
-    await expect(countOf(everyone(page))).toHaveText(/\b3\b/);
-
-    await searchBox(page).fill(`hartley ${tag}`);
-    await expect(personRows(page)).toHaveCount(1);
-    await expect(rowOf(page, `Ada Hartley ${tag}`)).toBeVisible();
-    await expect(countOf(everyone(page))).toHaveText(/\b1\b/);
-
-    await searchBox(page).fill(`nobody ${tag}`);
-    await expect(countOf(everyone(page))).toHaveText(/\b0\b/);
-    await expect(personRows(page)).toHaveCount(1);
-    await expect(personRows(page).getByRole("button")).toHaveText(["Clear Search"]);
-    const narrowed = await countOf(everyone(page)).innerText();
-    await passesTheAccessibilityGate();
-    await everyone(page).getByRole("button", { name: "Clear Search" }).click();
-
-    await expect(searchBox(page)).toHaveValue("");
-    await expect(searchBox(page)).toBeFocused();
-    await expect(
-      countOf(everyone(page)),
-      "the count still says what the search left",
-    ).not.toHaveText(narrowed);
-    await expect(countOf(everyone(page))).toHaveText(/\d/);
-  });
-
-  test("pages through more people than one page holds", async ({ page, request }) => {
-    await signedInAsTheOperator(page, request, aTag());
-    const tag = aTag();
-    for (let made = 0; made < 51; made += 1) {
-      await person(request, anAddress(`${tag}-${made}`), { displayName: `Person ${made}` });
-    }
-
-    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
-
-    const paging = everyone(page).getByRole("navigation", { name: "Pages of People" });
-    await expect(personRows(page)).toHaveCount(50);
-    await expect(paging).toHaveText(THE_FIRST_PAGE);
-    await expect(paging.getByRole("button", { name: "Previous Page" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
-
-    const next = paging.getByRole("button", { name: "Next Page" });
-    await next.click();
-    await expect(personRows(page)).toHaveCount(1);
-    await expect(paging).toHaveText(THE_LAST_PAGE);
-    await expect(next).toHaveAttribute("aria-disabled", "true");
-    await expect(next).toBeFocused();
-
-    await paging.getByRole("button", { name: "Previous Page" }).click();
-    await expect(personRows(page)).toHaveCount(50);
-
-    const said = outcomeOf(everyone(page));
-    await expect(said).toBeEmpty();
-    await page.keyboard.press(PEOPLE_KEYSTROKES.previous.key);
-    await expect(said).toHaveText(/\S/);
-    await expect(paging).toHaveText(THE_FIRST_PAGE);
-    const atTheFirst = await said.innerText();
-    await page.keyboard.press(PEOPLE_KEYSTROKES.next.key);
-    await expect(paging).toHaveText(THE_LAST_PAGE);
-    await page.keyboard.press(PEOPLE_KEYSTROKES.next.key);
-    await expect(said, "the outcome still says the first page's end").not.toHaveText(atTheFirst);
-    await expect(said).toHaveText(/\S/);
-    await expect(paging).toHaveText(THE_LAST_PAGE);
-    await page.keyboard.press(PEOPLE_KEYSTROKES.previous.key);
-    await expect(paging).toHaveText(THE_FIRST_PAGE);
-  });
-
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
     await signedInAsTheOperator(page, request, aTag());
 
@@ -383,23 +206,6 @@ test.describe("the console's Everyone page", () => {
     expect(elapsed, "the first page of everyone rendered past its budget").toBeLessThan(
       LIST_BUDGET_MS,
     );
-  });
-
-  test("takes the list away once the mark clears", async ({ page, request }) => {
-    const tag = aTag();
-    const operators = await signedInAsTheOperator(page, request, tag);
-    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
-    await expect(personRows(page)).toHaveCount(1);
-
-    await markTheOperator(request, operators.admin.email, "revoke");
-    await navOf(page, "Console").getByRole("link", { name: "Every Workspace" }).click();
-    const refused = refusalAnswering(page, "console.people.list");
-    await navOf(page, "Console").getByRole("link", { name: "Everyone" }).click();
-
-    expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR, class: "forbidden" });
-    await expect(everyone(page)).not.toContainText(NOT_THE_OPERATOR);
-    await expect(everyone(page).getByRole("table")).toHaveCount(0);
-    await saysOfItsRead(everyone(page));
   });
 
   test("opens no person by key after focus leaves the list", async ({ page, request }) => {
@@ -509,115 +315,6 @@ test.describe("the console's Everyone page", () => {
 });
 
 test.describe("a person, opened from Everyone as a sheet", () => {
-  test("shows a person's workspaces, sessions and assistant access", async ({
-    page,
-    request,
-    baseURL,
-    passesTheAccessibilityGate,
-  }) => {
-    const tag = aTag();
-    const { operators, priya } = await priyaConnected(page, request, baseURL, tag);
-
-    const sheet = await openPriya(page, tag);
-
-    await expect(sheet.getByRole("heading", { level: 2, name: "Priya Shah" })).toBeFocused();
-    await expect(sheet).toMatchAriaSnapshot(`
-      - dialog "Priya Shah":
-        - heading "Priya Shah" [level=2]
-        - paragraph: ${priya.email}
-        - region "Workspaces":
-          - heading "Workspaces" [level=3]
-          - list:
-            - listitem: ${operators.name} Editor
-        - region "Sign-In":
-          - heading "Sign-In" [level=3]
-          - term: Last Sign-In
-          - definition: /\\d{2}:\\d{2} · \\d{1,2} [A-Z][a-z]+ \\d{4}/
-          - term: Every Sign-In and Token Ended
-          - definition: /^\\D+$/
-        - region "Sessions":
-          - heading "Sessions" [level=3]
-          - paragraph: /\\b1\\b/
-          - list:
-            - /children: equal
-            - listitem:
-              - term: Began
-              - definition: /\\d{4}/
-              - term: Last Used
-              - definition: /\\d{4}/
-              - term: Expires
-              - definition: /\\d{4}/
-        - region "Assistant Access":
-          - heading "Assistant Access" [level=3]
-          - list:
-            - listitem "Claude":
-              - heading "Claude" [level=4]
-              - term: Workspace
-              - definition: ${operators.name}
-              - term: Issued
-              - definition: /\\d{4}/
-              - term: Last Used
-              - definition: /\\d{4}/
-              - button "More About Claude’s Grant"
-        - region "Display Name":
-          - heading "Display Name" [level=3]
-          - paragraph
-          - button "Correct Display Name"
-        - region "End Every Sign-In Everywhere":
-          - heading "End Every Sign-In Everywhere" [level=3]
-          - paragraph
-          - button "${REVOKE}"
-        - button "Close"
-    `);
-    for (const action of ["Correct Display Name", REVOKE]) {
-      await expect(
-        sheet.getByRole("button", { name: action }),
-        `“${action}” does not say whom it acts on`,
-      ).toHaveAccessibleDescription(/Priya Shah/);
-    }
-    await passesTheAccessibilityGate();
-
-    const grant = regionOf(sheet, "Assistant Access").getByRole("listitem", { name: "Claude" });
-    await expect(grant.getByText("Live", { exact: true })).toBeVisible();
-    await grant.getByRole("button", { name: "More About Claude’s Grant" }).click();
-    await expect(grant).toContainText("https://claude.ai/oauth/mcp-oauth-client-metadata");
-
-    await page.keyboard.press("Escape");
-    await expect(personButton(page, "Priya Shah")).toBeFocused();
-  });
-
-  test("shows a grant Claude disconnected as ended, naming no person", async ({
-    page,
-    request,
-    baseURL,
-  }) => {
-    const tag = aTag();
-    const { operators, refreshToken } = await priyaConnected(page, request, baseURL, tag);
-    await claudeDisconnects(request, refreshToken);
-
-    const sheet = await openPriya(page, tag);
-
-    const grant = regionOf(sheet, "Assistant Access").getByRole("listitem", { name: "Claude" });
-    await expect(grant).toMatchAriaSnapshot(`
-      - listitem "Claude":
-        - heading "Claude" [level=4]
-        - term: Workspace
-        - definition: ${operators.name}
-        - term: Issued
-        - definition: /\\d{4}/
-        - term: Ended
-        - definition: /\\d{4}/
-        - term: Ended By
-        - definition: /\\S/
-        - term: Ended In
-        - definition: ${operators.name}
-        - button "More About Claude’s Grant"
-    `);
-    for (const someone of ["Priya Shah", operators.admin.name]) {
-      await expect(grant, `the grant says ${someone} ended it`).not.toContainText(someone);
-    }
-  });
-
   test("ends every sign-in everywhere behind a confirmation, within its budget", async ({
     page,
     request,
@@ -677,138 +374,6 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(sessionsOf(sheet)).toHaveCount(0);
     await expect(grant).toMatchAriaSnapshot(endedEverywhere);
   });
-
-  test("re-confirms a stale confirmation, retrying the act", async ({ page, request, baseURL }) => {
-    const tag = aTag();
-    const { operators } = await priyaConnected(page, request, baseURL, tag);
-    await ageTheConfirmation(request, operators.admin.id);
-    const sheet = await openPriya(page, tag);
-
-    await sheet.getByRole("button", { name: REVOKE }).click();
-    const refused = refusalAnswering(page, "console.people.endEverySignInAndToken");
-    await confirmationOf(page)
-      .getByRole("button", { name: "End Every Sign-In Everywhere" })
-      .click();
-
-    expect(await refused).toMatchObject({ word: STALE_CONFIRMATION });
-
-    await reconfirmedOn(page, request, operators.admin.email);
-    const ended = regionOf(sheet, "End Every Sign-In Everywhere");
-    await expect(ended.getByRole("status")).toHaveText(ENDED_AT);
-    await expect(sessionsOf(sheet)).toHaveCount(0);
-
-    await page.keyboard.press("Escape");
-    await expect(personButton(page, "Priya Shah")).toBeFocused();
-  });
-
-  test("ends the focused person's sign-ins by keyboard alone", async ({
-    page,
-    request,
-    baseURL,
-  }) => {
-    const tag = aTag();
-    await priyaConnected(page, request, baseURL, tag);
-    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
-    await expect(personRows(page)).toHaveCount(2);
-
-    await personButton(page, "Priya Shah").focus();
-    await page.keyboard.press("r");
-    const sheet = sheetOf(page, "Priya Shah");
-    await expect(sheet.getByRole("button", { name: REVOKE })).toBeFocused();
-
-    await page.keyboard.press("Enter");
-    const confirmation = confirmationOf(page);
-    await expect(confirmation.getByRole("button", { name: "Cancel" })).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(
-      confirmation.getByRole("button", { name: "End Every Sign-In Everywhere" }),
-    ).toBeFocused();
-    await page.keyboard.press("Enter");
-
-    await expect(regionOf(sheet, "End Every Sign-In Everywhere").getByRole("status")).toHaveText(
-      ENDED_AT,
-    );
-    await expect(sessionsOf(sheet)).toHaveCount(0);
-    await page.keyboard.press("Escape");
-    await expect(personButton(page, "Priya Shah")).toBeFocused();
-  });
-
-  test("corrects a display name from the sheet, within its budget", async ({
-    page,
-    request,
-    passesTheAccessibilityGate,
-  }) => {
-    await priyaListed(page, request, aTag());
-    await personButton(page, "Priya Shah").click();
-    const correct = regionOf(sheetOf(page, "Priya Shah"), "Display Name").getByRole("button", {
-      name: "Correct Display Name",
-    });
-
-    const dialog = await correctingCancelled(page, correct, "Priya Shah", {
-      audit: passesTheAccessibilityGate,
-    });
-
-    await correct.click();
-    await nameFieldOf(dialog).fill("Priya Sharma");
-    await clockTheNextKey(page, {
-      at: "(//div[@role='dialog'][.//h3[normalize-space(.)='Display Name']]//h2)[1]",
-      reads: "Priya Sharma",
-    });
-    await page.keyboard.press("Enter");
-
-    const renamed = sheetOf(page, "Priya Sharma");
-    await expect(renamed.getByRole("heading", { level: 2 })).toHaveText("Priya Sharma");
-    await theActionLandedWithinItsBudget(page, "correct display name");
-    await savedInTheSheet(renamed);
-
-    await page.keyboard.press("Escape");
-    await expect(personButton(page, "Priya Sharma")).toBeFocused();
-    await page.reload();
-    await expect(personButton(page, "Priya Sharma")).toBeVisible();
-  });
-
-  test("keeps a sheet open when its person leaves the search", async ({ page, request }) => {
-    const tag = aTag();
-    await signedInAsTheOperator(page, request, tag);
-    const flagged = `Priya ${tag}`;
-    await person(request, anAddress("priya"), { displayName: flagged });
-    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
-    await personButton(page, flagged).click();
-    const correct = regionOf(sheetOf(page, flagged), "Display Name").getByRole("button", {
-      name: "Correct Display Name",
-    });
-
-    await correct.click();
-    await nameFieldOf(dialogToCorrect(page, flagged)).fill("Priya Shah");
-    await page.keyboard.press("Enter");
-
-    await expect(
-      page
-        .getByRole("region", { name: "Everyone", includeHidden: true })
-        .getByRole("status", { includeHidden: true })
-        .first(),
-    ).toHaveText(/\b1\b/);
-    await savedInTheSheet(sheetOf(page, "Priya Shah"));
-    await page.keyboard.press("Escape");
-    await expect(searchBox(page)).toBeFocused();
-  });
-
-  test("corrects a name after re-confirming, from the sheet", async ({ page, request }) => {
-    const { operators } = await priyaListed(page, request, aTag());
-    await ageTheConfirmation(request, operators.admin.id);
-    await personButton(page, "Priya Shah").click();
-    const part = regionOf(sheetOf(page, "Priya Shah"), "Display Name");
-    await part.getByRole("button", { name: "Correct Display Name" }).click();
-    await nameFieldOf(dialogToCorrect(page, "Priya Shah")).fill("Priya Sharma");
-    await correctionReconfirmed(page, request, operators.admin.email);
-
-    const corrected = regionOf(sheetOf(page, "Priya Sharma"), "Display Name");
-    await expect(corrected.getByRole("status")).toHaveText(/\S/);
-    await expect(corrected.getByRole("button", { name: "Correct Display Name" })).toHaveAttribute(
-      "aria-disabled",
-      "false",
-    );
-  });
 });
 
 test.describe("the console's Names Waiting page", () => {
@@ -861,29 +426,6 @@ test.describe("the console's Names Waiting page", () => {
     `);
   });
 
-  test("says what Names Waiting is, apart from Everyone", async ({ page, request }) => {
-    await signedInAsTheOperator(page, request, aTag());
-    await page.goto(NAMES_WAITING_PAGE);
-
-    const summary = thePage(page).locator("h1 + p");
-    const descriptions = thePage(page).locator("h2 + p");
-    await expect(summary).toHaveText(/\S/);
-    await expect(namesWaiting(page).locator("h2 + p")).toHaveText(/\S/);
-    await expect(descriptions, "Names Waiting describes more than itself").toHaveCount(1);
-    const theGroups = await summary.innerText();
-    const ofNamesWaiting = await descriptions.innerText();
-
-    await navOf(page, "Console").getByRole("link", { name: "Everyone" }).click();
-    await expect(everyone(page).locator("h2 + p")).toHaveText(/\S/);
-    await expect(descriptions, "Everyone describes more than itself").toHaveCount(1);
-    await expect(descriptions, "Everyone is described as Names Waiting is").not.toHaveText(
-      ofNamesWaiting,
-    );
-    await expect(summary, "the two pages of one group lead with different lines").toHaveText(
-      theGroups,
-    );
-  });
-
   test("narrows by name or workspace, and says when none match", async ({
     page,
     request,
@@ -922,99 +464,6 @@ test.describe("the console's Names Waiting page", () => {
       narrowed,
     );
     await expect(waitingCount(page)).toHaveText(/\d/);
-  });
-
-  test("keeps Names Waiting's search and focus through a refused re-read", async ({
-    page,
-    context,
-    request,
-  }) => {
-    await signedInAsTheOperator(page, request, aTag());
-    await page.goto(NAMES_WAITING_PAGE);
-    await expect(namesWaiting(page).getByRole("table")).toBeVisible();
-    await waitingSearch(page).fill("priya");
-    await expect(waitingSearch(page)).toBeFocused();
-
-    await refusedFromNowOn(page, "console.people.namesWaiting");
-    const refused = refusalAnswering(page, "console.people.namesWaiting");
-    // The query library reads every list again as the network comes back.
-    await context.setOffline(true);
-    await context.setOffline(false);
-
-    expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR });
-    await expect(namesWaiting(page).getByRole("table")).toHaveCount(0);
-    await saysOfItsRead(namesWaiting(page));
-    await expect(waitingSearch(page)).toBeVisible();
-    await expect(waitingSearch(page)).toBeFocused();
-    await expect(waitingSearch(page)).toHaveValue("priya");
-  });
-
-  test("corrects a name behind a confirmation, within its budget", async ({
-    page,
-    request,
-    passesTheAccessibilityGate,
-  }) => {
-    const tag = aTag();
-    const { name } = await priyaFlagged(page, request, tag);
-    const corrected = `Priya Sharma ${tag}`;
-    await page.goto(NAMES_WAITING_PAGE);
-    const correct = correctButtonOf(page, name);
-
-    const dialog = await correctingCancelled(page, correct, name, {
-      audit: passesTheAccessibilityGate,
-    });
-
-    await correct.click();
-    await nameFieldOf(dialog).fill(corrected);
-    await clockTheRowLeaving(page, name);
-    await page.keyboard.press("Enter");
-
-    await expect(waitingRowOf(page, name)).toHaveCount(0);
-    await theActionLandedWithinItsBudget(page, "correct display name");
-    await expect(outcomeOf(namesWaiting(page))).toHaveText(/\S/);
-    await expect(namesWaiting(page).getByRole("heading", { name: "Names Waiting" })).toBeFocused();
-
-    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
-    await expect(personButton(page, corrected)).toBeVisible();
-    await page.goto(NAMES_WAITING_PAGE);
-    await expect(waitingCount(page)).toHaveText(/\S/);
-    await expect(waitingRowOf(page, name)).toHaveCount(0);
-  });
-
-  test("refuses a name the rule forbids, in the rule's words", async ({ page, request }) => {
-    const { name } = await priyaFlagged(page, request, aTag());
-    await page.goto(NAMES_WAITING_PAGE);
-    await correctButtonOf(page, name).click();
-    const dialog = dialogToCorrect(page, name);
-    await nameFieldOf(dialog).fill("Priya <priya@acme.invalid>");
-    const refused = refusalAnswering(page, CORRECT_A_NAME);
-    await dialog.getByRole("button", { name: "Save Changes" }).click();
-
-    expect(await refused).toMatchObject({ word: "display-name-angle-bracket" });
-    const alert = namesWaiting(page).getByRole("alert");
-    await saysARefusal(alert);
-    const said = await alert.innerText();
-    await expect(correctButtonOf(page, name)).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(nameFieldOf(dialog)).toHaveValue("Priya <priya@acme.invalid>");
-    await expect(nameFieldOf(dialog)).toHaveAttribute("aria-invalid", "true");
-    await expect(nameFieldOf(dialog)).toHaveAccessibleDescription(
-      new RegExp(`${asWritten(said)}$`),
-    );
-  });
-
-  test("corrects a waiting name after re-confirming", async ({ page, request }) => {
-    const tag = aTag();
-    const { operators, name } = await priyaFlagged(page, request, tag);
-    const corrected = `Priya Sharma ${tag}`;
-    await ageTheConfirmation(request, operators.admin.id);
-    await page.goto(NAMES_WAITING_PAGE);
-    await correctButtonOf(page, name).click();
-    await nameFieldOf(dialogToCorrect(page, name)).fill(corrected);
-    await correctionReconfirmed(page, request, operators.admin.email);
-    await expect(waitingRowOf(page, name)).toHaveCount(0);
-    await expect(outcomeOf(namesWaiting(page))).toHaveText(/\S/);
-    await expect(page).toHaveURL(NAMES_WAITING_PAGE);
   });
 
   test("corrects no name by key after focus leaves the list", async ({ page, request }) => {

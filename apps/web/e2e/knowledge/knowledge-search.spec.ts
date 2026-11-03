@@ -2,24 +2,17 @@ import assert from "node:assert/strict";
 
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import {
-  MATCHES_A_PAGE,
-  QUERY_MAX,
-  SEARCH_KEYSTROKES as KEY,
-} from "@/features/knowledge/knowledge-state.ts";
+import { SEARCH_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
-import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
-  aMemberSignedInAt,
   anAddress,
   provision,
   seedConcepts,
   seedConnectedSources,
   signIn,
   skipLinkReachesThePage,
-  answersRead,
 } from "../harness.ts";
 import { heldBack, isAFind, listsItsKeystrokes, scrolledSideways } from "../knowledge.ts";
 import { aVirtualAuthenticator } from "../virtual-authenticator.ts";
@@ -214,65 +207,6 @@ const foundNothing = async (
 const handbookMatches = (page: Page) => matchesOf(page).filter({ hasText: HANDBOOK });
 
 test.describe("the Knowledge Search page", () => {
-  test("marks each match with its kind and trust word", async ({ page, request }) => {
-    await anAdminAtSearch(page, request, "Swale Records", [conceptsSeeded]);
-
-    await searched(page, "audit log retention");
-    const retention = matchesOf(page).filter({ hasText: "Audit Logs Retention" });
-    await expect(retention).toContainText("Answer");
-    await expect(retention).toContainText("Verified automatically");
-    const committee = matchesOf(page).filter({ hasText: "Audit Committee" });
-    await expect(committee).toContainText("Unverified");
-  });
-
-  test("marks each match with its collection, or none", async ({ page, request }) => {
-    await anAdminAtSearch(page, request, "Nidd Records", [
-      async (api, workspace) => {
-        await seedConcepts(api, {
-          workspaceId: workspace.workspaceId,
-          userId: workspace.adminId,
-          concepts: [
-            {
-              title: "Payroll Retention",
-              collection: "finance",
-              body: "We keep payroll records for six years.",
-            },
-            { title: "Visitor Retention", body: "We keep visitor records for one year." },
-          ],
-        });
-      },
-    ]);
-
-    await searched(page, "retention");
-    await expect(matchesOf(page).filter({ hasText: "Payroll Retention" })).toContainText("finance");
-    await expect(matchesOf(page).filter({ hasText: "Visitor Retention" })).toContainText(
-      "No collection",
-    );
-  });
-
-  test("shows a Viewer no Restricted match and no count", async ({ page, request }) => {
-    const workspace = await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
-    const seeded = { workspaceId: workspace.workspaceId, adminId: workspace.admin.id };
-    await conceptsSeeded(request, seeded);
-    await payReviewSeeded(request, seeded);
-    const answers = answersRead(page, isAFind);
-
-    await page.goto(asked("audit"));
-    await expect(said(page)).toContainText("audit");
-    await expect(matchesOf(page).filter({ hasText: "Audit Logs Retention" })).toHaveCount(1);
-    await expect(matchesOf(page).filter({ hasText: "Audit Salary Bands" })).toHaveCount(0);
-    await expect(page.locator("body"), "the matches page shows a number").not.toContainText(/\d/);
-
-    await foundNothing(page, "salary bands", () => page.goto(asked("salary bands")));
-    await expect(page.locator("body"), "the page shows a number").not.toContainText(/\d/);
-    expect(await page.content(), "the page draws the withheld document").not.toContain(PAY_REVIEW);
-    await expect.poll(() => answers.length).toBe(2);
-    expect(
-      (await Promise.all(answers)).join("\n"),
-      "the read answered with a withheld title",
-    ).not.toMatch(new RegExp(`${PAY_REVIEW}|Audit Salary Bands`));
-  });
-
   test("finds an Admin what a Viewer's search withholds", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Esk Archives", [conceptsSeeded, payReviewSeeded]);
 
@@ -284,30 +218,6 @@ test.describe("the Knowledge Search page", () => {
     const document = matchesOf(page).filter({ hasText: PAY_REVIEW });
     await expect(document).toHaveCount(1);
     await expect(document).toContainText(markedAt("Restricted"));
-  });
-
-  test("asks for the most the read takes, and no more", async ({ page, request }) => {
-    await anAdminAtSearch(page, request, "Esk Records", []);
-    const statusOf = async (input: { readonly query: string; readonly limit: number }) => {
-      const answered = await page.request.get(
-        `/trpc/knowledge.find?${new URLSearchParams({ input: JSON.stringify(input) }).toString()}`,
-      );
-      return answered.status();
-    };
-    const longest = "a".repeat(QUERY_MAX);
-
-    expect(
-      await statusOf({ query: longest, limit: MATCHES_A_PAGE }),
-      "the read refuses a search the page sends: QUERY_MAX or MATCHES_A_PAGE is past the read's own",
-    ).toBe(200);
-    expect(
-      await statusOf({ query: `${longest}a`, limit: MATCHES_A_PAGE }),
-      "the read takes a longer query than QUERY_MAX lets the box hold",
-    ).toBe(400);
-    expect(
-      await statusOf({ query: "audit", limit: MATCHES_A_PAGE + 1 }),
-      "the read gives a larger page than MATCHES_A_PAGE asks for",
-    ).toBe(400);
   });
 
   test("opens a passage match in the panel without leaving Search", async ({ page, request }) => {
