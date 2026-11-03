@@ -28,7 +28,7 @@ import {
 } from "@test/second-factor-api.ts";
 import { addressOf, answered } from "@test/stubbed-api.ts";
 
-await vi.hoisted(() => import("@test/auth/forwarding-fetch.ts"));
+await vi.hoisted(() => import("@test/forwarding-fetch.ts"));
 
 afterEach(() => {
   cleanup();

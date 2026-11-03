@@ -71,14 +71,6 @@ export const addMember = (
   input: { workspaceId: string; userId: string; role: "Admin" | "Editor" | "Viewer" },
 ) => ask(api, "/members", input, memberAdded);
 
-export const removeMember = async (
-  api: APIRequestContext,
-  input: { workspaceId: string; userId: string },
-): Promise<void> => {
-  const answered = await api.delete(`${HARNESS}/members`, { data: input });
-  expect(answered.ok(), `removing a member answered ${answered.status()}`).toBe(true);
-};
-
 export const endEverySignInAndToken = (api: APIRequestContext, userId: string) =>
   ask(api, "/revocations", { userId }, credentialsRevoked);
 
