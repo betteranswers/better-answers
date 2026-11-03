@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { z } from "zod";
 
 import type {
@@ -71,14 +71,6 @@ export const addMember = (
   input: { workspaceId: string; userId: string; role: "Admin" | "Editor" | "Viewer" },
 ) => ask(api, "/members", input, memberAdded);
 
-export const removeMember = async (
-  api: APIRequestContext,
-  input: { workspaceId: string; userId: string },
-): Promise<void> => {
-  const answered = await api.delete(`${HARNESS}/members`, { data: input });
-  expect(answered.ok(), `removing a member answered ${answered.status()}`).toBe(true);
-};
-
 export const endEverySignInAndToken = (api: APIRequestContext, userId: string) =>
   ask(api, "/revocations", { userId }, credentialsRevoked);
 
@@ -116,28 +108,6 @@ export const invite = (
     },
     invitationWritten,
   );
-};
-
-const confirmationAged = z.object({ aged: z.boolean() });
-
-export const ageTheConfirmation = (api: APIRequestContext, userId: string) =>
-  ask(api, "/confirmations/aged", { userId }, confirmationAged);
-
-export const ageTheCode = (api: APIRequestContext, email: string) =>
-  ask(api, "/codes/aged", { email }, confirmationAged);
-
-export const reconfirmOf = (page: Page): Locator =>
-  page.getByRole("dialog", { name: "Confirm It’s You" });
-
-export const reconfirmedOn = async (
-  page: Page,
-  api: APIRequestContext,
-  email: string,
-): Promise<void> => {
-  await expect(reconfirmOf(page)).toBeVisible();
-  const key = await withAnAuthenticator(api, email);
-  await authenticatorCodeField(page).fill(authenticatorCodeAt(key, new Date()));
-  await expect(reconfirmOf(page)).toHaveCount(0);
 };
 
 const enrolled = z.object({ key: z.string(), recoveryCodes: z.array(z.string()) });
@@ -208,23 +178,6 @@ export const claudeExchanges = async (
   });
   expect(exchanged.ok(), `the code's exchange answered ${exchanged.status()}`).toBe(true);
   const tokens = z.object({ refresh_token: z.string() }).parse(await exchanged.json());
-  return { refreshToken: tokens.refresh_token };
-};
-
-export const claudeRefreshes = async (
-  api: APIRequestContext,
-  asked: { readonly origin: string; readonly refreshToken: string },
-): Promise<{ readonly refreshToken: string }> => {
-  const refreshed = await api.post("/oauth2/token", {
-    form: {
-      ...CLAUDE,
-      resource: `${asked.origin}/mcp`,
-      grant_type: "refresh_token",
-      refresh_token: asked.refreshToken,
-    },
-  });
-  expect(refreshed.ok(), `the refresh answered ${refreshed.status()}`).toBe(true);
-  const tokens = z.object({ refresh_token: z.string() }).parse(await refreshed.json());
   return { refreshToken: tokens.refresh_token };
 };
 
@@ -490,22 +443,6 @@ export const emailsSentTo = async (api: APIRequestContext, email: string): Promi
   const counted = await api.get(`${HARNESS}/emails?to=${encodeURIComponent(email)}`);
   expect(counted.ok(), `counting the emails answered ${counted.status()}`).toBe(true);
   return emailsCounted.parse(await counted.json()).sent;
-};
-
-const aSessionSeeded = z.object({ sessionId: z.string() });
-
-export const aSessionOn = async (
-  api: APIRequestContext,
-  personId: string,
-  userAgent?: string,
-): Promise<string> => {
-  const asked = await ask(
-    api,
-    "/sessions",
-    { userId: personId, ...(userAgent === undefined ? {} : { userAgent }) },
-    aSessionSeeded,
-  );
-  return asked.sessionId;
 };
 
 export const anAddress = (who: string): string =>

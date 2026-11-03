@@ -67,6 +67,30 @@ describe("collections and owners through the api", () => {
     expect(named).toMatchObject({ personId: viewer.id });
   });
 
+  it("refuses an Editor owning nothing the list and naming", async () => {
+    const { workspace, editor } = await aWorkspaceHoldingPolicy();
+    const asTheEditor = await webSignedIn(app(), editor.email);
+    const asTheAdmin = await webSignedIn(app(), workspace.admin.email);
+    const asked = { collection: "policy", personId: editor.id };
+
+    const listed = await refusalOfCall(asTheEditor.api.knowledge.collections.query());
+    const named = await refusalOfCall(asTheEditor.api.knowledge.nameOwner.mutate(asked));
+    await asTheAdmin.api.knowledge.nameOwner.mutate(asked);
+    const listedOnceOwning = await asTheEditor.api.knowledge.collections.query();
+
+    expect(listed).toMatchObject({
+      data: { httpStatus: 403, refusal: { word: "owner-forbids", class: "forbidden" } },
+    });
+    expect(named).toMatchObject({
+      data: { httpStatus: 403, refusal: { word: "role-forbids", class: "forbidden" } },
+    });
+    expect(listedOnceOwning).toEqual({
+      collections: [
+        { collection: "policy", owner: { id: editor.id, name: editor.name }, overrides: 0 },
+      ],
+    });
+  });
+
   it("names an owner and answers the new list", async () => {
     const { workspace, viewer } = await aWorkspaceHoldingPolicy();
     const { api } = await webSignedIn(app(), workspace.admin.email);

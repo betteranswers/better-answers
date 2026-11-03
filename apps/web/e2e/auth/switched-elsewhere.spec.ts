@@ -31,9 +31,6 @@ const membersRegion = (page: Page): Locator => page.getByRole("region", { name: 
 const roleOf = (page: Page, name: string): Locator =>
   membersRegion(page).getByRole("row").filter({ hasText: name }).getByRole("cell").nth(2);
 
-const tickOf = (page: Page, name: string): Locator =>
-  membersRegion(page).getByRole("checkbox", { name: `Select ${name}`, exact: true });
-
 const removalOf = (samsPage: Locator): Locator =>
   samsPage.getByRole("region", { name: "Removal", exact: true });
 
@@ -118,45 +115,5 @@ test.describe("an action from a tab left in another workspace", () => {
     await expect(roleOf(elsewhere, "Sam Okoro"), `removed from ${two.first.name}`).toHaveText(
       "Editor",
     );
-  });
-
-  test("refuses a ticked set's role change, every role kept", async ({
-    page,
-    context,
-    request,
-  }) => {
-    const two = await inTwoWorkspaces(page, request, {
-      first: "Ouse Joinery",
-      second: "Foss Joinery",
-    });
-    const ticked = ["Sam Okoro", "Priya Shah"];
-    for (const name of ticked) {
-      await aMemberOfBoth(request, two, name, { first: "Editor", second: "Admin" });
-    }
-    await membersReadAfresh(page, two.first);
-    await expect(roleOf(page, "Priya Shah")).toHaveText("Editor");
-    const elsewhere = await switchedInAnotherTab(context, page, two);
-
-    for (const name of ticked) await tickOf(page, name).check();
-    await page
-      .getByRole("toolbar", { name: "Selected Members" })
-      .getByRole("button", { name: "Change Role", exact: true })
-      .click();
-    const answered = refusalAnswering(page, "members.bulkChangeRole");
-    await page
-      .getByRole("dialog", { name: "Change Role for 2 Members" })
-      .getByRole("button", { name: "Change Role", exact: true })
-      .click();
-    expect(await answered).toMatchObject(SWITCHED);
-
-    await membersReadAfresh(elsewhere, two.second);
-    for (const name of ticked) {
-      await expect(roleOf(elsewhere, name), `changed in ${two.second.name}`).toHaveText("Admin");
-    }
-    await landedHomeSayingWhy(page, two.second);
-    await backIn(elsewhere, two);
-    for (const name of ticked) {
-      await expect(roleOf(elsewhere, name), `changed in ${two.first.name}`).toHaveText("Editor");
-    }
   });
 });

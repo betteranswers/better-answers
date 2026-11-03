@@ -110,6 +110,12 @@ const expectRefusalPage = (html: string, said: RefusalWords): void => {
   expect(read.slice(-next.length)).toBe(next);
 };
 
+const redirectedTo = (response: Response): URL => {
+  const next = response.headers.get("location");
+  assert(next !== null, "the answer redirected");
+  return new URL(next, PUBLIC_URL);
+};
+
 const backThroughSignIn = async (
   client: ReturnType<TestApp["client"]>,
   email: string,
@@ -298,6 +304,35 @@ describe("the flow, as claude.ai drives it", () => {
     assert(now !== undefined, "the session is still there");
     expect(now.active_workspace_id).toBe(solo.workspaceId);
     expect(now.updated_at.getTime()).toBeGreaterThan(before.updated_at.getTime());
+  });
+
+  it("asks consent again only when the host asks for it", async () => {
+    const acme = await app.provision({ name: "Returning" });
+    const client = app.client();
+    const { challenge } = pkce();
+    const authorizing = async (state: string, ...leftOut: readonly string[]): Promise<URL> => {
+      const asked = new URL(
+        authorizeUrl({ challenge, scope: "knowledge:read", state }),
+        PUBLIC_URL,
+      );
+      for (const parameter of leftOut) asked.searchParams.delete(parameter);
+      return redirectedTo(await client.fetch(asked.href, { redirect: "manual" }));
+    };
+    const consenting = async (consentPage: URL): Promise<URL> =>
+      redirectedTo(await client.form(`/consent${consentPage.search}`, connectIn(acme.workspaceId)));
+
+    await consenting(await driveToPage(app, client, acme.admin));
+    const asked = await authorizing("second");
+    expect(`${asked.origin}${asked.pathname}`).toBe(`${PUBLIC_URL}/consent`);
+    const granted = await consenting(asked);
+    const skipped = await authorizing("third", "prompt");
+
+    expect(`${granted.origin}${granted.pathname}`).toBe(CLAUDE_REDIRECT_URI);
+    expect(granted.searchParams.get("state")).toBe("second");
+    expect(granted.searchParams.get("code")).not.toBeNull();
+    expect(`${skipped.origin}${skipped.pathname}`).toBe(CLAUDE_REDIRECT_URI);
+    expect(skipped.searchParams.get("state")).toBe("third");
+    expect(skipped.searchParams.get("code")).not.toBeNull();
   });
 
   it("redirects an unoffered scope back to the host with iss", async () => {

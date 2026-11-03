@@ -4,7 +4,6 @@ import { z } from "zod";
 import { expect, test } from "../browser.ts";
 import {
   addMember,
-  ageTheCode,
   anAddress,
   clockTheNextKey,
   codeSentTo,
@@ -16,9 +15,7 @@ import {
   person,
   personMenuOpened,
   provision,
-  removeMember,
   saysSomethingNew,
-  saysARefusal,
   saysTheWait,
   signedInAtHome,
   signIn,
@@ -26,7 +23,6 @@ import {
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
 import { scrolledSideways } from "../knowledge.ts";
-import { authAnswering } from "../refused-read.ts";
 
 const thePicker = (page: Page) => page.getByRole("heading", { level: 1, name: "Your Workspaces" });
 
@@ -43,14 +39,6 @@ const waitNamedBy = async (answered: ReturnType<typeof theSendsAnswer>): Promise
   const waitSeconds = Number(response.headers()["retry-after"]);
   expect(Number.isInteger(waitSeconds), "the ceiling's refusal named no wait").toBe(true);
   return waitSeconds;
-};
-
-const theSendIsRefusedNamingItsWait = async (page: Page, email: string): Promise<void> => {
-  await page.getByLabel("Email Address").fill(email);
-  const answered = theSendsAnswer(page);
-  await page.getByRole("button", { name: "Send Code" }).click();
-
-  await saysTheWait(page.getByRole("alert"), await waitNamedBy(answered));
 };
 
 const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
@@ -85,8 +73,6 @@ const aWrongCodeIsRefused = async (page: Page): Promise<void> => {
   await codeField(page).fill("000000");
   await expect(page.getByRole("alert")).toHaveText(triesLeft(2));
 };
-
-const SIGN_IN_PATH = "/sign-in/email-otp";
 
 const pastedIntoTheField = async (page: Page, copied: string): Promise<void> => {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -297,15 +283,6 @@ test("keeps the framed sign-in page inside 320 pixels", async ({ page }) => {
   expect(sideways, "the page scrolls sideways at 320px").toBe(0);
 });
 
-test("names the wait when one client asks too many codes", async ({ page }) => {
-  await page.goto("/sign-in");
-  for (let asked = 0; asked < 5; asked += 1) {
-    await page.request.post(SEND_PATH, { data: { email: anAddress("spread"), type: "sign-in" } });
-  }
-
-  await theSendIsRefusedNamingItsWait(page, anAddress("sixth"));
-});
-
 test("a new code sent from the code step signs in", async ({
   page,
   request,
@@ -405,35 +382,6 @@ for (const [named, between] of [
   });
 }
 
-const anotherCodeSignsIn = async (page: Page, request: APIRequestContext, email: string) => {
-  await expect(page.getByRole("button", { name: "Send a New Code" })).toBeFocused();
-  const saidOfTheFirst = await page.getByRole("status").innerText();
-
-  await page.keyboard.press("Enter");
-  await expect(codeField(page)).toBeFocused();
-  await expect(codeField(page), "the spent digits outlived the new code").toHaveValue("");
-  await saysANewEmailWent(page, saidOfTheFirst);
-  await page.keyboard.type(await codeSentTo(request, email));
-  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
-};
-
-test("an expired code reads as spent, handing focus to another", async ({ page, request }) => {
-  const email = anAddress("expired");
-  await person(request, email);
-  await atTheCodeStep(page, email);
-  const code = await codeSentTo(request, email);
-  await ageTheCode(request, email);
-
-  const refused = authAnswering(page, SIGN_IN_PATH);
-  await codeField(page).fill(code);
-  expect(await refused, "the expired code was not refused as spent").toMatchObject({
-    code: "OTP_EXPIRED",
-  });
-  await saysARefusal(page.getByRole("alert"));
-
-  await anotherCodeSignsIn(page, request, email);
-});
-
 test("a tab waiting on one address ignores another's sign-in", async ({
   page,
   context,
@@ -507,39 +455,6 @@ test("a shown tab waits for a sign-in of its own", async ({ page, request }) => 
   await landedAtHome(page, "Admin");
 
   expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);
-});
-
-test("drops and names a workspace the person was removed from", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
-  const email = anAddress("removed");
-  const { first, second } = await memberOfTwoWorkspaces(request, email, {
-    first: "Still Mine",
-    second: "Taken Away",
-  });
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await expect(page.getByRole("button", { name: second.name })).toBeVisible();
-
-  await removeMember(request, { workspaceId: second.workspaceId, userId: first.admin.id });
-  const refused = authAnswering(page, "/organization/set-active");
-  await page.getByRole("button", { name: second.name }).click();
-
-  expect(await refused).toMatchObject({
-    status: 403,
-    code: "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION",
-  });
-  await expect(page.getByRole("alert")).toContainText(second.name);
-  await expect(thePicker(page)).toBeVisible();
-  await expect(page.getByRole("button", { name: second.name })).toHaveCount(0);
-  const stillMine = page.getByRole("button", { name: first.name });
-  await expect(stillMine, "focus was not left on what the reader can do next").toBeFocused();
-  await passesTheAccessibilityGate();
-
-  await page.keyboard.press("Enter");
-  await landedAtHome(page, "Admin");
 });
 
 test("makes the pages outside the shell keyboard-operable, landmarked and labelled", async ({

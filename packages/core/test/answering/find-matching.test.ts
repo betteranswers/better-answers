@@ -413,6 +413,33 @@ describe("find's pages", () => {
     expect(titlesOf(toTheAdmin)).toEqual([AUDIT_LOGS_RETENTION]);
     expect(toTheAdmin.nextCursor).toBeDefined();
   });
+
+  it("finds an Admin what a Viewer's search withholds", async () => {
+    const { workspaceId, viewer, admin } = await arrange();
+    const payroll = await connectedSourceHolding(db(), workspaceId, { sensitivity: "Restricted" });
+    const content = "The salary bands were set at the spring pay review.";
+    await passageUnder(db(), workspaceId, payroll, {
+      content,
+      ordinal: 0,
+      charStart: 0,
+      charEnd: content.length,
+    });
+
+    const [toTheViewer, toTheAdmin] = await Promise.all([
+      searching(viewer, "salary bands"),
+      searching(admin, "salary bands"),
+    ]);
+
+    expect(toTheViewer.matches).toEqual([]);
+    expect(toTheAdmin.matches).toEqual([
+      matching.objectContaining({
+        layer: "sources",
+        kind: "document",
+        sensitivity: "Restricted",
+        locator: `${payroll.documentId}/chars:0-${content.length}`,
+      }),
+    ]);
+  });
 });
 
 const afterAFailedStatement = async <T, Refused>(

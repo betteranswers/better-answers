@@ -8,17 +8,12 @@ import {
   addMember,
   anAddress,
   clockTheNextKey,
-  crumbOf,
   keyShown,
-  keystrokesDismissed,
-  keystrokesListed,
   person,
   personMenuOpened,
   provision,
-  railOf,
   saysARefusal,
   signedInAtHome,
-  signIn,
   signInByEmail,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
@@ -57,16 +52,6 @@ const accountFromTheBand = async (page: Page, who: string): Promise<void> => {
   await expect(page).toHaveURL(/\/account$/);
 };
 
-const accountWithNoWorkspace = async (page: Page, api: Parameters<typeof person>[0]) => {
-  const email = anAddress("no-workspace");
-  await person(api, email);
-  await page.goto("/sign-in");
-  await signIn(page, api, email);
-  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
-  await page.getByRole("link", { name: "Account" }).click();
-  await expect(accountHeading(page)).toBeVisible();
-};
-
 const setupOpened = async (page: Page): Promise<string> => {
   await setUpButton(page).click();
   await expect(page.getByRole("img", { name: "QR code for your authenticator" })).toBeVisible();
@@ -86,11 +71,6 @@ const doneClosesTheCodes = async (page: Page): Promise<void> => {
   await expect(
     page.getByRole("heading", { level: 3, name: "Recovery Codes", exact: true }),
   ).toBeFocused();
-};
-
-const codesSaved = async (page: Page): Promise<void> => {
-  await savedBox(page).check();
-  await doneClosesTheCodes(page);
 };
 
 const tenCodesInTheList = Array.from(
@@ -165,88 +145,6 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   await expect(codesLeft).toHaveText(everyCodeLeft);
   await expect(removeButton(page), "the page does not list the authenticator").toBeVisible();
   await expect(codesListed(page)).toHaveCount(0);
-});
-
-test("a setup's codes land though Set up is pressed mid-finish", async ({ page, request }) => {
-  await accountWithNoWorkspace(page, request);
-  const key = await setupOpened(page);
-  const pressed = Promise.withResolvers<void>();
-  await page.route("**/authenticator/finish", async (route) => {
-    const answer = await route.fetch();
-    await pressed.promise;
-    await route.fulfill({ response: answer });
-  });
-  const asked = page.waitForRequest("**/authenticator/finish");
-  await codeField(page).fill(authenticatorCodeAt(key, new Date()));
-  await asked;
-
-  await expect(setUpButton(page)).toHaveAttribute("aria-disabled", "true");
-  await setUpButton(page).focus();
-  await page.keyboard.press("Enter");
-  pressed.resolve();
-
-  await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
-  await expect(
-    codesBlock(page).getByRole("heading", { name: "Save Your Recovery Codes" }),
-  ).toBeFocused();
-});
-
-test("a member removes their authenticator through its dialog", async ({ page, request }) => {
-  await accountWithNoWorkspace(page, request);
-  await setUpWithItsCode(page);
-  await codesSaved(page);
-  const saidOfTheSetup = await outcomeOf(page).innerText();
-
-  await removeButton(page).click();
-  const dialog = page.getByRole("dialog", { name: "Remove Authenticator" });
-  await expect(dialog, "the dialog does not say what removing does").toHaveAccessibleDescription(
-    /\S/,
-  );
-  await dialog.getByRole("button", { name: "Remove", exact: true }).click();
-
-  await expect
-    .poll(() => outcomeOf(page).innerText(), "the page says nothing new of the removal")
-    .not.toBe(saidOfTheSetup);
-  await expect(removeButton(page)).toHaveCount(0);
-  await expect(setUpButton(page)).toBeFocused();
-});
-
-test("replacing the recovery codes shows a new set", async ({ page, request }) => {
-  await accountWithNoWorkspace(page, request);
-  const first = await setUpWithItsCode(page);
-  await expect(codesBlock(page).getByRole("paragraph")).toHaveCount(1);
-  await codesSaved(page);
-  const saidOfTheSetup = await outcomeOf(page).innerText();
-
-  await page.getByRole("button", { name: "Replace Recovery Codes" }).click();
-  const dialog = page.getByRole("dialog", { name: "Replace Recovery Codes" });
-  await expect(dialog, "the dialog does not say what replacing does").toHaveAccessibleDescription(
-    /\S/,
-  );
-  await dialog.getByRole("button", { name: "Replace", exact: true }).click();
-
-  await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
-  await expect(
-    codesBlock(page).getByRole("paragraph"),
-    "the set does not say it replaces one",
-  ).toHaveCount(2);
-  await expect
-    .poll(() => outcomeOf(page).innerText(), "the page says nothing new of the new set")
-    .not.toBe(saidOfTheSetup);
-  const second = await codesListed(page).allInnerTexts();
-  expect(
-    second.filter((code) => first.includes(code)),
-    "a code of the first set came back",
-  ).toEqual([]);
-});
-
-test("a member's Account page sits inside the shell", async ({ page, request }) => {
-  await anEditorOnAccount(page, request);
-
-  await expect(railOf(page)).toBeVisible();
-  await expect(crumbOf(page, "Account")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Go to better-answers" })).toHaveCount(0);
-  await keystrokesDismissed(page, await keystrokesListed(page, "Account"));
 });
 
 const passkeyName = (page: Page) => page.getByLabel("Passkey Name");

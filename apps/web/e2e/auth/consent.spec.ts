@@ -134,41 +134,6 @@ test("draws consent, then its refusal, in the dark theme kept", async ({
   expect(await paintsTheDarkPage(page), "dark painted the light page").not.toBe(light);
 });
 
-test("asks consent again only when the host asks for it", async ({
-  page,
-  request,
-  baseURL,
-  passesTheAccessibilityGate,
-}) => {
-  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
-  const origin = baseURL;
-  const email = anAddress("returning");
-  await provision(request, { name: "Returning Ltd", adminEmail: email });
-  await catchClaudesRedirect(page);
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-
-  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent", state: "first" }));
-  await expect(consentHeading(page)).toBeVisible();
-  await passesTheAccessibilityGate();
-  await page.getByRole("button", { name: "Connect" }).click();
-  expect(landedAt(page).searchParams.get("state")).toBe("first");
-
-  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent", state: "second" }));
-  await expect(consentHeading(page)).toBeVisible();
-  expect(landedAt(page).pathname).toBe("/consent");
-  await page.getByRole("button", { name: "Connect" }).click();
-  expect(landedAt(page).searchParams.get("state")).toBe("second");
-  expect(landedAt(page).searchParams.get("code")).not.toBeNull();
-
-  await page.goto(claudesAuthorizeUrl(origin, { state: "third" }));
-  const skipped = landedAt(page);
-  expect(`${skipped.origin}${skipped.pathname}`).toBe(CLAUDES_REDIRECT_URI);
-  expect(skipped.searchParams.get("state")).toBe("third");
-  expect(skipped.searchParams.get("code")).not.toBeNull();
-  await expect(consentHeading(page)).toHaveCount(0);
-});
-
 test("takes a named member from connector sign-in straight to consent", async ({
   page,
   request,

@@ -12,8 +12,6 @@ import {
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 export const isAFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
 
-export const isAnOpen = (url: URL): boolean => url.pathname.includes("knowledge.open");
-
 export const heldBack = async (page: Page, named: (url: URL) => boolean) => {
   const held = Promise.withResolvers<void>();
   const reached = Promise.withResolvers<void>();

@@ -27,7 +27,7 @@ Two reference files hold the detail. Open the one a task needs:
 comment there says why it is not `pnpm run`. A spec builds its state through the harness actions in
 `apps/web/e2e/harness.ts`, each of which calls `/__harness`, which
 `apps/api/tests/support/harness/harness-control.ts` mounts. Search both before adding an action.
-The actions include `provision`, `addMember`, `removeMember`, `endEverySignInAndToken`, `markTheOperator`,
+The actions include `provision`, `addMember`, `endEverySignInAndToken`, `markTheOperator`,
 `invite`, `seedModelChoices`, `seedConnectedSources`, `nameOwners`, `seedQuestions`,
 and `makeGroups`.
 

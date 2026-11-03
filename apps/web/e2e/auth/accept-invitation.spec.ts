@@ -4,31 +4,22 @@ import type { Role } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
-  addMember,
   anAddress,
   clockTheNextKey,
   invite,
-  keepsItsWordOffThePage,
   keystrokesDismissed,
   keystrokesListed,
-  landedAtHome,
   person,
   personMenuOpened,
   provision,
-  saysARefusal,
   signIn,
   signInHeading,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
-import { refusalAnswering } from "../refused-read.ts";
 
 const READ_BUDGET_MS = 1000;
 
 const INVITER = "Morgan Reid";
-
-const THE_INVITATION = "person.invitation";
-
-const THE_JOIN = "person.acceptInvitation";
 
 const invitationHeading = (page: Page, workspace: string) =>
   page.getByRole("heading", { level: 1, name: `Your Invitation to ${workspace}` });
@@ -128,95 +119,4 @@ test("a named invitee reads it within a second, joins keyboard-only", async ({
   await page.keyboard.press("Enter");
 
   await expect(page.getByRole("banner").getByText("Ryedale Metalwork")).toBeVisible();
-});
-
-test("keeps a given name when the join is then refused", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
-  const { workspace, address, link } = await anInvitation(request, "Ashby Survey", "Editor");
-  const invitee = await person(request, address, { displayName: "" });
-  await page.goto(link);
-  await signIn(page, request, address);
-  await expect(nameField(page)).toBeVisible();
-  await addMember(request, {
-    workspaceId: workspace.workspaceId,
-    userId: invitee.id,
-    role: "Viewer",
-  });
-
-  await nameField(page).fill("Ines Moreau");
-  const refused = refusalAnswering(page, THE_JOIN);
-  await joinButton(page).click();
-
-  expect(await refused).toMatchObject({ word: "already-a-member" });
-  await saysARefusal(page.getByRole("alert"));
-  await keepsItsWordOffThePage(page, "already-a-member");
-  await passesTheAccessibilityGate();
-
-  await page.getByRole("button", { name: "Go to Your Workspaces" }).click();
-  await landedAtHome(page, "Viewer");
-  await expect(page.getByRole("banner").getByRole("button", { name: /Ines Moreau/ })).toBeVisible();
-});
-
-const signedInAtAnotherAddress = async (
-  page: Page,
-  request: APIRequestContext,
-  workspaceName: string,
-) => {
-  const { address, link } = await anInvitation(request, workspaceName, "Editor");
-  await person(request, address, { displayName: "Priya Shah" });
-  const other = anAddress("theo");
-  await person(request, other, { displayName: "Theo Other" });
-
-  await page.goto(link);
-  const refused = refusalAnswering(page, THE_INVITATION);
-  await signIn(page, request, other);
-
-  expect(await refused).toMatchObject({ word: "invitation-for-another-address" });
-  return { address, link };
-};
-
-test("refuses a person at another address, offering the invited one", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
-  const { address } = await signedInAtAnotherAddress(page, request, "Brightwater Estimating");
-  await saysARefusal(page.getByRole("alert"));
-  await expect(page.getByRole("main")).toMatchAriaSnapshot(`
-    - main:
-      - heading "Your Invitation" [level=1]
-      - alert
-      - button "Sign In with Another Address"
-      - button "Sign Out"
-      - button "Keyboard Shortcuts"
-  `);
-  await expect(page.getByRole("main")).not.toContainText("Brightwater Estimating");
-  await passesTheAccessibilityGate();
-
-  const keystrokes = await keystrokesListed(page, "This Page");
-  await expect(keystrokes.getByRole("term").filter({ hasText: /^s$/ })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(keystrokes).toBeHidden();
-  await page.keyboard.press("s");
-  await expect(signInHeading(page, "joining")).toBeVisible();
-  await signIn(page, request, address);
-
-  await expect(invitationHeading(page, "Brightwater Estimating")).toBeVisible();
-});
-
-test("tells a named person a stray link names no invitation", async ({ page, request }) => {
-  const address = anAddress("stray");
-  await person(request, address, { displayName: "Una Price" });
-
-  await page.goto("/invitations/01J0000000000000000000000Z");
-  const refused = refusalAnswering(page, THE_INVITATION);
-  await signIn(page, request, address);
-
-  expect(await refused).toMatchObject({ word: "no-such-invitation" });
-  await saysARefusal(page.getByRole("alert"));
-  await keepsItsWordOffThePage(page, "no-such-invitation");
-  await expect(page.getByRole("button", { name: /^Join/ })).toHaveCount(0);
 });

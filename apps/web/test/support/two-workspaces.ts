@@ -44,6 +44,15 @@ export const aRefusalAnswer = (word: string, refusalClass: string, httpStatus: n
 
 export const FORBIDDEN = aRefusalAnswer("forbidden", "forbidden", 403);
 
+export const aCeilingMet = (waitSeconds: number): Response =>
+  new Response(
+    JSON.stringify({ error: "too_many_requests", error_description: "Too many requests." }),
+    {
+      status: 429,
+      headers: { "content-type": "application/json", "retry-after": String(waitSeconds) },
+    },
+  );
+
 export const LOST = {
   error: {
     message: "lost",
@@ -97,7 +106,10 @@ const answering =
     const address = addressOf(asked);
     const { pathname } = address;
     await aTurnLater();
-    if (!pathname.startsWith("/trpc/")) return answered(api.get(pathname)?.() ?? A_SESSION);
+    if (!pathname.startsWith("/trpc/")) {
+      const answer = api.get(pathname)?.() ?? A_SESSION;
+      return answer instanceof Response ? answer : answered(answer);
+    }
 
     const names = pathname.replace("/trpc/", "").split(",");
     const inputs = inputsOf(address, init);
