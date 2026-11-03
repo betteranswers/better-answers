@@ -1,6 +1,6 @@
 # Readings
 
-Every measurement the route and its blocks rely on, one dated row under its measure, newest last. A brief that names a threshold links the measure's heading here. "Old route, archived" means the figure's only record is the route spec as it stood before the route was split into briefs, frozen as `docs/archive/specs/v01-route-to-2026-10-20.md`.
+Every measurement the route and its blocks rely on, one dated row under its measure, newest last. A brief that names a threshold links the measure's heading here. "Old route, archived" means the figure's only record is the route spec as it stood before the route was split into briefs, frozen as `e19cfb9d4^:docs/archive/specs/v01-route-to-2026-10-20.md`. That spec, and the archived spec and ADR this page cites, left the tree in `e19cfb9d4`, so each is cited at that commit's parent, which `git show` reads.
 
 ## Recall at ten on the synthetic sets
 
@@ -8,7 +8,7 @@ The share of the `Answer`s each synthetic question names that `find` returns in 
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
-| 2026-10-09 | #655 | Paraphrases, `find`, first ten, by `Answer` named | 249 of 340, 73.2 % | `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R23 |
+| 2026-10-09 | #655 | Paraphrases, `find`, first ten, by `Answer` named | 249 of 340, 73.2 % | `docs/archive/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R23 |
 | 2026-10-13 | #721 | Paraphrases, `find`, first ten, by `Answer` named | 249 of 340, 73.2 % | Old route, archived |
 | 2026-10-13 | #721 | Paraphrases, `ask`'s plan step, first 20, by `Answer` named | 265 of 340, 77.9 % | Old route, archived |
 | 2026-10-13 | #721 | Paraphrases, `ask`'s plan step, first 20, each one's collection named | 276 of 340, 81.2 % | Old route, archived |
@@ -29,26 +29,26 @@ The share of the `Answer`s each synthetic question names that `find` returns in 
 | 2026-10-13 | A probe not in the tree | Buyer-worded, namings missed at ten that share no word with their question | 55 of 76 | Old route, archived |
 | 2026-10-13 | A probe not in the tree | Buyer-worded, `ask`'s plan step, first 25, by `Answer` named | 59.7 % | Old route, archived |
 | 2026-10-13 | A probe not in the tree | Paraphrases, every match taken, by `Answer` named | 276 of 340, 81.2 % | Old route, archived |
-| 2026-10-14 | #736 | Paraphrases, `find`, first ten, by `Answer` named | 247 of 340, 72.6 % | `docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md` |
-| 2026-10-14 | #736 | Paraphrases, `ask`, first 20, by `Answer` named | 266 of 340, 78.2 % | `docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md` |
-| 2026-10-14 | #736 | Paraphrases, `ask`, first 20, collection named | 276 of 340, 81.2 % | `docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md` |
-| 2026-10-14 | #736 | Buyer-worded, `find`, first ten, by `Answer` named | 86 of 154, 55.8 % | `docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md` |
-| 2026-10-14 | #736 | Buyer-worded, `find`, first ten, every `Answer` named | 45 of 86, 52.3 % | `docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md` |
-| 2026-10-14 | #736 | Buyer-worded, `find`, first ten, at least one | 60 of 86, 69.8 % | `docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md` |
-| 2026-10-14 | #736 | Buyer-worded, `ask`, first 20, by `Answer` named | 92 of 154, 59.7 % | `docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md` |
-| 2026-10-14 | #736 | Buyer-worded, `ask`, first 20, every `Answer` named | 49 of 86, 57.0 % | `docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md` |
-| 2026-10-14 | #736 | Buyer-worded, `ask`, first 20, at least one | 64 of 86, 74.4 % | `docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md` |
-| 2026-10-14 | #736 | Buyer-worded, the 72 rows with a collection, `ask`, none named, by `Answer` named | 56 of 87, 64.4 % | `docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md` |
-| 2026-10-14 | #736 | The same 72 rows, `ask`, theirs named, by `Answer` named | 61 of 87, 70.1 % | `docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md` |
+| 2026-10-14 | #736 | Paraphrases, `find`, first ten, by `Answer` named | 247 of 340, 72.6 % | `docs/plans/004-rarity-weighted-matching.md` |
+| 2026-10-14 | #736 | Paraphrases, `ask`, first 20, by `Answer` named | 266 of 340, 78.2 % | `docs/plans/004-rarity-weighted-matching.md` |
+| 2026-10-14 | #736 | Paraphrases, `ask`, first 20, collection named | 276 of 340, 81.2 % | `docs/plans/004-rarity-weighted-matching.md` |
+| 2026-10-14 | #736 | Buyer-worded, `find`, first ten, by `Answer` named | 86 of 154, 55.8 % | `docs/plans/004-rarity-weighted-matching.md` |
+| 2026-10-14 | #736 | Buyer-worded, `find`, first ten, every `Answer` named | 45 of 86, 52.3 % | `docs/plans/004-rarity-weighted-matching.md` |
+| 2026-10-14 | #736 | Buyer-worded, `find`, first ten, at least one | 60 of 86, 69.8 % | `docs/plans/004-rarity-weighted-matching.md` |
+| 2026-10-14 | #736 | Buyer-worded, `ask`, first 20, by `Answer` named | 92 of 154, 59.7 % | `docs/plans/004-rarity-weighted-matching.md` |
+| 2026-10-14 | #736 | Buyer-worded, `ask`, first 20, every `Answer` named | 49 of 86, 57.0 % | `docs/plans/004-rarity-weighted-matching.md` |
+| 2026-10-14 | #736 | Buyer-worded, `ask`, first 20, at least one | 64 of 86, 74.4 % | `docs/plans/004-rarity-weighted-matching.md` |
+| 2026-10-14 | #736 | Buyer-worded, the 72 rows with a collection, `ask`, none named, by `Answer` named | 56 of 87, 64.4 % | `docs/plans/004-rarity-weighted-matching.md` |
+| 2026-10-14 | #736 | The same 72 rows, `ask`, theirs named, by `Answer` named | 61 of 87, 70.1 % | `docs/plans/004-rarity-weighted-matching.md` |
 
 ## The production readings of ask
 
-How often a G-Cloud row of the buyer-worded set, asked word for word with no collection named on the first customer's workspace, reaches an `Answer` that answers it, taken by hand as S2b's plan sets out in `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, with a gate of at least one answering `Answer` in the first ten for 70 % of the rows the bundle answers.
+How often a G-Cloud row of the buyer-worded set, asked word for word with no collection named on the first customer's workspace, reaches an `Answer` that answers it, taken by hand as S2b's plan sets out in `docs/archive/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, with a gate of at least one answering `Answer` in the first ten for 70 % of the rows the bundle answers.
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
-| 2026-10-13 | Not recorded | Reading 1 through `find`, counted against titles by a session that held the rankings, at least one in the first ten, the 47 rows the bundle answers by title | 36 of 47, 76.6 % | `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, Risks |
-| 2026-10-13 | Not recorded | Reading 1 through `find`, counted against titles by a session that held the rankings, at least one in the first ten, all 60 rows asked | 36 of 60, 60.0 % | `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, Risks |
+| 2026-10-13 | Not recorded | Reading 1 through `find`, counted against titles by a session that held the rankings, at least one in the first ten, the 47 rows the bundle answers by title | 36 of 47, 76.6 % | `docs/archive/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, Risks |
+| 2026-10-13 | Not recorded | Reading 1 through `find`, counted against titles by a session that held the rankings, at least one in the first ten, all 60 rows asked | 36 of 60, 60.0 % | `docs/archive/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, Risks |
 | 2026-10-13 | Not recorded | Reading 1 through `find`, counted against titles by a session that held the rankings, at least one in the first 20, the 47 rows | 42 of 47, 89.4 % | Old route, archived |
 | 2026-10-13 | Not recorded | Reading 1 through `find`, counted against titles by a session that held the rankings, every answering `Answer` in the first ten, the 47 rows | 12 of 47, 25.5 % | Old route, archived |
 | 2026-10-13 | Not recorded | Reading 1 through `find`, counted against titles by a session that held the rankings, every answering `Answer` in the first 20, the 47 rows | 27 of 47, 57.4 % | Old route, archived |
@@ -114,10 +114,10 @@ How long a narrowing over one connected source takes when a number of concepts c
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
-| 2026-09-10 | A probe branch, never merged | Narrowing, 300 citing concepts | 995 ms, 3.3 ms per citing concept | `docs/archive/specs/s1-one-uploaded-document-to-a-cited-passage.md` |
-| 2026-09-27 | `ac4f5c8d` | Narrowing, 300 citing concepts, median of three runs of 1,028, 1,106 and 1,116 ms on an Apple M4 Pro | 1,106 ms, 3.7 ms per citing concept | `docs/archive/specs/s1-one-uploaded-document-to-a-cited-passage.md` |
-| 2026-09-27 | `ac4f5c8d` | Narrowing, 600 citing concepts, one run | 2,110 ms, 3.5 ms per citing concept | `docs/archive/specs/s1-one-uploaded-document-to-a-cited-passage.md` |
-| 2026-09-27 | `ac4f5c8d` | Widening, 300 citing concepts, median of three runs | 1,057 ms | `docs/archive/specs/s1-one-uploaded-document-to-a-cited-passage.md` |
+| 2026-09-10 | A probe branch, never merged | Narrowing, 300 citing concepts | 995 ms, 3.3 ms per citing concept | `e19cfb9d4^:docs/archive/specs/s1-one-uploaded-document-to-a-cited-passage.md` |
+| 2026-09-27 | `ac4f5c8d` | Narrowing, 300 citing concepts, median of three runs of 1,028, 1,106 and 1,116 ms on an Apple M4 Pro | 1,106 ms, 3.7 ms per citing concept | `e19cfb9d4^:docs/archive/specs/s1-one-uploaded-document-to-a-cited-passage.md` |
+| 2026-09-27 | `ac4f5c8d` | Narrowing, 600 citing concepts, one run | 2,110 ms, 3.5 ms per citing concept | `e19cfb9d4^:docs/archive/specs/s1-one-uploaded-document-to-a-cited-passage.md` |
+| 2026-09-27 | `ac4f5c8d` | Widening, 300 citing concepts, median of three runs | 1,057 ms | `e19cfb9d4^:docs/archive/specs/s1-one-uploaded-document-to-a-cited-passage.md` |
 
 ## The worker's box figures
 
@@ -125,14 +125,14 @@ The worker's memory and swap at the container's cgroup under the deploy unit's 1
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
-| 2026-09-23 | The tree's image, emulated `linux/amd64` on an Apple M4 Pro | The weights loaded twice, `memory.peak`, three capped runs | 1,536 MB in all three, the cap | `docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
-| 2026-09-23 | The same | The weights loaded twice, `memory.swap.peak`, three capped runs | 1,474, 1,456 and 1,473 MB | `docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
-| 2026-09-23 | The same | Swap-in during detection, three pages | 3.8 to 4.6 MB/s | `docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
-| 2026-09-23 | The same | The seam, ms per page under the limit | 5,579, 6,453 and 5,273 | `docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
-| 2026-09-23 | Image `e95f0c16` on VPC 1 | The weights loaded twice, `memory.peak`, three capped runs | 1,536 MB in all three, the cap | `docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
-| 2026-09-23 | Image `e95f0c16` on VPC 1 | The weights loaded twice, `memory.swap.peak` | 1,401, 1,509 and 1,302 MB | `docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
-| 2026-09-23 | Image `1587e0c1` on VPC 1, the detector patched | The weights held once, `memory.peak`, three capped runs and one uncapped | 1,032, 712 and 758 MB, uncapped 718 MB | `docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
-| 2026-09-23 | Image `1587e0c1` on VPC 1, the detector patched | The weights held once, `memory.swap.peak` | 0 in all four | `docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
-| 2026-09-23 | Image `1587e0c1` on VPC 1, the detector patched | The weights held once, settled 30 s after the last page | 650 to 656 MB anonymous plus 4 to 324 MB of file-backed weights | `docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
-| 2026-09-23 | Image `1587e0c1` on VPC 1, the detector patched | The weights held once, swap-in | 5 to 7 pages per run | `docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
-| 2026-09-23 | Image `1587e0c1` on VPC 1, the detector patched | The weights held once, the seam, median of three, ms per page | 3,209, 3,016 and 3,254, uncapped 3,119 | `docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
+| 2026-09-23 | The tree's image, emulated `linux/amd64` on an Apple M4 Pro | The weights loaded twice, `memory.peak`, three capped runs | 1,536 MB in all three, the cap | `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
+| 2026-09-23 | The same | The weights loaded twice, `memory.swap.peak`, three capped runs | 1,474, 1,456 and 1,473 MB | `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
+| 2026-09-23 | The same | Swap-in during detection, three pages | 3.8 to 4.6 MB/s | `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
+| 2026-09-23 | The same | The seam, ms per page under the limit | 5,579, 6,453 and 5,273 | `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
+| 2026-09-23 | Image `e95f0c16` on VPC 1 | The weights loaded twice, `memory.peak`, three capped runs | 1,536 MB in all three, the cap | `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
+| 2026-09-23 | Image `e95f0c16` on VPC 1 | The weights loaded twice, `memory.swap.peak` | 1,401, 1,509 and 1,302 MB | `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
+| 2026-09-23 | Image `1587e0c1` on VPC 1, the detector patched | The weights held once, `memory.peak`, three capped runs and one uncapped | 1,032, 712 and 758 MB, uncapped 718 MB | `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
+| 2026-09-23 | Image `1587e0c1` on VPC 1, the detector patched | The weights held once, `memory.swap.peak` | 0 in all four | `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
+| 2026-09-23 | Image `1587e0c1` on VPC 1, the detector patched | The weights held once, settled 30 s after the last page | 650 to 656 MB anonymous plus 4 to 324 MB of file-backed weights | `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
+| 2026-09-23 | Image `1587e0c1` on VPC 1, the detector patched | The weights held once, swap-in | 5 to 7 pages per run | `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
+| 2026-09-23 | Image `1587e0c1` on VPC 1, the detector patched | The weights held once, the seam, median of three, ms per page | 3,209, 3,016 and 3,254, uncapped 3,119 | `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md` |
