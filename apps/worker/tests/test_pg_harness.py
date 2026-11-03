@@ -31,6 +31,7 @@ from support.pg_harness import (
     pinned_postgres_image,
     shared_address,
     sweep_dead_cases,
+    template_name,
 )
 from support.roots import REPOSITORY_ROOT
 
@@ -136,6 +137,26 @@ def test_shares_the_located_server_and_constructs_no_container(
     assert re.fullmatch(r"tpl_py_[0-9a-f]{12}", cluster.template)
     assert _row_of(maintenance, cluster.template) == (True, False)
     assert dead not in _case_names(maintenance)
+
+
+def test_a_clone_holds_the_question_months_of_the_servers_clock() -> None:
+    with migrated_postgres_at() as (connection, _conninfo):
+        made = connection.execute(
+            "SELECT child.relname FROM pg_inherits"
+            " JOIN pg_class child ON child.oid = pg_inherits.inhrelid"
+            " WHERE pg_inherits.inhparent = 'question_content'::regclass ORDER BY 1"
+        ).fetchall()
+        clock = connection.execute(
+            "SELECT 'question_content_' || to_char((now() AT TIME ZONE 'UTC')"
+            " + months * interval '1 month', 'YYYY_MM')"
+            " FROM unnest(ARRAY[0, 1]) AS months"
+        ).fetchall()
+
+    assert made == clock
+
+
+def test_the_template_name_turns_with_the_servers_month() -> None:
+    assert template_name("2026-11") != template_name("2026-10")
 
 
 def test_constructs_a_container_when_the_locator_is_blank(
