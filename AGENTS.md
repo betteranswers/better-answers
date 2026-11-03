@@ -70,7 +70,7 @@ The verifier records its Shipping verdict as a commit status on the verified hea
 
 ### Skills
 
-Every skill lives in `.claude/skills/`, never under an app. A `paths` line in its frontmatter loads it only for the files it serves. The table of lines is in `packages/devtools/src/scans/skill-paths.ts`, and `pnpm run skill-paths` (in `check:gates`) fails when a skill drifts from it. After `npx skills add` or `update`, run `pnpm run skill-paths --write`.
+Every skill lives in `.claude/skills/`, never under an app. A `paths` line in its frontmatter loads it only for the files it serves. The table of lines is in `packages/devtools/src/scans/skill-paths.ts`, and `pnpm run skill-paths` (in `check:gates`) fails when a skill drifts from it. Update skills with `pnpm run skills-update` only. It runs `npx skills update` and then `skill-paths --write`, and every `skills-lock.json` entry sets `installMode: copy`, so a skill stays a real tracked folder. The gate refuses a symlinked skill folder or a missing `SKILL.md`; restore it with `git checkout -- .claude/skills/<name>` and update again.
 
 ### Issue tracker
 

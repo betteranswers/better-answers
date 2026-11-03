@@ -63,11 +63,11 @@ Plan 008 owns the folder restructure and is moving files under `packages/*` and 
 - [ ] Hold the file boundaries.
   - [ ] BA-268 touches only `AGENTS.md` "Testing", `docs/solutions/architecture-patterns/`, `.agents/playbooks/verification.md`, `.claude/skills/survey-architecture/references/deepening.md`, `.claude/skills/browser-suite/` and `docs/operations/local-gates.md`.
   - [ ] BA-287 touches only `packages/devtools/`, `scripts/test-folders.mjs`, root `package.json`, `lefthook.yml`, `AGENTS.md` "Where a file goes", `apps/web/AGENTS.md`, the test files it moves and the path mentions `scripts/move-files.mjs` rewrites.
-  - [ ] BA-288 touches only `.claude/skills/browser-suite/`, `.claude/skills/verify/`, `apps/web/.claude/skills/playwright-specs/`, `apps/web/test/gates/`, root `package.json`, `packages/devtools/test/ci/docs-lane.test.ts`, `.agents/playbooks/verification.md`, `.agents/playbooks/plan.md`, `docs/solutions/integration-issues/chromium-keeps-no-body-for-a-streamed-trpc-answer.md` and `docs/plans/007-s3-concepts-and-guides.md`.
+  - [ ] BA-288 touches only `.claude/skills/browser-suite/`, `.claude/skills/verify/`, `.claude/skills/playwright-specs/`, `apps/web/test/gates/`, root `package.json`, `packages/devtools/test/ci/docs-lane.test.ts`, `.agents/playbooks/verification.md`, `.agents/playbooks/plan.md`, `docs/solutions/integration-issues/chromium-keeps-no-body-for-a-streamed-trpc-answer.md` and `docs/plans/007-s3-concepts-and-guides.md`.
   - [ ] BA-269, BA-270 and BA-275 touch `packages/core/` and, for BA-269, `.github/workflows/`. BA-270 also touches the worker's entry module and one api test. BA-275 also touches `apps/api/src/ops/concepts.ts` and `apps/api/tests/ops/concepts.test.ts`.
   - [ ] BA-269, BA-271 and BA-278 each add one row to `PINS` in `packages/devtools/src/scans/test-folders.ts`. The later of two open PRs rebases over the earlier one's row.
   - [ ] BA-271 is the only PR that edits `.github/workflows/check.yml` before BA-278, and the only one that edits `.github/workflows/build.yml`.
-  - [ ] BA-272, BA-277 and BA-278 touch only `apps/web/`, `apps/api/tests/` for moved harness cases, `apps/web/.claude/skills/playwright-specs/` and, for BA-278, `.github/workflows/check.yml`, `PINS`, `docs/operations/CI.md`, `docs/plans/009-test-pyramid/` and the `docs/solutions/` line a deletion makes false.
+  - [ ] BA-272, BA-277 and BA-278 touch only `apps/web/`, `apps/api/tests/` for moved harness cases, `.claude/skills/playwright-specs/` and, for BA-278, `.github/workflows/check.yml`, `PINS`, `docs/operations/CI.md`, `docs/plans/009-test-pyramid/` and the `docs/solutions/` line a deletion makes false.
 - [ ] Hold the review gate. No PR changes an interaction, so none waits for the operator's review.
 
 ### PR mechanics, for every PR
@@ -290,7 +290,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
   - [ ] Two drives run side by side on two ports, since each provisions its own workspace and mints its own addresses.
   - [ ] Cleanup stops what the drive started, by process id, and leaves the evidence where the skill names it.
 - [ ] Write a feature file for each area of `apps/web/src/shared/navigation/areas.ts` that names every page in that area, and one for the pages outside the shell, such as sign-in and consent. The generator seeds three to five features. This repository asks for every page, because the plan's lanes drive pages the first five would miss.
-- [ ] Move browser-suite's text without rewording it, split by job. The verify skill holds the seam, the launch and the seeding facts, which a drive needs. `apps/web/.claude/skills/playwright-specs/` holds the rules for writing and running a spec. `/maintain-verification-skill` edits only the verify skill's directory, so a spec rule kept there would be rewritten by a pass that never reads a spec.
+- [ ] Move browser-suite's text without rewording it, split by job. The verify skill holds the seam, the launch and the seeding facts, which a drive needs. `.claude/skills/playwright-specs/` holds the rules for writing and running a spec. `/maintain-verification-skill` edits only the verify skill's directory, so a spec rule kept there would be rewritten by a pass that never reads a spec.
 - [ ] Write `web-skills.test.ts` to keep the old test's four claims, read over both skills. Every `apps/` path the skills name exists. They name the suite's own modules. They name every helper two or more specs share. They give table rows only to helpers the suite still exports. Add two claims. Every page in `apps/web/src/shared/navigation/areas.ts` appears in a file under `.claude/skills/verify/features/`. The verify skill's frontmatter says `name: verify` and has no `disable-model-invocation`.
 - [ ] Edit `.agents/playbooks/verification.md`. Delete "This repository has no `verify` skill. Its matching surface is `.claude/skills/browser-suite/SKILL.md`." In the "Reproduce it yourself" change, delete "the driver skill is `browser-suite`" and keep BA-268's lowest-layer rule, because poteto-mode finds `.claude/skills/verify/` without help. In the "Verify on the matching surface." change, add that a change to a page is also driven live through that page's feature file, and that a change to what a page shows updates its feature file in the same PR.
 - [ ] Edit `.agents/playbooks/plan.md`. Delete the change that names `browser-suite` as the web's driver skill, because the bundled step finds `.claude/skills/verify/` without it.
@@ -320,7 +320,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Lane 6. Run `/maintain-verification-skill` at the head. Save `maintain.md`. Pass when its outcome is `clean`.
 - [ ] Lane 7. Run `node <plugin>/skills/poteto-mode/scripts/check-playbooks.mjs` from the repository root. Save `check-playbooks.log`. Pass when it prints no unanchored change for `verification.md` or `plan.md`.
 - [ ] Lane 8. In scratch edits, drop one page from a feature file, then rename one shared helper export in `apps/web/e2e/locators.ts`. Save `skill-test-breaks.log`. Pass when `web-skills.test.ts` fails on each, naming the page and the helper.
-- [ ] Lane 9. Write one new spec for an existing page from `apps/web/.claude/skills/playwright-specs/` alone, and run it per its *Running it*. Save `new-spec.log`. Pass when the spec passes and the gate audits its page.
+- [ ] Lane 9. Write one new spec for an existing page from `.claude/skills/playwright-specs/` alone, and run it per its *Running it*. Save `new-spec.log`. Pass when the spec passes and the gate audits its page.
 - [ ] Lane 10. Audit that every fact browser-suite held has one home. Compare browser-suite at trunk with the two new skills, section by section and row by row. Save `audit.md`. Pass when each is found in exactly one of them, unchanged except for paths.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
@@ -527,7 +527,7 @@ Changed 29/10/2026. The triage's 70 duplicates were estimates from titles and a 
 - [ ] Edit `apps/web/playwright.config.ts` to add a `gate` project for the accessibility-gate spec. Playwright sets a web server on the config and never on a project, so `E2E_GATE_ALONE=1` leaves the api out and serves the build with `vite preview`.
 - [ ] Edit `apps/web/test/gates/playwright-config.test.ts` to pin the two projects and the gate-alone switch.
 - [ ] Edit `apps/api/tests/support/harness/harness-control.test.ts` so its "answers 400 naming an unreadable reason that holds a space" case also asserts that the refused seed leaves no connected source. Sources' "tells a spec why the harness refused its seed" made that claim beyond the 400 the api case asserts, and the seed call's error naming the status, field and rule. Add `apps/web/test/gates/harness-refusal.test.ts` for the second.
-- [ ] Edit `apps/web/.claude/skills/playwright-specs/` wherever it names a deleted case or the project list.
+- [ ] Edit `.claude/skills/playwright-specs/` wherever it names a deleted case or the project list.
 
 **Build.**
 
@@ -910,7 +910,7 @@ PR 1 deletes 352 of the 367 rows its classification first named. Three rows are 
 - [ ] PR 2. Add 27 Testing Library tests, 3 api tests and 1 core test, and delete the browser case each replaces, for the `2-new` rows of `ba-278-cases.tsv`.
 - [ ] PR 3. Add 34 Testing Library tests and 1 api test, and delete the browser case each replaces, for the `3-new` rows.
 - [ ] PR 4. Edit the remaining specs under `apps/web/e2e/`. Create `apps/web/e2e/journeys/`, one spec per cross-page journey, named for the journey, such as `sign-in-to-shell.spec.ts` and `invite-then-accept.spec.ts`. Add one row to `PINS` in `packages/devtools/src/scans/test-folders.ts`, `{ folder: "apps/web/e2e/journeys", kind: "mirror", reason: "docs/specs/route" }`, because a journey's subject is the route and not one feature and the gate refuses a folder it has no row for.
-- [x] PR 5. Edit `.github/workflows/check.yml`, the `full-web-browser` shard matrix and the `full-core` shards. Edit `docs/operations/CI.md`, whose `full-web-browser` entry names three shards, `apps/web/.claude/skills/playwright-specs/` and `docs/specs/route/seams.md` where a named spec moved or a count changed.
+- [x] PR 5. Edit `.github/workflows/check.yml`, the `full-web-browser` shard matrix and the `full-core` shards. Edit `docs/operations/CI.md`, whose `full-web-browser` entry names three shards, `.claude/skills/playwright-specs/` and `docs/specs/route/seams.md` where a named spec moved or a count changed.
 
 **Build.**
 

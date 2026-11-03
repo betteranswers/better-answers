@@ -61,6 +61,8 @@ describe("the gate", () => {
   const entry = (name: string, frontmatter: string): SkillOnDisk => ({
     skill: name,
     tracked: true,
+    symlink: false,
+    linkTracked: false,
     text: skill(frontmatter),
   });
   const held = 'name: hono\npaths: "apps/api/**, packages/core/**"';
@@ -96,6 +98,50 @@ describe("the gate", () => {
     );
 
     expect(found[0]).toContain("no row");
+  });
+
+  it("refuses a symlinked skill folder and names the recovery", () => {
+    const found = findingsFor(
+      [{ ...entry("hono", held), symlink: true }, entry("verify", "name: verify")],
+      TABLE,
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain("symlink");
+    expect(found[0]).toContain("git checkout -- .claude/skills/hono");
+    expect(found[0]).toContain("skills-update");
+    expect(found[0]).not.toContain("Delete the row");
+  });
+
+  it("accepts a symlink the repository tracks as one", () => {
+    expect(
+      findingsFor(
+        [
+          { ...entry("hono", held), symlink: true, linkTracked: true },
+          entry("verify", "name: verify"),
+        ],
+        TABLE,
+      ),
+    ).toEqual([]);
+  });
+
+  it("refuses a tracked skill with no SKILL.md", () => {
+    const found = findingsFor(
+      [
+        {
+          ...entry("hono", held),
+          text: null,
+          symlink: true,
+          linkTracked: true,
+        },
+        entry("verify", "name: verify"),
+      ],
+      TABLE,
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain("git checkout -- .claude/skills/hono");
+    expect(found[0]).not.toContain("Delete the row");
   });
 
   it("fails a tracked row with no tracked skill", () => {

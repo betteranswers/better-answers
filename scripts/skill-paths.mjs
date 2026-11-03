@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { trackedFiles } from "../packages/devtools/src/paths.ts";
 import {
   findingsFor,
   SCOPES,
@@ -21,32 +21,49 @@ const write = process.argv.includes("--write");
 
 const skillFile = (skill) => path.join(workingTree, SKILLS_FOLDER, skill, "SKILL.md");
 
-const tracked = new Set(
-  trackedFiles(workingTree)
-    .filter((file) => file.startsWith(`${SKILLS_FOLDER}/`))
-    .map((file) => file.split("/")[2]),
+const trackedFilesHere = execFileSync("git", ["-C", workingTree, "ls-files", "-z", SKILLS_FOLDER], {
+  encoding: "utf8",
+})
+  .split("\0")
+  .filter((file) => file !== "");
+
+const tracked = new Set(trackedFilesHere.map((file) => file.split("/")[2]));
+
+const linkTracked = new Set(
+  trackedFilesHere.filter((file) => file.split("/").length === 3).map((file) => file.split("/")[2]),
 );
 
-const read = () =>
-  readdirSync(path.join(workingTree, SKILLS_FOLDER), { withFileTypes: true }).flatMap((entry) => {
-    try {
-      return [
-        {
-          skill: entry.name,
-          tracked: tracked.has(entry.name),
-          text: readFileSync(skillFile(entry.name), "utf8"),
-        },
-      ];
-    } catch {
-      return [];
-    }
-  });
+const textOf = (skill) => {
+  try {
+    return readFileSync(skillFile(skill), "utf8");
+  } catch {
+    return null;
+  }
+};
+
+const read = () => {
+  const entries = readdirSync(path.join(workingTree, SKILLS_FOLDER), {
+    withFileTypes: true,
+  })
+    .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+    .map((entry) => entry.name);
+  return [...new Set([...entries, ...tracked])].map((skill) => ({
+    skill,
+    tracked: tracked.has(skill),
+    symlink:
+      lstatSync(path.join(workingTree, SKILLS_FOLDER, skill), {
+        throwIfNoEntry: false,
+      })?.isSymbolicLink() ?? false,
+    linkTracked: linkTracked.has(skill),
+    text: textOf(skill),
+  }));
+};
 
 if (write) {
   const table = new Map(SCOPES.map((one) => [one.skill, one.paths]));
   for (const one of read()) {
     const paths = table.get(one.skill);
-    if (paths === undefined) continue;
+    if (paths === undefined || one.text === null || (one.symlink && !one.linkTracked)) continue;
     const next = withPaths(one.text, paths);
     if (next === one.text) continue;
     writeFileSync(skillFile(one.skill), next);

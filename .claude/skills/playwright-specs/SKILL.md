@@ -1,7 +1,7 @@
 ---
 name: playwright-specs
 description: This skill should be used when asked to "write a browser spec", "add a Playwright test", "run the e2e suite", "debug a flaky spec" or "test a passkey in the browser", when a spec under apps/web/e2e fails, flakes or hangs, when the accessibility gate refuses a page, or when a change renames a page's label, heading or accessible name. It covers the client-address fixtures, the virtual authenticator, locators, waiting, refusals, latency budgets, the shared helpers, the gate and the run commands.
-paths: "apps/web/e2e/**, apps/web/playwright.config.ts"
+paths: "apps/web/**"
 ---
 
 # Playwright specs
