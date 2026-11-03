@@ -52,7 +52,7 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `switched` | Opens the switcher named for where the person is and picks the radio item holding another workspace's name. It waits for nothing after the pick, so the spec asserts where the person landed |
 | `inTwoWorkspaces` | A new person who is the Admin of one new workspace and holds a role in a second, Admin unless Viewer is named. It signs them in through `signIn`, picks the first workspace, waits for the Admin's home and the switcher named for it, and answers the address and both workspaces. A spec about moving between workspaces starts from it |
 | `authenticatorCodeField` | The *Authenticator Code* field, by its exact label. `signIn` fills it on the confirm page |
-| `memberUnreadUntil` | Drops the shell's member read, fails the member read in the frame's batch, and holds the lone retry until the promise it is given settles. The page then draws with the member unread. A spec sets it up, reloads, and acts before it lets the read land, as `apps/web/e2e/people/members.spec.ts` does |
+| `memberUnreadUntil` | Drops the shell's member read, fails the member read in the frame's batch, and holds the lone retry until the promise it is given settles. The page then draws with the member unread. A spec sets it up, reloads, and acts before it lets the read land, as `apps/web/e2e/journeys/self-removal-to-the-chooser.spec.ts` does |
 | `ACTION_SAMPLES` | How many times a spec clocks one action before it judges it, five. A spec seeds `ACTION_SAMPLES - 1` extra rows, so each sample has a row to act on |
 | `actionClocked` | Waits for the clock `clockTheNextKey` started and answers it in milliseconds. It fails when no clock was started, and fails by name when the node had not read its text 2 s after the key while a request was held. A spec collects one per sample for `theActionsLandedWithinTheirBudget` |
 | `theActionsLandedWithinTheirBudget` | Annotates the test with every sample of an action and their median, and asserts the median under the action's 100 ms, which on CI it only annotates. It fails by name when the action was never clocked. `theActionLandedWithinItsBudget` is the same check over one sample |
@@ -66,7 +66,7 @@ not go.
 
 ## Claude's part in OAuth
 
-Six more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/auth/consent.spec.ts` for the consent page, `apps/web/e2e/journeys/console-end-sessions.spec.ts` for a person who has given an assistant access:
+Six more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/auth/consent.spec.ts` for the consent page, `apps/web/e2e/journeys/consent-and-oauth.spec.ts` and `apps/web/e2e/journeys/console-end-sessions.spec.ts` for a person who has given an assistant access:
 
 | Helper | What it does |
 | --- | --- |
@@ -150,8 +150,8 @@ still shown the api refused.
 | Helper | What it does |
 | --- | --- |
 | `isAFind` | Matches a request whose path names `knowledge.find` anywhere, because the tRPC client batches its reads. A spec hands it to `heldBack`, `page.route` or a request wait to catch a search's read |
-| `heldBack` | Holds every request a matcher picks until the spec releases it. It answers `reached`, which settles when the first arrives, and `release`. A spec reads the page while a read is still out with it. `apps/web/e2e/knowledge/search.spec.ts` uses it during a search and `apps/web/e2e/sources/connected-sources.spec.ts` during the sources list |
+| `heldBack` | Holds every request a matcher picks until the spec releases it. It answers `reached`, which settles when the first arrives, and `release`. A spec reads the page while a read is still out with it. `apps/web/e2e/knowledge/search.spec.ts` uses it during a search and `apps/web/e2e/journeys/source-upload-to-published.spec.ts` while the sources list loads |
 | `scrolledSideways` | How far the page scrolls sideways in pixels, the document's scroll width less its client width. A spec at a narrow width asserts it is 0 |
 | `listsItsKeystrokes` | Opens the page's list of keystrokes through `keystrokesListed`. It asserts each given key is among the list's terms and each named action is in it, then dismisses the list through `keystrokesDismissed`. A page's keystroke spec runs it with the page's own keys |
-| `conceptsSeeded` | Runs `seedConcepts` and answers a map from each concept's title to what the harness answered for it, its IRI, path and cited documents. `apps/web/e2e/knowledge/concept.spec.ts`, `apps/web/e2e/knowledge/knowledge-base.spec.ts` and `apps/web/e2e/inbox/waiting-on-you.spec.ts` look concepts up in it by title |
+| `conceptsSeeded` | Runs `seedConcepts` and answers a map from each concept's title to what the harness answered for it, its IRI, path and cited documents. `apps/web/e2e/knowledge/concept.spec.ts` and `apps/web/e2e/inbox/waiting-on-you.spec.ts` look concepts up in it by title |
 | `knowledgeMenuOpened` | Opens Knowledge from the rail and answers its menu once it shows. `apps/web/e2e/knowledge/collections-and-owners.spec.ts` reads which pages a role sees there |

@@ -234,5 +234,37 @@ test.describe("Waiting on You", () => {
       }
       theActionsLandedWithinTheirBudget("accepting a suggestion", clocked);
     });
+
+    await test.step("opens a suggestion within budget and declines it by keyboard alone", async () => {
+      await page.goto(WAITING_ON_YOU.path);
+      await expect(rowTitles(page).first()).toBeVisible();
+      const opened = (await rowTitles(page).first().innerText()).trim();
+      await skipLinkReachesThePage(page);
+      await tabUntilFocused(page, rowLink(page, opened).first());
+
+      const started = Date.now();
+      await page.keyboard.press("Enter");
+      await expect(
+        page.getByRole("heading", { level: 2, name: opened, exact: true }),
+      ).toBeVisible();
+      const elapsed = Date.now() - started;
+      test.info().annotations.push({ type: "suggestion", description: `${String(elapsed)} ms` });
+      expect(elapsed, "a suggestion rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+
+      await tabUntilFocused(page, page.getByRole("link", { name: "Back to Waiting on You" }));
+      await page.keyboard.press("Tab");
+      await expect(page.getByRole("button", { name: "Accept", exact: true })).toBeFocused();
+      await page.keyboard.press("Tab");
+      const decline = page.getByRole("button", { name: "Decline", exact: true });
+      await expect(decline).toBeFocused();
+
+      await page.keyboard.press("d");
+      await expect(page.getByRole("textbox", { name: "Reason for Declining" })).toBeFocused();
+      await passesTheAccessibilityGate();
+
+      await tabUntilFocused(page, page.getByRole("button", { name: "Cancel", exact: true }), 5);
+      await page.keyboard.press("Enter");
+      await expect(decline).toBeFocused();
+    });
   });
 });

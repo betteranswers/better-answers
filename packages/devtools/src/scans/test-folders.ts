@@ -32,7 +32,11 @@ export const PINS: readonly Pin[] = [
     reason: "the images script and the full-images job select it; check excludes it",
   },
   { folder: "apps/api/tests/trpc/members", kind: "split", reason: "apps/api/src/trpc/members.ts" },
-  { folder: "apps/web/e2e/journeys", kind: "mirror", reason: "docs/specs/route" },
+  {
+    folder: "apps/web/e2e/journeys",
+    kind: "mirror",
+    reason: "docs/specs/route: the Appendix F journeys that cross pages through the real api",
+  },
   {
     folder: "packages/core/test/budgets",
     kind: "run",
@@ -117,12 +121,14 @@ export const isNamedKind = (
 const strayReport = (folder: string): string =>
   `${folder}: mirrors no source folder and is not a kind folder. Move its files to the folder of the entry they drive, or add a row to PINS in ${WHERE_THE_PINS_LIVE} with the kind and the reason.`;
 
+export const treeOf = (pin: Pin): string => pin.reason.split(": ")[0] ?? pin.reason;
+
 const staleReport = (pin: Pin, files: readonly string[]): string | undefined => {
   if (!files.some((file) => holds(pin.folder, file))) {
     return `${pin.folder}: its row in ${WHERE_THE_PINS_LIVE} is stale, since the folder holds no tracked file. Delete the row.`;
   }
-  if (pin.kind !== "run" && !files.some((file) => holds(pin.reason, file))) {
-    return `${pin.folder}: its row names ${pin.reason}, which holds no tracked file. Point the row at the tree it mirrors, or move the tests into their mirror folder and delete the row.`;
+  if (pin.kind !== "run" && !files.some((file) => holds(treeOf(pin), file))) {
+    return `${pin.folder}: its row names ${treeOf(pin)}, which holds no tracked file. Point the row at the tree it mirrors, or move the tests into their mirror folder and delete the row.`;
   }
   return undefined;
 };

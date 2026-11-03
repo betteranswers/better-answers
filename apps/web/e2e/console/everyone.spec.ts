@@ -119,7 +119,8 @@ test.describe("the console's Everyone page", () => {
     await expect(personRows(page)).toHaveCount(1);
 
     const priya = personButton(page, "Priya Shah");
-    await priya.focus();
+    await page.keyboard.press("Tab");
+    await expect(priya, "Tab from the search did not reach the person").toBeFocused();
     await page.keyboard.press("o");
     await expect(sheetOf(page, "Priya Shah").getByRole("heading", { level: 2 })).toBeFocused();
     await page.keyboard.press("Escape");

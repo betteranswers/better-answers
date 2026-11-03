@@ -43,7 +43,7 @@ fixtures and adds a fourth:
 | `request` | An `APIRequestContext` on the config's `baseURL`, carrying a `cf-connecting-ip` header of its **own**; disposed after the test |
 | `passesTheAccessibilityGate` | The audit below, declared `auto`, so it runs whether a spec names it or not |
 
-A spec asks for the ones it uses and gets the rest anyway: `apps/web/e2e/app/frame.spec.ts` takes
+A spec asks for the ones it uses and gets the rest anyway: `apps/web/e2e/auth/sign-in.spec.ts` takes
 `context` to clear cookies mid-test, and every spec that builds state takes `request`.
 
 The two addresses are **different on purpose**. The browser is one client and the set-up traffic
@@ -152,7 +152,7 @@ signs in by email while the device holds a passkey.
   a number the alert shows is matched by pattern. No spec imports a refusal's sentence, and the
   page gains no marker for a test's sake. `apps/web/e2e/people/members.spec.ts` reads a batched answer,
   `apps/web/e2e/sources/connected-sources.spec.ts` one sent alone,
-  `apps/web/e2e/auth/sign-in.spec.ts` Better Auth's, and `apps/web/e2e/app/frame.spec.ts` a
+  `apps/web/e2e/auth/confirm.spec.ts` Better Auth's, and `apps/web/e2e/ask/new-question.spec.ts` a
   dropped request.
 - **A latency budget is measured, annotated and asserted**: `test.info().annotations.push(…)`
   beside the comparison, so a run that passes still says how close it came. A list's second is
@@ -168,7 +168,7 @@ signs in by email while the device holds a passkey.
   draw that does wait on the server, such as jump-to's list, uses `clockTheNextDraw`, which holds
   nothing. `apps/web/e2e/sources/connected-sources.spec.ts` times both, with `clockTheNextKey` and
   `theActionLandedWithinItsBudget`. Most specs time one sample;
-  `apps/web/e2e/people/members.spec.ts` and `apps/web/e2e/people/groups.spec.ts` take the median of
+  `apps/web/e2e/people/members.spec.ts` and `apps/web/e2e/inbox/waiting-on-you.spec.ts` take the median of
   `ACTION_SAMPLES` through `theActionsLandedWithinTheirBudget`.
 - **A shared part no page draws yet is bundled with Vite, not imported.** Playwright compiles
   every `.tsx` it loads with its own JSX runtime, so React cannot render a component a spec imports.
@@ -196,12 +196,11 @@ carries that as three things, of which automated rules are only one:
   the floor, not the extra.
 - **An aria snapshot**, written inline with `toMatchAriaSnapshot`, where what a page *sounds
   like* is the thing under test: a row that lost its heading or a list that stopped being a list
-  fails it though the pixels are unchanged. `apps/web/e2e/model-choices/models-and-spend.spec.ts` holds one and
-  `apps/web/e2e/app/frame.spec.ts` two.
+  fails it though the pixels are unchanged. `apps/web/e2e/model-choices/models-and-spend.spec.ts` holds two.
 
 Ask for the `passesTheAccessibilityGate` fixture, called with no arguments, where the test does
 not end on the page it is about. The models-and-spend and failed-page specs walk on to other pages
-afterwards; most tests in `apps/web/e2e/auth/consent.spec.ts` end at the assistant's own redirect, which
+afterwards; most tests in `apps/web/e2e/journeys/consent-and-oauth.spec.ts` end at the assistant's own redirect, which
 is another origin and no page of ours. A test that ends somewhere this product did not serve and
 audited nothing is refused by name, so an absence is a failure rather than a silence.
 `apps/web/e2e/model-choices/models-and-spend.spec.ts` carries all three and is the model to copy.

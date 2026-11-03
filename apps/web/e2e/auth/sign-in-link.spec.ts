@@ -70,7 +70,7 @@ test("signing in by link in another tab lands the asker", async ({ page, context
   await landedAtHome(asking, "Editor");
 });
 
-test("the code reads as six digits, and c copies it", async ({
+test("Sign In Link reads six digits and copies on c", async ({
   page,
   context,
   request,
