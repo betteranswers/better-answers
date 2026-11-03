@@ -34,6 +34,12 @@ export const SAM = joined("01JSAM", "Sam Okoro", "Viewer");
 
 export const listed = () => within(screen.getByRole("region", { name: "Members" }));
 
+export const namesShown = (): (string | null)[] =>
+  listed()
+    .getAllByRole("row")
+    .filter((row) => within(row).queryAllByRole("cell").length > 0)
+    .map((row) => within(row).getAllByRole("link").at(0)?.textContent ?? null);
+
 export const rowOf = (name: string): HTMLElement => {
   const row = listed().getByRole("link", { name }).closest("tr");
   if (row === null) throw new Error(`${name} has no row`);

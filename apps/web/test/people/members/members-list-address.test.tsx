@@ -3,7 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { choosing, placedWithoutMeasuring } from "@test/measuring.ts";
-import { joined, listed, MEMBERS, outcome, PRIYA, siteLeads } from "@test/people/members-roster.ts";
+import {
+  joined,
+  listed,
+  MEMBERS,
+  namesShown,
+  outcome,
+  PRIYA,
+  siteLeads,
+} from "@test/people/members-roster.ts";
 import { ADA, adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -30,12 +38,6 @@ const apiOf = (...members: readonly object[]) => {
   api.set("members.groups", () => read([SITE_LEADS]));
   return api;
 };
-
-const namesShown = (): (string | null)[] =>
-  listed()
-    .getAllByRole("row")
-    .filter((row) => within(row).queryAllByRole("cell").length > 0)
-    .map((row) => within(row).getAllByRole("link").at(0)?.textContent ?? null);
 
 const memberLink = (name: string) => listed().getByRole("link", { name });
 

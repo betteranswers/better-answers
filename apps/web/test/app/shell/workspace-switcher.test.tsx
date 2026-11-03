@@ -39,7 +39,14 @@ import { HOMES } from "@/shared/navigation.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { server, type Asked } from "@test/stub-server.ts";
-import { addressOf, answered, answeringAs, heldBack, type Api } from "@test/stubbed-api.ts";
+import {
+  addressOf,
+  answered,
+  answeringAs,
+  heldBack,
+  type Api,
+  type Held,
+} from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -329,6 +336,12 @@ const openAtTheMembers = async (api: Api = adaAnAdmin()) => {
   return router;
 };
 
+const newMembersLoaded = async (list: Held) => {
+  expect(await screen.findByText(MEMBERS_LOADING)).toBeDefined();
+  list.resolve();
+  await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());
+};
+
 const BOTH = [`${NORTHERN.name} Admin`, `${HOLME.name} Viewer`];
 
 const home = (name: string) => screen.findByRole("heading", { level: 1, name });
@@ -382,10 +395,7 @@ describe("the workspace switcher in the app", () => {
     expect(document.body.textContent, "drew a person from the left workspace").not.toContain(
       GRACE.displayName,
     );
-    expect(await screen.findByText(MEMBERS_LOADING)).toBeDefined();
-
-    list.resolve();
-    await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());
+    await newMembersLoaded(list);
   });
 
   it("drops the left workspace's members when All workspaces picks another", async () => {

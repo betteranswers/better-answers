@@ -10,16 +10,7 @@ import { HOMES, type Role } from "@/shared/navigation.ts";
 import { appAt, openApp } from "@test/open-app.tsx";
 import { addressOf, answered, answeringAs, withTheApiDown } from "@test/stubbed-api.ts";
 
-/**
- * The auth library keeps the `fetch` it found when made, so it is given one that asks whichever
- * stub stands now.
- */
-vi.hoisted(() => {
-  const original = globalThis.fetch;
-  const forwarding: typeof fetch = (input, init) =>
-    globalThis.fetch === forwarding ? original(input, init) : globalThis.fetch(input, init);
-  globalThis.fetch = forwarding;
-});
+await vi.hoisted(() => import("@test/forwarding-fetch.ts"));
 
 const A_MEMBER = {
   workspace: { id: "w", name: "Northern Tooling" },

@@ -16,7 +16,7 @@ import { JUMP_TO } from "@/app/words.ts";
 import { useRemovalOf, useRemoveMember } from "@/features/people/people-api.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { anAdminOver } from "@test/people/member-pages.ts";
-import { joined, listed, MEMBERS, PRIYA } from "@test/people/members-roster.ts";
+import { joined, MEMBERS, namesShown, PRIYA } from "@test/people/members-roster.ts";
 import { answeringAs } from "@test/stubbed-api.ts";
 import { ADA, openAt, read as readAnswer } from "@test/two-workspaces.ts";
 
@@ -76,12 +76,6 @@ const aTeamPriyaCanBeRemovedFrom = () => {
   return api;
 };
 
-const membersListed = (): (string | null)[] =>
-  listed()
-    .getAllByRole("row")
-    .filter((row) => within(row).queryAllByRole("cell").length > 0)
-    .map((row) => within(row).getAllByRole("link").at(0)?.textContent ?? null);
-
 const rowMenuOpened = async (name: string): Promise<HTMLElement> => {
   fireEvent.keyDown(await screen.findByRole("button", { name: `Actions for ${name}` }), {
     key: "Enter",
@@ -127,7 +121,7 @@ describe("a removal and jump-to", () => {
 
   it("removing a member opened from jump-to keeps Members' search", async () => {
     const router = await openAt(SEARCHED, aTeamPriyaCanBeRemovedFrom());
-    await waitFor(() => expect(membersListed()).toEqual([TOM.displayName]));
+    await waitFor(() => expect(namesShown()).toEqual([TOM.displayName]));
 
     await jumpedToMember("priya", PRIYA.displayName);
     await removedOnTheirPage();
@@ -135,7 +129,7 @@ describe("a removal and jump-to", () => {
     await waitFor(() => expect(router.state.location.href).toBe(SEARCHED));
     const box = screen.getByRole("searchbox", { name: "Search by name or address" });
     expect(screen.getByDisplayValue(SURNAME)).toBe(box);
-    expect(membersListed()).toEqual([TOM.displayName]);
+    expect(namesShown()).toEqual([TOM.displayName]);
   });
 
   it("jumping after a removal focuses the page, not Remove", async () => {
@@ -144,7 +138,7 @@ describe("a removal and jump-to", () => {
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Remove" }));
     await screen.findByRole("heading", { level: 2, name: PRIYA.displayName });
     await removedOnTheirPage();
-    await waitFor(() => expect(membersListed()).toEqual([ADA.displayName, TOM.displayName]));
+    await waitFor(() => expect(namesShown()).toEqual([ADA.displayName, TOM.displayName]));
 
     const focus = recordingFocus();
     try {
