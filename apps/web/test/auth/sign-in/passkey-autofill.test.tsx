@@ -47,6 +47,19 @@ const wrapper = (properties: { readonly children: ReactNode }) => (
   <Providers clients={createAppClients()}>{properties.children}</Providers>
 );
 
+const withAConditionalDevice = (
+  device: (options: CredentialRequestOptions) => Promise<unknown>,
+) => {
+  vi.stubGlobal(
+    "PublicKeyCredential",
+    Object.assign(() => undefined, { isConditionalMediationAvailable: async () => true }),
+  );
+  Object.defineProperty(navigator, "credentials", {
+    value: { get: device },
+    configurable: true,
+  });
+};
+
 describe("signing in with a passkey from the email field", () => {
   it("says a refused autofill pick after a cancelled press", async () => {
     const field = document.createElement("input");
@@ -54,14 +67,7 @@ describe("signing in with a passkey from the email field", () => {
     document.body.append(field);
     const device = aDevice();
     vi.stubGlobal("fetch", passkeyRoutes);
-    vi.stubGlobal(
-      "PublicKeyCredential",
-      Object.assign(() => undefined, { isConditionalMediationAvailable: async () => true }),
-    );
-    Object.defineProperty(navigator, "credentials", {
-      value: { get: device },
-      configurable: true,
-    });
+    withAConditionalDevice(device);
     const { result } = renderHook(() => usePasskeySignIn(true, () => undefined), { wrapper });
     await waitFor(() => {
       expect(device).toHaveBeenCalledOnce();
@@ -101,14 +107,7 @@ describe("signing in with a passkey from the email step", () => {
     const prompt = Promise.withResolvers<null>();
     const device = aDevicePressedAs(() => prompt.promise, NOTHING_GIVEN);
     server.answer = onlyThePasskeyOptions;
-    vi.stubGlobal(
-      "PublicKeyCredential",
-      Object.assign(() => undefined, { isConditionalMediationAvailable: async () => true }),
-    );
-    Object.defineProperty(navigator, "credentials", {
-      value: { get: device },
-      configurable: true,
-    });
+    withAConditionalDevice(device);
     const user = userEvent.setup();
     await openApp("/sign-in");
     const field = await screen.findByLabelText("Email Address");

@@ -1,15 +1,10 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
+import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/signed-in-without-workspace.ts";
 import { server, type Asked } from "@test/stub-server.ts";
 import { addressOf, type Api } from "@test/stubbed-api.ts";
-import {
-  ADA,
-  adaAnAdmin,
-  aRefusalAnswer,
-  openOutsideTheShellAt,
-  read,
-} from "@test/two-workspaces.ts";
+import { aRefusalAnswer, openOutsideTheShellAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
@@ -24,18 +19,8 @@ const THE_LINK = `/invitations/${INVITATION_ID}`;
 
 const SIGN_OUT = "/sign-out";
 
-const NEEDS_A_PICK = aRefusalAnswer("no-active-workspace", "unauthenticated", 401);
-
-const signedInAs = (name: string) => ({
-  session: { id: "s" },
-  user: { id: ADA.personId, name, email: ADA.address },
-});
-
 const inviteeNamed = (name: string): Api => {
-  const api = adaAnAdmin();
-  api.set("/get-session", () => signedInAs(name));
-  api.set("session.member", () => NEEDS_A_PICK);
-  api.set("person.invitations", () => read([]));
+  const api = aPersonNamedWithNoWorkspace(name);
   api.set(SIGN_OUT, () => ({ success: true }));
   return api;
 };

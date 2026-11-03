@@ -93,15 +93,20 @@ const picksRefused = (api: Api): (() => number) => {
   return () => asked;
 };
 
+const openedWithTwo = async () => {
+  const api = holding([NORTHERN_ROW, HOLME_ROW]);
+  picksOpenAs(api, "Admin");
+  const { picked, watching } = watchingPicks();
+  const router = await openOutsideTheShellAt("/choose-workspace", api, watching);
+  return { api, picked, router };
+};
+
 const thePicker = () => screen.findByRole("heading", { level: 1, name: PICKER_WORDS.heading });
 
 const refusal = () => screen.getByRole("alert").textContent;
 
 it("shows a member of two workspaces their role in each", async () => {
-  const api = holding([NORTHERN_ROW, HOLME_ROW]);
-  picksOpenAs(api, "Admin");
-  const { picked, watching } = watchingPicks();
-  const router = await openOutsideTheShellAt("/choose-workspace", api, watching);
+  const { picked, router } = await openedWithTwo();
 
   const list = await within(screen.getByRole("main")).findByRole("list");
 
@@ -210,10 +215,7 @@ it("separates an unread workspace list from no workspace, offering retry", async
 });
 
 it("drops and names a workspace the person was removed from", async () => {
-  const api = holding([NORTHERN_ROW, HOLME_ROW]);
-  picksOpenAs(api, "Admin");
-  const { picked, watching } = watchingPicks();
-  const router = await openOutsideTheShellAt("/choose-workspace", api, watching);
+  const { api, picked, router } = await openedWithTwo();
   const taken = await screen.findByRole("button", { name: HOLME.name });
   removedFrom(HOLME);
   api.set("person.workspaces", () => read([NORTHERN_ROW]));

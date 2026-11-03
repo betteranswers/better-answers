@@ -2,15 +2,9 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { DISPLAY_NAME_MAX_CHARACTERS } from "@/shared/member/display-name-words.ts";
+import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/signed-in-without-workspace.ts";
 import { server } from "@test/stub-server.ts";
-import type { Api } from "@test/stubbed-api.ts";
-import {
-  ADA,
-  adaAnAdmin,
-  aRefusalAnswer,
-  openOutsideTheShellAt,
-  read,
-} from "@test/two-workspaces.ts";
+import { aRefusalAnswer, openOutsideTheShellAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
@@ -19,27 +13,11 @@ afterEach(() => {
   localStorage.clear();
 });
 
-const NEEDS_A_PICK = aRefusalAnswer("no-active-workspace", "unauthenticated", 401);
-
-const signedInAs = (name: string) => ({
-  session: { id: "s" },
-  user: { id: ADA.personId, name, email: ADA.address },
-});
-
-const aPersonWithNoWorkspace = (): Api => {
-  const api = adaAnAdmin();
-  api.set("/get-session", () => signedInAs(""));
-  api.set("session.member", () => NEEDS_A_PICK);
-  api.set("person.workspaces", () => read([]));
-  api.set("person.invitations", () => read([]));
-  return api;
-};
-
 const saved = () =>
   server.asks.filter((ask) => ask.procedure === "person.setDisplayName").map((ask) => ask.input);
 
 it("says what to change in a bad name, then saves", async () => {
-  const api = aPersonWithNoWorkspace();
+  const api = aPersonNamedWithNoWorkspace("");
   const answers = [
     () => aRefusalAnswer("display-name-angle-bracket", "malformed", 400),
     () => aRefusalAnswer("display-name-too-long", "malformed", 400),
