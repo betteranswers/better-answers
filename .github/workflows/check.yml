@@ -119,6 +119,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: the runner's CPU
+        run: lscpu | grep -E '^(Model name|CPU\(s\)):'
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -154,15 +156,12 @@ jobs:
     if: ${{ needs.lane.outputs.lane == 'full' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
-    strategy:
-      # Cancelling the other shard would hide its failures until this one's were fixed.
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: the runner's CPU
+        run: lscpu | grep -E '^(Model name|CPU\(s\)):'
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -190,9 +189,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - run: pnpm check:core:suite --shard="${SHARD}"
-        env:
-          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+      - run: pnpm check:core:suite
 
   full-api:
     needs: lane
@@ -203,6 +200,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: the runner's CPU
+        run: lscpu | grep -E '^(Model name|CPU\(s\)):'
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -240,6 +239,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: the runner's CPU
+        run: lscpu | grep -E '^(Model name|CPU\(s\)):'
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -254,17 +255,14 @@ jobs:
     if: ${{ needs.lane.outputs.lane == 'full' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
-    strategy:
-      # Cancelling the other shard would hide its failures until this one's were fixed.
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
     env:
-      TRACE_ARTIFACT: browser-traces-shard-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
+      TRACE_ARTIFACT: browser-traces-attempt-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: the runner's CPU
+        run: lscpu | grep -E '^(Model name|CPU\(s\)):'
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -276,9 +274,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - run: pnpm check:web:e2e --shard="${SHARD}"
-        env:
-          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+      - run: pnpm check:web:e2e
       # Not failure(): a flake passes on its retry, and its trace is the one worth reading.
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -297,6 +293,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: the runner's CPU
+        run: lscpu | grep -E '^(Model name|CPU\(s\)):'
       # Weights inside the checkout are read by every tree walker too, and a job's own
       # `env:` cannot reach the `runner` context.
       - name: HF_HOME on the runner's own temp directory, not the checkout
@@ -345,6 +343,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: the runner's CPU
+        run: lscpu | grep -E '^(Model name|CPU\(s\)):'
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:

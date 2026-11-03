@@ -577,10 +577,7 @@ const RUN_BY_STEP: Readonly<Record<string, Readonly<Record<string, string>>>> = 
   "apps/web": { typecheck: "check:web:typecheck", test: "check:web:test", e2e: "check:web:e2e" },
 };
 
-const SHARDED_LEGS: Readonly<Record<string, string>> = {
-  "full-core": "check:core:suite",
-  "full-web-browser": "check:web:e2e",
-};
+const SHARDED_LEGS: Readonly<Record<string, string>> = {};
 
 const manifestAt = (directory: string): { readonly name: string; readonly check: string } => {
   const { name, scripts } = z
