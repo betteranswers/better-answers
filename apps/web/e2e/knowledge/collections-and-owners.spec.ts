@@ -12,6 +12,7 @@ import {
   provision,
   seedConcepts,
   signIn,
+  signOutFromTheShell,
   skipLinkReachesThePage,
 } from "../harness.ts";
 import { knowledgeMenuOpened, listsItsKeystrokes } from "../knowledge.ts";
@@ -107,7 +108,11 @@ const saveOf = (page: Page, collection: string): Locator =>
 const said = (page: Page): Locator => collections(page).getByRole("status").nth(1);
 
 test.describe("Collections and Owners", () => {
-  test("an Editor owning a collection finds it under Curation", async ({ page, request }) => {
+  test("an Editor owning a collection finds it under Curation", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
     const at = await aCuratedWorkspace(request, "Teme Valley Surveys");
     await ownersNamed(request, at, [
       { collection: "policy", personId: at.editor.id },
@@ -159,40 +164,40 @@ test.describe("Collections and Owners", () => {
             - term: Concepts with Their Own Owner
             - definition
     `);
-  });
+    await passesTheAccessibilityGate();
 
-  test("an Admin names and clears owners by keyboard alone", async ({ page, request }) => {
-    const at = await aCuratedWorkspace(request, "Teme Bridge Bakery");
-    await ownersNamed(request, at, [{ collection: "policy", personId: at.viewer.id }]);
-    await signedInAtThePage(page, request, at.admin.email);
+    await test.step("an Admin names and clears owners by keyboard alone", async () => {
+      await signOutFromTheShell(page, EDITOR);
+      await signedInAtThePage(page, request, at.admin.email);
 
-    await skipLinkReachesThePage(page);
-    await listsItsKeystrokes(page, "Collections and Owners", KEY, [
-      "Change the Owner of the Collection in Focus",
-    ]);
-    await page.keyboard.press(KEY.changeOwner.key);
-    await expect(pickerOf(page, "held"), "the key did not reach the first picker").toBeFocused();
+      await skipLinkReachesThePage(page);
+      await listsItsKeystrokes(page, "Collections and Owners", KEY, [
+        "Change the Owner of the Collection in Focus",
+      ]);
+      await page.keyboard.press(KEY.changeOwner.key);
+      await expect(pickerOf(page, "held"), "the key did not reach the first picker").toBeFocused();
 
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Tab");
-    await expect(pickerOf(page, "policy")).toBeFocused();
-    await page.keyboard.press("n");
-    await expect(pickerOf(page, "policy")).toHaveValue("");
-    await page.keyboard.press("Tab");
-    await expect(saveOf(page, "policy")).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(ownerOf(page, "policy")).not.toContainText(VIEWER);
-    await expect(said(page)).toHaveText(/\S/);
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Tab");
+      await expect(pickerOf(page, "policy")).toBeFocused();
+      await page.keyboard.press("n");
+      await expect(pickerOf(page, "policy")).toHaveValue("");
+      await page.keyboard.press("Tab");
+      await expect(saveOf(page, "policy")).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(ownerOf(page, "policy")).not.toContainText(EDITOR);
+      await expect(said(page)).toHaveText(/\S/);
 
-    await page.keyboard.press("Tab");
-    await expect(pickerOf(page, "safety")).toBeFocused();
-    await page.keyboard.press("r");
-    await expect(pickerOf(page, "safety")).toHaveValue(at.viewer.id);
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Enter");
-    await expect(ownerOf(page, "safety")).toHaveText(VIEWER);
+      await page.keyboard.press("Tab");
+      await expect(pickerOf(page, "safety")).toBeFocused();
+      await page.keyboard.press("r");
+      await expect(pickerOf(page, "safety")).toHaveValue(at.viewer.id);
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Enter");
+      await expect(ownerOf(page, "safety")).toHaveText(VIEWER);
 
-    await page.keyboard.press(KEY.changeOwner.key);
-    await expect(pickerOf(page, "safety"), "the key left the row in focus").toBeFocused();
+      await page.keyboard.press(KEY.changeOwner.key);
+      await expect(pickerOf(page, "safety"), "the key left the row in focus").toBeFocused();
+    });
   });
 });

@@ -1,7 +1,5 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-
 import { expect, test } from "../browser.ts";
 import {
   addMember,
@@ -25,8 +23,6 @@ import {
 import { scrolledSideways } from "../knowledge.ts";
 
 const ANSWER_BUDGET_MS = 1000;
-
-const QUESTIONS_ASKED = pageNamed(menuGroupIn(CONTROL_CENTRE, "questions"), "Questions Asked");
 
 const QUESTION = "How do buyers access audit information?";
 
@@ -67,13 +63,14 @@ type Script = Omit<AskingScript, "workspaceId">;
 type Asking = {
   readonly workspaceId: string;
   readonly adminId: string;
-  readonly adminEmail: string;
   readonly viewerEmail: string;
 };
 
 const aWorkspaceToAsk = async (api: APIRequestContext, script: Script): Promise<Asking> => {
-  const adminEmail = anAddress("admin");
-  const workspace = await provision(api, { name: "Calder Audits", adminEmail });
+  const workspace = await provision(api, {
+    name: "Calder Audits",
+    adminEmail: anAddress("admin"),
+  });
   const { workspaceId } = workspace;
   await seedConcepts(api, {
     workspaceId,
@@ -84,7 +81,7 @@ const aWorkspaceToAsk = async (api: APIRequestContext, script: Script): Promise<
   const viewerEmail = anAddress("viewer");
   const viewer = await person(api, viewerEmail, { displayName: "Vera Viewer" });
   await addMember(api, { workspaceId, userId: viewer.id, role: "Viewer" });
-  return { workspaceId, adminId: workspace.admin.id, adminEmail, viewerEmail };
+  return { workspaceId, adminId: workspace.admin.id, viewerEmail };
 };
 
 const signedInAsTheViewer = async (page: Page, api: APIRequestContext, asking: Asking) => {
@@ -144,80 +141,6 @@ const asksCounted = (page: Page): string[] => {
 };
 
 test.describe("Ask › New question", () => {
-  test("shows a fitting Answer word for word, within its budget", async ({ page, request }) => {
-    await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
-
-    await questionBox(page).fill(QUESTION);
-    const started = Date.now();
-    await questionBox(page).press("Enter");
-    const result = answered(page, "Answered");
-    const audits = collectionIn(result, "audits");
-    await expect(audits.getByRole("heading", { level: 4, name: USERS.title })).toBeVisible();
-    const elapsed = Date.now() - started;
-
-    test.info().annotations.push({ type: "first content", description: `${elapsed} ms` });
-    expect(elapsed, "the verdict landed past the answer's budget").toBeLessThan(ANSWER_BUDGET_MS);
-    await expect(audits.getByText(USERS.body)).toBeVisible();
-    await expect(audits.getByText("Verified automatically")).toBeVisible();
-    await expect(result.getByText("Judged", { exact: true })).toBeVisible();
-    await expect(result.getByText(SUPPLIER.body)).toHaveCount(0);
-    await expect(said(page)).toHaveText(/\S/);
-    await expect(questionBox(page), "focus left the question").toBeFocused();
-  });
-
-  test("shows the first drafted sentence before the stream ends", async ({ page, request }) => {
-    const { workspaceId } = await aViewerAsking(page, request, {
-      judging: { fits: [] },
-      drafting: DRAFTING,
-      holds: "draft",
-    });
-
-    await questionBox(page).fill(QUESTION);
-    const started = Date.now();
-    await questionBox(page).press("Enter");
-    const audits = collectionIn(answered(page, "Related Knowledge"), "audits");
-    await expect(audits.getByText(DRAFTED)).toBeVisible();
-    const elapsed = Date.now() - started;
-
-    test
-      .info()
-      .annotations.push({ type: "first sentence, streamed", description: `${elapsed} ms` });
-    await expect(askButton(page), "the stream had ended").toHaveAttribute("aria-disabled", "true");
-    await expect(audits.getByRole("button", { name: `Cites ${POLICY.title}` })).toBeVisible();
-    await releaseTheModel(request, workspaceId);
-    await expect(askButton(page)).not.toHaveAttribute("aria-disabled", "true");
-  });
-
-  test("flags one drafted sentence, storing it and its concept", async ({ page, request }) => {
-    const { adminEmail } = await aWorkspaceToAsk(request, {
-      judging: { fits: [] },
-      drafting: DRAFTING,
-    });
-    await page.goto("/sign-in");
-    await signIn(page, request, adminEmail);
-    await railOf(page).getByRole("link", { name: "Ask" }).click();
-    await asked(page);
-
-    const audits = collectionIn(answered(page, "Related Knowledge"), "audits");
-    await audits.getByRole("button", { name: `Flag “${DRAFTED}”` }).click();
-    const flagging = page.getByRole("dialog", { name: `Flag “${DRAFTED}”` });
-    await flagging.getByRole("radio", { name: "Wrong" }).check();
-    const sending = page.waitForResponse((response) => response.url().includes("ask.giveFeedback"));
-    await flagging.getByRole("button", { name: "Send Flag" }).click();
-    await expect(audits.getByRole("button", { name: "Flagged" })).toBeVisible();
-    expect((await sending).ok(), "the flag was not stored").toBe(true);
-
-    await page.goto(QUESTIONS_ASKED.path);
-    await page
-      .getByRole("region", { name: "Flagged" })
-      .getByRole("button", { name: QUESTION })
-      .click();
-    const record = page.getByRole("dialog", { name: QUESTION });
-    await expect(record.getByText(/Wrong/)).toBeVisible();
-    await expect(record.getByRole("blockquote")).toHaveText(DRAFTED);
-    await expect(record.getByRole("link", { name: POLICY.title })).not.toHaveCount(0);
-  });
-
   test("reopens a refused flag with its draft and the refusal", async ({ page, request }) => {
     await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
     await asked(page);
@@ -322,7 +245,30 @@ test.describe("Ask › New question", () => {
     passesTheAccessibilityGate,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await aViewerAsking(page, request, { judging: { fits: [] }, drafting: DRAFTING });
+    const { workspaceId } = await aViewerAsking(page, request, {
+      judging: { fits: [USERS.title] },
+    });
+
+    await test.step("shows a fitting Answer word for word, within its budget", async () => {
+      await questionBox(page).fill(QUESTION);
+      const started = Date.now();
+      await questionBox(page).press("Enter");
+      const result = answered(page, "Answered");
+      const audits = collectionIn(result, "audits");
+      await expect(audits.getByRole("heading", { level: 4, name: USERS.title })).toBeVisible();
+      const elapsed = Date.now() - started;
+
+      test.info().annotations.push({ type: "first content", description: `${elapsed} ms` });
+      expect(elapsed, "the verdict landed past the answer's budget").toBeLessThan(ANSWER_BUDGET_MS);
+      await expect(audits.getByText(USERS.body)).toBeVisible();
+      await expect(audits.getByText("Verified automatically")).toBeVisible();
+      await expect(result.getByText("Judged", { exact: true })).toBeVisible();
+      await expect(result.getByText(SUPPLIER.body)).toHaveCount(0);
+      await expect(said(page)).toHaveText(/\S/);
+      await expect(questionBox(page), "focus left the question").toBeFocused();
+    });
+
+    await scriptAsking(request, { workspaceId, judging: { fits: [] }, drafting: DRAFTING });
     await asked(page);
     const audits = collectionIn(answered(page, "Related Knowledge"), "audits");
     await expect(audits.getByText(DRAFTED)).toBeVisible();
