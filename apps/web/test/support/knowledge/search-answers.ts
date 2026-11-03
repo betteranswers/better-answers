@@ -183,7 +183,7 @@ export const theForkliftGuide = answeringPassages(() =>
   aPassageRead(FORKLIFT_GUIDE, FORKLIFT_GUIDE_LOCATOR, FORKLIFT_GUIDE_TEXT),
 );
 
-export const aCeilingMet = (retryAfterSeconds: number) => ({
+export const aProcedureCeilingMet = (retryAfterSeconds: number) => ({
   error: {
     message: "Too many requests.",
     code: -32_029,

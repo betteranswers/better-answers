@@ -14,13 +14,7 @@ import { testData } from "@better-answers/schema/testing";
 
 import { IDENTITY_PRINCIPAL } from "../../../src/identity-principal.ts";
 import { authenticatorKeyOf, holdAnAuthenticator, savedRecoveryCodes } from "../factor-harness.ts";
-import {
-  codeSentPastItsExpiry,
-  confirmationsAgedOverAnHourAgo,
-  pendingSessionsPastTheirHour,
-  restoredByTheOperator,
-  aSeededSessionFor,
-} from "../provoke.ts";
+import { pendingSessionsPastTheirHour, restoredByTheOperator } from "../provoke.ts";
 import {
   askingNamed,
   askingScripting,
@@ -95,15 +89,9 @@ const seeding = z.object({
     }),
   ),
 });
-const ending = z.object({ workspaceId: z.string().min(1), userId: z.string().min(1) });
 const MARK_CHANGES = ["grant", "revoke"] as const;
 const marking = z.object({ email: z.string().min(1), change: z.enum(MARK_CHANGES) });
 const aging = z.object({ userId: z.string().min(1) });
-const aSession = z.object({
-  userId: z.string().min(1),
-  userAgent: z.string().min(1).nullish(),
-});
-const codeAging = z.object({ email: z.string().min(1) });
 const byEmail = z.object({ email: z.string().min(1) });
 const CODES_GIVEN = ["saved", "none"] as const;
 
@@ -195,30 +183,9 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
     return context.json({ revoked: true });
   });
 
-  control.post(`${HARNESS_PREFIX}/confirmations/aged`, async (context) => {
-    const asked = await readBody(context.req.raw, aging);
-    await confirmationsAgedOverAnHourAgo(app, asked.userId);
-    return context.json({ aged: true });
-  });
-
-  control.post(`${HARNESS_PREFIX}/sessions`, async (context) => {
-    const asked = await readBody(context.req.raw, aSession);
-    const agent =
-      asked.userAgent === undefined || asked.userAgent === null
-        ? {}
-        : { userAgent: asked.userAgent };
-    return context.json({ sessionId: await aSeededSessionFor(app, asked.userId, agent) });
-  });
-
   control.post(`${HARNESS_PREFIX}/pending-sessions/aged`, async (context) => {
     const asked = await readBody(context.req.raw, aging);
     await pendingSessionsPastTheirHour(app, asked.userId);
-    return context.json({ aged: true });
-  });
-
-  control.post(`${HARNESS_PREFIX}/codes/aged`, async (context) => {
-    const asked = await readBody(context.req.raw, codeAging);
-    await codeSentPastItsExpiry(app, asked.email);
     return context.json({ aged: true });
   });
 
@@ -232,12 +199,6 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
   control.post(`${HARNESS_PREFIX}/restores`, async (context) => {
     const asked = await readBody(context.req.raw, byEmail);
     return context.json({ code: await restoredByTheOperator(app, asked.email) });
-  });
-
-  control.delete(`${HARNESS_PREFIX}/members`, async (context) => {
-    const asked = await readBody(context.req.raw, ending);
-    await app.removeMember(asked.workspaceId, asked.userId);
-    return context.json({ removed: true });
   });
 
   control.post(`${HARNESS_PREFIX}/model-choices`, async (context) => {

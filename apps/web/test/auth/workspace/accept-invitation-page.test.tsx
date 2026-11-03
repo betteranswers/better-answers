@@ -99,6 +99,9 @@ it("refuses a person at another address, offering the invited one", async () => 
 
   await waitFor(() => expect(router.state.location.pathname).toBe("/sign-in"));
   expect(await screen.findByRole("heading", { level: 1, name: /^Sign In/ })).toBeDefined();
+  expect(router.state.location.href, "the sign-in carries the invitation to return to").toContain(
+    encodeURIComponent(THE_LINK),
+  );
   expect(askedPaths.filter((path) => path === SIGN_OUT)).toHaveLength(1);
 });
 

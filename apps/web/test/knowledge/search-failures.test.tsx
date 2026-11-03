@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MATCHES_A_PAGE as A_PAGE } from "@/features/knowledge/knowledge-state.ts";
 import {
-  aCeilingMet,
+  aProcedureCeilingMet,
   aSearchApi,
   alerted,
   answeringFinds,
@@ -55,7 +55,7 @@ const saysSomething = (alert: HTMLElement | null) =>
 describe("the Knowledge Search page", () => {
   it("says the reads' ceiling and asks no more", async () => {
     const { api } = await palletsFound();
-    api.set("knowledge.find", answeringFinds(refusing(aCeilingMet(180))));
+    api.set("knowledge.find", answeringFinds(refusing(aProcedureCeilingMet(180))));
 
     typed("forklift");
 
@@ -83,7 +83,7 @@ describe("the Knowledge Search page", () => {
     await waitFor(() => expect(screen.getByRole("blockquote").textContent).toContain("Pallet bay"));
     await closed();
     const before = opensAsked();
-    api.set("knowledge.open", answeringPassages(refusing(aCeilingMet(60))));
+    api.set("knowledge.open", answeringPassages(refusing(aProcedureCeilingMet(60))));
 
     for (const opener of [unread, wasRead]) {
       pressed(opener);

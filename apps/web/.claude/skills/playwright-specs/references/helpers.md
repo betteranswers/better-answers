@@ -77,12 +77,7 @@ Six more play Claude's part in its OAuth flow on the suite's own origin — `app
 
 ## Reading the api's answers
 
-Two helpers in `apps/web/e2e/refused-read.ts` answer for the api. `theNextAskMeetsACeiling` answers the next ask of one path outside tRPC with the
-api's own 429 and the wait it is handed, then lets that path through again. `aCeilingMet` is that
-answer alone, for a spec that refuses every ask and counts them.
-`apps/web/e2e/auth/sign-out.spec.ts` uses both.
-
-Two more in that module read what the api answered. `refusalAnswering` waits for the next answer to
+Two helpers in `apps/web/e2e/refused-read.ts` read what the api answered. `refusalAnswering` waits for the next answer to
 one tRPC procedure, found by its place in a batch or in a call sent alone. It answers the refusal's
 word and class, and each item's word where a set was refused whole. A ceiling carries no word, so
 for one it answers the 429 status and the wait in seconds. `authAnswering` waits for the next answer

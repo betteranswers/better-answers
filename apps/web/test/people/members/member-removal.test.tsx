@@ -166,13 +166,14 @@ describe("a stale confirmation before removing a member", () => {
         api.set("members.list", () => readAnswer([ADA, SAM]));
         return readAnswer({});
       },
+      () => {
+        api.set("members.list", () => readAnswer([ADA]));
+        return readAnswer({});
+      },
     ];
     api.set("person.secondFactor", () => readAnswer({ ...BOTH_HELD, passkeys: [] }));
     api.set("/second-factor/confirm/authenticator", () => ({ confirmed: true }));
     api.set("members.remove", () => removals.shift()?.());
-    api.set("members.changeRole", () =>
-      readAnswer({ personId: SAM.personId, previousRole: "Viewer", role: "Editor" }),
-    );
     const router = await openAt(memberPageOf(PRIYA.personId), api);
     await personHeading("Priya Shah");
 
@@ -195,14 +196,14 @@ describe("a stale confirmation before removing a member", () => {
 
     fireEvent.click(await screen.findByRole("link", { name: "Sam Okoro" }));
     await personHeading("Sam Okoro");
-    fireEvent.click(screen.getByRole("radio", { name: "Editor" }));
-    fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
+    fireEvent.click(removal().getByRole("button", { name: "Remove Member" }));
+    fireEvent.click(await waitFor(() => removal().getByRole("button", { name: "Remove" })));
 
     await waitFor(() =>
-      expect(
-        within(thePage().getByRole("region", { name: "Role" })).getByRole("status").textContent,
-      ).toMatch(/Sam Okoro.*Editor/),
+      expect(server.asks.filter((ask) => ask.procedure === "members.remove")).toHaveLength(3),
     );
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/people/members"));
+    expect(screen.queryByRole("link", { name: "Sam Okoro" })).toBeNull();
+    expect(screen.queryByRole("dialog"), "no confirmation asked for the second removal").toBeNull();
   });
 });
