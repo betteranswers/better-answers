@@ -64,7 +64,7 @@ Day-to-day workflow: `/poteto-mode <goal and definition of done>` - name the goa
 
 The project playbooks in `.agents/playbooks/` add this repository's steps to pstack's.
 
-Cubic, CodeRabbit and Codacy review each pull request. No bot is a required check. `.agents/playbooks/review.md` says what each one reviews, and what the verdict does when no AI reviewer ran on the head.
+Cubic, CodeRabbit and Codacy are set to review each pull request, and any of them can fail to run. No bot is a required check. `.agents/playbooks/review.md` says what each one reviews, and what the verdict does when no AI reviewer ran on the head.
 
 Until v0.1 the session lands its own pull request, with no press from the owner, once the verdict is `PASS` or `PASS+NOTES`.
 

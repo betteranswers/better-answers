@@ -2,9 +2,14 @@
 import { execFileSync } from "node:child_process";
 
 const BOTS = [
-  { name: "cubic", app: "cubic-dev-ai", reviewed: ["success"] },
-  { name: "coderabbit", app: "coderabbitai", reviewed: ["success"] },
-  { name: "codacy", app: "codacy-production", reviewed: ["success", "action_required"] },
+  { name: "cubic", check: "cubic · AI code reviewer", ai: true, reviewed: ["success"] },
+  { name: "coderabbit", check: "CodeRabbit", ai: true, reviewed: ["success"] },
+  {
+    name: "codacy",
+    check: "Codacy Static Code Analysis",
+    ai: false,
+    reviewed: ["success", "action_required"],
+  },
 ];
 
 const pr = process.argv[2];
@@ -21,22 +26,28 @@ const runs = JSON.parse(
 
 process.stdout.write(`head ${head}\n`);
 let reviewers = 0;
+let pending = false;
 for (const bot of BOTS) {
-  const run = runs.find((one) => one.app?.slug === bot.app);
-  if (!run) {
+  const mine = runs
+    .filter((one) => one.name === bot.check)
+    .toSorted((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? ""));
+  const passed = mine.find((one) => bot.reviewed.includes(one.conclusion));
+  const latest = passed ?? mine[0];
+  if (latest === undefined) {
     process.stdout.write(`${bot.name}\tmissing (no check run on this head)\n`);
-    continue;
+  } else if (passed === undefined && latest.status !== "completed") {
+    pending = true;
+    process.stdout.write(`${bot.name}\tpending (${latest.status})\n`);
+  } else {
+    if (passed !== undefined && bot.ai) reviewers += 1;
+    const outcome = passed === undefined ? "not reviewed" : "reviewed";
+    const title = latest.output?.title ?? "";
+    process.stdout.write(`${bot.name}\t${outcome} (${latest.conclusion}: ${title})\n`);
   }
-  if (run.status !== "completed") {
-    process.stdout.write(`${bot.name}\tpending (${run.status})\n`);
-    continue;
-  }
-  const ok = bot.reviewed.includes(run.conclusion);
-  if (ok && bot.name !== "codacy") reviewers += 1;
-  const title = run.output?.title ?? "";
-  process.stdout.write(
-    `${bot.name}\t${ok ? "reviewed" : "not reviewed"} (${run.conclusion}: ${title})\n`,
-  );
 }
 process.stdout.write(`ai reviewers on this head: ${String(reviewers)} of 2\n`);
+if (pending) {
+  process.stdout.write("a bot is still running, so this is not final\n");
+  process.exit(3);
+}
 process.exit(reviewers > 0 ? 0 : 1);
