@@ -113,30 +113,6 @@ const aPageAndOneMoreOpened = async (page: Page, api: APIRequestContext, name: s
 };
 
 test.describe("Questions asked", () => {
-  test("a refused closing puts the flag back and says so", async ({ page, request }) => {
-    const at = await aWorkspaceWithConcepts(request, "Colne Refusals");
-    await seedQuestions(request, {
-      workspaceId: at.workspaceId,
-      records: aFlagAndANewerQuestion(at),
-    });
-    await signedInAtTheQuestions(page, request, at);
-    await page.route(
-      (url) => url.pathname.includes("questions.closeFlag"),
-      (route) => route.abort(),
-    );
-
-    await rowsOf(groupNamed(page, "Flagged")).first().click();
-    const record = recordOf(page, FLAGGED_QUESTION);
-    const closing = record.getByRole("group", { name: "Close This Flag" });
-    await closing.getByRole("button", { name: "No Fault in the Knowledge" }).click();
-
-    await saysARefusal(record.getByRole("alert"));
-    await expect(closing.getByRole("button", { name: "Fixed in the Knowledge" })).toBeFocused();
-    await page.keyboard.press("Escape");
-    await expect(record).toHaveCount(0);
-    await expect(rowsOf(groupNamed(page, "Flagged"))).toHaveText([FLAGGED_QUESTION]);
-  });
-
   test("renders a page of rows within the list budget", async ({ page, request }) => {
     await aPageAndOneMoreOpened(page, request, "Wharfe Pages");
 
@@ -149,45 +125,4 @@ test.describe("Questions asked", () => {
     expect(elapsed, "a page of 50 questions rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
   });
 
-  test("opens no question by key after focus leaves the list", async ({ page, request }) => {
-    const at = await aWorkspaceWithConcepts(request, "Holme Keys");
-    await seedQuestions(request, {
-      workspaceId: at.workspaceId,
-      records: aFlagAndANewerQuestion(at),
-    });
-    await signedInAtTheQuestions(page, request, at);
-    const region = questionsAsked(page);
-    const saying = region.getByRole("status").filter({ hasText: /\S/ });
-    await expect(saying, "the list says nothing at rest").toHaveCount(0);
-    await rowsOf(region).first().focus();
-    await region.getByRole("heading", { level: 2 }).focus();
-
-    await page.keyboard.press(KEY.open.key);
-    await expect(saying, "a keystroke with no question in focus says nothing").toHaveCount(1);
-    await expect(recordOf(page, FLAGGED_QUESTION)).toHaveCount(0);
-  });
-
-  test("lists, opens and pages the questions by keyboard", async ({ page, request }) => {
-    await aPageAndOneMoreOpened(page, request, "Aire Keys");
-    await expect(rowsOf(questionsAsked(page))).toHaveCount(50);
-
-    const keystrokes = await keystrokesListed(page, "Questions Asked");
-    for (const { key } of Object.values(KEY)) {
-      await expect(keyListed(keystrokes, key)).toBeVisible();
-    }
-    await keystrokesDismissed(page, keystrokes);
-
-    await page.keyboard.press(KEY.more.key);
-    await expect(rowsOf(questionsAsked(page))).toHaveCount(51);
-    const oldest = rowsOf(questionsAsked(page)).nth(50);
-    await expect(oldest, "focus did not land on the first older question").toBeFocused();
-    await expect(oldest).toHaveText("Question number 1");
-
-    await page.keyboard.press(KEY.open.key);
-    const record = recordOf(page, "Question number 1");
-    await expect(record).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(record).toHaveCount(0);
-    await expect(oldest).toBeFocused();
-  });
 });

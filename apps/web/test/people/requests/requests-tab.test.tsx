@@ -129,6 +129,8 @@ describe("the People page's Requests tab", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(heading());
     });
-    expect(document.body.textContent, "the refusal names an organisation").not.toMatch(NAMES_AN_ORGANISATION);
+    expect(document.body.textContent, "the refusal names an organisation").not.toMatch(
+      NAMES_AN_ORGANISATION,
+    );
   });
 });

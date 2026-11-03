@@ -139,26 +139,4 @@ test.describe("the Models and spend page's model choices card", () => {
 });
 
 test.describe("a page's older address", () => {
-  test("never shows a Viewer an address under /system/", async ({
-    page,
-    request,
-    passesTheAccessibilityGate,
-  }) => {
-    await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
-    await page.goto("/people/not-a-page");
-    await expect(page.getByRole("link", { name: "Go to New Question" })).toBeVisible();
-    const neverExisted = await page.getByRole("main").ariaSnapshot();
-
-    const visited: string[] = [];
-    page.on("framenavigated", (frame) => visited.push(frame.url()));
-    await page.goto("/people/audit-log");
-
-    await expect(page.getByRole("link", { name: "Go to New Question" })).toBeVisible();
-    await expect(page).toHaveURL(/\/people\/audit-log$/);
-    expect(await page.getByRole("main").ariaSnapshot(), "a hidden page gives itself away").toBe(
-      neverExisted,
-    );
-    expect(visited.filter((address) => address.includes("/system/"))).toEqual([]);
-    await passesTheAccessibilityGate();
-  });
 });

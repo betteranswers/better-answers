@@ -298,4 +298,22 @@ describe("a person in no workspace", () => {
     ).toBeDefined();
     expect(router.state.location.pathname).toBe("/no-workspace");
   });
+
+  it("draws an unknown address outside the shell without a workspace", async () => {
+    vi.stubGlobal("fetch", inNoWorkspace(false));
+
+    await openApp("/nothing-here");
+
+    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe("Page Not Found");
+    const banner = within(screen.getByRole("banner"));
+    expect(banner.getAllByText("better-answers").length).toBeGreaterThan(0);
+    expect(banner.queryAllByRole("link")).toEqual([]);
+    expect(banner.queryAllByRole("button")).toEqual([]);
+    expect(screen.queryByRole("navigation", { name: "Areas" })).toBeNull();
+    expect(
+      within(screen.getByRole("main"))
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Go to Your Home Page"]);
+  });
 });

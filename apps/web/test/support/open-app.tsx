@@ -19,3 +19,14 @@ export const openApp = async (path: string, clients: AppClients = createAppClien
   );
   return { router, clients, rendered };
 };
+
+/** Renders the app at once, as the browser does, without waiting on the loads the first draw does not need. */
+export const drawApp = (path: string, clients: AppClients = createAppClients()) => {
+  const router = createAppRouter(clients, createMemoryHistory({ initialEntries: [path] }));
+  render(
+    <Providers clients={clients}>
+      <RouterProvider router={router} />
+    </Providers>,
+  );
+  return router;
+};

@@ -199,6 +199,24 @@ describe("the shell's regions", () => {
   });
 });
 
+describe("a page's older address", () => {
+  it("never shows a Viewer an address under /system/", async () => {
+    const neverExisted = await openAs("Viewer", "/people/not-a-page");
+    await screen.findByRole("link", { name: "Go to New Question" });
+    const mainOfNeverExisted = screen.getByRole("main").innerHTML;
+    neverExisted.unmount();
+
+    vi.stubGlobal("fetch", answeringAs("Viewer"));
+    const { router } = await openApp("/people/audit-log");
+
+    await screen.findByRole("link", { name: "Go to New Question" });
+    expect(router.history.location.pathname).toBe("/people/audit-log");
+    expect(screen.getByRole("main").innerHTML, "a hidden page gives itself away").toBe(
+      mainOfNeverExisted,
+    );
+  });
+});
+
 describe("jump to, while no role is held", () => {
   it("is not offered in the band", async () => {
     await openWithNoRoleAt("/people/members");

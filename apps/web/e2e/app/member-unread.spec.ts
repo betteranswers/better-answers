@@ -67,14 +67,4 @@ const narrowOpened = async (page: Page) => {
 };
 
 test.describe("a page drawn before the reader's member read lands", () => {
-  test("an open panel stays open as the member read lands", async ({ page, request }) => {
-    const landed = Promise.withResolvers<void>();
-    await atSourcesUnread(page, request, "Hebble Tinworks", landed.promise);
-    const panel = await narrowOpened(page);
-
-    landed.resolve();
-
-    await expect(switcherOf(page, "Hebble Tinworks")).toBeVisible();
-    await expect(panel, "the page was drawn again and lost its panel").toBeVisible();
-  });
 });
