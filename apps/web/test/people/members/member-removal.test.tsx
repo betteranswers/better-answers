@@ -13,12 +13,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { JUMP_TO } from "@/app/words.ts";
+import { STALE_CONFIRMATION } from "@/features/auth/refusal-words.ts";
+import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { useRemovalOf, useRemoveMember } from "@/features/people/people-api.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { anAdminOver } from "@test/people/member-pages.ts";
-import { joined, MEMBERS, namesShown, PRIYA } from "@test/people/members-roster.ts";
+import { anAdminOver, personHeading, thePage } from "@test/people/member-pages.ts";
+import { joined, MEMBERS, namesShown, PRIYA, SAM } from "@test/people/members-roster.ts";
+import { BOTH_HELD } from "@test/second-factor-api.ts";
+import { server } from "@test/stub-server.ts";
 import { answeringAs } from "@test/stubbed-api.ts";
-import { ADA, openAt, read as readAnswer } from "@test/two-workspaces.ts";
+import { ADA, aRefusalAnswer, openAt, read as readAnswer } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
@@ -150,5 +154,55 @@ describe("a removal and jump-to", () => {
 
     expect(focus.stops).toContain("main");
     expect(focus.stops, "focus never stops on Remove Member").not.toContain("Remove Member");
+  });
+});
+
+describe("a stale confirmation before removing a member", () => {
+  it("asks again before removing a member, and not after", async () => {
+    const api = anAdminOver([ADA, PRIYA, SAM]);
+    const removals = [
+      () => aRefusalAnswer(STALE_CONFIRMATION, "precondition", 412),
+      () => {
+        api.set("members.list", () => readAnswer([ADA, SAM]));
+        return readAnswer({});
+      },
+    ];
+    api.set("person.secondFactor", () => readAnswer({ ...BOTH_HELD, passkeys: [] }));
+    api.set("/second-factor/confirm/authenticator", () => ({ confirmed: true }));
+    api.set("members.remove", () => removals.shift()?.());
+    api.set("members.changeRole", () =>
+      readAnswer({ personId: SAM.personId, previousRole: "Viewer", role: "Editor" }),
+    );
+    const router = await openAt(memberPageOf(PRIYA.personId), api);
+    await personHeading("Priya Shah");
+
+    const removal = () => within(thePage().getByRole("region", { name: "Removal" }));
+    fireEvent.click(removal().getByRole("button", { name: "Remove Member" }));
+    fireEvent.click(await waitFor(() => removal().getByRole("button", { name: "Remove" })));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(server.asks.filter((ask) => ask.procedure === "members.remove")).toHaveLength(1);
+    expect(router.state.location.pathname).toBe("/people/members");
+    fireEvent.change(await within(dialog).findByRole("textbox", { name: "Authenticator Code" }), {
+      target: { value: "123456" },
+    });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() =>
+      expect(server.asks.filter((ask) => ask.procedure === "members.remove")).toHaveLength(2),
+    );
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Priya Shah" })).toBeNull());
+
+    fireEvent.click(await screen.findByRole("link", { name: "Sam Okoro" }));
+    await personHeading("Sam Okoro");
+    fireEvent.click(screen.getByRole("radio", { name: "Editor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
+
+    await waitFor(() =>
+      expect(
+        within(thePage().getByRole("region", { name: "Role" })).getByRole("status").textContent,
+      ).toMatch(/Sam Okoro.*Editor/),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
