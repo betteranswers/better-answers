@@ -578,6 +578,7 @@ const RUN_BY_STEP: Readonly<Record<string, Readonly<Record<string, string>>>> = 
 };
 
 const SHARDED_LEGS: Readonly<Record<string, string>> = {
+  "full-core": "check:core:suite",
   "full-web-browser": "check:web:e2e",
 };
 
