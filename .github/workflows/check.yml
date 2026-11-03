@@ -255,10 +255,10 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 25
     strategy:
-      # Cancelling the other shards would hide their failures until this one's were fixed.
+      # Cancelling the other shard would hide its failures until this one's were fixed.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2]
     env:
       TRACE_ARTIFACT: browser-traces-shard-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
     steps:
