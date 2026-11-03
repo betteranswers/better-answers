@@ -11,6 +11,8 @@ const noWorkspaceHeading = (page: Page) =>
 
 const displayNameField = (page: Page) => page.getByLabel("Display Name");
 
+const saveButton = (page: Page) => page.getByRole("button", { name: "Save and Continue" });
+
 test("asks a first-time person for a display name before anything", async ({
   page,
   request,
@@ -34,6 +36,11 @@ test("asks a first-time person for a display name before anything", async ({
     (element) => getComputedStyle(element).boxShadow,
   );
   expect(ring, "the focused field shows no focus ring").not.toBe("none");
+
+  await page.keyboard.press("Tab");
+  await expect(saveButton(page), "Tab left the field without reaching Save").toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(displayNameField(page)).toBeFocused();
 
   await page.keyboard.type("Priya Shah");
   await clockTheNextKey(page, { at: "//main//button[@type='submit']", reads: "Saving" });
