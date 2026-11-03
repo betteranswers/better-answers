@@ -176,7 +176,7 @@ test("a new code sent from the code step signs in", async ({
   await landedAtHome(page, "Admin");
 });
 
-test("names the wait when a new code meets the ceiling", async ({
+test("Sign In waits at its ceiling and works by keyboard", async ({
   page,
   context,
   request,

@@ -196,7 +196,7 @@ const modelChoicesBroken = async (route: Route) => {
   await route.fulfill({ json: broken });
 };
 
-test("offers a way out, shell intact, when a page throws", async ({
+test("the Shell frames every page, within budget and by keyboard", async ({
   page,
   request,
   passesTheAccessibilityGate,

@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -6,6 +8,7 @@ import { expect, test } from "../browser.ts";
 import {
   addMember,
   anAddress,
+  crumbOf,
   person,
   provision,
   seedConcepts,
@@ -19,6 +22,8 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
+const RECORD_BUDGET_MS = 1000;
+
 const PAGE = pageNamed(menuGroupIn(ASK, "ask"), "Your Questions");
 
 const YOUR_QUESTIONS = PAGE.path;
@@ -26,6 +31,10 @@ const YOUR_QUESTIONS = PAGE.path;
 const RETENTION = "Audit Logs Retention";
 
 const MINUTES = "Board Minutes Policy";
+
+const ANSWERED = "What is the audit log retention period?";
+
+const FLAG_NOTE = "The retention period changed in March.";
 
 const yourQuestions = (page: Page) => page.getByRole("region", { name: "Your Questions" });
 
@@ -105,15 +114,23 @@ test.describe("Your questions", () => {
     passesTheAccessibilityGate,
   }) => {
     const at = await aWorkspace(request, "Wharfe Pages");
-    await seeded(
-      request,
-      at,
-      Array.from({ length: 51 }, (_, nth): SeedRecord => ({
-        askedBy: at.editor.id,
-        question: `Question number ${nth + 1}`,
-        verdict: "refuse",
-      })),
-    );
+    const retention = at.concepts.get(RETENTION);
+    assert.ok(retention, "the retention concept was not seeded");
+    const answered: SeedRecord = {
+      askedBy: at.editor.id,
+      question: ANSWERED,
+      verdict: "ok",
+      judgeState: "judged",
+      concepts: [{ iri: retention, judged: "yes" }],
+      drafted: [{ sentence: "We keep audit logs for seven years.", concepts: [retention] }],
+      flags: [{ reason: "out-of-date", note: FLAG_NOTE }],
+    };
+    const refused = Array.from({ length: 50 }, (_, nth): SeedRecord => ({
+      askedBy: at.editor.id,
+      question: `Question number ${nth + 2}`,
+      verdict: "refuse",
+    }));
+    await seeded(request, at, [answered, ...refused]);
     await signedInAt(page, request, at.editor, YOUR_QUESTIONS);
 
     const started = Date.now();
@@ -138,6 +155,27 @@ test.describe("Your questions", () => {
       await page.keyboard.press("Enter");
       await expect(rowsOf(yourQuestions(page))).toHaveCount(51);
       await expect(rowsOf(yourQuestions(page)).last()).toBeFocused();
+    });
+
+    await test.step("opens a record within budget and leaves it by keyboard alone", async () => {
+      const opened = Date.now();
+      await page.keyboard.press("Enter");
+      await expect(
+        page.getByRole("heading", { level: 2, name: ANSWERED, exact: true }),
+      ).toBeVisible();
+      const drawn = Date.now() - opened;
+
+      test.info().annotations.push({ type: "your record", description: `${drawn} ms` });
+      expect(drawn, "a record rendered past its budget").toBeLessThan(RECORD_BUDGET_MS);
+      await expect(page.getByText(FLAG_NOTE)).toBeVisible();
+
+      const crumb = crumbOf(page, "Your Questions");
+      await tabUntilFocused(page, crumb);
+      await passesTheAccessibilityGate();
+
+      await page.keyboard.press("Enter");
+      await expect(page).toHaveURL(new RegExp(`${YOUR_QUESTIONS}$`));
+      await expect(rowsOf(yourQuestions(page)).first()).toBeVisible();
     });
   });
 });

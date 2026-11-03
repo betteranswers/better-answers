@@ -11,6 +11,7 @@ import {
   PINS,
   reportFor,
   TREES,
+  treeOf,
   WHERE_THE_PINS_LIVE,
 } from "@better-answers/devtools/test-folders";
 import type { Pin, Tree } from "@better-answers/devtools/test-folders";
@@ -197,6 +198,12 @@ describe("a row of the table", () => {
     expect(findingsOf(PINNED, [row])).toEqual([]);
   });
 
+  it("takes a mirror row's tree from before its colon", () => {
+    const row = mirror("packages/probe/src: what the folder holds");
+
+    expect(findingsOf(PINNED, [row])).toEqual([]);
+  });
+
   it("names a stale row once, not also for its reason", () => {
     const row = mirror("packages/probe/gone");
 
@@ -255,10 +262,11 @@ const tracked = (...files: readonly string[]): string => {
 };
 
 const everyPinHeld = (): readonly string[] =>
-  PINS.flatMap(({ folder, kind, reason }) => {
-    const held = [`${folder}/probe.test.ts`];
-    if (kind === "run") return held;
-    return [...held, /\.\w+$/u.test(reason) ? reason : `${reason}/probe.ts`];
+  PINS.flatMap((pin) => {
+    const held = [`${pin.folder}/probe.test.ts`];
+    if (pin.kind === "run") return held;
+    const tree = treeOf(pin);
+    return [...held, /\.\w+$/u.test(tree) ? tree : `${tree}/probe.ts`];
   });
 
 const gateIn = (cwd: string) => spawnSync(process.execPath, [SCRIPT], { cwd, encoding: "utf8" });
