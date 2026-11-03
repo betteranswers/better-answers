@@ -16,8 +16,9 @@ Three bots review each pull request. Each one reports a check run on the head.
 Cubic and CodeRabbit are the AI reviewers. Codacy does not count as one. No bot is a required check, so a bot's own result never blocks a merge. The verdict holds the rule instead, and it can fail a risky change that no AI reviewer reviewed.
 
 - **In** "One verifier per PR", the verifier runs `pnpm run review-coverage <pr>` on the head it verifies, and reads every bot's findings before it decides.
-  - The script exits 3 while a bot is still running. Wait for it to finish before you post the verdict.
-  - If neither AI reviewer reviewed the head, ask for a full review: comment `@cubic review` and `@coderabbitai full review` on the pull request. Then wait and run the script again.
+  - The script exits 3 while a bot is still running. Wait up to 20 minutes for it to finish, then treat a bot still running as one that did not run.
+  - The script exits 2 when it cannot read the pull request. That is no answer, so fix the cause and run it again.
+  - If neither AI reviewer reviewed the head, ask for a full review: comment `@cubic-dev-ai review this PR` and `@coderabbitai full review` on the pull request. Then wait and run the script again.
   - If neither AI reviewer reviews the head after that, the verdict depends on the change. A change to a migration (`packages/schema/migrations/`), to sign-in, access or row-level security, to erasure, or to `contracts/` gets `FAIL` with the reason `no AI review`. Split the pull request until a reviewer runs, or ask the owner. Any other change gets `PASS+NOTES`, never `PASS`, and the notes name each reviewer that did not run and why.
   - The verdict's description names the bots that reviewed the head, for example `PASS+NOTES by v968; reviewed: cubic, codacy`.
 - **In** "Bugbot is triaged skeptically, always.", the bots are Cubic, CodeRabbit and Codacy. Codacy's `action_required` conclusion means it found something to triage. It is not a gate.

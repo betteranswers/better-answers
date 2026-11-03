@@ -18,7 +18,16 @@ if (!/^\d+$/u.test(pr)) {
   process.exit(2);
 }
 
-const gh = (...args) => execFileSync("gh", args, { encoding: "utf8" }).trim();
+const gh = (...args) => {
+  try {
+    return execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  } catch (cause) {
+    process.stderr.write(
+      `review-coverage: gh ${args[0]} failed: ${String(cause.stderr ?? cause)}\n`,
+    );
+    process.exit(2);
+  }
+};
 const head = gh("pr", "view", pr, "--json", "headRefOid", "-q", ".headRefOid");
 const runs = JSON.parse(
   gh("api", "--paginate", "--slurp", `repos/{owner}/{repo}/commits/${head}/check-runs`),
