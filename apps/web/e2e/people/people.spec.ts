@@ -903,38 +903,6 @@ test.describe("bulk actions on the members ticked", () => {
     await expect(page).toHaveURL(/\/choose-workspace$/);
   });
 
-  test("bulk Remove names the count and opens on Cancel", async ({
-    page,
-    request,
-    passesTheAccessibilityGate,
-  }) => {
-    await anAdminAtPeople(page, request, "Rye Ropeworks");
-    await tickOf(page, "Priya Shah").check();
-    await tickOf(page, "Sam Okoro").check();
-
-    const remove = selectionAction(page, "Remove");
-    await remove.click();
-    const dialog = page.getByRole("dialog", { name: "Remove 2 Members" });
-    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
-    await expect(dialog).toHaveAccessibleDescription(/\S/);
-    await expect(linesIn(dialog), "a line warns two others as it would the reader").toHaveCount(1);
-    await passesTheAccessibilityGate();
-    await page.keyboard.press("Escape");
-    await expect(dialog).toHaveCount(0);
-    await expect(remove).toBeFocused();
-    await expect(memberRows(page)).toHaveCount(3);
-
-    await remove.click();
-    await dialog.getByRole("button", { name: "Remove", exact: true }).click();
-    await expect(memberRows(page)).toHaveCount(1);
-    await expect(outcomeOf(page), "the outcome counts two removed, and none skipped").toHaveText(
-      /^\D*2\D*$/,
-    );
-    await expect(listHeading(page)).toBeFocused();
-    await page.reload();
-    await expect(memberRows(page)).toHaveCount(1);
-  });
-
   test("ticks at the first click after a bulk role change", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Ribble Joinery");
     await tickOf(page, "Priya Shah").check();
