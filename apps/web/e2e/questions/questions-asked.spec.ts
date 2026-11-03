@@ -1,16 +1,11 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { QUESTIONS_KEYSTROKES as KEY } from "@/features/questions/questions-state.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
   anAddress,
-  keyListed,
-  keystrokesDismissed,
-  keystrokesListed,
   provision,
-  saysARefusal,
   seedConcepts,
   seedQuestions,
   signIn,
@@ -23,20 +18,9 @@ const QUESTIONS_ASKED = pageNamed(menuGroupIn(CONTROL_CENTRE, "questions"), "Que
 
 const AUDIT_CONCEPT = "Audit Logs Retention";
 
-const FLAGGED_QUESTION = "How long do you keep audit logs for buyers?";
-
-const NEWER_QUESTION = "Who can see the audit log?";
-
-const DISPUTED = "Audit logs are kept for one year.";
-
 const questionsAsked = (page: Page) => page.getByRole("region", { name: "Questions Asked" });
 
-const groupNamed = (page: Page, name: string) =>
-  questionsAsked(page).getByRole("region", { name, exact: true });
-
 const rowsOf = (region: Locator) => region.getByRole("listitem").getByRole("button");
-
-const recordOf = (page: Page, question: string) => page.getByRole("dialog", { name: question });
 
 type AtTheQuestions = {
   readonly workspaceId: string;
@@ -71,12 +55,6 @@ const aWorkspaceWithConcepts = async (
   };
 };
 
-const iriOf = (at: AtTheQuestions, title: string): string => {
-  const iri = at.concepts.get(title);
-  if (iri === undefined) throw new Error(`no concept titled ${title} was seeded`);
-  return iri;
-};
-
 const signedInAtTheQuestions = async (page: Page, api: APIRequestContext, at: AtTheQuestions) => {
   await page.goto("/sign-in");
   await signIn(page, api, at.adminEmail);
@@ -86,21 +64,6 @@ const signedInAtTheQuestions = async (page: Page, api: APIRequestContext, at: At
     .click();
   await expect(page).toHaveURL(new RegExp(`${QUESTIONS_ASKED}$`));
 };
-
-const aFlagAndANewerQuestion = (at: AtTheQuestions): readonly SeedRecord[] => [
-  {
-    askedBy: at.adminId,
-    transport: "mcp",
-    question: FLAGGED_QUESTION,
-    verdict: "ok",
-    judgeState: "judged",
-    concepts: [{ iri: iriOf(at, AUDIT_CONCEPT), judged: "yes" }],
-    flags: [
-      { reason: "wrong", disputedSentence: DISPUTED, disputedConcept: iriOf(at, AUDIT_CONCEPT) },
-    ],
-  },
-  { askedBy: at.adminId, question: NEWER_QUESTION, verdict: "related" },
-];
 
 const aPageAndOneMoreOpened = async (page: Page, api: APIRequestContext, name: string) => {
   const at = await aWorkspaceWithConcepts(api, name);
@@ -124,5 +87,4 @@ test.describe("Questions asked", () => {
     test.info().annotations.push({ type: "questions asked", description: `${elapsed} ms` });
     expect(elapsed, "a page of 50 questions rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
   });
-
 });

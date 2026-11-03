@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "../browser.ts";
-import { railOf, signedInWithNoWorkspace, signInHeading } from "../harness.ts";
+import { signInHeading } from "../harness.ts";
 
 const NOWHERE = "/nothing-here";
 
@@ -24,4 +24,3 @@ test("offers a signed-out visitor the logo and sign-in", async ({
   await page.getByRole("link", { name: "Sign In" }).click();
   await expect(signInHeading(page)).toBeVisible();
 });
-

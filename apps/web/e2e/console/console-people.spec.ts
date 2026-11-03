@@ -19,7 +19,6 @@ import {
   countOf,
   flagTheName,
   keystrokesDismissed,
-  keystrokesButton,
   keystrokesListed,
   markTheOperator,
   person,
@@ -185,12 +184,6 @@ const priyaFlagged = async (page: Page, api: APIRequestContext, tag: string) => 
     personId: priya.id,
   });
   return { operators, priya, name };
-};
-
-const priyaListed = async (page: Page, api: APIRequestContext, tag: string) => {
-  const held = await priyaWithTheOperator(page, api, { tag, displayName: "Priya Shah" });
-  await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
-  return held;
 };
 
 test.describe("the console's Everyone page", () => {

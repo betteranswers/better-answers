@@ -7,7 +7,6 @@ import { expect, test } from "../browser.ts";
 import {
   addMember,
   anAddress,
-  holdingTheFirstAnswer,
   keyListed,
   keystrokesListed,
   makeGroups,
@@ -18,10 +17,6 @@ import {
 } from "../harness.ts";
 
 const LIST_BUDGET_MS = 1000;
-
-const aSearchForPriya = (url: URL): boolean =>
-  url.pathname.includes("members.auditLog") &&
-  (url.searchParams.get("input") ?? "").includes('"search":"Priya"');
 
 const ONE_LINE_PX = 48;
 
@@ -36,8 +31,6 @@ const searchBox = (page: Page) =>
 
 const familyFilter = (page: Page) =>
   auditLog(page).getByRole("combobox", { name: "Filter by Family" });
-
-const BY_PRIYA = /Priya Shah.*Bid writers/;
 
 const pickFamily = async (page: Page, family: string): Promise<void> => {
   await familyFilter(page).click();

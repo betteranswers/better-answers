@@ -2,11 +2,10 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
-import { CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
-  aMemberSignedInAt,
   anAddress,
   provision,
   seedModelChoices,
@@ -138,5 +137,4 @@ test.describe("the Models and spend page's model choices card", () => {
   });
 });
 
-test.describe("a page's older address", () => {
-});
+test.describe("a page's older address", () => {});

@@ -7,7 +7,6 @@ import { expect, test } from "../browser.ts";
 import {
   addMember,
   anAddress,
-  clockTheNextKey,
   keyListed,
   keystrokesDismissed,
   keystrokesListed,
@@ -45,11 +44,6 @@ const nameField = (page: Page): Locator =>
   createDialog(page).getByRole("textbox", { name: "New Group Name" });
 
 const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", { name });
-
-const renameDialog = (page: Page, name: string): Locator =>
-  page.getByRole("dialog", { name: `Rename ${name}` });
-
-const LIST_COUNT = "//section[h2[normalize-space(.)='Groups']]/div/output";
 
 const anAdminAtGroups = async (
   page: Page,

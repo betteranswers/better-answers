@@ -1,5 +1,4 @@
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
-import { z } from "zod";
+import type { APIRequestContext, Page } from "@playwright/test";
 
 import { CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
@@ -13,14 +12,9 @@ import {
   person,
   provision,
   signIn,
-  requestsSent,
 } from "../harness.ts";
 
 const LIST_BUDGET_MS = 1000;
-
-const PEOPLE = menuGroupIn(CONTROL_CENTRE, "people");
-
-const MEMBERS = pageNamed(PEOPLE, "Members");
 
 const MODELS = menuGroupIn(CONTROL_CENTRE, "models");
 
@@ -47,21 +41,6 @@ const searchBoxOf = (page: Page) =>
   page
     .getByRole("region", { name: "Search" })
     .getByRole("searchbox", { name: "Search by a word or a question" });
-
-const saidIn = (page: Page) => dialogOf(page).getByRole("status");
-
-const searchBox = (page: Page) =>
-  page.getByRole("searchbox", { name: "Search by name or address" });
-
-const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
-
-const memberRows = (page: Page): Locator =>
-  membersRegion(page)
-    .getByRole("row")
-    .filter({ has: page.getByRole("cell") });
-
-/** Matched by name anywhere in the path, because the tRPC client batches its reads. */
-const theMembersRead = (url: URL) => url.pathname.includes("members.list");
 
 const signedInOffMembers = async (page: Page, api: APIRequestContext, email: string) => {
   await page.goto("/sign-in");
@@ -102,34 +81,6 @@ const opened = async (page: Page, keys: string) => {
 const typed = async (page: Page, words: string) => {
   await inputOf(page).fill(words);
 };
-
-const memberPageNaming = (page: Page, name: string) =>
-  page.getByRole("main").getByRole("heading", { level: 2, name, exact: true });
-
-const jumpedToMember = async (page: Page, words: string, name: string): Promise<void> => {
-  await opened(page, "Meta+k");
-  await typed(page, words);
-  await optionOf(page, new RegExp(name)).click();
-  await expect(memberPageNaming(page, name)).toBeVisible();
-};
-
-const removedOnTheirPage = async (page: Page): Promise<void> => {
-  const removal = page.getByRole("region", { name: "Removal", exact: true });
-  await removal.getByRole("button", { name: "Remove Member" }).click();
-  await removal.getByRole("button", { name: "Remove", exact: true }).click();
-};
-
-const focusStopsRecorded = (page: Page) =>
-  page.evaluate(() => {
-    const stops: string[] = [];
-    Reflect.set(window, "focusStops", stops);
-    document.addEventListener("focusin", (event) => {
-      if (event.target instanceof HTMLElement) stops.push(event.target.innerText);
-    });
-  });
-
-const focusStops = async (page: Page): Promise<readonly string[]> =>
-  z.array(z.string()).parse(await page.evaluate((): unknown => Reflect.get(window, "focusStops")));
 
 for (const [what, words] of [
   ["a decimal", "1.50"],

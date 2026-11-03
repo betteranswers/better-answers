@@ -368,6 +368,12 @@ describe("the workspace switcher in the app", () => {
     expect(document.activeElement).toBe(await switcher());
     fireEvent.click(within(await openedMenu()).getByRole("menuitem", { name: "Console" }));
     await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.operator.path));
+    fireEvent.keyDown(await band().findByRole("button", { name: ADA.displayName }), {
+      key: "Enter",
+    });
+    const person = await screen.findByRole("menu", { name: new RegExp(ADA.displayName) });
+    expect(within(person).getByText(ADA.displayName)).toBeDefined();
+    expect(textOf(within(person).getAllByRole("menuitem"))).toEqual(["Account", "Sign Out"]);
 
     cleanup();
     await openAt(MEMBERS, adaAnAdmin());

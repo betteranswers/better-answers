@@ -849,8 +849,6 @@ const tickOf = (page: Page, name: string) =>
 const selectionAction = (page: Page, action: string): Locator =>
   selectionBar(page).getByRole("button", { name: action, exact: true });
 
-const linesIn = (dialog: Locator): Locator => dialog.getByRole("paragraph");
-
 const changeRoleOpened = async (page: Page, titled: string): Promise<Locator> => {
   await selectionAction(page, "Change Role").click();
   const dialog = page.getByRole("dialog", { name: titled });
