@@ -460,13 +460,6 @@ export const makeGroups = (
   },
 ) => ask(api, "/groups", input, groupsMade);
 
-const accessAsked = z.object({ asked: z.literal(true) });
-
-export const askToJoin = (
-  api: APIRequestContext,
-  input: { shortName: string; requesterId: string; reason: string },
-) => ask(api, "/access-requests", input, accessAsked);
-
 const nameFlagged = z.object({ flagged: z.literal(true) });
 
 export const flagTheName = (
