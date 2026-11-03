@@ -162,8 +162,22 @@ def _located_cluster(locator: str, *, shared: bool) -> Cluster:
     _refuse_unless_fit(maintenance, shared=shared)
     sweep_dead_cases(maintenance)
     return Cluster(
-        maintenance, ensure_template(maintenance, template_name(), apply_journal)
+        maintenance,
+        ensure_template(
+            maintenance, template_name(_server_month(maintenance)), apply_journal
+        ),
     )
+
+
+def _server_month(maintenance: str) -> str:
+    with psycopg.connect(maintenance) as connection:
+        row = connection.execute(
+            "SELECT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM')"
+        ).fetchone()
+    if row is None:
+        message = "the server named no month"
+        raise RuntimeError(message)
+    return str(row[0])
 
 
 def _server_facts(maintenance: str) -> tuple[bool, str | None]:
@@ -204,7 +218,8 @@ def _refuse_unless_fit(maintenance: str, *, shared: bool) -> None:
 _TEMPLATE_PREFIX = "tpl_py_"
 
 
-def template_name() -> str:
+def template_name(month: str) -> str:
+    """`month` is the server's UTC YYYY-MM, the clock a migration reads."""
     digest = hashlib.sha256()
     files = sorted(
         (path.relative_to(MIGRATIONS_DIR).as_posix(), path)
@@ -214,6 +229,7 @@ def template_name() -> str:
     for relative, path in files:
         digest.update(relative.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
     digest.update(Path(__file__).read_bytes())
+    digest.update(month.encode("utf-8"))
     return f"{_TEMPLATE_PREFIX}{digest.hexdigest()[:12]}"
 
 
