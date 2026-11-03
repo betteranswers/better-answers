@@ -39,6 +39,11 @@ const elsewhere = z.object({ until: z.string() });
 
 const linkTo = (token: string): string => `/sign-in/link#${token}`;
 
+const openedAfresh = async (page: Page, address: string): Promise<void> => {
+  await page.goto("about:blank");
+  await page.goto(address);
+};
+
 const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, who: string) => {
   const email = anAddress(who.toLowerCase());
   const editor = await person(api, email, { displayName: `${who} Editor` });
@@ -52,33 +57,7 @@ const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, w
   return { email, asking: page, token: await linkSentTo(api, email) };
 };
 
-const headingOf = (page: Page, name: string) =>
-  page.getByRole("heading", { level: 1, name, exact: true });
-
 const signInButton = (page: Page) => page.getByRole("button", { name: "Sign In", exact: true });
-
-test("a scanner's read spends nothing; the asking browser signs in", async ({
-  page,
-  context,
-  request,
-  anotherBrowser,
-  passesTheAccessibilityGate,
-}) => {
-  const { email, token } = await aLinkAskedForIn(context, request, "Linden");
-
-  const scanner = await anotherBrowser.newPage();
-  await scanner.goto(linkTo(token));
-  await expect(headingOf(scanner, "Enter This Code Where You Started")).toBeVisible();
-
-  await page.goto(linkTo(token));
-  await expect(signInButton(page)).toBeFocused();
-  await expect(page.getByRole("status"), "the page does not say who signs in").toContainText(email);
-  await expect(page, "the fragment lingers in the address").toHaveURL(/\/sign-in\/link$/);
-  await passesTheAccessibilityGate();
-
-  await page.keyboard.press("Enter");
-  await landedAtHome(page, "Editor");
-});
 
 test("signing in by link in another tab lands the asker", async ({ page, context, request }) => {
   const { asking, token } = await aLinkAskedForIn(context, request, "Follow");
@@ -96,6 +75,7 @@ test("the code reads as six digits, and c copies it", async ({
   context,
   request,
   anotherBrowser,
+  passesTheAccessibilityGate,
 }) => {
   const { email, token } = await aLinkAskedForIn(anotherBrowser, request, "Digits");
   const code = await codeSentTo(request, email);
@@ -130,4 +110,24 @@ test("the code reads as six digits, and c copies it", async ({
   });
   await page.keyboard.press("c");
   await theActionLandedWithinItsBudget(page, "copy");
+
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Copy Code" }), "Tab missed Copy").toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Keyboard Shortcuts" })).toBeFocused();
+  await passesTheAccessibilityGate();
+
+  await test.step("a scanner's read spends nothing; the asking browser signs in", async () => {
+    await context.addCookies(await anotherBrowser.cookies());
+    await openedAfresh(page, linkTo(token));
+    await expect(signInButton(page)).toBeFocused();
+    await expect(page.getByRole("status"), "the page does not say who signs in").toContainText(
+      email,
+    );
+    await expect(page, "the fragment lingers in the address").toHaveURL(/\/sign-in\/link$/);
+    await passesTheAccessibilityGate();
+
+    await page.keyboard.press("Enter");
+    await landedAtHome(page, "Editor");
+  });
 });

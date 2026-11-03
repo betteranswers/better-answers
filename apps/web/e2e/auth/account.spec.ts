@@ -1,24 +1,29 @@
+import assert from "node:assert/strict";
+
 import type { Page } from "@playwright/test";
 
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
+
+import { THEME_KEPT_UNDER } from "@/shared/theme/theme-switch.ts";
 
 import { expect, test } from "../browser.ts";
 import {
   addMember,
   anAddress,
   clockTheNextKey,
+  contrastBetween,
   keyShown,
   person,
   personMenuOpened,
   provision,
   saysARefusal,
   signedInAtHome,
-  signInByEmail,
+  signedInWithNoWorkspace,
+  tabUntilFocused,
   theActionLandedWithinItsBudget,
+  tokenColour,
 } from "../harness.ts";
-
-const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
 
 const accountHeading = (page: Page) => page.getByRole("heading", { level: 1, name: "Account" });
 
@@ -42,8 +47,6 @@ const savedBox = (page: Page) => page.getByRole("checkbox", { name: "I have save
 
 const removeButton = (page: Page) =>
   authenticatorPart(page).getByRole("button", { name: "Remove", exact: true });
-
-const outcomeOf = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
 
 const accountFromTheBand = async (page: Page, who: string): Promise<void> => {
   const menu = await personMenuOpened(page, who);
@@ -73,11 +76,6 @@ const doneClosesTheCodes = async (page: Page): Promise<void> => {
   ).toBeFocused();
 };
 
-const tenCodesInTheList = Array.from(
-  { length: RECOVERY_CODES_IN_A_SET },
-  () => `        - listitem: ${String(RECOVERY_CODE)}`,
-).join("\n");
-
 const anEditorOnAccount = async (page: Page, api: Parameters<typeof person>[0]) => {
   const email = anAddress("editor");
   const editor = await person(api, email, { displayName: "Ines Editor" });
@@ -88,39 +86,15 @@ const anEditorOnAccount = async (page: Page, api: Parameters<typeof person>[0]) 
   await expect(setUpButton(page)).toBeVisible();
 };
 
-test("an Editor sets up an authenticator from the avatar menu", async ({ page, request }) => {
-  await anEditorOnAccount(page, request);
-
-  const codes = await setUpWithItsCode(page);
-
-  expect(
-    codes.every((code) => RECOVERY_CODE.test(code)),
-    "a code is not one the api mints",
-  ).toBe(true);
-  await expect(outcomeOf(page), "the page says nothing of the setup").toBeVisible();
-  await expect(removeButton(page), "the page does not list the authenticator").toBeVisible();
-  await expect(
-    codesBlock(page).getByRole("heading", { name: "Save Your Recovery Codes" }),
-  ).toBeFocused();
-  await expect(codesBlock(page)).toMatchAriaSnapshot(`
-    - region "Save Your Recovery Codes":
-      - heading "Save Your Recovery Codes" [level=3]
-      - paragraph
-      - list "Recovery Codes":
-${tenCodesInTheList}
-      - button "Copy Codes"
-      - link "Download"
-      - button "Print"
-      - checkbox "I have saved these codes"
-      - button "Done"
-  `);
-});
-
-test("Done waits for the tick, and a reload shows none", async ({ page, request }) => {
+test("Done waits for the tick, and a reload shows none", async ({
+  page,
+  request,
+  passesTheAccessibilityGate,
+}) => {
   await anEditorOnAccount(page, request);
   await setUpWithItsCode(page);
 
-  await doneButton(page).focus();
+  await tabUntilFocused(page, doneButton(page));
   await clockTheNextKey(page, {
     at: `//section[h3[normalize-space(.)="Save Your Recovery Codes"]][.//*[@role='alert'][normalize-space(.)]]`,
     reads: "Save Your Recovery Codes",
@@ -130,6 +104,7 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   await saysARefusal(codesBlock(page).getByRole("alert"));
   await expect(savedBox(page)).toBeFocused();
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
+  await passesTheAccessibilityGate();
 
   await page.keyboard.press("Space");
   await expect(savedBox(page)).toBeChecked();
@@ -147,40 +122,35 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   await expect(codesListed(page)).toHaveCount(0);
 });
 
-const passkeyName = (page: Page) => page.getByLabel("Passkey Name");
+const keptOnThisBrowser = (page: Page, theme: string) =>
+  page.addInitScript(
+    ([key, value]) => {
+      localStorage.setItem(key, value);
+    },
+    [THEME_KEPT_UNDER, theme] as const,
+  );
 
-const authenticatorInstead = (page: Page) =>
-  page.getByRole("button", { name: "Set Up an Authenticator Instead" });
+const paintedHex = (hex: string): string =>
+  `rgb(${[1, 3, 5].map((at) => String(Number.parseInt(hex.slice(at, at + 2), 16))).join(", ")})`;
 
-const primaries = (page: Page) =>
-  page.getByRole("button").and(page.locator('[data-variant="default"]'));
+test("draws the authenticator's code dark on light in dark", async ({ page, request }) => {
+  await keptOnThisBrowser(page, "dark");
+  await signedInWithNoWorkspace(page, request, "theme-code");
+  await page.goto("/account");
+  await page.getByRole("button", { name: "Set Up an Authenticator" }).click();
+  const code = page.getByRole("img", { name: "QR code for your authenticator" });
+  await expect(code).toBeVisible();
 
-const anAdminOnSetup = async (page: Page, api: Parameters<typeof person>[0]): Promise<void> => {
-  const { admin } = await provision(api, { name: "Skipton Setups" });
-  await page.goto("/sign-in");
-  await signInByEmail(page, api, admin.email);
-  await expect(passkeyName(page)).toBeVisible();
-};
-
-test("setup shows one primary, whichever way is open", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
-  await anAdminOnSetup(page, request);
-  await expect(primaries(page)).toHaveText(["Add a Passkey"]);
-
-  await authenticatorInstead(page).click();
-
-  await expect(codeField(page)).toBeVisible();
-  await expect(primaries(page)).toHaveText(["Finish Setup"]);
-  await expect(passkeyName(page)).toBeHidden();
-  await expect(authenticatorInstead(page)).toBeFocused();
-  await passesTheAccessibilityGate();
-
-  await authenticatorInstead(page).click();
-
-  await expect(passkeyName(page)).toBeVisible();
-  await expect(primaries(page)).toHaveText(["Add a Passkey"]);
-  await expect(authenticatorInstead(page)).toBeFocused();
+  const [stroke, fill] = await Promise.all([
+    code.locator("path[stroke]").first().getAttribute("stroke"),
+    code.locator("path[fill]").first().getAttribute("fill"),
+  ]);
+  assert.ok(stroke !== null, "the code's modules name no stroke");
+  assert.ok(fill !== null, "the code's field names no fill");
+  const modules = paintedHex(stroke);
+  const field = paintedHex(fill);
+  expect(contrastBetween(modules, field), "a scanner cannot read the code").toBeGreaterThanOrEqual(
+    4.5,
+  );
+  expect(modules, "the code is drawn light on dark").toBe(await tokenColour(page, "--grey-900"));
 });

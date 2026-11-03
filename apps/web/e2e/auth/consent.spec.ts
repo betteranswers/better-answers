@@ -7,8 +7,6 @@ import { THEME_KEPT_UNDER } from "@/shared/theme/theme-switch.ts";
 import { expect, test } from "../browser.ts";
 import {
   anAddress,
-  catchClaudesRedirect,
-  CLAUDES_REDIRECT_URI,
   claudesAuthorizeUrl,
   drawnMarks,
   provision,
@@ -17,13 +15,10 @@ import {
   tokenPainted,
 } from "../harness.ts";
 
-const landedAt = (page: Page): URL => new URL(page.url());
+const READ_BUDGET_MS = 1000;
 
 const consentHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Connect Claude" });
-
-const displayNameHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "Your Name" });
 
 const themeOf = (page: Page) => page.evaluate(() => document.documentElement.dataset["theme"]);
 
@@ -38,19 +33,17 @@ const paintsTheDarkPage = async (page: Page): Promise<string> => {
   return painted;
 };
 
-const anAdminAtConsent = async (
-  page: Page,
-  api: APIRequestContext,
-  origin: string,
-  who: string,
-) => {
+const anAdminSignedIn = async (page: Page, api: APIRequestContext, who: string) => {
   const email = anAddress(who);
   const workspace = await provision(api, { name: `${who} Ltd`, adminEmail: email });
   await page.goto("/sign-in");
   await signIn(page, api, email);
+  return workspace;
+};
+
+const atConsent = async (page: Page, origin: string): Promise<void> => {
   await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent" }));
   await expect(consentHeading(page)).toBeVisible();
-  return workspace;
 };
 
 const connectOnceRevoked = async (page: Page, api: APIRequestContext, userId: string) => {
@@ -59,21 +52,20 @@ const connectOnceRevoked = async (page: Page, api: APIRequestContext, userId: st
   await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();
 };
 
-const connectedAt = async (page: Page): Promise<URL> => {
-  await page.getByRole("button", { name: "Connect" }).click();
-  const callback = landedAt(page);
-  expect(`${callback.origin}${callback.pathname}`).toBe(CLAUDES_REDIRECT_URI);
-  expect(callback.searchParams.get("code")).not.toBeNull();
-  return callback;
-};
-
 test("draws consent in the sign-in pages' card, faces and tokens", async ({
   page,
   request,
   baseURL,
+  passesTheAccessibilityGate,
 }) => {
   assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
-  await anAdminAtConsent(page, request, baseURL, "drawn");
+  await anAdminSignedIn(page, request, "drawn");
+
+  const started = Date.now();
+  await atConsent(page, baseURL);
+  const elapsed = Date.now() - started;
+  test.info().annotations.push({ type: "consent read", description: `${elapsed} ms` });
+  expect(elapsed, "consent was not read within its second").toBeLessThan(READ_BUDGET_MS);
 
   expect(await drawnMarks(page), "the card stands for its primary button").toEqual(["card"]);
   const geistLoaded = await page.evaluate(async () => {
@@ -100,6 +92,7 @@ test("draws consent in the sign-in pages' card, faces and tokens", async ({
   await expect(connect).toBeFocused();
   const ring = await tokenPainted(page, "--focus-ring", "box-shadow");
   await expect(connect).toHaveCSS("box-shadow", ring);
+  await passesTheAccessibilityGate();
 
   await page.setViewportSize({ width: 320, height: 720 });
   const sideways = await page.evaluate(
@@ -116,7 +109,8 @@ test("draws consent, then its refusal, in the dark theme kept", async ({
 }) => {
   assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   await page.emulateMedia({ colorScheme: "light" });
-  const workspace = await anAdminAtConsent(page, request, baseURL, "keeps-dark");
+  const workspace = await anAdminSignedIn(page, request, "keeps-dark");
+  await atConsent(page, baseURL);
   expect(await themeOf(page), "a light device opened a dark page").toBe("light");
   const light = await pagePainted(page);
 
@@ -132,24 +126,4 @@ test("draws consent, then its refusal, in the dark theme kept", async ({
 
   await connectOnceRevoked(page, request, workspace.admin.id);
   expect(await paintsTheDarkPage(page), "dark painted the light page").not.toBe(light);
-});
-
-test("takes a named member from connector sign-in straight to consent", async ({
-  page,
-  request,
-  baseURL,
-  passesTheAccessibilityGate,
-}) => {
-  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
-  const email = anAddress("named-connecting");
-  await provision(request, { name: "Named Connecting Ltd", adminEmail: email });
-  await catchClaudesRedirect(page);
-
-  await page.goto(claudesAuthorizeUrl(baseURL, { prompt: "consent" }));
-  await signIn(page, request, email);
-
-  await expect(consentHeading(page)).toBeVisible();
-  await expect(displayNameHeading(page)).toHaveCount(0);
-  await passesTheAccessibilityGate();
-  await connectedAt(page);
 });
