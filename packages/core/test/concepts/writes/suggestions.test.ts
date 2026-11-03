@@ -313,6 +313,20 @@ describe("a suggestion set", () => {
     expect(after.map((item) => item.baseMoved)).toEqual([false]);
   });
 
+  it("names no target to an Admin outside its concept's audience", async () => {
+    const scenario = await arrange();
+    const { written, set } = await proposedAgainst(scenario, "edit");
+    await db().pool.query(
+      `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
+        WHERE workspace_id = $1 AND iri = $2`,
+      [scenario.workspaceId, written.iri, ulid()],
+    );
+
+    const summary = await summaryOf(scenario, set.setId);
+
+    expect(summary.map((item) => item.target)).toEqual([null]);
+  });
+
   it("renders each item's kind, status and decider from its rows", async () => {
     const scenario = await arrange();
     const request = requestFor();

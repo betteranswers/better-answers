@@ -2,6 +2,7 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it } from "vitest";
 
+import { ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
 import {
@@ -295,6 +296,24 @@ describe("Waiting on you", () => {
       owner: [],
       ownerOpens: { ok: false, error: "not-found" },
       admin: [suggestionId],
+    });
+  });
+
+  it("hides an edit from an Admin outside its concept's audience", async () => {
+    const scenario = await arrange();
+    const { written, suggestionId } = await conceptProposedBy(scenario, scenario.viewer);
+    await db().pool.query(
+      `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
+        WHERE workspace_id = $1 AND iri = $2`,
+      [scenario.workspaceId, written.iri, ulid()],
+    );
+
+    expect({
+      admin: await suggestionsWaitingFor(scenario.admin),
+      adminOpens: await openedBy(scenario.admin, suggestionId),
+    }).toEqual({
+      admin: [],
+      adminOpens: { ok: false, error: "not-found" },
     });
   });
 });
