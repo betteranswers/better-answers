@@ -1,10 +1,13 @@
 import { configDefaults, defineConfig } from "vitest/config";
 
 import { pathWithAppleGit } from "@better-answers/schema/testing/apple-git";
+import { slowTestThreshold } from "@better-answers/schema/testing/slow-test-threshold";
 
 export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
+
+    slowTestThreshold: slowTestThreshold(),
 
     exclude: [...configDefaults.exclude, "tests/images/**"],
 
