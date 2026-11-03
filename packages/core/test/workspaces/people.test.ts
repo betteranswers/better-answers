@@ -144,10 +144,13 @@ describe("the operator's list of people", () => {
       expiresAt: new Date(Date.now() + 3_600_000),
     });
     const revokedAt = new Date();
-    const revoked = await asTheOperator(db(), (operator, tx) =>
+    const { answered } = await asANewOperator(db(), revokedAt, (operator, tx) =>
       endEverySignInAndToken(operator, tx, { personId: personIdOf(personId), at: revokedAt }),
     );
-    expect(revoked.ok).toBe(true);
+    expect(answered).toEqual({
+      ok: true,
+      value: { ok: true, value: { personId, revokedAt: revokedAt.toISOString() } },
+    });
 
     expect(await listed(email)).toMatchObject({
       ok: true,
