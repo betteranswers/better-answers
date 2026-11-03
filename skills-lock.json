@@ -13,18 +13,6 @@
       "skillPath": "packages/server/skills/auth/SKILL.md",
       "computedHash": "fef9f9dcb1631490a3a273f1a6b89aa234260ed8087a97de5a1c75f769ea26fe"
     },
-    "ban-type-assertions": {
-      "source": "whamp/skills",
-      "sourceType": "github",
-      "skillPath": "engineering/ban-type-assertions/SKILL.md",
-      "computedHash": "de04a4a73910b9ff960f4759b05f828507b16ab72fea6122f843c01f64ac4e84"
-    },
-    "c4-architecture": {
-      "source": "softaworks/agent-toolkit",
-      "sourceType": "github",
-      "skillPath": "skills/c4-architecture/SKILL.md",
-      "computedHash": "f35f57420c35f2e8413e1e22934ca3950cae8286499f6fbe978cff604c35cfcd"
-    },
     "caching": {
       "source": "trpc/trpc",
       "sourceType": "github",
@@ -42,12 +30,6 @@
       "sourceType": "github",
       "skillPath": "packages/client/skills/client-setup/SKILL.md",
       "computedHash": "65b2f97d796665441ec9044e422d549184836684b2f15b8586d978b9f8bb0406"
-    },
-    "docker-patterns": {
-      "source": "affaan-m/ecc",
-      "sourceType": "github",
-      "skillPath": "skills/docker-patterns/SKILL.md",
-      "computedHash": "2518afd6ae1e1b91d7f8d2f8d9b7145fb08ec640b9624e3dffc0a21289417245"
     },
     "email-best-practices": {
       "source": "resend/resend-skills",
@@ -73,12 +55,6 @@
       "skillPath": "skills/implementing-gdpr-data-subject-access-request/SKILL.md",
       "computedHash": "146286ad6fd6ce797afbbcbadd373d8c57438015bdf073a8b20dfdc2e8bce8f1"
     },
-    "knip-deadcode": {
-      "source": "pproenca/dot-skills",
-      "sourceType": "github",
-      "skillPath": "skills/.experimental/knip-deadcode/SKILL.md",
-      "computedHash": "45d9e8307860a058942a1de80571036521c3edf29ec371741c326736b29b81b5"
-    },
     "links": {
       "source": "trpc/trpc",
       "sourceType": "github",
@@ -90,12 +66,6 @@
       "sourceType": "github",
       "skillPath": "packages/server/skills/middlewares/SKILL.md",
       "computedHash": "f6e57c21ef44f645b7cb3f144901497631abb6dbe8aa37a0bfcce48459b274b3"
-    },
-    "multi-stage-dockerfile": {
-      "source": "github/awesome-copilot",
-      "sourceType": "github",
-      "skillPath": "skills/multi-stage-dockerfile/SKILL.md",
-      "computedHash": "698bf93a84dae18fd7bd0b1d35c21427307fde78fbdf4624be9726f5f98189ca"
     },
     "mutation-testing": {
       "source": "jspiro/skills",

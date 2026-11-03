@@ -43,7 +43,6 @@ reviews:
       - packages/design-system/thumbnail.html
       - docs/**
       - .claude/skills/**
-      - apps/api/.claude/skills/**
       - .claude/agents/**
       - .claude/settings.json
       - packages/schema/migrations/meta/**

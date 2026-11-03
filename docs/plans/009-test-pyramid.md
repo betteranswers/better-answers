@@ -91,7 +91,7 @@ Plan 008 owns the folder restructure and is moving files under `packages/*` and 
 
 ### Boot recipe, for every live lane
 
-Each live lane runs in its own worktree at the PR head. The surface under test is the suites themselves, so a lane drives them through `pnpm` and `uv` and saves the run's log. A lane that needs the served app drives it through `.claude/skills/verify/SKILL.md`, from its Launch to its Cleanup, and runs a browser spec per `apps/web/.claude/skills/playwright-specs/SKILL.md`, *Running it*. A PR that does not wait on BA-288 has no lane that needs the served app.
+Each live lane runs in its own worktree at the PR head. The surface under test is the suites themselves, so a lane drives them through `pnpm` and `uv` and saves the run's log. A lane that needs the served app drives it through `.claude/skills/verify/SKILL.md`, from its Launch to its Cleanup, and runs a browser spec per `.claude/skills/playwright-specs/SKILL.md`, *Running it*. A PR that does not wait on BA-288 has no lane that needs the served app.
 
 - [ ] `git fetch origin <head-branch> && git checkout <head SHA>`.
 - [ ] Run `pnpm install --frozen-lockfile` and `cd apps/worker && uv sync --frozen`. Confirm Docker answers `docker info`. Start one shared Postgres with `pnpm reap-containers` first, then export `TEST_POSTGRES_URI` per `docs/operations/local-gates.md`, so that interleaved runs do not each pay a container.
@@ -273,8 +273,8 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 - [ ] Create `.claude/skills/verify/` with `/create-verification-skill`, at the repository root, not under `apps/web/`. poteto-mode and `.agents/playbooks/verification.md` look for the driver skill at `.claude/skills/verify/`, and a change to what the api serves a page needs the same skill as a change to the page.
 - [ ] Create `.claude/skills/verify/references/harness.md` from browser-suite's `references/harness.md` sections "The ceilings a spec runs into", "The harness's actions" and "What a refused seed leaves". These are how a drive builds state.
-- [ ] Create `apps/web/.claude/skills/playwright-specs/SKILL.md`, which loads for work under `apps/web/`. It takes browser-suite's "The fixture module", "Writing a spec", "The accessibility gate", "Running it" and "Not carried".
-- [ ] Create `apps/web/.claude/skills/playwright-specs/references/helpers.md` from browser-suite's "The browser helpers", "Claude's part in OAuth", "Reading the api's answers" and "The knowledge module". Move `references/accessibility-gate.md` beside it.
+- [ ] Create `.claude/skills/playwright-specs/SKILL.md`, which loads for work under `apps/web/`. It takes browser-suite's "The fixture module", "Writing a spec", "The accessibility gate", "Running it" and "Not carried".
+- [ ] Create `.claude/skills/playwright-specs/references/helpers.md` from browser-suite's "The browser helpers", "Claude's part in OAuth", "Reading the api's answers" and "The knowledge module". Move `references/accessibility-gate.md` beside it.
 - [ ] Delete `.claude/skills/browser-suite/`.
 - [ ] Replace `apps/web/test/gates/browser-suite-skill.test.ts` with `apps/web/test/gates/web-skills.test.ts`. Point `check:docs:web` in root `package.json` and the test's row in `packages/devtools/test/ci/docs-lane.test.ts` at it.
 - [ ] Edit `.agents/playbooks/verification.md` and `.agents/playbooks/plan.md`.
@@ -1003,7 +1003,7 @@ PR 1 deletes 352 of the 367 rows its classification first named. Three rows are 
 
 ## Appendix D. Links and reading list
 
-- Read before editing. `AGENTS.md` "Where a file goes" and Testing, `apps/web/AGENTS.md`, `docs/okf-v02.md`, ADRs 0007, 0012, 0024, 0028, 0029, 0031, 0032 and 0049, `.claude/skills/survey-architecture/references/deepening.md`, `.agents/playbooks/verification.md`, the driver skill (`.claude/skills/browser-suite/SKILL.md` before BA-288, then `.claude/skills/verify/SKILL.md` and `apps/web/.claude/skills/playwright-specs/SKILL.md`), `docs/specs/route/seams.md`, `docs/plans/008-folder-restructure.md` and its maps.
+- Read before editing. `AGENTS.md` "Where a file goes" and Testing, `apps/web/AGENTS.md`, `docs/okf-v02.md`, ADRs 0007, 0012, 0024, 0028, 0029, 0031, 0032 and 0049, `.claude/skills/survey-architecture/references/deepening.md`, `.agents/playbooks/verification.md`, the driver skill (`.claude/skills/browser-suite/SKILL.md` before BA-288, then `.claude/skills/verify/SKILL.md` and `.claude/skills/playwright-specs/SKILL.md`), `docs/specs/route/seams.md`, `docs/plans/008-folder-restructure.md` and its maps.
 - BA-287 reads `packages/devtools/src/scans/loose-files.ts`, `scripts/loose-files.mjs` and its test, `scripts/move-files.mjs` and `scripts/test-inventory.sh` before code.
 - BA-288 reads, from the installed plugin, `skills/create-verification-skill/SKILL.md` and its `references/feature-map-example/`, `skills/maintain-verification-skill/SKILL.md` and `skills/create-formal-verification-skill/SKILL.md`. From this repository it reads `.claude/skills/browser-suite/` in full, `apps/web/test/gates/browser-suite-skill.test.ts`, `.agents/playbooks/plan.md` and `docs/plans/006-resolve-bundle-fence-across-processes.md`.
 - BA-270, BA-274 and BA-275 get `skills/how/SKILL.md` before code and `skills/interrogate/SKILL.md` before merge-ready, since each changes a seam another tier or transport crosses.

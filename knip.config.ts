@@ -15,7 +15,8 @@ const config: KnipConfig = {
       entry: ["docs/plans/*/*.mjs"],
 
       // A skill's reference files are samples for other projects, so nothing here imports them.
-      ignore: [".claude/skills/*/references/**"],
+      // The security-audit skill's validators are vendored scripts it runs by name.
+      ignore: [".claude/skills/*/references/**", ".claude/skills/security-audit/**"],
     },
 
     "apps/api": {
@@ -27,9 +28,6 @@ const config: KnipConfig = {
         "lifts/**",
 
         "tests/fixtures/web-build/**",
-
-        // Vendored skills, whose samples import packages the api does not depend on.
-        ".claude/skills/**",
       ],
     },
 
