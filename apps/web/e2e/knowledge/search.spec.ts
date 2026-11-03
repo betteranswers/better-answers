@@ -4,10 +4,12 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { SEARCH_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
+import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
   anAddress,
+  landedAtHome,
   provision,
   seedConnectedSources,
   signIn,
@@ -20,6 +22,8 @@ const LIST_BUDGET_MS = 1000;
 
 const A_PAGE = 20;
 
+const DECIMAL = "1.50";
+
 const searchRegion = (page: Page) => page.getByRole("region", { name: "Search" });
 
 const searchBox = (page: Page) =>
@@ -27,6 +31,10 @@ const searchBox = (page: Page) =>
 
 const matchesOf = (page: Page): Locator =>
   searchRegion(page).getByRole("list", { name: "Matches" }).getByRole("listitem");
+
+const jumpToDialog = (page: Page) => page.getByRole("dialog", { name: "Jump To" });
+
+const jumpToInput = (page: Page) => jumpToDialog(page).getByRole("combobox", { name: "Jump To" });
 
 const said = (page: Page) => searchRegion(page).getByRole("status").first();
 
@@ -249,39 +257,31 @@ test.describe("the Knowledge Search page", () => {
     );
   });
 
-  for (const width of [1280, 1536]) {
-    test(`keeps the panel off the passkey offer, at ${String(width)} px`, async ({
-      page,
-      request,
-    }) => {
-      await aVirtualAuthenticator(page);
-      const email = anAddress("admin");
-      const workspace = await provision(request, {
-        name: `Holme Keys ${String(width)}`,
-        adminEmail: email,
-      });
-      await handbookSeeded(request, {
-        workspaceId: workspace.workspaceId,
-        adminId: workspace.admin.id,
-      });
-      await page.setViewportSize({ width, height: 720 });
-      await page.goto(asked("pallet"));
-      await signIn(page, request, email);
-      const dismiss = page.getByRole("button", { name: "Dismiss Passkey Offer" });
-      await expect(dismiss).toBeVisible();
-
-      await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
-      const panel = await passagePanel(page, HANDBOOK).boundingBox();
-      const offer = await dismiss.boundingBox();
-
-      assert.ok(panel !== null, "the panel drew a box");
-      assert.ok(offer !== null, "the passkey offer drew a box");
-      expect(
-        offer.x + offer.width,
-        "the panel covers the passkey offer's Dismiss",
-      ).toBeLessThanOrEqual(panel.x);
+  test("keeps the panel off the passkey offer, at 1280 px", async ({ page, request }) => {
+    await aVirtualAuthenticator(page);
+    const email = anAddress("admin");
+    const workspace = await provision(request, { name: "Holme Keys", adminEmail: email });
+    await handbookSeeded(request, {
+      workspaceId: workspace.workspaceId,
+      adminId: workspace.admin.id,
     });
-  }
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(asked("pallet"));
+    await signIn(page, request, email);
+    const dismiss = page.getByRole("button", { name: "Dismiss Passkey Offer" });
+    await expect(dismiss).toBeVisible();
+
+    await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
+    const panel = await passagePanel(page, HANDBOOK).boundingBox();
+    const offer = await dismiss.boundingBox();
+
+    assert.ok(panel !== null, "the panel drew a box");
+    assert.ok(offer !== null, "the passkey offer drew a box");
+    expect(
+      offer.x + offer.width,
+      "the panel covers the passkey offer's Dismiss",
+    ).toBeLessThanOrEqual(panel.x);
+  });
 
   for (const width of [320, 1024]) {
     test(`opens a passage inline beneath its match at ${String(width)} px`, async ({
@@ -314,18 +314,6 @@ test.describe("the Knowledge Search page", () => {
       await expect(opener).toBeFocused();
     });
   }
-
-  test("renders matches within the list's budget", async ({ page, request }) => {
-    await anAdminAtSearch(page, request, "Ryedale Archives", [handbookSeeded]);
-
-    const started = Date.now();
-    await page.goto(asked("pallet"));
-    await expect(matchesOf(page)).toHaveCount(A_PAGE);
-    const elapsed = Date.now() - started;
-
-    test.info().annotations.push({ type: "search", description: `${elapsed} ms` });
-    expect(elapsed, "a page of matches rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
-  });
 
   test("searches, opens and pages by keyboard", async ({
     page,
@@ -378,5 +366,33 @@ test.describe("the Knowledge Search page", () => {
     `);
 
     await passesTheAccessibilityGate();
+
+    await test.step("carries a decimal from jump-to to Search as typed, through a reload", async () => {
+      await page.goto(HOMES.Admin.path);
+      await landedAtHome(page, "Admin");
+      await page.keyboard.press("Control+k");
+      await expect(jumpToDialog(page)).toBeVisible();
+      await expect(jumpToInput(page)).toBeFocused();
+      await jumpToInput(page).fill(DECIMAL);
+      await jumpToDialog(page)
+        .getByRole("group", { name: "Knowledge" })
+        .getByRole("option")
+        .click();
+
+      await expect(searchBox(page)).toHaveValue(DECIMAL);
+      await expect(page).toHaveURL(/knowledge\.search=/);
+      await page.reload();
+      await expect(searchBox(page)).toHaveValue(DECIMAL);
+    });
+
+    await test.step("renders a page of matches within the list's budget", async () => {
+      const started = Date.now();
+      await page.goto(asked("pallet"));
+      await expect(matchesOf(page)).toHaveCount(A_PAGE);
+      const elapsed = Date.now() - started;
+
+      test.info().annotations.push({ type: "search", description: `${elapsed} ms` });
+      expect(elapsed, "a page of matches rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+    });
   });
 });

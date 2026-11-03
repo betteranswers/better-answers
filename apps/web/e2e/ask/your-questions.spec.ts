@@ -11,6 +11,8 @@ import {
   seedConcepts,
   seedQuestions,
   signIn,
+  skipLinkReachesThePage,
+  tabUntilFocused,
   type SeedConcept,
   type SeedRecord,
 } from "../harness.ts";
@@ -97,7 +99,11 @@ const signedInAt = async (page: Page, api: APIRequestContext, member: Member, pa
 };
 
 test.describe("Your questions", () => {
-  test("renders a page of rows within the list budget", async ({ page, request }) => {
+  test("renders a page of rows within the list budget", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
     const at = await aWorkspace(request, "Wharfe Pages");
     await seeded(
       request,
@@ -118,5 +124,20 @@ test.describe("Your questions", () => {
     test.info().annotations.push({ type: "your questions", description: `${elapsed} ms` });
     expect(elapsed, "a page of 50 questions rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
     await expect(rowsOf(yourQuestions(page)).first()).toHaveText("Question number 51");
+
+    await test.step("reaches every row and More by keyboard alone", async () => {
+      await skipLinkReachesThePage(page);
+      await page.keyboard.press("Tab");
+      await expect(rowsOf(yourQuestions(page)).first()).toBeFocused();
+      const more = page
+        .getByRole("navigation", { name: "More Questions" })
+        .getByRole("button", { name: "Load More" });
+      await tabUntilFocused(page, more, 60);
+      await passesTheAccessibilityGate();
+
+      await page.keyboard.press("Enter");
+      await expect(rowsOf(yourQuestions(page))).toHaveCount(51);
+      await expect(rowsOf(yourQuestions(page)).last()).toBeFocused();
+    });
   });
 });
