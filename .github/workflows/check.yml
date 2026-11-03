@@ -156,11 +156,6 @@ jobs:
     if: ${{ needs.lane.outputs.lane == 'full' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
-    strategy:
-      # Cancelling the other shard would hide its failures until this one's were fixed.
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -194,9 +189,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - run: pnpm check:core:suite --shard="${SHARD}"
-        env:
-          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+      - run: pnpm check:core:suite
 
   full-api:
     needs: lane
