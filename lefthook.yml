@@ -109,6 +109,10 @@ pre-push-gates:
       run: "{without-git-env} pnpm run loose-files"
       fail_text: "run it alone with pnpm run loose-files"
 
+    skill-paths:
+      run: "{without-git-env} pnpm run skill-paths"
+      fail_text: "run pnpm run skill-paths --write"
+
     test-folders:
       run: "{without-git-env} pnpm run test-folders"
       fail_text: "run it alone with pnpm run test-folders"

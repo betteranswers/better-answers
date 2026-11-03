@@ -95,4 +95,4 @@ The timing is the cost. `route.fetch()` waits for the whole body, so the page se
 - `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md` at `2729ebeec`, in the paragraph "Amended 15/10/2026 by the S2b ask plan" for U16 and KTD14, a detail the current ADR no longer holds: a streamed answer sends its status before any call settles, so a ceiling met inside it arrives in a body that answered 200. The spending limit's refusal follows the stream's first event, so it arrives the same way. That is a second reason `refusalAnswering` does not fit it.
 - `docs/solutions/architecture-patterns/adr-0016.md`: a refusal ends the stream with no prose, which is why the buffered read ends promptly.
 - `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md`: the same `route.fetch()` and `route.fulfill` pair, used there to let a call land and then take the page offline, not to read its body.
-- `apps/web/.claude/skills/playwright-specs/SKILL.md`: a spec reads the api's answer before `saysARefusal`.
+- `.claude/skills/playwright-specs/SKILL.md`: a spec reads the api's answer before `saysARefusal`.

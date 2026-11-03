@@ -66,7 +66,6 @@ packages/schema/test/
 packages/schema/tsconfig.json
 packages/schema/vitest.config.ts
 
-apps/api/.claude/
 apps/api/AGENTS.md
 apps/api/CLAUDE.md
 apps/api/Dockerfile
@@ -78,7 +77,6 @@ apps/api/tests/
 apps/api/tsconfig.json
 apps/api/vitest.config.ts
 
-apps/web/.claude/
 apps/web/AGENTS.md
 apps/web/CLAUDE.md
 apps/web/components.json
@@ -93,7 +91,6 @@ apps/web/tsconfig.json
 apps/web/vite.config.ts
 apps/web/vitest.config.ts
 
-apps/worker/.claude
 apps/worker/dockerignore
 apps/worker/.mypy_cache/
 apps/worker/.pytest_cache/

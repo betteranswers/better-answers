@@ -579,7 +579,6 @@
     "packages/devtools/lifts/anti-slop/**",
     ".claude/worktrees/**",
     ".claude/skills/**",
-    "apps/api/.claude/skills/**",
     "**/stryker-setup-*.js"
   ]
 }

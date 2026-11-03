@@ -9,7 +9,7 @@ import { EVERY_AREA, pagesOf } from "@/shared/navigation.ts";
 import { repositoryRoot } from "@test/roots.ts";
 
 const verifyDirectory = ".claude/skills/verify";
-const specsDirectory = "apps/web/.claude/skills/playwright-specs";
+const specsDirectory = ".claude/skills/playwright-specs";
 const featuresDirectory = `${verifyDirectory}/features`;
 const suiteDirectory = "apps/web/e2e";
 

@@ -22,7 +22,8 @@
     "renovate.json",
     "packages/devtools/lifts/anti-slop/**",
     ".claude/worktrees/**",
-    "apps/api/.claude/skills/**",
+    ".claude/skills/resend/**",
+    ".claude/skills/security-audit/**",
     "packages/schema/migrations/**",
     "packages/schema/roles-surface.json",
     ".cache/**"
