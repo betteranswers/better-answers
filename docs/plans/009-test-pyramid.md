@@ -910,18 +910,18 @@ PR 1 deletes 352 of the 367 rows its classification first named. Three rows are 
 - [ ] PR 2. Add 27 Testing Library tests, 3 api tests and 1 core test, and delete the browser case each replaces, for the `2-new` rows of `ba-278-cases.tsv`.
 - [ ] PR 3. Add 34 Testing Library tests and 1 api test, and delete the browser case each replaces, for the `3-new` rows.
 - [ ] PR 4. Edit the remaining specs under `apps/web/e2e/`. Create `apps/web/e2e/journeys/`, one spec per cross-page journey, named for the journey, such as `sign-in-to-shell.spec.ts` and `invite-then-accept.spec.ts`. Add one row to `PINS` in `packages/devtools/src/scans/test-folders.ts`, `{ folder: "apps/web/e2e/journeys", kind: "mirror", reason: "docs/specs/route" }`, because a journey's subject is the route and not one feature and the gate refuses a folder it has no row for.
-- [ ] PR 5. Edit `.github/workflows/check.yml`, the `full-web-browser` shard matrix and the `full-core` shards. Edit `docs/operations/CI.md`, whose `full-web-browser` entry names three shards, `apps/web/.claude/skills/playwright-specs/` and `docs/specs/route/seams.md` where a named spec moved or a count changed.
+- [x] PR 5. Edit `.github/workflows/check.yml`, the `full-web-browser` shard matrix and the `full-core` shards. Edit `docs/operations/CI.md`, whose `full-web-browser` entry names three shards, `apps/web/.claude/skills/playwright-specs/` and `docs/specs/route/seams.md` where a named spec moved or a count changed.
 
 **Build.**
 
 - [ ] PR 1. Write `delete-cases.mjs` under `/tmp/BA-278-1/` and run it. It matches cases by spec and title through `playwright test --list --reporter=json`, deletes only `1-delete` rows, and leaves a loop whole when any of its expansions is kept. Prune the imports, constants and helpers the deletion leaves unused. Run the `scripts/test-inventory.sh` diff at trunk and head, and paste it in the PR body. The removed Playwright lines are exactly the 352 titles, and no other suite's inventory changes.
 - [ ] PR 2 and PR 3. Write each new test at the lowest layer that sees its claim, per the `holder` column. Break the code the claim guards and see the new test fail. Delete the browser case in the same PR, so no claim lapses between PRs.
 - [ ] PR 4. Give each of the 31 page cases its missing facets, and fold the 41 folded cases and the 12 shared-loop cases into them or delete them as the `reason` column says. Add the three optional detail-page cases, a record, a member and a suggestion, only if the measured wall leaves room. Move spec files with `node scripts/move-files.mjs`, and paste the `scripts/test-inventory.sh` diff for `apps/web/e2e` in the PR body.
-- [ ] PR 5. Measure the one-job wall at three CI attempts and set the shard count by the rule. If the one-job median is over 240 s, try the browser cache first, then merging the five multi-case journeys, before a second shard. Balance the two `full-core` shards, so that neither job's wall exceeds the other's by more than 40%.
+- [x] PR 5. Measure the one-job wall at three CI attempts and set the shard count by the rule. If the one-job median is over 240 s, try the browser cache first, then merging the five multi-case journeys, before a second shard. Balance the two `full-core` shards, so that neither job's wall exceeds the other's by more than 40%.
 
 **You see.**
 
-- [ ] `pnpm check:web:e2e --list` shows about 104 tests, 107 with the three optional detail-page cases, and `check.yml` has one `full-web-browser` job when the one-job median is at or under 240 s and two shards otherwise.
+- [x] `pnpm check:web:e2e --list` shows about 104 tests, 107 with the three optional detail-page cases, and `check.yml` has one `full-web-browser` job when the one-job median is at or under 240 s and two shards otherwise.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -942,10 +942,12 @@ PR 1 deletes 352 of the 367 rows its classification first named. Three rows are 
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Job wall seconds of `full-web-browser`, the slowest shard at trunk and the slowest job at head.
-- [ ] Probe. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Rerun it with `gh run rerun <id>` until it has three full-lane attempts, each after the last has finished, and read each with `gh run view <id> --attempt <n> --json jobs`. After merge, read the first five `main` `build` runs whose `check` took the full lane. PR 1 records the summed CI seconds of its deleted cases from `cases-all.tsv`, the suite wall at trunk and at head with three workers, and its own `full-web-browser` shard walls, with no rule.
-- [ ] Baseline. Record first the slowest shard's median over the five latest full-lane `build` runs on `main`. Over the eleven runs in Appendix E it was 474s, and shard 3 ranged from 332 to 805s.
-- [ ] Rule. Fails if the head's slowest `full-web-browser` job exceeds 240s at the median of three attempts, at the shard count the PR sets. PR 5 sets one shard when the one-job median is at or under 240s, and two otherwise.
+- [x] Metric. Job wall seconds of `full-web-browser`, the slowest shard at trunk and the slowest job at head.
+- [x] Probe. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Rerun it with `gh run rerun <id>` until it has three full-lane attempts, each after the last has finished, and read each with `gh run view <id> --attempt <n> --json jobs`. After merge, read the first five `main` `build` runs whose `check` took the full lane. PR 1 records the summed CI seconds of its deleted cases from `cases-all.tsv`, the suite wall at trunk and at head with three workers, and its own `full-web-browser` shard walls, with no rule.
+- [x] Baseline. Record first the slowest shard's median over the five latest full-lane `build` runs on `main`. Over the eleven runs in Appendix E it was 474s, and shard 3 ranged from 332 to 805s.
+- [x] Rule. Fails if the head's slowest `full-web-browser` job exceeds 240s at the median of three attempts, at the shard count the PR sets. PR 5 sets one shard when the one-job median is at or under 240s, and two otherwise.
+
+**PR 5 result.** Changed 03/11/2026. The baseline was the slowest `full-web-browser` shard of the five latest full-lane `main` builds, at the three-shard count, were 150, 176, 179, 385 and 201 s, with a median of 179 s. One job at 465cf0d25 ran 234, 268 and 301 s in three attempts, median 268 s, so the rule sent the suite to two shards. Each attempt split into 17 to 34 s of setup, 17 to 28 s of Playwright install, 23 to 30 s of build and api start, and 158 to 200 s of tests. A browser cache would buy under ten seconds, since about nine seconds of the install are the download and the apt step runs whatever is cached, so none was added. At two shards at `2a8430b1a` the slowest job ran 189, 194 and 221 s, median 194 s. Two further attempts failed on a Docker Hub pull limit before any test ran and are not counted. `full-core` ran its shards 1.66 times apart on the latest `main` build, and 1.06 to 1.66 across the seven latest. Its sequencer now deals files by size, largest first, to the lighter shard, and the slower job ran 1.03 to 1.37 times the faster across six attempts, 1.15 at the median.
 
 **Review gate.** None. BA-278 is not review-gated.
 
@@ -1123,6 +1125,11 @@ The triage's named pairs include people's "refuses demoting both Admins" against
 | BA-275 (#947), `ff786ccb6` | 3 | full-web-browser (2), 430s | 2,446 | - |
 | BA-286 (#951), `6803b6b51` | 2 | full-web-browser (1), 400s | 2,414 | - |
 | BA-277 (#950), `024336ba6` | 1 | full-web-browser (1), 366s | 2,333 | - |
+| BA-278 (#952), `317460ad2` | 5 | full-root, 281s | 1,855 | - |
+| BA-278 (#956), `10f2912d6` | 5 | full-root, 281s | 1,824 | - |
+| BA-278 (#957), `53aca6d0d` | 5 | full-root, 281s | 1,804 | - |
+| BA-278 (#959), `9c5cbb383` | 3 | full-root, 282s | 1,752 | - |
+| BA-278 (#960), `89521de5c` | 2 | full-root, 273s | 1,739 | - |
 
 **Targets.** The critical path falls to 240s or less, set by BA-278's rule. Runner-seconds per run fall to 1,600 or less, as the sum of the suite-job medians like the 2,721 above. On the all-jobs basis of the 2,815 median run, that is about 1,650. A change runs the suites twice, on its pull request and on `main`, so per change the target is about 3,200. The in-process share of test files rises to 65% or more. These targets are estimates from the file times above. Each PR's perf rule checks its own share.
 
