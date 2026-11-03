@@ -34,7 +34,7 @@
     "insert-scan": "node scripts/insert-scan.mjs apps packages",
     "loose-files": "node scripts/loose-files.mjs",
     "skill-paths": "node scripts/skill-paths.mjs",
-    "skills-update": "npx --yes skills@1.7.6 update -p -y && node scripts/skill-paths.mjs --write",
+    "skills-update": "AI_AGENT=claude npx --yes skills@1.7.6 update -p -y && node scripts/skill-paths.mjs --write",
     "test-folders": "node scripts/test-folders.mjs",
     "move-files": "node scripts/move-files.mjs",
     "table-ownership-scan": "node scripts/table-ownership-scan.mjs packages/core/src apps/api/src",

@@ -54,13 +54,9 @@ AGENTS.md.bak
 
 # The skills CLI installs into .agents/ and GitNexus generates its skills there. The playbooks and
 # the format guides in references/ are this repository's own, and .agents/playbooks/knowledge.md names the guides.
-# `skills update` also copies each skill into the folders of agents this repository does not use.
 .agents/*
 !.agents/playbooks/
 !.agents/references/
-.augment/
-.devin/
-.windsurf/
 tasks/AGENTS.md
 
 # Worktrees created by background agents (Claude Code `isolation: worktree`).

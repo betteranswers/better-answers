@@ -6,6 +6,7 @@ import {
   pathsIn,
   pathsLine,
   SCOPES,
+  SYMLINKED_SKILL,
   withPaths,
 } from "@better-answers/devtools/skill-paths";
 import type { SkillOnDisk, SkillScope } from "@better-answers/devtools/skill-paths";
@@ -62,7 +63,7 @@ describe("the gate", () => {
     skill: name,
     tracked: true,
     symlink: false,
-    linkTracked: false,
+    linkTargetTracked: false,
     text: skill(frontmatter),
   });
   const held = 'name: hono\npaths: "apps/api/**, packages/core/**"';
@@ -113,16 +114,25 @@ describe("the gate", () => {
     expect(found[0]).not.toContain("Delete the row");
   });
 
-  it("accepts a symlink the repository tracks as one", () => {
-    expect(
-      findingsFor(
-        [
-          { ...entry("hono", held), symlink: true, linkTracked: true },
-          entry("verify", "name: verify"),
-        ],
-        TABLE,
-      ),
-    ).toEqual([]);
+  it("refuses an unnamed symlink even to a tracked target", () => {
+    const found = findingsFor(
+      [
+        { ...entry("hono", held), symlink: true, linkTargetTracked: true },
+        entry("verify", "name: verify"),
+      ],
+      TABLE,
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain("git checkout -- .claude/skills/hono");
+  });
+
+  it("accepts the named symlink to a tracked target", () => {
+    const named = { ...entry(SYMLINKED_SKILL, "name: x"), symlink: true };
+    const table = [{ skill: SYMLINKED_SKILL, paths: [] }];
+
+    expect(findingsFor([{ ...named, linkTargetTracked: true }], table)).toEqual([]);
+    expect(findingsFor([{ ...named, linkTargetTracked: false }], table)).toHaveLength(1);
   });
 
   it("refuses a tracked skill with no SKILL.md", () => {
@@ -132,7 +142,7 @@ describe("the gate", () => {
           ...entry("hono", held),
           text: null,
           symlink: true,
-          linkTracked: true,
+          linkTargetTracked: true,
         },
         entry("verify", "name: verify"),
       ],

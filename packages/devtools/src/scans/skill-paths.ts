@@ -6,6 +6,8 @@ const WHERE_THE_PATHS_LIVE = "packages/devtools/src/scans/skill-paths.ts";
 
 export const FIX_COMMAND = "pnpm run skill-paths --write";
 
+export const SYMLINKED_SKILL = "better-answers-design";
+
 const UPDATE_COMMAND = "pnpm run skills-update";
 
 export type SkillScope = {
@@ -89,7 +91,7 @@ export type SkillOnDisk = {
   readonly skill: string;
   readonly tracked: boolean;
   readonly symlink: boolean;
-  readonly linkTracked: boolean;
+  readonly linkTargetTracked: boolean;
   readonly text: string | null;
 };
 
@@ -103,7 +105,7 @@ const describe = (paths: readonly string[]): string =>
   paths.length === 0 ? "no paths line" : pathsLine(paths);
 
 const unreadableFinding = (one: SkillOnDisk): string | null => {
-  if (one.symlink && !one.linkTracked) {
+  if (one.symlink && !(one.skill === SYMLINKED_SKILL && one.linkTargetTracked)) {
     return `${SKILLS_FOLDER}/${one.skill}: is a symlink, so a commit would delete the tracked skill. ${recovery(one.skill)}`;
   }
   if (one.text !== null || !one.tracked) return null;
