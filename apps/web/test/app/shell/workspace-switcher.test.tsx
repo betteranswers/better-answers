@@ -371,7 +371,7 @@ describe("the workspace switcher in the app", () => {
     fireEvent.keyDown(await band().findByRole("button", { name: ADA.displayName }), {
       key: "Enter",
     });
-    const person = await screen.findByRole("menu", { name: new RegExp(ADA.displayName) });
+    const person = await screen.findByRole("menu", { name: ADA.displayName });
     expect(within(person).getByText(ADA.displayName)).toBeDefined();
     expect(textOf(within(person).getAllByRole("menuitem"))).toEqual(["Account", "Sign Out"]);
 

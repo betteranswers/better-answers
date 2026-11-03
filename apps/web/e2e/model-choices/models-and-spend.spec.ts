@@ -136,5 +136,3 @@ test.describe("the Models and spend page's model choices card", () => {
     await passesTheAccessibilityGate();
   });
 });
-
-test.describe("a page's older address", () => {});
