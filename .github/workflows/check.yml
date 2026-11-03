@@ -156,6 +156,11 @@ jobs:
     if: ${{ needs.lane.outputs.lane == 'full' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
+    strategy:
+      # Cancelling the other shard would hide its failures until this one's were fixed.
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -189,7 +194,9 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - run: pnpm check:core:suite
+      - run: pnpm check:core:suite --shard="${SHARD}"
+        env:
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
 
   full-api:
     needs: lane
@@ -255,8 +262,13 @@ jobs:
     if: ${{ needs.lane.outputs.lane == 'full' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
+    strategy:
+      # Cancelling the other shard would hide its failures until this one's were fixed.
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     env:
-      TRACE_ARTIFACT: browser-traces-attempt-${{ github.run_attempt }}
+      TRACE_ARTIFACT: browser-traces-shard-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -274,7 +286,9 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - run: pnpm check:web:e2e
+      - run: pnpm check:web:e2e --shard="${SHARD}"
+        env:
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
       # Not failure(): a flake passes on its retry, and its trace is the one worth reading.
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
