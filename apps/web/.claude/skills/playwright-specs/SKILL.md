@@ -29,7 +29,7 @@ comment there says why it is not `pnpm run`. A spec builds its state through the
 `apps/api/tests/support/harness/harness-control.ts` mounts. Search both before adding an action.
 The actions include `provision`, `addMember`, `endEverySignInAndToken`, `markTheOperator`,
 `invite`, `seedModelChoices`, `seedConnectedSources`, `nameOwners`, `seedQuestions`,
-and `makeGroups`.
+`makeGroups`, `scriptAsking` (scripts the model a question meets) and `releaseTheModel` (releases a model call it held).
 
 ## The fixture module
 
@@ -43,7 +43,7 @@ fixtures and adds a fourth:
 | `request` | An `APIRequestContext` on the config's `baseURL`, carrying a `cf-connecting-ip` header of its **own**; disposed after the test |
 | `passesTheAccessibilityGate` | The audit below, declared `auto`, so it runs whether a spec names it or not |
 
-A spec asks for the ones it uses and gets the rest anyway: `apps/web/e2e/auth/sign-out.spec.ts` takes
+A spec asks for the ones it uses and gets the rest anyway: `apps/web/e2e/app/frame.spec.ts` takes
 `context` to clear cookies mid-test, and every spec that builds state takes `request`.
 
 The two addresses are **different on purpose**. The browser is one client and the set-up traffic
@@ -65,15 +65,20 @@ WebAuthn domain over the DevTools protocol. It verifies its user and answers eve
 prompt shown, the email field's autofill included: a page opening the sign-in page while the
 device holds a passkey the platform keeps is signed in at once. Its `leftUnattended` leaves every
 prompt waiting, so that page signs in by email, and `attendedAgain` answers prompts again.
-`apps/web/e2e/auth/passkeys.spec.ts` is the worked example, and `apps/web/e2e/auth/confirm-recovery.spec.ts`
+`apps/web/e2e/journeys/passkey-enrol-and-sign-in.spec.ts` is the worked example, and `apps/web/e2e/auth/confirm.spec.ts`
 signs in by email while the device holds a passkey.
 
 ## Writing a spec
 
 - **Put a spec in the folder of the feature it drives**, `apps/web/e2e/<feature>/`, named as
   under `apps/web/src/features/`. The shell's specs are in `apps/web/e2e/app/` and the specs
-  of a shared part in `apps/web/e2e/shared/`. The suite's modules stay at the `e2e/` root, and
+  of a shared part in `apps/web/e2e/shared/`. A journey that crosses pages through the real api
+  is in `apps/web/e2e/journeys/`, one spec per journey. The suite's modules stay at the `e2e/` root, and
   no folder there holds more than 15 files.
+- **One page case per page, and a second case only for a distinct claim.** A page's spec has one case
+  that asserts its latency budget, the accessibility gate on its end state and keyboard reach by
+  native Tab. Each further claim of that page is a named `test.step` inside that case, so a failure
+  names it. A second case stays only where a fix or a `docs/solutions/` doc names a claim the page case cannot carry.
 - **Locate by role and accessible name, and write the name in the spec.** `getByRole`,
   `getByLabel`, `getByText`. A control, a heading, a region, a dialog and a field are each found by
   the name the page gives them, written as a literal where the spec uses it. A name built from
@@ -103,8 +108,8 @@ signs in by email while the device holds a passkey.
   - At a narrow width the navigation control opens a `dialog` named *Menu*, holding
     the rail and the menu.
 
-  `apps/web/e2e/app/frame.spec.ts` holds the shell. `apps/web/e2e/app/jump-to.spec.ts` and
-  `apps/web/e2e/app/workspace-switcher.spec.ts` are the worked examples for jump-to and the switcher.
+  `apps/web/e2e/app/frame.spec.ts` holds the shell. `apps/web/e2e/app/frame.spec.ts` and
+  `apps/web/e2e/journeys/workspace-switch.spec.ts` are the worked examples for jump-to and the switcher.
 - **Wait with auto-retrying matchers.** `await expect(…).toBeVisible()`, `.toHaveURL()`,
   `.toHaveCount(0)`. Where a navigation must complete before the next action, assert the thing that
   proves the page was left. Never a fixed sleep, and never a load state.
@@ -121,7 +126,7 @@ signs in by email while the device holds a passkey.
   is asserted nowhere, so rewording a page breaks no spec. Assert what the sentence stood for: the
   region and its role, the data or the state that changed, the next action. A region that stands
   empty until it has something to say is checked for holding words, with `toHaveText(/\S/)` or
-  `filter({ hasText: /\S/ })`. `apps/web/e2e/shared/outcome-regions.spec.ts` finds such a region while it
+  `filter({ hasText: /\S/ })`. `apps/web/e2e/people/groups.spec.ts` finds such a region while it
   is still empty, with `filter({ hasNotText: /\S/ })`, and checks the outcome lands in that same
   region. An aria snapshot keeps roles, names, levels, states and order, and no prose line of any
   kind, `- text:` lines included. A name in one is a literal, and a name from seeded data goes in
@@ -145,9 +150,9 @@ signs in by email while the device holds a passkey.
   Where the page decided (a request dropped, a refusal the page raises before it calls, the tries
   left for a code), no answer says which refusal it was, so `saysARefusal` is the whole check and
   a number the alert shows is matched by pattern. No spec imports a refusal's sentence, and the
-  page gains no marker for a test's sake. `apps/web/e2e/people/people.spec.ts` reads a batched answer,
-  `apps/web/e2e/sources/sources.spec.ts` one sent alone,
-  `apps/web/e2e/auth/sign-in.spec.ts` Better Auth's, and `apps/web/e2e/app/failed-page.spec.ts` a
+  page gains no marker for a test's sake. `apps/web/e2e/people/members.spec.ts` reads a batched answer,
+  `apps/web/e2e/sources/connected-sources.spec.ts` one sent alone,
+  `apps/web/e2e/auth/sign-in.spec.ts` Better Auth's, and `apps/web/e2e/app/frame.spec.ts` a
   dropped request.
 - **A latency budget is measured, annotated and asserted**: `test.info().annotations.push(…)`
   beside the comparison, so a run that passes still says how close it came. A list's second is
@@ -161,9 +166,9 @@ signs in by email while the device holds a passkey.
   samples one action several times waits for each sample's answer before the next key. On CI the
   100 ms is only recorded, because there the shared runner's processor sets the number. A timed
   draw that does wait on the server, such as jump-to's list, uses `clockTheNextDraw`, which holds
-  nothing. `apps/web/e2e/sources/sources.spec.ts` times both, with `clockTheNextKey` and
+  nothing. `apps/web/e2e/sources/connected-sources.spec.ts` times both, with `clockTheNextKey` and
   `theActionLandedWithinItsBudget`. Most specs time one sample;
-  `apps/web/e2e/people/people.spec.ts` and `apps/web/e2e/people/people-groups.spec.ts` take the median of
+  `apps/web/e2e/people/members.spec.ts` and `apps/web/e2e/people/groups.spec.ts` take the median of
   `ACTION_SAMPLES` through `theActionsLandedWithinTheirBudget`.
 - **A shared part no page draws yet is bundled with Vite, not imported.** Playwright compiles
   every `.tsx` it loads with its own JSX runtime, so React cannot render a component a spec imports.
@@ -187,7 +192,7 @@ carries that as three things, of which automated rules are only one:
 - **A keyboard traversal** reaching the page and each of its actions without a pointer:
   `apps/web/e2e/auth/sign-in.spec.ts` for the three pages outside the shell,
   `apps/web/e2e/app/frame.spec.ts` for the band, the rail and the menu, and
-  `apps/web/e2e/model-choices/models-and-spend.spec.ts` and `apps/web/e2e/app/failed-page.spec.ts` for theirs. It is
+  `apps/web/e2e/model-choices/models-and-spend.spec.ts` and `apps/web/e2e/app/frame.spec.ts` for theirs. It is
   the floor, not the extra.
 - **An aria snapshot**, written inline with `toMatchAriaSnapshot`, where what a page *sounds
   like* is the thing under test: a row that lost its heading or a list that stopped being a list

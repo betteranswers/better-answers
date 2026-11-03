@@ -9,12 +9,13 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | Helper | What it does |
 | --- | --- |
 | `anAddress` | An email address nobody else in the run will use, so a code read back is this test's |
-| `A_ROLE` | The article a role takes in a test's title, such as *an Editor*, for a test written once for each role |
 | `signInHeading` | The sign-in page's heading, for what the sign-in carries on to: nothing, joining a workspace or connecting Claude |
 | `signInByEmail` | Signs a person in **through the product's own page** — fill the address, send, read the six-digit code back from the captured transport, and fill it. Six digits submit on their own, so it clicks nothing, and it waits for the code field to be gone, because leaving the page sooner cancels the sign-in. An Admin or the operator is left on the confirm or setup page, which is where a spec about those pages starts |
 | `signIn` | `signInByEmail`, then, once the first page draws, past the confirm or setup page an Admin or the operator meets: it gives the person the harness's authenticator through `withAnAuthenticator`, opens the confirm page afresh with the page's own query, and types the code — the gate passed through the real page, never around it. Anyone else is left where the sign-in sends them. Most specs sign in with this |
 | `confirmedWhenAsked` | Waits for the confirm or setup page an action sent the person to, such as joining as an Admin, then passes it as `signIn` does |
-| `aMemberSignedInAt` | A new workspace's Editor or Viewer, signed in having asked for a path first, so sign-in carries them back to it — where a refused page is proved |
+| `memberOfTwoWorkspaces` | A person who is the Admin of one new workspace and holds a role, Viewer unless named, in a second. It answers both, and `inTwoWorkspaces` builds on it |
+| `signInSaysWhy` | Asserts the sign-in page's heading and a status that holds words, and answers the status' text |
+| `signedInAsTheOperator` | Provisions a workspace, marks its Admin the operator, signs them in at home and answers the workspace with a run tag, for the console specs |
 | `landedAtHome` | Asserts the page is on a role's home: its address, read off the navigation list, and its heading. The heading is the page's group's name, or its area's where it has none |
 | `notFoundOfferingHome` | Asserts the not-found page and its link to a role's home. A page hidden from the role shows it, as an address that never existed does |
 | `signedInAtHome` | Opens the sign-in page, runs `signIn`, and waits for a role's home, an Admin's unless another is named, as a member of one workspace arrives |
@@ -46,16 +47,16 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `keepsItsWordOffThePage` | Asserts the api's word for a refusal is nowhere on the page: the word is for the logs and the wire |
 | `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
 | `tokenColour` | A design-system token's colour as the browser paints it, so a computed style is compared with the token rather than a copied value |
-| `contrastBetween` | WCAG's contrast ratio between two painted `rgb()` colours, as `apps/web/e2e/app/focus-ring.spec.ts` measures each focus edge against the surface behind it |
+| `contrastBetween` | WCAG's contrast ratio between two painted `rgb()` colours, as `apps/web/e2e/app/frame.spec.ts` measures each focus edge against the surface behind it |
 | `controlEdges` | Each enabled control found by its edge alone, with its fill, every side it draws and the colour behind it, each composited as painted through fills and every ancestor's opacity. A wordless wrapper with a side within 8px of the control's own lends its fill, and its border on each such side. One with no such side lends nothing, and its own fill is the colour behind the control. The gate measures them with `contrastBetween` |
 | `switched` | Opens the switcher named for where the person is and picks the radio item holding another workspace's name. It waits for nothing after the pick, so the spec asserts where the person landed |
 | `inTwoWorkspaces` | A new person who is the Admin of one new workspace and holds a role in a second, Admin unless Viewer is named. It signs them in through `signIn`, picks the first workspace, waits for the Admin's home and the switcher named for it, and answers the address and both workspaces. A spec about moving between workspaces starts from it |
 | `authenticatorCodeField` | The *Authenticator Code* field, by its exact label. `signIn` fills it on the confirm page |
-| `memberUnreadUntil` | Drops the shell's member read, fails the member read in the frame's batch, and holds the lone retry until the promise it is given settles. The page then draws with the member unread. A spec sets it up, reloads, and acts before it lets the read land, as `apps/web/e2e/people/people.spec.ts` does |
+| `memberUnreadUntil` | Drops the shell's member read, fails the member read in the frame's batch, and holds the lone retry until the promise it is given settles. The page then draws with the member unread. A spec sets it up, reloads, and acts before it lets the read land, as `apps/web/e2e/people/members.spec.ts` does |
 | `ACTION_SAMPLES` | How many times a spec clocks one action before it judges it, five. A spec seeds `ACTION_SAMPLES - 1` extra rows, so each sample has a row to act on |
 | `actionClocked` | Waits for the clock `clockTheNextKey` started and answers it in milliseconds. It fails when no clock was started, and fails by name when the node had not read its text 2 s after the key while a request was held. A spec collects one per sample for `theActionsLandedWithinTheirBudget` |
 | `theActionsLandedWithinTheirBudget` | Annotates the test with every sample of an action and their median, and asserts the median under the action's 100 ms, which on CI it only annotates. It fails by name when the action was never clocked. `theActionLandedWithinItsBudget` is the same check over one sample |
-| `tokenPainted` | A design-system token's value for a named CSS property as the browser paints it. It is read off a probe element styled with the token. `tokenColour` is this for `color`. `apps/web/e2e/app/focus-ring.spec.ts` reads `--focus-ring` as `box-shadow` with it |
+| `tokenPainted` | A design-system token's value for a named CSS property as the browser paints it. It is read off a probe element styled with the token. `tokenColour` is this for `color`. `apps/web/e2e/app/frame.spec.ts` reads `--focus-ring` as `box-shadow` with it |
 | `drawnMarks` | The visible elements holding `data-marks` whose `::before` draws, each named by its `data-slot` or its tag. `apps/web/e2e/auth/consent.spec.ts` asserts the card alone draws them |
 
 The sign-in code is read from that capture, with `codeSentTo`, and from nowhere else: the api's
@@ -65,7 +66,7 @@ not go.
 
 ## Claude's part in OAuth
 
-Six more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/auth/consent.spec.ts` for the consent page, `apps/web/e2e/console/console-people.spec.ts` for a person who has given an assistant access:
+Six more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/auth/consent.spec.ts` for the consent page, `apps/web/e2e/journeys/console-end-sessions.spec.ts` for a person who has given an assistant access:
 
 | Helper | What it does |
 | --- | --- |
@@ -73,7 +74,63 @@ Six more play Claude's part in its OAuth flow on the suite's own origin — `app
 | `claudesAuthorizeUrl` | Claude's authorize request for the MCP surface at an origin, with an optional challenge, `prompt` and `state` |
 | `catchClaudesRedirect` | Answers the redirect to claude.ai with a stand-in page, since the suite cannot reach it |
 | `claudeExchanges` | Exchanges the code at the redirect for tokens, which is when the grant's refresh token is minted, and answers that refresh token |
-| `CLAUDES_REDIRECT_URI` | The redirect address the suite's Claude names in its authorize request and its token exchanges, `https://claude.ai/api/mcp/auth_callback`. A spec compares where *Connect* or *Cancel* landed with it. `catchClaudesRedirect` routes it, and `apps/web/e2e/console/console-people.spec.ts` unroutes it |
+| `CLAUDES_REDIRECT_URI` | The redirect address the suite's Claude names in its authorize request and its token exchanges, `https://claude.ai/api/mcp/auth_callback`. A spec compares where *Connect* or *Cancel* landed with it. `catchClaudesRedirect` routes it, and `apps/web/e2e/journeys/console-end-sessions.spec.ts` unroutes it |
+
+## The second-factor steps
+
+`apps/web/e2e/second-factor-steps.ts` holds the steps the confirm, recovery and journey specs share once an authenticator exists:
+
+| Helper | What it does |
+| --- | --- |
+| `heading` | The page's level-1 heading by name |
+| `codeField` | The *Authenticator Code* field |
+| `theRefusal` | The alert once it holds words |
+| `codeOf` | The code an authenticator key shows now |
+| `signedInAgain` | Clears the browser's cookies and signs the person in by email again, waiting on the confirm page |
+| `anAdminWithAnAuthenticator` | A new Admin whose authenticator is enrolled, with its recovery codes saved or none |
+| `recoveryField` | The *Recovery Code* field |
+| `codesListed` | The recovery codes' list items |
+| `saidOfTheSet` | The paragraph that says what the set of codes is |
+| `codesTicked` | Ticks *I have saved these codes* and presses the named finishing button |
+| `regionOf` | A region by its exact name |
+| `accountFromTheBand` | Opens Account from the avatar menu in the band |
+
+## The page modules
+
+Three modules hold what several pages' specs and the journeys share.
+
+`apps/web/e2e/asking.ts` is the New Question page's fixtures and locators:
+
+| Helper | What it does |
+| --- | --- |
+| `anAuditWorkspace` | A workspace with its Admin and four seeded concepts, one of them unfiled. It answers `workspaceId`, `adminId` and `adminEmail` |
+| `QUESTION`, `POLICY`, `DRAFTED`, `DRAFTING` | The audit question, the policy concept, the drafted sentence, and the drafting script that cites it |
+| `questionBox`, `askButton` | The New Question region's textbox and its *Ask* button |
+| `answered` | A result region by its verdict's name, such as *Answered* or *Related Knowledge* |
+| `collectionIn` | A collection's region inside a result |
+
+`apps/web/e2e/people-pages.ts` is the People group's pages and the invitation a person is sent:
+
+| Helper | What it does |
+| --- | --- |
+| `MEMBERS_PAGE` | The Members page's path, read off the navigation list |
+| `membersRegion`, `outcomeOf` | The Members region, and its second status |
+| `memberRows`, `tickOf`, `selectionAction` | The person rows, a row's *Select* checkbox, and a button of the selection bar |
+| `memberLink`, `thePage`, `openedByName` | A member's link, the main region, and opening a member's page by name until its heading shows |
+| `invitationsRegion`, `invitationRows`, `inviteDialog`, `inviteAction`, `addressField` | The Invitations tab's region and rows, the *Invite a Person* dialog, the button that opens it, and its address field |
+| `personButton`, `sheetOf` | The Everyone page's button for a person, and the sheet it opens |
+| `invitationHeading`, `joinButton`, `nameField`, `invitedAs` | The invitation page's heading, *Join Workspace* button, *Display Name* field, and the paragraph naming the inviter and the role |
+| `anInvitation` | Invites a new address to a workspace by a new inviter and answers the address and the link |
+
+`apps/web/e2e/connected-sources.ts` is the Sources page:
+
+| Helper | What it does |
+| --- | --- |
+| `anAdminAtSources` | A new workspace's Admin, with connected sources seeded if asked, signed in on the Sources page. It answers the workspace and what it seeded |
+| `indexed` | A seeded connected source, indexed and Internal unless the call overrides it |
+| `connectedSourcesRegion`, `saidIn` | The list's region, and its last status |
+| `connectedSourceNamed`, `stateOf`, `lastSyncedOf`, `sensitivityOf` | A source's list item, and its *State*, *Last Synced* and *Sensitivity* values |
+| `rowAction` | A row action's button: review, publish, narrow or widen |
 
 ## Reading the api's answers
 
@@ -93,8 +150,8 @@ still shown the api refused.
 | Helper | What it does |
 | --- | --- |
 | `isAFind` | Matches a request whose path names `knowledge.find` anywhere, because the tRPC client batches its reads. A spec hands it to `heldBack`, `page.route` or a request wait to catch a search's read |
-| `heldBack` | Holds every request a matcher picks until the spec releases it. It answers `reached`, which settles when the first arrives, and `release`. A spec reads the page while a read is still out with it. `apps/web/e2e/knowledge/knowledge-search.spec.ts` uses it during a search and `apps/web/e2e/sources/sources.spec.ts` during the sources list |
+| `heldBack` | Holds every request a matcher picks until the spec releases it. It answers `reached`, which settles when the first arrives, and `release`. A spec reads the page while a read is still out with it. `apps/web/e2e/knowledge/search.spec.ts` uses it during a search and `apps/web/e2e/sources/connected-sources.spec.ts` during the sources list |
 | `scrolledSideways` | How far the page scrolls sideways in pixels, the document's scroll width less its client width. A spec at a narrow width asserts it is 0 |
 | `listsItsKeystrokes` | Opens the page's list of keystrokes through `keystrokesListed`. It asserts each given key is among the list's terms and each named action is in it, then dismisses the list through `keystrokesDismissed`. A page's keystroke spec runs it with the page's own keys |
-| `conceptsSeeded` | Runs `seedConcepts` and answers a map from each concept's title to what the harness answered for it, its IRI, path and cited documents. `apps/web/e2e/knowledge/concept-page.spec.ts`, `apps/web/e2e/knowledge/knowledge-base.spec.ts` and `apps/web/e2e/inbox/waiting-on-you.spec.ts` look concepts up in it by title |
+| `conceptsSeeded` | Runs `seedConcepts` and answers a map from each concept's title to what the harness answered for it, its IRI, path and cited documents. `apps/web/e2e/knowledge/concept.spec.ts`, `apps/web/e2e/knowledge/knowledge-base.spec.ts` and `apps/web/e2e/inbox/waiting-on-you.spec.ts` look concepts up in it by title |
 | `knowledgeMenuOpened` | Opens Knowledge from the rail and answers its menu once it shows. `apps/web/e2e/knowledge/collections-and-owners.spec.ts` reads which pages a role sees there |
