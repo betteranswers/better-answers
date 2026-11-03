@@ -35,7 +35,7 @@ The analyse is an optimisation, so a failed analyse never fails or undoes the wr
 The two bulk writers call it:
 
 - The worker's rebuild. `full_rebuild` in `apps/worker/src/better_answers_worker/kinds.py` calls `analyse_map` from `rebuild.py` after the rebuild's transaction commits, so `live_gen` has already flipped. A failed analyse logs "the map was left unanalysed" with its SQLSTATE, and the job still completes.
-- The api's import. `runImport` in `packages/core/src/concepts/index.ts` calls the map store's `analyseMap` once landing has ended, whether it ran to the end or stopped at a file. A failed analyse goes to the import's `log` door as a warning. The import still reports what it landed, or the refusal it stopped with.
+- The api's import. `runImport` in `packages/core/src/concepts/import/import-bundle.ts` calls the map store's `analyseMap` once landing has ended, whether it ran to the end or stopped at a file. A failed analyse goes to the import's `log` door as a warning. The import still reports what it landed, or the refusal it stopped with.
 
 An ordinary edit's delta (`writeConceptDelta`) does not call it. The migration also sets `autovacuum_analyze_scale_factor = 0.01` on both tables, so autovacuum analyses a table once a hundredth of it has changed, where the default waits for a tenth. That floor is for the rows no bulk writer analyses, such as a new tenant's map written edit by edit, and for a failed analyse. It is not a backstop for a missed call: at 200,000 node rows, one tenant's 2,000-node rebuild no longer reaches it.
 

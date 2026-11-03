@@ -389,6 +389,8 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 Changed 28/10/2026. The 60s rule summed file times across parallel files. The measured median gain on trunk `d672b7313` was 50.6s, bounded by two 45s files, `import-direction.test.ts` and `erasure-routine.test.ts`. The rule now asks that the two ranges not overlap, which a real gain passes and no gain fails.
 
+Changed 03/11/2026. #967 runs core's suite as one job, so `check:core:suite` takes no `--shard` and this box's commands no longer run as written.
+
 **Review gate.** None. BA-269 is not review-gated.
 
 **Merge.**
@@ -1146,7 +1148,7 @@ The triage's named pairs include people's "refuses demoting both Admins" against
 **Seams.** Every seam is a pure function or an injected seam that exists already. No store door becomes a port.
 
 - Pure decide functions per slice, over rows already read. Today's examples are `kernel/admission.ts`, `concepts/trust.ts`, `erasure/identifiers.ts`, `concepts/file.ts` and `members/sets.ts`. BA-275 adds the merge key, guide coverage and marking. BA-274 adds `parseOpsArgs`.
-- The injected seams that exist today. `Clock`, `fetchModel` (ADR 0049), `sendEmail`, the Better Auth seam (ADR 0009) and `Doors`. BA-275 adds import's analyse step. BA-276 adds a clock to the worker loop.
+- The injected seams that exist today. `Clock`, `fetchModel` (ADR 0049), `sendEmail`, the Better Auth seam (ADR 0009) and `Doors`. BA-275 adds import's analyse step. BA-276 injects the worker loop's sleep.
 - The web's stubbed api, which BA-277 lets hold a request.
 - A rule's finding functions, which BA-273 calls directly.
 

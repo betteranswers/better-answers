@@ -37,7 +37,7 @@ The root `prepare` script runs `lefthook install`, and pnpm runs `prepare` after
 
 ## The pre-push hook
 
-Before a push that carries commits to a branch leaves the machine, the hook runs every step root `check:gates` names and the three prose suites `check:docs` adds to them: `check:docs:core`, `check:docs:devtools` and `check:docs:web`. `format:check` is in both scripts and runs once. In a sample of 30 failed pull requests, about half failed on one of these, and CI took five to nine minutes to say so. The merge queue is the only full CI run, so this hook is where a pull request hears about them first.
+Before a push that carries commits to a branch leaves the machine, the hook runs every step root `check:gates` names and the three prose suites `check:docs` adds to them: `check:docs:core`, `check:docs:devtools` and `check:docs:web`. `format:check` is in both scripts and runs once. In a sample of 30 failed pull requests, about half failed on one of these, and CI took five to nine minutes to say so. This hook says so before the push.
 
 Each step is a command of its own, and the commands run in parallel. A failure therefore names its gate, and `LEFTHOOK_EXCLUDE` can skip one gate and keep the rest. The list repeats the steps the two scripts name, and `packages/devtools/test/root-config/lefthook-config.test.ts` holds it to them in both directions: a gate added to either script fails that suite until the hook runs it too. The same file pushes through the real `lefthook.yml` in a throwaway repository, with a stand-in `pnpm`, from the main checkout and from a linked worktree.
 
@@ -84,42 +84,23 @@ Git keeps hooks in the common git directory, so one `pre-push` serves the main c
 
 ## The commit-message hook
 
-The `commit-msg` hook runs commitlint over every commit's message. Its config, `commitlint.config.mjs` at the root, is the one the `pr-title` job in `check.yml` reads too, so one config checks the form everywhere (`docs/agents/workflow.md`, *The commit's form*). `packages/devtools/test/root-config/commit-msg-hook.test.ts` commits through the hook's own command in a throwaway repository: a Conventional message goes in, and a declarative subject, a subject naming its ticket and one over 90 characters are each refused.
+The `commit-msg` hook runs commitlint over every commit's message. Its config, `commitlint.config.mjs` at the root, is the one the `pr-title` job in `check.yml` reads too, so one config checks the form everywhere. `packages/devtools/test/root-config/commit-msg-hook.test.ts` commits through the hook's own command in a throwaway repository: a Conventional message goes in, and a declarative subject, a subject naming its ticket and one over 90 characters are each refused.
 
 ## The Claude Code hooks
 
-`.claude/settings.json` wires three scripts under `.claude/hooks/`: the two worktree hooks and the doc watcher's cap.
+`.claude/settings.json` wires two scripts under `.claude/hooks/`: the worktree create hook and the doc watcher's cap.
 
-### Creating and removing a worktree
+### Creating a worktree
 
-`worktree-create-hook.sh` replaces native worktree creation so every worktree Claude Code makes — an `Agent(isolation: "worktree")` fork, `claude --worktree`, a desktop parallel session — is provisioned before the agent's first turn. The hook contract is Claude Code's: JSON on stdin carrying `.name`, and stdout must be exactly the created directory, a non-path there aborting session startup.
+`worktree-create-hook.sh` replaces native worktree creation for every worktree Claude Code makes, such as an `Agent(isolation: "worktree")` fork or `claude --worktree`. Claude Code sends JSON on stdin carrying `.name`, and the hook's stdout must be exactly the created directory, so every diagnostic goes to stderr.
 
-The layout stays native — `.claude/worktrees/<name>` on branch `worktree-<name>` — so `.gitignore` and oxlint's and oxfmt's ignore patterns keep working unchanged. The branch's base depends on where the request comes from, read from the input's `.cwd`. `CLAUDE_PROJECT_DIR` cannot tell the two apart, because it names the main checkout in both. A worktree asked for from the main checkout is independent work, so it starts from `origin/main` after a fetch, or from the local `main` when the fetch fails. It never starts from whatever branch the main checkout has out: before BA-65 it did, and a session that had checked out a feature branch there handed that branch's commits to every new worktree. A worktree asked for from a linked worktree is a delegate building one unit of that session's branch, so it starts from that worktree's HEAD and sees what the session sees. A hook-created worktree carries no Claude Code marker, so Claude Code's own periodic sweep leaves it alone. The remove hook and `sweep-worktrees.sh` are what remove it.
+The layout stays native, `.claude/worktrees/<name>` on branch `worktree-<name>`, so the ignore patterns keep working. The base depends on where the request comes from, read from the input's `.cwd`, because `CLAUDE_PROJECT_DIR` names the main checkout in both cases. A request from the main checkout is independent work, so it starts from `origin/main` after a fetch, or from the local `main` when the fetch fails. A request from a linked worktree is a delegate building part of that session's branch, so it starts from that worktree's `HEAD`. The branch is made with `--no-track`, so a bare `git pull` or `git push` never aims at `main`.
 
-`worktree-remove-hook.sh` is the cleanup half, and it sees less than its name suggests. Claude Code fires it only when an agent finishes having changed nothing. A worktree with a commit in it is kept and reported back, and no hook runs. The owner's transcripts show this: of 296 worktree agents that committed, 292 had their worktree reported kept. So the hook nearly always meets a fresh worktree, and removes it. When it does meet work, it keeps the worktree unless the work is merged:
+The hook then gives the worktree a jCodeMunch index and a jDocMunch index of its own. Without them, every edit in the worktree registers in the main checkout's indexes. A machine without either tool gets a line on stderr and a worktree all the same.
 
-- changed or untracked files are always kept;
-- commits are merged when `origin/main` or `main` holds them, or when a merged pull request has the worktree's HEAD as its head. The hook fetches `origin/main` before it gives up, because the main checkout's `main` is rarely pulled.
+The hook installs nothing. pnpm installs on the first `pnpm exec` and uv syncs on the first `uv run`. `packages/devtools/test/gates/worktree-create-hook.test.ts` holds the base choice, `--no-track` and the indexes.
 
-A kept worktree is removed by hand with `git worktree remove --force`. The hook may tidy and never block, so every outcome exits 0 and says why on stderr.
-
-`sweep-worktrees.sh [<main-checkout>]` removes what the remove hook never sees: the worktree whose agent committed, pushed and merged. Before the sweep, those piled up under `.claude/worktrees/` until someone cleared them by hand. The create hook starts it in the background on every creation, with its streams on `.git/worktree-sweep.log`, which holds the latest run. Creation is the one event that happens as often as worktrees pile up and needs nobody to remember it; a step after the merge is one an agent can skip. Run the sweep by hand to clear the estate at once. It fetches `origin/main` first, and then, for each worktree under `.claude/worktrees/` and nowhere else:
-
-- a locked worktree, or one with changed or untracked files, is kept;
-- a HEAD on `origin/main`'s first-parent line is kept. It holds no commit of its own, which is how a fresh worktree looks while its agent works;
-- a HEAD that reached `origin/main` through a merge commit, as the queue lands every pull request, is merged. So is a HEAD that a merged pull request has as its head, which gh answers;
-- a merge less than an hour old is kept, because the agent may still be reporting from the worktree, or be resumed in it;
-- anything else merged is removed, with its index, and its branch goes through `git branch -d`, never `-D`. The branch's upstream is pointed at `origin/main` first, so `-d` checks the ref the sweep judged by, where it would otherwise check the main checkout's lagging `main`. A squash-merged branch fails that check and stays for a person.
-
-A worktree the hook or the sweep removes also loses any vitest fork worker whose arguments name it, after the removal and never before, so a refused removal leaves a live run alone. A run killed under an agent leaves its workers behind, each on a core, and three such workers were found burning for between four and eleven hours on 15/10/2026, one of them in a worktree already gone. So each sweep run also kills every vitest worker under the main checkout, the main tree included, whose parent has gone to pid 1. The kill is TERM, two seconds, then KILL for any still there, because the workers found ignored TERM. pytest's workers retitle themselves and name no path, so the sweep does not reach them. Each sweep run then runs the script behind `pnpm reap-containers`, which removes a stopped testcontainers container no Ryuk serves and nothing running.
-
-A worktree the hook or the sweep removes also gives up the jCodeMunch index provisioning gave it. Without that, the registry keeps naming a root no longer on disk — the state the owner's machine was found in, seven create events and no removals, the oldest naming a path gone for a fortnight. A jCodeMunch repository id is not derivable from its path, so it is read from what `list-repos --json` prints.
-
-A worktree removed any other way, by the harness, by hand or by `rm -rf`, runs neither, and its jDocMunch index outlived it: 28 of 33 doc indexes named a gone folder on 06/10/2026. So each sweep run also drops every doc index whose root lies under `.claude/worktrees/` and is no longer a directory, read from what `jdocmunch-mcp watch-status` prints. An index whose folder exists, or that lies anywhere else, is left alone.
-
-Each sweep run then refreshes the main checkout's doc index, if it has one: `jdocmunch-mcp index-local --path <the main checkout> --no-ai-summaries --no-embeddings`. A doc change that arrives through git (a pull, a merge, a checkout) reaches that index only through the jDocMunch watcher. While the watcher is down, the index keeps the old headings, and each partial refresh still moves `indexed_at`, so it looks fresh. On 06/10/2026 it still listed headings that had left their files a day earlier. The sweep refreshes on every run rather than judging whether the index is behind, because `index-local` already makes that judgement: it compares each file with the index and rewrites only what differs, so an index in step costs one walk of the tree, a few seconds that no creation waits for. A main checkout with no doc index is not given one.
-
-The hooks append `~/Library/pnpm`, `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin` to `PATH` when they load `worktree-lib.sh`. A hook that the desktop client starts inherits launchd's bare `PATH`, where the sweep and the remove hook would find no `jdocmunch-mcp`, `jcodemunch-mcp`, `gh`, `node` or `docker` and skip each step without a word.
+Nothing in this repository removes a worktree. A hook-created worktree carries no Claude Code marker, so Claude Code's own sweep leaves it alone. pstack's worktree-cleanup playbook removes merged ones, and `pnpm reap-containers` removes stopped test containers.
 
 ### The doc watcher's log cap
 
@@ -132,38 +113,6 @@ bash scripts/jdocmunch-watch-cap.sh
 ```
 
 It adds the cap and reloads the service with `launchctl bootout` and `bootstrap`. When the cap is already there it changes nothing, unless an earlier run left the service unloaded, and then it loads it. A `SessionStart` hook, `.claude/hooks/watch-cap-hook.sh`, runs it with `--check` when a session starts fresh, not on a resume. When the cap is missing, the session opens with a message naming the command. The hook only reads the plist: nothing but a person running the script changes it. Set `JDOCMUNCH_WATCH_PLIST` to point the script at another plist.
-
-### Provisioning a worktree
-
-`provision-worktree.sh <worktree-path>` installs a fresh checkout's dependencies and the agent tooling a checkout cannot carry, so an agent's first action in a worktree is its task and not `pnpm install`. The create hook runs it; run it by hand after a `git worktree add`, which fires no hook. Six stages, each reporting on its own line and none stopping the next:
-
-| Stage | What it does |
-| --- | --- |
-| upstream | unsets the tracking branch — see below |
-| pnpm install | the TypeScript workspaces |
-| uv sync | the Python worker |
-| jcodemunch index | the worktree as a jCodeMunch root of its own |
-| skills | `provision-skills.sh`: the installed, ignored agent tooling |
-| scratch | the primary checkout's `.scratch`, linked |
-| planning | the primary checkout's `.planning`, linked, for the same reasons as `.scratch` |
-
-**The upstream.** `git worktree add -b <branch> <path> origin/main` sets the new branch to track `origin/main`, silently: a bare `git push` from the worktree then aims at `main`. `push.default` is unset here, so git's `simple` refuses the mismatched push — the tracking is surprising rather than harmful — and the stage unsets it so the branch's upstream is set on its first `git push -u`, by the session that means it. Here and not in the create hook, because a worktree made by hand fires no hook and runs this.
-
-**Why `node_modules` and `.venv` are installed, never symlinked or copied.** pnpm and uv both install by hard link from a global store, in seconds, and both write links that are relative to the real tree: pnpm's workspace links (`node_modules/@better-answers/core -> ../../packages/core`) and uv's editable `.pth`. A `node_modules` or `.venv` shared with `main` would import main's `packages/core` and worker source, so a worktree's tests would run against code it is not editing. That reasoning is about path resolution and does not reach the skills, which are static markdown; `provision-skills.sh` copies those.
-
-**Why the index is given at creation.** jCodeMunch resolves an edited file into the nearest containing indexed root. Until the worktree is one, every file an agent edits in it is registered into the *primary checkout's* index under `.claude/worktrees/…`, where a later search answers out of a ticket that is not the reader's, or out of a worktree no longer on disk. The verb is the CLI's own `index <path>`; `index_folder` is the MCP tool's name and is not something a script can call. A machine without jCodeMunch is not a broken worktree, so that case says what it costs and leaves the exit status alone — the shape `actionlint` has in `lefthook.yml` — while an index that was attempted and failed is a stage failure like any other.
-
-**Why `.scratch` is linked, never copied** — the opposite of the skills stage's reasoning, for three reasons a copy cannot answer. It is 1.2 GB across 45,256 files, so a copy per worktree is out. It is living context rather than static material: another session writes a note into it while a worktree is open, and a copy is stale from that moment. And a note an agent writes through the link outlives the worktree, where a copy is deleted with it. The cost, which is real: the link is read-write and shared, so every agent in every worktree writes into the one unversioned folder the primary checkout holds — there is no per-worktree `.scratch` to lose work in, and none to keep work private in either.
-
-The link cannot bloat the worktree's jCodeMunch index, for two independent reasons: `jcodemunch-mcp index` walks a directory symlink only under `--follow-symlinks`, which this script does not pass, and `.gitignore` names `.scratch` besides. Measured over a throwaway tree: 3 files indexed, then the 45,256-file `.scratch` linked into it and re-indexed — 0 new files, and 0 again for a symlinked directory that no ignore pattern covered.
-
-That `.gitignore` pattern carries no trailing slash on purpose. Git reads a symlink as a file, so `.scratch/` would match the primary's directory and leave every worktree's link showing as `?? .scratch`: the remove hook would then keep each worktree as one holding untracked work, and a `git add -A` would commit the link. `.planning` is ignored the same way.
-
-Nothing is copied from `.env.local`: no workspace, test or compose file reads it, and the integration harnesses reach Postgres through Testcontainers or through *The shared test Postgres*. If that changes, copy the file here — a `WorktreeCreate` hook suppresses `.worktreeinclude`.
-
-### Provisioning the skills
-
-`provision-skills.sh <worktree-path>` is the skills stage, and is runnable by hand. It copies every `.agents/skills` entry and `skills-lock.json` the primary checkout has and the worktree does not; reinstalls from the manifest when the copy left the worktree with nothing; and then verifies that every skill link — the root's at depth two and each nested folder's, down to depth four — resolves inside the worktree. The worktrees, the installs and the dependency trees are pruned rather than merely excluded from the walk, so a large `node_modules` is never entered.
 
 ## The `check` runner
 
@@ -218,10 +167,10 @@ Nothing in the configuration names `.gitnexus/`. A GitNexus index is written the
 
 An export is kept ahead of its caller only when the action it belongs to has no transport yet and a block under `docs/specs/route/` wires it. It carries knip's own tag on an `export` line of its own, `/** @public <block> */` — `/** @public S3 */` — so the tag covers the names beside it and no others, and the tag goes when the block's row in `docs/specs/v01-route.md` turns done. The input, result and refusal types of an action a transport already reaches are never kept: the transport infers them, and a later block that wants a name by hand adds one line to the barrel. A barrel itself is never deleted, because it is the slice's face, the list `better-answers/import-direction` reads (ADR 0029).
 
-`--production` and `--strict` are diagnostics, not gates. Production mode drops the test entries and the manifests' scripts, so every test helper and every script-run command — `migrate.ts`, `ops.ts`, `land.ts` — reads as unused; strict mode then refuses devDependencies to what it counts as production, so every devDependency a helper imports reads as unlisted. Gating either would mean a second copy of every manifest's entry points as production patterns, the copy the paragraph on entry points above refuses.
+`--production` and `--strict` are diagnostics, not gates. Production mode drops the test entries and the manifests' scripts, so every test helper and every script-run command — `migrate.ts` and `ops.ts` — reads as unused; strict mode then refuses devDependencies to what it counts as production, so every devDependency a helper imports reads as unlisted. Gating either would mean a second copy of every manifest's entry points as production patterns, the copy the paragraph on entry points above refuses.
 
 **`pnpm-workspace.yaml`** is the workspace manifest. `apps/worker/` is a uv workspace, not a pnpm one, and a documentation site would join the `packages:` list the day one is lifted in.
 
 `allowBuilds` runs one package's postinstall script, esbuild's, because that script puts the platform binary where vite and drizzle-kit reach it. `cpu-features`, `protobufjs` and `ssh2` are optional native accelerations we do not take. lefthook is `false` for the reason above. `false` rather than no entry at all, because pnpm 11 makes an undecided build script a hard error and silence would fail every fresh install.
 
-`patchedDependencies` holds two patches, and a patch is a liability at every upgrade, so each reason is written down. Each is keyed by package name alone, so a bump that leaves its hunks applying installs unchanged, and one that moves them fails the install on its own pull request. The testcontainers patch gives each test process a Ryuk of its own (`docs/agents/workflow.md`, *Environment*). `@stryker-mutator/vitest-runner` 10.0.0 joins a test's suite chain with a space where vitest 5 joins it with ` > `, so no mutant's name filter selected a test, and the patch builds the name as the running vitest does (`docs/operations/CI.md`, *A runner fault fails the leg*). It also misses a suite that fails on its own. A test file that failed to load, or a hook that threw, fails no test, so vitest never bails. The run goes on through every related file, and the mutant reads survived, or under CI's contention waits out its suite and reads Timeout, which counts as killed. The patch cancels the run on such a failure and counts it as one failed test, whose reason names the file, and the hook when one threw. It is retired when the fix is upstream.
+`patchedDependencies` holds two patches, and a patch is a liability at every upgrade, so each reason is written down. Each is keyed by package name alone, so a bump that leaves its hunks applying installs unchanged, and one that moves them fails the install on its own pull request. The testcontainers patch gives each test process a Ryuk of its own. `@stryker-mutator/vitest-runner` 10.0.0 joins a test's suite chain with a space where vitest 5 joins it with ` > `, so no mutant's name filter selected a test, and the patch builds the name as the running vitest does (`docs/operations/CI.md`, *A runner fault fails the leg*). It also misses a suite that fails on its own. A test file that failed to load, or a hook that threw, fails no test, so vitest never bails. The run goes on through every related file, and the mutant reads survived, or under CI's contention waits out its suite and reads Timeout, which counts as killed. The patch cancels the run on such a failure and counts it as one failed test, whose reason names the file, and the hook when one threw. It is retired when the fix is upstream.

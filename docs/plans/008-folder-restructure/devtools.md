@@ -278,7 +278,6 @@ The columns. **Kind** is glob (G) or literal (L). **Trigger** is the move that f
 | `scripts/mutation-shards.mjs:3-4,10,14` legs import `apps/api/stryker.config.mjs`, `packages/core/stryker.config.mjs` | L | Moving a stryker config | Loud |
 | Stryker `incrementalFile` `reports/mutation/stryker-incremental.json` (artifact from main, `.github/actions/mutation-baseline/action.yml:20,52`) keyed by file path. `weightsOf` (mutation-shards.ts:84-101) and `mergeShards` read it by path. | data | Any `src` move in api or core | Silent, one-time. Moved files lose history, every mutant reruns once, shard weights fall back to bytes. No failure. |
 | `.github/workflows/mutation.yml:43-67` legs by workspace path | L | Moving a workspace | n/a for in-workspace moves |
-| `.github/workflows/check.yml:177` core suite sharded by a hash of test paths | data | Moving core tests | Silent (shard balance reshuffles) |
 
 ## Repository gates in `packages/devtools` and `scripts/`
 
