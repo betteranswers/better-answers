@@ -49,8 +49,8 @@ reviews:
       - packages/schema/migrations/meta/**
 
 pr_descriptions:
-  generate: false
-  cubic_review_link: false
+  generate: true
+  cubic_review_link: true
   skip_if_author_description: true
 issues:
   fix_with_cubic_buttons: true

@@ -1,6 +1,6 @@
 {
   "env": {
-    "JCODEMUNCH_ENFORCE": "strict"
+    "CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL": "1"
   },
   "hooks": {
     "SessionStart": [
@@ -31,6 +31,5 @@
     "mattpocock-skills@claude-plugins-official": false,
     "mattpocock-skills@synced": false
   },
-  "extraKnownMarketplaces": {},
-  "subagentPromptCacheTtl": "1h"
+  "extraKnownMarketplaces": {}
 }
