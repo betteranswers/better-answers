@@ -3,7 +3,8 @@ import type { IncomingHttpHeaders } from "node:http";
 import type { RequestOptions } from "node:https";
 import { Readable } from "node:stream";
 
-import { describe, expect, it } from "vitest";
+import { getRequestListener } from "@hono/node-server";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -301,22 +302,43 @@ describe("the SSRF policy", () => {
 });
 
 describe("the lift's guards", () => {
-  it.each([600, 999])(
-    "refuses status %i as a transport error, staying up",
-    async (status) => {
-      const { request, observed } = observedAnswering({ status, body: "{}", holdOpen: true });
-      const fetcher = createClientMetadataFetcher({ lookup: resolvesTo(publicAnswer), request });
+  const native = {
+    Request: Object.getOwnPropertyDescriptor(globalThis, "Request"),
+    Response: Object.getOwnPropertyDescriptor(globalThis, "Response"),
+  };
 
-      const refused = fetcher("https://claude.ai/doc");
+  describe.each([
+    ["Node's own global Response", () => {}],
+    [
+      "the global Response that @hono/node-server's serve() installs",
+      () => void getRequestListener(() => new Response()),
+    ],
+  ])("under %s", (_globals, install) => {
+    beforeEach(install);
 
-      await expect(refused).rejects.toThrow(
-        new TypeError(`a Response cannot carry the metadata reply (status ${status})`),
-      );
-      await expect(refused).rejects.toMatchObject({ cause: matching.any(RangeError) });
-      expect(observed.response?.destroyed).toBe(true);
-    },
-    2_000,
-  );
+    afterEach(() => {
+      for (const [name, descriptor] of Object.entries(native)) {
+        if (descriptor !== undefined) Object.defineProperty(globalThis, name, descriptor);
+      }
+    });
+
+    it.each([600, 999])(
+      "refuses status %i as a transport error, staying up",
+      async (status) => {
+        const { request, observed } = observedAnswering({ status, body: "{}", holdOpen: true });
+        const fetcher = createClientMetadataFetcher({ lookup: resolvesTo(publicAnswer), request });
+
+        const refused = fetcher("https://claude.ai/doc");
+
+        await expect(refused).rejects.toThrow(
+          new TypeError(`a Response cannot carry the metadata reply (status ${status})`),
+        );
+        await expect(refused).rejects.toMatchObject({ cause: matching.any(RangeError) });
+        expect(observed.response?.destroyed).toBe(true);
+      },
+      2_000,
+    );
+  });
 
   it("abandons a silent lookup when the signal aborts, sending nothing", async () => {
     const { request, observed } = observedAnswering({ status: 200 });
