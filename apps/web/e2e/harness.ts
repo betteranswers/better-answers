@@ -505,23 +505,6 @@ export const signIn = async (page: Page, api: APIRequestContext, email: string):
   if (await firstPageDrawn(page)) await confirmedWithTheHarness(page, api, email);
 };
 
-export const aMemberSignedInAt = async (
-  page: Page,
-  api: APIRequestContext,
-  role: "Editor" | "Viewer",
-  path: string,
-) => {
-  const email = anAddress(role.toLowerCase());
-  const member = await person(api, email, { displayName: `A ${role}` });
-  const workspace = await provision(api, { name: `A workspace of ${role}s` });
-  await addMember(api, { role, userId: member.id, workspaceId: workspace.workspaceId });
-
-  await page.goto(path);
-  await signIn(page, api, email);
-  await expect(page).toHaveURL(new RegExp(`${path}$`));
-  return workspace;
-};
-
 export const signedInAtHome = async (
   page: Page,
   api: APIRequestContext,
@@ -542,6 +525,18 @@ export const signedInAsTheOperator = async (page: Page, api: APIRequestContext) 
   return { ...workspace, tag };
 };
 
+export const memberOfTwoWorkspaces = async (
+  api: APIRequestContext,
+  email: string,
+  names: { readonly first: string; readonly second: string },
+  role: "Admin" | "Viewer" = "Viewer",
+) => {
+  const first = await provision(api, { name: names.first, adminEmail: email });
+  const second = await provision(api, { name: names.second });
+  await addMember(api, { workspaceId: second.workspaceId, userId: first.admin.id, role });
+  return { first, second };
+};
+
 export const inTwoWorkspaces = async (
   page: Page,
   api: APIRequestContext,
@@ -549,9 +544,7 @@ export const inTwoWorkspaces = async (
   role: "Admin" | "Viewer" = "Admin",
 ) => {
   const email = anAddress("switching");
-  const first = await provision(api, { name: names.first, adminEmail: email });
-  const second = await provision(api, { name: names.second });
-  await addMember(api, { workspaceId: second.workspaceId, userId: first.admin.id, role });
+  const { first, second } = await memberOfTwoWorkspaces(api, email, names, role);
 
   await page.goto("/sign-in");
   await signIn(page, api, email);

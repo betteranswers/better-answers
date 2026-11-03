@@ -15,7 +15,6 @@ import {
   contrastBetween,
   keyShown,
   person,
-  personMenuOpened,
   provision,
   saysARefusal,
   signedInAtHome,
@@ -24,17 +23,11 @@ import {
   theActionLandedWithinItsBudget,
   tokenColour,
 } from "../harness.ts";
-
-const accountHeading = (page: Page) => page.getByRole("heading", { level: 1, name: "Account" });
-
-const regionOf = (page: Page, name: string) => page.getByRole("region", { name, exact: true });
+import { accountFromTheBand, codesListed, regionOf } from "../second-factor-steps.ts";
 
 const authenticatorPart = (page: Page) => regionOf(page, "Authenticator");
 
 const codesBlock = (page: Page) => regionOf(page, "Save Your Recovery Codes");
-
-const codesListed = (page: Page) =>
-  page.getByRole("list", { name: "Recovery Codes" }).getByRole("listitem");
 
 const codeField = (page: Page) => page.getByLabel("Authenticator Code");
 
@@ -47,13 +40,6 @@ const savedBox = (page: Page) => page.getByRole("checkbox", { name: "I have save
 
 const removeButton = (page: Page) =>
   authenticatorPart(page).getByRole("button", { name: "Remove", exact: true });
-
-const accountFromTheBand = async (page: Page, who: string): Promise<void> => {
-  const menu = await personMenuOpened(page, who);
-  await menu.getByRole("menuitem", { name: "Account" }).click();
-  await expect(accountHeading(page)).toBeVisible();
-  await expect(page).toHaveURL(/\/account$/);
-};
 
 const setupOpened = async (page: Page): Promise<string> => {
   await setUpButton(page).click();

@@ -2,8 +2,8 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
-import { expect } from "../browser.ts";
-import { enrolledWith, provision, signInByEmail } from "../harness.ts";
+import { expect } from "./browser.ts";
+import { enrolledWith, personMenuOpened, provision, signInByEmail } from "./harness.ts";
 
 const CONFIRM_HEADING = "Confirm It’s You";
 
@@ -14,6 +14,32 @@ export const codeField = (page: Page) => page.getByRole("textbox", { name: "Auth
 export const theRefusal = (page: Page) => page.getByRole("alert").filter({ hasText: /\S/ });
 
 export const codeOf = (key: string): string => authenticatorCodeAt(key, new Date());
+
+export const recoveryField = (page: Page) => page.getByRole("textbox", { name: "Recovery Code" });
+
+export const codesListed = (page: Page) =>
+  page.getByRole("list", { name: "Recovery Codes" }).getByRole("listitem");
+
+export const saidOfTheSet = (page: Page) =>
+  page.getByRole("region", { name: "Save Your Recovery Codes" }).getByRole("paragraph");
+
+export const codesTicked = async (page: Page, finish: string): Promise<void> => {
+  await page.getByRole("checkbox", { name: "I have saved these codes" }).check();
+  await page.getByRole("button", { name: finish }).click();
+  await expect(codesListed(page)).toHaveCount(0);
+};
+
+const accountHeading = (page: Page) => page.getByRole("heading", { level: 1, name: "Account" });
+
+export const regionOf = (page: Page, name: string) =>
+  page.getByRole("region", { name, exact: true });
+
+export const accountFromTheBand = async (page: Page, who: string): Promise<void> => {
+  const menu = await personMenuOpened(page, who);
+  await menu.getByRole("menuitem", { name: "Account" }).click();
+  await expect(accountHeading(page)).toBeVisible();
+  await expect(page).toHaveURL(/\/account$/);
+};
 
 const signedInWaiting = async (page: Page, api: APIRequestContext, email: string, on: string) => {
   await page.goto("/sign-in");

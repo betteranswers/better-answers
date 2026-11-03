@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import type { Locator, Page } from "@playwright/test";
+import type { Locator } from "@playwright/test";
 
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 
@@ -11,26 +11,16 @@ import {
   anAdminWithAnAuthenticator,
   codeField,
   codeOf,
+  codesListed,
+  codesTicked,
   heading,
+  recoveryField,
+  saidOfTheSet,
   signedInAgain,
   theRefusal,
-} from "./second-factor-steps.ts";
+} from "../second-factor-steps.ts";
 
 const READ_BUDGET_MS = 1000;
-
-const recoveryField = (page: Page) => page.getByRole("textbox", { name: "Recovery Code" });
-
-const codesListed = (page: Page) =>
-  page.getByRole("list", { name: "Recovery Codes" }).getByRole("listitem");
-
-const saidOfTheSet = (page: Page) =>
-  page.getByRole("region", { name: "Save Your Recovery Codes" }).getByRole("paragraph");
-
-const codesTicked = async (page: Page, finish: string): Promise<void> => {
-  await page.getByRole("checkbox", { name: "I have saved these codes" }).check();
-  await page.getByRole("button", { name: finish }).click();
-  await expect(codesListed(page)).toHaveCount(0);
-};
 
 const codeUsedByKeyboard = async (field: Locator, code: string): Promise<void> => {
   const page = field.page();

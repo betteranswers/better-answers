@@ -20,6 +20,7 @@ import {
   signedInAtHome,
   signIn,
   signInHeading,
+  signInSaysWhy,
   signOutFromTheShell,
   tabUntilFocused,
   theActionLandedWithinItsBudget,
@@ -334,14 +335,6 @@ test("a shown tab waits for a sign-in of its own", async ({ page, request }) => 
 
   expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);
 });
-
-const signInSaysWhy = async (page: Page): Promise<string> => {
-  await expect(signInHeading(page)).toBeVisible();
-  await expect(page.getByRole("status"), "the sign-in page says nothing of the arrival").toHaveText(
-    /\S/,
-  );
-  return page.getByRole("status").innerText();
-};
 
 test("brings an ended session through sign-in back to its page", async ({
   page,

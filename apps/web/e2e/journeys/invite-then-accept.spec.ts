@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
-
-import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
+import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -22,30 +20,28 @@ import {
   signInHeading,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
-
-const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
+import {
+  addressField,
+  anInvitation,
+  invitationHeading,
+  invitationRows,
+  invitationsRegion,
+  inviteAction,
+  inviteDialog,
+  invitedAs,
+  joinButton,
+  MEMBERS_PAGE,
+  nameField,
+  openedByName,
+  thePage,
+} from "../people-pages.ts";
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
-
-const INVITER = "Morgan Reid";
-
-const invitationsRegion = (page: Page) => page.getByRole("region", { name: "Invitations" });
-
-const invitationRows = (page: Page): Locator =>
-  invitationsRegion(page).getByRole("row").filter({ hasText: "@" });
 
 const rowOf = (page: Page, address: string): Locator =>
   invitationRows(page).filter({ hasText: address });
 
 const theOneCell = (page: Page): Locator => invitationsRegion(page).getByRole("cell");
-
-const INVITE = "Invite a Person";
-
-const inviteDialog = (page: Page) => page.getByRole("dialog", { name: INVITE });
-
-const inviteAction = (page: Page) => page.getByRole("button", { name: INVITE, exact: true });
-
-const addressField = (page: Page) => inviteDialog(page).getByLabel("Email Addresses");
 
 const openInvitations = async (page: Page): Promise<void> => {
   await page.getByRole("tab", { name: "Invitations" }).click();
@@ -57,49 +53,9 @@ const dialogOpened = async (page: Page): Promise<void> => {
   await expect(addressField(page)).toBeFocused();
 };
 
-const invitationHeading = (page: Page, workspace: string) =>
-  page.getByRole("heading", { level: 1, name: `Your Invitation to ${workspace}` });
-
-const joinButton = (page: Page) => page.getByRole("button", { name: "Join Workspace" });
-
-const nameField = (page: Page) => page.getByLabel("Display Name");
-
-const invitedAs = (page: Page, role: Role) =>
-  page
-    .getByRole("main")
-    .getByRole("paragraph")
-    .filter({
-      hasText: new RegExp(String.raw`${INVITER}(?:(?!Admin|Editor|Viewer).)*${role}\b`),
-    });
-
-const anInvitation = async (request: APIRequestContext, workspaceId: string, role: Role) => {
-  const inviter = await person(request, anAddress("morgan"), { displayName: INVITER });
-  const address = anAddress("priya");
-  const invited = await invite(request, {
-    workspaceId,
-    email: address,
-    inviterId: inviter.id,
-    role,
-  });
-  return { address, link: `/invitations/${invited.id}` };
-};
-
-const memberLink = (page: Page, name: string): Locator =>
-  page.getByRole("region", { name: "Members" }).getByRole("link", { name, exact: true });
-
-const thePage = (page: Page): Locator => page.getByRole("main");
-
 const activityOf = (page: Page): Locator => thePage(page).getByRole("region", { name: "Activity" });
 
 const linesOf = (page: Page): Locator => activityOf(page).getByRole("listitem");
-
-const AT_A_MEMBER_PAGE = new RegExp(`${MEMBERS_PAGE}/[0-9A-HJKMNP-TV-Z]{26}$`);
-
-const openedByName = async (page: Page, name: string): Promise<void> => {
-  await memberLink(page, name).click();
-  await expect(page).toHaveURL(AT_A_MEMBER_PAGE);
-  await expect(thePage(page).getByRole("heading", { level: 2, name, exact: true })).toBeVisible();
-};
 
 test("an Admin invites; invitees join; Activity shows only joining", async ({
   page,

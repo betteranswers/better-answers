@@ -1,60 +1,29 @@
 import assert from "node:assert/strict";
 
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
-import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
 import { expect, test } from "../browser.ts";
-import { enrolledWith, keyShown, landedAtHome, provision, signInByEmail } from "../harness.ts";
+import { keyShown, landedAtHome } from "../harness.ts";
 import { authAnswering } from "../refused-read.ts";
+import {
+  anAdminWithAnAuthenticator,
+  codeField,
+  codeOf,
+  codesListed,
+  codesTicked,
+  heading,
+  recoveryField,
+  saidOfTheSet,
+  signedInAgain,
+  theRefusal,
+} from "../second-factor-steps.ts";
 
 const CONFIRM_BY_CODE = "/second-factor/confirm/authenticator";
 
-const CONFIRM_HEADING = "Confirm It’s You";
-
-const heading = (page: Page, name: string) => page.getByRole("heading", { level: 1, name });
-
-const codeField = (page: Page) => page.getByRole("textbox", { name: "Authenticator Code" });
-
-const recoveryField = (page: Page) => page.getByRole("textbox", { name: "Recovery Code" });
-
 const authenticatorInstead = (page: Page) =>
   page.getByRole("button", { name: "Set Up an Authenticator Instead" });
-
-const codesListed = (page: Page) =>
-  page.getByRole("list", { name: "Recovery Codes" }).getByRole("listitem");
-
-const saidOfTheSet = (page: Page) =>
-  page.getByRole("region", { name: "Save Your Recovery Codes" }).getByRole("paragraph");
-
-const theRefusal = (page: Page) => page.getByRole("alert").filter({ hasText: /\S/ });
-
-const codeOf = (key: string): string => authenticatorCodeAt(key, new Date());
-
-const signedInWaiting = async (page: Page, api: APIRequestContext, email: string, on: string) => {
-  await page.goto("/sign-in");
-  await signInByEmail(page, api, email);
-  await expect(heading(page, on)).toBeVisible();
-};
-
-const signedInAgain = async (page: Page, api: APIRequestContext, email: string) => {
-  await page.context().clearCookies();
-  await signedInWaiting(page, api, email, CONFIRM_HEADING);
-};
-
-const anAdminWithAnAuthenticator = async (page: Page, api: APIRequestContext) => {
-  const { admin } = await provision(api, { name: "Calder Confirmations" });
-  const { key, recoveryCodes } = await enrolledWith(api, admin.email);
-  await signedInWaiting(page, api, admin.email, CONFIRM_HEADING);
-  return { email: admin.email, key, codes: recoveryCodes };
-};
-
-const codesTicked = async (page: Page, finish: string): Promise<void> => {
-  await page.getByRole("checkbox", { name: "I have saved these codes" }).check();
-  await page.getByRole("button", { name: finish }).click();
-  await expect(codesListed(page)).toHaveCount(0);
-};
 
 const codeUsed = async (field: Locator, code: string): Promise<void> => {
   await field.fill(code);

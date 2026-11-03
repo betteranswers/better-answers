@@ -1,16 +1,23 @@
 import assert from "node:assert/strict";
 
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "../browser.ts";
 import {
-  anAddress,
+  anAdminAtSources,
+  connectedSourceNamed,
+  connectedSourcesRegion,
+  indexed,
+  lastSyncedOf,
+  rowAction,
+  saidIn,
+  sensitivityOf,
+  stateOf,
+} from "../connected-sources.ts";
+import {
   clockTheNextKey,
-  provision,
   saysARefusal,
   type SeedConnectedSource,
-  seedConnectedSources,
-  signIn,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
 import { refusalAnswering } from "../refused-read.ts";
@@ -18,43 +25,6 @@ import { refusalAnswering } from "../refused-read.ts";
 const LIST_BUDGET_MS = 1000;
 
 const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
-
-const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
-
-const connectedSourcesRegion = (page: Page) =>
-  page.getByRole("region", { name: "Connected Sources" });
-
-const saidIn = (page: Page): Locator => connectedSourcesRegion(page).getByRole("status").last();
-
-const connectedSourceNamed = (page: Page, name: string): Locator =>
-  connectedSourcesRegion(page)
-    .getByRole("listitem")
-    .filter({ has: page.getByRole("heading", { level: 3, name, exact: true }) });
-
-const leadOf = (page: Page, name: string, term: string): Locator =>
-  connectedSourceNamed(page, name)
-    .getByRole("term")
-    .filter({ hasText: new RegExp(`^${term}$`) })
-    .first()
-    .locator("xpath=following-sibling::dd[1]");
-
-const stateOf = (page: Page, name: string) => leadOf(page, name, "State");
-
-const lastSyncedOf = (page: Page, name: string) => leadOf(page, name, "Last Synced");
-
-const sensitivityOf = (page: Page, name: string) => leadOf(page, name, "Sensitivity");
-
-const ROW_ACTIONS = {
-  review: "Review Findings",
-  narrow: "Narrow Sensitivity",
-  widen: "Widen Sensitivity or Audience",
-} as const;
-
-const rowAction = (page: Page, name: string, action: keyof typeof ROW_ACTIONS): Locator =>
-  connectedSourceNamed(page, name).getByRole("button", {
-    name: `${ROW_ACTIONS[action]} ${name}`,
-    exact: true,
-  });
 
 const SENSITIVITY_PANELS = {
   narrow: { named: (name: string) => `Narrow the Sensitivity of ${name}`, commit: "Narrow" },
@@ -76,38 +46,6 @@ const commitOf = (page: Page, name: string, change: SensitivityChange): Locator 
     name: SENSITIVITY_PANELS[change].commit,
     exact: true,
   });
-
-const anAdminAtSources = async (
-  page: Page,
-  api: APIRequestContext,
-  input: { readonly workspace: string; readonly connectedSources?: readonly SeedConnectedSource[] },
-) => {
-  const email = anAddress("admin");
-  const workspace = await provision(api, { name: input.workspace, adminEmail: email });
-  const seeded =
-    input.connectedSources === undefined
-      ? { connectedSources: [] }
-      : await seedConnectedSources(api, {
-          workspaceId: workspace.workspaceId,
-          connectedSources: input.connectedSources,
-        });
-  await page.goto("/sign-in");
-  await signIn(page, api, email);
-  await nav(page).getByRole("link", { name: "Connected Sources" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
-  return { workspace, seeded };
-};
-
-const indexed = (
-  name: string,
-  overrides: Partial<SeedConnectedSource> = {},
-): SeedConnectedSource => ({
-  name,
-  sensitivity: "Internal",
-  sync: "done",
-  documents: [{ title: `${name}.md` }],
-  ...overrides,
-});
 
 test.describe("connecting a document on the Sources page", () => {
   test("says in the dialog that the api refused an upload", async ({ page, request }) => {

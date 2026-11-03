@@ -12,12 +12,12 @@ import {
   keyShown,
   landedAtHome,
   person,
-  personMenuOpened,
   provision,
   signedInAtHome,
   signInByEmail,
   withAnAuthenticator,
 } from "../harness.ts";
+import { accountFromTheBand, codesListed, regionOf } from "../second-factor-steps.ts";
 
 const MEMBERS = HOMES.Admin.path;
 
@@ -30,14 +30,7 @@ const codeField = (page: Page) => page.getByRole("textbox", { name: "Authenticat
 
 const landedAt = (page: Page): URL => new URL(page.url());
 
-const accountHeading = (page: Page) => page.getByRole("heading", { level: 1, name: "Account" });
-
-const regionOf = (page: Page, name: string) => page.getByRole("region", { name, exact: true });
-
 const codesBlock = (page: Page) => regionOf(page, "Save Your Recovery Codes");
-
-const codesListed = (page: Page) =>
-  page.getByRole("list", { name: "Recovery Codes" }).getByRole("listitem");
 
 const setUpButton = (page: Page) =>
   page.getByRole("button", { name: "Set Up an Authenticator", exact: true });
@@ -58,13 +51,6 @@ const anAdminWaiting = async (page: Page, api: APIRequestContext, email: string)
   await signInByEmail(page, api, email);
   await expect(confirmHeading(page)).toBeVisible();
   return key;
-};
-
-const accountFromTheBand = async (page: Page, who: string): Promise<void> => {
-  const menu = await personMenuOpened(page, who);
-  await menu.getByRole("menuitem", { name: "Account" }).click();
-  await expect(accountHeading(page)).toBeVisible();
-  await expect(page).toHaveURL(/\/account$/);
 };
 
 test("a pending Admin confirms; an Editor sets up an authenticator", async ({

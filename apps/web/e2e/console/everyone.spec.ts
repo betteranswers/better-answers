@@ -11,14 +11,13 @@ import {
   signedInAsTheOperator,
   skipLinkReachesThePage,
 } from "../harness.ts";
+import { everyone, personButton, sheetOf } from "../people-pages.ts";
 
 const LIST_BUDGET_MS = 1000;
 
 const EVERYONE_PAGE = pageNamed(menuGroupIn(CONSOLE, "people"), "Everyone").path;
 
 const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
-
-const everyone = (page: Page) => page.getByRole("region", { name: "Everyone" });
 
 const outcomeOf = (list: Locator): Locator => list.locator("output:has(+ [role='alert'])");
 
@@ -29,11 +28,6 @@ const personRows = (page: Page): Locator =>
   everyone(page)
     .getByRole("row")
     .filter({ has: page.getByRole("cell") });
-
-const personButton = (page: Page, name: string): Locator =>
-  everyone(page).getByRole("button", { name, exact: true });
-
-const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", { name });
 
 test.describe("the console's Everyone page", () => {
   test("is keyboard-operable, sounds like a table and passes axe", async ({

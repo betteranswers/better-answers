@@ -21,6 +21,7 @@ import {
   railOf,
   signIn,
   signInHeading,
+  signInSaysWhy,
   signOutFromTheShell,
   signedInAtHome,
   skipLinkReachesThePage,
@@ -507,14 +508,6 @@ test("draws the token's ring on every shell page control", async ({ page, reques
 
   await holdsTheRing(page, await walked(page));
 });
-
-const signInSaysWhy = async (page: Page): Promise<string> => {
-  await expect(signInHeading(page)).toBeVisible();
-  await expect(page.getByRole("status"), "the sign-in page says nothing of the arrival").toHaveText(
-    /\S/,
-  );
-  return page.getByRole("status").innerText();
-};
 
 test("sign-out from the shell ends the session", async ({ page, request }) => {
   const email = anAddress("leaving");

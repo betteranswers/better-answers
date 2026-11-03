@@ -5,14 +5,14 @@ import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor"
 import { expect, test } from "../browser.ts";
 import { landedAtHome, saysSomethingNew, saysTheWait } from "../harness.ts";
 import { authAnswering } from "../refused-read.ts";
-import { aVirtualAuthenticator } from "../virtual-authenticator.ts";
 import {
   anAdminWithAnAuthenticator,
   codeField,
   codeOf,
   signedInAgain,
   theRefusal,
-} from "./second-factor-steps.ts";
+} from "../second-factor-steps.ts";
+import { aVirtualAuthenticator } from "../virtual-authenticator.ts";
 
 const CONFIRM_BY_CODE = "/second-factor/confirm/authenticator";
 

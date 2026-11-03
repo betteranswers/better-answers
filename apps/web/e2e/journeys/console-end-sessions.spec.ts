@@ -19,6 +19,7 @@ import {
   signIn,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
+import { personButton, sheetOf } from "../people-pages.ts";
 
 const EVERYONE_PAGE = pageNamed(menuGroupIn(CONSOLE, "people"), "Everyone").path;
 
@@ -29,13 +30,6 @@ const REVOKE = "End Every Sign-In and Token";
 const ENDED_AT = /\d{2}:\d{2}/;
 
 const aTag = (): string => `t${Date.now()}${Math.floor(Math.random() * 1e6)}`;
-
-const everyone = (page: Page) => page.getByRole("region", { name: "Everyone" });
-
-const personButton = (page: Page, name: string): Locator =>
-  everyone(page).getByRole("button", { name, exact: true });
-
-const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", { name });
 
 const regionOf = (sheet: Locator, name: string): Locator =>
   sheet.getByRole("region", { name, exact: true });

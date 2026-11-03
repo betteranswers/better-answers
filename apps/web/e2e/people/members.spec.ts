@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -29,13 +28,27 @@ import {
   theActionLandedWithinItsBudget,
   theActionsLandedWithinTheirBudget,
 } from "../harness.ts";
+import {
+  addressField,
+  invitationRows,
+  invitationsRegion,
+  inviteAction,
+  inviteDialog,
+  MEMBERS_PAGE,
+  memberLink,
+  memberRows,
+  membersRegion,
+  openedByName,
+  outcomeOf,
+  personHeading,
+  selectionAction,
+  selectionBar,
+  thePage,
+  tickOf,
+} from "../people-pages.ts";
 import { refusalAnswering } from "../refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
-
-const people = menuGroupIn(CONTROL_CENTRE, "people");
-
-const MEMBERS_PAGE = pageNamed(people, "Members").path;
 
 const roomBetween = async (above: Locator, below: Locator): Promise<number> => {
   const upper = await above.boundingBox();
@@ -83,13 +96,6 @@ const BULK_ROLE_CHANGE = (url: URL): boolean => url.pathname.includes(BULK_ROLE_
 
 const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 
-const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
-
-const outcomeOf = (page: Page): Locator => membersRegion(page).getByRole("status").nth(1);
-
-const selectionBar = (page: Page): Locator =>
-  page.getByRole("toolbar", { name: "Selected Members" });
-
 const describing = async (control: Locator): Promise<string> =>
   control
     .page()
@@ -98,11 +104,6 @@ const describing = async (control: Locator): Promise<string> =>
 
 const searchBox = (page: Page) =>
   page.getByRole("searchbox", { name: "Search by name or address" });
-
-const memberRows = (page: Page): Locator =>
-  membersRegion(page)
-    .getByRole("row")
-    .filter({ has: page.getByRole("cell") });
 
 const rowOf = (page: Page, name: string): Locator => memberRows(page).filter({ hasText: name });
 
@@ -130,18 +131,10 @@ const renderedLines = (text: Locator): Promise<string[]> =>
     return lines.map((line) => line.text);
   });
 
-const memberLink = (page: Page, name: string): Locator =>
-  membersRegion(page).getByRole("link", { name, exact: true });
-
 const listHeading = (page: Page): Locator =>
   membersRegion(page).getByRole("heading", { level: 2, name: "Members" });
 
-const thePage = (page: Page): Locator => page.getByRole("main");
-
 const memberPageAt = (personId: string): string => `${MEMBERS_PAGE}/${personId}`;
-
-const personHeading = (page: Page, name: string): Locator =>
-  thePage(page).getByRole("heading", { level: 2, name, exact: true });
 
 const accessOf = (page: Page): Locator => thePage(page).getByRole("region", { name: "Access" });
 
@@ -168,14 +161,6 @@ const accessLine = (term: string): string =>
 
 const displayNameRegion = (page: Page): Locator =>
   thePage(page).getByRole("region", { name: "Display Name" });
-
-const AT_A_MEMBER_PAGE = new RegExp(`${MEMBERS_PAGE}/[0-9A-HJKMNP-TV-Z]{26}$`);
-
-const openedByName = async (page: Page, name: string): Promise<void> => {
-  await memberLink(page, name).click();
-  await expect(page).toHaveURL(AT_A_MEMBER_PAGE);
-  await expect(personHeading(page, name)).toBeVisible();
-};
 
 const backToMembers = async (page: Page): Promise<void> => {
   await page.goBack();
@@ -320,23 +305,12 @@ const endsUnderItsLastLine = async (card: Locator, lastLine: Locator): Promise<v
   ).toBeLessThanOrEqual(ONE_GAP_PX);
 };
 
-const tickOf = (page: Page, name: string) =>
-  membersRegion(page).getByRole("checkbox", { name: `Select ${name}`, exact: true });
-
-const selectionAction = (page: Page, action: string): Locator =>
-  selectionBar(page).getByRole("button", { name: action, exact: true });
-
 const changeRoleOpened = async (page: Page, titled: string): Promise<Locator> => {
   await selectionAction(page, "Change Role").click();
   const dialog = page.getByRole("dialog", { name: titled });
   await expect(dialog.getByRole("combobox", { name: "Role" })).toBeFocused();
   return dialog;
 };
-
-const invitationsRegion = (page: Page) => page.getByRole("region", { name: "Invitations" });
-
-const invitationRows = (page: Page): Locator =>
-  invitationsRegion(page).getByRole("row").filter({ hasText: "@" });
 
 const invitationRowOf = (page: Page, address: string): Locator =>
   invitationRows(page).filter({ hasText: address });
@@ -354,14 +328,6 @@ const invitationOutcome = (page: Page): Locator =>
   invitationsRegion(page).getByRole("status").nth(1);
 
 const THE_INVITATIONS_COUNT = "//section[.//h2[.='Invitations']]//output";
-
-const INVITE = "Invite a Person";
-
-const inviteDialog = (page: Page) => page.getByRole("dialog", { name: INVITE });
-
-const inviteAction = (page: Page) => page.getByRole("button", { name: INVITE, exact: true });
-
-const addressField = (page: Page) => inviteDialog(page).getByLabel("Email Addresses");
 
 const heldAddresses = (page: Page) =>
   inviteDialog(page).getByRole("list", { name: "Addresses to Invite" }).getByRole("listitem");

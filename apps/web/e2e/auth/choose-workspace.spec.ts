@@ -1,33 +1,17 @@
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "../browser.ts";
 import {
-  addMember,
   anAddress,
   keystrokesButton,
   keystrokesDismissed,
   keystrokesListed,
-  provision,
+  memberOfTwoWorkspaces,
   signIn,
 } from "../harness.ts";
 import { scrolledSideways } from "../knowledge.ts";
 
 const thePicker = (page: Page) => page.getByRole("heading", { level: 1, name: "Your Workspaces" });
-
-const memberOfTwoWorkspaces = async (
-  request: APIRequestContext,
-  email: string,
-  names: { readonly first: string; readonly second: string },
-) => {
-  const first = await provision(request, { name: names.first, adminEmail: email });
-  const second = await provision(request, { name: names.second });
-  await addMember(request, {
-    workspaceId: second.workspaceId,
-    userId: first.admin.id,
-    role: "Viewer",
-  });
-  return { first, second };
-};
 
 const LIST_BUDGET_MS = 1000;
 

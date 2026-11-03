@@ -1,28 +1,28 @@
-import type { APIRequestContext, Locator, Page, Response } from "@playwright/test";
+import type { Locator, Page, Response } from "@playwright/test";
 
 import { expect, test } from "../browser.ts";
 import {
-  anAddress,
+  anAdminAtSources,
+  connectedSourceNamed,
+  connectedSourcesRegion,
+  indexed,
+  lastSyncedOf,
+  rowAction,
+  saidIn,
+  sensitivityOf,
+  stateOf,
+} from "../connected-sources.ts";
+import {
   clockTheNextKey,
   moveTheSync,
-  provision,
   saysOfItsRead,
-  type SeedConnectedSource,
   seedConnectedSources,
-  signIn,
   skipLinkReachesThePage,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
 import { heldBack } from "../knowledge.ts";
 
-const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
-
 const EVERYONE = "Everyone in the workspace";
-
-const connectedSourcesRegion = (page: Page) =>
-  page.getByRole("region", { name: "Connected Sources" });
-
-const saidIn = (page: Page): Locator => connectedSourcesRegion(page).getByRole("status").last();
 
 const saidNowIn = async (region: Locator): Promise<string> => (await region.textContent()) ?? "";
 
@@ -55,62 +55,12 @@ const listsNothingConnected = async (page: Page, open: () => Promise<unknown>): 
   await expect(region.getByRole("listitem")).toHaveCount(0);
 };
 
-const connectedSourceNamed = (page: Page, name: string): Locator =>
-  connectedSourcesRegion(page)
-    .getByRole("listitem")
-    .filter({ has: page.getByRole("heading", { level: 3, name, exact: true }) });
-
-const leadOf = (page: Page, name: string, term: string): Locator =>
-  connectedSourceNamed(page, name)
-    .getByRole("term")
-    .filter({ hasText: new RegExp(`^${term}$`) })
-    .first()
-    .locator("xpath=following-sibling::dd[1]");
-
-const stateOf = (page: Page, name: string) => leadOf(page, name, "State");
-
-const lastSyncedOf = (page: Page, name: string) => leadOf(page, name, "Last Synced");
-
-const sensitivityOf = (page: Page, name: string) => leadOf(page, name, "Sensitivity");
-
-const ROW_ACTIONS = {
-  review: "Review Findings",
-  publish: "Publish",
-} as const;
-
-const rowAction = (page: Page, name: string, action: keyof typeof ROW_ACTIONS): Locator =>
-  connectedSourceNamed(page, name).getByRole("button", {
-    name: `${ROW_ACTIONS[action]} ${name}`,
-    exact: true,
-  });
-
-const anAdminAtSources = async (page: Page, api: APIRequestContext, workspaceName: string) => {
-  const email = anAddress("admin");
-  const workspace = await provision(api, { name: workspaceName, adminEmail: email });
-  await page.goto("/sign-in");
-  await signIn(page, api, email);
-  await nav(page).getByRole("link", { name: "Connected Sources" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
-  return workspace;
-};
-
-const indexed = (
-  name: string,
-  overrides: Partial<SeedConnectedSource> = {},
-): SeedConnectedSource => ({
-  name,
-  sensitivity: "Internal",
-  sync: "done",
-  documents: [{ title: `${name}.md` }],
-  ...overrides,
-});
-
 test("an Admin connects by keyboard, then publishes within 100 ms", async ({
   page,
   request,
   passesTheAccessibilityGate,
 }) => {
-  const workspace = await anAdminAtSources(page, request, "Airedale Tooling");
+  const { workspace } = await anAdminAtSources(page, request, { workspace: "Airedale Tooling" });
 
   await test.step("an Admin connects by keyboard and sees received, indexing, indexed", async () => {
     await listsNothingConnected(page, () => page.goto("/sources/connected-sources"));

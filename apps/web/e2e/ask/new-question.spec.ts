@@ -1,5 +1,19 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import {
+  anAuditWorkspace,
+  answered,
+  askButton,
+  collectionIn,
+  DRAFTED,
+  DRAFTING,
+  newQuestion,
+  POLICY,
+  QUESTION,
+  questionBox,
+  SUPPLIER,
+  USERS,
+} from "../asking.ts";
 import { expect, test } from "../browser.ts";
 import {
   addMember,
@@ -9,12 +23,10 @@ import {
   landedAtHome,
   modelCallsIn,
   person,
-  provision,
   railOf,
   releaseTheModel,
   saysARefusal,
   scriptAsking,
-  seedConcepts,
   signIn,
   switched,
   tabUntilFocused,
@@ -23,40 +35,6 @@ import {
 import { scrolledSideways } from "../knowledge.ts";
 
 const ANSWER_BUDGET_MS = 1000;
-
-const QUESTION = "How do buyers access audit information?";
-
-const USERS = {
-  title: "How do buyers access audit information about their users' actions?",
-  collection: "audits",
-  kind: "Answer",
-  body: "Buyers download their users' audit log from the console.",
-  trust: "machine-confirmed",
-} as const;
-
-const SUPPLIER = {
-  title: "How do buyers access audit information about the supplier's actions?",
-  collection: "audits",
-  kind: "Answer",
-  body: "The supplier sends its own audit report on request.",
-} as const;
-
-const POLICY = {
-  title: "Audit information access for buyers",
-  collection: "audits",
-  kind: "Policy",
-  body: "Buyers access audit information through the console's audit page.",
-} as const;
-
-const UNFILED = {
-  title: "How do buyers access audit information they exported?",
-  kind: "Answer",
-  body: "Exported audit information stays in the buyer's own storage.",
-} as const;
-
-const DRAFTED = "Buyers use the console's audit page.";
-
-const DRAFTING = { writes: [{ citing: POLICY.title, sentence: DRAFTED }] } as const;
 
 type Script = Omit<AskingScript, "workspaceId">;
 
@@ -67,21 +45,12 @@ type Asking = {
 };
 
 const aWorkspaceToAsk = async (api: APIRequestContext, script: Script): Promise<Asking> => {
-  const workspace = await provision(api, {
-    name: "Calder Audits",
-    adminEmail: anAddress("admin"),
-  });
-  const { workspaceId } = workspace;
-  await seedConcepts(api, {
-    workspaceId,
-    userId: workspace.admin.id,
-    concepts: [USERS, SUPPLIER, POLICY, UNFILED],
-  });
+  const { workspaceId, adminId } = await anAuditWorkspace(api);
   await scriptAsking(api, { workspaceId, ...script });
   const viewerEmail = anAddress("viewer");
   const viewer = await person(api, viewerEmail, { displayName: "Vera Viewer" });
   await addMember(api, { workspaceId, userId: viewer.id, role: "Viewer" });
-  return { workspaceId, adminId: workspace.admin.id, viewerEmail };
+  return { workspaceId, adminId, viewerEmail };
 };
 
 const signedInAsTheViewer = async (page: Page, api: APIRequestContext, asking: Asking) => {
@@ -100,21 +69,9 @@ const aViewerAsking = async (
   return asking;
 };
 
-const newQuestion = (page: Page) => page.getByRole("region", { name: "New Question" });
-
-const questionBox = (page: Page) => newQuestion(page).getByRole("textbox", { name: "Question" });
-
-const askButton = (page: Page) => newQuestion(page).getByRole("button", { name: "Ask" });
-
 const said = (page: Page) => newQuestion(page).getByRole("status");
 
 const alerted = (page: Page) => newQuestion(page).getByRole("alert");
-
-const answered = (page: Page, verdict: string) =>
-  page.getByRole("region", { name: verdict, exact: true });
-
-const collectionIn = (result: Locator, collection: string) =>
-  result.getByRole("region", { name: collection, exact: true });
 
 const asked = async (page: Page, question = QUESTION): Promise<void> => {
   await questionBox(page).fill(question);

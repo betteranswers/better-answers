@@ -1,31 +1,16 @@
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { expect, test } from "../browser.ts";
 import {
-  addMember,
   anAddress,
   landedAtHome,
+  memberOfTwoWorkspaces,
   personMenuOpened,
   provision,
   signIn,
 } from "../harness.ts";
 
 const thePicker = (page: Page) => page.getByRole("heading", { level: 1, name: "Your Workspaces" });
-
-const memberOfTwoWorkspaces = async (
-  request: APIRequestContext,
-  email: string,
-  names: { readonly first: string; readonly second: string },
-) => {
-  const first = await provision(request, { name: names.first, adminEmail: email });
-  const second = await provision(request, { name: names.second });
-  await addMember(request, {
-    workspaceId: second.workspaceId,
-    userId: first.admin.id,
-    role: "Viewer",
-  });
-  return { first, second };
-};
 
 test("sign-in lands a sole member and scopes a picked workspace", async ({
   page,

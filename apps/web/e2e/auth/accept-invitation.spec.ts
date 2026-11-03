@@ -1,48 +1,22 @@
-import type { APIRequestContext, Page } from "@playwright/test";
-
-import type { Role } from "@/shared/navigation.ts";
-
 import { expect, test } from "../browser.ts";
-import { anAddress, invite, person, provision, signIn } from "../harness.ts";
+import { person, provision, signIn } from "../harness.ts";
+import {
+  anInvitation,
+  invitationHeading,
+  invitedAs,
+  joinButton,
+  nameField,
+} from "../people-pages.ts";
 
 const READ_BUDGET_MS = 1000;
-
-const INVITER = "Morgan Reid";
-
-const invitationHeading = (page: Page, workspace: string) =>
-  page.getByRole("heading", { level: 1, name: `Your Invitation to ${workspace}` });
-
-const joinButton = (page: Page) => page.getByRole("button", { name: "Join Workspace" });
-
-const nameField = (page: Page) => page.getByLabel("Display Name");
-
-const invitedAs = (page: Page, role: Role) =>
-  page
-    .getByRole("main")
-    .getByRole("paragraph")
-    .filter({
-      hasText: new RegExp(String.raw`${INVITER}(?:(?!Admin|Editor|Viewer).)*${role}\b`),
-    });
-
-const anInvitation = async (request: APIRequestContext, workspaceName: string, role: Role) => {
-  const workspace = await provision(request, { name: workspaceName });
-  const inviter = await person(request, anAddress("morgan"), { displayName: INVITER });
-  const address = anAddress("priya");
-  const invited = await invite(request, {
-    workspaceId: workspace.workspaceId,
-    email: address,
-    inviterId: inviter.id,
-    role,
-  });
-  return { workspace, address, link: `/invitations/${invited.id}` };
-};
 
 test("a named invitee reads it within a second, joins keyboard-only", async ({
   page,
   request,
   passesTheAccessibilityGate,
 }) => {
-  const { address, link } = await anInvitation(request, "Ryedale Metalwork", "Viewer");
+  const workspace = await provision(request, { name: "Ryedale Metalwork" });
+  const { address, link } = await anInvitation(request, workspace.workspaceId, "Viewer");
   await person(request, address, { displayName: "Sam Okoro" });
   await page.goto(link);
   await signIn(page, request, address);
