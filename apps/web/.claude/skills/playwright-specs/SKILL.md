@@ -43,7 +43,7 @@ fixtures and adds a fourth:
 | `request` | An `APIRequestContext` on the config's `baseURL`, carrying a `cf-connecting-ip` header of its **own**; disposed after the test |
 | `passesTheAccessibilityGate` | The audit below, declared `auto`, so it runs whether a spec names it or not |
 
-A spec asks for the ones it uses and gets the rest anyway: `apps/web/e2e/auth/sign-in-link.spec.ts` takes
+A spec asks for the ones it uses and gets the rest anyway: `apps/web/e2e/auth/sign-in.spec.ts` takes
 `context` to clear cookies mid-test, and every spec that builds state takes `request`.
 
 The two addresses are **different on purpose**. The browser is one client and the set-up traffic

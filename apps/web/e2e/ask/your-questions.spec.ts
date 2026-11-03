@@ -174,7 +174,7 @@ test.describe("Your questions", () => {
       await passesTheAccessibilityGate();
 
       await page.keyboard.press("Enter");
-      await expect(page).toHaveURL(new RegExp(`${YOUR_QUESTIONS}$`));
+      await expect(page).toHaveURL((url) => url.pathname === YOUR_QUESTIONS);
       await expect(rowsOf(yourQuestions(page)).first()).toBeVisible();
     });
   });
