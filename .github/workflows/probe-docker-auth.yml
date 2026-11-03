@@ -6,7 +6,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-26.04
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,12 +40,20 @@ jobs:
           auth="$(curl -s -u "$U:$P" 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull' | jq -r .token)"
           echo "--- anonymous"; limits "$anon"
           echo "--- as the account"; limits "$auth"
-          step() { echo "--- $1"; shift; "$@" 2>&1 | tail -2 || true; echo "account:"; limits "$auth"; echo "address:"; limits "$anon"; }
-          tok() { curl -s -u "$U:$P" "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$1:pull" | jq -r .token; }
-          digest() { curl -sI -H "Authorization: Bearer $(tok "$1")" -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json' "https://registry-1.docker.io/v2/$1/manifests/$2" | tr -d '\r' | awk -F': ' 'tolower($1)=="docker-content-digest"{print $2}'; }
-          bb="$(digest library/busybox 1.36)"; al="$(digest library/alpine 3.21)"
-          echo "busybox:1.36 is $bb; alpine:3.21 is $al"
-          step "tag pull busybox:1.37" docker pull busybox:1.37
-          step "tag@digest pull busybox:1.36@$bb" docker pull "busybox:1.36@$bb"
-          step "digest-only pull alpine@$al" docker pull "alpine@$al"
-          step "the pinned Postgres, through compose" deploy/test-postgres.sh up
+          remaining() { curl -sI -H "Authorization: Bearer $1" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | tr -d '\r' | awk -F'[:;] *' 'tolower($1)=="ratelimit-remaining"{print $2}'; }
+          for _ in $(seq 1 80); do
+            auth="$(curl -s -u "$U:$P" 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull' | jq -r .token)"
+            left="$(remaining "$auth")"
+            echo "$(date -u +%H:%M:%S) account remaining=${left:-none}"
+            [ -n "$left" ] && [ "$left" -le 0 ] && break
+            sleep 30
+          done
+          echo "--- token request as the account, status:"
+          curl -s -o /dev/null -w '%{http_code}\n' -u "$U:$P" 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/hello-world:pull'
+          echo "--- docker pull while the account is at ${left}"
+          docker pull hello-world:linux 2>&1 | tail -3 || true
+          echo "account:"; limits "$auth"; echo "address:"; limits "$anon"
+          echo "--- the same pull anonymously, with the login removed"
+          docker logout >/dev/null 2>&1 || true
+          docker pull hello-world:latest 2>&1 | tail -3 || true
+          echo "address:"; limits "$anon"
