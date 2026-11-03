@@ -19,6 +19,7 @@ jobs:
           ls -la ~/.docker || true
           cat /etc/docker/daemon.json || true
           if [ -f ~/.docker/config.json ]; then jq 'walk(if type=="object" and has("auth") then .auth="REDACTED" else . end)' ~/.docker/config.json; fi
+          jq -r '.auths[].auth' ~/.docker/config.json | base64 -d | cut -d: -f1 | sed "s/^/preinstalled account: /" || true
       - uses: ./.github/actions/docker-hub-login
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -39,11 +40,12 @@ jobs:
           auth="$(curl -s -u "$U:$P" 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull' | jq -r .token)"
           echo "--- anonymous"; limits "$anon"
           echo "--- as the account"; limits "$auth"
-          echo "--- pull busybox through the daemon"
-          docker pull busybox:1.37 2>&1 | tail -3 || true
-          echo "--- as the account, after the pull"; limits "$auth"
-          echo "--- anonymous, after the pull"; limits "$anon"
-          echo "--- compose pull, as test-postgres.sh does"
-          docker pull alpine:3.22 2>&1 | tail -2 || true
-          echo "--- as the account, after the second pull"; limits "$auth"
-          echo "--- anonymous, after the second pull"; limits "$anon"
+          step() { echo "--- $1"; shift; "$@" 2>&1 | tail -2 || true; echo "account:"; limits "$auth"; echo "address:"; limits "$anon"; }
+          tok() { curl -s -u "$U:$P" "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$1:pull" | jq -r .token; }
+          digest() { curl -sI -H "Authorization: Bearer $(tok "$1")" -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json' "https://registry-1.docker.io/v2/$1/manifests/$2" | tr -d '\r' | awk -F': ' 'tolower($1)=="docker-content-digest"{print $2}'; }
+          bb="$(digest library/busybox 1.36)"; al="$(digest library/alpine 3.21)"
+          echo "busybox:1.36 is $bb; alpine:3.21 is $al"
+          step "tag pull busybox:1.37" docker pull busybox:1.37
+          step "tag@digest pull busybox:1.36@$bb" docker pull "busybox:1.36@$bb"
+          step "digest-only pull alpine@$al" docker pull "alpine@$al"
+          step "the pinned Postgres, through compose" deploy/test-postgres.sh up
