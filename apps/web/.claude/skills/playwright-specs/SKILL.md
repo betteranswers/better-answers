@@ -231,7 +231,7 @@ E2E_GATE_ALONE=1 pnpm --filter @better-answers/web run e2e
 
 This workspace's `check` runs types, the vitest suite and then the whole browser suite, so a
 spec left broken fails `check:web` and the root `check` with it. Lint is the root's `check:gates`.
-The `check` workflow runs the browser suite as three shards of `check:web:e2e`, with three workers each.
+The `check` workflow runs the browser suite as one job, `check:web:e2e` with three workers.
 
 `test.only` is allowed while debugging and refused under CI by `forbidOnly`. The specs import
 `test` from the fixture module, so oxlint's vitest rules never see them and this is the only
