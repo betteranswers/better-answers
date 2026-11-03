@@ -16,6 +16,7 @@ import {
   confirmedWhenAsked,
   countOf,
   invite,
+  keepsItsWordOffThePage,
   keyListed,
   keystrokesDismissed,
   keystrokesListed,
@@ -50,6 +51,37 @@ const pageRoom = () => ({
 });
 
 const REMOVAL = (url: URL): boolean => url.pathname.includes("members.remove");
+
+const answeredChangedMeanwhile = (
+  page: Page,
+  action: (url: URL) => boolean,
+  held: Promise<void> = Promise.resolve(),
+  items?: Readonly<Record<string, string>>,
+) =>
+  page.route(action, async (route) => {
+    await held;
+    await route.fulfill({
+      status: 409,
+      json: [
+        {
+          error: {
+            message: "changed-meanwhile",
+            code: -32_603,
+            data: {
+              code: "CONFLICT",
+              httpStatus: 409,
+              refusal: { word: "changed-meanwhile", class: "conflict", items },
+            },
+          },
+        },
+      ],
+    });
+  });
+
+const BULK_ROLE_CHANGE_ASKED = "members.bulkChangeRole";
+
+/** Matched by name anywhere in the path, because the tRPC client batches its calls. */
+const BULK_ROLE_CHANGE = (url: URL): boolean => url.pathname.includes(BULK_ROLE_CHANGE_ASKED);
 
 const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 
@@ -918,6 +950,40 @@ test.describe("bulk actions on the members ticked", () => {
 
     await tickOf(page, "Sam Okoro").click();
     await expect(tickOf(page, "Sam Okoro"), "the first click ticked nothing").toBeChecked();
+  });
+
+  test("a second action waits on the first, whose refusal lands", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtPeople(page, request, "Wharfe Fulling");
+    const answered = Promise.withResolvers<void>();
+    await answeredChangedMeanwhile(page, BULK_ROLE_CHANGE, answered.promise);
+    await tickOf(page, "Priya Shah").check();
+    const dialog = await changeRoleOpened(page, "Change Role for 1 Member");
+    await dialog.getByRole("button", { name: "Change Role", exact: true }).click();
+    await expect(outcomeOf(page), "the pending change counts its one member").toHaveText(/\b1\b/);
+    const saidPending = await outcomeOf(page).innerText();
+
+    await tickOf(page, "Sam Okoro").check();
+    const action = selectionAction(page, "Change Role");
+    await expect(action).toHaveAttribute("aria-disabled", "true");
+    await action.focus();
+    await page.keyboard.press("Enter");
+    await expect(outcomeOf(page)).toHaveText(/\S/);
+    await expect(outcomeOf(page), "the second press said nothing of its own").not.toHaveText(
+      saidPending,
+    );
+    await page.keyboard.press(`Shift+${PEOPLE_KEYSTROKES.removeSelected.key}`);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await passesTheAccessibilityGate();
+
+    answered.resolve();
+    await saysARefusal(membersRegion(page).getByRole("alert"));
+    await keepsItsWordOffThePage(page, "changed-meanwhile");
+    await expect(tickOf(page, "Priya Shah")).toBeChecked();
+    await expect(action).not.toHaveAttribute("aria-disabled", "true");
   });
 
   test("at 320 pixels shows person and role, hiding the rest", async ({ page, request }) => {

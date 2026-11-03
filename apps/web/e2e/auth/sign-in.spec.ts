@@ -1,4 +1,5 @@
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import type { APIRequestContext, Locator, Page, Route } from "@playwright/test";
+import { z } from "zod";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -19,6 +20,7 @@ import {
   saysSomethingNew,
   saysARefusal,
   saysTheWait,
+  signedInAtHome,
   signIn,
   signInHeading,
   theActionLandedWithinItsBudget,
@@ -102,6 +104,13 @@ const aFramePassed = (page: Page): Promise<void> =>
       }),
   );
 
+/** Headless Chromium shows every tab, so a tab's being hidden or shown is set and told by hand. */
+const shownAs = (page: Page, state: DocumentVisibilityState): Promise<void> =>
+  page.evaluate((now) => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => now });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }, state);
+
 const stillWaitingOnceReread = async (page: Page, prompt: () => Promise<void>): Promise<void> => {
   const reread = page.waitForRequest((asked) => new URL(asked.url()).pathname === "/get-session");
   await prompt();
@@ -110,10 +119,25 @@ const stillWaitingOnceReread = async (page: Page, prompt: () => Promise<void>): 
   await expect(page, "the waiting tab left the code step").toHaveURL(/\/sign-in/);
 };
 
+const SESSION_READ = "**/get-session*";
+
+const heldSession = z.object({ session: z.object({ id: z.string() }) });
+
+const sessionHeldBy = async (page: Page): Promise<string> =>
+  heldSession.parse(await (await page.request.get("/get-session")).json()).session.id;
+
 const floodCodesTo = async (request: APIRequestContext, email: string, count: number) => {
   for (let asked = 0; asked < count; asked += 1) {
     await request.post(SEND_PATH, { data: { email, type: "sign-in" } });
   }
+};
+
+const anEditorOf = async (request: APIRequestContext, name: string): Promise<string> => {
+  const email = anAddress("tabs");
+  const who = await person(request, email, { displayName: "Tam Editor" });
+  const workspace = await provision(request, { name });
+  await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
+  return email;
 };
 
 const memberOfTwoWorkspaces = async (
@@ -430,6 +454,59 @@ test("a tab waiting on one address ignores another's sign-in", async ({
   await codeField(page).pressSequentially(await codeSentTo(request, email));
   await confirmedWhenAsked(page, request, email);
   await landedAtHome(page, "Admin");
+});
+
+const READ_ATTEMPTS = 3;
+
+const failingEveryRead = (times: number) => {
+  const failed = Promise.withResolvers<void>();
+  let refused = 0;
+  return {
+    failed: failed.promise,
+    route: async (route: Route) => {
+      await route.fulfill({ status: 503 });
+      refused += 1;
+      if (refused === times) failed.resolve();
+    },
+  };
+};
+
+test("a tab whose first read failed still follows a sign-in", async ({
+  page,
+  context,
+  request,
+}) => {
+  const email = await anEditorOf(request, "Unread Ltd");
+  await page.goto("/sign-in");
+  const unread = failingEveryRead(READ_ATTEMPTS);
+  await page.route(SESSION_READ, unread.route);
+  await sendTheFirstCode(page, email);
+  await unread.failed;
+  await page.unroute(SESSION_READ);
+
+  await shownAs(page, "hidden");
+  await stillWaitingOnceReread(page, () => shownAs(page, "visible"));
+  const other = await context.newPage();
+  await other.goto("/sign-in");
+  await signIn(other, request, email);
+
+  await landedAtHome(page, "Editor");
+});
+
+test("a shown tab waits for a sign-in of its own", async ({ page, request }) => {
+  const email = anAddress("standing");
+  await provision(request, { name: "Standing Ltd", adminEmail: email });
+  await signedInAtHome(page, request, email);
+  const standing = await sessionHeldBy(page);
+  await atTheCodeStep(page, email);
+
+  await shownAs(page, "hidden");
+  await stillWaitingOnceReread(page, () => shownAs(page, "visible"));
+  await codeField(page).pressSequentially(await codeSentTo(request, email));
+  await confirmedWhenAsked(page, request, email);
+  await landedAtHome(page, "Admin");
+
+  expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);
 });
 
 test("drops and names a workspace the person was removed from", async ({
