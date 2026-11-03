@@ -8,6 +8,5 @@ export default defineConfig({
     ...suites.test,
     include: ["tests/images/**/*.test.ts"],
     exclude: configDefaults.exclude,
-    isolate: true,
   },
 });
