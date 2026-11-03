@@ -48,6 +48,18 @@ type Owned = Parameters<typeof nameOwners>[1]["owners"][number];
 
 type SeedConcept = Parameters<typeof conceptsSeeded>[1]["concepts"][number];
 
+const BULK_COLLECTIONS = ["policies", "safety", "finance", "people", "estates"] as const;
+
+const BULK_CONCEPTS: readonly SeedConcept[] = BULK_COLLECTIONS.flatMap((collection) =>
+  [1, 2].map((at) => ({
+    title: `${collection} rule ${String(at)}`,
+    collection,
+    body: `The ${collection} rule ${String(at)} holds.`,
+  })),
+);
+
+const DRAFTS = [1, 2, 3, 4, 5];
+
 type Deciding = {
   readonly workspaceId: string;
   readonly admin: Member;
@@ -131,9 +143,11 @@ const said = (page: Page): Locator => waiting(page).getByRole("status").nth(1);
 const SAID_AT = "(//section[.//h2[.='Waiting on You']]//output)[2]";
 
 const answered = async (page: Page, procedure: "accept" | "decline", act: () => Promise<void>) => {
-  const answer = page.waitForResponse((each) => each.url().includes(`inbox.${procedure}`));
-  await act();
-  expect((await answer).ok(), `the ${procedure} was refused`).toBe(true);
+  const [answer] = await Promise.all([
+    page.waitForResponse((each) => each.url().includes(`inbox.${procedure}`)),
+    act(),
+  ]);
+  expect(answer.ok(), `the ${procedure} was refused`).toBe(true);
 };
 
 const signedInAtTheList = async (page: Page, api: APIRequestContext, email: string) => {
@@ -143,90 +157,82 @@ const signedInAtTheList = async (page: Page, api: APIRequestContext, email: stri
 };
 
 test.describe("Waiting on You", () => {
-  test("an Editor owner bulk-accepts by keyboard alone at 320px", async ({ page, request }) => {
-    const at = await aDecidingWorkspace(request, "Corve Dale Cider");
-    await ownersNamed(request, at, [{ collection: "policies", personId: at.editor.id }]);
+  test("an Editor owner bulk-accepts by keyboard alone at 320px", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    test.slow();
+    const at = await aDecidingWorkspace(request, "Corve Dale Cider", BULK_CONCEPTS);
+    await ownersNamed(
+      request,
+      at,
+      BULK_COLLECTIONS.map((collection) => ({ collection, personId: at.editor.id })),
+    );
     await suggested(request, at, LEAVE, "Leave is 30 days.");
     await suggested(request, at, CLAIMS, "Claims go in within a week.");
+    for (const { title } of BULK_CONCEPTS) {
+      for (const draft of DRAFTS) {
+        await suggested(request, at, title, `Draft ${String(draft)} of ${title}.`);
+      }
+    }
+    const wide = page.viewportSize();
+    assert.ok(wide, "the page has no viewport to restore");
     await page.setViewportSize(NARROW);
     await signedInAtTheList(page, request, at.editor.email);
 
-    await skipLinkReachesThePage(page);
-    await listsItsKeystrokes(page, "Waiting on You", KEY, [
-      "Select or Clear the Suggestion in Focus",
-      "Accept the Selected Suggestions",
-    ]);
-    await tabUntilFocused(page, rowLink(page, LEAVE));
-    await page.keyboard.press(KEY.tick.key);
-    await expect(tickOf(page, LEAVE)).toBeChecked();
-    await tabUntilFocused(page, rowLink(page, CLAIMS));
-    await page.keyboard.press(KEY.tick.key);
-    await expect(tickOf(page, CLAIMS)).toBeChecked();
-    await answered(page, "accept", () => page.keyboard.press(`Shift+${KEY.acceptSelected.key}`));
+    await test.step("bulk-accepts two suggestions by keyboard alone at 320px", async () => {
+      await skipLinkReachesThePage(page);
+      await listsItsKeystrokes(page, "Waiting on You", KEY, [
+        "Select or Clear the Suggestion in Focus",
+        "Accept the Selected Suggestions",
+      ]);
+      await tabUntilFocused(page, rowLink(page, LEAVE));
+      await page.keyboard.press(KEY.tick.key);
+      await expect(tickOf(page, LEAVE)).toBeChecked();
+      await tabUntilFocused(page, rowLink(page, CLAIMS));
+      await page.keyboard.press(KEY.tick.key);
+      await expect(tickOf(page, CLAIMS)).toBeChecked();
+      await answered(page, "accept", () => page.keyboard.press(`Shift+${KEY.acceptSelected.key}`));
 
-    await expect(said(page)).toContainText(LEAVE);
-    await expect(said(page)).toContainText(CLAIMS);
-    await expect(rowTitles(page)).toHaveCount(0);
-    expect(await scrolledSideways(page), "the list scrolls sideways at 320px").toBe(0);
-  });
-
-  test("renders within its budget", async ({ page, request }) => {
-    test.slow();
-    const collections = ["policies", "safety", "finance", "people", "estates"];
-    const adminEmail = anAddress("admin");
-    const workspace = await provision(request, { name: "Rhondda Valley Logistics", adminEmail });
-    const { workspaceId } = workspace;
-    const proposer = await person(request, anAddress("editor"), { displayName: PROPOSER });
-    await addMember(request, { workspaceId, userId: proposer.id, role: "Editor" });
-    const concepts = await conceptsSeeded(request, {
-      workspaceId,
-      userId: workspace.admin.id,
-      concepts: collections.flatMap((collection) =>
-        [1, 2].map((at) => ({
-          title: `${collection} rule ${String(at)}`,
-          collection,
-          body: `The ${collection} rule ${String(at)} holds.`,
-        })),
-      ),
+      await expect(said(page)).toContainText(LEAVE);
+      await expect(said(page)).toContainText(CLAIMS);
+      await expect(rowTitles(page)).toHaveCount(BULK_CONCEPTS.length * DRAFTS.length);
+      expect(await scrolledSideways(page), "the list scrolls sideways at 320px").toBe(0);
+      await passesTheAccessibilityGate();
     });
-    const titles = [...concepts.keys()];
-    for (const [title, { iri }] of concepts) {
-      for (const draft of [1, 2, 3, 4, 5]) {
-        await seedEditSuggestion(request, {
-          workspaceId,
-          userId: proposer.id,
-          iri,
-          body: `Draft ${String(draft)} of ${title}.`,
-        });
+
+    await page.setViewportSize(wide);
+
+    await test.step("renders 50 rows within the list budget", async () => {
+      const rendered: number[] = [];
+      for (let sample = 0; sample < LIST_SAMPLES; sample += 1) {
+        const started = Date.now();
+        await page.goto(WAITING_ON_YOU.path);
+        await expect(rowTitles(page)).toHaveCount(50);
+        rendered.push(Date.now() - started);
       }
-    }
-    await signedIn(page, request, adminEmail);
-
-    const rendered: number[] = [];
-    for (let sample = 0; sample < LIST_SAMPLES; sample += 1) {
-      const started = Date.now();
-      await page.goto(WAITING_ON_YOU.path);
-      await expect(rowTitles(page)).toHaveCount(50);
-      rendered.push(Date.now() - started);
-    }
-    const [, median] = rendered.toSorted((one, other) => one - other);
-    assert.ok(median !== undefined, "the list was drawn fewer than twice");
-    test.info().annotations.push({
-      type: "waiting on you",
-      description: `${rendered.map((elapsed) => `${String(elapsed)} ms`).join(", ")}; median ${String(median)} ms`,
-    });
-    expect(median, "the list rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
-
-    const clocked: number[] = [];
-    for (const title of titles.slice(0, ACTION_SAMPLES)) {
-      await tickOf(page, title).first().check();
-      await clockTheNextKey(page, { at: SAID_AT, reads: title });
-      await answered(page, "accept", async () => {
-        await page.keyboard.press(`Shift+${KEY.acceptSelected.key}`);
-        clocked.push(await actionClocked(page));
+      const [, median] = rendered.toSorted((one, other) => one - other);
+      assert.ok(median !== undefined, "the list was drawn fewer than twice");
+      test.info().annotations.push({
+        type: "waiting on you",
+        description: `${rendered.map((elapsed) => `${String(elapsed)} ms`).join(", ")}; median ${String(median)} ms`,
       });
-      await expect(said(page)).toContainText(PROPOSER);
-    }
-    theActionsLandedWithinTheirBudget("accepting a suggestion", clocked);
+      expect(median, "the list rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+    });
+
+    await test.step("accepts by key within the action budget", async () => {
+      const clocked: number[] = [];
+      for (const { title } of BULK_CONCEPTS.slice(0, ACTION_SAMPLES)) {
+        await tickOf(page, title).first().check();
+        await clockTheNextKey(page, { at: SAID_AT, reads: title });
+        await answered(page, "accept", async () => {
+          await page.keyboard.press(`Shift+${KEY.acceptSelected.key}`);
+          clocked.push(await actionClocked(page));
+        });
+        await expect(said(page)).toContainText(PROPOSER);
+      }
+      theActionsLandedWithinTheirBudget("accepting a suggestion", clocked);
+    });
   });
 });

@@ -36,11 +36,6 @@ const models = menuGroupIn(CONTROL_CENTRE, "models");
 
 const MODELS_AND_SPEND = pageNamed(models, "Models and Spend");
 
-const openModelChoices = async (page: Page) => {
-  await page.goto(MODELS_AND_SPEND.path);
-  await expect(modelChoicesCard(page)).toBeVisible();
-};
-
 const signedInWith = async (
   page: Page,
   api: APIRequestContext,
@@ -54,30 +49,10 @@ const signedInWith = async (
   });
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await openModelChoices(page);
   return workspace;
 };
 
 test.describe("the Models and spend page's model choices card", () => {
-  test("renders the list within the constitution's latency budget", async ({ page, request }) => {
-    await signedInWith(page, request, {
-      name: "Dales Engineering",
-      modelChoices: ANSWERING_AND_EMBEDDING,
-    });
-
-    const nav = page.getByRole("navigation", { name: "Control Centre" });
-    await nav.getByRole("link", { name: "Members" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
-
-    const started = Date.now();
-    await nav.getByRole("link", { name: "Models and Spend" }).click();
-    await expect(modelChoicesCard(page).getByRole("listitem")).toHaveCount(5);
-    const elapsed = Date.now() - started;
-
-    test.info().annotations.push({ type: "model choices list", description: `${elapsed} ms` });
-    expect(elapsed).toBeLessThan(LIST_BUDGET_MS);
-  });
-
   test("is keyboard-reachable and axe-clean under its group", async ({
     page,
     request,
@@ -87,7 +62,18 @@ test.describe("the Models and spend page's model choices card", () => {
       name: "Wharfedale Castings",
       modelChoices: ANSWERING_AND_EMBEDDING,
     });
-    await expect(modelChoicesCard(page).getByRole("listitem")).toHaveCount(5);
+
+    await test.step("renders the list within the constitution's latency budget", async () => {
+      const started = Date.now();
+      await page.goto(MODELS_AND_SPEND.path);
+      await expect(modelChoicesCard(page).getByRole("listitem")).toHaveCount(5);
+      const elapsed = Date.now() - started;
+
+      test.info().annotations.push({ type: "model choices list", description: `${elapsed} ms` });
+      expect(elapsed, "the model choices list rendered past its budget").toBeLessThan(
+        LIST_BUDGET_MS,
+      );
+    });
 
     await skipLinkReachesThePage(page);
 
