@@ -14,7 +14,7 @@ import { z } from "zod";
 
 import { POSTGRES_IMAGE } from "../../src/postgres-image.ts";
 import { testData } from "./factory.ts";
-import { type MigratedPostgres, POSTGRES_COMMAND } from "./harness.ts";
+import { endPool, type MigratedPostgres, POSTGRES_COMMAND } from "./harness.ts";
 import { matching } from "./matching.ts";
 import { repositoryRoot, workspaceRoot } from "./roots/roots.ts";
 import {
@@ -244,8 +244,8 @@ describe("the warm harness", () => {
     await writeModelChoice(bailed);
     const name = await databaseNameOf(bailed);
 
-    await bailed.pool.end();
-    await bailed.runtimePool.end();
+    await endPool(bailed.pool);
+    await endPool(bailed.runtimePool);
 
     const reopened = await openMigratedPostgres("re-run");
     try {
