@@ -137,7 +137,7 @@ export const suggestionSetSummary = async (
          FROM suggestion_set_summary($1) s
          LEFT JOIN concept_index c
                 ON c.iri = s.resolved_iri
-               AND ($2 = 'Admin' OR (${readableClause("c", 2)}))`,
+               AND ${readableClause("c", 2)}`,
       [setId, ...readableParameters(reader)],
     ),
   );

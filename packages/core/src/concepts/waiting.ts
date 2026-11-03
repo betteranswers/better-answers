@@ -111,10 +111,10 @@ const waitingSelect = (narrowed: boolean): string => `WITH sets AS (
            ON starts_with(s.proposer, '${PERSON_PREFIX}')
           AND pu.id = substr(s.proposer, ${PERSON_PREFIX.length + 1})
    WHERE s.kind = '${SUGGESTION_EDIT_KIND}' AND s.status = '${SUGGESTION_WAITING_STATUS}'
-     AND ($2 = 'Admin'
-          OR (o.person_id = $4 AND (s.resolved_iri IS NULL OR (${readableClause("c", 2)}))))${
-            narrowed ? "\n     AND s.suggestion_id = $5" : ""
-          }
+     AND ($2 = 'Admin' OR o.person_id = $4)
+     AND (s.resolved_iri IS NULL OR (${readableClause("c", 2)}))${
+       narrowed ? "\n     AND s.suggestion_id = $5" : ""
+     }
    ORDER BY p.proposed_at, s.suggestion_id`;
 
 const WAITING = waitingSelect(false);
