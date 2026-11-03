@@ -32,6 +32,7 @@ export const PINS: readonly Pin[] = [
     reason: "the images script and the full-images job select it; check excludes it",
   },
   { folder: "apps/api/tests/trpc/members", kind: "split", reason: "apps/api/src/trpc/members.ts" },
+  { folder: "apps/web/e2e/journeys", kind: "mirror", reason: "docs/specs/route" },
   {
     folder: "packages/core/test/budgets",
     kind: "run",

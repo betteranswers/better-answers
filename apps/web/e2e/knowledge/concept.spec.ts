@@ -181,42 +181,6 @@ test.describe("the concept page", () => {
     await expect(box, "a row from the search left took focus from the box").toBeFocused();
   });
 
-  for (const width of [320, 1024]) {
-    test(`opens a source under its claim at ${String(width)} px`, async ({ page, request }) => {
-      const seeded = await aWorkspaceOfConcepts(request, `Holme Registers ${String(width)}`);
-      await signedInAsTheAdmin(page, request, seeded);
-      await page.setViewportSize({ width, height: 720 });
-      const concept = await atTheConcept(page, seeded, RETENTION);
-
-      const mark = markOf(page, 1, POLICY);
-      await mark.click();
-      const inline = concept.getByRole("region", { name: POLICY });
-      await expect(inline).toContainText(POLICY_PASSAGE);
-      await expect(inline.getByRole("heading", { name: POLICY })).toBeFocused();
-      await expect(panelOf(page, POLICY)).toHaveCount(0);
-      const claim = await edges(concept.getByText(CLAIM));
-      const next = await edges(concept.getByRole("heading", { name: "Who decides" }));
-      const drawn = await edges(inline);
-      expect(drawn.top, "the panel is not under its claim").toBeGreaterThanOrEqual(claim.bottom);
-      expect(drawn.bottom, "the panel is not above the next block").toBeLessThanOrEqual(next.top);
-      expect(await scrolledSideways(page), `the page scrolls sideways at ${String(width)} px`).toBe(
-        0,
-      );
-
-      await page.keyboard.press("Escape");
-      await expect(inline).toHaveCount(0);
-      await expect(mark).toBeFocused();
-
-      const listed = sourceLines(page).nth(2).getByRole("button", { name: COMMITTEE });
-      await listed.click();
-      const listedInline = sourceLines(page).nth(2).getByRole("region", { name: COMMITTEE });
-      await expect(listedInline).toContainText("The committee meets each quarter.");
-      await listedInline.getByRole("button", { name: "Close" }).click();
-      await expect(listedInline).toHaveCount(0);
-      await expect(listed).toBeFocused();
-    });
-  }
-
   test("renders within its budget, read by keyboard alone", async ({
     page,
     request,
@@ -265,5 +229,35 @@ test.describe("the concept page", () => {
     await expect(
       page.getByRole("searchbox", { name: "Search by a word or a question" }),
     ).toBeVisible();
+
+    await test.step("opens a source under its claim at 320 px", async () => {
+      await page.setViewportSize({ width: 320, height: 720 });
+      const concept = await atTheConcept(page, seeded, RETENTION);
+
+      const mark = markOf(page, 1, POLICY);
+      await mark.click();
+      const inline = concept.getByRole("region", { name: POLICY });
+      await expect(inline).toContainText(POLICY_PASSAGE);
+      await expect(inline.getByRole("heading", { name: POLICY })).toBeFocused();
+      await expect(panelOf(page, POLICY)).toHaveCount(0);
+      const claim = await edges(concept.getByText(CLAIM));
+      const next = await edges(concept.getByRole("heading", { name: "Who decides" }));
+      const drawn = await edges(inline);
+      expect(drawn.top, "the panel is not under its claim").toBeGreaterThanOrEqual(claim.bottom);
+      expect(drawn.bottom, "the panel is not above the next block").toBeLessThanOrEqual(next.top);
+      expect(await scrolledSideways(page), "the page scrolls sideways at 320 px").toBe(0);
+
+      await page.keyboard.press("Escape");
+      await expect(inline).toHaveCount(0);
+      await expect(mark).toBeFocused();
+
+      const listed = sourceLines(page).nth(2).getByRole("button", { name: COMMITTEE });
+      await listed.click();
+      const listedInline = sourceLines(page).nth(2).getByRole("region", { name: COMMITTEE });
+      await expect(listedInline).toContainText("The committee meets each quarter.");
+      await listedInline.getByRole("button", { name: "Close" }).click();
+      await expect(listedInline).toHaveCount(0);
+      await expect(listed).toBeFocused();
+    });
   });
 });

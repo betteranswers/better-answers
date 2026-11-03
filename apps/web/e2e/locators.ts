@@ -106,6 +106,14 @@ const SIGN_IN_HEADINGS = {
 export const signInHeading = (page: Page, carriedOn: CarriedOn | "nothing" = "nothing"): Locator =>
   page.getByRole("heading", { level: 1, name: SIGN_IN_HEADINGS[carriedOn], exact: true });
 
+export const signInSaysWhy = async (page: Page): Promise<string> => {
+  await expect(signInHeading(page)).toBeVisible();
+  await expect(page.getByRole("status"), "the sign-in page says nothing of the arrival").toHaveText(
+    /\S/,
+  );
+  return page.getByRole("status").innerText();
+};
+
 export const emailField = (page: Page): Locator => page.getByLabel("Email Address");
 
 export const sendCodeButton = (page: Page): Locator =>
@@ -135,12 +143,6 @@ export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<
   await expect(listed).toHaveCount(0);
   await expect(keystrokesButton(page)).toBeFocused();
 };
-
-export const A_ROLE = {
-  Admin: "an Admin",
-  Editor: "an Editor",
-  Viewer: "a Viewer",
-} as const satisfies Readonly<Record<Role, string>>;
 
 const HOME_NAMES = {
   Admin: { heading: "People", link: "Go to Members" },

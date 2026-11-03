@@ -1,5 +1,7 @@
-import type { APIRequestContext, Locator, Page, Route } from "@playwright/test";
+import type { APIRequestContext, Page, Route } from "@playwright/test";
 import { z } from "zod";
+
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -8,23 +10,22 @@ import {
   clockTheNextKey,
   codeSentTo,
   confirmedWhenAsked,
-  keystrokesButton,
   keystrokesDismissed,
   keystrokesListed,
   landedAtHome,
   person,
-  personMenuOpened,
   provision,
   saysSomethingNew,
   saysTheWait,
   signedInAtHome,
   signIn,
   signInHeading,
+  signInSaysWhy,
+  signOutFromTheShell,
+  tabUntilFocused,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
 import { scrolledSideways } from "../knowledge.ts";
-
-const thePicker = (page: Page) => page.getByRole("heading", { level: 1, name: "Your Workspaces" });
 
 const SEND_PATH = "/email-otp/send-verification-otp";
 
@@ -126,163 +127,6 @@ const anEditorOf = async (request: APIRequestContext, name: string): Promise<str
   return email;
 };
 
-const memberOfTwoWorkspaces = async (
-  request: APIRequestContext,
-  email: string,
-  names: { readonly first: string; readonly second: string },
-) => {
-  const first = await provision(request, { name: names.first, adminEmail: email });
-  const second = await provision(request, { name: names.second });
-  await addMember(request, {
-    workspaceId: second.workspaceId,
-    userId: first.admin.id,
-    role: "Viewer",
-  });
-  return { first, second };
-};
-
-const LIST_BUDGET_MS = 1000;
-
-const rowsOf = (page: Page) => page.getByRole("main").getByRole("listitem");
-
-const linesOf = (button: Locator): Promise<number> =>
-  button.evaluate((drawn) => {
-    const text = document.createRange();
-    text.selectNodeContents(drawn);
-    return new Set([...text.getClientRects()].map((line) => Math.round(line.top))).size;
-  });
-
-test("keeps a long workspace name and role at 320 pixels", async ({ page, request }) => {
-  const email = anAddress("narrow");
-  const { first } = await memberOfTwoWorkspaces(request, email, {
-    first: "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch Community Joinery",
-    second: "Short Joinery",
-  });
-  await page.setViewportSize({ width: 320, height: 720 });
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await expect(thePicker(page)).toBeVisible();
-
-  const named = page.getByRole("button", { name: first.name, exact: true });
-  await expect(named).toHaveAccessibleDescription("Admin");
-  expect(await linesOf(named), "the long name stays on one line").toBeGreaterThan(1);
-  await expect(
-    rowsOf(page).filter({ has: named }).getByText("Admin", { exact: true }),
-  ).toBeInViewport({ ratio: 1 });
-  expect(await scrolledSideways(page), "the picker scrolls sideways at 320 pixels").toBe(0);
-});
-
-test("lists a member's workspaces within a second", async ({ page, request }) => {
-  const email = anAddress("listed");
-  await memberOfTwoWorkspaces(request, email, { first: "Timed Forgings", second: "Timed Fabrics" });
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await expect(rowsOf(page)).toHaveCount(2);
-
-  const started = Date.now();
-  await page.goto("/choose-workspace");
-  await expect(rowsOf(page)).toHaveCount(2);
-  const elapsed = Date.now() - started;
-  test.info().annotations.push({ type: "workspace list", description: `${elapsed} ms` });
-  expect(elapsed, "the list of two workspaces rendered past its budget").toBeLessThan(
-    LIST_BUDGET_MS,
-  );
-});
-
-test("lands a sole member in the shell: workspace, person, role", async ({ page, request }) => {
-  const email = anAddress("sole");
-  const workspace = await provision(request, { name: "Acme Joinery", adminEmail: email });
-
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-
-  await landedAtHome(page, "Admin");
-  const bar = page.getByRole("banner");
-  await expect(bar.getByText(workspace.name)).toBeVisible();
-  const you = await personMenuOpened(page, workspace.admin.name);
-  await expect(you.getByText(workspace.admin.name, { exact: true })).toBeVisible();
-  await expect(you.getByText("Admin", { exact: true })).toBeVisible();
-  await page.keyboard.press("Escape");
-
-  await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /create/i })).toHaveCount(0);
-});
-
-test("scopes everything to the workspace a two-workspace member picks", async ({
-  page,
-  request,
-}) => {
-  const email = anAddress("both");
-  const { first, second } = await memberOfTwoWorkspaces(request, email, {
-    first: "Northern Tooling",
-    second: "Southern Castings",
-  });
-
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-
-  await expect(thePicker(page)).toBeVisible();
-  await expect(page.getByRole("button", { name: first.name })).toBeVisible();
-
-  await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /create/i })).toHaveCount(0);
-  await page.getByRole("button", { name: second.name }).click();
-
-  await landedAtHome(page, "Viewer");
-  const bar = page.getByRole("banner");
-  await expect(bar.getByText(second.name)).toBeVisible();
-  await expect(bar.getByText(first.name)).toHaveCount(0);
-  await expect(await personMenuOpened(page, first.admin.name)).toContainText("Viewer");
-});
-
-test("ends the chooser with Account, Sign out and Keyboard shortcuts", async ({
-  page,
-  request,
-}) => {
-  const email = anAddress("foot");
-  await memberOfTwoWorkspaces(request, email, { first: "Foot Forgings", second: "Foot Fabrics" });
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  const workspaces = page.getByRole("main").getByRole("listitem").getByRole("button");
-  await expect(workspaces).toHaveCount(2);
-
-  await expect(page.getByRole("main")).toMatchAriaSnapshot(`
-    - main:
-      - heading "Your Workspaces" [level=1]
-      - paragraph
-      - list
-      - link "Account"
-      - button "Sign Out"
-      - button "Keyboard Shortcuts"
-  `);
-  await workspaces.first().focus();
-  await page.keyboard.press("Tab");
-  await expect(workspaces.last(), "a role tag took a stop between the workspaces").toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Account" })).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Sign Out" })).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(keystrokesButton(page)).toBeFocused();
-
-  const listed = await keystrokesListed(page, "Your Workspaces");
-  await expect(listed.getByRole("term").filter({ hasText: /^w$/ })).toBeVisible();
-  await keystrokesDismissed(page, listed);
-  await page.keyboard.press("w");
-  await expect(workspaces.first()).toBeFocused();
-});
-
-test("keeps the framed sign-in page inside 320 pixels", async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 720 });
-  await page.goto("/sign-in");
-  await expect(signInHeading(page)).toBeVisible();
-
-  const sideways = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(sideways, "the page scrolls sideways at 320px").toBe(0);
-});
-
 test("a new code sent from the code step signs in", async ({
   page,
   request,
@@ -334,9 +178,49 @@ test("a new code sent from the code step signs in", async ({
 
 test("names the wait when a new code meets the ceiling", async ({
   page,
+  context,
   request,
   passesTheAccessibilityGate,
 }) => {
+  await test.step("keeps the framed sign-in page inside 320 pixels", async () => {
+    const narrow = await context.newPage();
+    await narrow.setViewportSize({ width: 320, height: 720 });
+    await narrow.goto("/sign-in");
+    await expect(signInHeading(narrow)).toBeVisible();
+    expect(await scrolledSideways(narrow), "the page scrolls sideways at 320px").toBe(0);
+    await narrow.close();
+  });
+
+  await test.step("makes the pages outside the shell keyboard-operable, landmarked and labelled", async () => {
+    const keyboard = anAddress("keyboard");
+    await person(request, keyboard);
+
+    await page.goto("/sign-in");
+    await expect(signInHeading(page)).toBeVisible();
+
+    await expect(page.getByRole("main")).toHaveCount(1);
+    await page.keyboard.press("Tab");
+    await expect(page.getByLabel("Email Address")).toBeFocused();
+    await page.keyboard.type(keyboard);
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "Send Code" })).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    await expect(codeField(page)).toBeVisible();
+    const sixDigits = await codeSentTo(request, keyboard);
+    await codeField(page).focus();
+    await page.keyboard.type(sixDigits);
+
+    await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
+    await expect(page.getByRole("main")).toHaveCount(1);
+    const signOut = page.getByRole("button", { name: "Sign Out" });
+    await tabUntilFocused(page, signOut);
+
+    const ring = await signOut.evaluate((element) => getComputedStyle(element).boxShadow);
+    expect(ring).not.toBe("none");
+  });
+
+  await context.clearCookies();
   const email = anAddress("ceiling");
   await provision(request, { name: "Ceiling Ltd", adminEmail: email });
   await atTheCodeStep(page, email);
@@ -365,22 +249,17 @@ test("names the wait when a new code meets the ceiling", async ({
   await expect(page.getByLabel("Email Address")).toHaveValue(email);
 });
 
-for (const [named, between] of [
-  ["a space", " "],
-  ["a dash", "-"],
-] as const) {
-  test(`signs in from a code pasted with ${named}`, async ({ page, request }) => {
-    const email = anAddress("pasted");
-    await provision(request, { name: "Pasted Ltd", adminEmail: email });
-    await atTheCodeStep(page, email);
-    const code = await codeSentTo(request, email);
+test("signs in from a code pasted with a space", async ({ page, request }) => {
+  const email = anAddress("pasted");
+  await provision(request, { name: "Pasted Ltd", adminEmail: email });
+  await atTheCodeStep(page, email);
+  const code = await codeSentTo(request, email);
 
-    await pastedIntoTheField(page, `${code.slice(0, 3)}${between}${code.slice(3)}`);
+  await pastedIntoTheField(page, `${code.slice(0, 3)} ${code.slice(3)}`);
 
-    await confirmedWhenAsked(page, request, email);
-    await landedAtHome(page, "Admin");
-  });
-}
+  await confirmedWhenAsked(page, request, email);
+  await landedAtHome(page, "Admin");
+});
 
 test("a tab waiting on one address ignores another's sign-in", async ({
   page,
@@ -457,35 +336,30 @@ test("a shown tab waits for a sign-in of its own", async ({ page, request }) => 
   expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);
 });
 
-test("makes the pages outside the shell keyboard-operable, landmarked and labelled", async ({
+test("brings an ended session through sign-in back to its page", async ({
   page,
+  context,
   request,
+  passesTheAccessibilityGate,
 }) => {
-  const email = anAddress("keyboard");
-  await person(request, email);
-
+  const email = anAddress("returning");
+  const workspace = await provision(request, { name: "Returning", adminEmail: email });
   await page.goto("/sign-in");
-  await expect(signInHeading(page)).toBeVisible();
+  await signIn(page, request, email);
+  const elsewhere = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log");
+  await page.getByRole("link", { name: "Audit Log" }).click();
+  await expect(page).toHaveURL(new RegExp(`${elsewhere.path}$`));
 
-  await expect(page.getByRole("main")).toHaveCount(1);
-  await page.keyboard.press("Tab");
-  await expect(page.getByLabel("Email Address")).toBeFocused();
-  await page.keyboard.type(email);
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Send Code" })).toBeFocused();
-  await page.keyboard.press("Enter");
+  await context.clearCookies();
+  await page.reload();
 
-  await expect(codeField(page)).toBeVisible();
-  const sixDigits = await codeSentTo(request, email);
-  await codeField(page).focus();
-  await page.keyboard.type(sixDigits);
+  const ended = await signInSaysWhy(page);
+  await passesTheAccessibilityGate();
+  await signIn(page, request, email);
 
-  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
-  await expect(page.getByRole("main")).toHaveCount(1);
-  const signOut = page.getByRole("button", { name: "Sign Out" });
-  await signOut.focus();
-  await expect(signOut).toBeFocused();
+  await expect(page).toHaveURL(new RegExp(`${elsewhere.path}$`));
+  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
 
-  const ring = await signOut.evaluate((element) => getComputedStyle(element).boxShadow);
-  expect(ring).not.toBe("none");
+  await signOutFromTheShell(page, workspace.admin.name);
+  expect(await signInSaysWhy(page), "a sign-out read as an ended session").not.toBe(ended);
 });

@@ -156,7 +156,7 @@ onSuccess: () => {
 
 `held` becomes `undefined`, so `here` and `person` become `undefined` (`WorkspaceFrame` in `frame.tsx`), and the band empties. The member query sets no `initialData` (`memberOptions` in `apps/web/src/shared/member/member.ts`), so "initial state" holds no data.
 
-Then the reset refetches. After the matches are reset, `resetQueries` refetches the ones that are active (`queryClient.ts`), and the shell's mounted observer makes this one active. If the read fails again, the shell shows its failed page and a retry (`RoleUnread` in `router.tsx`), which is what the first spec asserts ("drops the left workspace's name when the member read fails" in `apps/web/e2e/app/workspace-switcher.spec.ts`). If the device is offline, the offline spec ("drops the left workspace's name while the switch waits offline") goes back online and lands on the new workspace's home and name.
+Then the reset refetches. After the matches are reset, `resetQueries` refetches the ones that are active (`queryClient.ts`), and the shell's mounted observer makes this one active. If the read fails again, the shell shows its failed page and a retry (`RoleUnread` in `router.tsx`), which is what the first spec asserts ("drops the left workspace's name when the member read fails" in `apps/web/e2e/journeys/workspace-switch.spec.ts`). If the device is offline, the offline spec ("drops the left workspace's name while the switch waits offline") goes back online and lands on the new workspace's home and name.
 
 Checking `fetchStatus` as well as `status` is what catches the paused case. A paused read after a good pick has `status: 'success'` (A's data) and `fetchStatus: 'paused'`, so a check on `status` alone would keep A's answer.
 
