@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { DISPLAY_NAME_MAX_CHARACTERS } from "@/shared/member/display-name-words.ts";
-import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/signed-in-without-workspace.ts";
+import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/auth/signed-in-without-workspace.ts";
 import { server } from "@test/stub-server.ts";
 import { aRefusalAnswer, openOutsideTheShellAt, read } from "@test/two-workspaces.ts";
 

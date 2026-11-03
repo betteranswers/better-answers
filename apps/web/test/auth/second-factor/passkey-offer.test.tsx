@@ -18,7 +18,7 @@ import {
   withPasskeysHere,
 } from "@test/second-factor-api.ts";
 
-await vi.hoisted(() => import("@test/forwarding-fetch.ts"));
+await vi.hoisted(() => import("@test/auth/forwarding-fetch.ts"));
 
 const SHOWN_UNDER = "better-answers.passkey-offer-shown";
 

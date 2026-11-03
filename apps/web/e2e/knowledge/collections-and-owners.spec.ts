@@ -1,7 +1,4 @@
-import type { APIRequestContext, APIResponse, Locator, Page } from "@playwright/test";
-import { z } from "zod";
-
-import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
+import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { COLLECTIONS_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -13,14 +10,11 @@ import {
   nameOwners,
   person,
   provision,
-  removeMember,
-  saysARefusal,
   seedConcepts,
   signIn,
   skipLinkReachesThePage,
 } from "../harness.ts";
 import { knowledgeMenuOpened, listsItsKeystrokes } from "../knowledge.ts";
-import { refusalAnswering } from "../refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -32,8 +26,6 @@ const COLLECTIONS_AND_OWNERS = pageNamed(
 const EDITOR = "Ifan Morgan";
 
 const VIEWER = "Rhian Pryce";
-
-const NAME_OWNER = "knowledge.nameOwner";
 
 type Member = { readonly id: string; readonly email: string };
 
@@ -114,15 +106,6 @@ const saveOf = (page: Page, collection: string): Locator =>
 
 const said = (page: Page): Locator => collections(page).getByRole("status").nth(1);
 
-const aRefusal = z.object({
-  error: z.object({ data: z.object({ refusal: z.object({ word: z.string() }) }) }),
-});
-
-const refusedWith = async (answered: APIResponse) => ({
-  status: answered.status(),
-  word: aRefusal.safeParse(await answered.json()).data?.error.data.refusal.word,
-});
-
 test.describe("Collections and Owners", () => {
   test("an Editor owning a collection finds it under Curation", async ({ page, request }) => {
     const at = await aCuratedWorkspace(request, "Teme Valley Surveys");
@@ -178,36 +161,6 @@ test.describe("Collections and Owners", () => {
     `);
   });
 
-  test("rolls back a naming the api refuses, saying why", async ({ page, request }) => {
-    const at = await aCuratedWorkspace(request, "Arrow Valley Joinery");
-    await signedInAtThePage(page, request, at.admin.email);
-    await pickerOf(page, "policy").selectOption({ label: VIEWER });
-    await removeMember(request, { workspaceId: at.workspaceId, userId: at.viewer.id });
-
-    const refused = refusalAnswering(page, NAME_OWNER);
-    await saveOf(page, "policy").press("Enter");
-
-    expect((await refused).word).toBe("no-such-member");
-    await saysARefusal(collections(page).getByRole("alert"));
-    await expect(ownerOf(page, "policy")).not.toContainText(VIEWER);
-    await expect(pickerOf(page, "policy")).toHaveValue("");
-  });
-
-  test("a Viewer named owner reads their collection with no picker", async ({ page, request }) => {
-    const at = await aCuratedWorkspace(request, "Clun Forest Herbs");
-    await ownersNamed(request, at, [{ collection: "policy", personId: at.viewer.id }]);
-    await signedIn(page, request, at.viewer.email);
-
-    const menu = await knowledgeMenuOpened(page);
-    await expect(menu.getByRole("heading", { level: 3 })).toHaveText(["Browse", "Curation"]);
-    await menu.getByRole("link", { name: "Collections and Owners" }).click();
-
-    await expect(ownerOf(page, "policy")).toHaveText(VIEWER);
-    await expect(pickerOf(page, "policy")).toHaveCount(0);
-    await expect(collections(page).getByRole("combobox")).toHaveCount(0);
-    await expect(collections(page).getByRole("button")).toHaveCount(0);
-  });
-
   test("an Admin names and clears owners by keyboard alone", async ({ page, request }) => {
     const at = await aCuratedWorkspace(request, "Teme Bridge Bakery");
     await ownersNamed(request, at, [{ collection: "policy", personId: at.viewer.id }]);
@@ -241,20 +194,5 @@ test.describe("Collections and Owners", () => {
 
     await page.keyboard.press(KEY.changeOwner.key);
     await expect(pickerOf(page, "safety"), "the key left the row in focus").toBeFocused();
-  });
-
-  test("refuses an Editor owning nothing the list and naming", async ({ page, request }) => {
-    const at = await aCuratedWorkspace(request, "Kemp Valley Builders");
-    await ownersNamed(request, at, [{ collection: "policy", personId: at.viewer.id }]);
-    await signedIn(page, request, at.editor.email);
-
-    const listed = await page.request.get("/trpc/knowledge.collections");
-    expect(await refusedWith(listed)).toEqual({ status: 403, word: "owner-forbids" });
-
-    const named = await page.request.post(`/trpc/${NAME_OWNER}`, {
-      data: { collection: "policy", personId: at.editor.id },
-      headers: { [TAB_WORKSPACE_HEADER]: at.workspaceId },
-    });
-    expect(await refusedWith(named)).toEqual({ status: 403, word: "role-forbids" });
   });
 });

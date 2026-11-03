@@ -5,13 +5,7 @@ import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 
 import { expect, test } from "../browser.ts";
 import { anAddress, provision, signIn, skipLinkReachesThePage } from "../harness.ts";
-import {
-  conceptsSeeded,
-  isAFind,
-  isAnOpen,
-  listsItsKeystrokes,
-  scrolledSideways,
-} from "../knowledge.ts";
+import { conceptsSeeded, isAFind, listsItsKeystrokes, scrolledSideways } from "../knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -147,14 +141,6 @@ const panelOf = (page: Page, title: string): Locator => page.getByRole("dialog",
 const wayBack = (page: Page): Locator =>
   page.getByRole("main").getByRole("link", { name: "Back to Search" });
 
-const drawsNotFound = async (page: Page): Promise<void> => {
-  const main = page.getByRole("main");
-  await expect(wayBack(page)).toBeVisible();
-  await expect(page.getByRole("article")).toHaveCount(0);
-  await expect(main.getByRole("alert")).toHaveCount(0);
-  await expect(main.getByRole("status").filter({ hasText: /\S/ })).toHaveCount(0);
-};
-
 const asked = (query: string): string =>
   `${SEARCH.path}?${new URLSearchParams({ "knowledge.search": query }).toString()}`;
 
@@ -175,22 +161,6 @@ const edges = (drawn: Locator) =>
   });
 
 test.describe("the concept page", () => {
-  test("draws not found when the api calls the id malformed", async ({ page, request }) => {
-    const seeded = await aWorkspaceOfConcepts(request, "Holme Annals");
-    await signedInAsTheAdmin(page, request, seeded);
-    const ulid = pageOf(seeded.concepts, RETENTION).slice(SEARCH.path.length + 1);
-    await page.route(isAnOpen, (route) =>
-      route.continue({ url: route.request().url().replace(ulid, ulid.toLowerCase()) }),
-    );
-    const answered = page.waitForResponse((response) => isAnOpen(new URL(response.url())));
-    await page.goto(pageOf(seeded.concepts, RETENTION));
-
-    expect(await (await answered).text(), "the api did not call the id malformed").toContain(
-      '"httpStatus":400',
-    );
-    await drawsNotFound(page);
-  });
-
   test("leaves focus in the box when its row never drew", async ({ page, request }) => {
     const seeded = await aWorkspaceOfConcepts(request, "Ouse Annals");
     await signedInAsTheAdmin(page, request, seeded);

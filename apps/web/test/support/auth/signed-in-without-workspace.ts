@@ -1,5 +1,5 @@
-import type { Api } from "./stubbed-api.ts";
-import { ADA, adaAnAdmin, aRefusalAnswer, read } from "./two-workspaces.ts";
+import type { Api } from "../stubbed-api.ts";
+import { ADA, adaAnAdmin, aRefusalAnswer, read } from "../two-workspaces.ts";
 
 const NEEDS_A_PICK = aRefusalAnswer("no-active-workspace", "unauthenticated", 401);
 

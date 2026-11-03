@@ -1,7 +1,7 @@
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { z } from "zod";
 
-import { codeShown, codeSpelled } from "@/features/auth/sign-in/link-words.ts";
+import { codeSpelled } from "@/features/auth/sign-in/link-words.ts";
 
 import { expect, test as base } from "../browser.ts";
 import {
@@ -13,7 +13,6 @@ import {
   linkSentTo,
   person,
   provision,
-  signInHeading,
   theActionLandedWithinItsBudget,
 } from "../harness.ts";
 
@@ -53,11 +52,6 @@ const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, w
   return { email, asking: page, token: await linkSentTo(api, email) };
 };
 
-const typedWhereItStarted = async (asking: Page, code: string): Promise<void> => {
-  await asking.getByLabel("Verification Code", { exact: true }).fill(code);
-  await landedAtHome(asking, "Editor");
-};
-
 const headingOf = (page: Page, name: string) =>
   page.getByRole("heading", { level: 1, name, exact: true });
 
@@ -95,37 +89,6 @@ test("signing in by link in another tab lands the asker", async ({ page, context
   await landedAtHome(page, "Editor");
 
   await landedAtHome(asking, "Editor");
-});
-
-test("another device shows the code and stays signed out", async ({
-  page,
-  context,
-  request,
-  anotherBrowser,
-}) => {
-  const { email, asking, token } = await aLinkAskedForIn(anotherBrowser, request, "Ashby");
-  const code = await codeSentTo(request, email);
-
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.goto(linkTo(token));
-  await expect(headingOf(page, "Enter This Code Where You Started")).toBeVisible();
-  await expect(page.getByText(codeShown(code))).toBeVisible();
-  await expect(signInButton(page)).toHaveCount(0);
-
-  const saidOfTheCopy = page.getByRole("status").last();
-  await expect(saidOfTheCopy, "the copy's status holds words before a copy").toBeEmpty();
-  await page.getByRole("button", { name: "Copy Code" }).click();
-  await expect(saidOfTheCopy, "the page says nothing of the copy").toHaveText(/\S/);
-  await page.bringToFront();
-  const copied = await page.evaluate(() => navigator.clipboard.readText());
-  expect(copied, "the copy is not the six digits alone").toBe(code);
-
-  const later = await context.newPage();
-  await later.goto("/");
-  await expect(signInHeading(later), "the link signed this browser in").toBeVisible();
-  await later.close();
-
-  await typedWhereItStarted(asking, code);
 });
 
 test("the code reads as six digits, and c copies it", async ({

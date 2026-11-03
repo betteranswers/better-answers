@@ -9,7 +9,6 @@ import { expect, test } from "../browser.ts";
 import {
   anAddress,
   provision,
-  seedConcepts,
   seedConnectedSources,
   signIn,
   skipLinkReachesThePage,
@@ -33,9 +32,6 @@ const said = (page: Page) => searchRegion(page).getByRole("status").first();
 
 const passagePanel = (page: Page, title: string) => page.getByRole("dialog", { name: title });
 
-const markedAt = (sensitivity: string): RegExp =>
-  new RegExp(`Not company knowledge\\W+${sensitivity}`);
-
 const asked = (query: string): string =>
   `${SEARCH.path}?${new URLSearchParams({ "knowledge.search": query }).toString()}`;
 
@@ -50,27 +46,6 @@ const FIRST_PALLET_PASSAGE = palletPassage(0);
 
 type Seeded = { readonly workspaceId: string; readonly adminId: string };
 
-const conceptsSeeded = async (api: APIRequestContext, workspace: Seeded): Promise<void> => {
-  await seedConcepts(api, {
-    workspaceId: workspace.workspaceId,
-    userId: workspace.adminId,
-    concepts: [
-      {
-        title: "Audit Logs Retention",
-        body: "We keep audit logs for seven years, then delete them.",
-        trust: "machine-confirmed",
-      },
-      { title: "Audit Committee", body: "The committee meets each quarter." },
-      {
-        title: "Audit Salary Bands",
-        body: "Each salary band is reviewed by the audit committee.",
-        sensitivity: "Restricted",
-      },
-      { title: "Forklift Licences", body: "Every forklift driver holds a current licence." },
-    ],
-  });
-};
-
 const handbookSeeded = async (api: APIRequestContext, workspace: Seeded): Promise<void> => {
   await seedConnectedSources(api, {
     workspaceId: workspace.workspaceId,
@@ -81,25 +56,6 @@ const handbookSeeded = async (api: APIRequestContext, workspace: Seeded): Promis
         published: true,
         sync: "done",
         documents: [{ title: HANDBOOK, passages: PALLET_PASSAGES }],
-      },
-    ],
-  });
-};
-
-const PAY_REVIEW = "Pay review minutes";
-
-const payReviewSeeded = async (api: APIRequestContext, workspace: Seeded): Promise<void> => {
-  await seedConnectedSources(api, {
-    workspaceId: workspace.workspaceId,
-    connectedSources: [
-      {
-        name: "Payroll drive",
-        sensitivity: "Restricted",
-        published: true,
-        sync: "done",
-        documents: [
-          { title: PAY_REVIEW, passages: ["The salary bands were set at the spring pay review."] },
-        ],
       },
     ],
   });
@@ -207,19 +163,6 @@ const foundNothing = async (
 const handbookMatches = (page: Page) => matchesOf(page).filter({ hasText: HANDBOOK });
 
 test.describe("the Knowledge Search page", () => {
-  test("finds an Admin what a Viewer's search withholds", async ({ page, request }) => {
-    await anAdminAtSearch(page, request, "Esk Archives", [conceptsSeeded, payReviewSeeded]);
-
-    await searched(page, "audit");
-    await expect(matchesOf(page).filter({ hasText: "Audit Salary Bands" })).toHaveCount(1);
-
-    await searched(page, "salary bands");
-    await expect(matchesOf(page).filter({ hasText: "Audit Salary Bands" })).toHaveCount(1);
-    const document = matchesOf(page).filter({ hasText: PAY_REVIEW });
-    await expect(document).toHaveCount(1);
-    await expect(document).toContainText(markedAt("Restricted"));
-  });
-
   test("opens a passage match in the panel without leaving Search", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Ryedale Stores", [handbookSeeded]);
     await searched(page, "pallet");

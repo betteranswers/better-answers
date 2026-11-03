@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
-import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/signed-in-without-workspace.ts";
+import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/auth/signed-in-without-workspace.ts";
 import { server, type Asked } from "@test/stub-server.ts";
 import { addressOf, type Api } from "@test/stubbed-api.ts";
 import { aRefusalAnswer, openOutsideTheShellAt, read } from "@test/two-workspaces.ts";
