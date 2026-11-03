@@ -24,5 +24,7 @@ export default defineConfig({
     hookTimeout: 120_000,
 
     maxWorkers: 6,
+
+    isolate: false,
   },
 });

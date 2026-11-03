@@ -17,6 +17,10 @@ export default defineConfig({
     include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
     environment: "jsdom",
     env: { PATH: pathWithAppleGit() },
-    setupFiles: ["@better-answers/schema/testing/test-title-setup"],
+    setupFiles: [
+      "./test/support/setup/fresh-file.ts",
+      "@better-answers/schema/testing/test-title-setup",
+    ],
+    isolate: false,
   },
 });

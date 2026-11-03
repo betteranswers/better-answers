@@ -1,6 +1,6 @@
 import { inspect } from "node:util";
 
-import { assert, describe, expect, expectTypeOf, it } from "vitest";
+import { afterAll, assert, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { NIGHTLY_AUDIT_KIND, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
@@ -122,6 +122,12 @@ const claimsFor = (seeded: Seeded, overrides: Partial<Claims> = {}): Claims => (
   userId: seeded.userId,
   issuedAt: new Date(),
   ...overrides,
+});
+
+// Vitest's `isolate: false` keeps modules across a worker's files, so the probe actions leave with
+// this file.
+afterAll(() => {
+  vi.resetModules();
 });
 
 const PROBE_ACTIONS = declareActions("platform", {

@@ -10,5 +10,7 @@ export default defineConfig({
     include: ["test/readings/*.reading.ts"],
     testTimeout: 3_600_000,
     maxWorkers: 1,
+    // A shared worker hands later readings a warm JIT and cache, so each reading keeps its own.
+    isolate: true,
   },
 });

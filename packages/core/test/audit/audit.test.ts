@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { assert, describe, expect, expectTypeOf, it } from "vitest";
+import { afterAll, assert, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { FAMILIES, ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
@@ -42,6 +42,12 @@ import { postgresForSuite } from "../support/suite-postgres.ts";
 import { loadEveryEntryPoint } from "./entry-points.ts";
 
 const db = postgresForSuite();
+
+// Vitest's `isolate: false` keeps modules across a worker's files, so the probe actions leave with
+// this file.
+afterAll(() => {
+  vi.resetModules();
+});
 
 const actionLiteralsIn = (files: readonly string[]): Set<string> =>
   new Set(
