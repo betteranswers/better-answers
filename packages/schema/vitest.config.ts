@@ -3,10 +3,13 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 import { pathWithAppleGit } from "./test/support/apple-git.ts";
+import { slowTestThreshold } from "./test/support/ci/slow-test-threshold.ts";
 
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
+
+    slowTestThreshold: slowTestThreshold(),
 
     env: { PATH: pathWithAppleGit() },
 
