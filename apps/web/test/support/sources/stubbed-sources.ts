@@ -3,7 +3,7 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import type { GroupOfFindings, ListedConnectedSource } from "@/features/sources/sources-api.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import type { Api } from "@test/stubbed-api.ts";
-import { adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
+import { adaAnAdmin, drawnAt, openAt, read } from "@test/two-workspaces.ts";
 
 const CONNECTED_SOURCES = pageNamed(
   menuGroupIn(CONTROL_CENTRE, "sources"),
@@ -138,6 +138,9 @@ export const anAdminWith = (...sources: readonly AConnectedSource[]): Api => {
 };
 
 export const openSources = (api: Api) => openAt(CONNECTED_SOURCES, api);
+
+export const drawSourcesThrough = (api: Api, through: Parameters<typeof drawnAt>[2]) =>
+  drawnAt(CONNECTED_SOURCES, api, through);
 
 export const connectedSourcesRegion = (): HTMLElement =>
   screen.getByRole("region", { name: "Connected Sources" });

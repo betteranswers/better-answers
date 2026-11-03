@@ -1,7 +1,5 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
-
 import { WORKSPACES_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
 import { HOMES } from "@/shared/navigation.ts";
 
@@ -10,39 +8,18 @@ import {
   anAddress,
   avatarOf,
   crumbOf,
-  keyShown,
   markTheOperator,
   navOf,
-  person,
-  personMenuOpened,
   provision,
   railOf,
   signedInAtHome,
-  signIn,
-  signInByEmail,
   skipLinkReachesThePage,
-  switcherMenuOf,
   switcherOf,
-  withAnAuthenticator,
 } from "../harness.ts";
 
 const LIST_BUDGET_MS = 1000;
 
 const EVERY_WORKSPACE = HOMES.operator.path;
-
-const controlCentreMenu = (page: Page) => navOf(page, "Control Centre");
-
-const noWorkspaceYet = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
-
-const theConsoleOffered = async (page: Page, workspaceName: string) => {
-  await switcherOf(page, workspaceName).click();
-  const theConsole = switcherMenuOf(page, workspaceName).getByRole("menuitem", {
-    name: "Console",
-  });
-  await expect(theConsole).toBeVisible();
-  return theConsole;
-};
 
 const listOf = (page: Page) => page.getByRole("region", { name: "Every Workspace" });
 
@@ -72,89 +49,6 @@ const theOperator = async (page: Page, api: APIRequestContext, workspaceName: st
   await signedInAtHome(page, api, email);
   return workspace;
 };
-
-test.describe("the way into the console", () => {
-  test("offers the operator the console from the workspace switcher", async ({
-    page,
-    request,
-    passesTheAccessibilityGate,
-  }) => {
-    const workspace = await theOperator(page, request, "Wharfedale Castings");
-
-    const theConsole = await theConsoleOffered(page, workspace.name);
-    await passesTheAccessibilityGate();
-    await theConsole.click();
-
-    await expect(page).toHaveURL(EVERY_WORKSPACE);
-    const bar = page.getByRole("banner");
-    await expect(switcherOf(page, "Console")).toBeVisible();
-    await expect(bar.getByText(workspace.name)).toHaveCount(0);
-    await expect(bar.getByRole("link", { name: "better-answers" })).toHaveAttribute(
-      "href",
-      EVERY_WORKSPACE,
-    );
-    await expect(railOf(page).getByRole("link")).toHaveText(["Console"]);
-    await expect(navOf(page, "Console").getByRole("link")).toHaveText([
-      "Everyone",
-      "Names Waiting",
-      "Every Workspace",
-    ]);
-    await expect(controlCentreMenu(page)).toHaveCount(0);
-
-    const you = await personMenuOpened(page, workspace.admin.name);
-    await expect(you.getByText(workspace.admin.name, { exact: true })).toBeVisible();
-    await expect(you).not.toContainText("Admin");
-    await expect(you.getByRole("menuitem")).toHaveText(["Account", "Sign Out"]);
-  });
-
-  test("sends a no-workspace operator to the console after setup", async ({ page, request }) => {
-    const email = anAddress("operator");
-    await person(request, email);
-    await markTheOperator(request, email);
-    await page.goto("/sign-in");
-    await signInByEmail(page, request, email);
-
-    await page.getByRole("button", { name: "Set Up an Authenticator Instead" }).click();
-    const key = await keyShown(page);
-    await page.getByLabel("Authenticator Code").fill(authenticatorCodeAt(key, new Date()));
-    await page.getByRole("checkbox", { name: "I have saved these codes" }).check();
-    await page.getByRole("button", { name: "Finish Setup" }).click();
-
-    await expect(page).toHaveURL(EVERY_WORKSPACE);
-    await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
-    await expect(switcherOf(page, "Console")).toBeVisible();
-  });
-
-  test("sends no-workspace operators to the console at sign-in and /", async ({
-    page,
-    request,
-  }) => {
-    const email = anAddress("operator");
-    await person(request, email);
-    await markTheOperator(request, email);
-    await withAnAuthenticator(request, email);
-    await page.goto("/sign-in");
-    await signIn(page, request, email);
-
-    await expect(page).toHaveURL(EVERY_WORKSPACE);
-    await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
-
-    await page.goto("/");
-    await expect(page).toHaveURL(EVERY_WORKSPACE);
-    await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
-    await expect(noWorkspaceYet(page)).toHaveCount(0);
-  });
-
-  test("shows a non-operator with no workspace No Workspace Yet", async ({ page, request }) => {
-    const email = anAddress("person");
-    await person(request, email);
-    await page.goto("/sign-in");
-    await signIn(page, request, email);
-
-    await page.goto("/");
-    await expect(noWorkspaceYet(page)).toBeVisible();
-  });
-});
 
 test.describe("the console's Workspaces page", () => {
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {

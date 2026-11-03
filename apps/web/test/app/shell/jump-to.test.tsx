@@ -1,12 +1,36 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { jumpsIn, linesOf, matching, searchGroup, type JumpGroup } from "@/app/shell/jump-to.tsx";
-import { findWhat, JUMP_TO } from "@/app/words.ts";
-import { CONSOLE, readerOf, AREAS, visibleTo, type Role, type Area } from "@/shared/navigation.ts";
+import { findWhat, JUMP_TO, searchFor } from "@/app/words.ts";
+import { memberPageOf } from "@/features/people/members/members-address.ts";
+import {
+  CONSOLE,
+  CONTROL_CENTRE,
+  HOMES,
+  menuGroupIn,
+  pageNamed,
+  readerOf,
+  AREAS,
+  visibleTo,
+  type Role,
+  type Area,
+} from "@/shared/navigation.ts";
 import { nothingMatches } from "@/shared/words.ts";
+import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { openApp } from "@test/open-app.tsx";
-import { answeringAs } from "@test/stubbed-api.ts";
+import {
+  anAdminOver,
+  personHeading,
+  PRIYA as PRIYA_LISTED,
+  SAM,
+} from "@test/people/member-pages.ts";
+import { server } from "@test/stub-server.ts";
+import { answeringAs, heldBack } from "@test/stubbed-api.ts";
+import { ADA, adaAnAdmin, adaAt, openAt } from "@test/two-workspaces.ts";
+
+await vi.hoisted(() => import("@test/stub-server.ts"));
 
 afterEach(() => {
   cleanup();
@@ -201,6 +225,70 @@ describe("choosing Invite a person in the app", () => {
     await vi.waitFor(() =>
       expect(router.state.location.href).toBe("/people/members?members.role=Editor"),
     );
+  });
+});
+
+const MODELS_AND_SPEND = pageNamed(menuGroupIn(CONTROL_CENTRE, "models"), "Models and Spend");
+
+const jumpToOpened = async (): Promise<HTMLElement> => {
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  return screen.findByRole("combobox", { name: JUMP_TO.name });
+};
+
+const optionNamed = (name: string | RegExp): Promise<HTMLElement> =>
+  screen.findByRole("option", { name });
+
+const selection = (option: HTMLElement): string | null => option.getAttribute("aria-selected");
+
+describe("what jump-to reads in the app", () => {
+  placedWithoutMeasuring();
+
+  it("hides People from a Viewer, reading no members", async () => {
+    const api = adaAnAdmin();
+    api.set("session.member", () => adaAt("Viewer"));
+    await openAt(HOMES.Viewer.path, api);
+    const user = userEvent.setup();
+
+    const input = await jumpToOpened();
+    await optionNamed(/^Ask$/);
+    await user.type(input, "people");
+
+    const dialog = screen.getByRole("dialog", { name: JUMP_TO.name });
+    expect(within(dialog).getByRole("status").textContent).toBe(nothingMatches("people"));
+    expect(
+      within(dialog)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([searchFor("people")]);
+    expect(within(dialog).queryByRole("group", { name: JUMP_TO.groups.members })).toBeNull();
+    expect(input.getAttribute("placeholder")).toMatch(/page/i);
+    expect(input.getAttribute("placeholder")).not.toMatch(/member|action/i);
+    expect(
+      server.asks.map((ask) => ask.procedure),
+      "a Viewer's jump-to asked for the members",
+    ).not.toContain("members.list");
+  });
+
+  it("opens a member who loads after the search row", async () => {
+    const api = anAdminOver([ADA, PRIYA_LISTED, SAM]);
+    const router = await openAt(MODELS_AND_SPEND.path, api);
+    const members = heldBack(api, "members.list");
+    const user = userEvent.setup();
+
+    const input = await jumpToOpened();
+    await user.type(input, "priya");
+    await members.asked;
+    expect(selection(await optionNamed(searchFor("priya")))).toBe("true");
+
+    members.resolve();
+    const priya = await optionNamed(new RegExp(PRIYA_LISTED.displayName));
+    await waitFor(() => expect(selection(priya)).toBe("true"));
+    await user.keyboard("{Enter}");
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(memberPageOf(PRIYA_LISTED.personId)),
+    );
+    await personHeading(PRIYA_LISTED.displayName);
   });
 });
 

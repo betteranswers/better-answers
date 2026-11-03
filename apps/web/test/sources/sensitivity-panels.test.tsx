@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import type { ConnectedSourceWidened } from "@/features/sources/sources-api.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -10,6 +11,7 @@ import {
   describedBy,
   leadOf,
   openSources,
+  drawSourcesThrough,
   panelOf,
   press,
   pressed,
@@ -19,9 +21,15 @@ import {
   thePanelOf,
   connectedSourcesRegion,
 } from "@test/sources/stubbed-sources.ts";
-import { server } from "@test/stub-server.ts";
-import { heldBack, settlingAfter } from "@test/stubbed-api.ts";
-import { aRefusalAnswer, read } from "@test/two-workspaces.ts";
+import { server, type Asked } from "@test/stub-server.ts";
+import { addressOf, heldBack, settlingAfter } from "@test/stubbed-api.ts";
+import {
+  aRefusalAnswer,
+  read,
+  switcher,
+  switcherDrawn,
+  type Answering,
+} from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
@@ -299,5 +307,59 @@ describe("publishing, narrowing and widening a connected source", () => {
     await waitFor(() => {
       expect(leadOf(row, "Sensitivity").textContent).toBe("Restricted");
     });
+  });
+});
+
+const A_FAILED_READ = {
+  error: {
+    message: "INTERNAL_SERVER_ERROR",
+    code: -32_603,
+    data: { code: "INTERNAL_SERVER_ERROR", httpStatus: 500 },
+  },
+};
+
+const proceduresOf = (asked: Asked): string[] =>
+  addressOf(asked).pathname.replace("/trpc/", "").split(",");
+
+/** The shell's first member read is dropped. Its retry, asked alone, waits to land. */
+const memberUnreadUntil = (landed: Promise<void>) => (answer: Answering) => {
+  let theShellsReadToDrop = true;
+  return async (asked: Asked, init?: RequestInit): Promise<Response> => {
+    const procedures = proceduresOf(asked);
+    if (!procedures.includes("session.member")) return answer(asked, init);
+    if (theShellsReadToDrop) {
+      theShellsReadToDrop = false;
+      throw new TypeError("the request was dropped");
+    }
+    if (procedures.length === 1) {
+      await landed;
+      return answer(asked, init);
+    }
+    const answered = await answer(asked, init);
+    const answers = z.array(z.unknown()).parse(await answered.json());
+    return Response.json(
+      answers.map((each, at) => (procedures[at] === "session.member" ? A_FAILED_READ : each)),
+    );
+  };
+};
+
+describe("a page drawn before the reader's member read lands", () => {
+  it("an open panel stays open as the member read lands", async () => {
+    const api = anAdminWith(
+      aConnectedSource("Supplier payments", { state: "published", publishedAt: A_PUBLICATION }),
+    );
+    const landed = Promise.withResolvers<void>();
+    drawSourcesThrough(api, memberUnreadUntil(landed.promise));
+    const row = await rowOf("Supplier payments");
+    pressed(rowAction(row, "narrow"));
+    const panel = thePanelOf("narrow", "Supplier payments");
+    const sensitivityPicked = within(panel).getByRole("combobox", { name: "Sensitivity" });
+    expect(document.activeElement).toBe(sensitivityPicked);
+    expect(switcherDrawn(), "the member read landed before it was let through").toBeNull();
+
+    landed.resolve();
+
+    await switcher();
+    expect(thePanelOf("narrow", "Supplier payments"), "the page was drawn again").toBe(panel);
   });
 });

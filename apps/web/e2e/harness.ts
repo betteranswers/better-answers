@@ -460,13 +460,6 @@ export const makeGroups = (
   },
 ) => ask(api, "/groups", input, groupsMade);
 
-const accessAsked = z.object({ asked: z.literal(true) });
-
-export const askToJoin = (
-  api: APIRequestContext,
-  input: { shortName: string; requesterId: string; reason: string },
-) => ask(api, "/access-requests", input, accessAsked);
-
 const nameFlagged = z.object({ flagged: z.literal(true) });
 
 export const flagTheName = (
@@ -666,28 +659,4 @@ export const memberUnreadUntil = async (page: Page, landed: Promise<void>): Prom
       });
     },
   );
-};
-
-export const holdingTheFirstAnswer = async (
-  page: Page,
-  matches: (url: URL) => boolean,
-): Promise<{
-  readonly reached: Promise<void>;
-  readonly release: () => void;
-  readonly asked: () => number;
-}> => {
-  const reached = Promise.withResolvers<void>();
-  const released = Promise.withResolvers<void>();
-  let asked = 0;
-  await page.route(matches, async (route) => {
-    asked += 1;
-    const first = asked === 1;
-    const response = await route.fetch();
-    if (first) {
-      reached.resolve();
-      await released.promise;
-    }
-    await route.fulfill({ response });
-  });
-  return { reached: reached.promise, release: released.resolve, asked: () => asked };
 };

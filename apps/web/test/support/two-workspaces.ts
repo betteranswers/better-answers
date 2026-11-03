@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createAppClients } from "@/app/providers.tsx";
 import type { Role } from "@/shared/navigation.ts";
 
-import { openApp } from "./open-app.tsx";
+import { drawApp, openApp } from "./open-app.tsx";
 import { server, type Asked } from "./stub-server.ts";
 import { addressOf, answered, type Api } from "./stubbed-api.ts";
 
@@ -150,6 +150,15 @@ export const openAt = async (path: string, api: Api) => {
   const { router } = await openApp(path, clients);
   await switcher();
   return router;
+};
+
+export type Answering = typeof server.answer;
+
+/** Draws the app at once, as the browser does, and returns without waiting on a read the first draw needs. */
+export const drawnAt = (path: string, api: Api, through: (answer: Answering) => Answering) => {
+  server.asks = [];
+  server.answer = through(answering(api));
+  return drawApp(path);
 };
 
 export const openOutsideTheShellAt = async (

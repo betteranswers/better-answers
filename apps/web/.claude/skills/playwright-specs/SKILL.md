@@ -29,7 +29,7 @@ comment there says why it is not `pnpm run`. A spec builds its state through the
 `apps/api/tests/support/harness/harness-control.ts` mounts. Search both before adding an action.
 The actions include `provision`, `addMember`, `removeMember`, `endEverySignInAndToken`, `markTheOperator`,
 `invite`, `seedModelChoices`, `seedConnectedSources`, `nameOwners`, `seedQuestions`,
-`makeGroups` and `askToJoin`.
+and `makeGroups`.
 
 ## The fixture module
 

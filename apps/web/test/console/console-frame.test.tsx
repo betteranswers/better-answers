@@ -9,7 +9,9 @@ import {
 } from "@/features/console/list-words.ts";
 import {
   NAMES_WAITING_KEYSTROKES,
+  PEOPLE_KEYSTROKES,
   SELECT_A_NAME_FIRST,
+  SELECT_A_PERSON_FIRST,
 } from "@/features/console/people-keystrokes.ts";
 import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
@@ -148,6 +150,10 @@ const listAt = async (path: string, name: string, held: Readonly<Record<string, 
   const list = await screen.findByRole("region", { name });
   await within(list).findByRole("table");
   return list;
+};
+
+const press = (key: string): void => {
+  fireEvent.keyDown(document.activeElement ?? document.body, { key });
 };
 
 const searchFor = (list: HTMLElement, label: string, typed: string): void => {
@@ -364,6 +370,51 @@ describe("the console's lists", () => {
     within(list).getByRole("button", { name: toCorrectPriya }).focus();
     pressCorrect();
     expect(await screen.findByRole("dialog", { name: toCorrectPriya })).toBeDefined();
+  });
+
+  it("opens no person by key after focus leaves the list", async () => {
+    const list = await listAt("/console/people/everyone", "Everyone", {
+      "console.people.list": { people: [PRIYA], total: 1 },
+    });
+    expect(
+      within(list).queryByText(SELECT_A_PERSON_FIRST),
+      "the list says nothing at rest",
+    ).toBeNull();
+    within(list).getByRole("button", { name: PRIYA.displayName }).focus();
+    screen.getByRole("button", { name: "Keyboard Shortcuts" }).focus();
+
+    for (const { key } of [
+      PEOPLE_KEYSTROKES.open,
+      PEOPLE_KEYSTROKES.revoke,
+      PEOPLE_KEYSTROKES.correct,
+    ]) {
+      press(key);
+      expect(
+        within(list).getByText(SELECT_A_PERSON_FIRST),
+        `${key} with no person in focus said nothing`,
+      ).toBeDefined();
+      expect(screen.queryByRole("dialog"), `${key} opened a person not in focus`).toBeNull();
+    }
+  });
+
+  it("corrects no name by key after focus leaves the list", async () => {
+    const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_LIST.heading, {
+      "console.people.namesWaiting": NAMES_WAITING,
+    });
+    expect(
+      within(list).queryByText(SELECT_A_NAME_FIRST),
+      "the list says nothing at rest",
+    ).toBeNull();
+    within(list).getByRole("button", { name: "Correct Priya Shah’s Display Name" }).focus();
+    screen.getByRole("button", { name: "Keyboard Shortcuts" }).focus();
+
+    press(NAMES_WAITING_KEYSTROKES.correct.key);
+
+    expect(
+      within(list).getByText(SELECT_A_NAME_FIRST),
+      "c with no name in focus said nothing",
+    ).toBeDefined();
+    expect(screen.queryByRole("dialog"), "c corrected a name not in focus").toBeNull();
   });
 
   it("keeps the description of Everyone off Names waiting", async () => {

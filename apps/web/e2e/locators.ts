@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { z } from "zod";
 
 import type { CarriedOn } from "@/features/auth/sign-in/sign-in-words.ts";
@@ -31,11 +31,6 @@ export const switcherMenuOf = (page: Page, here: string): Locator =>
 export const switched = async (page: Page, from: string, to: string): Promise<void> => {
   await switcherOf(page, from).click();
   await switcherMenuOf(page, from).getByRole("menuitemradio").filter({ hasText: to }).click();
-};
-
-export const allWorkspacesPicked = async (page: Page, here: string): Promise<void> => {
-  await switcherOf(page, here).click();
-  await switcherMenuOf(page, here).getByRole("menuitem", { name: "All Workspaces" }).click();
 };
 
 export const railOf = (page: Page): Locator => page.getByRole("navigation", { name: "Areas" });
@@ -457,11 +452,3 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
       .filter(seen)
       .map(measured);
   });
-
-export const requestsSent = (page: Page, matches: (url: URL) => boolean): Request[] => {
-  const sent: Request[] = [];
-  page.on("request", (request) => {
-    if (matches(new URL(request.url()))) sent.push(request);
-  });
-  return sent;
-};

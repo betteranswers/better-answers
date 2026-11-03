@@ -19,7 +19,6 @@ import {
   countOf,
   flagTheName,
   keystrokesDismissed,
-  keystrokesButton,
   keystrokesListed,
   markTheOperator,
   person,
@@ -187,12 +186,6 @@ const priyaFlagged = async (page: Page, api: APIRequestContext, tag: string) => 
   return { operators, priya, name };
 };
 
-const priyaListed = async (page: Page, api: APIRequestContext, tag: string) => {
-  const held = await priyaWithTheOperator(page, api, { tag, displayName: "Priya Shah" });
-  await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
-  return held;
-};
-
 test.describe("the console's Everyone page", () => {
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
     await signedInAsTheOperator(page, request, aTag());
@@ -206,21 +199,6 @@ test.describe("the console's Everyone page", () => {
     expect(elapsed, "the first page of everyone rendered past its budget").toBeLessThan(
       LIST_BUDGET_MS,
     );
-  });
-
-  test("opens no person by key after focus leaves the list", async ({ page, request }) => {
-    await priyaListed(page, request, aTag());
-    await expect(personRows(page)).toHaveCount(2);
-    const said = outcomeOf(everyone(page));
-    await expect(said, "the list says nothing at rest").toHaveText("");
-    await personButton(page, "Priya Shah").focus();
-    await keystrokesButton(page).focus();
-
-    for (const key of ["o", "r", "c"]) {
-      await page.keyboard.press(key);
-      await expect(said, `${key} with no person in focus said nothing`).toHaveText(/\S/);
-      await expect(page.getByRole("dialog"), `${key} opened a person not in focus`).toHaveCount(0);
-    }
   });
 
   test("is keyboard-operable, sounds like a table and passes axe", async ({
@@ -464,20 +442,6 @@ test.describe("the console's Names Waiting page", () => {
       narrowed,
     );
     await expect(waitingCount(page)).toHaveText(/\d/);
-  });
-
-  test("corrects no name by key after focus leaves the list", async ({ page, request }) => {
-    const { name } = await priyaFlagged(page, request, aTag());
-    await page.goto(NAMES_WAITING_PAGE);
-    const said = outcomeOf(namesWaiting(page));
-    await expect(correctButtonOf(page, name)).toBeVisible();
-    await expect(said, "the list says nothing at rest").toHaveText("");
-    await correctButtonOf(page, name).focus();
-    await keystrokesButton(page).focus();
-
-    await page.keyboard.press("c");
-    await expect(said, "c with no name in focus said nothing").toHaveText(/\S/);
-    await expect(page.getByRole("dialog"), "c corrected a name not in focus").toHaveCount(0);
   });
 
   test("is keyboard-operable and lists its keystrokes", async ({ page, request }) => {

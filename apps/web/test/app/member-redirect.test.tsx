@@ -2,11 +2,15 @@ import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppClients } from "@/app/providers.tsx";
-import { PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
+import { nextAfterSignIn } from "@/features/auth/carried-flow.ts";
+import { stepAfterTheCodes } from "@/features/auth/second-factor-steps.ts";
+import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
 import { ROLES } from "@/features/people/role-meanings.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
 import { appAt, openApp } from "@test/open-app.tsx";
 import { addressOf, answered, answeringAs, withTheApiDown } from "@test/stubbed-api.ts";
+
+await vi.hoisted(() => import("@test/forwarding-fetch.ts"));
 
 const A_MEMBER = {
   workspace: { id: "w", name: "Northern Tooling" },
@@ -57,6 +61,27 @@ const answering =
     const names = pathname.replace("/trpc/", "").split(",");
     asked.push(...names);
     return answered(names.map((name) => answerTo(name, refusal, role)));
+  };
+
+const SIGNED_IN_WITH_NONE_OPEN = {
+  session: { id: "s" },
+  user: { id: "p", name: "Ada", email: "ada@example.test" },
+};
+
+const EMPTY_READS = new Set(["person.workspaces", "person.invitations", "console.workspaces.list"]);
+
+const inNoWorkspace =
+  (operator: boolean) =>
+  (input: string | URL | Request): Promise<Response> => {
+    const { pathname } = addressOf(input);
+    if (!pathname.startsWith("/trpc/")) return answered(SIGNED_IN_WITH_NONE_OPEN);
+
+    const answerToNoWorkspace = (name: string) => {
+      if (name === "session.operator") return { result: { data: { operator, name: "Ada" } } };
+      if (EMPTY_READS.has(name)) return { result: { data: [] } };
+      return answerTo(name, NEEDS_A_PICK, "Admin");
+    };
+    return answered(pathname.replace("/trpc/", "").split(",").map(answerToNoWorkspace));
   };
 
 const losingTheShellsRead = (role: Role) => {
@@ -218,5 +243,68 @@ describe("the index route", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
 
     await vi.waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Viewer.path));
+  });
+});
+
+type Router = Awaited<ReturnType<typeof openApp>>["router"];
+
+const consoleLanding = async (router: Router) => {
+  await screen.findByRole("heading", { level: 1, name: "Workspaces" });
+  return {
+    at: router.state.location.pathname,
+    inTheConsole:
+      within(screen.getByRole("banner")).queryByRole("button", { name: "Console" }) !== null,
+    toldNoWorkspace:
+      screen.queryByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING }) !== null,
+  };
+};
+
+const ON_THE_CONSOLE = { at: HOMES.operator.path, inTheConsole: true, toldNoWorkspace: false };
+
+describe("a person in no workspace", () => {
+  it("sends a no-workspace operator to the console after setup", async () => {
+    vi.stubGlobal("fetch", inNoWorkspace(true));
+
+    const { router } = await openApp(stepAfterTheCodes(""));
+
+    expect(await consoleLanding(router)).toEqual(ON_THE_CONSOLE);
+  });
+
+  it("sends no-workspace operators to the console at sign-in and /", async () => {
+    vi.stubGlobal("fetch", inNoWorkspace(true));
+    expect(nextAfterSignIn("")).toBe("/");
+
+    const { router } = await openApp("/");
+
+    expect(await consoleLanding(router)).toEqual(ON_THE_CONSOLE);
+  });
+
+  it("shows a non-operator with no workspace No Workspace Yet", async () => {
+    vi.stubGlobal("fetch", inNoWorkspace(false));
+
+    const { router } = await openApp("/");
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING }),
+    ).toBeDefined();
+    expect(router.state.location.pathname).toBe("/no-workspace");
+  });
+
+  it("draws an unknown address outside the shell without a workspace", async () => {
+    vi.stubGlobal("fetch", inNoWorkspace(false));
+
+    await openApp("/nothing-here");
+
+    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe("Page Not Found");
+    const banner = within(screen.getByRole("banner"));
+    expect(banner.getAllByText("better-answers").length).toBeGreaterThan(0);
+    expect(banner.queryAllByRole("link")).toEqual([]);
+    expect(banner.queryAllByRole("button")).toEqual([]);
+    expect(screen.queryByRole("navigation", { name: "Areas" })).toBeNull();
+    expect(
+      within(screen.getByRole("main"))
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Go to Your Home Page"]);
   });
 });
