@@ -579,7 +579,6 @@ const RUN_BY_STEP: Readonly<Record<string, Readonly<Record<string, string>>>> = 
 
 const SHARDED_LEGS: Readonly<Record<string, string>> = {
   "full-core": "check:core:suite",
-  "full-web-browser": "check:web:e2e",
 };
 
 const manifestAt = (directory: string): { readonly name: string; readonly check: string } => {
@@ -948,6 +947,11 @@ describe("the sharded legs of check.yml", () => {
         "a gate beside the shard runs once per shard, where one run would do",
       ).toEqual([script]);
     }
+  });
+
+  it("runs the browser suite as one unsharded job", () => {
+    expect(checkJobs()["full-web-browser"]?.strategy).toBeUndefined();
+    expect(gatesOf("full-web-browser")).toEqual(["check:web:e2e"]);
   });
 });
 

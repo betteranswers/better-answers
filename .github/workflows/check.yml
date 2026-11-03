@@ -248,19 +248,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:web:unit
 
-  # Playwright deals tests to the shards, not files, because the suite is fully parallel.
   full-web-browser:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
-    strategy:
-      # Cancelling the other shards would hide their failures until this one's were fixed.
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
     env:
-      TRACE_ARTIFACT: browser-traces-shard-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
+      TRACE_ARTIFACT: browser-traces-attempt-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -276,9 +270,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - run: pnpm check:web:e2e --shard="${SHARD}"
-        env:
-          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+      - run: pnpm check:web:e2e
       # Not failure(): a flake passes on its retry, and its trace is the one worth reading.
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
