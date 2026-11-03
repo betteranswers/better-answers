@@ -153,26 +153,25 @@ test.describe("the System group's Audit log page", () => {
     }
   });
 
-  test("renders the audit log within the latency budget", async ({ page, request }) => {
-    await anAdminAtTheAuditLog(page, request, "Ryedale Metalwork");
-
-    const started = Date.now();
-    await page.goto(AUDIT_LOG_PAGE);
-    await expect(linesOf(page)).toHaveCount(3);
-    const elapsed = Date.now() - started;
-
-    test.info().annotations.push({ type: "audit log", description: `${elapsed} ms` });
-    expect(elapsed, "the audit log of three events rendered past its budget").toBeLessThan(
-      LIST_BUDGET_MS,
-    );
-  });
-
   test("searches, opens and pages the audit log by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     const at = await anAdminAtTheAuditLog(page, request, "Calder Castings");
+
+    await test.step("renders the audit log within the latency budget", async () => {
+      const started = Date.now();
+      await page.goto(AUDIT_LOG_PAGE);
+      await expect(linesOf(page)).toHaveCount(3);
+      const elapsed = Date.now() - started;
+
+      test.info().annotations.push({ type: "audit log", description: `${elapsed} ms` });
+      expect(elapsed, "the audit log of three events rendered past its budget").toBeLessThan(
+        LIST_BUDGET_MS,
+      );
+    });
+
     await aFullPageOpened(page, request, at, 51);
 
     await skipLinkReachesThePage(page);
