@@ -1,0 +1,49 @@
+name: probe-docker-auth
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: daemon and client
+        run: |
+          docker version
+          docker info --format 'mirrors={{json .RegistryConfig.Mirrors}} driver={{.Driver}} index={{.IndexServerAddress}} status={{json .DriverStatus}}'
+          echo "DOCKER_CONFIG=${DOCKER_CONFIG:-unset} HOME=$HOME"
+          ls -la ~/.docker || true
+          cat /etc/docker/daemon.json || true
+          if [ -f ~/.docker/config.json ]; then jq 'walk(if type=="object" and has("auth") then .auth="REDACTED" else . end)' ~/.docker/config.json; fi
+      - uses: ./.github/actions/docker-hub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: what the login wrote, and what Docker Hub bills
+        env:
+          U: ${{ secrets.DOCKERHUB_USERNAME }}
+          P: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "DOCKER_CONFIG=${DOCKER_CONFIG:-unset}"
+          echo "username length ${#U}; has @: $([[ "$U" == *@* ]] && echo yes || echo no); has whitespace: $([[ "$U" =~ [[:space:]] ]] && echo yes || echo no)"
+          cfg="${DOCKER_CONFIG:-$HOME/.docker}/config.json"
+          jq 'walk(if type=="object" and has("auth") then .auth=(.auth|length|tostring) else . end)' "$cfg"
+          limits() {
+            curl -sI -H "Authorization: Bearer $1" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep -i -E 'ratelimit' || echo "(no rate-limit headers)"
+          }
+          anon="$(curl -s 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull' | jq -r .token)"
+          auth="$(curl -s -u "$U:$P" 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull' | jq -r .token)"
+          echo "--- anonymous"; limits "$anon"
+          echo "--- as the account"; limits "$auth"
+          echo "--- pull busybox through the daemon"
+          docker pull busybox:1.37 2>&1 | tail -3 || true
+          echo "--- as the account, after the pull"; limits "$auth"
+          echo "--- anonymous, after the pull"; limits "$anon"
+          echo "--- compose pull, as test-postgres.sh does"
+          docker pull alpine:3.22 2>&1 | tail -2 || true
+          echo "--- as the account, after the second pull"; limits "$auth"
+          echo "--- anonymous, after the second pull"; limits "$anon"
