@@ -1,5 +1,7 @@
 name: docker-hub-login
-description: Log in to Docker Hub read-only, so a leg's image pulls count against the account's limit and not the runner address's.
+description: >-
+  Send the Docker daemon's Docker Hub pulls through mirror.gcr.io, which counts against no Docker Hub
+  limit, and log in to Docker Hub read-only for any image the mirror lacks.
 inputs:
   username:
     description: The Docker Hub account, from the DOCKERHUB_USERNAME secret.
@@ -10,10 +12,22 @@ inputs:
 runs:
   using: composite
   steps:
+    # Every logged-in leg of every run shares the account's 200 pulls an hour, and CI spent
+    # them all (BA-314). The restart stops any running container, so this goes before the first.
+    - name: Docker Hub pulls through mirror.gcr.io
+      shell: bash
+      run: |
+        daemon=/etc/docker/daemon.json
+        { sudo cat "${daemon}" 2>/dev/null || echo '{}'; } \
+          | jq '."registry-mirrors" = ["https://mirror.gcr.io"]' \
+          | sudo tee "${daemon}.new" >/dev/null
+        sudo mv "${daemon}.new" "${daemon}"
+        sudo systemctl restart docker
+        docker info --format 'registry mirrors: {{json .RegistryConfig.Mirrors}}'
     # A run without the secrets, a fork's, pulls anonymously as before and says so.
     - if: inputs.username == '' || inputs.token == ''
       shell: bash
-      run: echo "::warning::no Docker Hub credentials reached this job, so its image pulls are anonymous and share the runner address's rate limit"
+      run: echo "::warning::no Docker Hub credentials reached this job, so an image the mirror lacks is pulled anonymously and shares the runner address's rate limit"
     - if: inputs.username != '' && inputs.token != ''
       uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:
