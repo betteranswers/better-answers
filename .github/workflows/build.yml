@@ -111,8 +111,18 @@ jobs:
         with:
           # This job holds `packages: write` and then runs three Dockerfiles.
           persist-credentials: false
+      # Before the builder starts, because it restarts the daemon.
+      - uses: ./.github/actions/docker-hub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
       # The default `docker` driver cannot export a cache, so `cache-to` fails the build.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          # The builder does not read the daemon's mirror.
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
