@@ -902,7 +902,7 @@ PR 1 deletes 352 of the 367 rows its classification first named. Three rows are 
 
 **Wall.** On CI, the test phase of each shard equals the summed per-test seconds divided by three workers. The 104 staying cases sum to 483 CI seconds (463 for the first 101, and 7.0, 5.3 and 7.3 for the three restored), which is 161 s of testing on one job. With the 25 facet edits at a guessed 1 s each, the fixed costs of 61 to 85 s and the last worker's tail of up to 13 s, one job takes 232 to 272 s, centrally about 242 s. Two shards take about 150 to 185 s each. The central estimate sits about 2 s over the 240 s line, and the range crosses it. Restoring Playwright's browser from a cache would buy about 15 to 30 s (inferred, not measured), and merging the multi-case journeys about 10 s. PR 5 decides from the median of three CI attempts of the one-job wall. One shard stays when that median is at or under 240 s, and two shards otherwise.
 
-**`full-core` is one job.** Changed 03/11/2026. The 1.40 ratio rule for the two core shards is withdrawn, and so are the shards. In 5 of 5 valid probe runs a core job finished 33 to 114 s before `full-root`, and one core job ran the whole suite in 137 to 146 s, so the split never set the `check` wall (`/Users/liamj/.claude/orchestrate/test-pyramid-009/reports/ci-shape.md`).
+**`full-core` is one job.** Changed 03/11/2026. The 1.40 ratio rule for the two core shards is withdrawn, and so are the shards. In 5 of 5 valid probe runs a core job finished 33 to 114 s before `full-root`, and one core job ran the whole suite in 137 to 146 s, so the split never set the `check` wall (measured on the probe PR #966).
 
 **Files.**
 
