@@ -1,0 +1,7 @@
+---
+exclude_paths:
+  - "pnpm-lock.yaml"
+  - "apps/worker/uv.lock"
+  - "packages/schema/migrations/meta/**"
+  - ".cubic/wiki/**"
+  - "**/THIRD_PARTY_NOTICES.md"
