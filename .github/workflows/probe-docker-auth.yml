@@ -6,54 +6,56 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-26.04
-    timeout-minutes: 45
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        mirror: [none, mirror.gcr.io]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: daemon and client
-        run: |
-          docker version
-          docker info --format 'mirrors={{json .RegistryConfig.Mirrors}} driver={{.Driver}} index={{.IndexServerAddress}} status={{json .DriverStatus}}'
-          echo "DOCKER_CONFIG=${DOCKER_CONFIG:-unset} HOME=$HOME"
-          ls -la ~/.docker || true
-          cat /etc/docker/daemon.json || true
-          if [ -f ~/.docker/config.json ]; then jq 'walk(if type=="object" and has("auth") then .auth="REDACTED" else . end)' ~/.docker/config.json; fi
-          jq -r '.auths[].auth' ~/.docker/config.json | base64 -d | cut -d: -f1 | sed "s/^/preinstalled account: /" || true
       - uses: ./.github/actions/docker-hub-login
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: what the login wrote, and what Docker Hub bills
+      - name: the daemon's mirror
+        if: matrix.mirror != 'none'
+        env:
+          MIRROR: ${{ matrix.mirror }}
+        run: |
+          start=$(date +%s.%N)
+          echo "{\"registry-mirrors\":[\"https://${MIRROR}\"]}" | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format 'mirrors={{json .RegistryConfig.Mirrors}}'
+          echo "restart took $(echo "$(date +%s.%N) - $start" | bc) s"
+      - name: what each pull costs Docker Hub
         env:
           U: ${{ secrets.DOCKERHUB_USERNAME }}
           P: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          echo "DOCKER_CONFIG=${DOCKER_CONFIG:-unset}"
-          echo "username length ${#U}; has @: $([[ "$U" == *@* ]] && echo yes || echo no); has whitespace: $([[ "$U" =~ [[:space:]] ]] && echo yes || echo no)"
-          cfg="${DOCKER_CONFIG:-$HOME/.docker}/config.json"
-          jq 'walk(if type=="object" and has("auth") then .auth=(.auth|length|tostring) else . end)' "$cfg"
-          limits() {
-            curl -sI -H "Authorization: Bearer $1" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep -i -E 'ratelimit' || echo "(no rate-limit headers)"
-          }
-          anon="$(curl -s 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull' | jq -r .token)"
-          auth="$(curl -s -u "$U:$P" 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull' | jq -r .token)"
-          echo "--- anonymous"; limits "$anon"
-          echo "--- as the account"; limits "$auth"
           remaining() { curl -sI -H "Authorization: Bearer $1" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | tr -d '\r' | awk -F'[:;] *' 'tolower($1)=="ratelimit-remaining"{print $2}'; }
-          for _ in $(seq 1 80); do
-            auth="$(curl -s -u "$U:$P" 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull' | jq -r .token)"
-            left="$(remaining "$auth")"
-            echo "$(date -u +%H:%M:%S) account remaining=${left:-none}"
-            [ -n "$left" ] && [ "$left" -le 0 ] && break
-            sleep 30
+          token() { curl -s ${1:+-u "$1"} 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull' | jq -r .token; }
+          anon="$(token)"; auth="$(token "$U:$P")"
+          images=(
+            "pgvector/pgvector:0.8.7-pg18-trixie@sha256:9d9c930220cb9bf2f956d10a8f909cf9973d9672ca0278aef2c1e6facccad2e0"
+            "dxflrs/garage:v2.3.0@sha256:866bd13ed2038ba7e7190e840482bc27234c4afaf77be8cfa439ae088c1e4690"
+            "testcontainers/ryuk:0.14.0"
+            "testcontainers/ryuk:0.8.1"
+            "node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c"
+            "python:3.13.15-slim-trixie@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b"
+            "debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad"
+            "alpine:3.23.5@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40"
+            "cloudflare/cloudflared:2026.8.2@sha256:0aa26e284f05e6c77ae375b8c9c11d9eb6a448fb7bcd8d40f31cb6176189eb38"
+          )
+          for image in "${images[@]}"; do
+            a0="$(remaining "$auth")"; n0="$(remaining "$anon")"
+            start=$(date +%s.%N)
+            # The Engine API with X-Registry-Auth, as testcontainers pulls.
+            header="$(jq -cn --arg u "$U" --arg p "$P" '{username:$u,password:$p,serveraddress:"https://index.docker.io/v1/"}' | base64 -w0 | tr '+/' '-_')"
+            out="$(curl -s --unix-socket /var/run/docker.sock -H "X-Registry-Auth: $header" -X POST "http://localhost/images/create?fromImage=$(jq -rn --arg i "$image" '$i|@uri')" | tail -1)"
+            took="$(echo "$(date +%s.%N) - $start" | bc)"
+            a1="$(remaining "$auth")"; n1="$(remaining "$anon")"
+            echo "${image%%@*}: account ${a0}->${a1} address ${n0}->${n1} ${took}s last=$(echo "$out" | cut -c1-160)"
           done
-          echo "--- token request as the account, status:"
-          curl -s -o /dev/null -w '%{http_code}\n' -u "$U:$P" 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/hello-world:pull'
-          echo "--- docker pull while the account is at ${left}"
-          docker pull hello-world:linux 2>&1 | tail -3 || true
-          echo "account:"; limits "$auth"; echo "address:"; limits "$anon"
-          echo "--- the same pull anonymously, with the login removed"
-          docker logout >/dev/null 2>&1 || true
-          docker pull hello-world:latest 2>&1 | tail -3 || true
-          echo "address:"; limits "$anon"
+          docker image ls --digests

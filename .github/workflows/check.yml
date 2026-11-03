@@ -112,7 +112,7 @@ jobs:
 
   full-root:
     needs: lane
-    if: ${{ needs.lane.outputs.lane == 'full' }}
+    if: ${{ needs.lane.outputs.lane == 'probe-off' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
     steps:
@@ -145,19 +145,12 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: probe records pulls
-        run: |
-          nohup docker events --filter type=image --filter event=pull --format '{{.Time}} {{.Actor.ID}}' > "$RUNNER_TEMP/pulls.txt" 2>&1 &
-          sleep 1
       # `check:tree` less `packages/core`'s suite, which is `full-core`'s.
       - run: pnpm check:root
-      - name: probe pulls
-        if: always()
-        run: sleep 2; echo "pulls=$(wc -l < "$RUNNER_TEMP/pulls.txt")"; cat "$RUNNER_TEMP/pulls.txt"; docker image ls --digests
 
   full-core:
     needs: lane
-    if: ${{ needs.lane.outputs.lane == 'full' }}
+    if: ${{ needs.lane.outputs.lane == 'probe-off' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
     steps:
@@ -191,18 +184,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: probe records pulls
-        run: |
-          nohup docker events --filter type=image --filter event=pull --format '{{.Time}} {{.Actor.ID}}' > "$RUNNER_TEMP/pulls.txt" 2>&1 &
-          sleep 1
       - run: pnpm check:core:suite
-      - name: probe pulls
-        if: always()
-        run: sleep 2; echo "pulls=$(wc -l < "$RUNNER_TEMP/pulls.txt")"; cat "$RUNNER_TEMP/pulls.txt"; docker image ls --digests
 
   full-api:
     needs: lane
-    if: ${{ needs.lane.outputs.lane == 'full' }}
+    if: ${{ needs.lane.outputs.lane == 'probe-off' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
     steps:
@@ -234,19 +220,12 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: probe records pulls
-        run: |
-          nohup docker events --filter type=image --filter event=pull --format '{{.Time}} {{.Actor.ID}}' > "$RUNNER_TEMP/pulls.txt" 2>&1 &
-          sleep 1
       - uses: ./.github/actions/git-filter-repo
       - run: pnpm check:api
-      - name: probe pulls
-        if: always()
-        run: sleep 2; echo "pulls=$(wc -l < "$RUNNER_TEMP/pulls.txt")"; cat "$RUNNER_TEMP/pulls.txt"; docker image ls --digests
 
   full-web-unit:
     needs: lane
-    if: ${{ needs.lane.outputs.lane == 'full' }}
+    if: ${{ needs.lane.outputs.lane == 'probe-off' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
     steps:
@@ -264,7 +243,7 @@ jobs:
   # Playwright deals tests to the shards, not files, because the suite is fully parallel.
   full-web-browser:
     needs: lane
-    if: ${{ needs.lane.outputs.lane == 'full' }}
+    if: ${{ needs.lane.outputs.lane == 'probe-off' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
     strategy:
@@ -289,16 +268,9 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: probe records pulls
-        run: |
-          nohup docker events --filter type=image --filter event=pull --format '{{.Time}} {{.Actor.ID}}' > "$RUNNER_TEMP/pulls.txt" 2>&1 &
-          sleep 1
       - run: pnpm check:web:e2e --shard="${SHARD}"
         env:
           SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
-      - name: probe pulls
-        if: always()
-        run: sleep 2; echo "pulls=$(wc -l < "$RUNNER_TEMP/pulls.txt")"; cat "$RUNNER_TEMP/pulls.txt"; docker image ls --digests
       # Not failure(): a flake passes on its retry, and its trace is the one worth reading.
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -310,7 +282,7 @@ jobs:
 
   full-worker:
     needs: lane
-    if: ${{ needs.lane.outputs.lane == 'full' }}
+    if: ${{ needs.lane.outputs.lane == 'probe-off' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
@@ -344,10 +316,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: probe records pulls
-        run: |
-          nohup docker events --filter type=image --filter event=pull --format '{{.Time}} {{.Actor.ID}}' > "$RUNNER_TEMP/pulls.txt" 2>&1 &
-          sleep 1
       - name: one Postgres for the suite's workers
         run: deploy/test-postgres.sh up
       - run: pnpm check:worker
@@ -356,13 +324,10 @@ jobs:
           # Without it every run tells a third party what this repository is building, once
           # per document.
           COCOINDEX_DISABLE_USAGE_TRACKING: "1"
-      - name: probe pulls
-        if: always()
-        run: sleep 2; echo "pulls=$(wc -l < "$RUNNER_TEMP/pulls.txt")"; cat "$RUNNER_TEMP/pulls.txt"; docker image ls --digests
 
   full-images:
     needs: lane
-    if: ${{ needs.lane.outputs.lane == 'full' }}
+    if: ${{ needs.lane.outputs.lane == 'probe-off' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
@@ -396,17 +361,10 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: probe records pulls
-        run: |
-          nohup docker events --filter type=image --filter event=pull --format '{{.Time}} {{.Actor.ID}}' > "$RUNNER_TEMP/pulls.txt" 2>&1 &
-          sleep 1
       - run: pnpm check:images
         env:
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller || needs.lane.outputs.images == 'no' }}
           IMAGE_CACHE_REGISTRY: ghcr.io/${{ github.repository_owner }}
-      - name: probe pulls
-        if: always()
-        run: sleep 2; echo "pulls=$(wc -l < "$RUNNER_TEMP/pulls.txt")"; cat "$RUNNER_TEMP/pulls.txt"; docker image ls --digests
 
   # The title becomes the squash commit's subject.
   pr-title:
