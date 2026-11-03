@@ -24,7 +24,6 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `signOutFromTheShell` | Opens the avatar menu through `personMenuOpened`, then signs out, because sign-out is one disclosure in |
 | `switcherOf` | The workspace switcher in the band, named for where the person is: the workspace they are reading, or the console |
 | `switcherMenuOf` | The switcher's open menu, named as its button is |
-| `allWorkspacesPicked` | Opens the switcher and picks *All Workspaces*, its way to the picker |
 | `railOf` | The icon rail, the `navigation` named *Areas* |
 | `navOf` | The menu, the `navigation` named for the open area, whose name it is given, such as `"Control Centre"` |
 | `crumbOf` | A part of the band's breadcrumb by its name. The current part is a link too, so a part that leads somewhere is told by its `href` |
