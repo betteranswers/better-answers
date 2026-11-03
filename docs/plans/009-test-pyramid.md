@@ -902,7 +902,7 @@ PR 1 deletes 352 of the 367 rows its classification first named. Three rows are 
 
 **Wall.** On CI, the test phase of each shard equals the summed per-test seconds divided by three workers. The 104 staying cases sum to 483 CI seconds (463 for the first 101, and 7.0, 5.3 and 7.3 for the three restored), which is 161 s of testing on one job. With the 25 facet edits at a guessed 1 s each, the fixed costs of 61 to 85 s and the last worker's tail of up to 13 s, one job takes 232 to 272 s, centrally about 242 s. Two shards take about 150 to 185 s each. The central estimate sits about 2 s over the 240 s line, and the range crosses it. Restoring Playwright's browser from a cache would buy about 15 to 30 s (inferred, not measured), and merging the multi-case journeys about 10 s. PR 5 decides from the median of three CI attempts of the one-job wall. One shard stays when that median is at or under 240 s, and two shards otherwise.
 
-**`full-core` balance.** The 40% box stays with the PR that edits `check.yml`. BA-269's shard-balance lane moved here on 28/10/2026, and BA-270 has since balanced the shards, which `main`'s `build` at `d672b7313` ran in 186 and 187 s. Across eight recent `main` builds the slower core shard ran 1.05 to 1.53 times the faster, and 2 of 8 exceeded 1.40, so `main` already fails the box some of the time. The PR re-balances the shards before it asserts the box.
+**`full-core` is one job.** Changed 03/11/2026. The 1.40 ratio rule for the two core shards is withdrawn, and so are the shards. In 5 of 5 valid probe runs a core job finished 33 to 114 s before `full-root`, and one core job ran the whole suite in 137 to 146 s, so the split never set the `check` wall (measured on the probe PR #966).
 
 **Files.**
 
@@ -917,7 +917,7 @@ PR 1 deletes 352 of the 367 rows its classification first named. Three rows are 
 - [ ] PR 1. Write `delete-cases.mjs` under `/tmp/BA-278-1/` and run it. It matches cases by spec and title through `playwright test --list --reporter=json`, deletes only `1-delete` rows, and leaves a loop whole when any of its expansions is kept. Prune the imports, constants and helpers the deletion leaves unused. Run the `scripts/test-inventory.sh` diff at trunk and head, and paste it in the PR body. The removed Playwright lines are exactly the 352 titles, and no other suite's inventory changes.
 - [ ] PR 2 and PR 3. Write each new test at the lowest layer that sees its claim, per the `holder` column. Break the code the claim guards and see the new test fail. Delete the browser case in the same PR, so no claim lapses between PRs.
 - [ ] PR 4. Give each of the 31 page cases its missing facets, and fold the 41 folded cases and the 12 shared-loop cases into them or delete them as the `reason` column says. Add the three optional detail-page cases, a record, a member and a suggestion, only if the measured wall leaves room. Move spec files with `node scripts/move-files.mjs`, and paste the `scripts/test-inventory.sh` diff for `apps/web/e2e` in the PR body.
-- [x] PR 5. Measure the one-job wall at three CI attempts and set the shard count by the rule. If the one-job median is over 240 s, try the browser cache first, then merging the five multi-case journeys, before a second shard. Balance the two `full-core` shards, so that neither job's wall exceeds the other's by more than 40%.
+- [x] PR 5. Measure the one-job wall at three CI attempts and set the shard count by the rule. If the one-job median is over 240 s, try the browser cache first, then merging the five multi-case journeys, before a second shard. Run `full-core` as one job.
 
 **You see.**
 
@@ -936,7 +936,7 @@ PR 1 deletes 352 of the 367 rows its classification first named. Three rows are 
 - [ ] Lane 5. Slow one page's procedure past its budget in a scratch edit. Save `budget-breaks.log`. Pass when that page's case fails.
 - [ ] Lane 6. Add a contrast fault to one page in a scratch edit. Save `gate-breaks.log`. Pass when the gate fails.
 - [ ] Lane 7. Run `pnpm lint:workflows`. Save `workflows.log`. Pass when it passes.
-- [ ] Lane 8. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Save `ci-run.json`. Pass when `full-web-browser` runs at the shard count the rule names and is green, and, for PR 5, neither `full-core` shard's job wall exceeds the other's by more than 40%.
+- [ ] Lane 8. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Save `ci-run.json`. Pass when `full-web-browser` runs at the shard count the rule names and is green.
 - [ ] Lane 9. Run `pnpm check:docs`. Save `docs.log`. Pass when it passes.
 - [ ] Lane 10. Audit that every deleted case is DROP with its reason in `ba-278-cases.tsv`, or is held by a named test that makes its claim. Save `audit.md`. Pass when none is unaccounted for.
 
