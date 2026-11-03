@@ -99,7 +99,8 @@ const filesUnder = async (folder: string): Promise<readonly string[]> => {
 
 const TEMPLATE_PREFIX = "tpl_ts_";
 
-export const templateNameOver = async (folder: string): Promise<string> => {
+/** `month` is the server's UTC `YYYY-MM`: a migration makes the question months of the clock it runs on. */
+export const templateNameOver = async (folder: string, month: string): Promise<string> => {
   const files = await filesUnder(folder);
   const contents = await Promise.all(files.map((file) => readFile(path.join(folder, file))));
   const digest = createHash("sha256");
@@ -109,9 +110,22 @@ export const templateNameOver = async (folder: string): Promise<string> => {
       .update(contents[at] ?? "")
       .update("\0");
   });
-  digest.update(await readFile(HARNESS_SOURCE)).update(MARK_THE_MATCH_LEAKPROOF);
+  digest
+    .update(await readFile(HARNESS_SOURCE))
+    .update(MARK_THE_MATCH_LEAKPROOF)
+    .update(month);
   return `${TEMPLATE_PREFIX}${digest.digest("hex").slice(0, 12)}`;
 };
+
+const monthOfTheServer = (adminUri: string): Promise<string> =>
+  withAdmin(adminUri, async (admin) => {
+    const read = await admin.query<{ month: string }>(
+      "SELECT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM') AS month",
+    );
+    const month = read.rows[0]?.month;
+    if (month === undefined) throw new Error("the server named no month");
+    return month;
+  });
 
 const databaseExists = async (admin: pg.Client, database: string): Promise<boolean> => {
   const found = await admin.query("SELECT 1 FROM pg_database WHERE datname = $1", [database]);
@@ -267,7 +281,7 @@ const startShared = async ({ uri, shared }: Locator): Promise<Started> => {
   const fault = imageFault(server, shared);
   if (fault !== undefined) throw pointTheWayUp(fault);
   await sweepDeadRuns(adminUri);
-  const name = await templateNameOver(migrationsFolder);
+  const name = await templateNameOver(migrationsFolder, await monthOfTheServer(adminUri));
   const templateDatabase = await ensureTemplate(adminUri, name, migrateInto);
   return {
     provided: { connectionUri: adminUri, templateDatabase, runId: process.pid, source: "shared" },
