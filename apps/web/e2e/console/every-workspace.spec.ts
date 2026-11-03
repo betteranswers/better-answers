@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { WORKSPACES_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
@@ -51,51 +53,54 @@ const theOperator = async (page: Page, api: APIRequestContext, workspaceName: st
 };
 
 test.describe("the console's Workspaces page", () => {
-  test("renders the list within the constitution's latency budget", async ({ page, request }) => {
-    const workspace = await theOperator(page, request, "Wensleydale Precision");
-
-    const started = Date.now();
-    await page.goto(EVERY_WORKSPACE);
-    await expect(rowOf(page, workspace.name)).toBeVisible();
-    const elapsed = Date.now() - started;
-
-    test.info().annotations.push({ type: "workspaces list", description: `${elapsed} ms` });
-    expect(elapsed, "the workspaces list took longer than its second").toBeLessThan(LIST_BUDGET_MS);
-  });
-
-  test("scrolls nothing sideways at 320 pixels", async ({ page, request }) => {
-    const workspace = await theOperator(page, request, "Acme Joinery");
-    await page.setViewportSize({ width: 320, height: 720 });
-    await page.goto(EVERY_WORKSPACE);
-    await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
-    await expect(rowOf(page, workspace.name)).toBeVisible();
-
-    await expect(listOf(page).getByRole("columnheader")).toHaveText(["Workspace", "Short Name"]);
-    const room = {
-      page: await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      ),
-      table: await page
-        .locator("[data-slot=table-container]")
-        .evaluate((table) => table.scrollWidth - table.clientWidth),
-    };
-    expect(room, "the page or its table scrolls sideways").toEqual({ page: 0, table: 0 });
-
-    await listOf(page).getByRole("button", { name: "Columns" }).click();
-    await page.getByRole("menuitemcheckbox", { name: "Members" }).click();
-    await page.keyboard.press("Escape");
-    await expect(rowOf(page, workspace.name).getByRole("cell").nth(2)).toHaveText(/\b1\b/);
-  });
-
   test("is keyboard-operable, sounds like a table and passes axe", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     const workspace = await theOperator(page, request, "Pendle Toolworks");
-    await page.goto(EVERY_WORKSPACE);
     const ours = rowOf(page, workspace.name);
-    await expect(ours).toBeVisible();
+
+    await test.step("renders the list within the constitution's latency budget", async () => {
+      const started = Date.now();
+      await page.goto(EVERY_WORKSPACE);
+      await expect(ours).toBeVisible();
+      const elapsed = Date.now() - started;
+
+      test.info().annotations.push({ type: "workspaces list", description: `${elapsed} ms` });
+      expect(elapsed, "the workspaces list took longer than its second").toBeLessThan(
+        LIST_BUDGET_MS,
+      );
+    });
+
+    await test.step("scrolls nothing sideways at 320 pixels", async () => {
+      const desktop = page.viewportSize();
+      assert.ok(desktop !== null, "the page has a viewport");
+      await page.setViewportSize({ width: 320, height: 720 });
+      await page.goto(EVERY_WORKSPACE);
+      await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
+      await expect(ours).toBeVisible();
+
+      await expect(listOf(page).getByRole("columnheader")).toHaveText(["Workspace", "Short Name"]);
+      const room = {
+        page: await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+        table: await page
+          .locator("[data-slot=table-container]")
+          .evaluate((table) => table.scrollWidth - table.clientWidth),
+      };
+      expect(room, "the page or its table scrolls sideways").toEqual({ page: 0, table: 0 });
+
+      await listOf(page).getByRole("button", { name: "Columns" }).click();
+      await page.getByRole("menuitemcheckbox", { name: "Members" }).click();
+      await page.keyboard.press("Escape");
+      await expect(ours.getByRole("cell").nth(2)).toHaveText(/\b1\b/);
+
+      await page.setViewportSize(desktop);
+      await page.goto(EVERY_WORKSPACE);
+      await expect(ours).toBeVisible();
+    });
 
     await skipLinkReachesThePage(page);
 

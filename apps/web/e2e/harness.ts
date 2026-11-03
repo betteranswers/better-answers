@@ -533,6 +533,15 @@ export const signedInAtHome = async (
   await landedAtHome(page, role);
 };
 
+export const signedInAsTheOperator = async (page: Page, api: APIRequestContext) => {
+  const tag = `t${Date.now()}${Math.floor(Math.random() * 1e6)}`;
+  const email = anAddress(`${tag}-operator`);
+  const workspace = await provision(api, { name: `Operators ${tag}`, adminEmail: email });
+  await markTheOperator(api, email);
+  await signedInAtHome(page, api, email);
+  return { ...workspace, tag };
+};
+
 export const inTwoWorkspaces = async (
   page: Page,
   api: APIRequestContext,
