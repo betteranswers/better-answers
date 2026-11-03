@@ -106,6 +106,25 @@ describe("the warm harness", () => {
     }
   });
 
+  it("holds the question months of the server's clock", async () => {
+    const db = await openMigratedPostgres("question-months");
+    try {
+      const made = await db.pool.query<{ name: string }>(
+        `SELECT child.relname AS name FROM pg_inherits
+           JOIN pg_class child ON child.oid = pg_inherits.inhrelid
+          WHERE pg_inherits.inhparent = 'question_content'::regclass ORDER BY 1`,
+      );
+      const clock = await db.pool.query<{ name: string }>(
+        `SELECT 'question_content_' || to_char((now() AT TIME ZONE 'UTC') + months * interval '1 month', 'YYYY_MM') AS name
+           FROM unnest(ARRAY[0, 1]) AS months`,
+      );
+
+      expect(made.rows).toEqual(clock.rows);
+    } finally {
+      await db.stop();
+    }
+  });
+
   it("gives each file a database of its own", async () => {
     const one = await openMigratedPostgres("one-file");
     const another = await openMigratedPostgres("another-file");
@@ -777,10 +796,23 @@ describe("a shared template", () => {
     const folder = await mkdtemp(path.join(tmpdir(), "warm-template-"));
     try {
       await writeFile(path.join(folder, "0000_first.sql"), "CREATE TABLE one ();");
-      const named = await templateNameOver(folder);
+      const named = await templateNameOver(folder, "2026-10");
       await rename(path.join(folder, "0000_first.sql"), path.join(folder, "0000_renamed.sql"));
 
-      expect(await templateNameOver(folder)).not.toBe(named);
+      expect(await templateNameOver(folder, "2026-10")).not.toBe(named);
+    } finally {
+      await rm(folder, { recursive: true });
+    }
+  });
+
+  it("changes its name when the server's month turns", async () => {
+    const folder = await mkdtemp(path.join(tmpdir(), "warm-template-"));
+    try {
+      await writeFile(path.join(folder, "0000_first.sql"), "CREATE TABLE one ();");
+
+      expect(await templateNameOver(folder, "2026-11")).not.toBe(
+        await templateNameOver(folder, "2026-10"),
+      );
     } finally {
       await rm(folder, { recursive: true });
     }
@@ -792,11 +824,15 @@ describe("a shared template", () => {
       await mkdir(path.join(folder, "meta"));
       await writeFile(path.join(folder, "0000_first.sql"), "CREATE TABLE one ();");
       await writeFile(path.join(folder, "meta", "_journal.json"), "{}");
-      const named = await templateNameOver(folder);
-      const again = await templateNameOver(folder);
+      const named = await templateNameOver(folder, "2026-10");
+      const again = await templateNameOver(folder, "2026-10");
       await writeFile(path.join(folder, "0000_first.sql"), "CREATE TABLE two ();");
 
-      expect({ named, again, changed: (await templateNameOver(folder)) !== named }).toEqual({
+      expect({
+        named,
+        again,
+        changed: (await templateNameOver(folder, "2026-10")) !== named,
+      }).toEqual({
         named: matching.stringMatching(/^tpl_ts_[0-9a-f]{12}$/u),
         again: named,
         changed: true,
