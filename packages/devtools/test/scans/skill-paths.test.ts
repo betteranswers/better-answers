@@ -109,7 +109,7 @@ describe("the gate", () => {
 
     expect(found).toHaveLength(1);
     expect(found[0]).toContain("symlink");
-    expect(found[0]).toContain("git checkout -- .claude/skills/hono");
+    expect(found[0]).toContain("git checkout HEAD -- .claude/skills/hono");
     expect(found[0]).toContain("skills-update");
     expect(found[0]).not.toContain("Delete the row");
   });
@@ -124,7 +124,7 @@ describe("the gate", () => {
     );
 
     expect(found).toHaveLength(1);
-    expect(found[0]).toContain("git checkout -- .claude/skills/hono");
+    expect(found[0]).toContain("git checkout HEAD -- .claude/skills/hono");
   });
 
   it("accepts the named symlink to a tracked target", () => {
@@ -150,7 +150,7 @@ describe("the gate", () => {
     );
 
     expect(found).toHaveLength(1);
-    expect(found[0]).toContain("git checkout -- .claude/skills/hono");
+    expect(found[0]).toContain("git checkout HEAD -- .claude/skills/hono");
     expect(found[0]).not.toContain("Delete the row");
   });
 

@@ -99,7 +99,7 @@ const sameList = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((one, index) => one === right[index]);
 
 const recovery = (skill: string): string =>
-  `Run git checkout -- ${SKILLS_FOLDER}/${skill} to restore it, then update with ${UPDATE_COMMAND}, which installs a real copy. Never delete its row.`;
+  `Run git checkout HEAD -- ${SKILLS_FOLDER}/${skill} to restore it, then update with ${UPDATE_COMMAND}, which installs a real copy. Never delete its row.`;
 
 const describe = (paths: readonly string[]): string =>
   paths.length === 0 ? "no paths line" : pathsLine(paths);
