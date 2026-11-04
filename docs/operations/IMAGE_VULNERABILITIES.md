@@ -29,7 +29,7 @@ Every critical, high, medium and unrated alert open that day, except those a fix
 - 5 are glibc's CVE-2026-84243, from BA-310, which read the repository only. The images confirm it. The `image-api` reason is reworded, because `initRepository` runs `git init` without `LC_ALL=C`. That call still runs in C, as nothing sets `LANG`.
 - 84 are new, under BA-323.
 
-Held open: #1667 and #1671 (BA-283), #1837, and #446, above. These have a fix: undici in pnpm under `/opt/corepack` (#1849, #1850, #1860, #1861 and #1862, BA-311), `libbrotli1` in `image-backup` (#1841), and `ca-certificates` (#1839) and `liblzma5` (#1733 and #1365) in `image-worker`.
+Held open: #1667 and #1671 (BA-283), #1837, and #446, above. Left to a fix, and not assessed: undici in pnpm under `/opt/corepack` (#1849, #1850, #1860, #1861 and #1862, BA-311), `libbrotli1` in `image-backup` (#1841), and `ca-certificates` (#1839) and `liblzma5` (#1733 and #1365) in `image-worker`.
 
 ### `image-api`
 
@@ -52,7 +52,7 @@ The service is as on 24/09, below. The image's `backup.sh` and `backup-env` matc
 - **`curl`, `libcurl4t64`, `libcurl3t64-gnutls`**: CVE-2026-92388, 3 alerts. The flaw needs a failed FTP wildcard `LIST` and a reused handle. The job's one `curl` call is an HTTPS POST to the ping URL, one handle per run, and git's HTTP transports never run.
 - **gcc-14**: `gcc-14-base`, `libgcc-s1`, `libstdc++6`. CVE-2026-95619 (#1662 to #1664), CVE-2026-102010 (#1644 to #1646), and CVE-2026-114690, CVE-2026-114691 and CVE-2026-115455 (#1872 to #1877 and #1888 to #1890), 15 alerts. `gcc-14-base` is docs only, and `libgcc_s` exports no C++ symbol. Only apt's binaries link `libstdc++`, and the jobs never run apt. cron, the jobs' tools, `rclone` and `age` are C or Go.
 - **glibc**: `libc6`, `libc-bin`. CVE-2026-84243, 2 alerts. The image has no locale but C.UTF-8, and every job runs in C.
-- **Go's standard library in `age` and `age-keygen`**: the thirteen CVEs BA-279 names, 26 alerts. `age` v1.3.2 (go1.27.0) links no `net/http`, `html/template`, `mime/multipart`, `crypto/tls` or `(*Certificate).Verify`. It encrypts local files only.
+- **Go's standard library in `age` and `age-keygen`**: CVE-2026-56866, CVE-2026-78659, CVE-2026-78660, CVE-2026-78663, CVE-2026-78667, CVE-2026-78669, CVE-2026-94439, CVE-2026-94440, CVE-2026-94448, CVE-2026-97030, CVE-2026-97031, CVE-2026-97032 and CVE-2026-111943, 26 alerts. The low CVE-2026-56857 is left open with the other low alerts. `age` v1.3.2 (go1.27.0) links no `net/http`, `html/template`, `mime/multipart`, `crypto/tls` or `(*Certificate).Verify`. It encrypts local files only.
 - **`github.com/go-chi/chi/v5` in `rclone`**: CVE-2026-114437, 1 alert. The flaw is in the `ClientIPFromXFF` middleware. `rclone` links chi's `middleware` package but not that function, and runs here as an S3 client with no listener.
 - **`golang.org/x/crypto` in `age`, `age-keygen` and `rclone`**: GO-2026-5932, 3 alerts. The advisory is the unmaintained `openpgp` package, and none of the three binaries links any of its functions.
 - **`golang.org/x/net` in `rclone`**: CVE-2026-78661 and CVE-2026-97045, 2 alerts. Both flaws are in `x/net/html`, which parses HTML. An `s3` remote returns XML, which `rclone` parses with `encoding/xml`. Which `rclone` code calls the HTML parser is inferred from its source, not read in the binary.
@@ -60,7 +60,7 @@ The service is as on 24/09, below. The image's `backup.sh` and `backup-env` matc
 - **`libexpat1`**: CVE-2026-113351, CVE-2026-115506, CVE-2026-117610 and CVE-2026-118370, 4 alerts. Nothing imports `XML_ParserReset`, only `git-http-push` links the library, and the mirror push is over SSH.
 - **`libsasl2-2`, `libsasl2-modules-db`**: CVE-2026-107161, 2 alerts. As in `image-api`: no DIGEST-MD5 plugin, and only `libldap` links `libsasl2`.
 - **`libsqlite3-0`**: the nine CVEs in `image-api`, 9 alerts. Only `liblastlog2` links it, for `lslogins`, which the jobs never run.
-- **`openssh-client`**: CVE-2026-106553, CVE-2026-106555, CVE-2026-106586, CVE-2026-106552, CVE-2026-106585 and CVE-2026-106583, 6 alerts. The first three are in `sshd`, which the image does not carry. CVE-2026-106552 is in `sftp`, which `backup.sh` never runs. CVE-2026-106585 needs compression: `backup.sh` passes no `-C`, and no file in `/etc/ssh` sets `Compression`. CVE-2026-106583 needs a `$` or `\` in a command-line username, and the only one is the mirror account in the operator's `GIT_MIRROR_SSH_TARGET`.
+- **`openssh-client`**: CVE-2026-106553, CVE-2026-106555, CVE-2026-106586, CVE-2026-106552, CVE-2026-106585 and CVE-2026-106583, 6 alerts. The first three are in `sshd`, which the image does not carry. CVE-2026-106552 is in `sftp`, which `backup.sh` never runs. CVE-2026-106585 needs compression: `backup.sh` passes no `-C`, no file in `/etc/ssh` sets `Compression`, and `/root/.ssh` is the read-only mount of `/data/backup/mirror-ssh` (`deploy/stores.compose.yaml`), which `host-setup.sh` fills with the mirror's key and `known_hosts` and no config. CVE-2026-106583 needs a `$` or `\` in a command-line username. The only one is `mirror`, from the operator's `GIT_MIRROR_SSH_TARGET` (`deploy/wizard-41.sh`), which holds neither.
 - **Perl**: the four packages in `image-api`. CVE-2026-82560, 4 alerts. Perl runs only as `pg_wrapper`, which loads no `Pod::` module.
 
 ### `image-worker`
