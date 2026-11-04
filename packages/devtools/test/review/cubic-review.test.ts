@@ -26,6 +26,19 @@ import {
 const NO_PROVIDER =
   "No AI provider is configured. Set CUBIC_API_KEY, or run `cubic auth login`, `cubic auth connect codex`, `cubic auth connect cursor`, or `claude login`.";
 
+const SUBSCRIPTION_EXPIRED = `{
+  "issues": [],
+  "error": "Subscription expired. Visit https://www.cubic.dev/settings?tab=subscription to renew.",
+  "repository_context": {
+    "status": "loaded",
+    "repository": "betteranswers/better-answers",
+    "settings": true,
+    "custom_agents": ["Require API Auth, Validation, and Tenant Scoping"],
+    "learnings": 0
+  }
+}
+`;
+
 const LOADED = { status: "loaded", repository: "betteranswers/better-answers", settings: true };
 
 const finding = (priority: string, file: string, title: string, line?: number) => ({
@@ -60,27 +73,8 @@ describe("reading the cubic CLI's output", () => {
     expect(review).toMatchObject({ kind: "findings", issues: [{ priority: "P1", line: 12 }] });
   });
 
-  it("reads an error beside exit 1 as a failure", () => {
-    const failed = reviewFrom(cli({ issues: [], error: NO_PROVIDER }, 1));
-
-    expect(kindOf(failed)).toBe("could-not-run:no-credential");
-  });
-
   it("reads the failure the real CLI 1.14.2 printed", () => {
-    const printed = `{
-  "issues": [],
-  "error": "Subscription expired. Visit https://www.cubic.dev/settings?tab=subscription to renew.",
-  "repository_context": {
-    "status": "loaded",
-    "repository": "betteranswers/better-answers",
-    "settings": true,
-    "custom_agents": ["Require API Auth, Validation, and Tenant Scoping"],
-    "learnings": 0
-  }
-}
-`;
-
-    expect(kindOf(reviewFrom(cli(printed, 1)))).toBe("could-not-run:subscription");
+    expect(kindOf(reviewFrom(cli(SUBSCRIPTION_EXPIRED, 1)))).toBe("could-not-run:subscription");
   });
 
   it("lets an error outrank findings printed beside it", () => {
@@ -94,9 +88,9 @@ describe("reading the cubic CLI's output", () => {
   it.each([
     ["a rate limit", "Rate limit exceeded. Try again in 60 seconds.", "rate-limit"],
     ["a 429", "Server error (429)", "rate-limit"],
+    ["no provider configured", NO_PROVIDER, "no-credential"],
     ["a missing credential", "Cubic credentials are missing", "no-credential"],
     ["a malformed key", "CUBIC_API_KEY does not look like a cubic API key", "no-credential"],
-    ["a lapsed subscription", "Subscription expired. Visit cubic.dev to renew.", "subscription"],
     ["an unknown failure", "Review returned an invalid final response", "failed"],
   ])("names %s", (_name, error, cause) => {
     expect(kindOf(reviewFrom(cli({ issues: [], error }, 1)))).toBe(`could-not-run:${cause}`);
@@ -195,18 +189,26 @@ describe("the report", () => {
     expect(lines[3]).toMatch(/…$/u);
   });
 
-  it("names the sign-in routes when no credential is set", () => {
+  it("names the connect and sign-in routes without a credential", () => {
     const text = report(HEAD, BASE, reviewFrom(cli({ issues: [], error: NO_PROVIDER }, 1)));
 
     expect(text).toContain("could not run on head " + HEAD + " (no credential)");
+    expect(text).toContain("`cubic auth connect claude-code`");
     expect(text).toContain("`cubic auth login`");
     expect(text).toContain("CUBIC_API_KEY");
   });
 
-  it("tells how to install a missing CLI", () => {
+  it("names the provider connection for a lapsed subscription", () => {
+    const text = report(HEAD, BASE, reviewFrom(cli(SUBSCRIPTION_EXPIRED, 1)));
+
+    expect(text).toContain("(subscription)");
+    expect(text).toContain("`cubic auth connect claude-code`");
+  });
+
+  it("tells how to install a missing CLI without git-ai", () => {
     const text = report(HEAD, BASE, couldNot("cli-absent", "`cubic` is not on PATH"));
 
-    expect(text).toContain("npm install --global @cubic-dev-ai/cli");
+    expect(text).toContain("CUBIC_DISABLE_GIT_AI=1 npm install --global @cubic-dev-ai/cli");
   });
 
   it("says unknown when no head could be read", () => {
@@ -219,16 +221,13 @@ describe("the report", () => {
 describe("the branch the review would cover", () => {
   const tree = { head: "a".repeat(40), dirty: false };
 
-  it("accepts a clean branch", () => {
+  it("accepts a clean branch whose head held still", () => {
     expect(refusal(tree)).toBeUndefined();
+    expect(drift(tree, tree)).toBeUndefined();
   });
 
   it("refuses uncommitted tracked changes", () => {
     expect(refusal({ ...tree, dirty: true })).toContain("uncommitted");
-  });
-
-  it("accepts a head that held still", () => {
-    expect(drift(tree, tree)).toBeUndefined();
   });
 
   it("refuses a head that moved", () => {
@@ -241,7 +240,7 @@ describe("the branch the review would cover", () => {
 });
 
 describe("the child's environment and the printed text", () => {
-  it("keeps the key and adds the headless switches", () => {
+  it("keeps the key and adds the headless and git-ai switches", () => {
     const env = { CUBIC_API_KEY: "cbk_secret", PATH: "/bin" };
     const child = cubicEnvironment(env);
 
@@ -250,6 +249,7 @@ describe("the child's environment and the printed text", () => {
       PATH: "/bin",
       CUBIC_DISABLE_AUTOUPDATE: "1",
       CUBIC_DISABLE_LSP_DOWNLOAD: "1",
+      CUBIC_DISABLE_GIT_AI: "1",
     });
     expect(env).toEqual({ CUBIC_API_KEY: "cbk_secret", PATH: "/bin" });
   });
@@ -360,18 +360,6 @@ describe("the cubic-review script", () => {
 
     expect(result.status).toBe(1);
     expect(result.stdout).toContain("P1 b.txt:1 Wrong total");
-  });
-
-  it("exits 2 and names the sign-in routes without a credential", () => {
-    const one = setup();
-    stubCubic(one, { issues: [], error: NO_PROVIDER }, 1);
-
-    const result = ranOn(one);
-
-    expect(result.status).toBe(2);
-    expect(result.stdout).toContain("(no credential)");
-    expect(result.stdout).toContain("cubic auth login");
-    expect(result.stdout).toContain("CUBIC_API_KEY");
   });
 
   it("exits 2 when the cubic CLI is not installed", () => {

@@ -64,16 +64,16 @@ export const EXIT = {
 const CAUSES = {
   "no-credential": {
     label: "no credential",
-    fix: "sign in with `cubic auth login`, or export CUBIC_API_KEY (a `cbk_` personal key from cubic.dev) for CI and cloud sessions",
+    fix: "run `cubic auth connect claude-code` (or `codex`) to review with that model, which needs no Cubic seat. Or sign in with `cubic auth login`, or export CUBIC_API_KEY (a `cbk_` personal key from cubic.dev), which need an active Cubic subscription",
   },
   "rate-limit": { label: "rate limit", fix: "wait a few minutes, then run it again" },
   subscription: {
     label: "subscription",
-    fix: "the organisation's Cubic subscription must be active for the CLI to review. The owner manages it at cubic.dev/settings. Until then, ask the PR bot",
+    fix: "Cubic's included model needs an active subscription, which the owner manages at cubic.dev/settings. Run `cubic auth connect claude-code` (or `codex`) to review without a seat",
   },
   "cli-absent": {
     label: "cubic CLI not installed",
-    fix: "npm install --global @cubic-dev-ai/cli",
+    fix: "CUBIC_DISABLE_GIT_AI=1 npm install --global @cubic-dev-ai/cli (the variable keeps Cubic's git-ai notes and git hook off this machine)",
   },
   "not-ready": { label: "branch not ready", fix: undefined },
   failed: { label: "cubic failed", fix: undefined },
@@ -165,11 +165,12 @@ export const drift = (before: Tree, after: Tree): string | undefined => {
   return after.dirty ? "tracked files changed during the review." : undefined;
 };
 
-/** The one place the environment reaches the child: the headless switches the CLI's docs recommend. */
+/** The headless switches the CLI's docs recommend, and the opt-out that keeps its git-ai hook off the machine. */
 export const cubicEnvironment = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => ({
   ...env,
   CUBIC_DISABLE_AUTOUPDATE: "1",
   CUBIC_DISABLE_LSP_DOWNLOAD: "1",
+  CUBIC_DISABLE_GIT_AI: "1",
 });
 
 export const redact = (text: string, secret: string | undefined): string =>
