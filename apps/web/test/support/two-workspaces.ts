@@ -6,7 +6,7 @@ import { createAppClients } from "@/app/providers.tsx";
 import type { Role } from "@/shared/navigation.ts";
 
 import { drawApp, openApp } from "./open-app.tsx";
-import { server, type Asked } from "./stub-server.ts";
+import { server, type Ask, type Asked } from "./stub-server.ts";
 import { addressOf, answered, type Api } from "./stubbed-api.ts";
 
 export const NORTHERN = { id: "w", name: "Northern Tooling" };
@@ -100,9 +100,11 @@ const inputsOf = (address: URL, init?: RequestInit): Readonly<Record<string, unk
   return typeof raw === "string" ? z.record(z.string(), z.unknown()).parse(JSON.parse(raw)) : {};
 };
 
-const answering =
-  (api: Api) =>
-  async (asked: Asked, init?: RequestInit): Promise<Response> => {
+/** Starts a fresh record, so a request an earlier test left in flight lands in that test's record. */
+const answering = (api: Api) => {
+  const asks: Ask[] = [];
+  server.asks = asks;
+  return async (asked: Asked, init?: RequestInit): Promise<Response> => {
     const address = addressOf(asked);
     const { pathname } = address;
     await aTurnLater();
@@ -114,11 +116,12 @@ const answering =
     const names = pathname.replace("/trpc/", "").split(",");
     const inputs = inputsOf(address, init);
     for (const [at, procedure] of names.entries()) {
-      server.asks.push({ procedure, input: inputs[String(at)] });
+      asks.push({ procedure, input: inputs[String(at)] });
     }
     const answers = names.map((name) => Promise.resolve(api.get(name)?.() ?? FORBIDDEN));
     return answered(await Promise.all(answers));
   };
+};
 
 export const band = () => within(screen.getByRole("banner"));
 
@@ -155,7 +158,6 @@ export const drawnWithNoWorkspace = async () => {
 };
 
 export const openAt = async (path: string, api: Api) => {
-  server.asks = [];
   server.answer = answering(api);
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
@@ -168,7 +170,6 @@ export type Answering = typeof server.answer;
 
 /** Draws the app at once, as the browser does, and returns without waiting on a read the first draw needs. */
 export const drawnAt = (path: string, api: Api, through: (answer: Answering) => Answering) => {
-  server.asks = [];
   server.answer = through(answering(api));
   return drawApp(path);
 };
@@ -178,7 +179,6 @@ export const openOutsideTheShellAt = async (
   api: Api,
   watching?: (asked: Asked, init?: RequestInit) => void,
 ) => {
-  server.asks = [];
   const answer = answering(api);
   server.answer = (asked, init) => {
     watching?.(asked, init);
