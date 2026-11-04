@@ -12,7 +12,6 @@ import {
   waitingEdit,
   waitingOnYou,
   type SuggestionRequest,
-  type WriteConceptInput,
 } from "../../src/concepts/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { parseLocator, passageAt } from "../../src/sources/index.ts";
@@ -292,42 +291,50 @@ describe("Waiting on you", () => {
 
   it("hides an edit whose concept the owner cannot read", async () => {
     const scenario = await arrange();
-    const { suggestionId } = await conceptProposedBy(scenario, scenario.viewer, {
-      sensitivity: "Restricted",
+    const restricted = { sensitivity: "Restricted" } as const;
+    const published = await conceptProposedBy(scenario, scenario.viewer, restricted);
+    const draft = await conceptProposedBy(scenario, scenario.viewer, {
+      ...restricted,
+      status: "draft",
     });
 
     expect({
       owner: await suggestionsWaitingFor(scenario.editor),
-      ownerOpens: await openedBy(scenario.editor, suggestionId),
+      ownerOpensPublished: await openedBy(scenario.editor, published.suggestionId),
+      ownerOpensDraft: await openedBy(scenario.editor, draft.suggestionId),
       admin: await suggestionsWaitingFor(scenario.admin),
     }).toEqual({
       owner: [],
-      ownerOpens: { ok: false, error: "not-found" },
-      admin: [suggestionId],
+      ownerOpensPublished: { ok: false, error: "not-found" },
+      ownerOpensDraft: { ok: false, error: "not-found" },
+      admin: [published.suggestionId, draft.suggestionId],
     });
   });
 
   it("hides an edit from an Admin outside its concept's audience", async () => {
     const scenario = await arrange();
-    const { written, suggestionId } = await conceptProposedBy(scenario, scenario.viewer);
+    const published = await conceptProposedBy(scenario, scenario.viewer);
+    const draft = await conceptProposedBy(scenario, scenario.viewer, { status: "draft" });
     await db().pool.query(
       `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
-        WHERE workspace_id = $1 AND iri = $2`,
-      [scenario.workspaceId, written.iri, ulid()],
+        WHERE workspace_id = $1 AND iri = ANY($2)`,
+      [scenario.workspaceId, [published.written.iri, draft.written.iri], ulid()],
     );
 
     expect({
       admin: await suggestionsWaitingFor(scenario.admin),
-      adminOpens: await openedBy(scenario.admin, suggestionId),
+      adminOpensPublished: await openedBy(scenario.admin, published.suggestionId),
+      adminOpensDraft: await openedBy(scenario.admin, draft.suggestionId),
     }).toEqual({
       admin: [],
-      adminOpens: { ok: false, error: "not-found" },
+      adminOpensPublished: { ok: false, error: "not-found" },
+      adminOpensDraft: { ok: false, error: "not-found" },
     });
   });
 
   describe("on a draft concept", () => {
-    const draftProposed = (scenario: Scenario, wrote: Partial<WriteConceptInput> = {}) =>
-      conceptProposedBy(scenario, scenario.viewer, { status: "draft", ...wrote });
+    const draftProposed = (scenario: Scenario) =>
+      conceptProposedBy(scenario, scenario.viewer, { status: "draft" });
 
     const standingText = {
       title: "Expenses",
@@ -367,39 +374,6 @@ describe("Waiting on you", () => {
         proposerOpens: { ok: false, error: "not-found" },
         anotherEditor: [],
         anotherEditorOpens: { ok: false, error: "not-found" },
-      });
-    });
-
-    it("hides its edit from an Admin outside its audience", async () => {
-      const scenario = await arrange();
-      const { written, suggestionId } = await draftProposed(scenario);
-      await db().pool.query(
-        `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
-          WHERE workspace_id = $1 AND iri = $2`,
-        [scenario.workspaceId, written.iri, ulid()],
-      );
-
-      expect({
-        admin: await suggestionsWaitingFor(scenario.admin),
-        adminOpens: await openedBy(scenario.admin, suggestionId),
-      }).toEqual({
-        admin: [],
-        adminOpens: { ok: false, error: "not-found" },
-      });
-    });
-
-    it("shows a Restricted draft's edit to Admins, not its owner", async () => {
-      const scenario = await arrange();
-      const { suggestionId } = await draftProposed(scenario, { sensitivity: "Restricted" });
-
-      expect({
-        owner: await suggestionsWaitingFor(scenario.editor),
-        ownerOpens: await openedBy(scenario.editor, suggestionId),
-        admin: await suggestionsWaitingFor(scenario.admin),
-      }).toEqual({
-        owner: [],
-        ownerOpens: { ok: false, error: "not-found" },
-        admin: [suggestionId],
       });
     });
 
