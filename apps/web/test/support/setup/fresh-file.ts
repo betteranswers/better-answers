@@ -1,8 +1,12 @@
-import { vi } from "vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
 
 declare global {
   var fetchBeforeAnyStub: typeof fetch | undefined;
 }
+
+/** Vitest has no globals, so Testing Library registers no cleanup of its own. */
+afterEach(cleanup);
 
 /**
  * Under Vitest's `isolate: false` a worker keeps modules and the jsdom window across files, so each
