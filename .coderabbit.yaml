@@ -13,8 +13,10 @@ reviews:
   review_status: true
   collapse_walkthrough: true
   sequence_diagrams: false
+  # Cubic is the default reviewer. A positive label opts a pull request in while enabled is false.
   auto_review:
-    enabled: true
+    enabled: false
+    labels: ["review:coderabbit"]
     drafts: false
   path_filters:
     - "!pnpm-lock.yaml"

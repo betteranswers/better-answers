@@ -5,7 +5,8 @@ version: 1
 reviews:
   enabled: true
   sensitivity: medium
-  incremental_commits: true
+  # One review on open. A later push is reviewed locally: pnpm run cubic-review.
+  incremental_commits: false
   check_drafts: false
   architecture_diagrams: true
   external_contributors_require_manual_review: false
