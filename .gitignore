@@ -9,62 +9,44 @@ __pycache__/
 .ruff_cache/
 .turbo/
 coverage/
-# A generic cache root, where CI restores the redaction detector's weights, is never
-# tracked material: the format check walks a checkout's files, and a downloaded weight
-# is neither prose nor small (PR #57 CI).
 .cache/
-# `reports/mutation/` carries a slash, so git anchored it to the repository root and left
-# `apps/api/reports/` and `packages/core/reports/` tracked. Every workspace on the mutation
-# schedule writes its report and its incremental result file under its own `reports/`, so the
-# pattern has to match at any depth — and the incremental file is git-ignored on purpose:
-# actions/cache is what carries it from night to night.
 reports/
 
-# Mutation testing leftovers: mutmut copies the tier into `apps/worker/mutants/`, and
-# Stryker's Vitest runner writes a per-worker setup file into the workspace it runs in.
+# Mutation testing
 mutants/
 stryker-setup-*.js
 
-# Playwright's per-run artefacts (traces, screenshots) and its last-run marker.
+# Playwright
 test-results/
 playwright-report/
+.playwright-cli/
 
-# local env — every secret lives in Coolify's env or the password manager (docs/operations/SECRETS.md)
+# Local env
 .env
 .env.*
 !.env.example
 
-# worker state is never committed and never backed up (ADR 0005 amendment)
+# Worker state
 /data/
 
-# tooling
+# Tooling
 .DS_Store
 .memdb/
 .lavish/*.session
 
-# wizard facts file (URLs, names, UUIDs — no secrets, but local)
+# Folders
 deploy/wizard-41.env
 
 .planning/
 .scratch/
 .lavish/
-15-user-feedback.md
-old-suggested-schema.md
-AGENTS.md.bak
 
-# The skills CLI installs into .agents/ and GitNexus generates its skills there. The playbooks and
-# the format guides in references/ are this repository's own, and .agents/playbooks/knowledge.md names the guides.
+# Skills
 .agents/*
 !.agents/playbooks/
 !.agents/references/
-tasks/AGENTS.md
 
-# Worktrees created by background agents (Claude Code `isolation: worktree`).
+# Claude
 .claude/worktrees/
-
 .claude/tmp/
-
-# A person's own Claude Code overrides (permissions, skill toggles); the project's hooks live in .claude/settings.json.
 .claude/settings.local.json
-# Playwright CLI output (may contain credentials)
-.playwright-cli/
