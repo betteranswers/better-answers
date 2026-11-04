@@ -16,7 +16,14 @@ import {
 } from "@better-answers/core/concepts";
 import { actorIdOfPerson, type UserPrincipal } from "@better-answers/core/kernel";
 import { head, initRepository, type GitDoor } from "@better-answers/core/store/git";
-import { AUDIENCES, COLLECTION, conceptFrontmatter, SENSITIVITIES } from "@better-answers/schema";
+import {
+  AUDIENCES,
+  COLLECTION,
+  CONCEPT_STABLE_STATUS,
+  CONCEPT_STATUSES,
+  conceptFrontmatter,
+  SENSITIVITIES,
+} from "@better-answers/schema";
 import { conceptIndexRows, testData } from "@better-answers/schema/testing";
 
 import { inOneTransaction, seedPassages } from "./harness-sources.ts";
@@ -89,6 +96,7 @@ const aConcept = z
     collection: z.string().min(1).optional(),
     kind: z.string().min(1).default("Answer"),
     body: z.string().min(1),
+    status: z.enum(CONCEPT_STATUSES).default(CONCEPT_STABLE_STATUS),
     sensitivity: z.enum(SENSITIVITIES).default("Internal"),
     audience: z.enum(AUDIENCES).default("everyone"),
     groupMemberIds: z.array(z.string().min(1)).default([]),
@@ -365,7 +373,7 @@ const conceptWritten = async (
       message: `Record ${concept.title}`,
       author: writer.author,
       expects: { head: await head(principal, git) },
-      status: "stable",
+      status: concept.status,
       sensitivity: concept.sensitivity,
     },
   );
