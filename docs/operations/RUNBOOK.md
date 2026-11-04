@@ -1,211 +1,466 @@
-# Runbook — thirteen pages and ten procedures
+# Runbook
 
-**Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
+This file has thirteen incident pages, then the procedures an operator runs by hand. The docs site does not render it.
 
-Each entry: the check that fires, what to do, the rows to attach, who to escalate to, the drill that rehearses it.
+**This file is the public half.** The private half is `.planning/estate/RUNBOOK.md`, outside the repository, beside `.planning/estate/SECRETS.md` and `.planning/estate/coolify.md`. It holds the provider console, the host paths, the named credentials to rotate, the addresses, the names behind each escalation contact, and the recorded results. Run an incident from the private copy. `SECRETS.md` covers secrets and rotation, `BACKUPS.md` covers the copies, and `coolify.md` covers the deployment.
 
-**This is the public half.** The pages below state *what happens* and *in what order* — the shape one non-technical owner follows. The estate's own half — the provider console to open, the exact host paths, the named credential list to rotate, the addresses, the **names behind each escalation contact** and the recorded results — is **not published**: it is `.planning/estate/RUNBOOK.md`, outside the repository, beside `.planning/estate/SECRETS.md` and `.planning/estate/coolify.md` (ADR 0027, ticket 79 Q10; ticket 77's acceptance line). An operator runs from the private copy; a reader learns the design from this one. Detail on where each secret lives and the rotation contract is in `SECRETS.md`; on the copies, in `BACKUPS.md`; on the shape of the deployment, in `coolify.md`.
+**Escalation contacts.** Each page names a role: the technical contact, the second escrow holder, or the customer's named contact. The private file's § Contacts maps each role to a person and a number, and is reread at every quarterly erasure rehearsal. If a contact cannot be reached within the page's time, escalate to the second escrow holder, who can open the vault and step in.
 
-**Escalation contacts.** Every page names a *role* — the technical contact, the second escrow holder, the customer's named contact. The private file's § Contacts maps each role to a person and a number, and is re-read at every quarterly erasure rehearsal. A page that cannot reach its contact within its stated time escalates to the second escrow holder, who can open the vault and step in.
-
-The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orchestrator, the git mirror and a restore target — staging exists only while someone has brought it up.
+The estate is two 4 GB boxes. VPC 1 is production. VPC 2 holds the orchestrator, the git mirror, and a restore target. Staging exists only while someone has brought it up.
 
 ## 1. A box is down
 
-- **Fires:** the uptime check on the product's two paths (`coolify.md` § Ingress) goes red, by email while the product is in development (page 7); the scheduler's dead-man check misses (VPC 1, page 12). For VPC 2 the watchers depend on the zone's plan: on Pro nothing fires within the hour — the daily `coolify-backup` ping and the monthly `drill` ping are the only watchers, so a VPC 2 outage is noticed within a day, not a minute, and that blind spot is written down here rather than left implicit. On Free the uptime probe runs *from* VPC 2 (`deploy/uptime-probe.sh`, `coolify.md` § Ingress), so its `uptime` check's silence also fires within ten minutes of VPC 2 going down.
-- **Do:** open the provider's console and read the server's status. **VPC 1:** reboot — the stacks are `restart: unless-stopped`, `init` re-owns `/data`, and the orchestrator shows the stack healthy within minutes. If the disk is gone: a new box, `deploy/host-setup.sh vpc1` (it creates `/data`, the swap file, the checkout and the mirror key), the server re-added in the orchestrator, the Postgres resource redeployed then both stacks, then **`deploy/restore-production.sh --objectstore --git`**, run from the checkout at `/opt/better-answers` once it is brought to `main` (`pull --ff-only`) and with `REPO_DIR` set to it, with the backup identity fetched from escrow for the duration and deleted after. That script is the production restore: it has no exit trap, needs no second database, replaces the database but wipes no other store, and replays every erasure completed after the dump before `api` starts — it is **not** `restore-drill.sh`, which is the staging rehearsal and ends by wiping what it restored. Its steps run in the order `BACKUPS.md` § Recovery order states: the database, then the object store, then the git store, then the replay, then `api`. **The stores stack's `backup` service is stopped first and started last**, once `api` answers: a dump's locks would hold up the database step's one transaction, and a nightly run would sync a half-restored object store over its mirror. No dump is taken in between, so `pg-hourly` goes red if the run outlasts the check's grace, and `nightly` if the run spans 02:00; each turns green at its first run after the start. **Over a database that is already there** — the one the redeploy's `migrate` made, or one that is wrong — the database step does this, in this order: it reads the dump whole into the SQL it will apply, and a dump it cannot read stops the run with the database unchanged; it applies the roles the dump was taken with; then one transaction drops every schema the database holds, makes `public` again as a new database has it, and applies that SQL. A statement that fails rolls the whole transaction back, so the database is as it was and the script can run again, with an older dump if the fault is the dump's. The transaction holds a lock on everything it drops and makes: on 24/09/2026, on PostgreSQL 18's defaults, 400 workspaces took 18,124 locks and completed, and 800 stopped with *out of shared memory* and changed nothing — raise `max_locks_per_transaction` on the Postgres resource, restart it, and run the script again. The replay is step 6 and not step 3, because the routine it re-runs rewrites the bare repositories and reads the replay copies in the object store; it runs on the `api` service, the only one carrying both stores' settings. **VPC 2:** reinstall the orchestrator at the pinned version and restore its instance backup (page 5).
-- **If the restore stops:** once step 1 has run, `api` and the `backup` service stay stopped. Before step 6, the run's two work directories stay behind too: the `mktemp -d` directories under `/tmp` on VPC 1, mode 700, that the log names on its `work directories` line. The first is root's throughout. The second is root's too until the git step hands it to the api's uid as it starts, and hands over each bundle once it is moved in, so that uid can clone from it while the first stays closed to it. A run stopped before a handover leaves the second, or the bundle in it, root's. Stopped at the database step, the first holds `pg.dump`, the decrypted dump, and `pg.sql`, the SQL made from it. Stopped at the git step, one workspace's decrypted `<workspace>.bundle` is in the first if the run stopped before moving it and in the second after, never in both, because the move is a rename. Stopped anywhere else, neither holds a decrypted file. Each of those is personal data in plaintext. The script has no exit trap to remove them (ADR 0022), and a new run makes directories of its own, so remove both by hand with `rm -rf` once the restore is done (a later run has completed) or abandoned. A run that completes ends by starting the `backup` service; an abandoned restore starts it by hand with `docker compose … -p better-answers-stores start backup`, the invocation the script's `stores` helper makes.
-- **Attach:** the provider's status page or ticket; the restore log the script writes under `/var/log/`; the dump name and its stamp (the RPO); the RTO the script prints; the `restore` rows of the `backup` table, one per store the run restored, which the script writes at its end. If the log says `backup row not written`, run the statement it logged once the database answers (`BACKUPS.md` § The `backup` rows).
-- **Escalate:** the technical contact if the box is not back within one hour; the customer's named contact once the RTO passes two hours.
-- **Rehearsed by:** the monthly drill — VPC 1 rebuilt from nothing, on VPC 2.
+**Fires.**
+
+- The uptime check on the product's two paths goes red (`coolify.md` § Ingress). During development it alerts by email (page 7).
+- The scheduler's dead-man check misses, for VPC 1 (page 12).
+- For VPC 2 on Pro, nothing fires within the hour. Only the daily `coolify-backup` ping and the monthly `drill` ping watch it, so an outage shows within a day. On Free, the uptime probe runs from VPC 2 (`deploy/uptime-probe.sh`), so its `uptime` check goes silent within ten minutes.
+
+**Do.**
+
+1. Read the server's status in the provider's console.
+2. If VPC 2 is down, reinstall the orchestrator at the pinned version and restore its instance backup (page 5). Stop.
+3. If VPC 1 is down and its disk is intact, reboot it. The stacks are `restart: unless-stopped`, and the orchestrator shows them healthy within minutes. Stop.
+4. If VPC 1's disk is gone, make a new box and run `deploy/host-setup.sh vpc1` on it. It creates `/data`, the swap file, the checkout, and the mirror key.
+5. Re-add the server in the orchestrator. Redeploy the Postgres resource, then both stacks.
+6. Bring the checkout at `/opt/better-answers` to `main` (`pull --ff-only`).
+7. Fetch the backup identity from escrow.
+8. From the checkout, with `REPO_DIR` set to it, run **`deploy/restore-production.sh --objectstore --git`**.
+9. Delete the backup identity.
+
+**The restore.** `restore-production.sh` replaces the database, wipes no other store, and replays every erasure completed after the dump before `api` starts. It is **not** `restore-drill.sh`, the staging rehearsal, which wipes what it restored. It follows `BACKUPS.md` § Recovery order: the database, the object store, the git store, the erasure replay (step 6, on the `api` service), then `api`. It stops the stores stack's `backup` service first and starts it last. So `pg-hourly` goes red if the run outlasts its grace, and `nightly` goes red if the run spans 02:00. Each turns green at its next run.
+
+Over an existing database, the database step reads the whole dump first, and stops with the database unchanged if it cannot. It then applies the dump's roles. In one transaction it drops every schema, makes `public` again, and applies the dump. A failed statement rolls the whole transaction back.
+
+**If the restore stops.**
+
+1. If the log says *out of shared memory*, raise `max_locks_per_transaction` on the Postgres resource and restart the resource.
+2. Run the script again, with an older dump if the dump is at fault.
+3. If you abandon the restore, start the `backup` service with `docker compose … -p better-answers-stores start backup`.
+4. Once a run completes, or you abandon the restore, remove both work directories with `rm -rf`. The log names them on its `work directories` line.
+
+Until a run completes, `api` and `backup` stay stopped. The work directories are `mktemp -d` directories under `/tmp` on VPC 1, mode 700, owned by root. The git step hands the second to the api's uid. A run stopped at the database step leaves `pg.dump` and `pg.sql` in the first. A run stopped at the git step leaves one decrypted `<workspace>.bundle` in one of them. These files are personal data in plaintext, and the script has no exit trap to remove them.
+
+**Attach.** The provider's status page or ticket, the restore log under `/var/log/`, the dump name and stamp (the RPO), the RTO the script prints, and the `restore` rows of the `backup` table. If the log says `backup row not written`, run the statement it logged once the database answers (`BACKUPS.md` § The `backup` rows).
+
+**Escalate.** Escalate to the technical contact if the box is not back within one hour. Escalate to the customer's named contact once the RTO passes two hours.
+
+**Rehearsed by.** The monthly drill, which rebuilds VPC 1 from nothing on VPC 2.
 
 ## 2. Host compromise
 
-- **Fires:** anything unusual — a firewall rule you did not make, an unknown process, a provider notice; a spike in `401`s on the machine route (ticket 42).
-- **Do:** **isolate** (deny all inbound at the provider's firewall; revoke the tunnel token so nothing reaches the api). **Rotate every host-side credential** — that is every row in the estate's secrets inventory whose *Lives in* column names a box, and no others: the bucket write-and-list pair, the registry pull token, the object store's root pair, the mirror deploy key, the auth secret and the mail credential. The **escrowed credentials were never on VPC 1**; do not rotate the envelope key unless the database itself is suspected, because a new one means every model key is reissued at its model provider and set again (§ Set a workspace's model key). Once a workspace holds a model key, `KEK` is in the `api` service's env on VPC 1 beside the rows it seals, so a compromise of VPC 1 that may have read either is a compromise of `KEK`. Then rebuild VPC 1 from a fresh image and **restore from a copy older than the compromise** (`restore-production.sh --dump <the copy>`) — the dumps are under object-lock governance, so an attacker could not have altered them — and the script **replays erasures** after the dump, before the api turns healthy. Go to page 3 if personal data may have been read.
-- **If the compromised box is VPC 2:** the backup `age` identity is **resident there in a root-only file** (`SECRETS.md` § The backup identity), so assume **every dump and bundle in the buckets was readable in plaintext** — that is every customer's personal data — and page 3 applies without further evidence. Rotate the identity by that section's procedure, the bucket READ credential, the mirror key's accepted public half, and every orchestrator token; rebuild VPC 2 (page 5) before the drill runs again.
-- **Attach:** the provider notice or the log line that fired; the rotation list with each row ticked and timed; the dump name restored from.
-- **Escalate:** the technical contact immediately; the second escrow holder if a rotation needs the vault and the owner is unreachable.
-- **Rehearsed by:** the drill's restore path; the rotation list is reviewed at the quarterly erasure rehearsal.
+**Fires.** Anything unusual: a firewall rule you did not make, an unknown process, a provider notice, or a spike in `401`s on the machine route.
+
+**Do.**
+
+1. Deny all inbound traffic at the provider's firewall.
+2. Revoke the tunnel token.
+3. Rotate every row in the estate's secrets inventory whose *Lives in* column names a box: the bucket write-and-list pair, the registry pull token, the object store's root pair, the mirror deploy key, the auth secret, and the mail credential. The **escrowed credentials were never on VPC 1**.
+4. If the database may have been read, rotate the envelope key too. `KEK` sits in the `api` service's env on VPC 1 beside the rows it seals, so a compromise that may have read either is a compromise of `KEK`. A new key means every model key is reissued at its provider and set again (§ Set a workspace's model key).
+5. Rebuild VPC 1 from a fresh image.
+6. **Restore from a copy older than the compromise**: `restore-production.sh --dump <the copy>`. Object-lock governance means an attacker could not have altered the dumps, and the script **replays erasures** after the dump.
+7. If personal data may have been read, go to page 3.
+
+**If the compromised box is VPC 2.** The backup `age` identity is **resident there in a root-only file** (`SECRETS.md` § The backup identity). Assume **every dump and bundle in the buckets was readable in plaintext**, and apply page 3 without further evidence.
+
+1. Rotate the identity by the procedure in `SECRETS.md` § The backup identity.
+2. Rotate the bucket READ credential, the mirror key's accepted public half, and every orchestrator token.
+3. Rebuild VPC 2 (page 5) before the drill runs again.
+
+**Attach.** The notice or log line that fired, the rotation list with each row ticked and timed, and the name of the dump restored from.
+
+**Escalate.** Escalate to the technical contact immediately. If a rotation needs the vault and the owner is unreachable, escalate to the second escrow holder.
+
+**Rehearsed by.** The drill's restore path. The rotation list is reviewed at the quarterly erasure rehearsal.
 
 ## 3. Personal-data breach
 
-- **Fires:** page 2, a customer's report, a subject's report, a provider notice.
-- **Clock:** 72 hours to the ICO from *awareness*, if the breach is likely to risk people's rights; the customer (controller) is told without undue delay — the platform is the processor.
-- **Do:** contain (page 2); establish scope from `audit_event`, `questions_asked` and the `backup` rows — which copies exist and who could have read them (`SECRETS.md` § Who can read a backup bucket: a VPC 2 compromise means the copies' plaintext, because the identity is resident there); write the notification from those rows; tell the customer's named contact; record the decision either way.
-- **Attach:** the rows above; the containment times from page 2; the notification sent or the reasoned decision not to.
-- **Escalate:** the customer's named contact within 24 hours of awareness; the technical contact for scope; a solicitor if the ICO question is not clear-cut.
-- **Rehearsed by:** the quarterly erasure rehearsal's report shape — the same rows answer both questions.
+**Fires.** Page 2, a customer's report, a subject's report, or a provider notice.
+
+**Clock.** If the breach is likely to risk people's rights, the ICO must hear within 72 hours of *awareness*. Tell the customer, the controller, without undue delay. The platform is the processor.
+
+**Do.**
+
+1. Contain the breach (page 2).
+2. Establish the scope from `audit_event`, `questions_asked`, and the `backup` rows: which copies exist, and who could have read them. After a VPC 2 compromise, the copies' plaintext is in scope (`SECRETS.md` § Who can read a backup bucket).
+3. Write the notification from those rows.
+4. Tell the customer's named contact.
+5. Record the decision either way.
+
+**Attach.** The rows above, the containment times from page 2, and the notification sent or the reasoned decision not to send one.
+
+**Escalate.** Escalate to the customer's named contact within 24 hours of awareness, and to the technical contact for the scope. If the ICO question is not clear-cut, escalate to a solicitor.
+
+**Rehearsed by.** The quarterly erasure rehearsal's report shape. The same rows answer both questions.
 
 ## 4. Erasure incident (a subject request that reaches git history)
 
-- **Fires:** a `subject request` in Control Centre (ticket 24, ADR 0020).
-- **Do:** ADR 0020's routine — the api holds `pg_advisory_lock(41)` so the hourly dump waits; history rewrite (`git filter-repo`) on the bare repository under its own lock, then `git reflog expire --expire=now --all` and `git gc --prune=now` there; `git push --mirror` to VPC 2 and the same expiry and `gc` on the mirror (there is no forge and no indexer — ADR 0024); the index, passages, evidence and map re-derived by a full rebuild (ADR 0032 — the map is plain tables in the same Postgres, so the rebuild is a repair path, and an erasure's flip and sweep are one step); suppression + reprocess for source entities; the object-store deletion propagates to the mirror bucket that night; the report quotes the three dates from the last dump before the rewrite (`BACKUPS.md`).
-- **What the routine does not do:** it rewrites what the platform wrote — actor ids across history — and **not** a person's name written inside a concept body, which the owner edits forward as a new commit. The report says so in those words (ADR 0020's 2026-08-30 amendment).
-- **Attach:** the erasure report; the `erasure_request` row; the last dump's stamp.
-- **Escalate:** the customer's named contact with the report; the technical contact if the rewrite fails its verification.
-- **Rehearsed by:** every third drill, on a synthetic subject.
+**Fires.** A `subject request` in Control Centre.
+
+**Do.** Run the erasure routine (ADR 0020). It takes these steps in order:
+
+1. The api holds `pg_advisory_lock(41)`, so the hourly dump waits.
+2. It rewrites history with `git filter-repo` on the bare repository, under the repository's own lock.
+3. It runs `git reflog expire --expire=now --all` and `git gc --prune=now` there.
+4. It runs `git push --mirror` to VPC 2, then the same expiry and `gc` on the mirror. The estate runs no forge and no indexer.
+5. A full rebuild derives the index, the passages, the evidence, and the map again. The map is plain tables in the same Postgres, so an erasure's flip and sweep are one step.
+6. It suppresses and reprocesses the source entities.
+7. The object-store deletion reaches the mirror bucket that night.
+8. The report quotes the three dates from the last dump before the rewrite (`BACKUPS.md`).
+
+The routine rewrites what the platform wrote, the actor ids across history. It does **not** rewrite a person's name inside a concept body. The owner edits that forward as a new commit, and the report says so.
+
+**Attach.** The erasure report, the `erasure_request` row, and the last dump's stamp.
+
+**Escalate.** Escalate to the customer's named contact with the report. If the rewrite fails its verification, escalate to the technical contact.
+
+**Rehearsed by.** Every third drill, on a synthetic subject.
 
 ## 5. The orchestrator is lost (VPC 2 rebuilt)
 
-- **Fires:** nothing automatic — the `coolify-backup` ping misses, the drill fails to run, or a deploy fails.
-- **Do:** `deploy/host-setup.sh vpc2` on the new box (the mirror user, the checkout, the root-only env files, the drill's cron); install the pinned version; stop its containers; `pg_restore` its instance backup into its own database; **replace its SSH key directory from escrow** — it is not in the instance backup; set the previous-key variable if Coolify's `APP_KEY` changed; re-run the installer; re-add VPC 1; verify both stacks show healthy **without a redeploy**; then **re-escrow Coolify's `APP_KEY`**. Put the backup identity back into its root-only file from escrow; the drill needs it.
-- **Attach:** the instance-backup name restored; the time both stacks showed healthy.
-- **Escalate:** the technical contact if VPC 1's stacks do not show healthy after the re-add; the second escrow holder for the vault.
-- **Rehearsed by:** once, before the first customer goes live (the wizard's last stage); then yearly.
+**Fires.** Nothing automatic. The `coolify-backup` ping misses, the drill fails to run, or a deploy fails.
+
+**Do.**
+
+1. On the new box, run `deploy/host-setup.sh vpc2`. It creates the mirror user, the checkout, the root-only env files, and the drill's cron.
+2. Install the orchestrator at the pinned version, and stop its containers.
+3. Restore its instance backup into its own database with `pg_restore`.
+4. **Replace its SSH key directory from escrow.** The instance backup does not hold it.
+5. If Coolify's `APP_KEY` changed, set the previous-key variable.
+6. Run the installer again, and re-add VPC 1.
+7. Check that both stacks show healthy **without a redeploy**.
+8. **Escrow Coolify's `APP_KEY` again.**
+9. Put the backup identity back into its root-only file from escrow. The drill needs it.
+
+**Attach.** The name of the instance backup restored, and the time both stacks showed healthy.
+
+**Escalate.** If VPC 1's stacks do not show healthy after the re-add, escalate to the technical contact. Escalate to the second escrow holder for the vault.
+
+**Rehearsed by.** Once before the first customer goes live, at the wizard's last stage. Then yearly.
 
 ## 6. A release went wrong
 
-- **Fires:** `release.yml`'s post-deploy smoke is red. A release that ran itself shows it as a red `build` run on `main`, whose last job is the release, or a red nightly `release` run. `deploy/await-release.sh` polls `/health` for six minutes until it answers healthy **and** names the api digest the release promoted. Its error names *expected*, the promoted digest, and *answering*, the digest the last answer named, with that answer's status in brackets. Read the pair:
-  - *answering* the build it replaced, `healthy`: the promoted image never took over, and the orchestrator's deploy log says why;
-  - *answering* the promoted digest, `unhealthy`: it started, and `/health`'s body names the store it cannot reach;
-  - *answering no image named*, `no health answer`: nothing answers, so production is down, with the old container gone and the new one not up; *the last image named* is the build that answered last.
+**Fires.**
 
-  Also: the uptime check goes red within minutes of a promotion; the orchestrator's *failed deployment* or *unhealthy container* mail.
+- `release.yml`'s post-deploy smoke is red. That shows as a red `build` run on `main`, whose last job is the release, or a red nightly `release` run.
+- The step `set digests, redeploy production and wait for the deployment` is red.
+- The uptime check goes red within minutes of a promotion.
+- The orchestrator mails *failed deployment* or *unhealthy container*.
 
-  Or the step before the smoke, `set digests, redeploy production and wait for the deployment`, is red (BA-219). It waits up to 30 minutes for the orchestrator's deployment, and its error names that deployment. Read the deployment's log in the orchestrator. A deployment that failed before its log reached `Removing old containers.`, a pull that failed say, left production running the release before it, so nothing needs rolling back. A failure after that line left production down, and this page's **Do** applies. A deployment that never finished may still swap production later, so read `/health` before acting. An error naming production's deployment as `queued` or `in_progress` means the release found one before it set anything, so nothing changed: let that deployment end, or cancel it, and run the release again. An error saying the orchestrator queued no deployment means one was queued between that check and the POST. Both digests are set by then, and a deployment that had not started ships them with no smoke and no tag, so read `/health` once it ends. None of these pushed a tag.
-- **Do:** **list the release tags newest first** and take the newest — a release is tagged only once its smoke passed, so the newest tag is the last release that held (promotions are `release/*` tags since 23/09/2026, T-342; `deploy/RELEASES.md` is frozen and holds the promotions before that date, its last row read the same way):
+**Read a red smoke.** `deploy/await-release.sh` polls `/health` for six minutes until it answers healthy **and** names the promoted api digest. Its error names *expected*, the promoted digest, and *answering*, the digest of the last answer, with that answer's status in brackets.
 
-  ```sh
-  git fetch --tags && git tag --list 'release/*' --sort=-creatordate | head -5
-  git show --no-patch release/<stamp>   # when, who, both digests, what it rode on, its run
-  ```
+- *answering* the replaced build, `healthy`. The promoted image never took over. The orchestrator's deploy log says why.
+- *answering* the promoted digest, `unhealthy`. `/health`'s body names the store it cannot reach.
+- *answering no image named*, `no health answer`. Production is down, with the old container gone and the new one not up. *the last image named* is the build that answered last.
 
-  The failed release pushed no tag: a run whose smoke failed says so in its summary. Two tags of 27/09/2026 broke that rule, `release/20260927T193912Z-4bc6a2e` and `release/20260927T200343Z-821c331`: each was pushed before a smoke that failed, and neither release reached production. Both are gone from origin, but a clone that fetched them keeps them until `git fetch --prune --prune-tags`, so pass over either if it is listed. A tag with no `Run:` line predates automatic releases and was dispatched by hand.
+**Read a red redeploy step.** The step waits up to 30 minutes for the orchestrator's deployment, and its error names that deployment. Read the deployment's log. None of these cases pushed a tag.
 
-  **The newest tag may be older than what production runs.** A release whose smoke failed pushed no `release/` tag, but its migrations ran at its promotion all the same, and a newer release may have followed it. Before rolling back, list the migrations production holds that the tag's api does not. Each api image names the commit it was built from in its revision label, and `migrate` runs the api image. The packages are private, so log in to `ghcr.io` first (`docker login ghcr.io`, with a token that reads packages), then from the repository's root:
+- If it failed before its log reached `Removing old containers.`, as a failed pull does, production still runs the previous release. Nothing needs rolling back.
+- If it failed after that line, production is down. Follow **Do**.
+- If it never finished, it may still swap production later. Read `/health` before you act.
+- If the error names production's deployment as `queued` or `in_progress`, nothing changed. Let that deployment end, or cancel it, and run the release again.
+- If the error says the orchestrator queued no deployment, both digests are already set, and a deployment that had not started ships them with no smoke and no tag. Read `/health` once it ends.
 
-  ```sh
-  git fetch --tags origin main                           # the untagged commits too
-  live=$(curl -sS <PUBLIC_URL>/health | jq -r .image)   # the api digest production runs
-  target=<the digest on the tag's api: line>
-  built() { docker buildx imagetools inspect "ghcr.io/betteranswers/api@$1" --format '{{ index .Image.Config.Labels "org.opencontainers.image.revision" }}'; }
-  git diff --name-only --diff-filter=A "$(built "$target")" "$(built "$live")" -- 'packages/schema/migrations/*.sql'
-  ```
+**Do.**
 
-  An empty `built` answer is a missing login, not an empty diff: `git` then refuses rather than listing nothing.
+1. Read the deploy log in the orchestrator. If a stack never came up for a missing env key, set the key and stop.
+2. **List the release tags newest first**, and take the newest. Pass over `release/20260927T193912Z-4bc6a2e` and `release/20260927T200343Z-821c331`.
 
-  No file listed: the digests alone are the rollback. A `.sql` file listed is the migration case below, and its dump is the last one stamped before the first untagged release's promotion. That release has no tag to give its time, so read it from its run.
+   ```sh
+   git fetch --tags && git tag --list 'release/*' --sort=-creatordate | head -5
+   git show --no-patch release/<stamp>   # when, who, both digests, what it rode on, its run
+   ```
 
-  Run `release` again with that tag's two digests as the inputs and `rehearsed_by: hotfix: rollback of <the failed tag>`. Migrations are forward-only (ADR 0022, and its 2026-09-21 amendment records why that is the ADR's decision and not a coding rule): a migration that cannot run under the previous release says so in its release note, and then the rollback is the previous digests first and page 1's restore second, from the last dump stamped before the failed promotion: the restore's migrate step runs whichever release is deployed, and a dump taken after the promotion already carries its migration. Read the deploy log in the orchestrator before either — a stack that never came up (a missing env key: the api refuses to start unless `PUBLIC_URL`, `AGENT_HOSTNAME` and `APEX_HOSTNAME` are set and differ, ADR 0034) is fixed by the key, not by a rollback.
+3. Log in to `ghcr.io` with a token that reads packages (`docker login ghcr.io`).
+4. From the repository's root, list the migrations that production holds and the tag's api does not. An empty `built` answer is a missing login, not an empty diff.
 
-  **A rollback waits behind a release still running.** Every release runs in one concurrency group, `release-production`, which cancels no run. A rollback dispatched while another release's `promote` job runs is queued behind it. That can last the redeploy's 30-minute wait and the smoke's worst case of about 11 minutes after it, and at most about 70 minutes, the time limits of the release's three jobs together. So cancel the running release first: find its run with `gh run list --status in_progress`, a `build` run on `main` or a `release` run, and cancel it with `gh run cancel <run id>`. Cancelling the run does not stop its deployment in the orchestrator. Its redeploy step's log names that deployment. While it is queued or running, the rollback's redeploy step stops before it sets anything and names that deployment. So cancel that deployment on its page in the orchestrator too, or let it end, and then dispatch the rollback.
+   ```sh
+   git fetch --tags origin main                           # the untagged commits too
+   live=$(curl -sS <PUBLIC_URL>/health | jq -r .image)   # the api digest production runs
+   target=<the digest on the tag's api: line>
+   built() { docker buildx imagetools inspect "ghcr.io/betteranswers/api@$1" --format '{{ index .Image.Config.Labels "org.opencontainers.image.revision" }}'; }
+   git diff --name-only --diff-filter=A "$(built "$target")" "$(built "$live")" -- 'packages/schema/migrations/*.sql'
+   ```
 
-  **Outside `drill` mode a rollback holds only until the next automatic release**: the next green build on `main` in `per-merge` mode, the next night in `nightly`. That release still carries the change that broke production. So merge nothing else until the fix, or the revert of that change, has merged: its release is the one that puts production right to stay. Setting `RELEASE_MODE` to `drill` holds the rollback while the fix is made.
-- **The switch: `RELEASE_MODE`** (ticket 79 Q7, phased by ADR 0022's later amendment of 2026-09-27). One repository variable, three modes:
-  - **`per-merge`**, the default while it is unset: every green build on `main` releases its own commit, and skips one that `main` has moved past.
-  - **`nightly`**: at 02:35 UTC `release` promotes the newest commit on `main` whose build is green, once the box's own backup is fresh. Fresh means the dead-man service's `pg-hourly` check is up and pinged within 65 minutes, and its `nightly` check up and pinged since the last 02:00 UTC. The run reads them with `HEALTHCHECKS_READ_KEY`, the service's read-only API key, kept as a `production` environment secret, and refuses without it. A night is skipped when that commit, or a newer one, already has a tag. A night refused for a stale backup deployed nothing: page 7 is the backup's page, and the next night tries again.
-  - **`drill`**: nothing releases itself, and `release` refuses to run unless `rehearsed_by` names the drill report a restore was just proved on, or a hotfix reason — one deploy train a month, on the drill day, plus hotfixes.
+5. If another release is running, find its run with `gh run list --status in_progress` and cancel it with `gh run cancel <run id>`. Cancel its deployment on its page in the orchestrator too, or let it end.
+6. Run `release` with the tag's two digests as the inputs and `rehearsed_by: hotfix: rollback of <the failed tag>`.
+7. If step 4 listed a `.sql` file, run page 1's restore once the release ends: `restore-production.sh --tier <tier> --dump <file>`. Use the last dump stamped before the first promotion after the tag. An untagged release's time is in its run.
+8. Unless `RELEASE_MODE` is `drill`, merge nothing else until the fix, or the revert, has merged.
 
-  Any other value fails closed: nothing is released, and the run says why. The phases are `per-merge` until the first customer's bundle lands (T-331); then `nightly` until the platform goes live, no earlier than the end of v0.1; then `drill`. Before the first switch, add the read key, then set the mode:
+**Why these steps.** A release is tagged only after its smoke passes, so the newest tag is the last release that held. `deploy/RELEASES.md` is frozen and holds the promotions before 23/09/2026. A tag with no `Run:` line was dispatched by hand. The two tags of 27/09/2026 were pushed before smokes that failed. They are gone from origin, but a clone keeps them until `git fetch --prune --prune-tags`.
 
-  ```sh
-  gh secret set HEALTHCHECKS_READ_KEY --env production   # the dead-man service's read-only key
-  gh variable set RELEASE_MODE --body nightly            # the day the bundle lands
-  gh variable set RELEASE_MODE --body drill              # the day the platform goes live
-  ```
-- **The next release is two steps, once** (11/09/2026, T-125): `deploy/platform.compose.yaml`'s bootstrap anchor now **requires** `S3_BUCKET` — the replay of erasures reads the object store and refuses when it cannot, and a bucket name it had to guess would be that refusal in production. So before the next production deploy, **set `S3_BUCKET` on the platform resource** in the orchestrator, to the bucket `wizard-41.sh`'s Garage stage created, and **then deploy**. A stack deployed without it does not come up half-working: compose refuses to start it, which is the failure this page's second bullet describes.
-- **No digest rollback across migration 0053** (24/09/2026, T-356): `0053_the-account-issuer-goes` drops `account.issuer`, which Better Auth 1.7.2 reads on every email-code sign-in, so the api of any release before it fails every sign-in on a migrated database with `column "issuer" does not exist`. Rolling back from the first release that carries 0053 to a tag below it is the migration case above: `release` with that tag's digests, then `restore-production.sh --tier <tier> --dump <file>` naming the last dump stamped before that promotion's time on its `release/*` tag — hourly dumps are kept 48 hours, and the 02:00 UTC one is filed under daily, weekly or monthly. Every write since that dump is lost, and every erasure since it is replayed. Between two releases that both carry 0053, the digests alone are the rollback.
-- **No digest rollback across migration 0066** (05/10/2026, BA-29): `0066_the-model-choice` renames the `llm_route` table to `model_choice`, with its policy, index, constraints and the `llm_route_for` function, and moves every queued `route-change` rebuild to `model-choice-change`. On a migrated database the api of any release before it fails every read of a workspace's model choices with `relation "llm_route" does not exist`, and its worker's deploy stamp no longer matches, so it claims nothing. Rolling back from the first release that carries 0066 to a tag below it is the migration case above, as for 0053: `release` with that tag's digests, then `restore-production.sh --tier <tier> --dump <file>` naming the last dump stamped before that promotion. Between two releases that both carry 0066, the digests alone are the rollback.
-- **No digest rollback across migration 0067** (05/10/2026, BA-29): `0067_the-map` renames the three map tables to `map_generation`, `map_node` and `map_edge`, with their policies, indexes, constraints and triggers and the two functions that guard a generation, renames the five NOT NULL constraints 0066 left under the old table's name, moves every connected source's map destination to `map` and every queued `first-sync` rebuild to `first-build`. On a migrated database the api of any release before it fails every map read and write with `relation "graph_node" does not exist`, and its worker's deploy stamp no longer matches, so it claims nothing. Rolling back from the first release that carries 0067 to a tag below it is the migration case above, as for 0053: `release` with that tag's digests, then `restore-production.sh --tier <tier> --dump <file>` naming the last dump stamped before that promotion. Between two releases that both carry 0067, the digests alone are the rollback.
-- **No digest rollback across migration 0068** (07/10/2026, BA-29): `0068_the-connected-source` renames the connected sources' table to `connected_source`, with its policy, keys, checks and NOT NULL constraints, renames `source_document`'s column naming it to `connected_source_id` with its key and two indexes, moves every connected source in the *landed* state to *received*, and moves every sync with the reason `bound`, finished ones too, to `connected`. The passage table's column naming it waited for migration 0069. On a migrated database the api of any release before it fails every Sources read and write with `relation "source_binding" does not exist`, and its worker's deploy stamp no longer matches, so it claims nothing. Rolling back from the first release that carries 0068 to a tag below it is the migration case above, as for 0053: `release` with that tag's digests, then `restore-production.sh --tier <tier> --dump <file>` naming the last dump stamped before that promotion. Between two releases that both carry 0068, the digests alone are the rollback.
-- **No digest rollback across migration 0069, and every connected source is wiped after it** (07/10/2026, BA-29): `0069_the-passage` renames the passage table to `index.passage`, with its partitions, policy, keys, indexes, NOT NULL constraints and view (`index.readable_passage`), renames its columns to `connected_source_id` and `embedding_model_choice_id`, replaces `create_workspace_partition` under the new names, and moves every connected source's destination `chunk-index` to `passage-index`. The worker's engine tracks the rows it landed under the table's old name, so after the rename it deletes nothing that leaves a source and raises no error (the U12 spike). So after the release, run `pnpm ops reindex-connected-sources --workspace <id>` for every workspace (`SELECT id FROM workspace`): it wipes each connected source and queues its `wiped` sync, which also removes the source's store under its old name, `binding/`. Then remove any `binding/` that a source no longer standing left under `LMDB_DIR`: `find /data/worker/lmdb -mindepth 3 -maxdepth 3 -type d -name binding -prune -exec rm -rf {} +`. Count rows as `postgres`, to which row-level security does not apply: the owner's unscoped count reads 0 whatever is stored. A migration that fails on `lock_timeout` rolls back whole and is safe to run again once the old worker is stopped. On a migrated database the api of any release before it fails every passage read with `relation "index.chunk" does not exist`, and its worker's deploy stamp no longer matches, so it claims nothing. Rolling back from the first release that carries 0069 to a tag below it is the migration case above, as for 0053: `release` with that tag's digests, then `restore-production.sh --tier <tier> --dump <file>` naming the last dump stamped before that promotion. Between two releases that both carry 0069, the digests alone are the rollback.
-- **No digest rollback across migration 0070** (07/10/2026, BA-29): `0070_the-verification` renames `concept_verification`'s column `checked_at` to `verified_at`, with its NOT NULL constraint and its index. The MCP entries keep the wire keys `checkedBy` and `checkedAt`. On a migrated database the api of any release before it fails every concept read and every bundle import with `column "checked_at" does not exist`, and its worker's deploy stamp no longer matches, so it claims nothing. Rolling back from the first release that carries 0070 to a tag below it is the migration case above, as for 0053: `release` with that tag's digests, then `restore-production.sh --tier <tier> --dump <file>` naming the last dump stamped before that promotion. Between two releases that both carry 0070, the digests alone are the rollback.
-- **No digest rollback across migration 0071** (07/10/2026, BA-29): `0071_the-short-name` renames the workspace column holding its short name to `workspace.short_name`, with its unique constraint (and the index under it) and its NOT NULL constraint. Better Auth's API keeps its own field name, which the api maps onto the column. On a migrated database the api of any release before it fails provisioning, renaming a workspace, asking to join, the console's Workspaces list and every Better Auth read of a workspace with `column "slug" does not exist`, and its worker's deploy stamp no longer matches, so it claims nothing. Rolling back from the first release that carries 0071 to a tag below it is the migration case above, as for 0053: `release` with that tag's digests, then `restore-production.sh --tier <tier> --dump <file>` naming the last dump stamped before that promotion. Between two releases that both carry 0071, the digests alone are the rollback.
-- **No digest rollback across migration 0072** (07/10/2026, BA-29): `0072_the-knowledge-words` renames the tables of write-ups and their includes to `write_up` and `write_up_include` (the include's key column to `write_up_id`), and the sensitivity overrides' table to `concept_sensitivity_override`, each with its policy, keys, checks, index and NOT NULL constraints. It renames `source_document`'s column naming why a document could not be read to `unreadable_reason`, with its CHECK, and the sensitivity ranking's function to `narrower_sensitivity`, which keeps its grants. It moves every stored value to its new word, in each workspace's scope: the suggestion kinds to `suggested-concept` and `citation-fix` (decided suggestions too), the verification origin to `citation-fix`, the document outcome to `unreadable` and the map's node label to `WriteUp`. The proposer CHECK is now `suggestion_citation_fix_proposer_check`, and `submit_suggestion_set` is replaced in place with the new kinds. A migration that fails on `lock_timeout` rolls back whole and is safe to run again once the old worker is stopped. On a migrated database the api of any release before it fails the Sources list, every concept read that derives a sensitivity, every sensitivity override, every narrowing and every suggestion set with `relation … does not exist` or a CHECK naming the old value, and its worker's deploy stamp no longer matches, so it claims nothing. A browser tab opened before the release still runs the old web app, which reads the Sources list and a source's move by their old names, so its Sources page shows the error page until the tab is reloaded: tell the Admins to reload. Rolling back from the first release that carries 0072 to a tag below it is the migration case above, as for 0053: `release` with that tag's digests, then `restore-production.sh --tier <tier> --dump <file>` naming the last dump stamped before that promotion. Between two releases that both carry 0072, the digests alone are the rollback.
-- **No digest rollback across migration 0073** (07/10/2026, BA-29): `0073_the-action` renames the `act` column of both audit logs, `audit_event` and `identity_audit_event`, to `action`, with its CHECK and its NOT NULL constraint on each (`…_action_check`, `…_action_not_null`). The generated `family` and `subject_kind` read the renamed column with no rebuild, no row is rewritten, and every stored action name stays as written. A migration that fails on `lock_timeout` rolls back whole and is safe to run again. On a migrated database the api of any release before it fails nearly every write, signing in among them, because each action records its audit event, and every read of the audit logs, the Audit log and its export among them, with `column "act" does not exist`. Its worker never reads the audit logs, but its deploy stamp no longer matches, so it claims nothing. The api's wire kept the key `act` until the next release, the action sweep's second pull request, which renamed it `action` with no migration: a browser tab opened before that release must be reloaded. Rolling back from the first release that carries 0073 to a tag below it is the migration case above, as for 0053: `release` with that tag's digests, then `restore-production.sh --tier <tier> --dump <file>` naming the last dump stamped before that promotion. Between two releases that both carry 0073, the digests alone are the rollback.
-- **No digest rollback across migration 0090** (21/10/2026, BA-226): `0090_the-backoff` narrows the run key, the partial unique index `job_queued_subject_key`, to queued jobs not yet tried, so a failed job waiting out its backoff no longer holds its subject's place. The api of any release before it enqueues with `ON CONFLICT … WHERE status = 'queued'`, which no longer names an index, so every job it enqueues fails with `there is no unique or exclusion constraint matching the ON CONFLICT specification` (42P10): a connected source's sync, a reprocess, a dismissal or restore, a rebuild and `ops reindex-connected-sources`. Its worker's deploy stamp no longer matches, so it claims nothing. Rolling back from the first release that carries 0090 to a tag below it is the migration case above, as for 0053: `release` with that tag's digests, then `restore-production.sh --tier <tier> --dump <file>` naming the last dump stamped before that promotion. Between two releases that both carry 0090, the digests alone are the rollback.
-- **The migration that adds `map_unresolved_reference` rebuilds every map on its own** (22/10/2026, BA-233): a concept that lands now settles the links waiting for its path from that table's rows, and no longer scans every body. The table starts empty, so a link written before the release has no row until its map is rebuilt. The migration therefore queues one `full-rebuild` job with the reason `upgrade` for each workspace that has a map, unless a full rebuild already waits there. It runs once per database, so a second release or a rerun of `migrate` queues nothing. The orchestrator stops the old `worker` before `migrate` runs, and the new one starts only once `migrate` succeeds (`docs/operations/CI.md`, *The pull runs before the stop*), so the new worker runs each rebuild, and the daily sweep removes the old generation. A worker left running across the migration checks its deploy stamp once per pass, not per claim, so it could take a rebuild in the pass where the migration lands, and that rebuild writes no rows. Nothing is run by hand. To watch it, count `SELECT workspace_id, status FROM job WHERE kind = 'full-rebuild' AND reason = 'upgrade'` as `postgres`: every row should reach `done` once the new worker is up. For a row that ends `failed` or `poisoned`, read the job's outcome, fix its cause, and run `pnpm ops map-rebuild --workspace <id> --reason upgrade --wait` for that workspace. Until a workspace's rebuild is done, a concept that lands at a path an older link names does not answer that link. Rolling back across the migration is the migration case above: an older api never reads the table, but an older worker's deploy stamp no longer matches, so it claims nothing. That rollback restores a dump taken before the migration, so rolling forward again runs it again and queues the rebuilds anew.
-- **A rollback to an api that names no image ends red at the smoke** (24/09/2026, T-364): an api image built before `/health` named its digest answers without an `image`, so the smoke waits out its six minutes and fails with *answering no image named* and a `healthy` last answer. Read `/health` by hand: `healthy` with no `image` is that older build answering, and the rollback done; `healthy` naming the failed digest is the failed build still up. Such a rollback pushes no tag, since only a release that held is recorded: tag it by hand as `deploy/RELEASES.md` shows.
-- **The tag ruleset.** A tag ruleset (Settings, Rules, Rulesets) targets `release/*` and is Active, with **Restrict updates** and **Restrict deletions** on and **Restrict creations** off. A tag that records a release can no longer be moved or deleted, and the record job's workflow token can still push a new one. To delete a tag by hand, as the two of 27/09/2026 were, turn the ruleset off for the deletion and on again after. The `production` environment admits only `main` (Settings, Environments, `production`, Deployment branches and tags), so no workflow on another branch reads its secrets. Both were set on 03/10/2026.
-- **Attach:** the `release/*` tag rolled back to, with the message `git show --no-patch` prints; the failed run, whose summary says no tag was pushed, with the smoke's error line naming both digests; the orchestrator's deploy log; the body `/health` answered, whose `image` is the digest actually running.
-- **Escalate:** the technical contact if the rollback does not turn `/health` green within 30 minutes; the customer's named contact if the product was unreachable for more than an hour.
-- **Rehearsed by:** the first release after the first drill is rolled back on purpose, once, and both tags are kept.
+A release whose smoke failed pushed no tag, but its migrations still ran. Migrations are forward-only, so the digests alone are the rollback only when step 4 lists nothing. A migration that cannot run under the previous release says so in its release note. The restore comes after the release because its migrate step runs the deployed release. Hourly dumps are kept 48 hours, and the 02:00 UTC dump is filed under daily, weekly, or monthly. Every write since the dump is lost, and every erasure since it is replayed.
+
+The api refuses to start unless `PUBLIC_URL`, `AGENT_HOSTNAME` and `APEX_HOSTNAME` are set and differ. `deploy/platform.compose.yaml` **requires** `S3_BUCKET`. Set it on the platform resource to the bucket that `wizard-41.sh`'s Garage stage created.
+
+Every release runs in the `release-production` concurrency group, which cancels no run. A rollback dispatched while another release's `promote` job runs waits behind it, for up to about 70 minutes. Cancelling the run does not stop its deployment, and while that deployment is queued or running, the rollback's redeploy step stops and names it.
+
+Outside `drill` mode, a rollback holds only until the next automatic release: the next green build in `per-merge`, or the next night in `nightly`. That release still carries the broken change. Setting `RELEASE_MODE` to `drill` holds the rollback while the fix is made.
+
+A rollback to an api built before `/health` named its digest ends red at the smoke, with *answering no image named* and a `healthy` last answer. Read `/health` by hand. `healthy` with no `image` means the rollback is done. `healthy` naming the failed digest means the failed build is still up. Such a rollback pushes no tag, so tag it by hand as `deploy/RELEASES.md` shows.
+
+**Attach.** The message of the `release/*` tag rolled back to, as `git show --no-patch` prints it. The failed run, with the smoke's error line naming both digests. The orchestrator's deploy log. The body `/health` answered, whose `image` is the digest actually running.
+
+**Escalate.** If the rollback does not turn `/health` green within 30 minutes, escalate to the technical contact. If the product was unreachable for more than an hour, escalate to the customer's named contact.
+
+**Rehearsed by.** The first release after the first drill is rolled back on purpose, once, and both tags are kept.
+
+### The `RELEASE_MODE` switch
+
+`RELEASE_MODE` is a repository variable with three modes. Any other value fails closed: nothing is released, and the run says why.
+
+- **`per-merge`**, the default while unset. Every green build on `main` releases its own commit, and skips one that `main` has moved past.
+- **`nightly`**. At 02:35 UTC, `release` promotes the newest green commit on `main`, once the box's backup is fresh. Fresh means the dead-man service's `pg-hourly` check is up and pinged within 65 minutes, and its `nightly` check is up and pinged since the last 02:00 UTC. The run reads them with `HEALTHCHECKS_READ_KEY`, the service's read-only API key, kept as a `production` environment secret, and refuses without it. A night is skipped when that commit, or a newer one, already has a tag. A night refused for a stale backup deploys nothing (page 7), and the next night tries again.
+- **`drill`**. Nothing releases itself. `release` refuses to run unless `rehearsed_by` names the drill report a restore was just proved on, or a hotfix reason.
+
+The phases are `per-merge` until the first customer's bundle lands, `nightly` until the platform goes live (no earlier than the end of v0.1), then `drill`. Add the read key before the first switch:
+
+```sh
+gh secret set HEALTHCHECKS_READ_KEY --env production   # the dead-man service's read-only key
+gh variable set RELEASE_MODE --body nightly            # the day the bundle lands
+gh variable set RELEASE_MODE --body drill              # the day the platform goes live
+```
+
+### Migrations that no digest rollback crosses
+
+On a migrated database, the api of every release before each migration below fails. From 0066 on, that release's worker also claims nothing, because its deploy stamp no longer matches. To roll back from the first release that carries one to a tag below it, run `release` with the tag's digests, then `restore-production.sh --tier <tier> --dump <file>` with the last dump stamped before that release's promotion. Between two releases that both carry it, the digests alone are the rollback.
+
+| Migration | Date | Change | An older api fails with |
+| --- | --- | --- | --- |
+| `0053_the-account-issuer-goes` | 24/09/2026 | Drops `account.issuer`, which Better Auth 1.7.2 reads on every email-code sign-in. | `column "issuer" does not exist` on every sign-in. |
+| `0066_the-model-choice` | 05/10/2026 | Renames `llm_route` to `model_choice`, and queued `route-change` rebuilds to `model-choice-change`. | `relation "llm_route" does not exist` on every read of a workspace's model choices. |
+| `0067_the-map` | 05/10/2026 | Renames the map tables to `map_generation`, `map_node` and `map_edge`. Moves map destinations to `map`, and queued `first-sync` rebuilds to `first-build`. | `relation "graph_node" does not exist` on every map read and write. |
+| `0068_the-connected-source` | 07/10/2026 | Renames the connected sources' table to `connected_source`, and `source_document`'s column to `connected_source_id`. Moves *landed* sources to *received*, and syncs with the reason `bound` to `connected`. | `relation "source_binding" does not exist` on every Sources read and write. |
+| `0069_the-passage` | 07/10/2026 | Renames the passage table to `index.passage`, its view to `index.readable_passage`, and its columns to `connected_source_id` and `embedding_model_choice_id`. Moves the destination `chunk-index` to `passage-index`. | `relation "index.chunk" does not exist` on every passage read. |
+| `0070_the-verification` | 07/10/2026 | Renames `concept_verification`'s `checked_at` to `verified_at`. The MCP wire keys stay `checkedBy` and `checkedAt`. | `column "checked_at" does not exist` on every concept read and bundle import. |
+| `0071_the-short-name` | 07/10/2026 | Renames the workspace's short-name column to `workspace.short_name`. | `column "slug" does not exist` on provisioning, renaming a workspace, asking to join, the console's Workspaces list, and every Better Auth read of a workspace. |
+| `0072_the-knowledge-words` | 07/10/2026 | Renames tables to `write_up`, `write_up_include` and `concept_sensitivity_override`, a column to `unreadable_reason`, and a function to `narrower_sensitivity`. Moves stored values to `suggested-concept`, `citation-fix`, `unreadable` and `WriteUp`. | `relation … does not exist`, or a CHECK naming the old value, on the Sources list, sensitivities, overrides, narrowings, and suggestion sets. |
+| `0073_the-action` | 07/10/2026 | Renames the `act` column of `audit_event` and `identity_audit_event` to `action`. | `column "act" does not exist` on nearly every write, signing in among them, and every read of the audit logs. |
+| `0090_the-backoff` | 21/10/2026 | Narrows `job_queued_subject_key` to queued jobs not yet tried. | `there is no unique or exclusion constraint matching the ON CONFLICT specification` (42P10) on every job it enqueues. |
+
+If 0069, 0072 or 0073 fails on `lock_timeout`, it rolls back whole and can run again. For 0069 and 0072, stop the old worker first.
+
+**After 0069, wipe every connected source.** The worker's engine tracks its rows under the passage table's old name, so after the rename it silently deletes nothing that leaves a source.
+
+1. For every workspace (`SELECT id FROM workspace`), run `pnpm ops reindex-connected-sources --workspace <id>`. Its `wiped` sync also removes the store under the old name, `binding/`.
+2. Remove any `binding/` left under `LMDB_DIR` by a source that no longer stands: `find /data/worker/lmdb -mindepth 3 -maxdepth 3 -type d -name binding -prune -exec rm -rf {} +`.
+3. Count rows as `postgres`. Row-level security makes the owner's unscoped count read 0.
+
+**After 0072,** a browser tab opened before the release shows the error page on Sources until reloaded. Tell the Admins to reload. **After 0073,** the next release renamed the api's wire key `act` to `action`, so a tab opened before that release must be reloaded.
+
+**The migration that adds `map_unresolved_reference`** (22/10/2026) queues one `full-rebuild` job with the reason `upgrade` for each workspace that has a map, unless a full rebuild already waits there. It runs once per database. Nothing is run by hand. Until a workspace's rebuild is done, a concept that lands at a path an older link names does not answer that link.
+
+1. To watch, count `SELECT workspace_id, status FROM job WHERE kind = 'full-rebuild' AND reason = 'upgrade'` as `postgres`. Every row reaches `done` once the new worker is up.
+2. If a row ends `failed` or `poisoned`, read the job's outcome and fix its cause.
+3. Run `pnpm ops map-rebuild --workspace <id> --reason upgrade --wait` for that workspace.
+
+A worker left running across the migration may take a rebuild and write no rows (`docs/operations/CI.md`, *The pull runs before the stop*). Rolling back across it is the migration case, and rolling forward again queues the rebuilds anew.
+
+### The tag ruleset
+
+A tag ruleset (Settings, Rules, Rulesets) targets `release/*` and is Active, with **Restrict updates** and **Restrict deletions** on and **Restrict creations** off. Nothing can move or delete a release tag, and the record job can still push one. To delete a tag by hand, turn the ruleset off for the deletion and on again after. The `production` environment admits only `main` (Settings, Environments, `production`, Deployment branches and tags), so no workflow on another branch reads its secrets. Both were set on 03/10/2026.
 
 ## 7. A backup check is red
 
-- **Fires:** `pg-hourly`, `nightly`, `coolify-backup` or `drill` late or failed at the dead-man service, by email. The product has no second channel while it is in development (the owner's decision of 03/10/2026), so read the alert the day it arrives: a missed backup is not an email to leave until Monday.
-- **Read the last run first.** Every run of `pg-hourly` or `nightly` ends its lines in the stores stack's `backup` service log with `backup.sh <hourly|nightly>: <ok|fail> bytes=<n> took=<seconds>`, the body of its ping. A run with no such line stopped before it pinged. The exception is an hourly run skipped while the erasure lock is held, which says so. A run that stops at `DATABASE_URL: parameter null or not set` was started without its variables. Every scheduled run did that from 04/09/2026 until T-357's image (24/09/2026), whose cron starts each job through `backup-env`. If you see it now, the container is running an older image, and `BACKUPS.md` § Putting a new backup image on production is the fix. § How the jobs run, and how to read the last one has the rest.
-- **Do:** read the stores stack's `backup` service log in the orchestrator and match the line to `BACKUPS.md` § The backup service's own failure modes — a full `/staging`, a rotated bucket credential, a mirror push refused, a dump skipped while the erasure lock is held (that one clears itself). A `backup` service that `restore-production.sh` stopped takes no dump until the script's last step starts it again, or until you start it by hand after an abandoned restore (page 1). List the dumps bucket per tier (`rclone lsf dumps:<bucket>/pg/<tier>/`) and read the last `backup` row per store. **Two consecutive `pg-hourly` misses mean the recovery point is now the last good dump and growing**: no release (page 6) and no rehearsal until green. `coolify-backup` red is the orchestrator's own S3 storage or credential — page 5's restore depends on it. `drill` red is page 5 or a failed step in the drill's report under `drills/`.
-- **Attach:** the failing job's log lines; the last `backup` row per store; the bucket listing per tier; the dead-man service's ping history for the check. The log lines hold no key or password, but they do hold paths. rclone's `Config file … not found` notice names its config file on every call, and a failing `rclone`, `age` or `git` names what it was working on: a file under `/staging`, the endpoint, bucket and object name, a repository under `/data/git` named for its workspace, or the mirror's address. A failing `pg_dump` or `psql` names the database's host, port and role. An address and a bucket name belong to the private half, so the lines go where its records are kept, never anywhere public.
-- **Escalate:** the technical contact if any check is still red after 24 hours or after one attempt to fix; the customer's named contact only if the recovery point passes the RPO their contract states.
-- **Rehearsed by:** the drill's step 9 (the bucket listing against the matrix); the `staging-wiped` check proves the drill's last step ran.
+**Fires.** `pg-hourly`, `nightly`, `coolify-backup` or `drill` is late or failed at the dead-man service, by email. During development there is no second channel, by the owner's decision of 03/10/2026, so read the alert the day it arrives.
+
+**Do.**
+
+1. Read the stores stack's `backup` service log in the orchestrator. Every `pg-hourly` or `nightly` run ends with `backup.sh <hourly|nightly>: <ok|fail> bytes=<n> took=<seconds>`, the body of its ping. A run with no such line stopped before it pinged, unless it was an hourly run skipped for the erasure lock, which says so.
+2. Match the line to `BACKUPS.md` § The backup service's own failure modes: a full `/staging`, a rotated bucket credential, a refused mirror push, or a dump skipped for the erasure lock, which clears itself. `BACKUPS.md` § How the jobs run, and how to read the last one has the rest.
+3. If a run stops at `DATABASE_URL: parameter null or not set`, the container runs an image older than 24/09/2026, whose cron does not start jobs through `backup-env`. Follow `BACKUPS.md` § Putting a new backup image on production.
+4. If an abandoned restore left the `backup` service stopped, start it by hand (page 1).
+5. List the dumps bucket per tier: `rclone lsf dumps:<bucket>/pg/<tier>/`.
+6. Read the last `backup` row per store.
+7. If `pg-hourly` missed twice in a row, run no release (page 6) and no rehearsal until the check is green. **The recovery point is now the last good dump, and growing.**
+8. If `coolify-backup` is red, check the orchestrator's own S3 storage and its credential. Page 5's restore depends on it.
+9. If `drill` is red, read page 5, or the failed step in the drill's report under `drills/`.
+
+**Attach.** The failing job's log lines, the last `backup` row per store, the bucket listing per tier, and the dead-man service's ping history for the check. The log lines hold no key or password, but they name paths, endpoints, buckets, objects, repositories, the mirror's address, and the database's host, port and role. rclone's `Config file … not found` notice is harmless. Keep the lines with the private half's records, never anywhere public.
+
+**Escalate.** If any check is still red after 24 hours, or after one attempt to fix it, escalate to the technical contact. Escalate to the customer's named contact only if the recovery point passes the RPO their contract states.
+
+**Rehearsed by.** The drill's step 9, which checks the bucket listing against the matrix. The `staging-wiped` check proves the drill's last step ran.
 
 ## 8. A customer reports wrong or lingering content
 
-- **Fires:** a customer's message: an answer is wrong, a concept says something false, a source they removed still answers, or a person's data is still visible.
-- **Do — wrong content:** find the answer's `questions_asked` row (the System page; by the person and the time) and the concept it asserts. The correction is a governed write: the Admin edits the concept forward as a new commit (*Update a concept's body in place*, below, when only its body is wrong), or files a *finding* on it (ADR 0014, 0017); the answer's row is marked *corrected* so the record shows what was said and when it changed. Nothing is deleted.
-- **Do — lingering content:** a removed *source* stops answering at the connected source's next sync — read the connected source's last sync row; if no sync has happened, start one. Its object-store originals are deleted on that sync and the deletion reaches the mirror bucket that night; dumps holding it expire on the tiers (`BACKUPS.md` § The retention schedule) and are beyond use meanwhile. A *person's* data is page 4, and the report's dates are the answer to "when is it gone from every copy".
-- **Attach:** the `questions_asked` or `audit_event` row; the concept's `bundle_commit`; the connected source's last sync row; the `backup` rows that bound the retention dates; the customer's message.
-- **Escalate:** the customer's named contact is answered within one working day with the row and the date; the technical contact if the next sync does not remove the content; page 3's contacts if personal data was served to someone who should not have seen it.
-- **Rehearsed by:** the quarterly erasure rehearsal (lingering); the first customer's onboarding, where a deliberately wrong concept is corrected end to end (wrong).
+**Fires.** A customer says an answer is wrong, a concept says something false, a source they removed still answers, or a person's data is still visible.
+
+**Do, for wrong content.**
+
+1. Find the answer's `questions_asked` row on the System page, by the person and the time, and the concept it asserts.
+2. Have the Admin edit the concept forward as a new commit, or file a *finding* on it. If only its body is wrong, use *Update a concept's body in place*, below.
+3. Mark the answer's row *corrected*. Nothing is deleted.
+
+**Do, for lingering content.**
+
+1. If a person's data is still visible, go to page 4. Its report's dates say when the data is gone from every copy.
+2. For a removed source, read the connected source's last sync row. If no sync has happened, start one.
+
+The next sync stops the source answering and deletes its object-store originals. The deletion reaches the mirror bucket that night. Dumps holding it expire on the tiers (`BACKUPS.md` § The retention schedule), and are beyond use meanwhile.
+
+**Attach.** The `questions_asked` or `audit_event` row, the concept's `bundle_commit`, the connected source's last sync row, the `backup` rows that bound the retention dates, and the customer's message.
+
+**Escalate.** Answer the customer's named contact within one working day, with the row and the date. If the next sync does not remove the content, escalate to the technical contact. If personal data was served to someone who should not have seen it, escalate to page 3's contacts.
+
+**Rehearsed by.** The quarterly erasure rehearsal, for lingering content. The first customer's onboarding, for wrong content, which corrects a deliberately wrong concept end to end.
 
 ## 9. Both boxes lost at once
 
-- **Fires:** nothing automatic beyond page 1's uptime check — you notice that the orchestrator is unreachable too. Cause: the provider, an account compromise, or a payment lapse.
-- **Do, in this order (half a day):** two new boxes at the provider; **`host-setup.sh vpc2`**, the orchestrator at the pinned version, its instance backup and SSH keys back from the dumps bucket and escrow (page 5); **`host-setup.sh vpc1`**, the server re-added, the Postgres resource on the pinned image by digest, the two stacks from this repository with every env value re-entered from the private inventory and escrow; then **`restore-production.sh --objectstore --git`** on VPC 1, from its checkout at `/opt/better-answers` once it is brought to `main` (`pull --ff-only`) and with `REPO_DIR` set to it, with the identity from escrow; a new tunnel token if the old one was revoked; the uptime check green. Every value needed exists in exactly one of three places — the repository, the private file, the vault — and `SECRETS.md`'s inventory is the checklist.
-- **Attach:** the restore log; the escrow access record (who opened the vault, when); the new addresses in the private file.
-- **Escalate:** the **second escrow holder** is who steps in if the owner cannot — this is the page the two-holder rule exists for; the customer's named contact within the first hour with an RTO.
-- **Rehearsed by:** never in full — the cost is a day. Its parts are: page 5 yearly, the drill monthly, and the second holder opening the vault once before the first customer goes live.
+**Fires.** Nothing beyond page 1's uptime check. You notice that the orchestrator is unreachable too. The cause is the provider, an account compromise, or a payment lapse.
+
+**Do, in this order.** It takes half a day. `SECRETS.md`'s inventory is the checklist, and every value is in the repository, the private file, or the vault.
+
+1. Make two new boxes at the provider.
+2. On VPC 2, run **`host-setup.sh vpc2`**, install the orchestrator at the pinned version, and bring back its instance backup and SSH keys (page 5).
+3. On VPC 1, run **`host-setup.sh vpc1`**, and re-add the server in the orchestrator.
+4. Deploy the Postgres resource on the pinned image, by digest.
+5. Deploy the two stacks from this repository, with every env value entered again from the private inventory and escrow.
+6. Bring the checkout at `/opt/better-answers` to `main` (`pull --ff-only`), fetch the backup identity from escrow, and with `REPO_DIR` set to the checkout run **`restore-production.sh --objectstore --git`**.
+7. If the old tunnel token was revoked, make a new one.
+8. Check that the uptime check is green.
+
+**Attach.** The restore log, the escrow access record (who opened the vault, and when), and the new addresses, in the private file.
+
+**Escalate.** If the owner cannot act, the **second escrow holder** steps in. This page is why the two-holder rule exists. Within the first hour, give the customer's named contact an RTO.
+
+**Rehearsed by.** Never in full, because it costs a day. Page 5 is rehearsed yearly, the drill monthly, and the second holder opens the vault once before the first customer goes live.
 
 ## 10. A workspace is stuck behind a commit
 
-- **Fires:** the api's reconciler tick logs `reconciler tick` at warn with a `stopped` entry — `workspace_id`, `commit_sha`, `reason` — and does so again every thirty seconds; or `pnpm ops reconcile-watermark --workspace <id>` refuses. Both are one function saying one thing (ADR 0012, amended 2026-09-07): the replay of the commits the rows missed stopped at a commit the index would not take, and until a person steps in that bundle's rows stay behind its repository and **every later write to that bundle fails** — a connected source, a write-up or a member is untouched, because only a bundle write reads the head.
-- **Read the refusal first.** `reconcile-watermark` is the reconciler on demand — step 2 of `BACKUPS.md` § Recovery order, and the one command on this page. Its refusal reads `reconcile-watermark: REFUSED — stopped at <sha> (<reason>); head <sha>, watermark <sha>, replayed <n>, already landed <n>; …`. *head* is where the repository is; *watermark* is the last commit the rows knew when the run began; *stopped at* is the first commit between them the index refused; *reason* is one of the replay's four words, **or a store's own failure in that store's words**. A reason that is not one of the four — `connection terminated unexpectedly` and its like — is not a stuck bundle at all: run the command again, escalate if it repeats, and **never rewind on one**, because the rewind below throws away work and a transient failure has taken nothing. The four words are what decides which of the two paths is open. `merge-key-taken` — another concept already holds the merge key the refused commit resolves by — **can be put right**. `path-taken` cannot, today: freeing a path means moving a concept's file, which the live write path refuses outright, and that refusal is the third reason, `rename-refused`. `unreadable-commit` and `rename-refused` are commits the governed write did not make at all, so there is nothing in the index to put right for either.
-- **Do — put it right, and prefer it wherever the reason allows.** For `merge-key-taken`: have an Editor or an Admin re-write the concept that holds the key onto a free one — a re-write may move its own concept onto a key that resolves to nothing — then run `reconcile-watermark` again and read the line. This is the first choice every time it is open, because it keeps every commit made while the workspace was stuck, the writes that committed and then failed their rows included, and the replay lands them in order behind the one that was refused. The other three reasons have no such action today, which is what the rewind is for.
-- **Do — rewind the ref to the watermark, when the reason cannot be put right.** A rewind **discards every edit attempted while the workspace was stuck**. Before touching the ref, list the commits it will drop with their subjects and their `Actor:` trailers, and **record who is being asked to redo which edit** — that list is the point of the page, not a by-product of it. Then, in this order:
-  1. Run `reconcile-watermark` once more and use the line that says `replayed 0, already landed 0`: on that line the *watermark* is the rows' own last commit, which is the commit to move to, and *stopped at* is its child. A line that landed anything names the watermark as it stood **before** that run, which is no longer where the rows are.
-  2. Every step below runs **inside the `api` container as the image's own user** — `docker compose … -p better-answers exec -T api …`, the invocation `deploy/restore-production.sh`'s `platform` helper makes; the private file holds its env file. Never run `git` as root on the host over `/data/git`: one root-owned object, ref or `.lock` file under a bare repository blocks every later write the api makes, and one incident becomes two.
-  3. `git --git-dir /data/git/<workspace>.git rev-parse refs/heads/main` — **the old head, into the incident record before anything moves.** Each bundle is `git init --bare`, which logs no ref updates, so once the ref has moved nothing on the box remembers where it was.
-  4. `git --git-dir … merge-base --is-ancestor <watermark> refs/heads/main` — an exit of 0 and no output is the whole answer: the watermark is on the head's own history and the move only drops commits. A non-zero exit is the rows and the repository disagreeing about the past; **stop there** and escalate, because no move makes that right.
-  5. `git --git-dir … log --oneline <watermark>..refs/heads/main` — the commits the move drops, with their subjects, into the record beside the old head.
-  6. `git --git-dir … update-ref refs/heads/main <watermark> <the old head>` — **three arguments, always.** The third is git's own compare-and-swap, the same one every governed write's ref move relies on: a commit that reached the ref since step 3 refuses the move instead of being discarded by it. If it refuses, begin again at step 1. The two-argument form skips that check and is never the form to type.
-  7. `pnpm ops reconcile-watermark --workspace <id>` again. `done — head <sha>, watermark <sha>, replayed 0, already landed 0` with the two shas equal is the bundle and its rows agreeing, and the workspace is writable again.
-- **Attach:** the refusal line or the tick's warn line that fired, with its stop reason; the old head; the dropped commits with their subjects and actors; who was told to redo which edit; the `reconcile-watermark` line that ended it.
-- **Escalate:** the technical contact before any rewind — this is the page that throws work away; the customer's named contact once the list of edits to redo exists, since it is their people who redo them.
-- **Rehearsed by:** once on staging against a made-up stuck bundle, before the first customer's data is on the box (ADR 0012, amended 2026-09-19). It is also the day page 6's switch turns to `nightly`. A commit the governed write did not make, written into a staging workspace's bundle by hand, stops the replay as `unreadable-commit` and is the cheapest stuck bundle there is. Rehearsed on 27/09/2026 at build `3557cba8`. The replay stopped as `unreadable-commit`, the tick logged the stop every thirty seconds, and steps 1 to 7 put it right. The workspace took a governed write straight after. Step 1's refusal exits non-zero, so run it on its own rather than in a script that stops on the first failure.
+**Fires.** The api logs `reconciler tick` at warn with a `stopped` entry (`workspace_id`, `commit_sha`, `reason`) every thirty seconds, or `pnpm ops reconcile-watermark --workspace <id>` refuses. The replay of commits the rows missed stopped at a commit the index would not take. Until someone steps in, **every later write to that bundle fails**. Connected sources, write-ups, and members are untouched.
+
+**Read the refusal first.** `reconcile-watermark` is the reconciler on demand, step 2 of `BACKUPS.md` § Recovery order. Its refusal reads `reconcile-watermark: REFUSED — stopped at <sha> (<reason>); head <sha>, watermark <sha>, replayed <n>, already landed <n>; …`. *head* is where the repository is. *watermark* is the last commit the rows knew when the run began. *stopped at* is the first commit between them that the index refused.
+
+| Reason | Path |
+| --- | --- |
+| `merge-key-taken`: another concept holds the merge key the refused commit resolves by | Put it right. |
+| `path-taken`: freeing the path means moving a concept's file, which the live write path refuses | Rewind. |
+| `rename-refused`, `unreadable-commit`: a commit the governed write did not make | Rewind. |
+| Anything else, such as `connection terminated unexpectedly`: a store's own failure | Run the command again, and escalate if it repeats. **Never rewind.** |
+
+**Do, to put it right** (`merge-key-taken`). Prefer this whenever the reason allows. It keeps every commit made while the workspace was stuck.
+
+1. Have an Editor or an Admin rewrite the concept that holds the key onto a free key.
+2. Run `reconcile-watermark` again and read the line.
+
+**Do, to rewind the ref to the watermark.** A rewind **discards every edit attempted while the workspace was stuck**. **Record who is asked to redo which edit**, from the dropped commits' subjects and `Actor:` trailers.
+
+1. Run `reconcile-watermark` once more, on its own, since its refusal exits non-zero. Use the line that says `replayed 0, already landed 0`. Its *watermark* is the commit to move to. A line that landed anything names a stale watermark.
+2. Run every step below **inside the `api` container as the image's own user**: `docker compose … -p better-answers exec -T api …`. Never run `git` as root on the host over `/data/git`. One root-owned file under a bare repository blocks every later write the api makes.
+3. Run `git --git-dir /data/git/<workspace>.git rev-parse refs/heads/main`. Write **the old head into the incident record before anything moves.** Nothing else on the box remembers it.
+4. Run `git --git-dir … merge-base --is-ancestor <watermark> refs/heads/main`. Exit 0 with no output means the move only drops commits. If it exits non-zero, **stop** and escalate.
+5. Run `git --git-dir … log --oneline <watermark>..refs/heads/main`, and write the commits it lists into the record.
+6. Run `git --git-dir … update-ref refs/heads/main <watermark> <the old head>`, **with three arguments, always.** The third makes git refuse if a commit reached the ref since step 3. If it refuses, begin again at step 1.
+7. Run `pnpm ops reconcile-watermark --workspace <id>` again. `done — head <sha>, watermark <sha>, replayed 0, already landed 0` with the two shas equal means the workspace is writable again.
+
+**Attach.** The line that fired, with its stop reason, the old head, the dropped commits with their subjects and actors, who was told to redo which edit, and the `reconcile-watermark` line that ended it.
+
+**Escalate.** Escalate to the technical contact before any rewind. Once the list of edits to redo exists, escalate to the customer's named contact, since their people redo them.
+
+**Rehearsed by.** Once on staging, before the first customer's data is on the box, which is also the day page 6's switch turns to `nightly`. A commit written into a staging bundle by hand stops the replay as `unreadable-commit`. Rehearsed on 27/09/2026 at build `3557cba8`, where steps 1 to 7 put it right.
 
 ## 11. The sweeps' check is red
 
-- **Fires:** the `sweeps` check at the dead-man service, by email only: a sweep is a day late, not an outage. **Late** means no pass completed in 25 hours; **failed** means a pass completed but could not sweep at least one workspace or delete one kind of expired sign-in row, or could not list the workspaces or write its row at all.
-- **Do — late:** the api's start line says why. `sweeps running` means the timer started, and the silence is the api being down (page 1) or a pass skipped for a held lock; `the sweeps are not running` names the reason: a wrong `UPLOAD_SWEEP`, or no object store on the api service. Fix the setting and redeploy. A skip reads `a sweep pass was skipped: another holder has the sweeps' lock`, and a sweep by hand that never finished is the usual holder. A pass whose ping never arrived says so with `check: sweeps`, in the two lines page 12 explains.
-- **Do — failed:** read the last `sweep pass` line: its `refusals` names each workspace passed over, the sweep (`uploads` or `map`) and the reason. Run that sweep by hand for that workspace to see the refusal on its own — `pnpm ops map-sweep --workspace <id>`, or `pnpm ops object-store-orphans --workspace <id> --list` while `UPLOAD_SWEEP` is `list`, because without `--list` the command removes whatever the setting says — fix what it names, and let the next pass go green. The rest of the workspaces were swept. A refusal whose sweep is `sessions`, `verifications` or `ingress` names no workspace: that kind's expired rows were kept, the other kinds were still deleted, and the next pass tries again. With no `sweep pass` line, `the sweep pass failed` carries the reason instead: the workspaces could not be listed, or the pass swept and could not write its row. The expired sign-in rows are deleted all the same, and that line carries `sessions_deleted`, `verifications_deleted`, `ingress_windows_deleted` and `refusals` too.
-- **Attach:** the `sweep pass` line or the start line that fired; the last `sweep_pass` row; the by-hand run's refusal line.
-- **Escalate:** the technical contact if the check is still red after two passes.
-- **Rehearsed by:** the drill's two sweeps on staging, which take the same lock and wait for a pass holding it.
+**Fires.** The `sweeps` check at the dead-man service, by email only. **Late** means no pass completed in 25 hours. **Failed** means a pass could not sweep a workspace, delete one kind of expired sign-in row, list the workspaces, or write its row.
+
+**Do, when late.**
+
+1. Read the api's start line.
+2. If it reads `sweeps running`, the api is down (page 1) or a pass was skipped for a held lock. A skip logs `a sweep pass was skipped: another holder has the sweeps' lock`, usually behind a sweep by hand that never finished.
+3. If it reads `the sweeps are not running`, fix what it names, a wrong `UPLOAD_SWEEP` or no object store on the api service, and redeploy.
+
+A ping that never arrived logs `check: sweeps`, as page 12 explains.
+
+**Do, when failed.**
+
+1. Read the last `sweep pass` line. Its `refusals` names each workspace passed over, the sweep (`uploads` or `map`), and the reason. The other workspaces were swept.
+2. Run that sweep by hand for that workspace: `pnpm ops map-sweep --workspace <id>`, or `pnpm ops object-store-orphans --workspace <id> --list` while `UPLOAD_SWEEP` is `list`. Without `--list`, it removes.
+3. Fix what the refusal names, and let the next pass go green.
+
+A refusal whose sweep is `sessions`, `verifications` or `ingress` names no workspace. Those rows were kept and the next pass tries again. With no `sweep pass` line, `the sweep pass failed` carries the reason, and still carries `sessions_deleted`, `verifications_deleted`, `ingress_windows_deleted` and `refusals`.
+
+**Attach.** The line that fired, the last `sweep_pass` row, and the refusal line of the run by hand.
+
+**Escalate.** If the check is still red after two passes, escalate to the technical contact.
+
+**Rehearsed by.** The drill's two sweeps on staging, which take the same lock.
 
 ## 12. The scheduler's check is red
 
-- **Fires:** the `scheduler` check at the dead-man service, by email while the product is in development (page 7). Green means the api is up and its head check is ticking; the head check pings once a minute. **Late** means four minutes without a ping — a minute's period and three of grace: the api is down, or the head check has stopped. **Failed** means a tick in the minute before the ping could not run its pass at all, because the database refused or did not answer; the service marks the check down on the first such ping, so one failed minute pages. A workspace the tick refused, or a bundle stuck behind a commit, is not a failure here: the tick still ran, and its `reconciler tick` line at warn names the workspace (a stuck one is page 10).
-- **Do — late:** page 1 first: is VPC 1 up, and is `api` healthy in the orchestrator? With the api up, its start line says why. `the scheduler check will not be pinged` names what is wrong with `HEALTHCHECKS_PING_URL_SCHEDULER`, and `head check running` then reads `check_configured: false`: put the check's URL on the platform resource and redeploy. Staging's env file takes a URL of its own, never production's, or a staging api would ping over production's silence. `the head check is not running` means the api service has no `GIT_STORE_DIR`. A tick that never finishes stops the pings too, and `a reconciler tick was skipped: the previous one is still running` repeats every thirty seconds: attach those lines, escalate, then restart `api`.
-- **Do — pinged and still late:** a ping the service did not count is logged once per ping with `check: scheduler`, and never with the URL. `a dead-man ping was refused` carries the `status` the service answered: a `404` is a check deleted or re-created under a new URL, so put its current URL on the platform resource and redeploy. `a dead-man ping could not be sent` carries the `reason`: a timeout, or no egress from VPC 1.
-- **Do — failed:** `the reconciler tick failed` in the api's log carries the database's own `reason`. One failed minute and then green is a blip the next tick got past. A check that stays failed is the database, and `/health` answers `unhealthy` with it: read the Postgres resource's log and its disk in the orchestrator.
-- **Attach:** the start line; the lines that fired; the check's ping history at the dead-man service.
-- **Escalate:** the technical contact if the check is not green fifteen minutes after `api` is healthy.
-- **Rehearsed by:** nothing on a schedule. The api's own suite proves the minute ping, the failure ping and both of the ping's log lines; stopping `api` for five minutes fires this page for real, and sends its email.
+**Fires.** The `scheduler` check at the dead-man service, by email during development (page 7). The api's head check pings once a minute. **Late** means four minutes without a ping. **Failed** means a tick could not run its pass because the database refused or did not answer, and one failed minute pages. A workspace the tick refused is not a failure here. Its `reconciler tick` line names the workspace, and a stuck one is page 10.
+
+**Do, when late.**
+
+1. Check page 1: VPC 1 is up and `api` is healthy in the orchestrator.
+2. Read the api's start line.
+3. If it reads `the scheduler check will not be pinged`, with `head check running` reading `check_configured: false`, set `HEALTHCHECKS_PING_URL_SCHEDULER` on the platform resource and redeploy. Staging takes a URL of its own, never production's.
+4. If it reads `the head check is not running`, give the api service its `GIT_STORE_DIR`.
+5. If `a reconciler tick was skipped: the previous one is still running` repeats every thirty seconds, attach those lines, escalate, then restart `api`.
+
+**Do, when pinged and still late.** Find the lines logged with `check: scheduler`, which never carry the URL.
+
+1. If `a dead-man ping was refused` carries `status` `404`, the check was deleted or re-created. Put its current URL on the platform resource and redeploy.
+2. If `a dead-man ping could not be sent`, its `reason` is a timeout or no egress from VPC 1.
+
+**Do, when failed.**
+
+1. Read `the reconciler tick failed` in the api's log, which carries the database's `reason`.
+2. If the check stays failed, read the Postgres resource's log and its disk in the orchestrator. `/health` answers `unhealthy` too. One failed minute and then green is a blip.
+
+**Attach.** The start line, the lines that fired, and the check's ping history.
+
+**Escalate.** If the check is not green fifteen minutes after `api` is healthy, escalate to the technical contact.
+
+**Rehearsed by.** Nothing on a schedule. The api's suite proves the pings and their log lines. Stopping `api` for five minutes fires this page for real.
 
 ## 13. The test workspace
 
-The test workspace stands in production, marked, and no run signs in to it. Its three test people, the test Admin, Editor and Viewer, and its 51 invented members all have addresses on its testing domain. Its mark names that domain in a row the api cannot delete (migrations 0062 and 0063). While the mark stands, an invitation from the workspace to an address off that domain is refused `off-testing-domain`, so an Admin of the workspace cannot invite a real person into it.
+The test workspace stands in production, marked, and no run signs in to it. Its three test people (the test Admin, Editor and Viewer) and its 51 invented members have addresses on its testing domain. The mark names that domain in a row the api cannot delete (migrations 0062 and 0063). While it stands, an invitation to an address off that domain is refused `off-testing-domain`.
 
-**The journeys and the test inbox are retired until go-live.** From 03/10/2026 the nightly journeys signed in to production as the three test people, each with an email code read from the test inbox, a Cloudflare Email Worker. The owner retired both on 19/10/2026 (BA-204), and ADR 0022 records why. The go-live rebuild starts from this page as `a3c19ec8` holds it, which set them up step by step, and from `docs/solutions/best-practices/a-cloudflare-email-worker-test-inbox-needs-its-own-zone-and-its-deploy-token-reaches-every-zone.md`.
+**The journeys and the test inbox are retired until go-live.** The owner retired them on 19/10/2026 (ADR 0022). The go-live rebuild starts from this page as `a3c19ec8` holds it, and from `docs/solutions/best-practices/a-cloudflare-email-worker-test-inbox-needs-its-own-zone-and-its-deploy-token-reaches-every-zone.md`.
 
-- **Fires:** nothing. An Admin of the test workspace who meets `off-testing-domain` has met the mark doing its job.
-- **Never erase a test person.** An erasure tombstones the address for good. A test person who must go is removed from the test workspace on its Members page, and never erased.
-- **The test Admin holds a second factor.** An Admin must hold one. Keep its authenticator key and recovery codes in the password manager. If the key leaks, end its factors and sessions with `pnpm ops restore-sign-in`. No inbox receives the test people's sign-in codes until go-live, so a new authenticator waits for the rebuild.
-- **Keep the testing domain while the test people are members.** Whoever holds the domain receives their sign-in codes, one of them an Admin's. Remove the test people from the workspace before the domain is released.
-- **Rehearsed by:** nothing until go-live.
+**Fires.** Nothing. `off-testing-domain` is the mark doing its job.
 
-## Bring staging up / tear it down
+**Do.**
 
-Staging is on demand on VPC 2 (ADR 0024): nothing stands between drills. To bring it up, from the repository checked out at `/opt/better-answers` and with the staging env in the root-only file `host-setup.sh` creates: `docker network create --internal better-answers-staging-shared` unless `docker network inspect better-answers-staging-shared` finds it, then `docker compose --project-directory deploy --env-file /etc/better-answers/staging.env -f deploy/stores.compose.yaml -f deploy/staging.override.yaml -p better-answers-stores-staging up -d`, then the same `docker compose` prefix with `-f deploy/platform.compose.yaml -f deploy/staging.platform.override.yaml -p better-answers-staging up -d --wait api worker`. The `-f` paths resolve against the working directory, not the project directory. The two projects meet on that network: `staging.override.yaml` puts `objectstore` on it under that alias and `staging.platform.override.yaml` puts `migrate`, `api` and `worker` beside it, so the platform's `S3_ENDPOINT` resolves across projects as Coolify's `coolify` network makes it resolve in production. It is internal so that each service keeps its default route, and so its way out, on its own project's network. Neither compose file names a network, so production's deploy is untouched, and compose refuses to start a service on the external network until it exists. The staging Postgres resource is created in the orchestrator the first time and kept empty; the digests are the ones `build.yml` last pushed, read from its run summary. `restore-drill.sh` does exactly this itself, network first (`ensure_staging_network`). To tear it down: `down --remove-orphans` on both (the network outlives them, and holds nothing), then wipe `/data/objectstore`, `/data/git`, `/data/worker/*`, the staging backup directory, and empty the staging database with `deploy/empty-database.sql`, the file `restore-production.sh` empties production's with: it drops every schema but the system's and makes `public` again as a new database has it. That is the whole wipe, because the map is plain tables in `public` (ADR 0032). The drill's `wipe_staging` is the reference, `seed-synthetic.sh` re-seeds the fixture, and the `staging-wiped` ping is the proof. Staging holds customer data only for the duration of a drill; a rehearsal that is not a drill uses the synthetic fixture — with one exception, the owner's of 22/09/2026: the first customer's reviewed bundle may stand on staging for the length of its rehearsal under *Provision the first customer and land its bundle* below, the two people that run needs signed in for real, and is wiped by the drill's own wipe when the rehearsal ends.
+- **Never erase a test person.** An erasure tombstones the address for good. Remove them on the workspace's Members page instead.
+- **Keep the test Admin's authenticator key and recovery codes in the password manager.** If the key leaks, end its factors and sessions with `pnpm ops restore-sign-in`. A new authenticator waits for the go-live rebuild, since no inbox receives the test people's sign-in codes.
+- **Keep the testing domain while the test people are members.** Its holder receives their sign-in codes. Remove the test people before the domain is released.
+
+**Rehearsed by.** Nothing until go-live.
+
+## Bring staging up and tear it down
+
+Use this procedure to stand staging up on VPC 2 for a drill or a rehearsal, and to wipe it after. `restore-drill.sh` does the same, network first (`ensure_staging_network`), and its `wipe_staging` is the reference wipe.
+
+**Bring staging up.**
+
+1. The first time only, create the staging Postgres resource in the orchestrator, and keep it empty.
+2. Take the digests `build.yml` last pushed, from its run summary.
+3. Work from the checkout at `/opt/better-answers`, with the staging env in the root-only file that `host-setup.sh` creates.
+4. If `docker network inspect better-answers-staging-shared` finds no network, run `docker network create --internal better-answers-staging-shared`.
+5. Start the stores: `docker compose --project-directory deploy --env-file /etc/better-answers/staging.env -f deploy/stores.compose.yaml -f deploy/staging.override.yaml -p better-answers-stores-staging up -d`.
+6. Start the platform with the same `docker compose` prefix and `-f deploy/platform.compose.yaml -f deploy/staging.platform.override.yaml -p better-answers-staging up -d --wait api worker`.
+
+The `-f` paths resolve against the working directory, not the project directory. `staging.override.yaml` puts `objectstore` on the network, and `staging.platform.override.yaml` puts `migrate`, `api` and `worker` there, so the platform's `S3_ENDPOINT` resolves across projects as Coolify's `coolify` network makes it resolve in production. Neither compose file names the network, so production's deploy is untouched.
+
+**Tear staging down.**
+
+1. Run `down --remove-orphans` on both projects. The network can stay.
+2. Wipe `/data/objectstore`, `/data/git`, `/data/worker/*`, and the staging backup directory.
+3. Empty the staging database with `deploy/empty-database.sql`, the file `restore-production.sh` uses. It drops every schema but the system's and makes `public` again. The map is plain tables in `public`, so that is the whole wipe.
+
+`seed-synthetic.sh` re-seeds the fixture, and the `staging-wiped` ping is the proof.
+
+Staging holds customer data only during a drill. Any other rehearsal uses the synthetic fixture. The one exception, the owner's of 22/09/2026, is the first customer's reviewed bundle, which may stand on staging for its rehearsal under *Provision the first customer and land its bundle*, with its two people signed in for real. The drill's wipe removes it when the rehearsal ends.
 
 ## Browse production
 
-Production's rows are browsed in a GUI through an SSH forward, as the read-only role `browse_ro`; the mechanism, the posture and what the role reads are `coolify.md` § Browsing the database. The values below are the private file's § Browsing production, read by name — here and by the helper — and never written into this file. Every command runs from the repository root of the main checkout, where the private file lives.
+Use this procedure to browse production's rows in a GUI, through an SSH forward, as the read-only role `browse_ro`. `coolify.md` § Browsing the database describes what the role reads. The values come from the private file's § Browsing production and are never written here. Run every command from the repository root of the main checkout.
 
-1. **Once, first: the public-port toggle, read on the day.** In the orchestrator, the Postgres resource's public-port toggle is on and publishes one port; the provider firewall does not let that port in. Both are recorded in the private file, dated. The toggle stays on: turned off, it leaves the forward nothing to reach.
-2. **Once: the private file's names.** § Browsing production in `.planning/estate/coolify.md` holds four lines: `VPC1_SSH_TARGET=<user>@<VPC 1's address>`, `VPC1_SSH_KEY=<the key's path>` (optional), `VPC1_DATABASE_PORT=<the port the toggle publishes>` and `VPC1_POSTGRES_CONTAINER=<the Postgres resource's UUID, which names its container>`. Steps 3 and 4 read them into the shell first, bash or zsh:
+1. **Check the public-port toggle, once, on the day.** In the orchestrator, the Postgres resource's public-port toggle must be on and publish one port, and the provider firewall must not let that port in. Record both in the private file, dated. Leave the toggle on, or the forward has nothing to reach.
+2. **Write the private file's names, once.** § Browsing production in `.planning/estate/coolify.md` holds `VPC1_SSH_TARGET=<user>@<VPC 1's address>`, `VPC1_SSH_KEY=<the key's path>` (optional), `VPC1_DATABASE_PORT=<the port the toggle publishes>` and `VPC1_POSTGRES_CONTAINER=<the Postgres resource's UUID, which names its container>`. Before steps 3 and 4, read them into bash or zsh:
 
    ```sh
    estate=.planning/estate/coolify.md
@@ -214,17 +469,19 @@ Production's rows are browsed in a GUI through an SSH forward, as the read-only 
    identity=(); [ -n "$key" ] && identity=(-o IdentitiesOnly=yes -i "${key/#\~/$HOME}")
    ```
 
-3. **Once per estate, and again after a release adds a table: the role.** As the resource's owner through its container, as the drill reads production — `ssh "${identity[@]}" "$target" docker exec -i "$pg" psql -U postgres -d better_answers -v ON_ERROR_STOP=1 < deploy/browse-role.sql`. The file is one transaction, and run again it changes nothing that is already right.
-4. **Once: its password.** The same hop with a terminal — `ssh -t "${identity[@]}" "$target" docker exec -it "$pg" psql -U postgres -d better_answers -c '\password browse_ro'` — prompts twice and sends only the hash. The password goes to the password manager, and the private inventory records where it is held.
-5. **Each time: open, browse, close.** `deploy/browse-production.sh` prints the loopback port it holds; the GUI's *production (read-only)* profile points at host `127.0.0.1`, port `55433`, database `better_answers`, user `browse_ro`. Ctrl-C in that terminal closes the forward. A refusal names what it found wrong — a local port already held, the private file absent, or one of its names missing, doubled or malformed — and prints no value it read.
+3. **Grant the role, once per estate and again after a release adds a table:** `ssh "${identity[@]}" "$target" docker exec -i "$pg" psql -U postgres -d better_answers -v ON_ERROR_STOP=1 < deploy/browse-role.sql`. The file is one transaction, and a rerun changes nothing that is already right.
+4. **Set the role's password, once:** `ssh -t "${identity[@]}" "$target" docker exec -it "$pg" psql -U postgres -d better_answers -c '\password browse_ro'`. It prompts twice and sends only the hash. Put the password in the password manager, and record in the private inventory where it is held.
+5. **Each time, run `deploy/browse-production.sh`.** Point the GUI's *production (read-only)* profile at host `127.0.0.1`, port `55433`, database `better_answers`, user `browse_ro`. Ctrl-C in that terminal closes the forward.
+
+If `deploy/browse-production.sh` refuses, it names a local port already held, the private file absent, or one of its names missing, doubled, or malformed. It prints no value it read.
 
 ## A shell in the worker
 
-The worker's image carries Python, its virtualenv and little else: no shell, no package manager, no `ls` (`apps/worker/Dockerfile` says why). So `exec worker sh` fails, and so does the orchestrator's terminal on the worker. There are three ways in, the lightest first. Each runs on VPC 1 against the platform stack's own compose project, `docker compose … -p better-answers`, which is the invocation `deploy/restore-production.sh`'s `platform` helper makes; the private file holds its env file. The api's image is Debian and keeps its shell, so none of this applies to `api`.
+Use this procedure to look inside the running worker. Its image has no shell, no package manager, and no `ls` (`apps/worker/Dockerfile` says why), so `exec worker sh` and the orchestrator's terminal both fail. The api's image keeps its shell. Run each way in on VPC 1 against `docker compose … -p better-answers`, the invocation `deploy/restore-production.sh`'s `platform` helper makes. The private file holds its env file.
 
-1. **The worker's own Python.** `exec worker python` opens the worker's interpreter as the worker's own user, with its virtualenv, its environment and its mounts. It prints one warning line first, `can't use pyrepl`, because the image has no terminal library for the line editor; the plain prompt that follows works, without line editing. `os.listdir`, `pathlib.Path(…).read_text()` and `os.environ` do what `ls`, `cat` and `env` would. `exec -T worker python -m better_answers_worker.health` runs the health check by hand: exit 0 is healthy, 1 is not.
-2. **A file out.** `docker cp <the worker's container>:<path> <here>` copies a file or a directory out of the running container. It needs nothing in the image, because the daemon does the copying. Never copy anything in: a change reaches the worker in a new image, through a release.
-3. **A shell beside it.** When a shell's tools are wanted, such as `ps`, `top`, `nc` or `wget`, run the base's debug variant. It carries busybox, and it can join the worker's process and network namespaces as the worker's own uid:
+1. **Use the worker's own Python.** `exec worker python` opens the interpreter as the worker's user, with its virtualenv, environment, and mounts. Ignore the `can't use pyrepl` warning. `os.listdir`, `pathlib.Path(…).read_text()` and `os.environ` replace `ls`, `cat` and `env`. `exec -T worker python -m better_answers_worker.health` runs the health check: exit 0 is healthy, and 1 is not.
+2. **Copy a file out** with `docker cp <the worker's container>:<path> <here>`. Never copy anything in. A change reaches the worker through a release.
+3. **Run a shell beside it** for `ps`, `top`, `nc` or `wget`. The base's debug variant carries busybox and joins the worker's process and network namespaces as the worker's uid:
 
    ```sh
    worker=$(docker compose … -p better-answers ps -q worker)
@@ -233,198 +490,269 @@ The worker's image carries Python, its virtualenv and little else: no shell, no 
      gcr.io/distroless/cc-debian13:debug-nonroot@sha256:f525a9a37aed3e8a848f46cfe055999782d66ed797e9e2886928c8caaaa4fc52
    ```
 
-   The digest was read from the gcr.io registry on 24/09/2026 and is pinned because this image runs inside production's namespaces. Renovate does not read this file, so a newer digest is read from the registry and written here by hand. The prompt is busybox's `sh`. The worker is PID 1 there, so its filesystem is `/proc/1/root`: `ls /proc/1/root/app`, `cat /proc/1/root/data/worker/…`. `ps` and `top` show its processes, and `nc` and `wget` reach the network from its address. The debug image is not the worker's image and changes nothing in it; `exit` removes the container. Run it as uid 1000 and never as root or `--privileged`. The worker's uid is enough to read its `/proc`, and root would only add the power to write where the worker cannot.
+   The worker is PID 1 there, so its filesystem is `/proc/1/root`: `ls /proc/1/root/app`, `cat /proc/1/root/data/worker/…`. `exit` removes the container. Run it as uid 1000, never as root or `--privileged`. Renovate does not read this file, so update the pinned digest by hand from the gcr.io registry.
 
-**A worker that restarts by itself.** The log line `the job outlived its deadline`, naming the job, is the worker ending a job that hung past `JOB_DEADLINE_SECONDS`, 36 hours (`apps/worker/src/better_answers_worker/queue.py`), with exit code 75; the thread stacks it prints to stderr just before name where the job hung. The exit code does not survive the restart, because `docker inspect` reads the running container's, so read it from `docker events --since 72h --filter event=die --filter container=<the worker's container>`, whose `exitCode=75` marks each such exit, and count the restarts with `docker inspect -f '{{.RestartCount}}' <the worker's container>`. `restart: unless-stopped` brings the worker back, it claims the job again, and a job that outlives every attempt ends `poisoned`, so the restarts stop on their own.
+### A worker that restarts by itself
+
+Use these steps when the worker restarts on its own.
+
+1. Find the log line `the job outlived its deadline`, which names the job. The thread stacks printed to stderr just before it show where the job hung.
+2. Read the exit codes with `docker events --since 72h --filter event=die --filter container=<the worker's container>`. `exitCode=75` marks each such exit. `docker inspect` cannot show it, because it reads the running container.
+3. Count the restarts with `docker inspect -f '{{.RestartCount}}' <the worker's container>`.
+
+The worker ends a job that hangs past `JOB_DEADLINE_SECONDS`, 36 hours (`apps/worker/src/better_answers_worker/queue.py`), with exit code 75. It restarts and claims the job again. A job that outlives every attempt ends `poisoned`, so the restarts stop on their own.
 
 ## Swap
 
-VPC 1 carries a 4 GB swap file on the NVMe so a first index that outgrows the worker's 1.5 GB cap slows down rather than fails (ADR 0024); `deploy/host-setup.sh vpc1` creates it once (`fallocate`, `mkswap`, `swapon`, the `fstab` line, `vm.swappiness=10`). The worker's own spill is bounded at 1.5 GB of swap by `memswap_limit` in `platform.compose.yaml`. The swap-in rate during the first index is ticket 42's measurement — the worker heartbeat's `pswpin` figure, above 4 MB/s for five minutes (ADR 0025) — and a box that swaps steadily is the signal for the WireGuard split; the page-cache floor in `BACKUPS.md` § Signals is the second trigger.
+VPC 1 has a 4 GB swap file on the NVMe, so a first index that outgrows the worker's 1.5 GB cap slows down rather than fails. `deploy/host-setup.sh vpc1` creates it with `fallocate`, `mkswap`, `swapon`, the `fstab` line, and `vm.swappiness=10`. `memswap_limit` in `platform.compose.yaml` caps the worker's spill at 1.5 GB of swap.
+
+During the first index, watch the worker heartbeat's `pswpin` figure. Above 4 MB/s for five minutes is the signal for the WireGuard split (ADR 0025). The page-cache floor in `BACKUPS.md` § Signals is the second trigger.
 
 ## The daily sweeps
 
-Two sweeps clear what no row names. **The upload sweep** removes an original a failed connect or a lost race left in the object store, once it is past the 24-hour grace and no document row names it: bytes that may hold personal data nobody can find (ADR 0020). **The map sweep** deletes every generation of a workspace's map but the live one. The pass then deletes the expired sign-in rows, each of which can hold an address or a browser string. It deletes every session past its expiry, and every session still pending an hour after it was first found pending. It deletes every verification row more than a day past its expiry: sign-in codes and links, restore codes, parked authenticator setups, passkey challenges and the library's other short-lived tokens. It also deletes every `ingress` rate-limit window more than a day old: the counts kept per IP address, email address, person or sign-in link, which no workspace holds. Better Auth's own deletion of expired codes is off, because it ran on any person's sign-in and made a code that had just expired read as wrong rather than spent. The pass keeps each person's failed second-factor confirms, because deleting that row would reset their backoff.
+Use this section to read the daily sweeps, and to switch the upload sweep from listing to removing.
 
-**Where the schedule lives.** In the api process, on a daily timer of its own beside the reconciler's and never on its tick (`apps/api/src/timers/sweeps.ts`). The first pass runs ten minutes after the api starts and the next every 24 hours after that, so a release restarts the wait without ever starving it. One pass sweeps every workspace in turn; a workspace whose sweep is refused is named in the log and passed over, and the rest are still swept.
+**What a pass deletes.**
 
-**One at a time.** A pass takes a Postgres advisory lock with a try, and is skipped while another holder has it. `pnpm ops map-sweep` and `pnpm ops object-store-orphans` take the same lock and wait for a pass that holds it, so a run by hand and the timer never overlap; the restore drill's two sweeps wait the same way on staging.
+- **The upload sweep** removes an original that a failed connect or a lost race left in the object store, once it is past the 24-hour grace and no document row names it.
+- **The map sweep** deletes every generation of a workspace's map but the live one.
+- Every session past its expiry, and every session still pending an hour after it was first found pending.
+- Every verification row more than a day past its expiry: sign-in codes and links, restore codes, parked authenticator setups, passkey challenges, and the library's other short-lived tokens.
+- Every `ingress` rate-limit window more than a day old.
 
-**The two settings, on the platform resource.**
+Better Auth's own deletion of expired codes is off. The pass keeps each person's failed second-factor confirms, which hold their backoff.
 
-- `HEALTHCHECKS_PING_URL_SWEEPS` — the compose file requires it. The check it names is `sweeps` at healthchecks.io, period 24 h, grace 1 h, alerting by email; creating it is the operator's (`deploy/wizard-41.sh`, the healthchecks.io stage). **Set it before the release that brings the sweeps reaches either box**: on the platform resource in the orchestrator, and in staging's env file, or the compose file refuses to start the stack, the drill's `platform up` included. Staging's value is a URL of its own and never production's, because a staging pass would ping over production's silence; staging stands only during a drill, so its check carries no alert.
-- `UPLOAD_SWEEP` — `list` unless set, or `remove`. Any other value stops the sweeps with `the sweeps are not running` in the log, and the check goes quiet.
+**Schedule.** The sweeps run on a daily timer in the api process, beside the reconciler and never on its tick (`apps/api/src/timers/sweeps.ts`). The first pass runs ten minutes after the api starts, then every 24 hours. A refused workspace is named in the log and passed over. A pass tries a Postgres advisory lock and is skipped while another holder has it. `pnpm ops map-sweep`, `pnpm ops object-store-orphans`, and the restore drill's sweeps take the same lock and wait for it.
 
-**Reading the last pass.** Each of three places is enough on its own:
+**Settings, on the platform resource.**
 
-- the `sweeps` check: a completed pass pings it with an outcome word and counts, such as `ok workspaces=3 refused=0 upload_sweep=list found=2 removed=0 generations=1`. A pass that passed over a workspace pings the check's failure with the same body under `fail`. The body never names a workspace, a key or an error.
-- the api's log: one `sweep pass` line per pass, at info even when it removed nothing and at warn when it passed over a workspace. It carries `upload_sweep`, `workspaces`, `refused`, `found`, `removed`, `generations`, `sessions_deleted`, `verifications_deleted`, `ingress_windows_deleted`, `reservations_settled` (§ Set a model's price and a workspace's spending limit) and `refusals`, which names each workspace passed over, which sweep and why. It never names a key, a person or an address.
-- the `sweep_pass` table: one row per completed pass, a pass that removed nothing included and a skipped one never, read through `browse_ro` (§ Browse production, whose step 3 is run again after the release that adds the table): `SELECT * FROM sweep_pass ORDER BY at DESC LIMIT 1`. It carries `at`, `upload_sweep`, `workspaces`, `refused` (how many were passed over), `found`, `removed` and `generations`, and names no workspace. The api writes it once and can neither change nor delete it.
+- `HEALTHCHECKS_PING_URL_SWEEPS` is required. It names the `sweeps` check at healthchecks.io (period 24 h, grace 1 h, email), which the operator creates (`deploy/wizard-41.sh`, the healthchecks.io stage). **Set it before the release that brings the sweeps reaches either box**, on the platform resource and in staging's env file, or compose refuses to start the stack, the drill's `platform up` included. Staging's URL is its own, never production's, and carries no alert.
+- `UPLOAD_SWEEP` is `list` unless set, or `remove`. Any other value stops the sweeps with `the sweeps are not running`, and the check goes quiet.
 
-**List-only until an operator switches removal on.** On production the upload sweep starts as `list`: it counts what it would remove and removes nothing, so a pass reads `upload_sweep=list … removed=0` and `found` is the number of originals past the grace that no document row names, over every workspace. The map sweep deletes from its first pass. A sweep that lists the bucket and removes what no row names deletes live bytes for good if its join is ever wrong, so its counts are read against their causes before it removes anything:
+**Reading the last pass.** Any one of these is enough:
 
-- `found` rises by one for each connect whose second transaction failed, and for each repeat of a connect that lost the race to the first. A lost race's key, `uploads/<connected source>/<document>/original`, names a connected source whose document row names another key. `found` falls only when something removes originals, such as `object-store-orphans` run by hand without `--list`. A rise with neither behind it is the join being wrong: leave the setting at `list` and escalate.
-- `pnpm ops object-store-orphans --workspace <id> --list` gives one workspace's count, and the per-workspace counts add up to `found`. By hand the command removes unless given `--list`, whatever the setting says.
+- **The `sweeps` check.** A pass pings it with an outcome word and counts, such as `ok workspaces=3 refused=0 upload_sweep=list found=2 removed=0 generations=1`, or under `fail` when it passed over a workspace. The body names no workspace, key, or error.
+- **The api's log.** One `sweep pass` line per pass, at warn when it passed over a workspace. It carries `upload_sweep`, `workspaces`, `refused`, `found`, `removed`, `generations`, `sessions_deleted`, `verifications_deleted`, `ingress_windows_deleted`, `reservations_settled` (§ Set a model's price and a workspace's spending limit) and `refusals`, which names each workspace passed over, the sweep, and why.
+- **The `sweep_pass` table.** One row per completed pass, never a skipped one: `SELECT * FROM sweep_pass ORDER BY at DESC LIMIT 1` through `browse_ro` (§ Browse production, step 3, rerun after the release that adds the table). It carries `at`, `upload_sweep`, `workspaces`, `refused`, `found`, `removed` and `generations`. The api cannot change or delete a row.
 
-**The day to switch** is seven days after the first upload is bound in a customer's workspace on production. The earliest document row that names an original gives it, read through `browse_ro` (§ Browse production):
+**The upload sweep only lists until an operator switches removal on.** On production it starts as `list`, so a pass reads `upload_sweep=list … removed=0`, and `found` counts the originals past the grace that no document row names. The map sweep deletes from its first pass. If the join were wrong, removal would delete live bytes for good, so read each rise in `found` against its cause first:
 
-```sql
-SELECT workspace_id, first_seen FROM source_document
- WHERE original_key LIKE 'uploads/%' ORDER BY first_seen LIMIT 1;
-```
+- `found` rises by one for each connect whose second transaction failed, and for each repeat of a connect that lost the race. A lost race's key, `uploads/<connected source>/<document>/original`, names a connected source whose document row names another key. `found` falls only when something removes originals, such as `object-store-orphans` run by hand without `--list`.
+- A rise with neither cause means the join is wrong. Leave the setting at `list` and escalate.
+- `pnpm ops object-store-orphans --workspace <id> --list` gives one workspace's count. The counts add up to `found`.
 
-No row means nothing is bound yet, and the setting stays at `list`. A row whose workspace is not a customer's does not count: add `AND workspace_id <> '<its id>'` and read again. The day is the row's `first_seen` plus seven days.
+**Switch the upload sweep to remove.** **The day to switch** is seven days after the first upload is bound in a customer's workspace on production. Before then, no row names an original, so every pass reads `found=0` and proves nothing. Importing a bundle (§ Import a company's bundle) writes no originals, so it does not start the week. Do not wait longer, because an orphan may hold personal data nobody can find.
 
-The week starts at the first connect because a pass proves nothing before it. Until an original is connected, no row names one, so the join has nothing to hold and every pass reads `found=0` whatever the join does. The exception is a failed connect, which can leave an original before any row exists; that rise is still read against its cause, as the list above says. A wrong join shows only once there are named originals for it to miss, and the first week with live originals is the one that proves the join holds them. Importing a bundle (§ Import a company's bundle) writes concepts and no originals, so it does not start the week. Nor should the switch wait past it: from then on an orphan may hold personal data nobody can find (ADR 0020), and the 24-hour grace already keeps removal away from an original whose connect is still running.
+1. Through `browse_ro` (§ Browse production), read the first upload:
 
-On the day, read the week's passes through `browse_ro`, with that `first_seen` in place:
+   ```sql
+   SELECT workspace_id, first_seen FROM source_document
+    WHERE original_key LIKE 'uploads/%' ORDER BY first_seen LIMIT 1;
+   ```
 
-```sql
-SELECT at, upload_sweep, found, removed FROM sweep_pass
- WHERE at >= '<first_seen>' ORDER BY at;
-```
+2. If no row comes back, leave the setting at `list` and stop.
+3. If the row's workspace is not a customer's, add `AND workspace_id <> '<its id>'` and read again.
+4. On the row's `first_seen` plus seven days, read the week's passes:
 
-If every rise in `found` has a failed connect or a lost race behind it, set `UPLOAD_SWEEP=remove` on the platform resource and redeploy. If any rise has neither, leave the setting at `list` and escalate. After the switch, the next pass reads `upload_sweep=remove`, with `removed` equal to `found`, and `found` falls to what failed binds and lost races have left since. Setting it back to `list` stops the removal from the next start.
+   ```sql
+   SELECT at, upload_sweep, found, removed FROM sweep_pass
+    WHERE at >= '<first_seen>' ORDER BY at;
+   ```
+
+5. If every rise in `found` has a failed connect or a lost race behind it, set `UPLOAD_SWEEP=remove` on the platform resource and redeploy. Otherwise leave it at `list` and escalate.
+6. Check that the next pass reads `upload_sweep=remove`, with `removed` equal to `found`. Setting `list` again stops removal from the next start.
 
 ## Import a company's bundle
 
-A company's reviewed OKF bundle lands in its workspace through one command on the `api` service, the only service carrying `GIT_STORE_DIR` and the database: `pnpm ops import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity Restricted|Internal|Public] [--dry-run]`. The directory is the bundle's own tree — `manifest.yaml` at its root with the five keys ADR 0002 names (`id`, a ULID minted once for the bundle; `origin`; `ref`; `owner`; `content_version`), the concept files beneath it in whatever folders the company keeps, `index.md` and `log.md` at any level skipped — copied to the box for the run. `--as` names the Admin the run acts as: every commit carries their name and email and every audit event their person id, so it is never a platform principal. An Editor or a Viewer is refused, because an import writes across every collection and no one owner answers for all of them. `--sensitivity` is the sensitivity every landed concept starts at, `Internal` unless said otherwise.
+Use this procedure to land a company's reviewed OKF bundle in its workspace. Run it on the `api` service, the only service that carries `GIT_STORE_DIR` and the database:
 
-The command reads and checks the whole tree before it writes anything, and one unsound file refuses the run naming the file and the reason: a file that does not parse, a file with no `type` or `title`, a relative `.md` link to a file that is not a concept in the tree, a `verified` event whose `human:<email>` is not a member of the workspace (invite them first), a file at a path the platform keeps or cannot hold, two files deriving one merge key, a manifest missing or malformed, or a manifest already standing in the workspace under another id. `--dry-run` stops there and says what a run would do. A real run writes the manifest as the bundle's first commit, then every concept in path order through the governed write — each its own commit, `verified[].by` rewritten from the email to the person id, `sources[]` kept as the file's projection, no evidence, status `stable` — and records each `verified` event as one imported verification with its audit event, so a reader sees *Verified by … · imported*. A second pass then rewrites every relative `.md` link in a concept's body to the IRI the first pass minted for that path, the link text untouched: one governed write per file that carries such a link, with a base precondition on the hash the first pass landed, the same path, kind, title and frontmatter; a file with no relative link left is skipped, so the pass is idempotent. After a full run no concept file under `knowledge/` carries a relative link or an email. The lines say `rewrote <path> — <n> links` per file, and the closing line is `import-bundle: done — landed <n>, skipped <n>, <n> verifications recorded (<n> already present), <n> links rewritten, <s> seconds`; the numbers go in the estate-size record.
+`pnpm ops import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity Restricted|Internal|Public] [--dry-run]`
 
-A rerun is safe and is the recovery from a run that stopped: every concept already standing at its path is skipped, every verification already held for that actor and instant is skipped, every link already an IRI is left alone, and the line says so. A run that a store refuses mid-way — a merge key another concept already holds, most likely — stops at that file, keeps what landed, and says `stopped at <file> (<reason>)`; put the reason right (page 10's `merge-key-taken` remedy applies: re-write the holder onto a free key) and run the command again. `stopped at <file> (stale-precondition)` is the second pass finding a concept changed under it between the passes — another writer's commit — and the rerun rewrites that file against what stands now. Rehearse the real bundle on staging against the synthetic seed before running it against production.
+1. Rehearse the real bundle on staging, against the synthetic seed, before production.
+2. Copy the bundle's own tree to the box.
+3. Run the command with `--dry-run`. It checks the whole tree, writes nothing, and says what a run would do.
+4. Run the command without `--dry-run`.
+5. If the run says `stopped at <file> (<reason>)`, put the reason right and run it again. For a taken merge key, apply page 10's `merge-key-taken` remedy and rewrite the holder onto a free key. `stopped at <file> (stale-precondition)` means another writer changed the file between the passes, and the rerun handles it.
+6. Put the numbers from the closing line in the estate-size record.
 
-The exit code says how the run ended. 0 is done. 1 is a run that names the file or commit it stopped at, whatever word it names. 1 is also an unsound tree, a manifest commit refused as malformed, and a refusal with no word, such as a bundle store that cannot be opened or a directory that cannot be read. 2 is a usage error: a missing `--workspace`, `--from` or `--as`, an unknown `--sensitivity`, or a value given to `--dry-run`. Any other refusal exits by its word's class: 2 `malformed`, 4 `unauthenticated`, 5 `forbidden`, 6 `absent`, 7 `inapplicable`, 8 `conflict`, 9 `precondition`. 3 is a database the migration has not reached. `pnpm ops` with no command prints the same table.
+**The tree.** `manifest.yaml` sits at its root, with the five keys ADR 0002 names: `id` (a ULID minted once for the bundle), `origin`, `ref`, `owner`, and `content_version`. Concept files sit beneath it in any folders. `index.md` and `log.md` are skipped at any level.
+
+**The flags.** `--as` names the Admin the run acts as. Every commit carries their name and email, and every audit event their person id. An Editor or a Viewer is refused, because an import writes across every collection. `--sensitivity` is where every landed concept starts, `Internal` by default.
+
+**The checks.** One unsound file refuses the run, naming the file and the reason. A file is unsound if it does not parse, has no `type` or `title`, links (relative `.md`) to a file that is not a concept in the tree, has a `verified` event whose `human:<email>` is not a member (invite them first), sits at a path the platform keeps or cannot hold, or derives another file's merge key. A missing or malformed manifest refuses the run, as does a manifest standing in the workspace under another id.
+
+**What a run writes.** The manifest is the bundle's first commit. Each concept follows in path order through the governed write, as its own commit, with `verified[].by` rewritten from email to person id, `sources[]` kept as the file's projection, no evidence, and status `stable`. Each `verified` event becomes an imported verification with its audit event, read as *Verified by … · imported*. A second pass rewrites every relative `.md` link in a body to the IRI minted for that path, keeping the link text, with one governed write per file and a base precondition on the hash the first pass landed. After a full run, no concept file under `knowledge/` carries a relative link or an email.
+
+The run prints `rewrote <path> — <n> links` per file, and closes with `import-bundle: done — landed <n>, skipped <n>, <n> verifications recorded (<n> already present), <n> links rewritten, <s> seconds`. A rerun is safe. It skips concepts already at their path, verifications already held, and links already IRIs, and says so.
+
+**Exit codes.** `pnpm ops` with no command prints the same table.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Done. |
+| 1 | The run stopped at a named file or commit, the tree is unsound, the manifest commit was refused as malformed, or a refusal has no word, such as a bundle store that cannot be opened or a directory that cannot be read. |
+| 2 | A usage error (a missing `--workspace`, `--from` or `--as`, an unknown `--sensitivity`, or a value given to `--dry-run`), or a refusal of the class `malformed`. |
+| 3 | A database the migration has not reached. |
+| 4 to 9 | A refusal, by its word's class: 4 `unauthenticated`, 5 `forbidden`, 6 `absent`, 7 `inapplicable`, 8 `conflict`, 9 `precondition`. |
 
 ## Update a concept's body in place
 
-To fix the content of a standing concept without editing it, such as removing a note a bid writer left in an imported `Answer`, use one command on the `api` service: `pnpm ops update-concept-body --workspace <id> --iri <iri> --as <member email> [--expect <content hash>] [--dry-run]`, with the new body on standard input. The command replaces the body and nothing else. The file's frontmatter keeps its bytes, and the concept keeps its status, its verification rows and its citations. `--as` names the concept's owner or an Admin the update acts as: the commit carries their name and email, and the audit event their person id. Anyone else is refused, the dry run too. A Restricted concept needs an Admin, because an Editor cannot read it and the command answers as if it were absent.
+Use this procedure to fix a standing concept's content without editing it, such as to remove a bid writer's note from an imported `Answer`. Run it on the `api` service, with the new body on standard input:
 
-1. Read the concept's file as it stands. On the `api` service, `git --git-dir "$GIT_STORE_DIR/<workspace id>.git" ls-tree -r --name-only main` lists the paths, and `git --git-dir "$GIT_STORE_DIR/<workspace id>.git" show main:<path>` prints the file. Its frontmatter carries the `iri`. The body is everything after the frontmatter's closing `---` and the blank line below it.
-2. Save the new body to a file on the box, the whole body with the change made, and pipe it in: `docker exec -i "$api" pnpm ops update-concept-body … < new-body.md`, with `$api` the `api` service's container. Run the command with `--dry-run` and no `--expect`. Its first line is `update-concept-body: <path> stands at <hash>; pass it as --expect`. The lines after it are the body's diff: two spaces mark a line both bodies hold, `- ` a line only the held body has, and `+ ` a line only the new body has. The last line names the hash the body would move to and says nothing was written.
-3. Read the diff. If it removes only what you meant to remove, run the command again without `--dry-run` and with `--expect <the hash from step 2>`. The done line is `update-concept-body: done — <path> moved from <old hash> to <new hash>, commit <short sha>; frontmatter, status, verification and citations kept`.
+`pnpm ops update-concept-body --workspace <id> --iri <iri> --as <member email> [--expect <content hash>] [--dry-run]`
 
-The write is one governed commit with one `knowledge.concept.committed` audit event, which names both hashes and never the body. An imported verification carries no hash, so the concept keeps reading *Verified by … · imported*. A verification that carries a hash reads *Changed since verified* until someone verifies the concept again, as it would after any edit.
+1. Read the concept's file. `git --git-dir "$GIT_STORE_DIR/<workspace id>.git" ls-tree -r --name-only main` lists the paths, and `git --git-dir "$GIT_STORE_DIR/<workspace id>.git" show main:<path>` prints the file. Its frontmatter carries the `iri`. The body is everything after the frontmatter's closing `---` and the blank line below it.
+2. Save the whole new body to a file on the box, and pipe it into a dry run with no `--expect`: `docker exec -i "$api" pnpm ops update-concept-body … < new-body.md`, with `$api` the `api` service's container. The first line is `update-concept-body: <path> stands at <hash>; pass it as --expect`. The diff follows, marking lines with two spaces (both), `- ` (held only), or `+ ` (new only).
+3. If the diff removes only what you meant to remove, run again without `--dry-run` and with `--expect <the hash from step 2>`. The done line is `update-concept-body: done — <path> moved from <old hash> to <new hash>, commit <short sha>; frontmatter, status, verification and citations kept`.
 
-A refusal writes nothing. `stale-precondition`, exit 8, is a concept that no longer stands at the `--expect` hash, or whose file at the bundle's head is ahead of its index row while another write lands: run the dry run again and read the new diff. If the dry run answers it again a minute later, the rows are behind the bundle, and page 10 comes first. `no-such-concept`, exit 6, is an IRI that names no concept the `--as` member can read. Exit 7 is one of two words, and the line says which. `unchanged` is a body that renders as the one held, which is also what a rerun after a done line answers. `widening-refused` is a concept held narrower than the documents its sources cite, as an Admin's override or a replay can leave it: a body update would widen it. `no-such-document` is a concept whose sources cite a document the catalogue no longer holds, which no write can carry. Escalate either to the technical contact: no ops command makes the write it needs. `body-locator-refused` is a new body that names a passage locator none of the concept's sources cites: cite it in the sources first, or leave it out. The command writes through the same save route as an edit from the concept's page, with the concept's reuse taken as confirmed. `not-a-member`, exit 4, is an `--as` who is not a member of the workspace. `role-forbids`, exit 5, is a Viewer. Exit 2 is a usage error: a missing `--workspace`, `--iri` or `--as`, a write with no `--expect`, a value given to `--dry-run`, an empty standard input, or a malformed IRI. Exit 1 is a refusal with no word, such as a bundle store that cannot be opened, or a concept whose file is missing from the bundle's head or does not parse there. Stop at exit 1 and escalate: the bundle and the rows need page 10 before any update. 3 is a database the migration has not reached.
+The command replaces the body and nothing else. The frontmatter's bytes, the status, the verification rows, and the citations stay. It is one governed commit through the concept page's save route, with reuse taken as confirmed, and one `knowledge.concept.committed` audit event naming both hashes. An imported verification keeps reading *Verified by … · imported*. A hashed verification reads *Changed since verified* until someone verifies again.
+
+`--as` must be the concept's owner or an Admin, for the dry run too. A Restricted concept needs an Admin, because to an Editor it is absent.
+
+**Refusals** write nothing.
+
+| Refusal | Exit | Meaning and what to do |
+| --- | --- | --- |
+| `stale-precondition` | 8 | The concept moved off the `--expect` hash, or its file is ahead of its row while another write lands. Run the dry run again. If it repeats a minute later, the rows are behind the bundle, so go to page 10. |
+| `no-such-concept` | 6 | The IRI names no concept the `--as` member can read. |
+| `unchanged` | 7 | The body renders as the one held, as after a done line. |
+| `widening-refused` | 7 | The concept is held narrower than its sources' documents, and the update would widen it. Escalate to the technical contact. |
+| `no-such-document` | 7 | A source cites a document the catalogue no longer holds. Escalate to the technical contact. |
+| `body-locator-refused` | 7 | The body names a passage locator no source cites. Cite it in the sources first, or leave it out. |
+| `not-a-member` | 4 | The `--as` person is not a member. |
+| `role-forbids` | 5 | The `--as` person is a Viewer. |
+| none | 2 | A usage error: a missing `--workspace`, `--iri` or `--as`, a write with no `--expect`, a value given to `--dry-run`, an empty standard input, or a malformed IRI. |
+| none | 1 | No word, such as a bundle store that cannot be opened, or a concept file missing or unparseable at the head. Stop and escalate, because page 10 comes before any update. |
+| none | 3 | A database the migration has not reached. |
 
 ## Provision the first customer and land its bundle
 
-The first customer is landed by this page on staging first and then on production, so that production's run is the second time it has been done. Three gates before either run: T-209 is merged, so a concept path another writer holds refuses before the commit and not after it; page 10's rewind (T-108) stands, in case a run leaves a workspace stuck behind a commit; and the bundle's own checker is green over the tree with `manifest.yaml` present at its root — `id` a ULID minted once and never changed between staging and production, `origin: company`, `ref` the libraries' titles and versions as the bundle's report names them, `owner` as ADR 0002 defines the key, `content_version` the first.
+Use this procedure to land the first customer on staging, then on production. First check three gates:
+
+- T-209 is merged, so a concept path another writer holds refuses before the commit.
+- Page 10's rewind stands.
+- The bundle's checker is green, with `manifest.yaml` at its root: `id` a ULID that never changes between staging and production, `origin: company`, `ref` the libraries' titles and versions as the bundle's report names them, `owner` as ADR 0002 defines it, and `content_version` the first.
 
 1. **Bring staging up** (the procedure above) at the digests `build.yml` last pushed.
-2. **Two sign-ins, each with an email code and a display name:** the running Admin — the owner, on staging and on production, reading only what they already hold as the platform's developer — and the verifier every `verified` event in the bundle names. The page after the code asks each for the display name they are credited by — *Verified by*, a commit's author — and both finish it before the next step: a workspace is never provisioned around a person the identity set does not hold or who has given no display name, and the loader refuses a `verified` event whose person is not a member.
-
-   A person who cannot sign in before the run is added instead: **`pnpm ops add-person --email <address> --name <display name>`** on the `api` service. It is for a person who must stand on the platform before they have done anything, at an address whose mail the operator cannot read. It writes the person with the name given and the address unverified, and records `people.person.added` in the identity-set audit log under the platform's own actor id. The done line begins with the new person's id. Their first email-code sign-in finds that person, marks the address verified and asks no display name. The command writes nothing when it refuses. `malformed` is an address that is not one. A `display-name-…` word is a name the display-name rule refuses. `person-exists` is an address a person already holds, however it is cased, and that person is taken as they stand.
-3. **`pnpm ops provision-workspace --name <name> --short-name <short name> --admin <the Admin's email>`** on the `api` service. The done line begins with the workspace id; copy it, since every later command takes it. It creates the workspace, its partition, the Admin's member row, its configuration row, its audit event and its bare bundle repository under `GIT_STORE_DIR`, and writes nothing when it refuses: `REFUSED — no-such-user` is step 2 not yet done for that person, by a sign-in or by `add-person`; `no-display-name` is step 2's display name not yet given — they sign in again and give it; `slug-taken` is a short name another workspace holds.
-4. **`pnpm ops add-member --workspace <id> --email <the verifier's email> --role Admin`** — the verifier as an Admin, since they own the content and will administer the workspace once the customer's own accounts exist; any of the three roles satisfies the loader, and the choice is the command line's. `no-display-name` refuses as it does in step 3. `already-a-member` on a repeat is the command refusing to change a role, which is the Admin's action on the People page (P1). Further people are added the same way when the customer is ready, or by invitation once P1 lands.
+2. **Have two people sign in with an email code and give a display name.** One is the running Admin, the owner, who reads only what they already hold as the platform's developer. The other is the verifier every `verified` event names. If one cannot sign in, add them with `add-person` (below).
+3. **Run `pnpm ops provision-workspace --name <name> --short-name <short name> --admin <the Admin's email>`** on the `api` service. Copy the workspace id the done line begins with.
+4. **Run `pnpm ops add-member --workspace <id> --email <the verifier's email> --role Admin`.** The verifier owns the content and will administer the workspace.
 5. **Copy the tree to the box**, `manifest.yaml` with it.
-6. **`pnpm ops import-bundle --workspace <id> --from <directory> --as <the Admin's email> --dry-run`**, then the same without `--dry-run` (the procedure above). The dry run says what a run would do and writes nothing; a refusal names the file and the reason.
-7. **Smoke and open:** `pnpm ops smoke --url <origin> --workspace <id> --find`; then, through the MCP surface as a member, one `find` for a question the bundle answers and one `open` of the concept it names, reading *Verified by <the verifier's name> · imported* under the answer.
-8. **Record the numbers** from the closing line — landed, skipped, checks, links, seconds — in the estate-size record, staging's beside production's.
-9. **Wipe staging** by the drill's own wipe (the procedure above); the `staging-wiped` ping is the proof, and the exception above ends with it.
-10. **Production:** steps 2 to 8 again on VPC 1 — the same two people, the same short name, the manifest's id unchanged. The numbers into the estate-size record are the first measurement of a real customer, and C1's brief says so.
+6. **Run `pnpm ops import-bundle --workspace <id> --from <directory> --as <the Admin's email> --dry-run`**, then the same without `--dry-run` (the procedure above).
+7. **Smoke and open.** Run `pnpm ops smoke --url <origin> --workspace <id> --find`. Through the MCP surface as a member, `find` a question the bundle answers and `open` the concept it names. Check for *Verified by <the verifier's name> · imported* under the answer.
+8. **Record the numbers** from the closing line (landed, skipped, checks, links, seconds) in the estate-size record, staging's beside production's.
+9. **Wipe staging** by the drill's own wipe (the procedure above). The `staging-wiped` ping is the proof.
+10. **Run steps 2 to 8 on production**, on VPC 1, with the same two people, the same short name, and the manifest's id unchanged. C1's brief records these numbers as the first measurement of a real customer.
 
-**Staging has no mail and no public hostname.** A rehearsal therefore runs steps 2 and 7 from inside the staging `api` container, against its loopback. The codes go to a mail catcher on the platform network. The display name is set by hand in staging's database, because the page that asks for it is not reachable. The MCP read runs the claude.ai assistant's OAuth flow to a bearer, then calls `/mcp`. Of the stores stack, only `objectstore` is started: `backup` would ship staging's rows to the off-host dumps, and the tunnel has nowhere to go. Production has both mail and a hostname, so its run follows the steps as written. On production the running Admin may be the operator's own address rather than one at the customer, and the verifier may be added by `add-person` rather than signed in. That is how the first customer landed.
+**Add a person who cannot sign in.** **`pnpm ops add-person --email <address> --name <display name>`** on the `api` service writes a person whose mail the operator cannot read, with the address unverified. It records `people.person.added` in the identity-set audit log under the platform's actor id, and its done line begins with the person's id. Their first email-code sign-in marks the address verified and asks no display name. It refuses `malformed` (not an address), a `display-name-…` word, or `person-exists`, an address held under any case, whose person is taken as they stand.
+
+**Refusals.** `provision-workspace` creates the workspace, its partition, the Admin's member row, its configuration row, its audit event, and its bare bundle repository under `GIT_STORE_DIR`. It writes nothing when it refuses. `REFUSED — no-such-user` means step 2 is not done for that person. `no-display-name` means they must sign in again and give one. `slug-taken` means another workspace holds the short name. `add-member` refuses `no-display-name` the same way, and `already-a-member` on a repeat, because changing a role is the Admin's action on the People page. Any role satisfies the loader. Add further people the same way, or by invitation once P1 lands.
+
+**On staging.** Staging has no mail and no public hostname. Run steps 2 and 7 inside the staging `api` container against its loopback. The codes go to a mail catcher on the platform network. Set the display name by hand in staging's database. The MCP read runs the claude.ai assistant's OAuth flow to a bearer, then calls `/mcp`. Start only `objectstore` of the stores stack, since `backup` would ship staging's rows off-host.
+
+**On production,** the steps run as written. The running Admin may be the operator's own address, and the verifier may be added by `add-person`, as the first customer was.
 
 ## Make or unmake the operator
 
-The operator is the person the console serves, marked on their person row. Only one command on the `api` service sets or clears the mark, and no page can. The person signs in with an email code first, or is added by `add-person` (the procedure above): the command refuses an address no person holds, `REFUSED — no-such-user`.
+Use this procedure to make a person the operator, whom the console serves, or to clear the mark. No page can.
 
-- `pnpm ops operator --email <address> --grant` makes them the operator, and `--revoke` clears the mark. Each change writes `people.operator.granted` or `people.operator.revoked` to the identity-set audit log under the platform's own actor id. A person who already stands as asked is left alone, and the done line says nothing was written.
-- The console answers the operator from their ordinary signed-in session, and never from an OAuth token. Clearing the mark refuses them from their next request.
-- Inside a workspace the operator is a member like any other, with the role they hold there. An erasure that pseudonymises the person clears the mark with the rest of their identity.
+1. Check that the person has signed in with an email code, or was added by `add-person` (the procedure above). An unknown address refuses `REFUSED — no-such-user`.
+2. Run `pnpm ops operator --email <address> --grant`, or `--revoke` to clear the mark.
+
+Each change writes `people.operator.granted` or `people.operator.revoked` to the identity-set audit log under the platform's own actor id. A person already as asked is left alone. The console answers the operator from their ordinary session, never an OAuth token, and clearing the mark refuses their next request. Inside a workspace the operator holds only their role there. An erasure that pseudonymises the person clears the mark.
 
 ## Restore a person's sign-in
 
-An Admin who has lost every second factor and every recovery code asks the operator to restore them. No page can.
+Use this procedure when an Admin who has lost every second factor and every recovery code asks the operator to restore them. No page can.
 
-1. Check who they are by a channel other than their email: a call to a number already on file, or in person. Someone holding only their mailbox must not get through.
-2. Run `pnpm ops restore-sign-in --email <address>` on the `api` service. In one transaction it ends their passkeys, authenticator, recovery codes and sessions, and records `people.person.sign_in_restored` in the identity-set audit log under the platform's own actor id. It then emails them a notice, which never carries the code.
-3. Read them the restore code it prints, by the channel you checked them on and never by email. It works once, for 24 hours, and a second restore voids it. At their next email sign-in, setup asks for it before any factor can be added.
+1. Check who they are by a channel other than their email: a call to a number already on file, or in person.
+2. Run `pnpm ops restore-sign-in --email <address>` on the `api` service.
+3. Read them the restore code it prints, by the channel you checked them on, and never by email.
 
-The command changes nothing for an address no person holds (`REFUSED — no-such-user`), or when the `api` service has no `SMTP_URL`, because the notice is part of the action. If the notice does not go, the restore still stands, and the output says to tell them yourself.
+In one transaction the command ends their passkeys, authenticator, recovery codes, and sessions, and records `people.person.sign_in_restored` in the identity-set audit log under the platform's own actor id. It emails a notice that never carries the code. The code works once, for 24 hours, and a second restore voids it. Their next email sign-in asks for it before any factor can be added. The command changes nothing for an unknown address (`REFUSED — no-such-user`), or when the `api` service has no `SMTP_URL`. If the notice does not go, the restore stands, and the output says to tell them yourself.
 
 ## Set a workspace's model key
 
-A workspace calls a model provider with a key of its own, its model key. One command on the `api` service sets it and replaces it, and no page can. Nothing reads a model provider's key from the environment (`SECRETS.md` § A workspace's model key).
+Use this procedure to set or replace a workspace's model key, its own key for a model provider. No page can, and nothing reads a provider's key from the environment (`SECRETS.md` § A workspace's model key).
 
-1. **Once per estate: the envelope key.** The `api` service's `KEK` is 64 hexadecimal characters, the 32 bytes every model key is sealed under. `openssl rand -hex 32` makes one. It goes into the escrow vault before it is set, because a row sealed under a lost key is lost with it. Nothing read `KEK` before this command and the release that brings the judge, so check the value the estate holds before the first run. A value of any other shape is replaced and the `api` service redeployed, which loses nothing while no model key is set. While `KEK` is absent or of another shape the command refuses, saying `KEK must be set to the envelope key`, and the `api` service starts but logs `no model will be called` and calls none.
-2. **Run `pnpm ops set-model-key --workspace <id> --provider <anthropic|mistral|cloudflare>` on the `api` service, with the key on standard input.** The key is never an argument, so it reaches no shell history and no process list. From a shell on the box, with `$api` the service's container:
+1. **Once per estate, set the envelope key.** Make it with `openssl rand -hex 32` (64 hexadecimal characters). Put it into the escrow vault first, then set it as the `api` service's `KEK`. If `KEK` already holds a value of another shape, replace it and redeploy. That loses nothing while no model key is set.
+2. **Run `pnpm ops set-model-key --workspace <id> --provider <anthropic|mistral|cloudflare>` on the `api` service, with the key on standard input,** never as an argument:
 
    ```sh
    read -rs MODEL_KEY && printf '%s' "$MODEL_KEY" | docker exec -i "$api" pnpm ops set-model-key --workspace <id> --provider anthropic; unset MODEL_KEY
    ```
 
-   `read -rs` takes the pasted key without showing it, and `printf` is the shell's own, so no process carries the key as an argument. The done line names the workspace and the model provider, and never the key. Each run records `platform.workspace.model_key_set` in the workspace's audit log under the platform's own actor id, naming the model provider.
+3. **To rotate,** issue a new key at the provider, run the command again, then revoke the old key. On a leak, revoke first.
+4. **After this release, run the browsing role's file again** (§ Browse production, step 3), not before. Before the migration it finds no `model_key` and grants nothing. It withholds the sealed key from `browse_ro`.
 
-   **A Cloudflare key** is for Workers AI, which runs the decision models. Cloudflare names the account in each call's address, so the key is the account id, a colon, then an API token allowed to run Workers AI: `<account id>:<API token>`, as in `0123456789abcdef0123456789abcdef:<token>`. The account id is the 32 lower-case hexadecimal characters on the Cloudflare dashboard's account page. A key in any other form is refused as `malformed` when it is set, and nothing is stored.
+Without a valid `KEK`, the command refuses `KEK must be set to the envelope key`, and the `api` service logs `no model will be called`. The done line names the workspace and the provider, never the key. Each run records `platform.workspace.model_key_set` in the workspace's audit log, under the platform's own actor id. A workspace holds one key per provider, and has no model from a provider it holds no key for.
 
-3. **To rotate,** issue a new key at the model provider, run the command again, then revoke the old key at the model provider. A second run replaces the key, and a workspace holds one for each model provider. On a leak, revoke first.
-4. **After this release, run the browsing role's file again** (§ Browse production, step 3), as after any release that adds a table. It withholds the sealed key from `browse_ro` and leaves each row's `workspace_id` and `provider` readable. Run it after the release and not before: before the migration it finds no `model_key`, fails whole and grants nothing.
+**A Cloudflare key** is for Workers AI, which runs the decision models. It is `<account id>:<API token>`, as in `0123456789abcdef0123456789abcdef:<token>`, where the account id is the 32 lower-case hexadecimal characters on the dashboard's account page and the token may run Workers AI.
 
-The command writes nothing when it refuses. `malformed` is a workspace id that is not one, a model provider outside the three, a standard input that is empty or holds a space or a line break, or a Cloudflare key not in the form above. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached. A workspace with no key for a model provider has no model available from that provider.
+**Refusals** write nothing. `malformed` is a bad workspace id, a provider outside the three, an empty standard input or one holding a space or line break, or a Cloudflare key in another form. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
 
-**Which workspaces hold a key.** No command lists them. Through the browsing login, `SELECT workspace_id, provider FROM model_key ORDER BY 1, 2` names every pair that holds a row. A workspace's audit log names each time a key was set, as `platform.workspace.model_key_set` with its model provider.
+**Which workspaces hold a key.** Through the browsing login, `SELECT workspace_id, provider FROM model_key ORDER BY 1, 2`.
 
-**After `KEK` changes.** A row sealed under the old envelope key stays in place and no longer opens. Nothing reports it until a model call for that workspace refuses. So list the pairs as above before the change, and run the command once for each afterwards.
+**After `KEK` changes,** rows sealed under the old key no longer open, and nothing reports it until a model call refuses. List the pairs before the change, and set each key again after.
 
-**After a compromise of `KEK`.** Whoever read `KEK` and the database can open every model key sealed under it. Sealing the same keys again under a new `KEK` protects nothing. Treat each one as leaked: revoke it at its model provider, issue a new one there, set the new `KEK`, redeploy, and set each new key with the command.
+**After a compromise of `KEK`,** every key sealed under it is leaked. Revoke each at its provider, issue a new one there, set a new `KEK`, redeploy, and set each new key.
 
-**After a restore.** A dump taken before a model key was replaced brings the earlier key back, and it opens cleanly under the same `KEK`, so nothing refuses until the model provider does. After any restore, set again every model key replaced since the dump was taken (`BACKUPS.md` § Recovery order).
+**After a restore,** a key replaced since the dump is back and still opens. Set each such key again (`BACKUPS.md` § Recovery order).
 
 ## Set a model's price and a workspace's spending limit
 
-A workspace's question calls a model only when three things stand: a model choice for the purpose, a price for that model on the day of the call, and a spending limit for the workspace. With any of them missing, `ask` calls no model and answers with its evidence. Commands on the `api` service set the price, the limit, a decision model's threshold and the model choice, and no page can. Money is in pounds sterling: prices, the ledger's `cost_gbp` and the limit are all in pounds, and no exchange rate is read when a call is made. The model choice is what turns the judge on, so set it last: with the key, the price and the limit in place, the next question with an `Answer` among what bears on it calls the model.
+Use this procedure to let a workspace's questions call a model. A question calls one only with a model choice for the purpose, a price for the model on the day, and a workspace spending limit. Otherwise `ask` answers with its evidence alone. No page can set these. Prices, `cost_gbp`, and the limit are in pounds sterling, and no exchange rate is read at call time. The model choice turns the judge on, so set it last.
 
-1. **Price the model, once per estate and again whenever the provider's price or the exchange rate moves.** Read the provider's list price in US dollars from its own price page on the day, convert it to pounds at that day's rate, and set it from that day:
+1. **Price the model, once per estate and whenever the provider's price or the exchange rate moves.** Convert the provider's list price in US dollars, from its price page, to pounds at that day's rate, and set it from that day. For a decision model on Workers AI, which charges for input alone, pass `--provider cloudflare --model clef-flash --gbp-per-million-out 0`.
 
    ```sh
    docker exec "$api" pnpm ops set-model-price --provider anthropic --model claude-sonnet-5-5 \
      --from <yyyy-mm-dd> --gbp-per-million-in <the input price in pounds> --gbp-per-million-out <the output price in pounds>
    ```
 
-   A decision model on Workers AI charges for input alone, so its price out is nought: `--provider cloudflare --model clef-flash --gbp-per-million-out 0`, with the input price converted as above.
-
-   A price is a fact about the provider, so it holds for every workspace that calls the model. A call is priced by the latest price on or before its day, by UTC, so a price set for a later day changes nothing until that day. When the dollar price or the rate moves, set a new price from the day it moves rather than editing an old one, so past calls keep the price they were made at. A second run for the same day replaces that day's price. The done line names the provider, the model and the day. Each run records `platform.model.priced` in the identity-set audit log under the platform's own actor id, with the provider, the model, the day and both rates: a price belongs to no workspace, so no workspace's audit log holds it.
-2. **Set the workspace's limit,** the most its model calls may spend in a calendar month, by UTC:
+2. **Set the workspace's limit** for a calendar month, by UTC:
 
    ```sh
    docker exec "$api" pnpm ops set-spending-limit --workspace <id> --gbp <pounds>
    ```
 
-   A second run replaces the limit, and each run records `platform.workspace.spending_limit_set` in the workspace's audit log under the platform's own actor id; the amount is the setting itself, read as below. Spend counts from the first of each month, and last month's calls never count against this one. At the limit `ask` refuses with `spending-limit-met`, a precondition, and its sentence tells the person their Admin can ask better-answers to raise it. `find` and `open` call no model and keep working.
-3. **Set a decision model's threshold,** once the owner's decision reading has chosen one, before the model is chosen for any workspace (§ Read the decision models):
+3. **Set a decision model's threshold** once the owner's decision reading has chosen one, before any workspace chooses the model (§ Read the decision models). It is a decimal strictly between 0 and 1, such as `0.7`:
 
    ```sh
    docker exec "$api" pnpm ops set-decision-threshold --provider cloudflare --model clef-flash --threshold <probability>
    ```
 
-   The threshold is the probability at or above which the model's yes is taken, a decimal strictly between 0 and 1, such as `0.7`. Like a price, it is a fact about the model, so it holds for every workspace that judges with it. A second run replaces it. The done line names the provider, the model and the threshold. Each run records `platform.model.threshold_set` in the identity-set audit log under the platform's own actor id, with the provider, the model and the threshold. A model on the Messages API takes no threshold.
-4. **Choose the workspace's model for a purpose,** once the model has a price in effect today:
+4. **Choose the workspace's model for a purpose** once the model has a price in effect today:
 
    ```sh
    docker exec "$api" pnpm ops set-model-choice --workspace <id> --purpose judging --provider anthropic --model claude-sonnet-5-5
    ```
 
-   A second run for the same purpose replaces the model in place. The provider must be one the DPIA names as a sub-processor, and the model must have a price on or before today; a call also needs the workspace's model key for that provider (§ Set a workspace's model key). Each run records `platform.workspace.model_choice_set` in the workspace's audit log under the platform's own actor id, with the purpose, the provider and the model. The embedding model is fixed and no command changes it.
+**Prices and thresholds** belong to the model and hold for every workspace. A call takes the latest price on or before its UTC day. Set a new price from the day it moves rather than editing an old one. A second run for the same day replaces it. `platform.model.priced` and `platform.model.threshold_set` go to the identity-set audit log, under the platform's own actor id. A model on the Messages API takes no threshold.
 
-A decision model cannot be chosen yet. `set-model-choice` refuses one with no threshold as `no-decision-threshold`, and then refuses `cloudflare` as `no-sub-processor` until the DPIA names Cloudflare as a sub-processor. No threshold is set today, because the owner's decision reading of 21/10/2026 found none that makes Clef or Clef-flash a judge on the reuse set. A decision model with no threshold when a question is asked is never called. Its judging fails, and the `api` logs one `llm: a model call never sent` line with `read` `no-threshold`, the purpose, the provider and the model, never the question.
+**The limit.** Spend counts from the first of each month. At the limit `ask` refuses `spending-limit-met`, a precondition, and tells the person their Admin can ask better-answers to raise it. `find` and `open` keep working. Each run records `platform.workspace.spending_limit_set` in the workspace's audit log.
 
-Each command writes nothing when it refuses. `set-model-choice` refuses in this order. `malformed` comes first, then `fixed-model-choice`, the embedding purpose. `no-decision-threshold` is a decision model with no threshold. `no-sub-processor` is a provider the DPIA does not name as a sub-processor, `local` and `cloudflare` included. `no-such-workspace` comes next, then `no-model-price`, a model with no price in effect today. The threshold is checked before the sub-processor because Cloudflare, the only decision provider, is no sub-processor yet, so a threshold check after that one could never refuse. `set-decision-threshold` refuses `malformed` for a threshold that is not a decimal strictly between 0 and 1, such as `0`, `1`, `1.0` or `.5`, and `not-a-decision-model` for a provider whose models speak no decision shape, `anthropic` and `mistral` among them. `malformed` is a sum that is not a decimal of pounds, a model name that is not lower case letters, digits, dots and hyphens, a day the calendar does not have, a model provider outside the three, or a workspace id that is not one. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
+**The model choice.** A second run for a purpose replaces it. The provider must be a sub-processor the DPIA names, and a call also needs the workspace's model key (§ Set a workspace's model key). Each run records `platform.workspace.model_choice_set`. The embedding model is fixed.
 
-**How a call is counted.** Before a model call, `ask` reserves the most the call may cost, at that day's price, in the same transaction that would refuse it, so two questions cannot both pass the last of the limit. When the call ends the reservation becomes one `llm_call` row per attempt at what was spent, and the rest is released. A reservation lives ten minutes. If the `api` stops mid-call, the daily sweep settles a reservation past its ten minutes as one failed `llm_call` row at the whole reserved cost, since the provider may have billed the call: the pass's log line counts them as `reservations_settled`, and names a workspace whose settling was refused under `refusals` with the sweep `spend`. Until then an open reservation still counts against the limit.
+**No decision model can be chosen yet.** No threshold is set, because the owner's decision reading of 21/10/2026 found none that makes Clef or Clef-flash a judge on the reuse set, and the DPIA does not name Cloudflare. A decision model with no threshold is never called. Its judging fails, and the `api` logs `llm: a model call never sent` with `read` `no-threshold`.
 
-**Reading the spend.** Through the browsing login: this month's spend for a workspace is `SELECT sum(cost_gbp) FROM llm_call WHERE workspace_id = '<id>' AND called_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`, and the limit is `SELECT value FROM workspace_config WHERE workspace_id = '<id>' AND key = 'llm.spending_limit_gbp'`. A row names the question it served by `answer_id`, and never holds the prompt or the completion. After the release that adds these tables, run the browsing role's file again (§ Browse production, step 3).
+**Refusals** write nothing.
+
+- `set-model-choice` checks, in order: `malformed`, `fixed-model-choice` (the embedding purpose), `no-decision-threshold`, `no-sub-processor` (`local` and `cloudflare` included), `no-such-workspace`, then `no-model-price`.
+- `set-decision-threshold` refuses `malformed` for `0`, `1`, `1.0`, `.5` or any value not strictly between 0 and 1, and `not-a-decision-model` for `anthropic` and `mistral`.
+- `malformed` is also a sum that is not pounds, a model name that is not lower case letters, digits, dots, and hyphens, a day not on the calendar, a provider outside the three, or a bad workspace id. `no-such-workspace` is an unknown id. `not built`, exit 3, is a database the migration has not reached.
+
+**How a call is counted.** Before a call, `ask` reserves the most the call may cost at the day's price, in the transaction that would refuse it, so two questions cannot both pass the last of the limit. When the call ends, it becomes one `llm_call` row per attempt and the rest is released. A reservation lives ten minutes, and counts against the limit until settled. If the `api` stops mid-call, the daily sweep settles it as one failed `llm_call` row at the whole reserved cost, counted as `reservations_settled`. A refused settling is named under `refusals` with the sweep `spend`.
+
+**Reading the spend** through the browsing login. This month's spend is `SELECT sum(cost_gbp) FROM llm_call WHERE workspace_id = '<id>' AND called_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`. The limit is `SELECT value FROM workspace_config WHERE workspace_id = '<id>' AND key = 'llm.spending_limit_gbp'`. A row names its question by `answer_id`, and never holds the prompt or the completion. After the release that adds these tables, rerun the browsing role's file (§ Browse production, step 3).
 
 ## Read the judge on the reuse set
 
-The reuse reading measures how well the judge tells an `Answer` that fits a question from one that differs from it in one qualifier, such as the plan, the module, the app or the audience. It runs on the owner's machine with the owner's own model key, and never in `check`: no test in `check` calls a real model. It asks the 34 questions of the synthetic reuse set (`packages/core/test/fixtures/reuse-set.json`) through the product's own `ask`, entry step and judge, in a throwaway Postgres container, so it reads what production would do with the same `Answer`s. It holds no customer content.
-
-It makes four runs, one after another: Claude Sonnet 5.5 and Claude Haiku 5.5, each at its own default effort (high for Sonnet 5.5, medium for Haiku 5.5) and at effort low. The product's judge sends no effort, so its default is what production runs; the reading adds effort low at the wire only.
+Use this procedure to measure how well the judge tells an `Answer` that fits a question from one that differs in one qualifier, such as the plan, the module, the app, or the audience. Run it on the owner's machine with the owner's own model key, never in `check`.
 
 1. **Have Docker running** and the checkout installed (`pnpm install`).
-2. **Read the day's exchange rate**, pounds per US dollar. The reading prices each model at its list price in dollars, written in `packages/core/test/readings/reuse.reading.ts`; check it against the provider's price page first.
-3. **Run it from `packages/core`.** `read -rs` takes the key without showing it, so no command line or history holds it:
+2. **Read the day's exchange rate**, in pounds per US dollar. Check the list prices in `packages/core/test/readings/reuse.reading.ts` against the provider's price page.
+3. **Run it from `packages/core`.** `read -rs` keeps the key out of the command line and history:
 
    ```sh
    cd packages/core
@@ -433,37 +761,31 @@ It makes four runs, one after another: Claude Sonnet 5.5 and Claude Haiku 5.5, e
    unset READING_ANTHROPIC_KEY
    ```
 
-   To take one model or one effort alone, add a filter on the run's name, such as `pnpm reading:reuse -t "Haiku"` or `-t "effort low"`.
+   To run one model or one effort, filter on the run's name, such as `pnpm reading:reuse -t "Haiku"` or `-t "effort low"`.
 
-Each run prints its figures under *Reuse reading*, then one line for each miss:
+4. **Record the figures** as a row per run under *The reuse reading* in `docs/operations/readings.md`, with the day, the rate, and the commit.
 
-- **fits found**, of the 32 the set names, and how many never reached the judge;
-- **hard negatives wrongly taken**, of the 36 the set names, and how many never reached the judge;
-- **other Answers taken**: `Answer`s judged to fit that the question names neither way, each a line to read;
-- **questions the judge answered**: a question whose call failed is left out of the counts above and named in a line of its own;
-- **spend** in pounds, from the run's own `llm_call` rows, as production counts it;
-- **judge latency**, the median and the worst call, retries included.
+The reading asks the 34 questions of the synthetic reuse set (`packages/core/test/fixtures/reuse-set.json`) through the product's own `ask`, entry step, and judge, in a throwaway Postgres container. It makes four runs: Claude Sonnet 5.5 and Claude Haiku 5.5, each at its default effort (high for Sonnet 5.5, medium for Haiku 5.5, which production runs) and at effort low. The key is sealed into the container's database and never printed or logged.
 
-A run whose judge answered nothing, as with a key the provider refuses, fails. The check suite holds every fit and every hard negative reaching the judge, so a figure of *never sent* above zero is something to report, not to read past.
+Each run prints, under *Reuse reading*, then one line per miss:
 
-**What it costs.** A run makes 34 calls of about 2,000 tokens in. All four runs together cost about £1 at a rate near 0.75, almost all of it Sonnet 5.5 at its default effort. The most they can cost, with every call spending its whole allowance of 16,000 tokens out, is about £9. Each run's workspace has a spending limit of £20, so a run cannot spend past that.
+- **fits found**, of 32, and how many never reached the judge.
+- **hard negatives wrongly taken**, of 36, and how many never reached the judge.
+- **other Answers taken**, `Answer`s judged to fit that the question names neither way.
+- **questions the judge answered**. A failed call is left out of the counts and named on its own line.
+- **spend** in pounds, from the run's `llm_call` rows.
+- **judge latency**, the median and the worst, retries included.
 
-**The key.** It is sealed into the container's database as production seals a workspace's key, and is gone when the run ends and the container is removed. The reading never prints or logs it.
-
-**Recording the figures.** Add each run's figures as a row under *The reuse reading* in `docs/operations/readings.md`, with the day, the rate and the commit the reading ran at.
+A run whose judge answered nothing fails. Report any *never sent* figure above zero. A run makes 34 calls of about 2,000 tokens in. All four runs cost about £1 at a rate near 0.75, and at most about £9 with every call spending 16,000 tokens out. Each run's workspace has a £20 spending limit.
 
 ## Read the decision models
 
-The decision reading measures Clef-flash and Clef, the decision models on Cloudflare's Workers AI, in two ways. It runs as the reuse reading does: on the owner's machine with the owner's own key, over synthetic content alone, in a throwaway Postgres container, and never in `check`.
-
-- **On reuse,** as the judge's decision backend. It asks the reuse set's 34 questions through the product's own `ask` at four thresholds: 0.3, 0.5, 0.7 and 0.9. No threshold is calibrated, and this reading is how one is chosen. Its figures are the reuse reading's, under *Reuse reading, Clef-flash at threshold 0.7* and the like.
-- **At the entry step,** against S2a's recall baseline. For each question of both recall sets, the 340 paraphrases and the 154 buyer-worded questions, it takes the entry step's first 20 points and asks the model whether each answers the question. It reorders the points by that probability and reports recall in the first ten beside `find`'s and the entry step's own, under *Entry step reading*. The product's entry step calls no model, and this reading changes nothing in it.
-
-The judging workspace's model choice is seeded in the container, because `set-model-choice` refuses Cloudflare until the DPIA names it. Each reuse run stores the threshold it reads at in the container's `decision_threshold` table before it asks, as `set-decision-threshold` would. Only synthetic content is sent.
+Use this procedure to measure Clef-flash and Clef, the decision models on Cloudflare's Workers AI. It runs like the reuse reading, over synthetic content only, never in `check`.
 
 1. **Have Docker running** and the checkout installed (`pnpm install`).
-2. **Make a Workers AI key:** an API token allowed to run Workers AI on the account, written as `<account id>:<API token>` (§ Set a workspace's model key). Read the day's exchange rate, pounds per US dollar. The list prices in dollars are written in `packages/core/test/readings/decision.reading.ts`; check them against each model's page on Cloudflare's site first.
-3. **Run it from `packages/core`:**
+2. **Make a Workers AI key**, written as `<account id>:<API token>` (§ Set a workspace's model key).
+3. **Read the day's exchange rate**, in pounds per US dollar. Check the list prices in `packages/core/test/readings/decision.reading.ts` against each model's page on Cloudflare's site.
+4. **Run it from `packages/core`:**
 
    ```sh
    cd packages/core
@@ -472,20 +794,31 @@ The judging workspace's model choice is seeded in the container, because `set-mo
    unset READING_WORKERS_AI_KEY
    ```
 
-   To take one model, one threshold or one way alone, add a filter on the run's name, such as `pnpm reading:decision -t "Clef-flash"`, `-t "threshold 0.7"` or `-t "entry step"`.
+   To run one model, threshold, or way, filter on the run's name, such as `pnpm reading:decision -t "Clef-flash"`, `-t "threshold 0.7"` or `-t "entry step"`.
 
-A run that judged or scored nothing, as with a key the provider refuses, fails. An entry point the model could not score keeps the entry step's own order, and the figures count those points.
+5. **Record the figures** as a row per run under *The decision reading* in `docs/operations/readings.md`, with the day, the rate, and the commit.
 
-**What it costs.** Clef-flash costs $0.038 and Clef $0.24 per million tokens in, and neither charges for output. All the runs together send a few million tokens, well under £1. The reuse runs' workspaces each have a spending limit of £20. The entry step's calls are made outside any workspace, and the window of each call bounds them to about £3 in all.
+The owner then chooses a threshold, if any, and sets it with `set-decision-threshold`. S2b's brief records which backend the first customer's workspace runs, and why.
 
-**Recording the figures.** Add each run's figures as a row under *The decision reading* in `docs/operations/readings.md`, with the day, the rate and the commit. The owner then decides which threshold, if any, a decision model's judging would run at, and sets it with `set-decision-threshold`, and S2b's brief records which backend the first customer's workspace runs, and why.
+The reading measures two ways:
+
+- **On reuse,** as the judge's decision backend, at thresholds 0.3, 0.5, 0.7 and 0.9, under *Reuse reading, Clef-flash at threshold 0.7* and the like. No threshold is calibrated yet.
+- **At the entry step,** against S2a's recall baseline. For each question of the 340 paraphrases and the 154 buyer-worded questions, the model scores the entry step's first 20 points, and the reading reports recall in the first ten beside `find`'s and the entry step's own, under *Entry step reading*. The product's entry step calls no model.
+
+The container seeds the model choice, because `set-model-choice` refuses Cloudflare until the DPIA names it, and stores each threshold in its `decision_threshold` table. A run that judged or scored nothing fails. An unscored point keeps the entry step's order. Clef-flash costs $0.038 and Clef $0.24 per million tokens in, with no output charge. All runs together cost well under £1. The reuse runs' workspaces have a £20 limit, and the entry step's calls are bounded to about £3 in all.
 
 ## Read a workspace's unmapped-passage rate
 
-The rate is the second reading that can bring vectors in, beside recall at ten on the customer's answer tests. It is read per workspace on the `api` service:
+Use this procedure to read a workspace's unmapped-passage rate, the second reading that can bring vectors in, beside recall at ten on the customer's answer tests:
 
 ```sh
 docker exec "$api" pnpm ops unmapped-passage-rate --workspace <id>
 ```
 
-It prints one JSON line, such as `{"with_the_map":{"flagged_incomplete":3,"showed_unmapped_passages":2},"map_unavailable":{"flagged_incomplete":1,"showed_unmapped_passages":1},"map_unknown":{"flagged_incomplete":0,"showed_unmapped_passages":0}}`. In each pair, the first count is the workspace's *Questions asked* records that hold a flag whose reason is *incomplete*, open or closed, a record flagged twice counted once. The second is how many of them showed at least one unmapped passage. Read the two together, never as one percentage. `with_the_map` is the reading: answers the map answered. `map_unavailable` is answers given while the map was unavailable, from search alone. `map_unknown` is records kept before the records kept the map's state. The command runs in a read-only transaction scoped to that workspace and prints no question, note or passage. The operator's console cannot read a workspace's records, which is why this is a command and not a console page. `malformed`, exit 2, is a workspace id that is not one; an id no workspace holds reads as zeros. `not built`, exit 3, is a database the migration has not reached.
+It prints one JSON line, such as `{"with_the_map":{"flagged_incomplete":3,"showed_unmapped_passages":2},"map_unavailable":{"flagged_incomplete":1,"showed_unmapped_passages":1},"map_unknown":{"flagged_incomplete":0,"showed_unmapped_passages":0}}`. In each pair, the first count is the *Questions asked* records with an *incomplete* flag, open or closed, each record counted once. The second is how many of them showed an unmapped passage. Read the two together, never as one percentage.
+
+- `with_the_map` is the reading: answers the map answered.
+- `map_unavailable` is answers from search alone, while the map was unavailable.
+- `map_unknown` is records kept before records kept the map's state.
+
+The command runs read-only, scoped to the workspace, and prints no question, note, or passage. The console cannot read a workspace's records. `malformed`, exit 2, is a bad workspace id. An unknown id reads as zeros. `not built`, exit 3, is a database the migration has not reached.
