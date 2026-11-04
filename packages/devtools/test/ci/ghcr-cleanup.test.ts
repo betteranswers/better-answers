@@ -21,6 +21,7 @@ const OCI_MANIFEST = "application/vnd.oci.image.manifest.v1+json";
 const LAYER = "application/vnd.oci.image.layer.v1.tar+gzip";
 const SIGSTORE_BUNDLE = "application/vnd.dev.sigstore.bundle.v0.3+json";
 const PACKAGES_API = "https://api.github.com/orgs/betteranswers/packages/container/";
+const PACKAGES_API_PATTERN = String.raw`https://api\.github\.com/orgs/betteranswers/packages/container/`;
 
 const digestOf = (body: string): string =>
   `sha256:${createHash("sha256").update(body).digest("hex")}`;
@@ -209,12 +210,14 @@ const registryOf = (packages: ReadonlyMap<string, Package>) => {
   const routes: readonly Route[] = [
     {
       method: "GET",
-      pattern: new RegExp(`^${PACKAGES_API}${tier}/versions\\?per_page=100&page=(?<page>\\d+)$`),
+      pattern: new RegExp(
+        `^${PACKAGES_API_PATTERN}${tier}/versions\\?per_page=100&page=(?<page>\\d+)$`,
+      ),
       answer: (fixture, found) => listingOf(fixture, found("tier"), Number(found("page"))),
     },
     {
       method: "DELETE",
-      pattern: new RegExp(`^${PACKAGES_API}${tier}/versions/(?<id>\\d+)$`),
+      pattern: new RegExp(`^${PACKAGES_API_PATTERN}${tier}/versions/(?<id>\\d+)$`),
       answer: (fixture, found) => deleteOf(fixture, Number(found("id"))),
     },
     {
