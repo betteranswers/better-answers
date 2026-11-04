@@ -12,7 +12,7 @@ def normalised(value: str) -> str:
 
 def letters_from(seed: str) -> tuple[str, ...]:
     shuffled = list(LETTERS)
-    Random(seed).shuffle(shuffled)
+    Random(seed).shuffle(shuffled)  # noqa: S311  # the same seed must give the same letters, so this is no secret
     return tuple(shuffled)
 
 
