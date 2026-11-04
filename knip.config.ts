@@ -3,7 +3,7 @@ import type { KnipConfig } from "knip";
 /** Not gated: `--production`/`--strict` call helpers unused and their devDependencies unlisted. */
 const config: KnipConfig = {
   // These are installed on the machine and never by npm, so no manifest names them.
-  ignoreBinaries: ["uv", "jdocmunch-mcp"],
+  ignoreBinaries: ["uv", "jdocmunch-mcp", "cubic"],
 
   // Nothing here is published, so an unimported entry export is dead; one kept
   // for a later route block carries `/** @public <block> */`.
