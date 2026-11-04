@@ -1144,7 +1144,7 @@ The triage's named pairs include people's "refuses demoting both Admins" against
 
 **Targets.** The critical path falls to 240s or less, set by BA-278's rule. Runner-seconds per run fall to 1,600 or less, as the sum of the suite-job medians like the 2,721 above. On the all-jobs basis of the 2,815 median run, that is about 1,650. A change runs the suites twice, on its pull request and on `main`, so per change the target is about 3,200. The in-process share of test files rises to 65% or more. These targets are estimates from the file times above. Each PR's perf rule checks its own share.
 
-**Outcome.** Measured at close on 04/11/2026. The critical path is 237s and the runner-seconds are 1,328 over five runs after #967, so both targets are met. The in-process share is 50% (277 of 552 files), so the 65% target is missed. BA-278 removed browser files and added few unit files, and the Postgres files stayed because the store is their claim.
+**Outcome.** Measured at close on 04/11/2026. The critical path is 237s and the runner-seconds are 1,328 over five runs after #967, so both targets are met. The in-process share is 50% (277 of 552 files), so the 65% target is missed. In-process files rose from 224 to 277, but Postgres files rose too, from 208 to 213, because the store is their claim.
 
 ## Appendix F. The target layering, the seams and the rule
 
