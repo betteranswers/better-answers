@@ -1,7 +1,7 @@
 # pgvector builds each tag once, so the database's image keeps the Debian packages of that
 # day. Here the build cache keeps the apt layer below until this digest or its RUN line
 # changes, so a security update published between two digests waits for one of them.
-FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
+FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
 # Debian 13 carries no PostgreSQL 18, so the PostgreSQL client comes from PGDG, whose signing key
 # Debian's own postgresql-common ships; a test holds its major to the database image's.
 # procps is the health check's pgrep. The upgrade is there because install leaves a package
