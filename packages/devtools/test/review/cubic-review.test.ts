@@ -423,6 +423,33 @@ describe("the cubic-review script", () => {
     expect(result.stdout + result.stderr).not.toContain("cbk_secret_value");
   });
 
+  it("hides the key before a long output is cut", () => {
+    const one = setup();
+    stubCubic(one, `${"x".repeat(230)} cbk_secret_value`, 1);
+
+    const result = ranOn(one, { CUBIC_API_KEY: "cbk_secret_value" });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).not.toContain("cbk_");
+  });
+
+  it("reviews a clone that fetches only its own branch", () => {
+    const one = setup();
+    stubCubic(one, { issues: [] }, 0);
+    gitIn(
+      one.work,
+      "config",
+      "remote.origin.fetch",
+      "+refs/heads/feature:refs/remotes/origin/feature",
+    );
+    gitIn(one.work, "update-ref", "-d", "refs/remotes/origin/main");
+
+    const result = ranOn(one);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("origin/main...HEAD, merge base");
+  });
+
   it("refuses a base outside origin", () => {
     const result = ranOn(setup(), {}, ["main"]);
 

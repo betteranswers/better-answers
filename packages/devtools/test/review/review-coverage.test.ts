@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { chmodSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import path from "node:path";
 
+import { afterAll, describe, expect, it } from "vitest";
+
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import {
   assess,
   parseCheckRuns,
@@ -7,6 +12,7 @@ import {
   REVIEW_LABEL,
 } from "@better-answers/devtools/review-coverage";
 import type { CheckRun, PullRequest } from "@better-answers/devtools/review-coverage";
+import { sweptFolder, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
 const HEAD = "50687082eea64fa7fad3bae37a5cf48d93c5cd50";
 const ARRIVED = "2026-11-04T10:00:00Z";
@@ -286,5 +292,73 @@ describe("reading what gh prints", () => {
 
   it("throws on check runs that are not pages", () => {
     expect(() => parseCheckRuns(JSON.stringify({ check_runs: [] }))).toThrow("expected array");
+  });
+});
+
+const SCRIPT = path.join(repositoryRoot, "scripts/review-coverage.mjs");
+
+const scratch = sweptFolder();
+
+afterAll(() => {
+  rmSync(scratch, { recursive: true, force: true });
+});
+
+let made = 0;
+
+const stubGh = (view: unknown, runs: readonly CheckRun[], exit = 0) => {
+  made += 1;
+  const bin = path.join(scratch, `case-${String(made)}`);
+  mkdirSync(bin);
+  const args = path.join(bin, "args.txt");
+  writeUnder(bin, "view.json", JSON.stringify(view));
+  writeUnder(bin, "runs.json", JSON.stringify([{ check_runs: runs }]));
+  writeUnder(
+    bin,
+    "gh",
+    `#!/bin/sh\nprintf '%s\\n' "$@" >> '${args}'\n[ ${String(exit)} -ne 0 ] && { echo 'gh broke' >&2; exit ${String(exit)}; }\ncase "$1" in pr) cat '${path.join(bin, "view.json")}';; *) cat '${path.join(bin, "runs.json")}';; esac\n`,
+  );
+  chmodSync(path.join(bin, "gh"), 0o755);
+  return { bin, args };
+};
+
+const scriptWith = (bin: string, pr = "934") =>
+  spawnSync(process.execPath, [SCRIPT, pr], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env["PATH"] ?? ""}` },
+  });
+
+const OPEN = { headRefOid: HEAD, labels: [], comments: [], reviews: [] };
+
+describe("the review-coverage script", () => {
+  it("exits 1 and prints the next step without a review", () => {
+    const { bin, args } = stubGh(OPEN, [NOT_STARTED]);
+
+    const result = scriptWith(bin);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain(askCubic("934"));
+    expect(readFileSync(args, "utf8")).toContain("headRefOid,labels,comments,reviews");
+  });
+
+  it("exits 0 when Cubic reviewed the head", () => {
+    const { bin } = stubGh(OPEN, [REVIEWED]);
+
+    expect(scriptWith(bin).status).toBe(0);
+  });
+
+  it("exits 2 when gh fails", () => {
+    const { bin } = stubGh(OPEN, [], 1);
+
+    const result = scriptWith(bin);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("gh pr failed");
+  });
+
+  it("exits 2 without a pull request number", () => {
+    const result = scriptWith(stubGh(OPEN, []).bin, "abc");
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("usage: pnpm run review-coverage");
   });
 });
