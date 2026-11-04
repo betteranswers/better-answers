@@ -16,23 +16,23 @@ The general test rules are in `AGENTS.md`, under Testing.
 
 ## The seams
 
-**core interface.** The core interface drives a block's actions and refusals through an entry that `packages/core` exports. It runs over real Postgres, and over a real bare repository where the block writes the bundle. The suites are in `packages/core/test/`.
+The **core interface** drives a block's actions and refusals through an entry that `packages/core` exports. It runs over real Postgres, and over a real bare repository where the block writes the bundle. The suites are in `packages/core/test/`.
 
-**api harness.** The api harness drives MCP, tRPC and the authorization server through the server's own requests, for every block a transport reaches. The suites are in `apps/api/tests/`.
+The **api harness** drives MCP, tRPC and the authorization server through the server's own requests, for every block a transport reaches. The suites are in `apps/api/tests/`.
 
-**browser suite.** The browser suite holds one spec per page a block builds. Each spec runs over a served build, with the page's latency budget and the accessibility gate. The specs are in `apps/web/e2e/`.
+The **browser suite** holds one spec per page a block builds. Each spec runs over a served build, with the page's latency budget and the accessibility gate. The specs are in `apps/web/e2e/`.
 
-**worker harness.** The worker harness runs the worker's pipeline steps through pytest, over real Postgres. The suites are in `apps/worker/tests/`.
+The **worker harness** runs the worker's pipeline steps through pytest, over real Postgres. The suites are in `apps/worker/tests/`.
 
-**tier contract.** Both tiers' suites read the same agreement under `contracts/`. A fixture on disk that `contracts/manifest.json` does not list fails both.
+In the **tier contract**, both tiers' suites read the same agreement under `contracts/`. A fixture on disk that `contracts/manifest.json` does not list fails both.
 
-**ops seam.** The ops seam runs each `pnpm ops` command through `runOps`. Each command answers done, refused or not built, each with its own exit code.
+The **ops seam** runs each `pnpm ops` command through `runOps`. Each command answers done, refused or not built, each with its own exit code.
 
-**rebuild equivalence.** The worker's full map rebuild matches the map the api's own writes left (`packages/core/test/concepts/rebuild-equivalence.test.ts`). A block that touches the map keeps the test green.
+**Rebuild equivalence** checks that the worker's full map rebuild matches the map the api's own writes left (`packages/core/test/concepts/rebuild-equivalence.test.ts`). A block that touches the map keeps the test green.
 
-**cross-tier document test.** The api's actions connect, review and publish a document. The worker runs as a real process against the same stores. The api then reads the passage back as a literal through `find` and `open`. The test is `packages/core/test/sources/cross-tier-document.test.ts`, and a block that adds a connector or an extraction step extends it.
+In the **cross-tier document test**, the api's actions connect, review and publish a document. The worker runs as a real process against the same stores. The api then reads the passage back as a literal through `find` and `open`. The test is `packages/core/test/sources/cross-tier-document.test.ts`, and a block that adds a connector or an extraction step extends it.
 
-**invisibility suite.** A concept, passage or `Answer` the reader may not read is absent through every entry, with no count and no different refusal. The suites are `packages/core/test/access/invisibility.test.ts` and `apps/api/tests/mcp/invisibility.test.ts`.
+The **invisibility suite** checks that a concept, passage or `Answer` the reader may not read is absent through every entry, with no count and no different refusal. The suites are `packages/core/test/access/invisibility.test.ts` and `apps/api/tests/mcp/invisibility.test.ts`.
 
 ## Third-party doubles
 
