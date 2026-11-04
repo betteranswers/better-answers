@@ -1,45 +1,45 @@
 # The v0.1 route
 
-The route is the way from the foundation to a finished v0.1, cut into blocks. This file holds the status table, which is the one home of each block's strand, status, next marker, waits and plan, and the rules a session follows to pick a block and to keep the table accurate. Each live block's brief is `docs/specs/route/<id>.md`, and `docs/specs/route/seams.md` names the test seams cited by a brief.
+The route is the way from the foundation to a finished v0.1, cut into blocks. This file holds the status table and the rules a session follows to pick a block and keep the table accurate. The table is the one home of each block's strand, status, next marker, waits and plan. Each live block's brief is `docs/specs/route/<id>.md`. `docs/specs/route/seams.md` names the test seams a brief cites.
 
 ## Where each block stands
 
 | Block | Strand | Delivers | Blocked by | Status | Next | Plan |
 | --- | --- | --- | --- | --- | --- | --- |
-| S0 | knowledge | Personal data withheld before any store, and an erasure that says what it did | none | done | | [S0's spec](../archive/specs/s0-redaction-seam-and-erasure.md) |
-| S1 | knowledge | One uploaded document to a cited passage, with no embedding | S0 | done | | [S1's spec](../archive/specs/s1-one-uploaded-document-to-a-cited-passage.md) |
-| S2a | knowledge | Search and the concept page, with no model call | S1 (`open` by locator) | done | | [S2a's plan](../plans/2026-10-09-1344-feat-s2a-search-and-concept-page-plan.md) |
-| S2b | knowledge | Ask answers from concepts with citations or refuses, and the Questions pages | S2a, S1 (unmapped passages) | done | | [S2b's plan](../plans/2026-10-11-2309-feat-s2b-ask-plan.md), [rarity-weighted matching](../plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md) |
+| S0 | knowledge | Personal data withheld before any store, and an erasure that says what it did | none | done | | `e19cfb9d4^:docs/archive/specs/s0-redaction-seam-and-erasure.md` |
+| S1 | knowledge | One uploaded document to a cited passage, with no embedding | S0 | done | | `e19cfb9d4^:docs/archive/specs/s1-one-uploaded-document-to-a-cited-passage.md` |
+| S2a | knowledge | Search and the concept page, with no model call | S1 (`open` by locator) | done | | [S2a's plan](../archive/plans/2026-10-09-1344-feat-s2a-search-and-concept-page-plan.md) |
+| S2b | knowledge | Ask answers from concepts with citations or refuses, and the Questions pages | S2a, S1 (unmapped passages) | done | | [S2b's plan](../archive/plans/2026-10-11-2309-feat-s2b-ask-plan.md), [rarity-weighted matching](../plans/004-rarity-weighted-matching.md) |
 | [S4](route/s4.md) | knowledge | The website and a SharePoint library as connected sources, priced before they sync | S1 | unplanned | | |
 | [S6](route/s6.md) | knowledge | A bid's question set answered and exported as a response-set document | S2b, S3 | unplanned | | |
 | [S7](route/s7.md) | knowledge | Suggested concepts extracted from synced sources within the spending limit | S4, S3 (the Kinds rename) | unplanned | | |
 | [S8](route/s8.md) | knowledge | Concept vectors, taken up only when its trigger fires | trigger | reserve | | |
-| [S3](route/s3.md) | records | Concepts typed and edited, guides built from them, owners per collection | none | planned | next | [plan](../plans/2026-10-21-1721-feat-s3-concepts-and-guides-plan.md) |
+| [S3](route/s3.md) | records | Concepts typed and edited, guides built from them, owners per collection | none | planned | next | [plan](../plans/007-s3-concepts-and-guides.md) |
 | [S5](route/s5.md) | records | Every suggestion decided on To decide, and answers promoted to `Answer`s | S2b, S3, S7 (the by-sync filter), V1 (flag routing) | unplanned | | |
 | [V1](route/v1.md) | records | Verification requests, shelf life, and conflicts a person resolves | S3 | unplanned | | |
-| [P1](route/p1.md) | people | People's pages, Microsoft sign-in and the Account page | none | building | | [people layout rework](../plans/2026-10-01-1807-feat-people-layout-rework-plan.md), [sign-in and security](../plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md) |
-| P2 | people | The platform console, with provisioning and a first member | P1 | done | | [P2's spec](../archive/specs/T-028.md) |
+| [P1](route/p1.md) | people | People's pages, Microsoft sign-in and the Account page | none | building | | [people layout rework](../archive/plans/2026-10-01-1807-feat-people-layout-rework-plan.md), [sign-in and security](../archive/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md) |
+| P2 | people | The platform console, with provisioning and a first member | P1 | done | | `e19cfb9d4^:docs/archive/specs/T-028.md` |
 | [O1](route/o1.md) | ops | Signals, System's cards, backups, and the Erasure and suppression page | S0 | unplanned | | |
 | [C1](route/c1.md) | customer | The first customer onboarded, and its real answer tests read | S5, S6, P1, O1 | unplanned | | |
 
-Every block gates v0.1 except S8, in reserve. Rows are in build order within a strand.
+Every block gates v0.1 except S8, which is in reserve. Rows are in build order within a strand. The specs of S0, S1 and P2 left the tree in `e19cfb9d4`, and `git show` reads each at that commit's parent.
 
 ## How a session uses the route
 
 ### Pick a block
 
-1. Read the table above. Nothing else is needed to pick.
+1. Read the table above. You need nothing else to pick.
 2. If a row on your strand is building, continue it. Open its plan and build the units that have not merged. Do not plan it again.
-3. Otherwise take the row marked next on your strand. The owner's prompt names the strand. With none named, take any strand's next.
-4. If your strand has no next, take the first row in table order that is planned or unplanned and whose Blocked by entries are all met. Build a planned row from its plan.
+3. Otherwise, take the row marked next on your strand. The owner's prompt names the strand. If it names none, take any strand's next row.
+4. If your strand has no next row, take the first row, in table order, that is planned or unplanned and whose Blocked by entries are all met. Build a planned row from its plan.
 5. A parallel session may take a second row on a strand by rule 4. Two sessions never take one block.
 6. Read the block's brief, `docs/specs/route/<id>.md`. List the open Linear issues that carry the block's label, from the Route Block label group.
 
 ### Read the Blocked by cell
 
 - A bare id, such as `S3`, is met when that row is done.
-- An id followed by bracketed words, such as `S7 (the by-sync filter)`, holds only the units those words name. Plan the block anyway, and list the entry among those units' dependencies. Remove the entry in the pull request that merges the last unit it names.
-- `trigger` on a reserve row means it waits on the measure its brief names.
+- An id followed by bracketed words, such as `S7 (the by-sync filter)`, blocks only the units those words name. Plan the block anyway, and list the entry among those units' dependencies. Remove the entry in the pull request that merges the last unit it names.
+- `trigger` on a reserve row means the row waits on the measure its brief names.
 
 ### Change the table
 
@@ -53,13 +53,13 @@ Change a row in the pull request that makes the change true. Each fact has one c
 | A plan or an owner ruling changes what a block waits on | Blocked by |
 | A reserve row's trigger fires | Status to `unplanned` |
 
-Before a row turns done, file what the block still owes as Linear issues under its label. A block is done when its Done when checks hold, not when every issue on its label has closed. Work that lands ahead of its block, with the owner's agreement, leaves the status alone. The same pull request moves the line from the brief's Must carry to its Builds on.
+Before a row turns done, file what the block still owes as Linear issues under its label. A block is done when its Done when checks hold, not when every issue on its label has closed. Work that lands ahead of its block, with the owner's agreement, leaves the status alone. That pull request moves the work's line from the brief's Must carry to its Builds on.
 
 ### Keep a brief current
 
 - A brief states what is true now and what the block still owes. It holds no date, no struck text and no account of who ruled when.
 - When the owner rules, rewrite the statement the ruling changes. Cite the ruling's ADR, plan or issue if it has one. Otherwise the statement stands on its own.
-- When a brief disagrees with an ADR, the glossary or the tree, they win in that order. Rewrite the line to match, in the pull request that found the disagreement.
+- If a brief disagrees with an ADR, the glossary or the tree, rewrite the brief's line to match, in the pull request that found the disagreement. The ADR wins first, then the glossary, then the tree.
 - A brief lists no issues, because the Linear label does. It cites a `BA-N` only inside the obligation whose detail that issue holds.
 - A plan edits its block's brief only to remove an obligation that no longer stands or to add one that is missing. The plan's own design stays in the plan.
 
@@ -71,13 +71,16 @@ Before a row turns done, file what the block still owes as Linear issues under i
 | Work not yet planned, or a finding put off for later | A Linear issue, with a block's label where it belongs to one |
 | A decision that is hard to reverse | Its ADR under `docs/solutions/architecture-patterns/` |
 | A user story | `docs/specs/v01-stories.md` |
-| What happened, and when | git, and `docs/plans/archive/` (when a plan is complete) |
+| What happened, and when | git, and `docs/archive/plans/` for a complete plan |
 
 ## Not in v0.1
 
-- The bids-and-proposals stage and the Then and Later stages of `VISION.md`. S5 and S6 fix the knowledge-side contract the next stage consumes.
-- Agent capabilities beyond the four read entries: `action:*` scopes, Agent Auth, the approval layer, the packaged client-side plugin. An MCP App that shows a concept file inside Claude, built from its own plan.
+- The bids-and-proposals stage, and the Then and Later stages of `VISION.md`. S5 and S6 fix the knowledge-side contract the next stage consumes.
+- Agent capabilities beyond the four read entries: `action:*` scopes, Agent Auth, the approval layer and the packaged client-side plugin.
+- An MCP App that shows a concept file inside Claude. It gets its own plan.
 - Imported and vendor bundles, the sensitivity-filtered bundle export, a read-only clone endpoint, and scheduled exports.
 - A `.docx` response set with real footnotes, JavaScript-rendered pages in the website connector, and local embedding on the first estate.
-- A metrics store, SLOs, tracing, a status page. Ontology curation beyond the Kinds list. Multi-process repository locking, a second api process, a resize of the estate.
-- Desktop Safari and Firefox. v0.1 supports Chromium on the desktop, which is Chrome and Microsoft Edge, and WebKit on the iPhone, which is every iOS browser. The browser suite proves Chromium today, and C1 adds the iPhone run.
+- A metrics store, SLOs, tracing and a status page.
+- Ontology curation beyond the Kinds list.
+- Multi-process repository locking, a second api process, and a resize of the estate.
+- Desktop Safari and Firefox. v0.1 supports Chromium on the desktop, which is Chrome and Microsoft Edge, and WebKit on the iPhone, which is every iOS browser. The browser suite runs Chromium only, and C1 adds the iPhone run.
