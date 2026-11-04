@@ -1,16 +1,11 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 
-const BOTS = [
-  { name: "cubic", check: "cubic · AI code reviewer", ai: true, reviewed: ["success"] },
-  { name: "coderabbit", check: "CodeRabbit", ai: true, reviewed: ["success"] },
-  {
-    name: "codacy",
-    check: "Codacy Static Code Analysis",
-    ai: false,
-    reviewed: ["success", "action_required"],
-  },
-];
+import {
+  assess,
+  parseCheckRuns,
+  parsePullRequest,
+} from "../packages/devtools/src/review/review-coverage.ts";
 
 const pr = process.argv[2];
 if (!/^\d+$/u.test(pr)) {
@@ -28,35 +23,25 @@ const gh = (...args) => {
     process.exit(2);
   }
 };
-const head = gh("pr", "view", pr, "--json", "headRefOid", "-q", ".headRefOid");
-const runs = JSON.parse(
-  gh("api", "--paginate", "--slurp", `repos/{owner}/{repo}/commits/${head}/check-runs`),
-).flatMap((page) => page.check_runs);
 
-process.stdout.write(`head ${head}\n`);
-let reviewers = 0;
-let pending = false;
-for (const bot of BOTS) {
-  const mine = runs
-    .filter((one) => one.name === bot.check)
-    .toSorted((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? ""));
-  const passed = mine.find((one) => bot.reviewed.includes(one.conclusion));
-  const latest = passed ?? mine[0];
-  if (latest === undefined) {
-    process.stdout.write(`${bot.name}\tmissing (no check run on this head)\n`);
-  } else if (passed === undefined && latest.status !== "completed") {
-    pending = true;
-    process.stdout.write(`${bot.name}\tpending (${latest.status})\n`);
-  } else {
-    if (passed !== undefined && bot.ai) reviewers += 1;
-    const outcome = passed === undefined ? "not reviewed" : "reviewed";
-    const title = latest.output?.title ?? "";
-    process.stdout.write(`${bot.name}\t${outcome} (${latest.conclusion}: ${title})\n`);
-  }
+let assessment;
+try {
+  const pullRequest = parsePullRequest(
+    gh("pr", "view", pr, "--json", "headRefOid,labels,comments"),
+  );
+  const runs = parseCheckRuns(
+    gh(
+      "api",
+      "--paginate",
+      "--slurp",
+      `repos/{owner}/{repo}/commits/${pullRequest.headRefOid}/check-runs`,
+    ),
+  );
+  assessment = assess(pr, pullRequest, runs);
+} catch (cause) {
+  process.stderr.write(`review-coverage: could not read pull request ${pr}: ${String(cause)}\n`);
+  process.exit(2);
 }
-process.stdout.write(`ai reviewers on this head: ${String(reviewers)} of 2\n`);
-if (pending) {
-  process.stdout.write("a bot is still running, so this is not final\n");
-  process.exit(3);
-}
-process.exit(reviewers > 0 ? 0 : 1);
+
+process.stdout.write(assessment.report);
+process.exit(assessment.exitCode);
