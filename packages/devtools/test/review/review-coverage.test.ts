@@ -11,7 +11,6 @@ import type { CheckRun, PullRequest } from "@better-answers/devtools/review-cove
 const HEAD = "50687082eea64fa7fad3bae37a5cf48d93c5cd50";
 const ARRIVED = "2026-11-04T10:00:00Z";
 const LATER = "2026-11-04T10:30:00Z";
-const EARLIER = "2026-11-04T09:00:00Z";
 
 const run = (
   name: string,
@@ -36,21 +35,27 @@ const SKIPPED = rabbit("skipped", "No files to review");
 const UP_TO_STANDARDS = codacy("success", "Your pull request is up to standards!");
 
 const ASK = "@cubic-dev-ai review this PR";
-const comment = (body: string, createdAt: string) => ({ body, createdAt });
+const comment = (body: string) => ({ body });
+const reviewBy = (login: string) => ({ author: { login } });
 const labelled = [{ name: REVIEW_LABEL }];
+const CUBIC_REVIEWED_BEFORE = [reviewBy("cubic-dev-ai")];
 
 const assessed = (pr: string, runs: readonly CheckRun[], rest: Partial<PullRequest> = {}) =>
-  assess(pr, { headRefOid: HEAD, labels: [], comments: [], ...rest }, runs);
+  assess(pr, { headRefOid: HEAD, labels: [], comments: [], reviews: [], ...rest }, runs);
 
-const LOCAL = "pnpm run cubic-review";
 const lines = (report: string): readonly string[] => report.trimEnd().split("\n");
 
-const nextOf = (report: string): readonly string[] =>
-  lines(report).filter((line) => line.startsWith("next:") || line.startsWith("if it cannot run:"));
+const nextOf = (report: string): string =>
+  lines(report).find((line) => line.startsWith("next:")) ?? "no next line";
+
+const addLabel = (pr: string) => `next: gh pr edit ${pr} --add-label ${REVIEW_LABEL}`;
+const askCubic = (pr: string) => `next: gh pr comment ${pr} --body "${ASK}"`;
 
 describe("the pull requests the script was written for", () => {
   it("shows #973 reviewed by Cubic, with nothing left to do", () => {
-    const result = assessed("973", [REVIEWED, SKIPPED, codacy("action_required", "1 new issue")]);
+    const result = assessed("973", [REVIEWED, SKIPPED, codacy("action_required", "1 new issue")], {
+      reviews: CUBIC_REVIEWED_BEFORE,
+    });
 
     expect(result.exitCode).toBe(0);
     expect(lines(result.report)).toEqual([
@@ -59,39 +64,33 @@ describe("the pull requests the script was written for", () => {
       "coderabbit\tnot reviewed (skipped: No files to review)",
       "codacy\treviewed (action_required: 1 new issue)",
       "ai reviewers on this head: 1 of 2",
-      "pull request: label review:coderabbit not set, Cubic asked for this head: no",
+      "pull request: label review:coderabbit not set, Cubic reviewed it: yes, Cubic asked: no",
       "next: none",
     ]);
   });
 
-  it("sends #972 to the local review, then to asking Cubic", () => {
-    const result = assessed("972", [NOT_STARTED, SKIPPED, UP_TO_STANDARDS]);
+  it("sends #964 to the label after an earlier Cubic review", () => {
+    const result = assessed("964", [COULD_NOT_START, SKIPPED, UP_TO_STANDARDS], {
+      reviews: CUBIC_REVIEWED_BEFORE,
+    });
 
     expect(result.exitCode).toBe(1);
-    expect(nextOf(result.report)).toEqual([
-      `next: ${LOCAL}`,
-      `if it cannot run: gh pr comment 972 --body "${ASK}"`,
-    ]);
+    expect(nextOf(result.report)).toBe(addLabel("964"));
   });
 
-  it("sends #964 the same way", () => {
-    const result = assessed("964", [COULD_NOT_START, SKIPPED, UP_TO_STANDARDS]);
-
-    expect(nextOf(result.report)).toEqual([
-      `next: ${LOCAL}`,
-      `if it cannot run: gh pr comment 964 --body "${ASK}"`,
-    ]);
-  });
-
-  it("sends #950 to the local review, then to the label", () => {
+  it("sends #950 to the label past Cubic's line limit", () => {
     const result = assessed("950", [OVER_LIMIT, SKIPPED]);
 
     expect(result.exitCode).toBe(1);
-    expect(nextOf(result.report)).toEqual([
-      `next: ${LOCAL}`,
-      `if it cannot run: gh pr edit 950 --add-label ${REVIEW_LABEL}`,
-    ]);
+    expect(nextOf(result.report)).toBe(addLabel("950"));
     expect(lines(result.report)).toContain("codacy\tmissing (no check run on this head)");
+  });
+
+  it("asks Cubic on #934, which it never reviewed", () => {
+    const result = assessed("934", [NOT_STARTED, SKIPPED]);
+
+    expect(result.exitCode).toBe(1);
+    expect(nextOf(result.report)).toBe(askCubic("934"));
   });
 });
 
@@ -100,15 +99,15 @@ describe("what counts as a review", () => {
     const result = assessed("1", [cubic("success", "AI review line limit reached")]);
 
     expect(result.exitCode).toBe(0);
-    expect(nextOf(result.report)).toEqual(["next: none"]);
+    expect(nextOf(result.report)).toBe("next: none");
   });
 
   it("finds the limit only in the title", () => {
     const limited = assessed("1", [cubic("neutral", "AI review line limit reached")]);
     const other = assessed("1", [cubic("neutral", "Incremental review could not start")]);
 
-    expect(nextOf(limited.report)[1]).toContain("--add-label");
-    expect(nextOf(other.report)[1]).toContain("gh pr comment");
+    expect(nextOf(limited.report)).toBe(addLabel("1"));
+    expect(nextOf(other.report)).toBe(askCubic("1"));
   });
 
   it("takes a passing run over a newer failed one", () => {
@@ -137,7 +136,7 @@ describe("what counts as a review", () => {
     const result = assessed("1", [SKIPPED]);
 
     expect(lines(result.report)).toContain("cubic\tmissing (no check run on this head)");
-    expect(nextOf(result.report)[0]).toBe(`next: ${LOCAL}`);
+    expect(nextOf(result.report)).toBe(askCubic("1"));
   });
 });
 
@@ -148,9 +147,9 @@ describe("a bot that is still running", () => {
     expect(result.exitCode).toBe(3);
     expect(lines(result.report)).toContain("cubic\tpending (in_progress)");
     expect(lines(result.report)).toContain("a bot is still running, so this is not final");
-    expect(nextOf(result.report)).toEqual([
+    expect(nextOf(result.report)).toBe(
       "next: wait for the running bot, then run pnpm run review-coverage 7 again",
-    ]);
+    );
   });
 
   it("exits 3 for Codacy even after Cubic reviewed", () => {
@@ -160,61 +159,67 @@ describe("a bot that is still running", () => {
   });
 });
 
-describe("asking Cubic and the CodeRabbit label", () => {
+describe("asking Cubic again and the CodeRabbit label", () => {
+  it("never asks Cubic again once it reviewed an earlier commit", () => {
+    const result = assessed("5", [NOT_STARTED, SKIPPED], { reviews: CUBIC_REVIEWED_BEFORE });
+
+    expect(nextOf(result.report)).toBe(addLabel("5"));
+  });
+
+  it("ignores a review by anyone but Cubic", () => {
+    const result = assessed("5", [NOT_STARTED, SKIPPED], {
+      reviews: [reviewBy("codacy-production"), reviewBy("liam-jons"), { author: null }],
+    });
+
+    expect(nextOf(result.report)).toBe(askCubic("5"));
+  });
+
   it("moves to the label once Cubic is asked", () => {
-    const result = assessed("5", [NOT_STARTED, SKIPPED], { comments: [comment(ASK, LATER)] });
+    const result = assessed("5", [NOT_STARTED, SKIPPED], { comments: [comment(ASK)] });
 
     expect(result.exitCode).toBe(1);
-    expect(nextOf(result.report)).toEqual([`next: gh pr edit 5 --add-label ${REVIEW_LABEL}`]);
+    expect(nextOf(result.report)).toBe(addLabel("5"));
     expect(lines(result.report)).toContain(
-      "pull request: label review:coderabbit not set, Cubic asked for this head: yes",
+      "pull request: label review:coderabbit not set, Cubic reviewed it: no, Cubic asked: yes",
     );
   });
 
-  it("ignores a request made before the head arrived", () => {
-    const result = assessed("5", [NOT_STARTED, SKIPPED], { comments: [comment(ASK, EARLIER)] });
+  it("counts a request made for an earlier head", () => {
+    const result = assessed("5", [], { comments: [comment(ASK)] });
 
-    expect(nextOf(result.report)[0]).toBe(`next: ${LOCAL}`);
+    expect(nextOf(result.report)).toBe(addLabel("5"));
   });
 
   it("ignores a comment that only quotes the request", () => {
     const result = assessed("5", [NOT_STARTED, SKIPPED], {
-      comments: [comment(`Run it. Then comment ${ASK} if it fails.`, LATER)],
+      comments: [comment(`Run it. Then comment ${ASK} if it fails.`)],
     });
 
-    expect(nextOf(result.report)[0]).toBe(`next: ${LOCAL}`);
+    expect(nextOf(result.report)).toBe(askCubic("5"));
   });
 
   it("accepts the request in any case", () => {
     const result = assessed("5", [NOT_STARTED, SKIPPED], {
-      comments: [comment("@Cubic-Dev-AI Review", LATER)],
+      comments: [comment("@Cubic-Dev-AI Review")],
     });
 
-    expect(nextOf(result.report)[0]).toContain("--add-label");
-  });
-
-  it("reads no request when the head has no check run", () => {
-    const result = assessed("5", [], { comments: [comment(ASK, LATER)] });
-
-    expect(nextOf(result.report)[0]).toBe(`next: ${LOCAL}`);
-  });
-
-  it("takes the label when Cubic is asked and limited", () => {
-    const result = assessed("5", [OVER_LIMIT, SKIPPED], { comments: [comment(ASK, LATER)] });
-
-    expect(nextOf(result.report)).toEqual([`next: gh pr edit 5 --add-label ${REVIEW_LABEL}`]);
+    expect(nextOf(result.report)).toBe(addLabel("5"));
   });
 
   it("ends the options on the pull request once labelled", () => {
     const result = assessed("5", [NOT_STARTED, SKIPPED], {
       labels: labelled,
-      comments: [comment(ASK, LATER)],
+      reviews: CUBIC_REVIEWED_BEFORE,
     });
 
     expect(result.exitCode).toBe(1);
-    expect(nextOf(result.report)).toEqual([
-      `next: none on the pull request. Run ${LOCAL} if it has not run on this head, then apply the verdict rule`,
-    ]);
+    expect(nextOf(result.report)).toMatch(/^next: none\. The label is on the pull request/u);
+  });
+
+  it("asks Cubic on a labelled pull request it never reviewed", () => {
+    const result = assessed("5", [NOT_STARTED, SKIPPED], { labels: labelled });
+
+    expect(nextOf(result.report)).toBe(askCubic("5"));
   });
 
   it("passes once CodeRabbit reviews the labelled head", () => {
@@ -223,7 +228,7 @@ describe("asking Cubic and the CodeRabbit label", () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(nextOf(result.report)).toEqual(["next: none"]);
+    expect(nextOf(result.report)).toBe("next: none");
   });
 
   it("waits while CodeRabbit runs on the labelled head", () => {
@@ -240,16 +245,21 @@ describe("reading what gh prints", () => {
     headRefOid: HEAD,
     labels: [{ name: "bug", color: "d73a4a" }, { name: REVIEW_LABEL }],
     comments: [{ body: ASK, createdAt: LATER, author: { login: "liam-jons" } }],
+    reviews: [
+      { author: { login: "cubic-dev-ai" }, state: "COMMENTED", commit: { oid: HEAD } },
+      { author: null, state: "COMMENTED" },
+    ],
   });
   const pages = (...perPage: readonly CheckRun[][]): string =>
     JSON.stringify(perPage.map((runs) => ({ total_count: runs.length, check_runs: runs })));
 
-  it("reads the head, the labels and the comments", () => {
+  it("reads the head, the labels, the comments and the reviewers", () => {
     const read = parsePullRequest(view);
 
     expect(read.headRefOid).toBe(HEAD);
     expect(read.labels.map((one) => one.name)).toEqual(["bug", REVIEW_LABEL]);
-    expect(read.comments).toEqual([{ body: ASK, createdAt: LATER }]);
+    expect(read.comments).toEqual([{ body: ASK }]);
+    expect(read.reviews.map((one) => one.author?.login)).toEqual(["cubic-dev-ai", undefined]);
   });
 
   it("joins the pages of check runs", () => {
@@ -269,9 +279,9 @@ describe("reading what gh prints", () => {
   });
 
   it("throws on a pull request without a head", () => {
-    expect(() => parsePullRequest(JSON.stringify({ labels: [], comments: [] }))).toThrow(
-      "headRefOid",
-    );
+    expect(() =>
+      parsePullRequest(JSON.stringify({ labels: [], comments: [], reviews: [] })),
+    ).toThrow("headRefOid");
   });
 
   it("throws on check runs that are not pages", () => {

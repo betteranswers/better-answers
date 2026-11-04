@@ -27,7 +27,7 @@ const gh = (...args) => {
 let assessment;
 try {
   const pullRequest = parsePullRequest(
-    gh("pr", "view", pr, "--json", "headRefOid,labels,comments"),
+    gh("pr", "view", pr, "--json", "headRefOid,labels,comments,reviews"),
   );
   const runs = parseCheckRuns(
     gh(
