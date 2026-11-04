@@ -2,10 +2,10 @@
 # workspace, not a pnpm one, and it shares four stores with the api tier and never code, so
 # its image needs nothing from the rest of the repository.
 #
-# Versions read: `python:3.13.15-slim-trixie` from Docker Hub on 24/09/2026 — 3.13 is what
+# Versions read: `python:3.13.16-slim-trixie` from Docker Hub on 04/11/2026 — 3.13 is what
 # `pyproject.toml` requires (`>=3.13,<3.14`) and `.python-version` names — uv 0.13.0
 # from astral-sh/uv's releases on 10/10/2026, and `gcr.io/distroless/cc-debian13:nonroot`
-# from the gcr.io registry on 24/09/2026. Each is pinned by digest as well as by tag: the
+# from the gcr.io registry on 04/11/2026. Each is pinned by digest as well as by tag: the
 # tag is the label a person reads, the digest is what actually ships. Debian 13 (trixie)
 # rather than 12 for the reason `apps/api/Dockerfile` gives beside its own base image.
 #
@@ -35,14 +35,14 @@ FROM ghcr.io/astral-sh/uv:0.13.0@sha256:cdc6093146eb3ff6a40107b38f008b789e050e77
 
 # The runtime's base, named here because the `tree` stage reads its accounts before the
 # runtime stage builds on it. `cc` rather than Distroless's own `python3-debian13`: that
-# image carries Debian's Python, 3.13.5 on 24/09/2026, ten releases behind the 3.13.15
+# image carries Debian's Python, 3.13.5 on 24/09/2026, eleven releases behind the 3.13.16
 # pinned below, at a path the build stage's venv does not point to. `nonroot`, so a lost
 # `USER` line would still not run the worker as root.
-FROM gcr.io/distroless/cc-debian13:nonroot@sha256:b7e81cb1af38d9345680e68bcf564d388f96304e25222030fc8c051faf8565b3 AS distroless
+FROM gcr.io/distroless/cc-debian13:nonroot@sha256:08476c244888bfb425bae1ae4dd7c17f093e972aab8426883d97f3c6f280f7c1 AS distroless
 
 # The one pin of the Python image. The build stage makes the venv with its interpreter and
 # the `tree` stage hands that same interpreter to the runtime, so the two cannot drift.
-FROM python:3.13.15-slim-trixie@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b AS interpreter
+FROM python:3.13.16-slim-trixie@sha256:cf50a4f6ac4f026458b08d5222023d700ac806410dff5e9ca8728fa44f2b850f AS interpreter
 
 FROM interpreter AS build
 COPY --from=uv /uv /uvx /usr/local/bin/
