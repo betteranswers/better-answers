@@ -137,7 +137,7 @@ describe("the indexes a new worktree gets", () => {
     const created = realpathSync(run.stdout.trim());
     expect(run.status).toBe(0);
     expect(readFileSync(codeLog, "utf8")).toBe(`index ${created}\n`);
-    expect(readFileSync(docLog, "utf8")).toBe(`- ${created}\n`);
+    expect(readFileSync(docLog, "utf8")).toBe(`- ${created} ${primary}\n`);
   });
 
   it("creates the worktree without the servers, saying what it costs", () => {
