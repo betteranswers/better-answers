@@ -48,7 +48,7 @@ const manifestOf = (directory: string): WorkspaceManifest =>
 export const workspacesGated = (): readonly string[] =>
   workspacePackages().filter((directory) => manifestOf(directory).scripts?.["check"] !== undefined);
 
-const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<gates>[\s\S]+)$/u;
+const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<gates>\S[\s\S]*)$/u;
 
 const stepsNamed = (command: string): readonly string[] =>
   (RUNNER.exec(command.trim())?.groups?.["gates"] ?? "")

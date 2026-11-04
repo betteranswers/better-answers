@@ -21,7 +21,8 @@ type JsonValue = z.infer<typeof jsonValue>;
 
 const SEGMENT = String.raw`[\w.@+-]+`;
 
-const SENTENCE_END = /[.-]+$/u;
+/** The lookbehind starts a match only at a run's first character, so a long run of dashes is read once, not once per character. */
+const SENTENCE_END = /(?<![.-])[.-]+$/u;
 
 const escaped = (root: string): string => root.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
 
