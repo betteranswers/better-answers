@@ -394,10 +394,12 @@ describe("the cubic-review script", () => {
     writeUnder(one.origin, "c.txt", "three\n");
     gitIn(one.origin, "add", "--", "c.txt");
     gitIn(one.origin, "commit", "-q", "-m", "three");
+    const newBase = gitIn(one.origin, "rev-parse", "HEAD").trim();
 
     const result = ranOn(one);
 
     expect(result.status).toBe(0);
+    expect(gitIn(one.work, "rev-parse", "origin/main").trim()).toBe(newBase);
     expect(result.stdout).toContain(`origin/main...HEAD, merge base ${mergeBase}`);
     expect(readFileSync(one.args, "utf8")).toContain("origin/main...HEAD");
   });

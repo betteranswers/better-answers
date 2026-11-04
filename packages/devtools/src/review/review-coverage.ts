@@ -4,6 +4,9 @@ import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 export const REVIEW_LABEL = "review:coderabbit";
 
+/** CodeRabbit skips a pull request of more files than this, so the label would do nothing. */
+const CODERABBIT_FILE_LIMIT = 100;
+
 const checkRunSchema = z.object({
   name: z.string(),
   status: z.string(),
@@ -19,13 +22,14 @@ const pullRequestSchema = z.object({
   labels: z.array(z.object({ name: z.string() })),
   comments: z.array(z.object({ body: z.string() })),
   reviews: z.array(z.object({ author: z.object({ login: z.string() }).nullish() })),
+  changedFiles: z.number(),
 });
 
 export type CheckRun = z.infer<typeof checkRunSchema>;
 
 export type PullRequest = z.infer<typeof pullRequestSchema>;
 
-/** The text of `gh pr view --json headRefOid,labels,comments,reviews`. */
+/** The text of `gh pr view --json headRefOid,labels,comments,reviews,changedFiles`. */
 export const parsePullRequest = (text: string): PullRequest =>
   pullRequestSchema.parse(JSON.parse(text));
 
@@ -101,6 +105,7 @@ type Facts = {
   readonly limited: boolean;
   readonly asked: boolean;
   readonly labelled: boolean;
+  readonly tooBigForCodeRabbit: boolean;
 };
 
 type Judged = { readonly bot: Bot; readonly state: BotState };
@@ -114,6 +119,7 @@ const factsOf = (judged: readonly Judged[], pullRequest: PullRequest) => {
     limited: cubic?.kind === "not reviewed" && LINE_LIMIT_TITLE.test(cubic.title),
     asked: pullRequest.comments.some((comment) => CUBIC_REQUEST.test(comment.body)),
     labelled: pullRequest.labels.some((label) => label.name === REVIEW_LABEL),
+    tooBigForCodeRabbit: pullRequest.changedFiles > CODERABBIT_FILE_LIMIT,
   } satisfies Facts;
 };
 
@@ -121,9 +127,11 @@ const factsOf = (judged: readonly Judged[], pullRequest: PullRequest) => {
 const cubicHadItsTurn = (facts: Facts): boolean =>
   facts.cubicReviewed || facts.limited || facts.asked;
 
+type ExitCode = 0 | 1 | 3;
+
 type Rule = {
   readonly when: (facts: Facts) => boolean;
-  readonly exit: 0 | 1 | 3;
+  readonly exit: ExitCode;
   readonly next: (pr: string) => string;
 };
 
@@ -137,10 +145,16 @@ const RULES: readonly Rule[] = [
   },
   { when: (facts) => facts.reviewed, exit: 0, next: () => "none" },
   {
-    when: (facts) => cubicHadItsTurn(facts) && facts.labelled,
+    when: (facts) => cubicHadItsTurn(facts) && facts.tooBigForCodeRabbit,
     exit: 1,
     next: () =>
-      "none. The label is on the pull request and no AI reviewer has reviewed this head, so apply the verdict rule",
+      `none. CodeRabbit skips a pull request of over ${String(CODERABBIT_FILE_LIMIT)} files, so the label would do nothing. Apply the verdict rule`,
+  },
+  {
+    when: (facts) => cubicHadItsTurn(facts) && facts.labelled,
+    exit: 1,
+    next: (pr) =>
+      `none to add. The label is on the pull request and no AI reviewer has reviewed this head. If CodeRabbit has not started, run pnpm run review-coverage ${pr} again for up to 10 minutes, then apply the verdict rule`,
   },
   { when: cubicHadItsTurn, exit: 1, next: addLabel },
 ];
@@ -151,7 +165,7 @@ const ASK_CUBIC: Rule = {
   next: (pr) => `gh pr comment ${pr} --body "@cubic-dev-ai review this PR"`,
 };
 
-export type Assessment = { readonly report: string; readonly exitCode: 0 | 1 | 3 };
+export type Assessment = { readonly report: string; readonly exitCode: ExitCode };
 
 const yesNo = (value: boolean): string => (value ? "yes" : "no");
 
@@ -169,7 +183,7 @@ export const assess = (
     ...judged.map(({ bot, state }) => `${bot.name}\t${describeState(state)}`),
     `ai reviewers on this head: ${String(reviewers.length)} of ${String(BOTS.filter((bot) => bot.ai).length)}`,
     ...(facts.pending ? ["a bot is still running, so this is not final"] : []),
-    `pull request: label ${REVIEW_LABEL} ${facts.labelled ? "set" : "not set"}, Cubic reviewed it: ${yesNo(facts.cubicReviewed)}, Cubic asked: ${yesNo(facts.asked)}`,
+    `pull request: ${String(pullRequest.changedFiles)} files, label ${REVIEW_LABEL} ${facts.labelled ? "set" : "not set"}, Cubic reviewed it: ${yesNo(facts.cubicReviewed)}, Cubic asked: ${yesNo(facts.asked)}`,
     `next: ${rule.next(pr)}`,
   ];
   return { report: `${lines.join("\n")}\n`, exitCode: rule.exit };

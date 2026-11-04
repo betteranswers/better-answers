@@ -47,7 +47,11 @@ const labelled = [{ name: REVIEW_LABEL }];
 const CUBIC_REVIEWED_BEFORE = [reviewBy("cubic-dev-ai")];
 
 const assessed = (pr: string, runs: readonly CheckRun[], rest: Partial<PullRequest> = {}) =>
-  assess(pr, { headRefOid: HEAD, labels: [], comments: [], reviews: [], ...rest }, runs);
+  assess(
+    pr,
+    { headRefOid: HEAD, labels: [], comments: [], reviews: [], changedFiles: 15, ...rest },
+    runs,
+  );
 
 const lines = (report: string): readonly string[] => report.trimEnd().split("\n");
 
@@ -70,7 +74,7 @@ describe("the pull requests the script was written for", () => {
       "coderabbit\tnot reviewed (skipped: No files to review)",
       "codacy\treviewed (action_required: 1 new issue)",
       "ai reviewers on this head: 1 of 2",
-      "pull request: label review:coderabbit not set, Cubic reviewed it: yes, Cubic asked: no",
+      "pull request: 15 files, label review:coderabbit not set, Cubic reviewed it: yes, Cubic asked: no",
       "next: none",
     ]);
   });
@@ -186,7 +190,7 @@ describe("asking Cubic again and the CodeRabbit label", () => {
     expect(result.exitCode).toBe(1);
     expect(nextOf(result.report)).toBe(addLabel("5"));
     expect(lines(result.report)).toContain(
-      "pull request: label review:coderabbit not set, Cubic reviewed it: no, Cubic asked: yes",
+      "pull request: 15 files, label review:coderabbit not set, Cubic reviewed it: no, Cubic asked: yes",
     );
   });
 
@@ -219,7 +223,19 @@ describe("asking Cubic again and the CodeRabbit label", () => {
     });
 
     expect(result.exitCode).toBe(1);
-    expect(nextOf(result.report)).toMatch(/^next: none\. The label is on the pull request/u);
+    expect(nextOf(result.report)).toMatch(/^next: none to add\. The label is on the pull request/u);
+    expect(nextOf(result.report)).toContain("review-coverage 5 again for up to 10 minutes");
+  });
+
+  it("skips the label past 100 changed files", () => {
+    const big = assessed("5", [OVER_LIMIT, SKIPPED], { changedFiles: 101 });
+    const edge = assessed("5", [OVER_LIMIT, SKIPPED], { changedFiles: 100 });
+
+    expect(nextOf(big.report)).toMatch(
+      /^next: none\. CodeRabbit skips a pull request of over 100/u,
+    );
+    expect(big.exitCode).toBe(1);
+    expect(nextOf(edge.report)).toBe(addLabel("5"));
   });
 
   it("asks Cubic on a labelled pull request it never reviewed", () => {
@@ -251,6 +267,7 @@ describe("reading what gh prints", () => {
     headRefOid: HEAD,
     labels: [{ name: "bug", color: "d73a4a" }, { name: REVIEW_LABEL }],
     comments: [{ body: ASK, createdAt: LATER, author: { login: "liam-jons" } }],
+    changedFiles: 15,
     reviews: [
       { author: { login: "cubic-dev-ai" }, state: "COMMENTED", commit: { oid: HEAD } },
       { author: null, state: "COMMENTED" },
@@ -266,6 +283,7 @@ describe("reading what gh prints", () => {
     expect(read.labels.map((one) => one.name)).toEqual(["bug", REVIEW_LABEL]);
     expect(read.comments).toEqual([{ body: ASK }]);
     expect(read.reviews.map((one) => one.author?.login)).toEqual(["cubic-dev-ai", undefined]);
+    expect(read.changedFiles).toBe(15);
   });
 
   it("joins the pages of check runs", () => {
@@ -286,7 +304,7 @@ describe("reading what gh prints", () => {
 
   it("throws on a pull request without a head", () => {
     expect(() =>
-      parsePullRequest(JSON.stringify({ labels: [], comments: [], reviews: [] })),
+      parsePullRequest(JSON.stringify({ labels: [], comments: [], reviews: [], changedFiles: 1 })),
     ).toThrow("headRefOid");
   });
 
@@ -327,7 +345,7 @@ const scriptWith = (bin: string, pr = "934") =>
     env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env["PATH"] ?? ""}` },
   });
 
-const OPEN = { headRefOid: HEAD, labels: [], comments: [], reviews: [] };
+const OPEN = { headRefOid: HEAD, labels: [], comments: [], reviews: [], changedFiles: 15 };
 
 describe("the review-coverage script", () => {
   it("exits 1 and prints the next step without a review", () => {
@@ -337,7 +355,7 @@ describe("the review-coverage script", () => {
 
     expect(result.status).toBe(1);
     expect(result.stdout).toContain(askCubic("934"));
-    expect(readFileSync(args, "utf8")).toContain("headRefOid,labels,comments,reviews");
+    expect(readFileSync(args, "utf8")).toContain("headRefOid,labels,comments,reviews,changedFiles");
   });
 
   it("exits 0 when Cubic reviewed the head", () => {
