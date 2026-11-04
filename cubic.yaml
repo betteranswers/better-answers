@@ -5,7 +5,8 @@ version: 1
 reviews:
   enabled: true
   sensitivity: medium
-  # One review on open. A later push is reviewed locally: pnpm run cubic-review.
+  # One review on open, because each review spends the monthly line allowance. A later push gets
+  # CodeRabbit's review through the label review:coderabbit (.agents/playbooks/review.md).
   incremental_commits: false
   check_drafts: false
   architecture_diagrams: true
