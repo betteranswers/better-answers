@@ -21,7 +21,7 @@ const OCI_MANIFEST = "application/vnd.oci.image.manifest.v1+json";
 const LAYER = "application/vnd.oci.image.layer.v1.tar+gzip";
 const SIGSTORE_BUNDLE = "application/vnd.dev.sigstore.bundle.v0.3+json";
 const PACKAGES_API = "https://api.github.com/orgs/betteranswers/packages/container/";
-const PACKAGES_API_PATTERN = PACKAGES_API.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+const PACKAGES_API_PATTERN = String.raw`https://api\.github\.com/orgs/betteranswers/packages/container/`;
 
 const digestOf = (body: string): string =>
   `sha256:${createHash("sha256").update(body).digest("hex")}`;
