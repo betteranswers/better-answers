@@ -6,10 +6,13 @@ import { ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
 import {
+  acceptSuggestions,
+  declineSuggestion,
   submitSuggestionSet,
   waitingEdit,
   waitingOnYou,
   type SuggestionRequest,
+  type WriteConceptInput,
 } from "../../src/concepts/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { parseLocator, passageAt } from "../../src/sources/index.ts";
@@ -18,7 +21,12 @@ import {
   passageUnder,
   writeUpIncluding,
 } from "../fixtures/sourced-concept.ts";
-import { nameOwnerAs, suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
+import {
+  doorsOf,
+  nameOwnerAs,
+  suiteWithBundles,
+  type Scenario,
+} from "../fixtures/workspace-with-bundle.ts";
 import {
   conceptProposedBy,
   conceptWritten,
@@ -314,6 +322,123 @@ describe("Waiting on you", () => {
     }).toEqual({
       admin: [],
       adminOpens: { ok: false, error: "not-found" },
+    });
+  });
+
+  describe("on a draft concept", () => {
+    const draftProposed = (scenario: Scenario, wrote: Partial<WriteConceptInput> = {}) =>
+      conceptProposedBy(scenario, scenario.viewer, { status: "draft", ...wrote });
+
+    const standingText = {
+      title: "Expenses",
+      body: "Expenses are claimed within thirty days.",
+      sources: undefined,
+    };
+
+    it("lists and opens its edit for the owner and Admins", async () => {
+      const scenario = await arrange();
+      const { written, suggestionId } = await draftProposed(scenario);
+      const opened = { ok: true, value: matching.objectContaining({ current: standingText }) };
+
+      expect({
+        owner: await suggestionsWaitingFor(scenario.editor),
+        ownerOpens: await openedBy(scenario.editor, suggestionId),
+        admin: await waitingFor(scenario.admin),
+        adminOpens: await openedBy(scenario.admin, suggestionId),
+      }).toEqual({
+        owner: [suggestionId],
+        ownerOpens: opened,
+        admin: [matching.objectContaining({ suggestionId, target: written.iri })],
+        adminOpens: opened,
+      });
+    });
+
+    it("hides its edit from people who may not decide it", async () => {
+      const scenario = await arrange();
+      const { suggestionId } = await draftProposed(scenario);
+
+      expect({
+        proposer: await suggestionsWaitingFor(scenario.viewer),
+        proposerOpens: await openedBy(scenario.viewer, suggestionId),
+        anotherEditor: await suggestionsWaitingFor(scenario.unowned),
+        anotherEditorOpens: await openedBy(scenario.unowned, suggestionId),
+      }).toEqual({
+        proposer: [],
+        proposerOpens: { ok: false, error: "not-found" },
+        anotherEditor: [],
+        anotherEditorOpens: { ok: false, error: "not-found" },
+      });
+    });
+
+    it("hides its edit from an Admin outside its audience", async () => {
+      const scenario = await arrange();
+      const { written, suggestionId } = await draftProposed(scenario);
+      await db().pool.query(
+        `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
+          WHERE workspace_id = $1 AND iri = $2`,
+        [scenario.workspaceId, written.iri, ulid()],
+      );
+
+      expect({
+        admin: await suggestionsWaitingFor(scenario.admin),
+        adminOpens: await openedBy(scenario.admin, suggestionId),
+      }).toEqual({
+        admin: [],
+        adminOpens: { ok: false, error: "not-found" },
+      });
+    });
+
+    it("shows a Restricted draft's edit to Admins, not its owner", async () => {
+      const scenario = await arrange();
+      const { suggestionId } = await draftProposed(scenario, { sensitivity: "Restricted" });
+
+      expect({
+        owner: await suggestionsWaitingFor(scenario.editor),
+        ownerOpens: await openedBy(scenario.editor, suggestionId),
+        admin: await suggestionsWaitingFor(scenario.admin),
+      }).toEqual({
+        owner: [],
+        ownerOpens: { ok: false, error: "not-found" },
+        admin: [suggestionId],
+      });
+    });
+
+    it("lets the owner accept and an Admin decline its edits", async () => {
+      const scenario = await arrange();
+      const accepted = await draftProposed(scenario);
+      const declined = await draftProposed(scenario);
+
+      const acceptance = await acceptSuggestions(scenario.editor, doorsOf(scenario), {
+        decisions: [{ suggestionId: accepted.suggestionId, expectedTarget: accepted.written.iri }],
+      });
+      const decline = await declineSuggestion(scenario.admin, doorsOf(scenario), {
+        suggestionId: declined.suggestionId,
+        reason: "Thirty days stands.",
+      });
+      const landed = await db().pool.query<{ status: string; body: string }>(
+        "SELECT status, body FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+        [scenario.workspaceId, accepted.written.iri],
+      );
+
+      expect({
+        acceptance,
+        decline,
+        landed: landed.rows,
+        waiting: await suggestionsWaitingFor(scenario.admin),
+      }).toEqual({
+        acceptance: {
+          ok: true,
+          value: [
+            {
+              suggestionId: accepted.suggestionId,
+              outcome: matching.objectContaining({ ok: true }),
+            },
+          ],
+        },
+        decline: matching.objectContaining({ ok: true }),
+        landed: [{ status: "draft", body: "Expenses are claimed within sixty days." }],
+        waiting: [],
+      });
     });
   });
 });
