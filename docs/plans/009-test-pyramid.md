@@ -962,10 +962,12 @@ PR 1 deletes 352 of the 367 rows its classification first named. Three rows are 
 
 ## Close the program
 
-- [ ] Every box above is checked with its evidence.
-- [ ] Appendix E's after-table holds five `main` `build` runs after BA-278, with the critical-path job and the sum of the suite-job medians.
-- [ ] Run `node docs/plans/009-test-pyramid/classify.mjs .` at `main` and fill Appendix E's after-row for in-process share. First add to its `TESTING_EXPORTS` any `testing` export that plan 008 moved. At `f59a9da35` it prints Appendix E's table exactly.
-- [ ] Reply to the operator with the report the execution playbook names.
+The owner ruled on 04/11/2026 that the ledger stands in for the unit boxes above. Each merged PR has a ledger row and a `verdict` status at its merged head, so the boxes stay as they were.
+
+- [x] Every box above is checked with its evidence. Met by the owner's ruling above.
+- [x] Appendix E's after-table holds five `main` `build` runs after BA-278, with the critical-path job and the sum of the suite-job medians.
+- [x] Run `node docs/plans/009-test-pyramid/classify.mjs .` at `main` and fill Appendix E's after-row for in-process share.
+- [x] Reply to the operator with the report the execution playbook names.
 
 ## Appendix A. Prototype evidence
 
@@ -1123,17 +1125,26 @@ The triage's named pairs include people's "refuses demoting both Admins" against
 | BA-291 (#946), `c12e78fef` | 5 | full-web-browser (2), 470s | 2,560 | - |
 | BA-288 (#942), `1dc783a94` | 5 | full-web-browser (2), 455s | 2,507 | - |
 | BA-272 (#948), `61eb0a2fb` | 5 | full-web-browser (2), 430s | 2,436 | - |
-| BA-274 (#949), `ad47d9d64` | 4 | full-web-browser (2), 443s | 2,390 | - |
-| BA-275 (#947), `ff786ccb6` | 3 | full-web-browser (2), 430s | 2,446 | - |
-| BA-286 (#951), `6803b6b51` | 2 | full-web-browser (1), 400s | 2,414 | - |
-| BA-277 (#950), `024336ba6` | 1 | full-web-browser (1), 366s | 2,333 | - |
+| BA-274 (#949), `ad47d9d64` | 5 | full-web-browser (2), 430s | 2,410 | - |
+| BA-275 (#947), `ff786ccb6` | 5 | full-web-browser (1), 405s | 2,470 | - |
+| BA-286 (#951), `6803b6b51` | 5 | full-web-browser (1), 366s | 2,348 | - |
+| BA-277 (#950), `024336ba6` | 5 | full-web-browser (1), 357s | 2,323 | - |
 | BA-278 (#952), `317460ad2` | 5 | full-root, 281s | 1,855 | - |
 | BA-278 (#956), `10f2912d6` | 5 | full-root, 281s | 1,824 | - |
 | BA-278 (#957), `53aca6d0d` | 5 | full-root, 281s | 1,804 | - |
-| BA-278 (#959), `9c5cbb383` | 3 | full-root, 282s | 1,752 | - |
-| BA-278 (#960), `89521de5c` | 2 | full-root, 273s | 1,739 | - |
+| BA-278 (#959), `9c5cbb383` | 5 | full-root, 285s | 1,760 | - |
+| BA-278 (#960), `89521de5c` | 5 | full-root, 285s | 1,713 | - |
+| BA-278 (#962), `dcfcaa5f8` | 5 | full-root, 281s | 1,643 | - |
+| VITEST-ISOLATE (#961), `3ba77e25e` | 5 | full-root, 272s | 1,584 | - |
+| BA-315 (#965), `0abaec9b4` | 5 | full-root, 268s | 1,576 | - |
+| BA-320 (#968), `7433b6726` | 5 | full-root, 268s | 1,604 | - |
+| BA-319 (#967), `42f1a5b94` | 5 | full-worker, 237s | 1,300 | - |
+| VITEST-REPORTERS (#964), `a45b1075e` | 5 | full-worker, 237s | 1,316 | - |
+| BA-314 (#972), `647d10f8c` | 5 | full-worker, 237s | 1,328 | 50% |
 
 **Targets.** The critical path falls to 240s or less, set by BA-278's rule. Runner-seconds per run fall to 1,600 or less, as the sum of the suite-job medians like the 2,721 above. On the all-jobs basis of the 2,815 median run, that is about 1,650. A change runs the suites twice, on its pull request and on `main`, so per change the target is about 3,200. The in-process share of test files rises to 65% or more. These targets are estimates from the file times above. Each PR's perf rule checks its own share.
+
+**Outcome.** Measured at close on 04/11/2026. The critical path is 237s and the runner-seconds are 1,328 over five runs after #967, so both targets are met. The in-process share is 50% (277 of 552 files), so the 65% target is missed. In-process files rose from 224 to 277, but Postgres files rose too, from 208 to 213, because the store is their claim.
 
 ## Appendix F. The target layering, the seams and the rule
 

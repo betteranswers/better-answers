@@ -27,6 +27,13 @@ const PLAN_PRS = {
   957: "BA-278",
   959: "BA-278",
   960: "BA-278",
+  961: "VITEST-ISOLATE",
+  962: "BA-278",
+  964: "VITEST-REPORTERS",
+  965: "BA-315",
+  967: "BA-319",
+  968: "BA-320",
+  972: "BA-314",
 };
 const WANTED_RUNS = 5;
 
