@@ -2,6 +2,14 @@
 // global `~/.code-index/config.jsonc` per key at read time rather than merged at load. Declare a
 // key here in full: whether a project array concatenates with the global one or replaces it is
 // documented nowhere, so the list below is the whole list and not an addition to one.
+// (Observed 2026-11-04: with this file present, the global list does not apply — it replaces.)
+// Lockfiles were a third of all symbols; .audit/.gitnexus/.memdb hold tool output, not source.
 {
-  "extra_ignore_patterns": ["**/.claude/worktrees/**"],
+  "extra_ignore_patterns": [
+    "**/.claude/worktrees/**",
+    "pnpm-lock.yaml",
+    ".audit/",
+    ".gitnexus/",
+    ".memdb/",
+  ],
 }

@@ -54,12 +54,21 @@ fi
 
 # jDocMunch's CLI lacks branch-local mode, so call its Python API. Leave the index unnamed: its edit
 # hook finds it by folder name.
+# jDocMunch has no global ignore list: exclusions live on each index, and a new index starts with
+# none. Copy the main checkout's, or the worktree indexes migration snapshots and dot directories
+# (an index of ~180 MB where the main checkout's is ~25 MB).
 if command -v jdocmunch-mcp >/dev/null 2>&1; then
   JDOC_PYTHON="$(dirname "$(readlink -f "$(command -v jdocmunch-mcp)")")/python3"
-  if ! "$JDOC_PYTHON" - "$REAL" >/dev/null <<'PY'
-import sys
+  if ! "$JDOC_PYTHON" - "$REAL" "$ROOT" >/dev/null <<'PY'
+import os, sys
+from jdocmunch_mcp.storage.doc_store import DocStore
 from jdocmunch_mcp.tools.index_local import index_local
-result = index_local(path=sys.argv[1], use_ai_summaries=False, use_embeddings=False, worktree_mode="branch_local")
+main = DocStore().load_index("local", os.path.basename(sys.argv[2].rstrip("/")))
+patterns = list(getattr(main, "corpus_shape_patterns", None) or []) or None
+if patterns is None:
+    print("worktree-create-hook: the main checkout's doc index has no exclusions to copy", file=sys.stderr)
+result = index_local(path=sys.argv[1], use_ai_summaries=False, use_embeddings=False,
+                     worktree_mode="branch_local", extra_ignore_patterns=patterns)
 sys.exit(0 if result.get("success") else 1)
 PY
   then
