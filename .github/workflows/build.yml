@@ -192,11 +192,11 @@ jobs:
       - name: the image the probe read is the image pushed
         id: push
         env:
-          IMAGE_ID: ${{ steps.load.outputs.imageid }}
+          LOADED: ${{ steps.load.outputs.imageid }}
           IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}
           TAG: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
         run: |
-          if [ -z "${IMAGE_ID}" ]; then
+          if [ -z "${LOADED}" ]; then
             echo "::error::no image was built and probed, so there is nothing to push: a leg ships only the image its probe read"
             exit 1
           fi
