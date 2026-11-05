@@ -7,12 +7,15 @@ import { conceptIriOf, passageLocatorOf, ulid, type ConceptIri } from "@better-a
 import { matching } from "@better-answers/schema/testing/matching";
 
 import {
+  acceptSuggestions,
   conceptToEdit,
   importBundle,
   reconcile,
   RECONCILER,
   renderConceptFile,
   saveConcept,
+  submitSuggestionSet,
+  suggestionSetSummary,
   writeConcept,
   type ConceptToEdit,
   type Frontmatter,
@@ -344,12 +347,15 @@ describe("a save seeded from the raw file", () => {
 });
 
 describe("a save around a source whose document is gone", () => {
-  const replayedCitingAGoneDocument = async (scenario: Scenario) => {
+  const replayedCitingAGoneDocument = async (
+    scenario: Scenario,
+    handbookPublished: Date | null = null,
+  ) => {
     const handbook = await documentLanded(db().pool, scenario.workspaceId, {
       title: "Handbook",
       text: "Allowances are paid monthly.",
       sensitivity: "Public",
-      publishedAt: null,
+      publishedAt: handbookPublished,
     });
     const gone = await connectedSourceHolding(db(), scenario.workspaceId);
     await db().pool.query("DELETE FROM source_document WHERE workspace_id = $1 AND id = $2", [
@@ -399,7 +405,7 @@ describe("a save around a source whose document is gone", () => {
 
   it("saves an edit that carries the gone source in place", async () => {
     const scenario = await arrange();
-    const { iri, path, goneLocator } = await replayedCitingAGoneDocument(scenario);
+    const { iri, path, goneLocator } = await replayedCitingAGoneDocument(scenario, new Date());
     expect(await sensitivityOf(iri)).toBe("Restricted");
 
     const { seed, answer } = await editedBy(
@@ -431,6 +437,67 @@ describe("a save around a source whose document is gone", () => {
 
     const published = await publishedOnceIndexed(db(), scenario.admin, handbook.connectedSourceId);
 
+    expect(published.ok).toBe(true);
+    expect(await sensitivityOf(iri)).toBe("Restricted");
+  });
+
+  const acceptedEdit = async (scenario: Scenario, iri: ConceptIri, path: string, body: string) => {
+    const found = await db().pool.query<{
+      merge_key: string;
+      kind: string;
+      title: string;
+      frontmatter: Frontmatter;
+      content_hash: string;
+    }>(
+      `SELECT i.merge_key, c.kind, c.title, c.frontmatter, c.content_hash
+         FROM concept_index c
+         JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
+        WHERE c.iri = $1`,
+      [iri],
+    );
+    const held = found.rows[0];
+    assert(held !== undefined, "the replayed concept is indexed");
+    const { iri: _iri, ...frontmatter } = held.frontmatter;
+    const set = await submitSuggestionSet(
+      scenario.editor,
+      { postgres: scenario.postgres },
+      {
+        kind: "edit",
+        requests: [
+          {
+            mergeKey: held.merge_key,
+            path,
+            conceptKind: held.kind,
+            title: held.title,
+            frontmatter,
+            body,
+            baseContentHash: held.content_hash,
+          },
+        ],
+      },
+    );
+    assert(set.ok, `the suggestion was refused: ${inspect(set)}`);
+    const summary = answered(
+      await readingAs(db().runtimePool, scenario.admin, (principal, tx) =>
+        suggestionSetSummary(principal, tx, set.value.setId),
+      ),
+    );
+    return acceptSuggestions(scenario.admin, doorsOf(scenario), {
+      decisions: summary.map((item) => ({
+        suggestionId: item.suggestionId,
+        expectedTarget: item.target,
+      })),
+    });
+  };
+
+  it("keeps an accepted edit Restricted through a later cascade", async () => {
+    const scenario = await arrange();
+    const { iri, path, handbook } = await replayedCitingAGoneDocument(scenario);
+
+    const accepted = await acceptedEdit(scenario, iri, path, "Allowances are paid on the 25th.");
+
+    expect(accepted).toMatchObject({ ok: true, value: [{ outcome: { ok: true } }] });
+    const published = await publishedOnceIndexed(db(), scenario.admin, handbook.connectedSourceId);
     expect(published.ok).toBe(true);
     expect(await sensitivityOf(iri)).toBe("Restricted");
   });
