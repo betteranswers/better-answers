@@ -25,6 +25,7 @@ import { bundleIndexed, type BundleIndexed } from "../fixtures/indexed-bundle.ts
 import { IMPORTED, NORTHGATE, TYPED } from "../fixtures/northgate-concepts.ts";
 import { northgate, type Northgate } from "../fixtures/northgate.ts";
 import { groupNamed } from "../fixtures/sourced-concept.ts";
+import { usesOfAConcept } from "../fixtures/usage-rows.ts";
 import {
   doorsOf,
   principalFor,
@@ -644,13 +645,14 @@ describe("records past their row cap", () => {
     });
     const admin = await memberAs(scenario, "Admin");
     const usedOlder = (from: number, to: number) =>
-      db().pool.query(
-        `INSERT INTO usage (workspace_id, id, actor, at, act, iri)
-         SELECT $1, lpad(n::text, 26, '0'), $2, $3::timestamptz - n * interval '1 second',
-                'copied', $4
-           FROM generate_series($5::int, $6::int) AS n`,
-        [scenario.workspaceId, `human:${admin.userId}`, AT.toISOString(), iri, from, to],
-      );
+      usesOfAConcept(db().pool, {
+        workspaceId: scenario.workspaceId,
+        actor: `human:${admin.userId}`,
+        before: AT,
+        iri,
+        from,
+        to,
+      });
     const usageLines = async () =>
       csvLinesOf(answered(await recordsOf(admin, scenario)).zip, "usage.csv");
 
