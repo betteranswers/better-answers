@@ -6,6 +6,18 @@ from ..concept_file import SCHEMED, resolved_resource
 _IRI = re.compile(r"^https://better-answers\.com/c/[0-9A-HJKMNP-TV-Z]{26}$")
 
 
+_PASSAGE_LOCATOR = re.compile(
+    r"[0-9A-HJKMNP-TV-Z]{26}/chars:(0|[1-9][0-9]*)-(0|[1-9][0-9]*)"
+)
+
+
+def _quotes_passage(resource: str, locator: str | None) -> bool:
+    if locator is None or _IRI.fullmatch(resource):
+        return False
+    span = _PASSAGE_LOCATOR.fullmatch(locator)
+    return span is not None and int(span[1]) < int(span[2])
+
+
 _URI_RESERVED = frozenset(";/?:@&=+$,#")
 
 

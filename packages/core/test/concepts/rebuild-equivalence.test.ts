@@ -266,13 +266,7 @@ describe("the worker's rebuild against the api's own map", () => {
       expect(await nodesAt(scenario.workspaceId, 2)).toEqual(liveNodes);
       expect(await edgesAt(scenario.workspaceId, 2)).toEqual(liveEdges);
       expect(await unresolvedAt(scenario.workspaceId, 2)).toEqual(liveUnresolved);
-      expect(liveUnresolved, "a source label waits as a path, in both tiers").toEqual([
-        {
-          from_uid: linker.iri,
-          relation: "lineage",
-          ordinal: 2,
-          target_path: "knowledge/The handbook",
-        },
+      expect(liveUnresolved, "a source label is evidence, never a path").toEqual([
         { from_uid: linker.iri, relation: "link", ordinal: 12, target_path: neverPath },
       ]);
 

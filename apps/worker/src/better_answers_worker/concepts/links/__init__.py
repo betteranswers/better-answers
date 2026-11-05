@@ -20,6 +20,8 @@ from .fences import prose_of
 
 PORT_OF = (
     "packages/schema/src/knowledge/concept-file.ts",
+    "packages/schema/src/knowledge/concept-tables.ts",
+    "packages/schema/src/sources/passage-locator.ts",
     "packages/core/src/store/map/write.ts",
 )
 AGREEMENT = "links"

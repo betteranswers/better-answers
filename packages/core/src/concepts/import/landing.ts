@@ -4,11 +4,10 @@ import {
   AUDIENCE_EVERYONE,
   boundarySchemas,
   citedSourcesOf,
-  IRI,
   LINKS_TO_LABEL,
-  parsedPassageLocator,
   CONCEPT_DRAFT_STATUS,
   PUBLISHED_STATUSES,
+  quotedPassageOf,
   SENSITIVITY_DEFAULT,
   SUGGESTION_ACCEPTED_STATUS,
   SUGGESTION_CITATION_FIX_KIND,
@@ -169,8 +168,8 @@ export const evidenceOfSources = (
 ): readonly EvidenceRow[] => {
   const rows = new Map<string, EvidenceRow>();
   for (const { resource, locator } of citedSourcesOf(frontmatter["sources"])) {
-    const passage = locator === null ? undefined : parsedPassageLocator(locator);
-    if (locator === null || passage === undefined || IRI.test(resource)) continue;
+    const passage = quotedPassageOf({ resource, locator });
+    if (locator === null || passage === undefined) continue;
     rows.set(locator, {
       workspaceId,
       sourceDocumentId: passage.sourceDocumentId,

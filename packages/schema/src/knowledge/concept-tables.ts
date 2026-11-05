@@ -14,6 +14,7 @@ import { listed, stamp } from "../column-helpers.ts";
 import { ACTOR_ID_PATTERN } from "../people/actor-id.ts";
 import { member } from "../people/identity-tables.ts";
 import { workspace } from "../people/workspace-table.ts";
+import { parsedPassageLocator, type PassageLocator } from "../sources/passage-locator.ts";
 import { sourceDocument } from "../sources/source-tables.ts";
 import { withRLS } from "../with-rls.ts";
 import { IRI, type CitedSource } from "./concept-file.ts";
@@ -109,6 +110,13 @@ export const citedSourcesOf = (value: SourcesValue): readonly CitedSource[] =>
     const cited = citedSourceOf(entry);
     return cited === undefined ? [] : [cited];
   });
+
+/** A citation of a connected source's passage is evidence, never lineage: its resource is a label. */
+export const quotedPassageOf = ({
+  resource,
+  locator,
+}: Pick<CitedSource, "resource" | "locator">): PassageLocator | undefined =>
+  locator === null || IRI.test(resource) ? undefined : parsedPassageLocator(locator);
 
 /**
  * A URL, or a resource starting `//`, comes back unchanged. Others resolve against the root when
