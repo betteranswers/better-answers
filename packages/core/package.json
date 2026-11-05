@@ -13,6 +13,7 @@
     "./bundle": "./src/bundle/index.ts",
     "./answering": "./src/answering/index.ts",
     "./guides": "./src/guides/index.ts",
+    "./usage": "./src/usage/index.ts",
     "./erasure": "./src/erasure/index.ts",
     "./runs": "./src/runs/index.ts",
     "./members": "./src/members/index.ts",
