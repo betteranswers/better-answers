@@ -110,7 +110,7 @@ Until a run completes, `api` and `backup` stay stopped. The two work directories
 5. A full rebuild derives the index, the passages, the evidence, and the map again. The map is plain tables in the same Postgres, so an erasure's flip and sweep are one step.
 6. It suppresses and reprocesses the source entities.
 7. The object-store deletion reaches the mirror bucket that night.
-8. The report quotes the three dates from the last dump before the rewrite (`BACKUPS.md`).
+8. The report quotes four dates, one per backup tier, each counted from when the routine took the erasure lock (`BACKUPS.md`).
 
 The routine rewrites what the platform wrote, the actor ids across history. It does **not** rewrite a person's name inside a concept body. The owner edits that forward as a new commit, and the report says so.
 

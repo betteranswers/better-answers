@@ -1,14 +1,26 @@
 # Readings
 
-This page records every measurement the route and its blocks rely on, one dated row under its measure, newest last. A brief that names a threshold links the measure's heading here.
+Each measure that the route and its blocks rely on has a section on this page. Each row is one dated reading, newest last. Specs and `docs/operations/RUNBOOK.md` link the section headings, so keep each heading's text unchanged.
 
-A source of "Old route" means the figure's only record is the route spec from before the route was split into briefs, frozen as `e19cfb9d4^:docs/archive/specs/v01-route-to-2026-10-20.md`. Commit `e19cfb9d4` removed it, with the archived spec and ADR this page also cites, so each is cited at that commit's parent, which `git show` reads.
+A source of "Old route" means that the only record of the figure is `e19cfb9d4^:docs/archive/specs/v01-route-to-2026-10-20.md`, the route spec from before the route was split into briefs. Commit `e19cfb9d4` deleted that file and the other archived spec and ADR that this page cites. This page cites each of them at the parent commit. To read one, run `git show e19cfb9d4^:<path>`.
 
 ## Recall at ten on the synthetic sets
 
-This measure is the share of the `Answer`s each synthetic question names that `find` returns in its first ten ("`find` at ten"), or that `ask`'s plan step returns in its first 20 entry points ("`ask` at 20"). The sets are the 340 paraphrases and the 86 buyer-worded rows in `packages/core/test/fixtures/`. `packages/core/test/answering/recall.test.ts` reads it in `check` against a 90 % target, which is reported and fails no build.
+Recall is the share of the `Answer`s that each synthetic question names that a ranking returns. The tables read two rankings:
 
-An empty cell was not read.
+- *`find` at ten* counts the first ten concepts that `find` returns.
+- *`ask` at 20* counts the first 20 entry points that the plan step of `ask` returns.
+
+The sets are in `packages/core/test/fixtures/`. `recall-set.json` holds 340 paraphrases of 240 `Answer`s. `buyer-questions.json` holds 86 buyer-worded questions.
+
+The *Set or rule* column names the set and the count:
+
+- *By `Answer` named* counts each `Answer` that a question names. The buyer-worded set names 154.
+- *Every `Answer` named* counts the questions whose named `Answer`s all appear.
+- *At least one* counts the questions with any named `Answer` in the ranking.
+- *None named* asks without the question's collection. *Collection named* and *theirs named* ask within it.
+
+`packages/core/test/budgets/recall.budget.ts` reads both sets. The nightly `budgets` workflow runs it with `pnpm --filter @better-answers/core run budgets`. It reports against a 90 % target and fails no build. An empty cell was not read.
 
 | Date | Release or commit | Set or rule | `find` at ten | `ask` at 20 | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -32,7 +44,7 @@ An empty cell was not read.
 | 2026-10-14 | #736 | The 72 buyer-worded rows with a collection, none named, by `Answer` named | | 56 of 87, 64.4 % | `docs/plans/004-rarity-weighted-matching.md` |
 | 2026-10-14 | #736 | The same 72 rows, theirs named, by `Answer` named | | 61 of 87, 70.1 % | `docs/plans/004-rarity-weighted-matching.md` |
 
-On 2026-10-13, a probe not in the tree read these figures. Their source is the old route.
+A probe that is not in the tree read these figures on 2026-10-13. Their source is the old route.
 
 | Set or rule | Figure |
 | --- | --- |
@@ -44,7 +56,13 @@ On 2026-10-13, a probe not in the tree read these figures. Their source is the o
 
 ## The production readings of ask
 
-This measure is how often a G-Cloud row of the buyer-worded set, asked word for word on the first customer's workspace with no collection named, reaches an `Answer` that answers it. It is taken by hand, as S2b's plan sets out in `docs/archive/plans/2026-10-11-2309-feat-s2b-ask-plan.md`. The gate is at least one answering `Answer` in the first ten for 70 % of the rows the bundle answers. Reading 1 went through `find`, counted against titles by a session that held the rankings. Reading 2 went through `ask`, counted against a list fixed blind beforehand. The owner read AE1, AE2, and AE14.
+This measure counts how often a G-Cloud row of the buyer-worded set reaches an `Answer` that answers it. Each row is asked word for word on the first customer's workspace, with no collection named. The reading is taken by hand, as S2b's plan in `docs/archive/plans/2026-10-11-2309-feat-s2b-ask-plan.md` sets out.
+
+The gate is at least one answering `Answer` in the first ten for 70 % of the rows that the bundle answers. The readings differ in method:
+
+- Reading 1 asked through `find`. A session that held the rankings counted the results against titles.
+- Reading 2 asked through `ask`. The count used a list fixed blind before the reading.
+- The owner read AE1, AE2, and AE14.
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
@@ -64,7 +82,7 @@ This measure is how often a G-Cloud row of the buyer-worded set, asked word for 
 
 ## The reuse reading
 
-This measure is how many of the reuse set's 32 fits the judge takes, and how many of its 36 hard negatives it wrongly takes, with the run's spend and the judge's latency. The owner runs `pnpm reading:reuse` from `packages/core`, as `docs/operations/RUNBOOK.md` sets out under *Read the judge on the reuse set*. No threshold is set. Spend is priced at £0.747 to the dollar. Every row's source is `pnpm reading:reuse`.
+This measure counts how many of the reuse set's 32 fits the judge takes, and how many of its 36 hard negatives it wrongly takes. Each row also gives the run's spend and the judge's latency. The set is `packages/core/test/fixtures/reuse-set.json`. The procedure is *Read the judge on the reuse set* in `docs/operations/RUNBOOK.md`, which runs `pnpm reading:reuse` from `packages/core`. No threshold is set. Spend is in pounds at £0.747 to the dollar. Every row's source is `pnpm reading:reuse`.
 
 | Date | Release or commit | Model and effort | Fits of 32 | Hard negatives taken of 36 | Other `Answer`s taken | Answered of 34 | Spend | Latency median, worst |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -73,11 +91,11 @@ This measure is how many of the reuse set's 32 fits the judge takes, and how man
 | 2026-10-21 | `76513a867` | Claude Haiku 5.5, medium, its default | 28 | 0 | 0 | 34, 0 never sent | £0.0079 | 2,385 ms, 8,212 ms |
 | 2026-10-21 | `76513a867` | Claude Haiku 5.5, low | 26 | 0 | 0 | 34, 0 never sent | £0.0065 | 1,469 ms, 5,212 ms |
 
-The three runs at 28 of 32 miss the same four fits. Each is a two-part question whose `Answer` answers one part. Two ask about encryption at rest and in transit, and two about each module's audit log. Haiku 5.5 at effort low misses the two audit-log fits and four one-part fits.
+The three runs at 28 of 32 miss the same four fits. Each of the four is a two-part question whose `Answer` answers one part. Two ask about encryption at rest and in transit. Two ask about each module's audit log. Claude Haiku 5.5 at effort low misses the two audit-log fits and four one-part fits.
 
 ## The decision reading
 
-This measure is how Clef-flash and Clef do as the judge's decision backend on the reuse set, at thresholds 0.3, 0.5, 0.7, and 0.9, and as a reordering of the entry step's first 20 points, read as recall in the first ten. The owner runs `pnpm reading:decision` from `packages/core`, as `docs/operations/RUNBOOK.md` sets out under *Read the decision models*, to choose a threshold, and none is set. Spend is priced at £0.747 to the dollar. Every row's source is `pnpm reading:decision`.
+This measure reads Clef-flash and Clef in two roles. On the reuse set, each is the judge's decision backend at thresholds 0.3, 0.5, 0.7, and 0.9. At the entry step, each reorders the first 20 entry points, and the reading is recall in the first ten. The procedure is *Read the decision models* in `docs/operations/RUNBOOK.md`, which runs `pnpm reading:decision` from `packages/core`. The reading exists to choose a threshold. None is set. Spend is in pounds at £0.747 to the dollar. Every row's source is `pnpm reading:decision`.
 
 | Date | Release or commit | Model on reuse, threshold | Fits of 32 | Hard negatives taken of 36 | Other `Answer`s taken | Spend | Latency median |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -90,20 +108,20 @@ This measure is how Clef-flash and Clef do as the judge's decision backend on th
 | 2026-10-21 | `76513a867` | Clef, 0.7 | 27 | 0 | 53 | £0.0126 | 362 ms |
 | 2026-10-21 | `76513a867` | Clef, 0.9 | 20 | 0 | 11 | £0.0126 | 382 ms |
 
-The entry-step rows give recall in the first ten after reordering. Without it, recall is 72.6 % for paraphrases and 55.8 % for buyer-worded rows.
+The entry-step rows give recall in the first ten after reordering. Without reordering, recall is 72.6 % for paraphrases and 55.8 % for buyer-worded rows.
 
 | Date | Release or commit | Model at the entry step | Paraphrases, reordered | Buyer-worded, reordered | Tokens in |
 | --- | --- | --- | --- | --- | --- |
 | 2026-10-21 | `76513a867` | Clef-flash | 77.9 %, 8 unscored | 53.9 %, 1 unscored | 835,709 |
 | 2026-10-21 | `76513a867` | Clef | 77.9 %, 8 unscored | 55.8 %, 1 unscored | 835,709 |
 
-Each of the first twelve other `Answer`s that Clef took at threshold 0.7, read by hand, answers a different question, such as an uptime question taking whether contractors are background checked. Claude Sonnet 5.5 and Claude Haiku 5.5 take none (§ The reuse reading). No threshold makes either Clef model a judge on this set, because one that keeps out the hard negatives still takes unrelated `Answer`s. At the entry step, reordering by either Clef model lifts paraphrase recall by 5.3 points and leaves buyer-worded recall level or lower.
+A hand check of the first twelve other `Answer`s that Clef took at threshold 0.7 found that each answers a different question. For example, an uptime question took an `Answer` about whether contractors are background checked. Claude Sonnet 5.5 and Claude Haiku 5.5 take no other `Answer`s, as *The reuse reading* shows. No threshold makes either Clef model a judge on this set. A threshold that keeps out the hard negatives still takes unrelated `Answer`s. At the entry step, reordering by either Clef model lifts paraphrase recall by 5.3 points and leaves buyer-worded recall level or lower.
 
-**The owner's choice from the two readings (21/10/2026).** Phew's workspace judges with Claude Sonnet 5.5 at its default effort, and no decision model has a threshold. Sonnet 5.5 took 28 of 32 fits on the reuse set, with no hard negative and no unrelated `Answer`. Clef and Clef-flash took unrelated `Answer`s at every threshold read. Claude Haiku 5.5 at its default effort matched Sonnet 5.5 at about a fifteenth of the cost, but the set's 34 questions cannot tell the two apart, so Haiku waits for a larger set.
+**The owner's choice, 2026-10-21.** Phew's workspace judges with Claude Sonnet 5.5 at its default effort. No decision model has a threshold. On the reuse set, Sonnet 5.5 took 28 of 32 fits, with no hard negative and no unrelated `Answer`. Clef and Clef-flash took unrelated `Answer`s at every threshold read. Claude Haiku 5.5 at its default effort matched Sonnet 5.5 at about a fifteenth of the cost. The set's 34 questions cannot tell the two models apart, so Haiku waits for a larger set.
 
 ## The governed write at 3,000 concepts
 
-This measure is how long one governed concept write takes through the core interface as the workspace grows to 3,000 concepts, and how much of that the creation-time backfill takes. The rows of 2026-09-10 came from a probe that was never merged. From 2026-10-21 the probe is `packages/core/test/budgets/write-budget.budget.ts`, and the write's own time is the figure S3's plan keeps or beats.
+This measure times one governed concept write through the core interface as the workspace grows to 3,000 concepts. It also times the part of the write that the creation-time backfill takes. The probe is `packages/core/test/budgets/write-budget.budget.ts`. The nightly `budgets` workflow runs it with `pnpm --filter @better-answers/core run budgets`. S3's plan must keep or beat the write's own time.
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
@@ -116,7 +134,7 @@ This measure is how long one governed concept write takes through the core inter
 
 ## The cascade ceiling
 
-This measure is how long a narrowing over one connected source takes inside the workspace's cascade lock, when a number of concepts cite its documents, over 3,000 concepts written through the core interface. A probe not in the tree times it. No threshold is set, and S4's cost estimate and O1's threshold are priced from the figure. Every row's source is `e19cfb9d4^:docs/archive/specs/s1-one-uploaded-document-to-a-cited-passage.md`.
+This measure times a narrowing over one connected source inside the workspace's cascade lock. The workspace holds 3,000 concepts written through the core interface, and the number in each row cite the source's documents. A probe that is not in the tree takes the reading. No threshold is set. S4's cost estimate and O1's threshold are priced from this figure. Every row's source is `e19cfb9d4^:docs/archive/specs/s1-one-uploaded-document-to-a-cited-passage.md`.
 
 | Date | Release or commit | Set or rule | Figure |
 | --- | --- | --- | --- |
@@ -127,7 +145,7 @@ This measure is how long a narrowing over one connected source takes inside the 
 
 ## The worker's box figures
 
-This measure is the worker's memory and swap at the container's cgroup, under the deploy unit's 1.5 GB cap and 1.5 GB of spill, read by hand over the seam's fixture page and both converters' fixtures. Step A is decided by swap-in above 4 MB/s for five minutes during a first index, which S4's first index reads next. Every row's source is `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md`.
+This measure is the worker's memory and swap at the container's cgroup. The deploy unit caps memory at 1.5 GB with 1.5 GB of spill. Readings are taken by hand over the seam's fixture page and both converters' fixtures. The signal for step A is swap-in above 4 MB/s for five minutes during a first index. S4 reads that signal next, on the first customer's first index. Every row's source is `e19cfb9d4^:docs/archive/adr/0024-forge-is-bare-git-repositories.md`.
 
 | Date | Release or commit | Set or rule | Figure |
 | --- | --- | --- | --- |

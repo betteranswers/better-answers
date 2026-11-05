@@ -1,49 +1,26 @@
 # The build cache
 
-Nothing deployed builds images, because `release.yml` promotes digests a runner built and tags each promotion `release/*`. There are two build caches:
+Nothing deployed builds an image. `release.yml` promotes digests that a runner built, and tags each promotion `release/*`. There are two build caches:
 
-- A development machine's cache, bounded by a garbage-collection policy the builder reads at startup.
+- A development machine's cache, bounded by a garbage-collection policy that the builder reads at startup.
 - The runner's cache, a tag in each image's package on GHCR.
 
 ## Where the policy lives
 
-Docker Desktop's **Settings**, under **Docker Engine**, writes the policy to `~/.docker/daemon.json` under `builder.gc`. Both builders here use the `docker` driver, so their BuildKit is the daemon's own and reads only that file. A `buildkitd.toml` binds only a `docker-container` builder, and there is none.
+Docker Desktop writes the policy to `~/.docker/daemon.json`, under `builder.gc`. Edit it in **Settings**, under **Docker Engine**. Both builders on a development machine use the `docker` driver, so their BuildKit is the daemon's own and reads only `daemon.json`. A `buildkitd.toml` applies only to a `docker-container` builder, and there is none.
 
-## Prove the policy parses
+## How the daemon reads a filter
 
-A malformed policy collects nothing and looks normal everywhere, and `buildx inspect` prints the rules without parsing them. After any edit to the policy:
+Every broken policy breaks one of these four rules:
 
-1. Run the inspect command:
+1. **The daemon splits a filter element at its first `=`, and nowhere else.** A comma does not separate predicates. `"type=a,type=b"` is one key, `type`, with the value `a,type=b`.
+2. **The daemon rewrites each predicate for BuildKit as the key, `==`, and the value.** So `daemon.json` takes one `=` where `buildkitd.toml` takes two.
+3. **BuildKit accepts `==`, `!=`, and `~=`.** Any other operator is an `unsupported operator` error. That includes a bare `=` that rule 1 left in a value.
+4. **The daemon runs the whole policy in one call, and the first rule that fails to parse ends the call.** No later rule runs.
 
-	```
-	docker buildx inspect desktop-linux
-	```
+Put one predicate in each array element, and use a different key for each predicate in a rule. A repeated key fails at startup with `filters expect only one value`. Different keys combine with AND, so one rule names one cache type, and a sweep of three types takes three rules. `daemon.json` cannot express "type A or type B" in one rule.
 
-2. Check that each rule's `Filters` line shows one predicate and no comma, and that each rule with an age shows a `Keep Duration`.
-3. Wait for at least two GC ticks, then search the VM's log:
-
-	```
-	grep "gc error" ~/Library/Containers/com.docker.docker/Data/log/vm/init.log
-	```
-
-4. Check that the search prints nothing. A policy that fails to parse logs one line per tick:
-
-	```
-	gc error: filters: parse error: […]: unsupported operator "=": invalid argument
-	```
-
-## How a filter is read
-
-Every broken policy breaks one of these four mechanics:
-
-1. **The daemon cuts a filter element at its first `=`, and nowhere else.** Commas do not separate predicates. `"type=a,type=b"` is one key, `type`, with the value `a,type=b`.
-2. **The daemon rebuilds each predicate for BuildKit as the key, `==`, and the value.** So `daemon.json` takes one `=` where `buildkitd.toml` takes two.
-3. **BuildKit accepts `==`, `!=`, and `~=`.** Any other operator, including a bare `=` that mechanic 1 left in a value, is an `unsupported operator`.
-4. **The whole policy runs in one call, and the first rule that fails to parse ends it.** No later rule runs.
-
-So put **one predicate in each array element**, and use **distinct keys within a rule**. A repeated key is the startup error `filters expect only one value`. Different keys combine with AND, so a rule names one cache type, and a sweep of three types is three rules. `daemon.json` cannot say "type A *or* type B" in one rule (moby/moby#46864).
-
-Age is a filter, `unused-for=48h`. `buildkitd.toml` has a `keepDuration` key, but `daemon.json` has none and drops it silently. `buildx inspect` then prints no `Keep Duration` line.
+Age is a filter: `unused-for=48h`. `buildkitd.toml` has a `keepDuration` key, but `daemon.json` has none and drops it without an error. `docker buildx inspect` then prints no `Keep Duration` line.
 
 ## The policy
 
@@ -59,74 +36,161 @@ Age is a filter, `unused-for=48h`. `buildkitd.toml` has a `keepDuration` key, bu
 
 | Threshold | Meaning |
 | --- | --- |
-| `reservedSpace` | The rule runs above it, and the sweep stops below it. |
-| `maxUsedSpace` | The ceiling a sweep brings the cache under. |
-| `minFreeSpace` | Disk headroom to leave. Unused here. |
+| `reservedSpace` | The rule runs when the cache is above this size, and the sweep stops below it. |
+| `maxUsedSpace` | The size that a sweep brings the cache under. |
+| `minFreeSpace` | The disk space to leave free. This policy does not set it. |
 
-A sweep leaves the cache **between 10 GB and 25 GB**, so a reading of 15 GB is the policy working. Read it with `docker buildx du`, or `docker system df` for one row.
+After a sweep, the cache is between 10 GB and 25 GB. A reading of 15 GB means the policy works. Read the size with `docker buildx du`, or with `docker system df` for a one-row total.
 
-The alternative is to set `builder.gc`'s `defaultReservedSpace`, `defaultMaxUsedSpace`, and `defaultMinFreeSpace`, and delete `policy`. That has no filters to malform, and Engine 29.6.0 and later compiles a correct three-type default.
+Instead of `policy`, you can set `defaultReservedSpace`, `defaultMaxUsedSpace`, and `defaultMinFreeSpace` under `builder.gc`. Those keys take no filters, so there is nothing to malform. On Engine 29.6.0 and later, the daemon builds a correct default policy for the three cache types from them.
+
+## Prove the policy parses
+
+A malformed policy collects nothing and shows no other sign. `docker buildx inspect` prints the rules without parsing them. After each edit to the policy:
+
+1. Inspect the builder:
+
+	```
+	docker buildx inspect desktop-linux
+	```
+
+2. Check that each rule's `Filters` line shows one predicate and no comma.
+3. Check that each rule with an age shows a `Keep Duration`.
+4. Wait for at least two GC ticks. Then search the VM's log:
+
+	```
+	grep "gc error" ~/Library/Containers/com.docker.docker/Data/log/vm/init.log
+	```
+
+5. Check that the search prints nothing. A policy that fails to parse logs one line on each tick:
+
+	```
+	gc error: filters: parse error: […]: unsupported operator "=": invalid argument
+	```
 
 ## On a `docker-container` builder
 
-A ceiling does not need one, because `maxUsedSpace` works in `daemon.json` on Engine 29.7.2, per rule and as a default. If you add one, select it with `--builder` on each build that wants it. A *selected* container builder leaves nothing in the local image store without `--load`. The image-contents suites (`apps/api/tests/images/image-probe.ts`, `apps/worker/tests/test_image.py`) pass `--load` only on a runner, where the builder can reach the runner's cache. On a laptop they run `docker build --quiet` and start a container from the printed id.
+You do not need a `docker-container` builder to set a ceiling. On Engine 29.7.2, `daemon.json` applies `maxUsedSpace` both per rule and as a default.
+
+If you add one, select it with `--builder` on each build that needs it. A build on a selected container builder leaves nothing in the local image store unless you pass `--load`. The image-contents suites, `apps/api/tests/images/image-probe.ts` and `apps/worker/tests/test_image.py`, pass `--load` only on a runner, where they read the runner's cache. On a laptop, they run `docker build --quiet` and start a container from the image id that it prints.
 
 ## The runner's cache
 
-The runner's cache is one tag, `buildcache`, in each image's GHCR package: `ghcr.io/<owner>/api:buildcache`, `…/worker:buildcache`, and `…/backup:buildcache`. `build.yml`'s image job writes it from each leg's one build, with `mode=max`, which keeps the builder stages' layers too, and `image-manifest=true`, which makes each write one OCI manifest with the config `application/vnd.buildkit.cacheconfig.v0`. Each leg writes only its own image's tag. Only a run on `refs/heads/main` writes the tag. Every other ref, a branch dispatch included, gets an empty `cache-to` and only reads. A dispatched branch runs its own copy of `build.yml`, so this rule stops an accidental write, not a deliberate one.
+The runner's cache is one tag, `buildcache`, in each image's GHCR package:
 
-**Why the registry and not the Actions cache.** Any workflow on `main` can write an Actions cache entry, because the cache service takes the runner's own token, not `GITHUB_TOKEN`, and no `permissions:` block limits it. The image job holds `packages: write`, `id-token: write`, and `attestations: write`, and ships what it restores, so it takes no Actions cache (zizmor's `cache-poisoning` audit, #441). Only a token with `packages: write` on a package moves its tag. Only the image job and the weekly deletion hold one, and the deletion pushes nothing.
+- `ghcr.io/<owner>/api:buildcache`
+- `ghcr.io/<owner>/worker:buildcache`
+- `ghcr.io/<owner>/backup:buildcache`
 
-**One writer, and the probes only read.** The readers are the image-contents suites in `check.yml`'s `full-images` leg. `apps/api/tests/images/image-probe.ts` builds `api` and `backup`, and `apps/worker/tests/test_image.py` builds `worker`. Each passes `--cache-from` and no `--cache-to`, and holds its own argv as a literal. The leg holds only `packages: read`, logs in to the private packages on ghcr.io with its own `GITHUB_TOKEN`, and passes the registry as `IMAGE_CACHE_REGISTRY`. A laptop names no registry and builds with the daemon. A registry tag has no ref scope, so read-only probes keep a pull request from deciding what `main`'s next build reads. The cost is that every pull request run carrying a layer change rebuilds that layer.
+### Who writes the tag
 
-**Reading needs the container builder.** Docker documents that the `docker` driver reads a registry cache only when the daemon keeps its images in containerd. The container builder comes from `docker/setup-buildx-action`. So `full-images` runs `setup-buildx`, and both suites refuse the `docker` driver.
+`build.yml`'s `image` job writes the tag from each leg's one build. Each leg writes only its own image's tag. The export uses two options:
 
-An unreadable cache is a warning. The build logs `importing cache manifest from …` with the error under it, and runs cold. A leg that loses the builder, the login, or `IMAGE_CACHE_REGISTRY` stays green. No test holds those steps to those legs, so only the leg's run time shows the loss.
+- `mode=max` keeps the layers of the builder stages as well as the final stage.
+- `image-manifest=true` makes each write one OCI manifest with the config `application/vnd.buildkit.cacheconfig.v0`.
 
-**The worker's source is its runtime stage's last copy.** BuildKit reruns every instruction below the first whose input moved, and a rerun `COPY` is a new blob even with the same bytes. Copied below the venv, the weights, and the suffix list, the source's layer is the only one an edit outside `redaction/` remakes. An edit inside `redaction/`, where the pins live, still refetches the weights. `apps/worker/tests/test_image.py` holds the order.
+Only a run on `refs/heads/main` writes the tag. On every other ref, including a dispatched branch, `cache-to` is empty and the build only reads. A dispatched branch runs its own copy of `build.yml`, so this rule stops an accidental write, not a deliberate one.
 
-**Two commits' runs can write one tag at once.** `build.yml`'s concurrency group is per commit, so several legs can export to `worker:buildcache` at once. Each built the same image, so the last write is right.
+A failed export only warns, so a cache that the registry refused does not stop the build.
 
-**An overwritten cache stays in the package.** Moving `buildcache` leaves the old manifest as an untagged version, with its layers, until the weekly cleanup deletes it. Every build adds its image, the attestation's two manifests, and a cache. Container registry storage is free, and GitHub has said it will give a month's notice before that changes. The old versions lengthen the version lists, but `scan.yml` picks by `sha-` tag and `release.yml` resolves a `sha-` tag directly, so neither reads a cache.
+### Why the cache is in the registry
 
-To check the caches, run:
+The `image` job holds `packages: write`, `id-token: write`, and `attestations: write`, and ships what it restores. Any workflow on `main` can write an Actions cache entry, because the cache service takes the runner's own token, not `GITHUB_TOKEN`, and no `permissions:` block limits it. So the `image` job restores no Actions cache. zizmor's `cache-poisoning` audit enforces this.
 
-```
-gh api --paginate 'orgs/{owner}/packages/container/worker/versions?per_page=100' \
-  --jq '.[] | select(.metadata.container.tags | index("buildcache")) | .updated_at'
-gh api repos/{owner}/{repo}/actions/cache/usage
-```
+A registry tag moves only for a token that holds `packages: write` on the package. Two jobs hold one: the `image` job and the weekly cleanup. The cleanup pushes nothing.
 
-The first command prints when a leg last wrote its tag. Name `api` or `backup` for the others. A probe that read the cache logs `importing cache manifest from ghcr.io/<owner>/<tier>:buildcache`, then `CACHED` against each reused layer. The second command reads the Actions cache, which still holds the pnpm store, uv's cache, and the detector's weights for `check.yml`.
+### Who reads the tag
+
+The readers are the image-contents suites in `check.yml`'s `full-images` leg:
+
+- `apps/api/tests/images/image-probe.ts` builds `api` and `backup`.
+- `apps/worker/tests/test_image.py` builds `worker`.
+
+Each suite passes `--cache-from` and no `--cache-to`, and holds its build argv as a literal. The leg holds only `packages: read`. It logs in to ghcr.io with its own `GITHUB_TOKEN`, because the packages are private, and passes the registry to the suites as `IMAGE_CACHE_REGISTRY`. On a laptop, `IMAGE_CACHE_REGISTRY` is unset and the suites build with the daemon.
+
+A registry tag has no ref scope. If a pull request could write the tag, it would decide which layers `main`'s next build reads and ships. Read-only probes prevent that. The cost is that each pull request run rebuilds every layer it changes.
+
+### Reading needs the container builder
+
+The `docker` driver reads a registry cache only when the daemon stores its images in containerd, and the runner's daemon does not. So `full-images` runs `docker/setup-buildx-action` to get a container builder. When `docker buildx inspect` reports the `docker` driver, or `IMAGE_CACHE_REGISTRY` is unset, both suites skip the cache and run `docker build --quiet`.
+
+### An unreadable cache only warns
+
+When the build cannot read the cache, it logs `importing cache manifest from …` with the error below that line, and builds without the cache. The leg stays green if it loses the builder, the login, or `IMAGE_CACHE_REGISTRY`. No test ties those steps to that leg. The only sign is a longer run time.
+
+### The worker's source is the last `COPY`
+
+BuildKit reruns every instruction below the first one whose input changed, and a rerun `COPY` makes a new blob even when the bytes are the same. In `apps/worker/Dockerfile`, `COPY src src` is the runtime stage's last copy, below the venv, the weights, and the suffix list. So an edit outside `redaction/` remakes only the source layer. An edit inside `redaction/`, which holds the pins, still fetches the weights again. `apps/worker/tests/test_image.py` checks this order.
+
+### Two commits can write one tag at once
+
+`build.yml`'s concurrency group is per commit, so runs for two commits on `main` can export to the same tag at the same time. The last write wins. Either cache is safe to read, because BuildKit keys each layer by its inputs and rebuilds any layer whose inputs differ.
+
+### An overwritten cache stays in the package
+
+When `buildcache` moves, the old manifest stays as an untagged version, with its layers, until the weekly cleanup deletes it. Each build adds an image, the attestation's two manifests, and a cache. GitHub does not charge for container registry storage. The old versions make the version lists longer. They do not affect a reader, because `scan.yml` picks a version by its `sha-` tag and `release.yml` resolves a `sha-` tag directly.
+
+## Check the runner's caches
+
+1. To see when a leg last wrote its tag, run:
+
+	```
+	gh api --paginate 'orgs/{owner}/packages/container/worker/versions?per_page=100' \
+	  --jq '.[] | select(.metadata.container.tags | index("buildcache")) | .updated_at'
+	```
+
+	Replace `worker` with `api` or `backup` to check the other packages.
+
+2. To see the Actions cache, run:
+
+	```
+	gh api repos/{owner}/{repo}/actions/cache/usage
+	```
+
+	The Actions cache holds the pnpm store, uv's cache, and the redaction detector's weights for `check.yml`.
+
+3. To confirm that a probe read the cache, search its log for `importing cache manifest from ghcr.io/<owner>/<tier>:buildcache`. Each reused layer shows `CACHED`.
 
 ## Deleting old cache manifests
 
-`.github/workflows/ghcr-cleanup.yml` runs `scripts/ghcr-cleanup.mjs` at 06:43 UTC every Sunday, after the nightly mutation run (02:17, about two and a half hours) and the scan (03:41), which draw on the same hourly API allowance. It reads the packages of the tiers in `build.yml`'s image matrix, as `scan.yml` does.
+`.github/workflows/ghcr-cleanup.yml` runs `scripts/ghcr-cleanup.mjs` at 06:43 UTC every Sunday. The nightly mutation run starts at 02:17 UTC and takes about two and a half hours, and the scan starts at 03:41 UTC. Both use the same hourly API allowance, so the cleanup starts after them. The cleanup reads the package of each tier in `build.yml`'s `image` matrix.
 
-It deletes a version only when all four hold:
+The cleanup deletes a version only when all four of these conditions are true:
 
 - The version has no tag.
 - Its manifest, read by digest and checked against that digest, is an OCI image manifest with the config `application/vnd.buildkit.cacheconfig.v0`, and names no subject.
-- It is more than 7 days old, by the later of its created and updated times.
-- It is not one of the package's three newest cache manifests, counting the one `buildcache` names.
+- It is more than 7 days old, measured from the later of its created and updated times.
+- It is not one of the package's three newest cache manifests. The manifest that `buildcache` names counts as one of the three.
 
-So it never deletes:
+So the cleanup never deletes these versions:
 
-- A tagged version: a `sha-` image, which `release.yml` and `scan.yml` read, a `sha256-` attestation index, or the manifest `buildcache` names.
-- An untagged attestation manifest, with the config `application/vnd.oci.empty.v1+json`. Each image's `sha256-<digest>` index names one, and deleting it would lose that image's provenance.
+- A tagged version. That is a `sha-` image, which `release.yml` and `scan.yml` read, a `sha256-` attestation index, or the manifest that `buildcache` names.
+- An untagged attestation manifest, with the config `application/vnd.oci.empty.v1+json`. Each image's `sha256-<digest>` index names one, and its deletion would lose that image's provenance.
 - An untagged image, left when a tag moved off it.
-- A manifest it cannot read, or whose body does not hash to its digest. The summary counts these.
+- A manifest that it cannot read, or whose body does not hash to its digest. The summary counts these.
 
-Before deleting, it lists the package again and drops any version that gained a tag or changed. It deletes oldest first, with a two-second pause before each delete. It stops at 400 deletes, or when fewer than 200 requests are left in the token's hour, and the next week's run takes the rest.
+Before it deletes, the cleanup lists the package again and drops each selected version that gained a tag or changed. It deletes the oldest version first and pauses for two seconds before each delete. It stops after 400 deletes, or when fewer than 200 requests remain in the token's hourly allowance. The next week's run deletes the rest.
 
-The job summary gives each package's versions seen, selected, and deleted, and why each kept version was kept. The packages API gives no sizes, so the summary's bytes freed counts the blobs a deleted manifest names that no kept cache names. That is a ceiling, because an image can share a blob with a cache.
+For each package, the job summary gives the number of versions seen, selected, and deleted, and the reason each kept version was kept. The packages API reports no sizes. The summary's "bytes freed" adds up the blobs that a deleted manifest names and that no kept cache names. That figure is a ceiling, because an image can share a blob with a cache.
 
-**Deleting takes the Admin role.** `GITHUB_TOKEN` with `packages: write` deletes a version only when the repository holds the Admin role on the package. GitHub gives that role to the repository whose workflow first published the package, and `build.yml` first published all three on 03/09/2026. If GitHub refuses a delete (HTTP 403), the job fails and names the package and the setting. To fix it, give this repository the Admin role under *Manage Actions access* in the package's settings.
+## Run the cleanup as a dry run
 
-**A dry run.** In Actions, open *ghcr-cleanup* and run it on `main`. The `dry-run` box is ticked by default. From a terminal, run:
+A dry run lists, reads, and selects versions as the scheduled run does, but sends no delete. Its summary lists what a real run would delete. A dry run cannot show whether GitHub would refuse a delete. Only the schedule, or a dispatch with `dry-run` cleared, deletes.
+
+To start a dry run in Actions, open **ghcr-cleanup** and run it on `main`. The **dry-run** box is selected by default.
+
+To start a dry run from a terminal, run:
 
 ```
 gh workflow run ghcr-cleanup.yml --ref main -f dry-run=true
 ```
 
-A dry run lists, reads, and selects as the scheduled run does, sends no delete, and its summary says what would go. It cannot show whether a delete would be refused. Only the schedule, or a dispatch with `dry-run` unticked, deletes.
+## Fix a refused delete
+
+The cleanup's `GITHUB_TOKEN` holds `packages: write`. That token deletes a version only when the repository holds the Admin role on the package. GitHub gives that role to the repository whose workflow first published the package, and `build.yml` first published all three. If GitHub refuses a delete with HTTP 403, the job fails and names the package and the setting.
+
+To fix a refused delete:
+
+1. Open the package's settings.
+2. If the package inherits its access from the repository, turn that off.
+3. Under **Manage Actions access**, give this repository the Admin role.
