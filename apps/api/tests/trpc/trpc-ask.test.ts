@@ -366,7 +366,9 @@ describe("ask over tRPC", () => {
 
     await streamed(web, { question: QUESTION });
 
-    expect(JSON.stringify(app().logs.slice(before))).not.toContain("the transaction has settled");
+    expect(JSON.stringify(app().logs.slice(before))).not.toContain(
+      "query sent after its transaction committed or rolled back",
+    );
   });
 });
 

@@ -94,9 +94,7 @@ const UNREADABLE = `SELECT connected_source_id, id, title, unreadable_reason FRO
       WHERE workspace_id = $1 AND outcome = $2 AND unreadable_reason IS NOT NULL
       ORDER BY connected_source_id, title, id`;
 
-const UNREADABLE_CONNECTED_SOURCE = new Error(
-  "a connected source's row is not the shape its table admits",
-);
+const UNREADABLE_CONNECTED_SOURCE = new Error("a connected_source row does not parse");
 
 const stateOf = (publishedAt: Date | null, lastSync: SubjectRun | null): ConnectedSourceState => {
   if (publishedAt !== null) return CONNECTED_SOURCE_PUBLISHED_STATE;

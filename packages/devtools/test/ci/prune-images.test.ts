@@ -160,7 +160,7 @@ describe("the nightly image prune", () => {
 
     expect(await prune(on)).toEqual({
       code: 0,
-      out: "2026-10-22T01:30:00Z prune-images: skipped: a Coolify deployment is running, so its images may not be in use yet\n",
+      out: "2026-10-22T01:30:00Z prune-images: skipped: a Coolify deployment is running, and the images it pulled may not be in a container yet. The next run prunes.\n",
       err: "",
     });
     expect(removed(on)).toBe("");

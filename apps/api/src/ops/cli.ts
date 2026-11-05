@@ -79,7 +79,7 @@ export const flagValue = (flags: Flags, name: string): string | undefined => {
 export const bundleStore = (doors: Doors, purpose: string): Result<GitDoor, string> =>
   doorTold(
     doors.git,
-    `no repositories' root is configured (GIT_STORE_DIR), so ${purpose}; the estate sets it to /data/git on the api service`,
+    `GIT_STORE_DIR is not set, so ${purpose}. Set it to /data/git on the api service.`,
   );
 
 export const reasonOf = (reason: string | Error): string =>

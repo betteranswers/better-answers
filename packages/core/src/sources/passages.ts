@@ -82,7 +82,7 @@ export const passageAt = async (
       const points = Array.from(row.content).length;
       if (points !== row.char_end - row.char_start) {
         throw new Error(
-          `the passage row at ${locatorOf(sourceDocumentId, row.char_start, row.char_end)} holds ${String(points)} code points`,
+          `the passage row at ${locatorOf(sourceDocumentId, row.char_start, row.char_end)} holds ${String(points)} code points, but its span is ${String(row.char_end - row.char_start)}`,
         );
       }
       return { ...row, sensitivity: PASSAGE_SENSITIVITY.parse(row.sensitivity) };
@@ -183,7 +183,10 @@ const LINE_END = String.raw`(?:\r\n|[\n\r\v\f\u0085\u2028\u2029])`;
 
 const BLANK_AND_HEADING_ONLY_LINES_AHEAD = String.raw`^(?:${SPACE_WITHIN_A_LINE}*(?:#{1,6})?${SPACE_WITHIN_A_LINE}*${LINE_END})+`;
 
-/** Over the page alone: in the matching query, Postgres would cut every matched row's text before its sort. */
+/**
+ * Applied to the page only. In the matching query, Postgres would cut the text of every matched row
+ * before sorting.
+ */
 const withOpenings = (
   rows: string,
 ): string => `SELECT found.source_document_id, found.char_start, found.char_end, found.sensitivity,

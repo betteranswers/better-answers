@@ -145,10 +145,10 @@ const isDeclared = (map: OwnershipMap, { table, slice, reads }: SliceRead): bool
 const refusalOf = (map: OwnershipMap, { file, line, table, slice, reads }: SliceRead): string => {
   const where = `${file}:${String(line)}`;
   if (slice === undefined) {
-    return `${where}: names ${table} outside every slice the map can name; move the statement into the slice that needs it.`;
+    return `${where}: names ${table} from a file that belongs to no slice. Move the statement into the slice that needs the table.`;
   }
   const declared = reads ? "declares no read" : "declares no access";
-  return `${where}: ${slice} names ${table}, which ${String(map.TABLE_OWNERS[table])} owns, and ${WHERE_THE_MAP_LIVES} ${declared} by ${slice}; read it through its owner's face, or give it an entry with its reason in CROSS_OWNER_TABLE_ACCESS.`;
+  return `${where}: ${slice} names ${table}, which ${String(map.TABLE_OWNERS[table])} owns, and ${WHERE_THE_MAP_LIVES} ${declared} by ${slice}. Read the table through its owner's face, or add an entry with a reason to CROSS_OWNER_TABLE_ACCESS.`;
 };
 
 export const undeclaredIn = (map: OwnershipMap, reads: readonly SliceRead[]): readonly string[] =>
@@ -165,5 +165,5 @@ export const unreadIn = (map: OwnershipMap, reads: readonly SliceRead[]): readon
     )
     .map(
       ({ table, by }) =>
-        `${WHERE_THE_MAP_LIVES}: declares that ${by} reads ${table}, and no statement under ${by} reads it; remove the entry, or correct its access to a write if the slice only writes it.`,
+        `${WHERE_THE_MAP_LIVES}: CROSS_OWNER_TABLE_ACCESS declares that ${by} reads ${table}, but no statement under ${by} reads it. Remove the entry, or set its access to "write" if the slice only writes the table.`,
     );

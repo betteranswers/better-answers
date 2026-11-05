@@ -582,7 +582,7 @@ describe("the decision shape", () => {
           seconds: 0,
           request_id: "8f1e2d3c4b5a6978-LHR",
         },
-        message: "llm: a model call's attempt",
+        message: "llm: model call attempted",
       },
     ]);
   });
@@ -617,7 +617,7 @@ describe("a decision model's context window in bytes", () => {
           seconds: 0,
           request_id: null,
         },
-        message: "llm: a model call never sent",
+        message: "llm: model call not sent",
       },
     ]);
   });
@@ -945,7 +945,7 @@ describe("what a model call logs", () => {
           seconds: 0,
           request_id: null,
         },
-        message: "llm: a model call's attempt",
+        message: "llm: model call attempted",
       },
       {
         line: {
@@ -958,7 +958,7 @@ describe("what a model call logs", () => {
           seconds: 0,
           request_id: "req_018EeWyXxfu5pfWkrYcMdjWG",
         },
-        message: "llm: a model call's attempt",
+        message: "llm: model call attempted",
       },
     ]);
   });

@@ -66,7 +66,8 @@ const stampLastActive = async (
       await tx.query(STAMP, [workspaceId, userId]);
     });
   } catch {
-    // The request is already answered, and the next one past the hour stamps again.
+    // The stamp is best effort: this request is already served, and the next request after the hour
+    // stamps again.
   }
 };
 

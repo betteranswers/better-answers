@@ -10,13 +10,13 @@ on:
         type: boolean
         default: false
       ceiling-minutes:
-        description: "Minutes before each shard is cancelled, its checkpoint kept; empty is 180, and 350 at most, since a hosted job is terminated at 360"
+        description: "Minutes before each shard is cancelled; its checkpoint is kept. Defaults to 180. The maximum is 350, because GitHub ends a hosted job at 360."
         type: number
       shards:
-        description: "The shards to run, as leg-number pairs with commas and no spaces, such as core-1,api-2; empty runs every shard, and a shard not named keeps its files' previous results"
+        description: "The shards to run, as leg-number pairs separated by commas with no spaces, such as core-1,api-2. Leave empty to run every shard. A shard that is not named keeps its files' previous results."
         type: string
 
-# Overlapping runs would each start from the same checkpoint, and the later upload, however poorer, would win.
+# Overlapping runs would start from the same checkpoint, and the later upload would win even if it holds fewer results.
 concurrency:
   group: mutation-${{ github.ref }}
   cancel-in-progress: false
@@ -29,14 +29,14 @@ jobs:
   stryker:
     name: stryker (${{ matrix.name }} ${{ matrix.shard }} of ${{ matrix.of }})
     runs-on: ubuntu-26.04
-    # A dispatch hands its inputs over as strings, and the timeout refuses anything but a number.
+    # A dispatch passes its inputs as strings, and timeout-minutes accepts only a number.
     timeout-minutes: ${{ fromJSON(inputs.ceiling-minutes || '180') }}
-    # A job's `if` cannot read the matrix, so a shard a dispatch did not name skips every step.
+    # A job's `if` cannot read the matrix, so every step checks SELECTED, and a shard the dispatch did not name skips them all.
     env:
       SELECTED: ${{ !inputs.shards || contains(format(',{0},', inputs.shards), format(',{0}-{1},', matrix.name, matrix.shard)) }}
     strategy:
       fail-fast: false
-      # The plan runs 20 jobs at once; this matrix leaves room for a run of check.yml, and mutation-baseline.test.ts counts that run's jobs.
+      # The plan allows 20 concurrent jobs. This limit leaves room for a run of check.yml, whose jobs mutation-baseline.test.ts counts.
       max-parallel: 6
       matrix:
         include:
@@ -66,8 +66,8 @@ jobs:
           - { name: core, path: packages/core, shard: 19, of: 20 }
           - { name: core, path: packages/core, shard: 20, of: 20 }
     steps:
-      # A shard named wrongly would run nothing, and the run would come back green having tested nothing.
-      - name: the shards the dispatch names
+      # A misnamed shard would run nothing, and the run would pass without testing anything.
+      - name: Check the shards the dispatch names
         if: inputs.shards
         env:
           SHARDS: ${{ inputs.shards }}
@@ -77,11 +77,11 @@ jobs:
           IFS=, read -ra named <<<"${SHARDS}"
           for shard in "${named[@]}"; do
             if [[ ! "${shard}" =~ ^(api|core)-([1-9][0-9]*)$ ]]; then
-              echo "::error::${shard} names no shard: a leg, a hyphen and a number, with commas and no spaces between, as core-1,api-2"
+              echo "::error::${shard} is not a shard name. Use a leg, a hyphen and a number, separated by commas with no spaces, for example core-1,api-2."
               exit 1
             fi
             if [[ "${BASH_REMATCH[1]}" == "${LEG}" && "${BASH_REMATCH[2]}" -gt "${OF}" ]]; then
-              echo "::error::${shard} is past the ${OF} shards of ${LEG}"
+              echo "::error::${shard} does not exist: ${LEG} has ${OF} shards."
               exit 1
             fi
           done
@@ -113,15 +113,15 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      # The whole leg's results, not this shard's: a file the slicing moves to another shard keeps them.
-      - name: the previous run's mutant results
+      # Restores the whole leg's results, not only this shard's, so a file that moves to another shard keeps its results.
+      - name: Restore the previous run's mutant results
         if: env.SELECTED == 'true'
         uses: ./.github/actions/mutation-baseline
         with:
           leg: ${{ matrix.name }}
           reports: ${{ matrix.path }}/reports/mutation
-      # `exec` leaves one process from the step down, so cancellation reaches Stryker.
-      - name: mutation
+      # `exec` replaces the shell with Stryker, so a cancellation signal reaches Stryker.
+      - name: Run Stryker on this shard
         if: env.SELECTED == 'true'
         working-directory: ${{ matrix.path }}
         env:
@@ -132,8 +132,8 @@ jobs:
           slice="$(node ../../scripts/mutation-shards.mjs slice --leg "${LEG}" --shard "${SHARD}" --of "${OF}" \
             --baseline reports/mutation/baseline.json)"
           exec node_modules/.bin/stryker run --mutate "${slice}" ${{ inputs.force && '--force' || '' }}
-      # Named for the shard, so the leg's summary gathers every shard into one directory.
-      - name: this shard's mutant results, whether or not it finished
+      # Named after the shard, so the leg's summary job can gather every shard into one directory.
+      - name: Collect this shard's mutant results, whether or not it finished
         if: always() && env.SELECTED == 'true'
         env:
           REPORTS: ${{ matrix.path }}/reports/mutation
@@ -153,13 +153,13 @@ jobs:
           name: stryker-shard-${{ matrix.name }}-${{ matrix.shard }}
           path: ${{ runner.temp }}/shard/
           retention-days: 1
-          # A re-run keeps the run id, so its first attempt's artifact may already hold this name.
+          # A re-run keeps the run id, so an artifact from the first attempt may already have this name.
           overwrite: true
 
   summary:
     name: summary (${{ matrix.name }})
     needs: stryker
-    # A shard cut at its ceiling still left a checkpoint, and the leg's results must carry it forward.
+    # A shard cancelled at its ceiling still leaves a checkpoint, and the leg's results must carry it forward.
     if: always()
     runs-on: ubuntu-26.04
     timeout-minutes: 20
@@ -179,7 +179,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: the previous run's mutant results
+      - name: Restore the previous run's mutant results
         uses: ./.github/actions/mutation-baseline
         with:
           leg: ${{ matrix.name }}
@@ -190,7 +190,7 @@ jobs:
           path: ${{ runner.temp }}/shards
           merge-multiple: true
       - id: merge
-        name: the shards' results, merged into the leg's
+        name: Merge the shards' results into the leg's
         env:
           LEG: ${{ matrix.name }}
           OF: ${{ matrix.of }}
@@ -199,8 +199,8 @@ jobs:
             --shards "${RUNNER_TEMP}/shards" \
             --baseline "${RUNNER_TEMP}/baseline/baseline.json" \
             --out "${RUNNER_TEMP}/merged" >> "${GITHUB_STEP_SUMMARY}"
-      # Red when the runner ran no test for a mutant or killed none: a broken harness, never a score.
-      - name: score and new survivors to the job summary
+      # Fails when the runner ran no test for a mutant or killed none: that is a broken runner, not a low score.
+      - name: Write the score and new survivors to the job summary
         env:
           LEG: ${{ matrix.name }}
         run: |
@@ -208,8 +208,8 @@ jobs:
             --report "${RUNNER_TEMP}/merged/mutation.json" \
             --checkpoint "${RUNNER_TEMP}/merged/stryker-incremental.json" \
             --baseline "${RUNNER_TEMP}/baseline/baseline.json" >> "${GITHUB_STEP_SUMMARY}"
-      # Not after a failed merge, which would upload nothing better than what the restore read.
-      - name: the leg's mutant results, for the next run to start from
+      # Skipped after a failed merge, which would upload nothing newer than what the restore read.
+      - name: Upload the leg's mutant results for the next run
         if: always() && steps.merge.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

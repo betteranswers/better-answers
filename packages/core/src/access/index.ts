@@ -104,7 +104,8 @@ const VISIBILITY_FIELDS = boundarySchemas.conceptIndex.select.pick({
   audienceGroups: true,
 });
 
-const AUDIENCE_DISAGREES = "a readable unit's audience word and its group list disagree";
+const AUDIENCE_DISAGREES =
+  "audience and audience_groups disagree: a group audience needs a non-empty group list, and any other audience needs none";
 
 export type VisibilityFields = z.output<typeof VISIBILITY_FIELDS>;
 

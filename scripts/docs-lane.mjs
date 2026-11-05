@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 
 const isMarkdown = (changed) => changed.endsWith(".md");
 
-/** Unsure means `full`: wrong that way costs minutes; the other way ships a tree no gate read. */
+/** Defaults to `full`: a needless full lane costs minutes, but a wrong docs lane merges code that no gate checked. */
 const laneOf = (paths) => (paths.length > 0 && paths.every(isMarkdown) ? "docs" : "full");
 
-/** Source the Dockerfiles copy is left out, because build.yml probes every image it pushes. */
+/** Omits source files that the Dockerfiles copy, because build.yml probes every image it pushes. */
 const IMAGE_INPUTS = [
   ".dockerignore",
   ".node-version",
@@ -40,10 +40,10 @@ const isAnImageInput = (changed) =>
     input.endsWith("/") ? changed.startsWith(input) : changed === input,
   );
 
-/** Unsure means `yes`: a probe run needlessly costs minutes; one skipped ships an image unread. */
+/** Defaults to `yes`: a needless probe costs minutes, but a skipped probe ships an untested image. */
 const imagesOf = (paths) => (paths.length === 0 || paths.some(isAnImageInput) ? "yes" : "no");
 
-/** One separator, never both: a NUL stream split on newlines too reads one path as two. */
+/** Splits on NUL or newline, never both: splitting a NUL stream on newlines too can turn one path into two. */
 const changedPaths = (raw) =>
   raw.split(raw.includes("\0") ? "\0" : "\n").filter((changed) => changed.length > 0);
 

@@ -11,8 +11,8 @@ export type Tx = Pick<pg.PoolClient, "query">;
 export type TxRow = pg.QueryResultRow;
 
 /**
- * Those of `names` that `information_schema.tables` lists in `public`, in no set order: a view
- * counts, a table the role holds no privilege on does not.
+ * The entries of `names` that `information_schema.tables` lists in `public`, in any order. A view
+ * counts. A table the role has no privilege on does not.
  */
 export const tablesPresent = async (
   door: PostgresDoor,

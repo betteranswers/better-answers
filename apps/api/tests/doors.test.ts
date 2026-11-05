@@ -49,7 +49,7 @@ describe("the api's composition root", () => {
 
     expect(doors.git).toEqual({
       ok: false,
-      error: `the repositories' root is no-such-root (GIT_STORE_DIR=${missing})`,
+      error: `GIT_STORE_DIR ${missing} cannot be opened: no-such-root`,
     });
     expect(doors.postgres.pool).toBe(app().database.pool);
   });
@@ -62,7 +62,7 @@ describe("the api's composition root", () => {
 
     expect(doors.objects).toEqual({
       ok: false,
-      error: "the object store is no-bucket (S3_ENDPOINT=http://127.0.0.1:1)",
+      error: "the object store at S3_ENDPOINT http://127.0.0.1:1 cannot be opened: no-bucket",
     });
   });
 

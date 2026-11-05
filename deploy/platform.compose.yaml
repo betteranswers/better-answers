@@ -14,9 +14,9 @@ x-mem-512: &mem512
 x-bootstrap: &bootstrap
   DATABASE_URL: ${DATABASE_URL:?}
   S3_ENDPOINT: http://objectstore:3900
-  # garage.toml fixes the same word: an S3 client signing for another region is refused.
+  # garage.toml sets the same region: Garage refuses a client that signs for another region.
   S3_REGION: garage
-  S3_BUCKET: ${S3_BUCKET:?the platform's bucket — wizard-41.sh § Garage creates it}
+  S3_BUCKET: ${S3_BUCKET:?set it to the platform's bucket, which the Garage stage of wizard-41.sh creates}
   S3_ACCESS_KEY: ${OBJECTSTORE_ROOT_KEY:?}
   S3_SECRET_KEY: ${OBJECTSTORE_ROOT_SECRET:?}
   EMBEDDINGS_URL: ${EMBEDDINGS_URL:-}
@@ -30,8 +30,8 @@ services:
     restart: "no"
     environment:
       <<: *bootstrap
-      # The owner DSN, migrate's alone: the runtime role the api connects as cannot run DDL.
-      DATABASE_URL: ${MIGRATE_DATABASE_URL:?the owner DSN — migrate's alone}
+      # The owner DSN, used only by migrate: the api's runtime role cannot run DDL.
+      DATABASE_URL: ${MIGRATE_DATABASE_URL:?set it to the owner DSN, which only migrate uses}
     labels: { coolify.exclude_from_hc: "true" }
     <<: [*logging, *mem512]
 
@@ -43,7 +43,7 @@ services:
     stop_grace_period: 30s
     environment:
       <<: *bootstrap
-      # /health names it: the build being replaced answers healthy until the swap, and only this tells them apart.
+      # /health reports this digest. The old build answers healthy until the swap, and only the digest tells the two apart.
       API_IMAGE_DIGEST: ${API_IMAGE_DIGEST:?}
       NODE_ENV: production
       PORT: "3000"
@@ -57,9 +57,9 @@ services:
       AGENT_MAX_FILE_BYTES: "104857600"
       HEALTHCHECKS_PING_URL_SCHEDULER: ${HEALTHCHECKS_PING_URL_SCHEDULER:?}
       HEALTHCHECKS_PING_URL_SWEEPS: ${HEALTHCHECKS_PING_URL_SWEEPS:?}
-      # `remove` waits for an operator, since a wrong join deletes live bytes for good. RUNBOOK.md § The daily sweeps names the day.
+      # `remove` stays a manual choice, because a wrong join deletes live data for good. RUNBOOK.md, The daily sweeps, says when to switch.
       UPLOAD_SWEEP: ${UPLOAD_SWEEP:-list}
-    # A healthcheck declared here replaces the image's outright, so its own is repeated.
+    # A healthcheck declared here replaces the image's, so the image's check is repeated here.
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 10s
@@ -84,7 +84,7 @@ services:
       HF_HOME: /data/worker/hf-cache
       HF_HUB_OFFLINE: "1"
       TLDEXTRACT_CACHE: /data/worker/tldextract-cache
-      # The engine calls a tracking host per sync otherwise, and nothing needs it.
+      # Otherwise the engine calls a tracking host on every sync, which nothing needs.
       COCOINDEX_DISABLE_USAGE_TRACKING: "1"
       MAX_CONCURRENT_RUNS: "1"
       LMDB_MAX_BYTES_PER_CONNECTED_SOURCE: "4294967296"
@@ -102,10 +102,10 @@ services:
     volumes:
       - /data/worker/lmdb:/data/worker/lmdb
       - /data/worker/trees:/data/worker/trees
-      # Nothing for HF_HOME or the suffix cache: a mount would mask the baked-in weights.
+      # No mount for HF_HOME or the suffix cache: a mount would hide the weights built into the image.
       - /data/git:/data/git:ro
     deploy:
       resources:
         limits: { memory: 1536m }
-    # Explicit, not implied: an index may spill 1.5 GB to the host's swap file.
+    # Set explicitly: an index job may spill 1.5 GB to the host's swap file.
     memswap_limit: 3072m

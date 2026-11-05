@@ -194,7 +194,9 @@ const exportNamed = (reading: Reading, statement: ExportNamedDeclaration): void 
 };
 
 const unread = (file: string, form: string): never => {
-  throw new Error(`${file} has ${form}, which the face reader does not follow`);
+  throw new Error(
+    `${file} has ${form}, which the face-admission scan cannot follow. Use named exports instead.`,
+  );
 };
 
 const exportWhole = (reading: Reading, statement: ExportAllDeclaration): void => {
@@ -254,7 +256,10 @@ export const facesAdmittingNobody = (
     const known = read.get(file);
     if (known !== undefined) return known;
     const source = sources[file];
-    if (source === undefined) throw new Error(`${file} is exported from and is not a source`);
+    if (source === undefined)
+      throw new Error(
+        `${file} is re-exported by a face, but it is not among the sources the scan read`,
+      );
 
     const { own, named, whole } = moduleOf(file, source);
     const found = new Map(own);

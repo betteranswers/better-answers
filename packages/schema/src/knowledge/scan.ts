@@ -1,5 +1,7 @@
-/** The next position at or after each index whose character `stops` holds, `-1` where
- * there is none. */
+/**
+ * For each index, the next position at or after it whose character is in `stops`, or `-1` if there
+ * is none.
+ */
 const nextStopsOf = (text: string, stops: (ch: string) => boolean): Int32Array => {
   const next = new Int32Array(text.length + 1);
   next[text.length] = -1;
@@ -38,7 +40,7 @@ const colonAfter = (text: string, at: number): number | undefined => {
   return text[scheme] === ":" ? scheme : undefined;
 };
 
-/** Where the autolink starting at `at` closes, or `undefined` when it is none. */
+/** Where the autolink starting at `at` closes, or `undefined` when no autolink starts there. */
 export const autolinkClosesAt = (
   text: string,
   at: number,

@@ -271,7 +271,7 @@ const liveGeneration = async (workspaceId: string, tx: Tx): Promise<number> => {
   );
 
   const liveGen = row.rows[0]?.live_gen;
-  if (liveGen === undefined) throw new Error("the live generation could not be read");
+  if (liveGen === undefined) throw new Error("map: the map_generation upsert returned no live_gen");
   return liveGen;
 };
 

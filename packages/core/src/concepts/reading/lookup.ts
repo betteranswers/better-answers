@@ -243,7 +243,7 @@ export const corpusCountsOf = (
       [...parameters, ...words.rows.map(({ word }) => word)],
     );
     const [counts] = counted.rows;
-    if (counts === undefined) throw new Error("a count answered no row");
+    if (counts === undefined) throw new Error("the count query returned no row");
     return counts;
   });
 

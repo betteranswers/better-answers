@@ -184,8 +184,8 @@ const recordExport = async (
 };
 
 /**
- * Reads holding no row, so no other Admin's action waits on the export, then records it in a short
- * transaction, answering once that committed.
+ * Reads without locking rows, so no other Admin's action waits on the export. Then records the
+ * export in a short transaction and returns once committed.
  */
 export const exportAuditLog = async (
   principal: UserPrincipal,

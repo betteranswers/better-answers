@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage: jdocmunch-watch-cap.sh [--check]
-# watch-install rewrites the plist without the cap. The cap binds the index files too, so it sits far above the largest.
+# watch-install rewrites the plist without the cap. The cap also limits the index files, so it is far above the largest one.
 CAP=1073741824
 PLIST="${JDOCMUNCH_WATCH_PLIST:-$HOME/Library/LaunchAgents/us.gravelle.jdocmunch-watch.plist}"
 DOMAIN="gui/$(id -u)"

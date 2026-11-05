@@ -104,7 +104,7 @@ const limitCodesByEmail = (door: PostgresDoor, clock: Clock): MiddlewareHandler 
     if (!throttle.allowed) {
       return tooManyRequests(
         throttle.retryAfterSeconds,
-        "Too many codes requested for this address; try again later.",
+        "Too many codes requested for this address. Try again later.",
       );
     }
     await next();
@@ -194,7 +194,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
       attempt(() =>
         auth.api.oauth2Consent({
           headers,
-          // The provider's authorize step reads the request itself, so a server call names one.
+          // The provider's authorize step reads the request itself, so a server call must pass one.
           request: new Request(`${publicUrl}${LIBRARY_CONSENT_PATH}`, { method: "POST", headers }),
           body: { accept, oauth_query: oauthQuery(context.req.url) },
           asResponse: true,
@@ -307,7 +307,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     }
     deps.logger.warn(
       { event: "auth.consent_failed", ...(await failureOf(decided)) },
-      "consent could not be completed",
+      "consent failed",
     );
     return context.html(refusedPage(REFUSAL_PAGES.notCompleted), 400);
   });

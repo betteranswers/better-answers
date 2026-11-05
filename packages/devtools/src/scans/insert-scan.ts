@@ -43,4 +43,4 @@ export const rawInsertsIn = (file: string, source: string): readonly RawInsert[]
     .flatMap((text, index) => (RAW_INSERT.test(text) ? [{ file, line: index + 1 }] : []));
 
 export const reportOf = (found: RawInsert): string =>
-  `${found.file}:${String(found.line)}: a raw \`INSERT\` outside a factory module; move it into one of the modules ${WHERE_THE_LIST_LIVES} names.`;
+  `${found.file}:${String(found.line)}: raw \`INSERT\` outside a factory module. Tests write rows only through factory modules, so move this insert into one of the modules in FACTORY_MODULES in ${WHERE_THE_LIST_LIVES}.`;

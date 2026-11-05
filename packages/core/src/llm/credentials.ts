@@ -71,7 +71,7 @@ const keyHeldFor = (
 const envelopeKeyHeld = (envelopeKey: Uint8Array): Uint8Array => {
   if (envelopeKey.length !== ENVELOPE_KEY_BYTES) {
     throw new Error(
-      `credentials: an envelope key is ${String(ENVELOPE_KEY_BYTES)} bytes, not ${String(envelopeKey.length)}`,
+      `credentials: the envelope key is ${String(envelopeKey.length)} bytes, but it must be ${String(ENVELOPE_KEY_BYTES)}`,
     );
   }
   return envelopeKey;
@@ -94,9 +94,7 @@ const keyOpened = (
   return key === undefined ? err("envelope-not-authentic") : ok({ reveal: () => key });
 };
 
-/**
- * @throws when `envelopeKey` is not the envelope's length, naming no byte of it.
- */
+/** @throws when `envelopeKey` has the wrong length. The message includes no byte of the key. */
 export const openCredentials = (envelopeKey: Uint8Array): Credentials => {
   const opener = envelopeKeyHeld(envelopeKey);
   return {
@@ -104,7 +102,7 @@ export const openCredentials = (envelopeKey: Uint8Array): Credentials => {
       const found = await tx.query<KeyOfTheScope>(KEY_OF_THE_SCOPE, [provider]);
       const workspaceId = found.rows[0]?.workspaceId ?? null;
       if (workspaceId === null) {
-        throw new Error("credentials: a model key is read inside its workspace's transaction");
+        throw new Error("credentials: model key read outside a workspace's transaction");
       }
       const sealed = found.rows[0]?.sealed ?? null;
       if (sealed === null) return ok(undefined);

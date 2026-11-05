@@ -119,16 +119,16 @@ export const isNamedKind = (
 };
 
 const strayReport = (folder: string): string =>
-  `${folder}: mirrors no source folder and is not a kind folder. Move its files to the folder of the entry they drive, or add a row to PINS in ${WHERE_THE_PINS_LIVE} with the kind and the reason.`;
+  `${folder} mirrors no source folder and is not a helper, gates or pinned folder. Move its files into the folder that mirrors the source they test, or add a row for it to PINS in ${WHERE_THE_PINS_LIVE} with its kind and reason.`;
 
 export const treeOf = (pin: Pin): string => pin.reason.split(": ")[0] ?? pin.reason;
 
 const staleReport = (pin: Pin, files: readonly string[]): string | undefined => {
   if (!files.some((file) => holds(pin.folder, file))) {
-    return `${pin.folder}: its row in ${WHERE_THE_PINS_LIVE} is stale, since the folder holds no tracked file. Delete the row.`;
+    return `${pin.folder} has no tracked files, so its row in PINS in ${WHERE_THE_PINS_LIVE} is not needed. Delete the row.`;
   }
   if (pin.kind !== "run" && !files.some((file) => holds(treeOf(pin), file))) {
-    return `${pin.folder}: its row names ${treeOf(pin)}, which holds no tracked file. Point the row at the tree it mirrors, or move the tests into their mirror folder and delete the row.`;
+    return `${pin.folder} has a PINS row that names ${treeOf(pin)}, but ${treeOf(pin)} has no tracked files. Change the row to name the tree the folder mirrors, or move the tests into the folder that mirrors their source and delete the row.`;
   }
   return undefined;
 };

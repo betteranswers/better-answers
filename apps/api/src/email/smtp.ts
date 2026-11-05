@@ -6,8 +6,8 @@ import { normalizeError } from "@better-answers/core/kernel";
 import type { EmailSender } from "./email.ts";
 
 /**
- * Resend's ten a second binds SMTP too, per team and with Coolify's alerts; a window's edge can
- * pass twice this.
+ * Resend allows ten emails a second per team, over SMTP too, shared with Coolify's alerts. A rate
+ * window's edge can let through twice this.
  */
 export const EMAILS_PER_SECOND = 5;
 

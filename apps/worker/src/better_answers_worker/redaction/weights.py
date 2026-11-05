@@ -31,7 +31,8 @@ def carried_repositories() -> tuple[Path, ...]:
         encoder = declared[_ENCODER_KEY]
         if not isinstance(encoder, str):
             raise TypeError(
-                f"{model_id} names no {_ENCODER_KEY} to fetch its tokenizer from"
+                f"{_ENCODER_DECLARATION} of {model_id} has no string {_ENCODER_KEY},"
+                " so the encoder whose tokenizer the image needs is unknown"
             )
         found[encoder] = Path(
             snapshot_download(encoder, local_files_only=True)

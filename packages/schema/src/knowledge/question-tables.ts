@@ -108,7 +108,9 @@ export const questionContent = withRLS(
   {
     workspaceId: text("workspace_id").notNull(),
     recordId: text("record_id").notNull(),
-    /** The record's own `asked_at`, repeated because a partition key sits on the row. */
+    /**
+     * A copy of the record's `asked_at`, because the partition key must be a column of this row.
+     */
     askedAt: stamp("asked_at").notNull(),
 
     question: text("question").notNull(),

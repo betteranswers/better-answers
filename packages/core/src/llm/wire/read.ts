@@ -18,7 +18,10 @@ export type WireRead<Said> =
   | { readonly read: "unavailable" }
   | { readonly read: "failed" };
 
-/** `text` read as JSON of `shape`, or `undefined`: a parse error quotes the text, so none leaves. */
+/**
+ * `text` parsed as JSON of `shape`, or `undefined`. A parse error quotes the text, so the error is
+ * dropped, not returned.
+ */
 export const jsonAs = <T>(shape: z.ZodType<T>, text: string): T | undefined => {
   try {
     const parsed = shape.safeParse(JSON.parse(text));

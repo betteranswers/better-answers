@@ -1,16 +1,19 @@
 /**
- * The theme's contract: the web keeps it, and the api's pages paint it too. No imports, only
- * syntax Node strips: `vite.config.ts` loads this through Node.
+ * Theme rules for the web app and the api's pages. No imports, and only TypeScript syntax Node can
+ * strip, because Node loads this for `vite.config.ts`.
  */
 
-/** Stored on readers' browsers, so the key keeps its first name. */
+/** Readers' browsers already store this key, so it must not be renamed. */
 export const THEME_KEPT_UNDER = "better-answers.theme";
 
 export type Theme = "light" | "dark";
 
 export const DEVICE_DARK = "(prefers-color-scheme: dark)";
 
-/** A theme kept on this browser wins; anything else, nothing included, leaves it to the device. */
+/**
+ * A theme stored in this browser wins. Any other stored value, or none, falls back to the device
+ * setting.
+ */
 export const themeShown = (kept: string | null, deviceDark: boolean): Theme => {
   if (kept === "light" || kept === "dark") return kept;
   return deviceDark ? "dark" : "light";

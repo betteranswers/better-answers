@@ -27,7 +27,7 @@ import {
 import { type WorkspaceHeld, workspacesOf } from "./people.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** In id order; empty, not refused, for an id no person holds. */
+/** In id order. Returns an empty list, not a refusal, for an id that matches no person. */
 export const workspacesHeldBy = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -57,8 +57,8 @@ type ReadWorkspacesHeldInput = {
 };
 
 /**
- * In name order; empty, not refused, for an id no person holds. A workspace where the person's
- * sign-ins were ended stays listed.
+ * In name order. Returns an empty list, not a refusal, for an unknown id. A workspace where the
+ * person's sign-ins were ended stays listed.
  */
 export const readWorkspacesHeld = async (
   platform: PlatformPrincipal,

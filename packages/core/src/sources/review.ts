@@ -109,7 +109,7 @@ export const effectiveClass = (
 };
 
 export const BROKEN_SENSITIVITY = new Error(
-  "a source document's sensitivity is not one the visibility words hold",
+  "a source document's sensitivity is not a known sensitivity",
 );
 
 const GROUPS_OF_FINDINGS = `SELECT d.id AS "documentId", d.title,
@@ -140,7 +140,7 @@ const OVERRIDDEN_SPAN = z.object({
 });
 
 const UNREADABLE_RUN = new Error(
-  "the connected source's last sync names the kept spans an erasure overrode in a shape the review cannot read",
+  "the last sync's list of spans that an erasure overrode does not parse",
 );
 
 const overriddenSpansOf = (

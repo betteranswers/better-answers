@@ -8,7 +8,7 @@ import {
   scannedFilesUnder,
 } from "../packages/devtools/src/scans/insert-scan.ts";
 
-/** The tree it is run in, not the tree it lives in, so a suite can spawn it over a throwaway. */
+/** The working directory, not this file's tree, so a test can run it over a throwaway tree. */
 const root = process.cwd();
 const roots = process.argv.slice(2);
 
@@ -25,7 +25,7 @@ try {
   process.exit(2);
 }
 
-// A walk that read no suite file is a gate that proved nothing, never a tree without inserts.
+// If the walk read no suite file, the gate proved nothing, so refuse instead of passing.
 if (files.length === 0) {
   process.stderr.write(`insert-scan: no suite file under ${roots.join(", ")}\n`);
   process.exit(2);
@@ -40,5 +40,5 @@ for (const one of found) process.stdout.write(`${reportOf(one)}\n`);
 if (found.length > 0) process.exit(1);
 
 process.stdout.write(
-  `no raw insert outside a factory in any of the ${String(files.length)} suite files read\n`,
+  `none of the ${String(files.length)} suite files checked has a raw insert outside a factory\n`,
 );

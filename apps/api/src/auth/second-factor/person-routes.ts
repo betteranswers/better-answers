@@ -48,7 +48,7 @@ export const PERSON_ROUTE_REFUSALS = {
 } as const;
 
 export const tooManyTries = (retryAfterSeconds: number): Response =>
-  tooManyRequests(retryAfterSeconds, "Too many tries; try again later.");
+  tooManyRequests(retryAfterSeconds, "Too many attempts. Try again later.");
 
 export const parsedBody = async <Schema extends z.ZodType>(context: Context, schema: Schema) =>
   schema.safeParse(await context.req.json().catch(() => undefined));
@@ -105,7 +105,7 @@ export const personRoutesAt = (routes: Hono, prefix: string, deps: PersonRoutes)
   const log = deps.logger.child({ module: "auth" });
 
   const unanswered = (context: Context, event: string, reason: string): Response => {
-    log.warn({ event, reason }, "a second-factor step went unanswered");
+    log.warn({ event, reason }, "a second-factor request failed");
     return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);
   };
 

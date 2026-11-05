@@ -82,7 +82,7 @@ const conceptBlock = (label: string, concept: OpenedConcept): string =>
 
 const FRAMING_TOKENS = 2_000;
 
-/** Each attempt's `max_tokens`, the model's thinking and a part's few sentences together. */
+/** Each attempt's `max_tokens`, covering the model's thinking and the few sentences of one part. */
 const DRAFT_TOKENS_OUT = 16_000;
 
 const DRAFT_WITHIN_MS = 150_000;

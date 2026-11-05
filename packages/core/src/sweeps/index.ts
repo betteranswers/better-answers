@@ -118,7 +118,7 @@ const recordThePass = async (
   );
   if (written.ok) return ok(undefined);
   return err(
-    new Error(`sweeps: the pass swept, but its row was not written: ${written.error.message}`),
+    new Error(`sweeps: the pass finished, but writing its row failed: ${written.error.message}`),
   );
 };
 

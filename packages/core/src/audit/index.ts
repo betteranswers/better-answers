@@ -252,7 +252,7 @@ const kindRefusal = (kind: DetailKind): string => {
   const optional = isOptionalKind(kind);
   const base = optional ? kind.slice(0, -1) : kind;
   const article = AN_KINDS.has(base) ? "an" : "a";
-  return optional ? `${article} ${base}, or absent` : `${article} ${base}`;
+  return optional ? `${article} ${base} or absent` : `${article} ${base}`;
 };
 
 const detailRefusal = (
@@ -260,7 +260,7 @@ const detailRefusal = (
   detail: Readonly<Record<string, DetailValue | undefined>>,
 ) => {
   for (const field of Object.keys(detail)) {
-    if (!Object.hasOwn(shape, field)) return `detail names a field the action does not: ${field}`;
+    if (!Object.hasOwn(shape, field)) return `detail field ${field} is not declared by the action`;
   }
   for (const [field, kind] of Object.entries(shape)) {
     const value = detail[field];
@@ -269,7 +269,7 @@ const detailRefusal = (
       if (isOptionalKind(kind)) continue;
       return `detail is missing the field ${field}`;
     }
-    if (!DETAIL_KINDS[kind](value)) return `detail's ${field} is not ${kindRefusal(kind)}`;
+    if (!DETAIL_KINDS[kind](value)) return `detail field ${field} must be ${kindRefusal(kind)}`;
   }
   return undefined;
 };
@@ -280,7 +280,7 @@ const rowToInsert = <A extends AuditAction>(
   event: AuditEvent<A>,
 ) => {
   if (!isDeclared(event.action.name))
-    throw new Error(`audit: ${event.action.name} was never declared`);
+    throw new Error(`audit: action ${event.action.name} is not declared`);
   const row = auditLog.safeParse({
     id: event.id,
     action: event.action.name,
@@ -290,10 +290,13 @@ const rowToInsert = <A extends AuditAction>(
     batchId: event.batchId ?? null,
   });
   if (!row.success) {
-    throw new Error(`audit: ${event.action.name} refused at the boundary`, { cause: row.error });
+    throw new Error(
+      `audit: ${event.action.name}: the event does not match the audit table's schema`,
+      { cause: row.error },
+    );
   }
   const refusal = detailRefusal(event.action.detail, event.detail);
-  if (refusal !== undefined) throw new Error(`audit: ${event.action.name} ${refusal}`);
+  if (refusal !== undefined) throw new Error(`audit: ${event.action.name}: ${refusal}`);
   return row.data;
 };
 
@@ -317,7 +320,7 @@ const write = async <A extends AuditAction>(
   );
 
   const id = inserted.rows[0]?.id;
-  if (id === undefined) throw new Error(`audit: ${event.action.name} landed no row`);
+  if (id === undefined) throw new Error(`audit: ${event.action.name}: the insert returned no row`);
   return { id: boundarySchemas.auditEvent.select.shape.id.parse(id), actorId: actor };
 };
 

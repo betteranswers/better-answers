@@ -371,8 +371,8 @@ const sentUnderLocks = async (
 export type InviteMembersInput = z.output<typeof inviteMembersInput> & { readonly now: Date };
 
 /**
- * One invitation per case-folded address, or none: one of no known form, off a marked workspace's
- * testing domain, or a member's here refuses the send.
+ * One invitation per case-folded address, or none. An invalid address, one off a marked workspace's
+ * testing domain, or a member's address refuses the send.
  */
 export const inviteMembers = async (
   principal: UserPrincipal,

@@ -105,10 +105,10 @@ class Host:
         environments_held: int = ENVIRONMENTS_HELD,
     ) -> None:
         if environments_held < len(STORES_A_CONNECTED_SOURCE_HOLDS):
+            needed = len(STORES_A_CONNECTED_SOURCE_HOLDS)
             message = (
-                f"the Environment cache must hold a connected source's"
-                f" {len(STORES_A_CONNECTED_SOURCE_HOLDS)} handles and was bounded at"
-                f" {environments_held}"
+                f"environments_held is {environments_held}, but one connected source"
+                f" opens {needed} stores, so it must be at least {needed}"
             )
             raise ValueError(message)
         self._bootstrap = bootstrap

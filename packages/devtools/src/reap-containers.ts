@@ -54,7 +54,9 @@ const listed = (): readonly Listed[] | undefined => {
       .filter((line) => line.trim() !== "")
       .map((line) => listedRow.parse(JSON.parse(line)));
   } catch (cause) {
-    complain(`docker listed the containers in a shape this cannot read: ${String(cause)}`);
+    complain(
+      `docker listed the containers in a format reap-containers cannot read: ${String(cause)}`,
+    );
     return undefined;
   }
 };

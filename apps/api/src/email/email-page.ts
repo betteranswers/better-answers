@@ -12,7 +12,7 @@ export const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Europe/London",
 });
 
-/** Inline, as a mail client keeps no stylesheet. */
+/** Inline, because mail clients drop stylesheets. */
 export const PARAGRAPH = "margin:0 0 16px";
 
 export const emailPage = (title: string, body: string): string => `<!doctype html>

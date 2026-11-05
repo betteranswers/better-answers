@@ -92,7 +92,7 @@ type SummaryRow = {
 };
 
 const actorOf = (value: string): ActorId => {
-  if (!isActorId(value)) throw new Error(`a suggestion holds an actor of no known form`);
+  if (!isActorId(value)) throw new Error(`suggestion actor ${value} is not an actor id`);
   return value;
 };
 
@@ -355,7 +355,9 @@ const decide = async (
         );
 
         if (written.rows.length === 0) {
-          throw new Error("the suggestion moved under the lock that was holding it");
+          throw new Error(
+            "deciding the suggestion updated no row, though the suggestion was locked",
+          );
         }
         return ok({ suggestionId: input.suggestionId, setId: row.set_id, status: decision.status });
       }),

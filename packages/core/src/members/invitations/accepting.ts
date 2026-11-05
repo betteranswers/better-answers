@@ -174,7 +174,7 @@ const readOf = (invitationId: InvitationId, invitation: HeldInvitation): Invitat
 
 /**
  * What accepting would join, for the person the invitation is addressed to. Refuses as accepting
- * would, save a missing display name.
+ * would, except for a missing display name.
  */
 export const readInvitation = async (
   platform: PlatformPrincipal,

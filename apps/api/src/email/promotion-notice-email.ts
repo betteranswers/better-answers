@@ -15,14 +15,14 @@ const WORDS = {
   subject: `You're now an Admin on ${PRODUCT_NAME}`,
   heldSome: "You've just been made an Admin. These can confirm your sign-in:",
   heldNone:
-    "You've just been made an Admin. You hold no passkey or authenticator yet, so you'll set one up before your next page.",
+    "You've just been made an Admin. You don't have a passkey or authenticator yet, so you'll need to set one up before you continue.",
   check: `If one isn't yours, confirm with one that is, then remove it on your Account page. If none is, sign out and ask ${PRODUCT_NAME} support to restore your sign-in.`,
   passkey: "Passkey",
   unnamed: "Unnamed",
   authenticator: "Authenticator",
 } as const;
 
-/** The plugin keeps no date for an authenticator, so its line names it alone. */
+/** The plugin stores no date for an authenticator, so its line shows only the word. */
 const linesOf = (held: CredentialsHeld): readonly string[] => [
   ...held.passkeys.map(
     (passkey) =>
@@ -73,7 +73,7 @@ export const sendPromotionNotice = async (
     ? await attempt(() => ctx.mail.send(promotionNoticeEmail(held.value, ctx.mail.publicUrl)))
     : held;
   if (!sent.ok) {
-    ctx.log.warn({ event: "auth.promotion_notice_failed" }, "a promotion notice did not go");
+    ctx.log.warn({ event: "auth.promotion_notice_failed" }, "could not send the promotion notice");
   }
   return sent.ok;
 };

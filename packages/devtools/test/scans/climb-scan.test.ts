@@ -38,10 +38,10 @@ const climbs = (
   helper = WORKER_HELPER,
   file = MODULE,
 ): string =>
-  `${file}:${String(line)}: \`${written}\` climbs to the root of \`${workspace}\` or out of it, so a move breaks the path. Import ${helper} and join the path from there.`;
+  `${file}:${String(line)}: \`${written}\` climbs to the root of \`${workspace}\` or above it, so the path breaks when the file moves. Import ${helper} and join the path from there.`;
 
 const passed = (modules: number): string =>
-  `climb_scan: no module climbs to the root of its workspace or out of it (modules read: ${String(modules)})`;
+  `climb_scan: no module climbs to the root of its workspace or above it (modules read: ${String(modules)})`;
 
 const refusal = (message: string): RegExp =>
   new RegExp(`exit 2\\n\\nclimb_scan: ${message.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n$`);

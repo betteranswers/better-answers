@@ -28,9 +28,10 @@ def full_rebuild(bootstrap: Bootstrap, job: queue.ClaimedJob) -> dict[str, Any]:
 
 def sync(bootstrap: Bootstrap, job: queue.ClaimedJob) -> dict[str, Any]:
     if job.subject_id is None or job.reason is None:
+        missing = "subject_id" if job.subject_id is None else "reason"
         message = (
-            "an index job naming no "
-            f"{'connected_source' if job.subject_id is None else 'reason'}: {job.id}"
+            f"index job {job.id} has no {missing}. An index job needs a subject_id,"
+            " which names its connected source, and a reason"
         )
         raise ValueError(message)
     sync = Sync(

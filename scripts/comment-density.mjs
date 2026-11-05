@@ -10,7 +10,7 @@ import {
   reportOf,
 } from "../packages/devtools/src/comments/comment-density.ts";
 
-/** The tree it is run in, not the tree it lives in, so a suite can spawn it over a throwaway. */
+/** The working directory, not this file's tree, so a test can run it over a throwaway tree. */
 const root = process.cwd();
 
 const refuse = (message) => {
@@ -27,10 +27,10 @@ try {
 
 const roots = parsed.positionals;
 if (roots.length === 0) {
-  refuse("name at least one root of workspaces");
+  refuse("name at least one root of workspaces, for example: comment-density apps packages");
 }
 
-/** A workspace is what carries a manifest, so a new one is measured without a line here. */
+/** Any folder with a manifest is a workspace, so a new workspace is measured without a change here. */
 const workspaces = roots.flatMap((directory) =>
   readdirSync(path.join(root, directory), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -53,7 +53,7 @@ try {
   refuse(`the line counter did not run: ${String(cause)}`);
 }
 
-// A counter that read nothing is a gate that proved nothing, never a tree under the ceiling.
+// If the counter read no file, the gate proved nothing, so refuse instead of passing.
 if (counted.length === 0) {
   refuse("the line counter measured no file it understands");
 }

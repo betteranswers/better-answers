@@ -26,8 +26,7 @@ export const jscpdArgv = (config: JscpdConfig): readonly string[] => [
   "--format",
   config.formats.join(","),
 
-  // Omitted, never passed empty: jscpd reads an empty ignore as every path, and a tree it
-  // scanned nothing of looks clean.
+  // jscpd reads an empty --ignore as every path, so it would scan nothing and report a clean tree.
   ...(config.ignore.length > 0 ? ["--ignore", config.ignore.join(",")] : []),
   "--reporters",
   "console",

@@ -131,7 +131,7 @@ export type RenamePasskeyRefusal = WorkspaceRefusal<
 
 type PasskeyRenamed = { readonly passkeyId: string; readonly name: string };
 
-/** The person is the one caller: a transport hands the id of the session's own person. */
+/** Only the person may call this. A transport passes the id of the session's own person. */
 export const renamePasskey = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -189,8 +189,8 @@ const removing = async (
 };
 
 /**
- * The person is the one caller. An Admin in any workspace, or the operator, keeps their last second
- * factor: two removals cannot each leave one.
+ * Only the person may call this. An Admin in any workspace, or the operator, keeps their last
+ * second factor, even under two removals at once.
  */
 export const removePasskey = async (
   platform: PlatformPrincipal,

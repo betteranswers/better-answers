@@ -206,7 +206,11 @@ const cappedAt = (body: ReadableStream<Uint8Array>): CappedBody => {
           counted.bytes += passage.byteLength;
           if (counted.bytes > UPLOAD_BYTE_CAP) {
             counted.passed = true;
-            controller.error(new Error("sources: the upload passed the cap"));
+            controller.error(
+              new Error(
+                `sources: the upload is larger than the ${String(UPLOAD_BYTE_CAP)}-byte cap`,
+              ),
+            );
             return;
           }
           controller.enqueue(passage);
@@ -285,14 +289,14 @@ const storeOriginal = async (
     throw put.error;
   }
   if (!put.value.ok) {
-    throw new Error(`sources: the original's key was refused (${put.value.error})`);
+    throw new Error(`sources: storing the original failed (${put.value.error})`);
   }
   return ok(capped.bytesStreamed());
 };
 
 /**
- * Once the first connect commits, a repeat returns its outcome and reads no byte. `too-large`
- * answers a declared size or streamed body over the cap.
+ * After the first connect commits, a repeat returns that outcome and reads no bytes. A declared
+ * size or streamed body over the cap returns `too-large`.
  */
 export const connectUpload = async (
   principal: UserPrincipal,
@@ -338,7 +342,7 @@ export const connectUpload = async (
       const first = await firstOutcomeOf(tx, workspaceId, connectedSourceId);
       if (first === undefined) {
         throw new Error(
-          `sources: ${connectedSourceId} is taken by a connected source no first connect accounts for`,
+          `sources: connected source ${connectedSourceId} already exists, but no first connect recorded it`,
         );
       }
       return first;

@@ -104,8 +104,8 @@ const correcting = async (tx: Tx, personId: UserId, name: string): Promise<boole
 };
 
 /**
- * The person is the one writer: a caller hands the id of the session's own person, never one a
- * request names.
+ * Only the person may write it. A caller passes the id of the session's own person, never an id
+ * from the request.
  */
 export const setDisplayName = async (
   platform: PlatformPrincipal,
@@ -149,8 +149,8 @@ type CorrectDisplayNameRefusal =
   | WorkspaceRefusal<"no-such-user" | "confirmation-too-old">;
 
 /**
- * Replaces a person's display name under the rule their own name follows. An erased person answers
- * `no-such-user`, as one nobody holds does.
+ * Replaces a person's display name under the rules for their own name. An erased person returns
+ * `no-such-user`, as an unknown id does.
  */
 export const correctDisplayName = async (
   operator: OperatorPrincipal,

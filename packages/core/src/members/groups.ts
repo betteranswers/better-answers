@@ -247,7 +247,10 @@ const memberTarget = (
 
 type Adding = { readonly groupId: GroupId; readonly personIds: readonly UserId[] };
 
-/** Key-share holds keep the group and each member from going, and wait on no other add. */
+/**
+ * FOR KEY SHARE locks stop the group and each member from being deleted, without blocking other
+ * adds.
+ */
 const KEY_SHARED_GROUP = `SELECT 1 FROM "group" WHERE workspace_id = $1 AND id = $2 FOR KEY SHARE`;
 
 const KEY_SHARED_MEMBERS = `SELECT user_id FROM member

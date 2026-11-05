@@ -310,7 +310,7 @@ describe("the local database", () => {
     expect({ status: again.status, stderr: again.stderr }).toEqual({
       status: 1,
       stderr: matching.stringContaining(
-        `local-database: REFUSED — this database holds the synthetic fixture under ${earlier}, and its workspace is ${SYNTHETIC_WORKSPACE} now — deploy/local-database.sh down --wipe, then up`,
+        `local-database: REFUSED: this database holds the synthetic fixture under workspace ${earlier}, but the fixture's workspace id is now ${SYNTHETIC_WORKSPACE}. Run deploy/local-database.sh down --wipe, then up.`,
       ),
     });
   }, 180_000);

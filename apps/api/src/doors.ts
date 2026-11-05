@@ -35,14 +35,16 @@ export type DoorSettings = {
 
 const bundleStoreAt = (root: string): Result<GitDoor, string> => {
   const git = openGit(root);
-  return git.ok ? git : err(`the repositories' root is ${git.error} (GIT_STORE_DIR=${root})`);
+  return git.ok ? git : err(`GIT_STORE_DIR ${root} cannot be opened: ${git.error}`);
 };
 
 const objectStoreOf = (settings: ObjectStoreSettings): Result<ObjectDoor, string> => {
   const objects = openObjects(settings);
   return objects.ok
     ? objects
-    : err(`the object store is ${objects.error} (S3_ENDPOINT=${settings.endpoint})`);
+    : err(
+        `the object store at S3_ENDPOINT ${settings.endpoint} cannot be opened: ${objects.error}`,
+      );
 };
 
 export const openDoors = (settings: DoorSettings): Doors => {

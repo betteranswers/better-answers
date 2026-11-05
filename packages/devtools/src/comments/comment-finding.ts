@@ -190,7 +190,9 @@ const pythonFoundIn = (file: string, source: string): readonly Found[] => {
     );
   return locatedBlocks.parse(JSON.parse(ran.stdout)).map(({ cut, ...block }) => {
     if (source.slice(cut.start, cut.end) !== block.text) {
-      throw new Error(`${file}:${block.start}: the locator's offsets do not hold the block's text`);
+      throw new Error(
+        `${file}:${block.start}: the locator's offsets do not match the block's text`,
+      );
     }
     const row: Row = { path: file, ...block, class: "", holder: "", structure: "", unit: "" };
     return { row, cut };

@@ -80,7 +80,7 @@ const TRANSPORTS = [
 
 const transport = z.enum(TRANSPORTS);
 
-/** The library keeps them comma-separated, and a device's own word may be one this list lacks. */
+/** The library stores transports comma-separated, and a device may report one this list lacks. */
 const transportsOf = (kept: string | null): AuthenticatorTransportFuture[] =>
   (kept ?? "").split(",").flatMap((named) => {
     const parsed = transport.safeParse(named);
@@ -227,7 +227,7 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     const sent = await parsedBody(context, codeAsked);
     if (!sent.success) return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
     const held = await heldBy(deps, person);
-    if (held === undefined) return unanswered(context, "the second factor was not read");
+    if (held === undefined) return unanswered(context, "could not read the person's factors");
     return { code: sent.data.code, held };
   };
 

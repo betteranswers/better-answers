@@ -20,7 +20,7 @@ export const findInput = z.object({
     .string()
     .min(1)
     .max(500)
-    .refine(holdsNoNul, "a query holds no NUL character")
+    .refine(holdsNoNul, "a query must not contain a NUL character")
     .describe("What to look for, in the person's own words."),
   limit: z
     .number()
@@ -47,7 +47,7 @@ export const askInput = z.object({
     .string()
     .min(1)
     .max(QUESTION_CHARACTERS_AT_MOST)
-    .refine(holdsNoNul, "a question holds no NUL character")
+    .refine(holdsNoNul, "a question must not contain a NUL character")
     .describe("The question, in the person's own words."),
   collections: z
     .array(
@@ -55,7 +55,7 @@ export const askInput = z.object({
         .string()
         .min(1)
         .max(COLLECTION_CHARACTERS_AT_MOST)
-        .refine(holdsNoNul, "a collection's name holds no NUL character"),
+        .refine(holdsNoNul, "a collection's name must not contain a NUL character"),
     )
     .max(COLLECTIONS_AT_MOST)
     .default([])

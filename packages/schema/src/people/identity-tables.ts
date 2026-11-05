@@ -94,7 +94,7 @@ export const account = pgTable(
     updatedAt: stamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    // Better Auth declares no key here yet refuses a lookup that matches two rows.
+    // Better Auth declares no unique key here, but fails a lookup that matches two rows.
     uniqueIndex("account_provider_id_account_id_uidx").on(table.providerId, table.accountId),
     index("account_user_id_idx").on(table.userId),
   ],
@@ -151,7 +151,7 @@ export const member = pgTable(
 
 export const INVITATION_EXPIRY_SECONDS = 3600 * 24 * 7;
 
-/** The organisation plugin's own status words, which its kept reads still speak. */
+/** Status values of the organisation plugin. The plugin reads we still call return them. */
 export const INVITATION_WAITING_STATUS = "pending";
 
 export const INVITATION_CANCELLED_STATUS = "canceled";
@@ -372,7 +372,10 @@ export const authenticator = pgTable(
     id: text("id").primaryKey(),
     secret: text("secret").notNull(),
 
-    /** The plugin writes a set at every setup and nothing reads it: recovery codes are our own. */
+    /**
+     * The plugin writes a set of codes at every setup, and nothing reads them. Recovery codes are
+     * kept in our own table.
+     */
     backupCodes: text("backup_codes").notNull(),
     userId: text("user_id")
       .notNull()
@@ -381,7 +384,8 @@ export const authenticator = pgTable(
     failedVerificationCount: integer("failed_verification_count").default(0).notNull(),
     lockedUntil: stamp("locked_until"),
   },
-  // The plugin keeps one row a person and updates it in place, so a second would be a race.
+  // The plugin keeps one row per person and updates it in place, so a second row could only come
+  // from a race.
   (table) => [uniqueIndex("authenticator_user_id_uidx").on(table.userId)],
 );
 
@@ -396,7 +400,8 @@ export const passkey = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     credentialID: text("credential_id").notNull(),
 
-    // WebAuthn's signature counter is an unsigned 32-bit number, past integer's reach.
+    // WebAuthn's signature counter is an unsigned 32-bit number, which can exceed Postgres
+    // `integer`.
     counter: bigint("counter", { mode: "number" }).notNull(),
     deviceType: text("device_type").notNull(),
     backedUp: boolean("backed_up").notNull(),
@@ -418,7 +423,10 @@ export const passkeyLastUse = pgTable("passkey_last_use", {
   at: stamp("at").notNull(),
 });
 
-/** Ours, not the plugin's: a passkey-only Admin has no authenticator row to keep them on. */
+/**
+ * Our table, not the plugin's. A passkey-only Admin has no authenticator row to keep recovery codes
+ * on.
+ */
 export const recoveryCode = pgTable(
   "recovery_code",
   {

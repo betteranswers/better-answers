@@ -151,16 +151,16 @@ const newSurvivors = (report: Report, baseline: Report): readonly NewSurvivor[] 
 };
 
 const NO_BASELINE =
-  "no baseline — nothing was restored to compare against, so this run's report is the next run's baseline";
+  "no baseline was restored, so there is nothing to compare against. This run's report becomes the next run's baseline.";
 
 const NOTE = {
   killed: "",
   absent: " (not in the baseline)",
-  "no verdict": " (no verdict in the baseline)",
+  "no verdict": " (no result in the baseline)",
 } as const satisfies Record<NewSurvivor["before"], string>;
 
 const MATCHING =
-  "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by their order in the file.";
+  "These mutants survived or had no coverage in this run, but not in the previous run's report. Mutants are matched by their mutated text, not by line number. When one file has two identical spans mutated the same way, they are matched in file order.";
 
 const newSurvivorLines = (
   leg: string,
@@ -183,25 +183,26 @@ const ranNoTestLines = (leg: string, report: Report): readonly string[] => {
     .sort(byPlace);
   if (rows.length === 0) return [`### ${leg} mutants that ran no test: none`];
   return [
-    `### ${leg} mutants that ran no test: ${String(rows.length)} — the runner ran none of the tests that cover them, which is a runner fault to fix (the vitest-runner patch under \`patches/\`), never a survivor to triage`,
+    `### ${leg} mutants that ran no test: ${String(rows.length)}. The runner ran none of the tests that cover these mutants. That is a runner fault, not a survivor. Fix the vitest-runner patch under \`patches/\`.`,
     ...rows.map((placed) => row(placed)),
   ];
 };
 
 const FAULT_CONSEQUENCE =
-  "no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again";
+  "No result in this report can be trusted. The leg fails until the runner is fixed and a run with `force` tests every mutant again.";
 
-const FROM_CHECKPOINT = ", read from the checkpoint since the run wrote no report";
+const FROM_CHECKPOINT = " in the checkpoint, because the run wrote no report";
 
 const runnerFault = (report: Report): string | undefined => {
   const mutants = mutantsOf(report);
   const covered = mutants.filter((mutant) => killed(mutant) || mutant.status === "Survived");
   const untested = mutants.filter(ranNoTest).length;
   if (untested > 0) {
-    return `${String(untested)} of its ${String(covered.length)} covered mutants ran no test`;
+    return `${String(untested)} of the leg's ${String(covered.length)} covered mutants ran no test`;
   }
   const total = mutants.filter(scored).length;
-  if (total > 0 && !mutants.some(killed)) return `it killed none of its ${String(total)} mutants`;
+  if (total > 0 && !mutants.some(killed))
+    return `the leg killed none of its ${String(total)} mutants`;
   return undefined;
 };
 
@@ -213,7 +214,7 @@ const faultOf = (
   const read = report ?? checkpoint;
   const fault = read === undefined ? undefined : runnerFault(read);
   if (fault === undefined) return undefined;
-  return `${leg} runner fault: ${fault}${report === undefined ? FROM_CHECKPOINT : ""} — ${FAULT_CONSEQUENCE}`;
+  return `${leg} runner fault: ${fault}${report === undefined ? FROM_CHECKPOINT : ""}. ${FAULT_CONSEQUENCE}`;
 };
 
 type SummaryRun = {

@@ -77,7 +77,8 @@ const copiable = async (
   const trusts = await readSectionTrusts(reader, tx, [held.includes.map(({ iri }) => iri)], now);
   if (!trusts.ok) return trusts;
   const weakest = trusts.value[0];
-  if (weakest === undefined) return err(new Error("the section's trust was not read"));
+  if (weakest === undefined)
+    return err(new Error("readSectionTrusts returned no trust for the section"));
   const threshold = await readActionThreshold(reader, tx, held.guideId);
   if (!threshold.ok) return threshold;
   return copyOfferOf(weakest, threshold.value) === "offered"

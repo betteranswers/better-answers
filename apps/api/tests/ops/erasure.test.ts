@@ -288,7 +288,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines.join("\n")).toContain("GIT_STORE_DIR");
-      expect(run.lines.join("\n")).toContain("do not start api");
+      expect(run.lines.join("\n")).toContain("Do not start the api service.");
     });
 
     it("refuses when no object store is configured", async () => {
@@ -297,8 +297,8 @@ describe("pnpm ops", () => {
       });
 
       expect(run.exitCode).toBe(1);
-      expect(run.lines.join("\n")).toContain("no object store is configured");
-      expect(run.lines.join("\n")).toContain("do not start api");
+      expect(run.lines.join("\n")).toContain("the object store is not configured");
+      expect(run.lines.join("\n")).toContain("Do not start the api service.");
     });
 
     it("refuses an unreachable object store, since erasures may be owed", async () => {
@@ -318,7 +318,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines.join("\n")).toContain("REFUSED");
-      expect(run.lines.join("\n")).toContain("do not start api");
+      expect(run.lines.join("\n")).toContain("Do not start the api service.");
     });
   });
 
@@ -355,7 +355,7 @@ describe("pnpm ops", () => {
 
       const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
       expect(run.lines).toEqual([
-        `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin member, one concept file and one indexed document naming them); take the dump, then run phase two`,
+        `erasure-rehearsal: done — created the synthetic subject in ${workspaceId}: a user row, an Admin member, one concept file and one indexed document that names them. Take the dump, then run phase two.`,
         `${email},human:${email},Rehearsal subject ${workspaceId}`,
       ]);
       const seededRow = await served().database.superuser.query(
@@ -409,7 +409,7 @@ describe("pnpm ops", () => {
       expect(run.exitCode).toBe(1);
       expect(sync).toEqual({ reason: "connected", status: "failed" });
       expect(run.lines).toEqual([
-        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${queued.id} is failed after 1 attempt; the job's own row says what it found`,
+        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed. Job ${queued.id} is failed after 1 attempt. The job's row in the database records why.`,
       ]);
     });
 
@@ -434,7 +434,7 @@ describe("pnpm ops", () => {
       assert(queued !== undefined, "the subject's document was never queued");
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([
-        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${queued.id} is still queued after 1 second, so no worker has indexed it`,
+        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed. Job ${queued.id} is still queued after 1 second, so no worker has indexed it`,
       ]);
     });
 
@@ -534,7 +534,6 @@ describe("pnpm ops", () => {
           accounts_deleted: 0,
           invitations_deleted_here: 0,
           invitations_deleted: 0,
-          msg: "erasure: the identity step's arm, and what it pseudonymised and deleted",
         }),
       ]);
       expect(JSON.stringify(run.logs)).not.toContain("@");
@@ -552,7 +551,7 @@ describe("pnpm ops", () => {
       );
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.precondition);
-      expect(run.lines.join("\n")).toContain("no synthetic subject stands in this workspace");
+      expect(run.lines.join("\n")).toContain("this workspace has no synthetic subject");
     });
   });
 });

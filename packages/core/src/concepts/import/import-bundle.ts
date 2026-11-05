@@ -147,7 +147,7 @@ const manifestRefusalOf = (refusal: WriteManifestRefusal | Error): ImportBundleR
   if (refusal instanceof Error) return refusal;
   if (refusal === "path-taken") return "manifest-taken";
   if (isMalformedManifest(refusal)) {
-    return new Error(`the manifest commit was refused: ${refusal}`);
+    return new Error(`committing the manifest failed: ${refusal}`);
   }
   return refusal;
 };
@@ -457,7 +457,7 @@ const runImport = async (
         bundle_id: opened.manifest.id,
         error: analysed.error.message,
       },
-      "import-bundle: the map was left unanalysed, so the planner waits for autovacuum",
+      "import-bundle: ANALYZE of the map tables failed, so query plans may be poor until autovacuum runs",
     );
   }
   if (!landing.ok) return err(landing.error);

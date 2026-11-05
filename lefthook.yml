@@ -28,12 +28,12 @@ pre-commit:
       root: apps/worker/
       run: uv run --frozen --only-group dev ruff check {staged_files}
 
-    # From the root, because the gate reads a file's place from its repository path.
+    # Runs from the root, because the gate uses each file's path from the repository root.
     comment-gate-python:
       glob: "*.py"
       run: python3 packages/devtools/python/comment_gate.py {staged_files}
 
-    # The worker's locked actionlint, so a commit and CI read a workflow with one version.
+    # Uses the worker's locked actionlint, so commits and CI check workflows with the same version.
     actionlint:
       glob: ".github/workflows/*.{yml,yaml}"
       run: uv run --project apps/worker --frozen --only-group dev actionlint -config-file .github/actionlint.yaml {staged_files}
@@ -64,15 +64,15 @@ pre-commit:
       run: pnpm run typecheck
 
 templates:
-  # A worktree's push sets GIT_DIR, which a suite's throwaway repository would then write into.
+  # A push from a worktree sets GIT_DIR, and a test's throwaway repository would then write into the real one.
   without-git-env: unset $(git rev-parse --local-env-vars);
 
 pre-push:
-  # Naming {files} stops lefthook skipping a push that changes no file on disk, or only deletes.
+  # Naming {files} stops lefthook from skipping a push that changes no file on disk or only deletes files.
   files: echo lefthook.yml
 
   commands:
-    # Only a job sees the pushed refs, and no file list skips a hook not named pre-push.
+    # Only a command here receives the pushed refs on stdin. lefthook never skips pre-push-gates for an empty file list.
     gates:
       use_stdin: true
       run: ": {files}; sh scripts/pre-push.sh"

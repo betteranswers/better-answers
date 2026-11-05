@@ -49,13 +49,13 @@ const scan = runsOverThrowawayTree({
   executable: SCAN_EXECUTABLE,
   argv: ["tsconfig.json", SEAM],
   foundSomething: [1],
-  smoke: { tree: LEAKS, reports: (output) => output.includes(`${SEAM}: the declaration of`) },
+  smoke: { tree: LEAKS, reports: (output) => output.includes(`${SEAM}: the declared type of`) },
 });
 
 describe("the auth seam's declarations", () => {
   it("refuses an export whose declaration names Better Auth", () => {
     expect(scan(LEAKS)).toContain(
-      `${SEAM}: the declaration of \`readSession\` names \`better-auth\`.`,
+      `${SEAM}: the declared type of \`readSession\` names \`better-auth\`, which comes from Better Auth.`,
     );
   });
 
@@ -69,7 +69,7 @@ describe("the auth seam's declarations", () => {
     });
 
     expect(scan(tree)).toContain(
-      `${SEAM}: the declaration of \`authClient\` names \`./auth-client.ts\`.`,
+      `${SEAM}: the declared type of \`authClient\` names \`./auth-client.ts\`, which comes from Better Auth.`,
     );
   });
 
@@ -78,7 +78,9 @@ describe("the auth seam's declarations", () => {
       'import { made } from "hidden-types";\n\nexport const madeHere = () => made();\n',
     );
 
-    expect(scan(tree)).toMatch(/^src\/auth-hooks\.ts:5: TypeScript refused the file \(TS2883:/);
+    expect(scan(tree)).toMatch(
+      /^src\/auth-hooks\.ts:5: TypeScript could not emit declarations for this file \(TS2883:/,
+    );
   });
 
   it("ignores a type error in a file the seam imports", () => {

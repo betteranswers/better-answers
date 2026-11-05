@@ -39,7 +39,7 @@ const doors = openDoors({
 if (doors.git?.ok === false) {
   logger.error(
     { reason: doors.git.error, git_store_dir: bootstrap.gitStoreDir },
-    "the api cannot start: the head check's repositories' root was refused",
+    "the api cannot start because GIT_STORE_DIR cannot be opened",
   );
   process.exit(1);
 }
@@ -97,7 +97,7 @@ const reconciler = startReconciler({ doors, settings: headCheckSettings });
 if (!reconciler.ok) {
   logger.warn(
     { reason: reconciler.error },
-    "no repositories' root is configured (GIT_STORE_DIR): the head check is not running",
+    "GIT_STORE_DIR is not set, so the head check is not running",
   );
 } else {
   running.push(reconciler.value);
@@ -152,10 +152,10 @@ const stop = async (signal: NodeJS.Signals): Promise<never> => {
   } else {
     logger.warn(
       { deadline_ms: stopSettings.deadlineMs },
-      "the stop reached its deadline, so what was still open is cut",
+      "the stop deadline passed, so the api exits with requests or queries still open",
     );
   }
-  // A non-zero exit leaves a cut stop in `docker inspect`, not only in the log.
+  // A non-zero exit records the cut-off stop in `docker inspect`, not only in the log.
   process.exit(drained ? 0 : 1);
 };
 

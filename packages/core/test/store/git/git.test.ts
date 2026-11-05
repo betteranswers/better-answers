@@ -276,7 +276,7 @@ const BUDGET_MS = 300;
 const overBudget = {
   ok: false,
   error: matching.objectContaining({
-    message: matching.stringContaining(`ran past its ${BUDGET_MS} ms budget`),
+    message: matching.stringContaining(`took longer than ${BUDGET_MS} ms`),
   }),
 };
 

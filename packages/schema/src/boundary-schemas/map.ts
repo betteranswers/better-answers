@@ -17,7 +17,7 @@ const mapLabel = (labels: readonly string[]) => (schema: z.ZodString) =>
   schema.refine(
     (label) =>
       labels.some((known) => known === label) || label.startsWith(SOURCE_ENTITY_LABEL_PREFIX),
-    { message: "a map label is one of the closed set, or wears the source-entity prefix" },
+    { message: "a map label must be a known label or start with the source-entity prefix" },
   );
 
 type MapRowInput = { readonly label: string; readonly gen?: number | null };
@@ -57,11 +57,12 @@ const mapNodeRefinements = {
 const mapNodeSelect = createSelectSchema(mapNode, mapNodeRefinements);
 const mapNodeInsert = createInsertSchema(mapNode, mapNodeRefinements)
   .refine(sourceEntityCarriesNoGen, {
-    message: "a source-entity label carries no generation",
+    message: "a source-entity label must have no generation",
     path: ["gen"],
   })
   .refine(closedNodeLabelCarriesGen, {
-    message: "a closed node label is a bundle-and-record row and carries its generation",
+    message:
+      "a node with a known label comes from the bundle or the records, so it must have a generation",
     path: ["gen"],
   });
 const mapNodeUpdate = createUpdateSchema(mapNode, mapNodeRefinements);
@@ -78,7 +79,7 @@ const mapEdgeRefinements = {
 const mapEdgeSelect = createSelectSchema(mapEdge, mapEdgeRefinements);
 const mapEdgeInsert = createInsertSchema(mapEdge, mapEdgeRefinements).refine(
   sourceEntityCarriesNoGen,
-  { message: "a source-entity label carries no generation", path: ["gen"] },
+  { message: "a source-entity label must have no generation", path: ["gen"] },
 );
 const mapEdgeUpdate = createUpdateSchema(mapEdge, mapEdgeRefinements);
 

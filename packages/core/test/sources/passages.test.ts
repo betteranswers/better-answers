@@ -421,9 +421,11 @@ describe("what a passage read fails on", () => {
     };
 
     expect(answers).toEqual({
-      "past its span": new Error(`the passage row at ${runsPast}/chars:0-16 holds 28 code points`),
+      "past its span": new Error(
+        `the passage row at ${runsPast}/chars:0-16 holds 28 code points, but its span is 16`,
+      ),
       "short of its span": new Error(
-        `the passage row at ${fallsShort}/chars:0-40 holds 28 code points`,
+        `the passage row at ${fallsShort}/chars:0-40 holds 28 code points, but its span is 40`,
       ),
     });
   });

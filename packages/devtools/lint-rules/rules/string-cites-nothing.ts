@@ -15,11 +15,11 @@ export const stringCitesNothingRule = defineRule({
     type: "problem",
     docs: {
       description:
-        "A string a person reads names what they can act on, in words that stand on their own. A test is exempt.",
+        "A string that a person reads says what they can act on, in words that make sense without another document. Tests are exempt.",
     },
     messages: {
       cites:
-        "This string cites {{what}} (`{{cited}}`); a string that reaches a person names what they can act on, never a document they cannot open from where they read it. Say the thing instead.",
+        "This string cites {{what}} (`{{cited}}`), which the reader cannot open from where they read the string. Say what the reader needs to know or do instead.",
     },
   },
   createOnce(context) {

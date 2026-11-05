@@ -151,7 +151,7 @@ describe("the release gate for a merge", () => {
   it("skips a build's commit once main has a newer head", async () => {
     expect(await runGate({ COMMIT: OLDER, EVENT: "push" })).toEqual(
       skipped(
-        `${OLDER} is no longer main's head; ${HEAD} is. Production never goes back to an older commit, so a newer commit's green build releases in its place.`,
+        `${OLDER} was not released because the head of main is now ${HEAD}. Production never moves back to an older commit, so the build of ${HEAD} releases instead.`,
         "merge",
       ),
     );
@@ -160,13 +160,17 @@ describe("the release gate for a merge", () => {
   it.each([
     {
       mode: "nightly",
-      instead: "The nightly release promotes main's newest green commit after a fresh backup.",
+      instead:
+        "In nightly mode, the nightly run releases the newest green commit on main after it confirms a fresh backup.",
     },
-    { mode: "drill", instead: "Dispatch `release` with `rehearsed_by` (RUNBOOK.md page 6)." },
+    {
+      mode: "drill",
+      instead: "In drill mode, dispatch `release` and fill `rehearsed_by` (RUNBOOK.md page 6).",
+    },
   ])("skips a build's release in $mode mode", async ({ mode, instead }) => {
     expect(await runGate({ COMMIT: HEAD, EVENT: "push", RELEASE_MODE: mode })).toEqual(
       skipped(
-        `RELEASE_MODE is ${mode}, so a green build does not release itself. ${instead}`,
+        `RELEASE_MODE is ${mode}, so a green build on main is not released automatically. ${instead}`,
         "merge",
       ),
     );
@@ -175,7 +179,7 @@ describe("the release gate for a merge", () => {
   it("refuses a build's commit when main's head cannot be read", async () => {
     expect(await runGate({ COMMIT: HEAD, EVENT: "push", STUB_GH_FAILS: "yes" })).toEqual(
       refused(
-        `main's head could not be read, so ${HEAD} is not released: a newer commit may already be the head`,
+        `Could not read the head of main from the GitHub API, so ${HEAD} was not released. Re-run this job; if main has moved on, the newer commit's build releases instead.`,
         "merge",
       ),
     );
@@ -183,7 +187,10 @@ describe("the release gate for a merge", () => {
 
   it("refuses a commit that is not a full sha", async () => {
     expect(await runGate({ COMMIT: HEAD.slice(0, 7), EVENT: "push" })).toEqual(
-      refused("commit is not a full commit sha (40 hex characters)", "merge"),
+      refused(
+        `COMMIT '${HEAD.slice(0, 7)}' is not a full commit SHA. Pass all 40 hex characters.`,
+        "merge",
+      ),
     );
   });
 });
@@ -211,7 +218,7 @@ describe("the release gate for the nightly release", () => {
       }),
     ).toEqual(
       skipped(
-        `${HEAD} is the newest release on main, and no commit after it has a green build, so nothing is released tonight.`,
+        `Nothing was released tonight: ${HEAD} is already released, and no later commit on main has a green build.`,
         "nightly",
       ),
     );
@@ -226,7 +233,7 @@ describe("the release gate for the nightly release", () => {
       }),
     ).toEqual(
       skipped(
-        `${OLDER} is the newest release on main, and no commit after it has a green build, so nothing is released tonight.`,
+        `Nothing was released tonight: ${OLDER} is already released, and no later commit on main has a green build.`,
         "nightly",
       ),
     );
@@ -235,7 +242,7 @@ describe("the release gate for the nightly release", () => {
   it("refuses when no recent commit on main is green", async () => {
     expect(await nightly({ STUB_COMMITS: `${HEAD} ${OLDER}`, STUB_GREEN: "" })).toEqual(
       refused(
-        "none of main's last 100 commits has a green build, so nothing is released tonight",
+        "Nothing was released tonight: none of the last 100 commits on main has a green build. Fix the build on main, then dispatch `release` or wait for the next nightly run.",
         "nightly",
       ),
     );
@@ -244,7 +251,7 @@ describe("the release gate for the nightly release", () => {
   it("skips the nightly release in per-merge mode", async () => {
     expect(await runGate({ EVENT: "schedule" })).toEqual(
       skipped(
-        "RELEASE_MODE is per-merge, so the nightly release has nothing to do. Every green build on main releases itself.",
+        "RELEASE_MODE is per-merge, so the nightly run releases nothing. In per-merge mode, every green build on main is released.",
         "nightly",
       ),
     );
@@ -270,7 +277,7 @@ describe("the release gate for a dispatched release", () => {
   it("refuses a dispatch without rehearsed_by in drill mode", async () => {
     expect(await runGate({ EVENT: "workflow_dispatch", RELEASE_MODE: "drill" })).toEqual(
       refused(
-        "RELEASE_MODE is drill: a release must ride a drill that just proved a restore, or state a hotfix reason. Fill `rehearsed_by` (RUNBOOK.md page 6)",
+        "RELEASE_MODE is drill, so a dispatched release needs `rehearsed_by`. Set it to the report of the restore drill that just passed (drills/drill-<stamp>.md), or to 'hotfix: <reason>'. See RUNBOOK.md page 6.",
         "dispatch",
       ),
     );
@@ -291,7 +298,7 @@ describe("the release gate for a dispatched release", () => {
     async ({ trigger, env }) => {
       expect(await runGate({ ...env, RELEASE_MODE: "weekly" })).toEqual(
         refused(
-          "RELEASE_MODE is 'weekly', which is not per-merge, nightly or drill, so nothing is released. Set one (gh variable set RELEASE_MODE --body nightly), or delete it for per-merge",
+          "RELEASE_MODE is 'weekly', so nothing was released. Set it to per-merge, nightly or drill (for example, gh variable set RELEASE_MODE --body nightly), or delete the variable to use per-merge.",
           trigger,
         ),
       );
@@ -355,7 +362,7 @@ describe("the backup check before a nightly release", () => {
       }),
     ).toEqual({
       code: 0,
-      out: `the box's own backup: the database dump verified at ${LAST_HOURS_DUMP}, the object and git store copies at ${TONIGHTS_COPIES}\n`,
+      out: `The backup is fresh: the database dump was verified at ${LAST_HOURS_DUMP}, and the object store and git store copies at ${TONIGHTS_COPIES}.\n`,
       err: "",
     });
   });
@@ -369,7 +376,7 @@ describe("the backup check before a nightly release", () => {
     ).toEqual({
       code: 1,
       out: "",
-      err: `::error::the pg-hourly backup is not fresh: its check is down, last pinged ${LAST_HOURS_DUMP}, where it needs to be up and pinged since 2026-10-01T07:55:00Z, so nothing is released\n`,
+      err: `::error::The pg-hourly backup is not fresh, so nothing was released. Its check is down and was last pinged at ${LAST_HOURS_DUMP}. It must be up and pinged at or after 2026-10-01T07:55:00Z. Check the backup job on the box, then dispatch \`release\`.\n`,
     });
   });
 
@@ -399,7 +406,7 @@ describe("the backup check before a nightly release", () => {
     ).toEqual({
       code: 1,
       out: "",
-      err: `::error::the nightly backup is not fresh: its check is up, last pinged ${copies}, where it needs to be up and pinged since 2026-10-01T02:00:00Z, so nothing is released\n`,
+      err: `::error::The nightly backup is not fresh, so nothing was released. Its check is up and was last pinged at ${copies}. It must be up and pinged at or after 2026-10-01T02:00:00Z. Check the backup job on the box, then dispatch \`release\`.\n`,
     });
   });
 
@@ -432,7 +439,7 @@ describe("the backup check before a nightly release", () => {
     expect(await runBackupFresh({}, "not-the-key")).toEqual({
       code: 1,
       out: "",
-      err: "::error::the dead-man service answered 401 for the pg-hourly check, so the backup's freshness is unknown and nothing is released\n",
+      err: "::error::The dead-man service answered 401 for the pg-hourly check, so the backup could not be checked and nothing was released.\n",
     });
   });
 
@@ -440,7 +447,7 @@ describe("the backup check before a nightly release", () => {
     expect(await runBackupFresh({}, "")).toEqual({
       code: 1,
       out: "",
-      err: "::error::HEALTHCHECKS_READ_KEY is not set in the production environment, so the nightly release cannot read whether the box's backup is fresh (RUNBOOK.md page 6)\n",
+      err: "::error::HEALTHCHECKS_READ_KEY is not set in the production environment, so the nightly release cannot check that the backup is fresh. Add the dead-man service's read-only key as that secret (RUNBOOK.md page 6).\n",
     });
   });
 });
@@ -581,7 +588,7 @@ describe("the redeploy step of a release", () => {
     ]);
     expect({ code: redeployed.code, out: redeployed.out, err: redeployed.err }).toEqual({
       code: 0,
-      out: `the compose build command is now \`${PULL_STEP}\`\ndeploying production as deployment ${DEPLOYMENT}\ndeployment ${DEPLOYMENT} finished\n`,
+      out: `Set the compose build command to \`${PULL_STEP}\`.\nDeploying production as deployment ${DEPLOYMENT}.\nDeployment ${DEPLOYMENT} finished.\n`,
       err: "",
     });
   });
@@ -613,7 +620,7 @@ describe("the redeploy step of a release", () => {
       code: redeployed.code,
       reads: redeployed.heard.filter((heard) => heard.url === DEPLOYMENT_READ).length,
       last: redeployed.out.trimEnd().split("\n").at(-1),
-    }).toEqual({ code: 0, reads: 3, last: `deployment ${DEPLOYMENT} finished` });
+    }).toEqual({ code: 0, reads: 3, last: `Deployment ${DEPLOYMENT} finished.` });
   });
 
   it("fails the release when the deployment fails, naming it", async () => {
@@ -623,7 +630,7 @@ describe("the redeploy step of a release", () => {
 
     expect({ code: redeployed.code, err: redeployed.err }).toEqual({
       code: 1,
-      err: `::error::deployment ${DEPLOYMENT} ended failed. Read its log in the orchestrator. A failure before \`Removing old containers.\` left production running the release before this one\n`,
+      err: `::error::Deployment ${DEPLOYMENT} ended with status failed. Read its log in the orchestrator. If it failed before the line \`Removing old containers.\`, production still runs the previous release.\n`,
     });
   });
 
@@ -646,7 +653,7 @@ describe("the redeploy step of a release", () => {
       read: true,
       waitedItOut: true,
       gaveUpPromptly: true,
-      err: `::error::deployment ${DEPLOYMENT} had not finished 2 s after it was queued, and its last status read was in_progress. It may still swap production later, so read /health before acting\n`,
+      err: `::error::Deployment ${DEPLOYMENT} did not finish within 2 s of being queued. Its last status was in_progress. It may still replace the production containers later, so read /health before you act.\n`,
     });
   });
 
@@ -661,7 +668,7 @@ describe("the redeploy step of a release", () => {
       }).toEqual({
         code: 1,
         calls: ["GET /api/v1/applications/uuid-1", `GET ${DEPLOYMENTS_LIST}`],
-        err: `::error::production's deployment dep-00 is ${status}, so the release sets nothing: a deployment not yet started reads the digests set before it starts. Let it end, or cancel it in the orchestrator, then run the release again\n`,
+        err: `::error::Production deployment dep-00 is ${status}, so the release changed nothing: a deployment that has not started would pick up the new digests. Wait for it to end, or cancel it in the orchestrator, then run the release again.\n`,
       });
     }
   });
@@ -677,7 +684,7 @@ describe("the redeploy step of a release", () => {
     expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
       code: 1,
       heard: 2,
-      err: `::error::GET ${DEPLOYMENTS_LIST} answered no list of deployments, so the release cannot tell whether one is queued or running, and sets nothing\n`,
+      err: `::error::GET ${DEPLOYMENTS_LIST} did not return a list of deployments, so the release cannot tell whether a deployment is queued or running. It changed nothing.\n`,
     });
   });
 
@@ -702,7 +709,7 @@ describe("the redeploy step of a release", () => {
     expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
       code: 1,
       heard: 6,
-      err: `::error::the orchestrator queued no deployment, because one of production was queued after this release checked for one, and the id it answered, ${DEPLOYMENT}, names nothing. Both digests are set, and that deployment reads them if it has not started, with no smoke and no tag after it. Read /health once it ends, then run the release again\n`,
+      err: `::error::The orchestrator did not queue a deployment: another production deployment was queued after this release checked, and the returned id ${DEPLOYMENT} does not exist. Both digests are set, so that other deployment uses them if it has not started, but no smoke test or tag follows it. When it ends, read /health, then run the release again.\n`,
     });
   });
 
@@ -717,7 +724,7 @@ describe("the redeploy step of a release", () => {
     expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
       code: 1,
       heard: 1,
-      err: "::error::GET /api/v1/applications/uuid-1 was answered 403: the token is not live, or lacks Coolify's `read` ability, or the edge refused its service token, as the answer above says. The release's token needs `read`, `write` and `deploy`\n",
+      err: "::error::GET /api/v1/applications/uuid-1 got 403. The response above says which cause applies: the Coolify token is invalid, the token lacks the `read` ability, or Cloudflare Access refused the service token. The Coolify token needs the `read`, `write` and `deploy` abilities.\n",
     });
   });
 
@@ -743,7 +750,7 @@ describe("the redeploy step of a release", () => {
     expect(redeployed.code).toBe(1);
     expect(redeployed.heard).toHaveLength(1);
     expect(redeployed.err).toEqual(
-      "::error::GET /api/v1/applications/uuid-1 was answered 302, a redirect to sign-in: the edge's Access credential is missing or expired, so the call never reached the orchestrator\n",
+      "::error::GET /api/v1/applications/uuid-1 got 302, a redirect to the sign-in page, so the call never reached the orchestrator. The Cloudflare Access service token (CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET) is missing or expired.\n",
     );
   });
 
@@ -754,7 +761,7 @@ describe("the redeploy step of a release", () => {
 
     expect({ code: redeployed.code, err: redeployed.err }).toEqual({
       code: 1,
-      err: `::error::GET ${DEPLOYMENT_READ} was answered 302, a redirect to sign-in: the edge's Access credential is missing or expired, so the call never reached the orchestrator\n`,
+      err: `::error::GET ${DEPLOYMENT_READ} got 302, a redirect to the sign-in page, so the call never reached the orchestrator. The Cloudflare Access service token (CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET) is missing or expired.\n`,
     });
   });
 
@@ -764,7 +771,7 @@ describe("the redeploy step of a release", () => {
     expect(redeployed.code).toBe(1);
     expect(redeployed.heard).toHaveLength(6);
     expect(redeployed.err).toEqual(
-      "::error::POST /api/v1/deploy?uuid=uuid-1&force=false was answered 500, so the release stops before anything else is sent\n",
+      "::error::POST /api/v1/deploy?uuid=uuid-1&force=false got 500, so the release stopped and sent no further requests. The response above says why.\n",
     );
   });
 
@@ -776,7 +783,7 @@ describe("the redeploy step of a release", () => {
     expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
       code: 1,
       heard: 6,
-      err: "::error::POST /api/v1/deploy named no deployment_uuid, so the release cannot wait for the deployment\n",
+      err: "::error::POST /api/v1/deploy returned no deployment_uuid, so the release cannot wait for the deployment. Find the deployment in the orchestrator and read /health once it ends.\n",
     });
   });
 
@@ -788,7 +795,7 @@ describe("the redeploy step of a release", () => {
     expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
       code: 1,
       heard: 0,
-      err: "::error::CF_ACCESS_CLIENT_ID is empty, so the orchestrator cannot be reached. A called release reads an environment secret only when its caller passes the secret's name\n",
+      err: "::error::CF_ACCESS_CLIENT_ID is empty, so the release cannot reach the orchestrator. A called workflow reads an environment secret only if its caller passes that secret by name, so check the secrets: block in the workflow that calls release.yml.\n",
     });
   });
 });

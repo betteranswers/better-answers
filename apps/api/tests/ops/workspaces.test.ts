@@ -135,7 +135,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
-        "provision-workspace: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
+        "provision-workspace: REFUSED — no-such-user: nobody@acme.invalid has not signed in. Ask them to sign in with an email code, or add them with add-person, then run this again.",
       ]);
       expect(await workspacesWithShortName(served(), shortName)).toBe(0);
     });
@@ -155,7 +155,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(9);
       expect(run.lines).toEqual([
-        `provision-workspace: REFUSED — no-display-name: ${admin.email} has given no display name; have them sign in and give one, then run this again`,
+        `provision-workspace: REFUSED — no-display-name: ${admin.email} has no display name. Ask them to sign in and give one, then run this again.`,
       ]);
       expect(await workspacesWithShortName(served(), shortName)).toBe(0);
       expect(await workspaceCountOf(served(), admin.id)).toBe(0);
@@ -186,7 +186,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(8);
       expect(run.lines).toEqual([
-        `provision-workspace: REFUSED — slug-taken: another workspace already holds the short name ${shortName}`,
+        `provision-workspace: REFUSED — slug-taken: another workspace already has the short name ${shortName}`,
       ]);
       expect(await workspacesWithShortName(served(), shortName)).toBe(1);
       expect(await workspaceCountOf(served(), second.id)).toBe(0);
@@ -206,7 +206,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
-        "provision-workspace: REFUSED — malformed: the name and the short name must each carry at least one character",
+        "provision-workspace: REFUSED — malformed: the name and the short name must each have at least one character",
       ]);
       expect(await workspaceCountOf(served(), admin.id)).toBe(0);
     });
@@ -301,7 +301,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
-        "add-member: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
+        "add-member: REFUSED — no-such-user: nobody@acme.invalid has not signed in. Ask them to sign in with an email code, or add them with add-person, then run this again.",
       ]);
       expect(await rowsOfAction(served(), workspaceId, "people.member.added")).toEqual([]);
     });
@@ -314,7 +314,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(9);
       expect(run.lines).toEqual([
-        `add-member: REFUSED — no-display-name: ${person.email} has given no display name; have them sign in and give one, then run this again`,
+        `add-member: REFUSED — no-display-name: ${person.email} has no display name. Ask them to sign in and give one, then run this again.`,
       ]);
       expect(await workspaceCountOf(served(), person.id)).toBe(0);
       expect(await rowsOfAction(served(), workspaceId, "people.member.added")).toEqual([]);
@@ -328,7 +328,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
-        `add-member: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
+        `add-member: REFUSED — no-such-workspace: no workspace has the id ${nowhere}`,
       ]);
       expect(await workspaceCountOf(served(), person.id)).toBe(0);
       expect(await auditLogOf(served(), nowhere)).toEqual([]);
@@ -344,7 +344,7 @@ describe("pnpm ops", () => {
 
       expect([again.exitCode, theAdmin.exitCode]).toEqual([8, 8]);
       expect(again.lines).toEqual([
-        `add-member: REFUSED — already-a-member: ${person.email} is already a member of workspace ${workspaceId}; a role change is the Admin's action on the People page`,
+        `add-member: REFUSED — already-a-member: ${person.email} is already a member of workspace ${workspaceId}. To change their role, an Admin uses the People page.`,
       ]);
       expect((await membersOf(served(), workspaceId, person.id)).map((row) => row.role)).toEqual([
         "Editor",
@@ -435,7 +435,7 @@ describe("pnpm ops", () => {
       expect(run.exitCode).toBe(0);
       const personId = idOnTheDoneLine(run);
       expect(run.lines).toEqual([
-        `add-person: done — ${personId}, ${email}, named Matthew Burgess; unverified until their first email-code sign-in`,
+        `add-person: done — ${personId}, ${email}, named Matthew Burgess. Their email address stays unverified until they first sign in with an email code.`,
       ]);
       expect(await personsAt(served(), email)).toEqual([
         { id: personId, name: "Matthew Burgess", email, email_verified: false },
@@ -475,12 +475,12 @@ describe("pnpm ops", () => {
       [
         "a two-line name",
         ["--email", "matthew@phew.invalid", "--name", "Matthew\nBurgess"],
-        "display-name-not-one-line: a display name is one line of 1 to 100 characters, with no angle brackets or control characters",
+        "display-name-not-one-line: a display name must be one line of 1 to 100 characters, with no angle brackets or control characters",
       ],
       [
         "an angle-bracketed name",
         ["--email", "matthew@phew.invalid", "--name", "Matthew <m@phew.invalid>"],
-        "display-name-angle-bracket: a display name is one line of 1 to 100 characters, with no angle brackets or control characters",
+        "display-name-angle-bracket: a display name must be one line of 1 to 100 characters, with no angle brackets or control characters",
       ],
     ])("refuses %s with exit 2 and writes nothing", async (_shape, flags, said) => {
       const before = await addedRowCount(served());
@@ -510,8 +510,8 @@ describe("pnpm ops", () => {
 
       expect([again.exitCode, held.exitCode]).toEqual([8, 8]);
       expect([...again.lines, ...held.lines]).toEqual([
-        `add-person: REFUSED — person-exists: ${email} is already a person; add-member takes them as they stand`,
-        `add-person: REFUSED — person-exists: ${signedIn.email.toUpperCase()} is already a person; add-member takes them as they stand`,
+        `add-person: REFUSED — person-exists: a person with the email address ${email} already exists. Add them to a workspace with add-member.`,
+        `add-person: REFUSED — person-exists: a person with the email address ${signedIn.email.toUpperCase()} already exists. Add them to a workspace with add-member.`,
       ]);
       expect((await personsAt(served(), email)).map((row) => row.name)).toEqual([
         "Matthew Burgess",
@@ -581,7 +581,7 @@ describe("pnpm ops", () => {
     ) => ({ actor: BOOTSTRAP_ACTOR, subject_id: workspaceId, detail });
 
     const MALFORMED =
-      "rename-workspace: REFUSED — malformed: give --workspace a workspace id, and --name, --short-name or both a value that is not blank";
+      "rename-workspace: REFUSED — malformed: --workspace must be a workspace id, and --name, --short-name or both must have a value that is not blank";
 
     it("changes the name, short name, or both, auditing each change", async () => {
       const { workspaceId, shortName } = await served().provision({ name: "Acme" });
@@ -657,7 +657,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(8);
       expect(run.lines).toEqual([
-        "rename-workspace: REFUSED — slug-taken: another workspace already holds that short name",
+        "rename-workspace: REFUSED — slug-taken: another workspace already has that short name",
       ]);
       expect(await outcomeOf(served(), workspaceId)).toEqual({
         standing: [{ name: "Acme", shortName }],
@@ -672,7 +672,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
-        `rename-workspace: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
+        `rename-workspace: REFUSED — no-such-workspace: no workspace has the id ${nowhere}`,
       ]);
       expect(await auditLogOf(served(), nowhere)).toEqual([]);
     });

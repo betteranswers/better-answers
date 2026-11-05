@@ -58,7 +58,7 @@ export const declarationDocBlockRule = defineRule({
     },
     messages: {
       lineComment:
-        "A declaration's comment is a `/** */` doc block, never `//`; an editor shows a doc block wherever the name is used. Write this block as `/** … */`.",
+        "Write a comment on a declaration as a `/** … */` doc block, not `//`, so an editor shows it wherever the name is used.",
     },
   },
   createOnce(context) {

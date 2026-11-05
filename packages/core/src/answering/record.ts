@@ -146,9 +146,7 @@ export type DraftKeeping = {
   readonly now: Date;
 };
 
-/**
- * A record not completed, or not there, answers an error.
- */
+/** Returns an error for a record that is missing or not completed. */
 export const keepDraft = async (
   asker: UserPrincipal,
   tx: Tx,

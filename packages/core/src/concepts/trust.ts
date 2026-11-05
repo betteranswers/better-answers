@@ -183,7 +183,10 @@ const rankOf = (trust: Trust): number =>
     ? STATUS_RANK.current + TIER_RANK[trust.tier]
     : STATUS_RANK[trust.status];
 
-/** Of two equally weak trusts, the one verified longest ago limits what rests on both. */
+/**
+ * When two trusts are equally weak, the one verified longest ago sets the trust of prose that cites
+ * both.
+ */
 const weaker = (one: Trust, other: Trust): Trust => {
   const difference = rankOf(one) - rankOf(other);
   if (difference !== 0) return difference < 0 ? one : other;
@@ -198,6 +201,6 @@ const NOTHING_CITED: Trust = {
   status: "current",
 };
 
-/** Prose is as trusted as the least trusted concept it rests on, and unverified when it rests on none. */
+/** Prose is as trusted as the least trusted concept it cites, and unverified when it cites none. */
 export const weakestTrust = (trusts: readonly Trust[]): Trust =>
   trusts.reduce(weaker, trusts[0] ?? NOTHING_CITED);

@@ -443,6 +443,6 @@ const suggested = async (
   if (!submitted.ok) return err(submitted.error);
   const [suggestionId] = submitted.value.suggestionIds;
   return suggestionId === undefined
-    ? err(new Error("a suggestion set of one answered no suggestion"))
+    ? err(new Error("submitting a set of one suggestion returned no suggestion id"))
     : ok({ outcome: "suggested", suggestionId });
 };

@@ -55,7 +55,7 @@ const parseArgv = (argv: readonly string[]): Parsed => {
   if (values === undefined) return { refused: USAGE };
   const anchor = anchorOf(values);
   if (anchor === undefined) return { refused: USAGE };
-  if (anchor.line < 1) return { refused: "--line counts from 1" };
+  if (anchor.line < 1) return { refused: "--line must be 1 or more" };
   if (anchor.from.length === 0) return { refused: "--from must name the text to replace" };
   const timeoutMs = timeoutOf(values.get("timeout-ms"));
   if (timeoutMs === undefined) {
@@ -90,7 +90,7 @@ const gitSync = (cwd: string, args: readonly string[]): GitAnswer => {
   return { status: result.status, out: `${result.stdout}${result.stderr}` };
 };
 
-/** The entry a workspace's `test` script starts; under pnpm's `#!` shim, every macOS spawn queues. */
+/** Runs vitest's entry directly, because spawns through pnpm's `#!` shim queue on macOS. */
 const vitestEntryFor = (workspace: string): string | undefined => {
   const entry = path.join(workspace, "node_modules", "vitest", "vitest.mjs");
   return existsSync(entry) ? entry : undefined;
@@ -101,18 +101,18 @@ const applyTo = (original: string, mutation: Mutation): { readonly mutated: stri
   const target = lines[mutation.line - 1];
   if (target === undefined) {
     return {
-      refused: `${mutation.file} has ${String(lines.length)} lines; there is no line ${String(mutation.line)}`,
+      refused: `${mutation.file} has ${String(lines.length)} lines, so there is no line ${String(mutation.line)}`,
     };
   }
   const first = target.indexOf(mutation.from);
   if (first === -1) {
     return {
-      refused: `line ${String(mutation.line)} of ${mutation.file} does not contain \`${mutation.from}\` — the source has moved; re-anchor the probe`,
+      refused: `line ${String(mutation.line)} of ${mutation.file} does not contain \`${mutation.from}\`. The source may have changed, so check --line and --from against the file.`,
     };
   }
   if (target.indexOf(mutation.from, first + 1) !== -1) {
     return {
-      refused: `line ${String(mutation.line)} of ${mutation.file} contains \`${mutation.from}\` more than once; give --from enough of the line to be unique`,
+      refused: `line ${String(mutation.line)} of ${mutation.file} contains \`${mutation.from}\` more than once. Give --from enough of the line to match only once.`,
     };
   }
   const mutatedLine = `${target.slice(0, first)}${mutation.to}${target.slice(first + mutation.from.length)}`;
@@ -171,7 +171,7 @@ const outcomeOf = (report: VitestReport | undefined, exit: string): SuiteOutcome
     report.numFailedTests === undefined ||
     report.success === undefined
   ) {
-    return { kind: "did not run", detail: `vitest exited ${exit} having run no test` };
+    return { kind: "did not run", detail: `vitest exited ${exit} without running a test` };
   }
   if (!report.success && report.numFailedTests === 0) {
     return { kind: "did not run", detail: filesFailedIn(report) };
@@ -265,7 +265,7 @@ const suiteFor = (file: string): Suite | Refused => {
   const workspace = workspaceOf(file);
   if (workspace === undefined) {
     return {
-      refused: `no package.json above ${file}, so there is no workspace whose suite to run`,
+      refused: `no package.json found above ${file}, so the probe cannot find a workspace suite to run`,
     };
   }
   const entry = vitestEntryFor(workspace);
@@ -278,12 +278,12 @@ const suiteFor = (file: string): Suite | Refused => {
 const gitRefusal = (workspace: string, file: string, relative: string): Refused | undefined => {
   if (gitSync(workspace, ["ls-files", "--error-unmatch", "--", relative]).status !== 0) {
     return {
-      refused: `${file} is not tracked by git, so a restore could not be checked against HEAD`,
+      refused: `${file} is not tracked by git, so the probe cannot check the restore against HEAD`,
     };
   }
   if (gitSync(workspace, ["diff", "--quiet", "--", relative]).status !== 0) {
     return {
-      refused: `${file} already has an unstaged change; a probe never restores over someone's edit`,
+      refused: `${file} has an unstaged change, which the probe would overwrite when it restores the file. Commit or stash the change first.`,
     };
   }
   return undefined;
@@ -325,7 +325,7 @@ const runMutated = async (probe: Probe): Promise<SuiteOutcome> => {
     complain(
       restored
         ? `${relative} restored`
-        : `${relative} could NOT be restored — it does not match what was read; restore it by hand`,
+        : `${relative} could NOT be restored, because its content differs from what the probe read. Restore it by hand.`,
     );
   }
 };
@@ -333,10 +333,10 @@ const runMutated = async (probe: Probe): Promise<SuiteOutcome> => {
 const printVerdict = (outcome: SuiteOutcome): Exit => {
   switch (outcome.kind) {
     case "interrupted":
-      complain("interrupted before the suite finished; no verdict");
+      complain("interrupted before the suite finished, so there is no verdict");
       return EXIT.interrupted;
     case "did not run":
-      complain(`the suite did not run (${outcome.detail}); no verdict`);
+      complain(`the suite did not run (${outcome.detail}), so there is no verdict`);
       return EXIT.failed;
     case "timed out":
       say("verdict: timed out");

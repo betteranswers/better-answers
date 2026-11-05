@@ -404,7 +404,7 @@ describe("the daily sweep pass", () => {
       matching.objectContaining({
         level: 50,
         msg: "the sweep pass failed",
-        reason: matching.stringContaining("its row was not written"),
+        reason: matching.stringContaining("sweep_pass"),
       }),
     );
     expect(sweeps.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);

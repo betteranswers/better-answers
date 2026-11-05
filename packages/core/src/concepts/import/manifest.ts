@@ -80,8 +80,8 @@ export const manifestAtHead = async (
 };
 
 /**
- * `written: false` when a manifest with the same id already stands, `path-taken` when anything
- * else holds the path.
+ * `written: false` when a manifest with the same id already exists, and `path-taken` when another
+ * file is at the path.
  */
 export const writeManifest = async (
   principal: UserPrincipal,

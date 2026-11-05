@@ -309,13 +309,14 @@ def main() -> int:
     mode.add_argument(
         "--once",
         action="store_true",
-        help="one pass over every workspace, then exit — what a test drives",
+        help="serve every workspace once, then exit. Tests use this mode",
     )
     mode.add_argument(
         "--ticks",
         action="store_true",
-        help="one pass per line on standard input, each answered with a done line,"
-        " then exit at its end (what a test file drives)",
+        help="serve every workspace once for each line read from standard input, and"
+        " log a 'tick done' event after each pass. Exit when the input ends. Test files"
+        " use this mode",
     )
     arguments = parser.parse_args()
 

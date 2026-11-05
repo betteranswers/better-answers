@@ -22,7 +22,7 @@ describe("the rule that a function never mutates a parameter", () => {
 
     expect(output).toContain("better-answers(parameter-never-mutated)");
     expect(output).toContain("`sort` changes the parameter `rows` in place");
-    expect(output).toContain("return a new value");
+    expect(output).toContain("Return a new value instead");
   });
 
   it.each([

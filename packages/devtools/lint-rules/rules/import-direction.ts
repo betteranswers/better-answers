@@ -29,23 +29,26 @@ const ZONES = {
   },
   door: {
     reaches: new Set<Zone>(["kernel"]),
-    clause: "a store door imports only kernel, and store/map alone also imports access",
+    clause:
+      "a store door (a folder under store/) imports only kernel, and only store/map may also import access",
   },
   layer: {
     reaches: new Set<Zone>(["kernel", "access", "door"]),
-    clause: "llm and audit import kernel, access and the doors — never a slice, never each other",
+    clause:
+      "llm and audit import only kernel, access and the store doors, never a slice or each other",
   },
   slice: {
     reaches: new Set<Zone>(["kernel", "access", "door", "layer", "slice"]),
-    clause: "a slice reaches another only through its face",
+    clause: "a slice imports another slice only through that slice's index.ts",
   },
   catalogue: {
     reaches: new Set<Zone>(["kernel", "slice"]),
-    clause: "the refusal catalogue imports kernel and each slice's face, and nothing else",
+    clause: "the refusal catalogue imports only kernel and each slice's index.ts",
   },
   test: {
     reaches: new Set<Zone>(["kernel", "access", "door", "layer", "slice", "catalogue"]),
-    clause: "a test reaches the directory its folder mirrors, and any other only through its face",
+    clause:
+      "a test imports any file in the directory its folder mirrors, and any other directory only through its index.ts",
   },
 } satisfies Record<Zone, { readonly reaches: ReadonlySet<Zone>; readonly clause: string }>;
 
@@ -266,18 +269,18 @@ export const importFinding = (
 
 const MESSAGES = {
   transport:
-    "packages/core is transport-agnostic: `{{specifier}}` is a transport or a transport's dependency. A status code, a Request or a Response belongs in apps/api; export a function and a typed error instead.",
-  direction: "`{{fromDir}}` ({{from}}) may not import `{{toDir}}` ({{to}}): {{clause}}.",
+    "packages/core must stay transport-agnostic, and `{{specifier}}` is a transport or a transport's dependency. Status codes, Request and Response belong in apps/api. Export a function and a typed error from core instead.",
+  direction: "`{{fromDir}}` ({{from}}) must not import `{{toDir}}` ({{to}}), because {{clause}}.",
   catalogue:
-    "Nothing in core imports the refusal catalogue; it reads every slice's vocabulary, and only a test reaches it.",
+    "Nothing in core may import the refusal catalogue, because the catalogue reads every slice's vocabulary. Only a test may import it.",
   erasure:
-    "Nothing in core imports `erasure` but the refusal catalogue; it sits at the top of the slice graph, and beyond the catalogue only a test reaches it.",
+    "Only the refusal catalogue may import `erasure`, because erasure is at the top of the slice graph. Outside the catalogue, only a test may import it.",
   internal:
-    "`{{fromDir}}` ({{from}}) reaches `{{dir}}` only through its own index.ts, never `{{inside}}`. Export what you need from that face and import it from there.",
+    "`{{fromDir}}` ({{from}}) may import `{{dir}}` only through its own index.ts, not `{{inside}}`. Export what you need from that index.ts and import it from there.",
   testInternal:
-    "A test reaches `{{dir}}` only through its own index.ts, never `{{inside}}`, unless it sits in `{{folder}}`, the folder that mirrors `{{dir}}`. Import the face, or move the test to `{{folder}}`.",
+    "A test may import `{{dir}}` only through its own index.ts, not `{{inside}}`, unless the test is in `{{folder}}`, the folder that mirrors `{{dir}}`. Import from the index.ts, or move the test to `{{folder}}`.",
   unexported:
-    "`{{dir}}/index.ts` is a face packages/core's exports map does not name. Add `./{{entry}}` to the map, so a sibling and a transport reach one face and a test outside its mirror folder reaches an entry point.",
+    "`{{dir}}/index.ts` is not in the exports map of packages/core. Add `./{{entry}}` to the map, so that sibling slices, transports and tests outside their mirror folder all import the same entry point.",
 } satisfies Record<Finding["messageId"], string>;
 
 export const messageOf = ({ messageId, data }: Finding): string =>
@@ -290,7 +293,8 @@ export const importDirectionRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description: "The import-direction rules over packages/core, by the position of both ends.",
+      description:
+        "Which folders in packages/core may import which, judged by where the importing and imported files sit.",
     },
     messages: MESSAGES,
   },

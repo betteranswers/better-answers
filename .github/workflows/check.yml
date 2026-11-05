@@ -2,29 +2,28 @@ name: check
 
 on:
   pull_request:
-  # `build.yml` calls this on main, so a push runs `check` once rather than twice.
+  # `build.yml` calls this on main, so a push runs `check` once, not twice.
   workflow_call:
     inputs:
       images-probed-by-the-caller:
         description: >-
           Set by a caller whose own job builds the images, loads each one that has a
-          contents test and runs that test against the build it is about to push (`T-043`).
-          The suites here then leave those tests to that job, so a push to main builds a
-          probed image once rather than once on this runner and once on that one. A pull
-          request has no such job and passes nothing, so it probes when an image's inputs changed.
-          It reaches the one leg whose suites read it, `full-images`, and no other;
-          `packages/devtools/test/ci/image-job.test.ts` holds that both ways.
+          contents test, and runs that test against the build it is about to push.
+          The suites here then skip those tests, so a push to main builds each probed image
+          once instead of twice. A pull request has no such job and passes nothing, so it
+          probes when an image's inputs changed. Only the `full-images` leg reads this input;
+          `packages/devtools/test/ci/image-job.test.ts` checks that.
         type: boolean
         default: false
-    # Passed by name from `build.yml`; a called workflow reads no secret it was not handed.
+    # Passed by name from `build.yml`; a called workflow can read only the secrets it is passed.
     secrets:
       DOCKERHUB_USERNAME:
         required: false
       DOCKERHUB_TOKEN:
         required: false
 
-# A pull request cancels the run it supersedes; a run `build.yml` calls never does,
-# because every commit that lands is worth an image.
+# A pull request cancels the run it replaces. A run that `build.yml` calls never does,
+# because every commit that lands on main needs its image.
 concurrency:
   group: check-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -33,8 +32,8 @@ permissions:
   contents: read
 
 jobs:
-  # A release, not the `ubuntu-latest` label, which GitHub is moving to Ubuntu 26; every
-  # `runs-on:` in this directory names one.
+  # A fixed release, not `ubuntu-latest`, which GitHub is moving to Ubuntu 26. Every
+  # `runs-on:` in this directory names a fixed release.
   lane:
     runs-on: ubuntu-26.04
     timeout-minutes: 10
@@ -45,9 +44,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The base is fetched one commit deep, and anonymously, the repository being public:
-      # `git diff` between two trees needs no ancestry.
-      - name: the lane this change runs in
+      # Fetches the base one commit deep and anonymously, because the repository is public:
+      # `git diff` between two trees needs no history.
+      - name: Choose the lane for this change
         id: lane
         env:
           EVENT: ${{ github.event_name }}
@@ -66,24 +65,24 @@ jobs:
             from="$(git rev-parse FETCH_HEAD)" &&
             git diff -z --name-only --no-renames "${from}" HEAD > "${RUNNER_TEMP}/changed-paths"; then
             echo "the changed paths are read from ${base}, at ${from}, to HEAD"
-            # Read back here so that an unknown word is refused below, not published.
+            # Read back here, so an unknown value fails below instead of being published.
             decided="$(node scripts/docs-lane.mjs < "${RUNNER_TEMP}/changed-paths")"
             lane="$(printf '%s\n' "${decided}" | sed -n 's/^lane=//p')"
             images="$(printf '%s\n' "${decided}" | sed -n 's/^images=//p')"
           else
-            echo "::notice::no diff against a base (event ${EVENT}, base '${base}'), so this run takes every path as changed"
+            echo "::notice::no base to diff against (event ${EVENT}, base '${base}'), so this run treats every path as changed"
           fi
           case "${lane}" in
             docs | full) ;;
             *)
-              echo "::error::the lane resolved to '${lane}', which is no lane this workflow has"
+              echo "::error::the lane resolved to '${lane}', but this workflow has no lane by that name. scripts/docs-lane.mjs must print docs or full."
               exit 1
               ;;
           esac
           case "${images}" in
             yes | no) ;;
             *)
-              echo "::error::whether an image's inputs changed resolved to '${images}', which is neither yes nor no"
+              echo "::error::images resolved to '${images}', which is neither yes nor no. scripts/docs-lane.mjs must print one of them."
               exit 1
               ;;
           esac
@@ -124,15 +123,15 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      # Unpinned, this action takes whatever uv is newest, which is not the uv the worker
+      # Without a pinned version, this action installs the newest uv, not the uv the worker
       # image was built with.
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
       - run: pnpm install --frozen-lockfile
-      # The only fresh clone in CI, so the only place install's promise can be tested.
-      - name: the pre-commit hook is installed by install alone
+      # The only fresh clone in CI, so the only place to test that install sets up the hook.
+      - name: Check that pnpm install alone installs the pre-commit hook
         run: |
           hook="$(git rev-parse --git-path hooks)/pre-commit"
           test -x "$hook" || { echo "no executable pre-commit hook at $hook"; exit 1; }
@@ -140,12 +139,12 @@ jobs:
       - run: uv sync --frozen
         working-directory: apps/worker
       # The suites' Postgres and the images they build pull from Docker Hub, whose anonymous
-      # limit is the runner address's and is shared with strangers (BA-96).
+      # rate limit applies per runner address and is shared with other users.
       - uses: ./.github/actions/docker-hub-login
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      # `check:tree` less `packages/core`'s suite, which is `full-core`'s.
+      # `check:tree` without the `packages/core` suite, which `full-core` runs.
       - run: pnpm check:root
 
   full-core:
@@ -166,12 +165,12 @@ jobs:
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
-      - name: HF_HOME on the runner's own temp directory, not the checkout
+      - name: Put HF_HOME in the runner's temp directory, outside the checkout
         run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
-      # The cross-tier suite runs the worker over an index job, which loads the detector's
-      # models; without this it fetches them afresh every run. Restore
-      # only: `build.yml`'s `caches` job writes the entry on main, where every ref reads it.
-      - name: the redaction detector's weights, keyed on the pins that name them
+      # The cross-tier suite runs the worker on an index job, which loads the detector's
+      # models; without this cache it downloads them on every run. This job only restores:
+      # the `caches` job in `build.yml` saves the entry on main, where every ref can read it.
+      - name: Restore the redaction detector's weights, keyed on its model pins
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/huggingface
@@ -204,11 +203,11 @@ jobs:
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
-      - name: HF_HOME on the runner's own temp directory, not the checkout
+      - name: Put HF_HOME in the runner's temp directory, outside the checkout
         run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
-      # This leg runs the worker over an index job, which loads the detector's models;
-      # without this it fetches them afresh every run. Restore only, as in `full-core`.
-      - name: the redaction detector's weights, keyed on the pins that name them
+      # This leg runs the worker on an index job, which loads the detector's models; without
+      # this cache it downloads them on every run. Restore only, as in `full-core`.
+      - name: Restore the redaction detector's weights, keyed on its model pins
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/huggingface
@@ -240,7 +239,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:web:unit
 
-  # Playwright deals tests to the shards, not files, because the suite is fully parallel.
+  # Playwright splits tests, not files, across the shards, because the suite is fully parallel.
   full-web-browser:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
@@ -271,7 +270,7 @@ jobs:
       - run: pnpm check:web:e2e --shard="${SHARD}"
         env:
           SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
-      # Not failure(): a flake passes on its retry, and its trace is the one worth reading.
+      # Not failure(): a flaky test passes on retry, and its trace is the one worth reading.
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -289,23 +288,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Weights inside the checkout are read by every tree walker too, and a job's own
-      # `env:` cannot reach the `runner` context.
-      - name: HF_HOME on the runner's own temp directory, not the checkout
+      # Weights inside the checkout would be read by every tree walker, and a job's own
+      # `env:` cannot use the `runner` context.
+      - name: Put HF_HOME in the runner's temp directory, outside the checkout
         run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
-          # pnpm verifies the tree before it runs a script, so `check:worker` installs
-          # whether this leg asked for it or not.
+          # pnpm checks the install before it runs a script, so `pnpm check:worker` installs
+          # Node dependencies in this leg too, and the cache speeds that up.
           cache: pnpm
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
       # Restore only, as in `full-core`.
-      - name: the redaction detector's weights, keyed on the pins that name them
+      - name: Restore the redaction detector's weights, keyed on its model pins
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/huggingface
@@ -316,13 +315,12 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: one Postgres for the suite's workers
+      - name: Start one Postgres for the suite's workers
         run: deploy/test-postgres.sh up
       - run: pnpm check:worker
         env:
           TEST_POSTGRES_URI: shared
-          # Without it every run tells a third party what this repository is building, once
-          # per document.
+          # Without this, every run reports each document it builds to a third-party service.
           COCOINDEX_DISABLE_USAGE_TRACKING: "1"
 
   full-images:
@@ -354,8 +352,8 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      # The daemon's own builder reads no registry cache unless it keeps images in containerd,
-      # which the runner's does not.
+      # The daemon's own builder reads no registry cache unless it stores images in containerd,
+      # and the runner's daemon does not.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           # The builder does not read the daemon's mirror.
@@ -388,8 +386,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
-      # Read when it runs, not from the event, so a re-run reads a retitle.
-      - name: the pull request's title, through commitlint
+      # Read when the step runs, not from the event, so a re-run sees a changed title.
+      - name: Check the pull request title with commitlint
         env:
           GH_TOKEN: ${{ github.token }}
           PULL_REQUEST: ${{ github.event.pull_request.number }}
@@ -418,12 +416,12 @@ jobs:
         full-images,
         pr-title,
       ]
-    # A skipped required check never reports, so this runs whatever the legs did.
+    # A skipped required check never reports, so this job always runs, whatever the legs did.
     if: ${{ always() }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
-      - name: every leg this lane names is green, and every other leg stood down
+      - name: Check that every leg in this lane passed and every other leg was skipped
         env:
           LANE: ${{ needs.lane.outputs.lane }}
           LEGS: ${{ toJSON(needs) }}
@@ -445,11 +443,11 @@ jobs:
             [ "${was}" = "${wanted}" ] || wrong="${wrong} ${leg}=${was}"
           done
           if [ "${named}" -lt 2 ] || [ "${required}" -lt 1 ]; then
-            echo "::error::this verdict read ${named} jobs and required ${required} of them, so it proved nothing"
+            echo "::error::this verdict read ${named} jobs and required ${required} of them, so it proved nothing. The needs list or the lane names are wrong."
             exit 1
           fi
           if [ -n "${wrong}" ]; then
-            echo "::error::check is not green:${wrong}"
+            echo "::error::check is not green. These jobs ended with the wrong result:${wrong}"
             exit 1
           fi
           echo "the ${LANE} lane is green: ${required} required jobs"

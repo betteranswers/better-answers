@@ -109,7 +109,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines.join("\n")).toContain(
-        "--wait    poll the job until it is over, 120 seconds",
+        "--wait    Waits for the job to finish, for up to 120 seconds",
       );
       expect(run.lines.join("\n")).toContain("--wait-seconds <n>");
     });
@@ -231,7 +231,7 @@ describe("pnpm ops", () => {
       ["map-sweep", "map-sweep: done — nothing to sweep"],
       [
         "object-store-orphans",
-        "object-store-orphans: done — removed 0 objects past the 24-hour grace no document names",
+        "object-store-orphans: done — removed 0 objects older than 24 hours that no document names",
       ],
     ])("%s waits for the daily pass's sweep lock, then runs", async (command, done) => {
       const { workspaceId } = await served().provision();

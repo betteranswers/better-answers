@@ -5,7 +5,7 @@ on:
   workflow_call:
     inputs:
       commit:
-        description: "the commit whose sha-<short> images the calling build pushed; released only while it is main's head"
+        description: "the commit whose sha-<short> images the calling build pushed. It is released only while it is the head of main."
         type: string
         required: true
     # Environment secrets, which a called job reads only when its caller passes their names.
@@ -16,22 +16,22 @@ on:
         required: false
       CF_ACCESS_CLIENT_SECRET:
         required: false
-      # Read by the nightly release alone, which no caller starts.
+      # Only the nightly release reads this, and no caller starts the nightly release.
       HEALTHCHECKS_READ_KEY:
         required: false
-  # After the box's 02:00 copy and its 02:05 dump; clear of mutation at 02:17 and scan at 03:41.
+  # Runs after the box's 02:00 copies and 02:05 dump, and apart from mutation at 02:17 and scan at 03:41.
   schedule:
     - cron: "35 2 * * *"
   workflow_dispatch:
     inputs:
       api_digest:
-        description: "ghcr.io/…/api digest (sha256:…) — blank = the image of main's head commit (its sha-<short> tag); refused if that commit has none"
+        description: "ghcr.io/…/api digest (sha256:…). Leave blank to use the image of the head commit of main (its sha-<short> tag). The release fails if that commit has no image."
         required: false
       worker_digest:
-        description: "ghcr.io/…/worker digest (sha256:…) — blank = the image of main's head commit (its sha-<short> tag); refused if that commit has none"
+        description: "ghcr.io/…/worker digest (sha256:…). Leave blank to use the image of the head commit of main (its sha-<short> tag). The release fails if that commit has no image."
         required: false
       rehearsed_by:
-        description: "When RELEASE_MODE is drill: the drill report this release rides on (drills/drill-<stamp>.md), or `hotfix: <reason>`"
+        description: "Required when RELEASE_MODE is drill: the report of the drill that just passed (drills/drill-<stamp>.md), or `hotfix: <reason>`"
         required: false
 
 permissions: {}
@@ -39,11 +39,11 @@ permissions: {}
 concurrency:
   group: release-production
   cancel-in-progress: false
-  # The default keeps one run pending and cancels it when the next arrives, ending its build cancelled.
+  # By default the queue holds one pending run and cancels it when the next arrives, so its build ends cancelled.
   queue: max
 
 jobs:
-  # It runs inside the group, so main's head is read after every earlier release has finished.
+  # The gate runs inside the group, so it reads the head of main after every earlier release has finished.
   gate:
     runs-on: ubuntu-26.04
     timeout-minutes: 5
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: whether this run releases, and which commit
+      - name: Decide whether this run releases, and which commit
         id: ask
         env:
           GH_TOKEN: ${{ github.token }}
@@ -96,9 +96,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # The commit the gate chose, never main's head as it is now, whose images may not exist yet.
+          # The commit the gate chose, not the current head of main, whose images may not exist yet.
           ref: ${{ needs.gate.outputs.commit || 'main' }}
-      - name: the box's own backup is fresh, before a nightly release
+      - name: Check that the box's backup is fresh before a nightly release
         id: backup
         if: needs.gate.outputs.trigger == 'nightly'
         env:
@@ -112,7 +112,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: resolve digests
+      - name: Resolve the image digests
         id: d
         env:
           IN_API: ${{ inputs.api_digest }}
@@ -123,17 +123,17 @@ jobs:
           # Seven characters, which is what `build.yml`'s `type=sha,prefix=sha-` cuts to.
           head="$(git rev-parse HEAD)"
           tag="sha-${head:0:7}"
-          # The refusal goes to stderr: inside `$(…)` stdout is the digest.
+          # The error goes to stderr, because stdout inside `$(…)` carries the digest.
           last_build() {
             docker buildx imagetools inspect "ghcr.io/${OWNER}/$1:${tag}" --format '{{.Manifest.Digest}}' && return
-            echo "::error::main's head ${head} has no ghcr.io/${OWNER}/$1:${tag} — its build is still running, or red. No older image is promoted in its place: wait for that build, dispatch \`build\` on main, or pass the digests" >&2
+            echo "::error::The head of main, ${head}, has no image ghcr.io/${OWNER}/$1:${tag}: its build is still running or has failed. The release never falls back to an older image. Wait for that build, dispatch \`build\` on main, or pass the digests as inputs." >&2
             return 1
           }
           api="${IN_API:-$(last_build api)}"
           worker="${IN_WORKER:-$(last_build worker)}"
           echo "api=${api}" >> "$GITHUB_OUTPUT"
           echo "worker=${worker}" >> "$GITHUB_OUTPUT"
-      - name: each digest is a digest, on its own
+      - name: Check that each digest is a sha256 digest
         env:
           API_DIGEST: ${{ steps.d.outputs.api }}
           WORKER_DIGEST: ${{ steps.d.outputs.worker }}
@@ -142,27 +142,26 @@ jobs:
           for name in API_DIGEST WORKER_DIGEST; do
             value="${!name}"
             if ! [[ "${value}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-              echo "::error::${name} is not a digest (sha256: followed by 64 hex characters)"
+              echo "::error::${name} is not a digest. Pass sha256: followed by 64 hex characters."
               exit 1
             fi
           done
-      - name: set digests, redeploy production and wait for the deployment
+      - name: Set the digests, redeploy production, and wait for the deployment
         env:
           API_DIGEST: ${{ steps.d.outputs.api }}
           WORKER_DIGEST: ${{ steps.d.outputs.worker }}
         run: deploy/release-redeploy.sh "${API_DIGEST}" "${WORKER_DIGEST}"
-      - name: post-deploy smoke against production
+      - name: Smoke test production after the deploy
         id: smoke
         env:
           API_DIGEST: ${{ steps.d.outputs.api }}
         run: |
           set -euo pipefail
           deploy/await-release.sh "${PUBLIC_URL}" "${API_DIGEST}"
-          # The uptime check watches this path and /health, so the smoke and the monitor
-          # read the same two.
+          # The uptime check watches this path and /health, so the smoke test checks the same two.
           curl -fsS --retry 5 --retry-delay 6 --retry-all-errors "${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp" | jq -e --arg mcp "${PUBLIC_URL}/mcp" '.resource == $mcp' >/dev/null
-      # Named here, where the inputs and digests are, and pushed by the record job, which holds write access.
-      - name: name the release's annotated release/<stamp> tag
+      # Prepared here, where the inputs and digests are. The record job pushes it, because only that job has write access.
+      - name: Prepare the name and message of the release/<stamp> tag
         id: name
         env:
           API_DIGEST: ${{ steps.d.outputs.api }}
@@ -182,25 +181,25 @@ jobs:
           esac
           when="$(date -u +%FT%TZ)"
           head="$(git rev-parse HEAD)"
-          # A ref name takes no colon; the head makes two runs of one second two tags.
+          # A ref name cannot contain a colon. The commit suffix stops two runs in one second from sharing a tag.
           stamp="${when//[-:]/}-${head:0:7}"
           tag="release/${stamp}"
-          # Each digest says for itself whether it was passed or resolved from this head.
+          # Say for each digest whether it was passed in or resolved from this head.
           if [ -z "${IN_API}" ] && [ -z "${IN_WORKER}" ]; then
             points="main's head, which both digests were resolved from"
           elif [ -n "${IN_API}" ] && [ -n "${IN_WORKER}" ]; then
-            points="main's head at this dispatch — both digests were passed in, so this is not where either image was built"
+            points="main's head at this dispatch; both digests were passed in, so neither image was built from this commit"
           elif [ -n "${IN_API}" ]; then
-            points="main's head, which the worker digest was resolved from — the api digest was passed in and its image was built elsewhere"
+            points="main's head, which the worker digest was resolved from; the api digest was passed in, and its image was built from another commit"
           else
-            points="main's head, which the api digest was resolved from — the worker digest was passed in and its image was built elsewhere"
+            points="main's head, which the api digest was resolved from; the worker digest was passed in, and its image was built from another commit"
           fi
           if [ "${TRIGGER}" = nightly ]; then
             points="main's newest commit with a green build, which both digests were resolved from"
           fi
           message="$(printf 'release: api %s · worker %s\n\nWhen (UTC): %s\nBy: %s\napi: %s\nworker: %s\nRode on: %s\nCommit: %s (%s)\nRun: %s\n' \
             "${API_DIGEST:7:12}" "${WORKER_DIGEST:7:12}" "${when}" "${by}" "${API_DIGEST}" "${WORKER_DIGEST}" "${rode}" "${head}" "${points}" "${RUN_URL}")"
-          # `rehearsed_by` is typed by whoever dispatches, so no fixed line can end the message.
+          # `rehearsed_by` is free text, so a random delimiter ends the message.
           delimiter="message-$(openssl rand -hex 16)"
           {
             echo "tag=${tag}"
@@ -220,16 +219,16 @@ jobs:
             echo ""
             echo "The api refuses to start unless PUBLIC_URL, AGENT_HOSTNAME and APEX_HOSTNAME are set on the api resource and all three hostnames differ (ADR 0034)."
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: say that a failed release recorded no tag
+      - name: Report that the failed release pushed no tag
         if: failure()
         env:
           SMOKE: ${{ steps.smoke.outcome }}
           API_DIGEST: ${{ steps.d.outputs.api }}
         run: |
           case "${SMOKE}" in
-            failure) said="The smoke failed: production never answered healthy on api \`${API_DIGEST}\`. No \`release/*\` tag was pushed, so the newest tag is still the release that held (RUNBOOK.md page 6)." ;;
-            success) said="The smoke passed, but the release's tag could not be named, so no \`release/*\` tag was pushed. A release is tagged on its smoke, so tag it by hand (RUNBOOK.md page 6) while production still answers healthy on api \`${API_DIGEST}\`." ;;
-            *) said="The release stopped before its smoke, so no \`release/*\` tag was pushed. Production may still be on the release before it (RUNBOOK.md page 6)." ;;
+            failure) said="The smoke test failed: production never reported healthy on api \`${API_DIGEST}\`. No \`release/*\` tag was pushed, so the newest tag is still the last release that passed its smoke test (RUNBOOK.md page 6)." ;;
+            success) said="The smoke test passed, but the step that prepares the tag failed, so no \`release/*\` tag was pushed. To record the release, tag it by hand (RUNBOOK.md page 6) while production still answers healthy on api \`${API_DIGEST}\`." ;;
+            *) said="The release stopped before its smoke test, so no \`release/*\` tag was pushed. Production may still run the previous release (RUNBOOK.md page 6)." ;;
           esac
           printf '### Not released\n\n%s\n' "${said}" >> "$GITHUB_STEP_SUMMARY"
 
@@ -243,16 +242,16 @@ jobs:
     env:
       PUBLIC_URL: ${{ vars.PUBLIC_URL }}
     steps:
-      # Promote's head, so a commit that landed after the promotion is never the one tagged.
+      # The promote job's head, so a commit that landed after the promotion is never tagged.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: # zizmor: ignore[artipacked] the job pushes its release tag with this credential
           ref: ${{ needs.promote.outputs.head }}
-      - name: production still answers healthy on the promoted api image
+      - name: Check that production still reports healthy on the promoted api image
         env:
           API_DIGEST: ${{ needs.promote.outputs.api_digest }}
           AWAIT_RELEASE_POLLS: "3"
         run: deploy/await-release.sh "${PUBLIC_URL}" "${API_DIGEST}"
-      - name: record the promotion as an annotated release/<stamp> tag (the release's last step)
+      - name: Push the annotated release/<stamp> tag (the release's last step)
         env:
           TAG: ${{ needs.promote.outputs.tag }}
           MESSAGE: ${{ needs.promote.outputs.message }}
@@ -269,10 +268,10 @@ jobs:
             echo ""
             echo "- \`${tag}\` on \`${RELEASE_HEAD}\`"
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: say that the record job pushed no tag
+      - name: Report that the record job pushed no tag
         if: failure()
         env:
           API_DIGEST: ${{ needs.promote.outputs.api_digest }}
         run: |
-          said="Its \`release/*\` tag was not pushed. A release is tagged on its smoke, so tag it by hand (RUNBOOK.md page 6) once production answers healthy on api \`${API_DIGEST}\`."
+          said="The \`release/*\` tag was not pushed. To record the release, tag it by hand (RUNBOOK.md page 6) once production answers healthy on api \`${API_DIGEST}\`."
           printf '### Not recorded\n\n%s\n' "${said}" >> "$GITHUB_STEP_SUMMARY"

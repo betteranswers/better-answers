@@ -56,17 +56,17 @@ export type McpSurfaceDependencies = ModelDoors & {
 const THE_BEARER = "the bearer";
 
 const CEILING_MESSAGE =
-  "This connection has made too many calls this minute; an Admin can raise the ceiling in System.";
+  "This connection made too many requests this minute. An Admin can raise the limit in System.";
 
 const refused = (): OAuthError =>
-  new OAuthError(OAuthErrorCode.InvalidToken, "the bearer was refused");
+  new OAuthError(OAuthErrorCode.InvalidToken, "the bearer token is not valid");
 
 const toolsListTtlOf = (authInfo: AuthInfo | undefined): number =>
   Number(authInfo?.extra?.["toolsListTtlMs"] ?? TOOLS_LIST_TTL_MS_DEFAULT);
 
 /**
- * Only a declared `true` opens read-only: a host reads an absent hint as a write. Any other
- * entry holds the member's rows to its commit.
+ * Hosts treat a missing hint as a write, so only an explicit `true` runs read-only. Other entries
+ * lock the member's rows until they commit.
  */
 export const doorOf = ({ readOnlyHint }: ToolAnnotations): typeof withPrincipal =>
   readOnlyHint === true ? withPrincipalRead : withHeldPrincipal;

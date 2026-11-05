@@ -79,7 +79,9 @@ def live_generation(cursor: psycopg.Cursor, workspace_id: str) -> int:
     )
     row = cursor.fetchone()
     if row is None:
-        raise RuntimeError("the live generation could not be read")
+        raise RuntimeError(
+            f"map_generation returned no live_gen row for workspace {workspace_id}"
+        )
     return int(row[0])
 
 

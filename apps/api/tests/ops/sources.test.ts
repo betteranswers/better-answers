@@ -61,7 +61,7 @@ describe("pnpm ops", () => {
       );
       expect(looked.exitCode).toBe(0);
       expect(looked.lines).toEqual([
-        "object-store-orphans: done — 1 object past the 24-hour grace no document names, removed none",
+        "object-store-orphans: done — found 1 object older than 24 hours that no document names, and removed none",
       ]);
 
       const run = await opsWith(served(), ["object-store-orphans", "--workspace", workspaceId], {
@@ -70,7 +70,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
-        "object-store-orphans: done — removed 1 object past the 24-hour grace no document names",
+        "object-store-orphans: done — removed 1 object older than 24 hours that no document names",
       ]);
       expect(await listObjects(admin, objects().door, "")).toEqual({ ok: true, value: [named] });
     });
@@ -83,7 +83,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
-        "object-store-orphans: done — removed 0 objects past the 24-hour grace no document names",
+        "object-store-orphans: done — removed 0 objects older than 24 hours that no document names",
       ]);
     });
 
@@ -107,7 +107,7 @@ describe("pnpm ops", () => {
       );
 
       expect(run.exitCode).toBe(1);
-      expect(run.lines.join("\n")).toContain("no object store is configured");
+      expect(run.lines.join("\n")).toContain("the object store is not configured");
     });
   });
 
@@ -121,7 +121,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
-        "reindex-connected-sources: done — 1 connected source wiped (1 passage) and queued to index again",
+        "reindex-connected-sources: done — cleared 1 connected source (1 passage). Each is queued to index again.",
       ]);
       expect(after.passages).toEqual([]);
       expect(after.jobs.at(-1)).toEqual({ kind: "index", reason: "wiped", status: "queued" });
@@ -134,7 +134,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
-        "reindex-connected-sources: done — no connected source to reindex",
+        "reindex-connected-sources: done — the workspace has no connected sources to reindex",
       ]);
     });
 

@@ -27,7 +27,10 @@ def copy_out(target: Path) -> None:
     cache = Path(get_cache_dir())
     entries = warmed_entries()
     if not entries:
-        message = f"nothing was warmed in {cache}, so there is no suffix list to carry"
+        message = (
+            f"the tldextract cache {cache} holds no public suffix list. Run fetch()"
+            " before copy_out()"
+        )
         raise RuntimeError(message)
     for entry in entries:
         landing = target / entry.relative_to(cache)

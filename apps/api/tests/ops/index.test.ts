@@ -95,10 +95,10 @@ describe("pnpm ops", () => {
     const run = await ops(served(), ["help"]);
 
     expect(run.lines.join("\n")).toContain(
-      "a run that names the file or commit it stopped at exits 1, whatever word it names: import-bundle's unsound tree and stopped import, reconcile-watermark's stopped replay",
+      "A run that stops at a named file or commit exits 1, whatever refusal word it prints. These runs are import-bundle with an unsound tree or a stopped import, and reconcile-watermark with a stopped replay.",
     );
     expect(run.lines.join("\n")).toContain(
-      "an import whose manifest commit is refused as malformed exits 1 too: only a defect in the import can cause it",
+      "An import whose manifest commit is refused as malformed also exits 1, because only a defect in the import can cause that refusal.",
     );
   });
 
@@ -152,7 +152,7 @@ describe("pnpm ops", () => {
           command,
           exitCode: NOT_BUILT,
           said: [
-            `${command}: not built — ${absent} absent from this schema; the slice that owns them has not landed`,
+            `${command}: not built — the database is missing these tables: ${absent}. Run the migrations that create them.`,
           ],
         });
       }
@@ -209,7 +209,7 @@ describe("pnpm ops", () => {
           flags: ["--list"],
           exitCode: 0,
           first:
-            "object-store-orphans: done — 0 objects past the 24-hour grace no document names, removed none",
+            "object-store-orphans: done — found 0 objects older than 24 hours that no document names, and removed none",
         },
         {
           command: "map-counts",
@@ -222,7 +222,7 @@ describe("pnpm ops", () => {
           flags: ["--synthetic", "--run", "--report", "/dev/null"],
           exitCode: EXIT_OF_CLASS.precondition,
           first:
-            "erasure-rehearsal: REFUSED — no synthetic subject stands in this workspace — phase one (--seed) has not been run here, or its subject has already been erased",
+            "erasure-rehearsal: REFUSED — this workspace has no synthetic subject. Either phase one (--seed) has not run here, or its subject is already erased.",
         },
       ])(
         "$command accepts the synthetic workspace id from the drill",

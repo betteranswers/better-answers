@@ -379,7 +379,9 @@ describe("enqueueing a job inside an action's transaction", () => {
 
     expect(await first).toEqual({ ok: true, value: { jobId: matching.any(String) } });
     expect(await second).toEqual(
-      new Error("another action queued this subject while this one was enqueueing it"),
+      new Error(
+        "another action queued this subject at the same time, so this enqueue returned no job",
+      ),
     );
     expect(await jobsIn(scenario.workspaceId)).toHaveLength(1);
   });

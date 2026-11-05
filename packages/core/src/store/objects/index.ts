@@ -36,7 +36,7 @@ export type ObjectDoor = {
 export type ObjectStoreRefusal = "endpoint-not-a-url" | "no-bucket";
 
 /**
- * Reaches no store: it checks only that the bucket is named and the endpoint parses as a URL.
+ * Makes no network call. It checks only that the bucket is named and the endpoint parses as a URL.
  */
 export const openObjects = (
   settings: ObjectStoreSettings,

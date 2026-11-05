@@ -49,7 +49,7 @@ describe("deploy/await-release.sh against a real api's /health", () => {
       const other = await run([origin, PROMOTED]);
       expect(other.code).toBe(1);
       expect(other.output).toContain(
-        `expected ${PROMOTED}, answering ${REPLACED} (the last answer: healthy)`,
+        `Expected image: ${PROMOTED}. Last image reported: ${REPLACED}. Last status: healthy.`,
       );
     });
   });
@@ -59,7 +59,7 @@ describe("deploy/await-release.sh against a real api's /health", () => {
       const waited = await run([origin, PROMOTED]);
 
       expect(waited.code).toBe(1);
-      expect(waited.output).toContain("answering no image named (the last answer: healthy)");
+      expect(waited.output).toContain("Last image reported: none. Last status: healthy.");
     });
   });
 });
@@ -124,7 +124,7 @@ describe("deploy/await-release.sh against a scripted series of health answers", 
 
     expect(waited).toMatchObject({ code: 1, asked: 3 });
     expect(waited.output).toContain(
-      `expected ${PROMOTED}, answering ${REPLACED} (the last answer: healthy)`,
+      `Expected image: ${PROMOTED}. Last image reported: ${REPLACED}. Last status: healthy.`,
     );
   });
 
@@ -143,7 +143,7 @@ describe("deploy/await-release.sh against a scripted series of health answers", 
     const waited = await awaitReleaseThrough([unhealthy(PROMOTED)], PROMOTED, 3);
 
     expect(waited).toMatchObject({ code: 1, asked: 3 });
-    expect(waited.output).toContain(`answering ${PROMOTED} (the last answer: unhealthy)`);
+    expect(waited.output).toContain(`Last image reported: ${PROMOTED}. Last status: unhealthy.`);
   });
 
   it("names the last image seen when production stops answering", async () => {
@@ -151,7 +151,7 @@ describe("deploy/await-release.sh against a scripted series of health answers", 
 
     expect(waited).toMatchObject({ code: 1, asked: 3 });
     expect(waited.output).toContain(
-      `answering no image named (the last answer: no health answer; the last image named was ${REPLACED})`,
+      `Last image reported: none. Last status: no health answer. The last image any answer reported was ${REPLACED}.`,
     );
   });
 
@@ -161,7 +161,7 @@ describe("deploy/await-release.sh against a scripted series of health answers", 
 
     expect(waited).toMatchObject({ code: 1, asked: 3 });
     expect(waited.output).toContain(
-      `answering no image named (the last answer: healthy; the last image named was ${PROMOTED})`,
+      `Last image reported: none. Last status: healthy. The last image any answer reported was ${PROMOTED}.`,
     );
   });
 

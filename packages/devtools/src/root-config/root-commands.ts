@@ -16,20 +16,26 @@ const scriptWords = (name: string): readonly string[] =>
 
 const provableCommand = (name: string): readonly string[] => {
   const words = scriptWords(name);
-  if (words.length < 2) throw new Error(`\`${name}\` is no command a reading of it could prove`);
+  if (words.length < 2)
+    throw new Error(
+      `the root script \`${name}\` is missing or has no arguments, so its command cannot be checked`,
+    );
   return words;
 };
 
 export const lintFlags = (): readonly string[] => {
   const [tool, ...flags] = scriptWords("lint");
-  if (tool !== "oxlint") throw new Error(`\`lint\` no longer runs oxlint: ${String(tool)}`);
+  if (tool !== "oxlint")
+    throw new Error(`the root \`lint\` script runs ${String(tool)}, not oxlint`);
   return flags;
 };
 
 export const pythonGateChecker = (): string => {
   const [, checker] = provableCommand("comment-gate:python");
   if (checker === undefined || !checker.endsWith(".py")) {
-    throw new Error("`comment-gate:python` runs no checker this reading can find");
+    throw new Error(
+      "the root `comment-gate:python` script names no `.py` checker as its second word",
+    );
   }
   return checker;
 };
@@ -57,7 +63,10 @@ const stepsNamed = (command: string): readonly string[] =>
 
 const expand = (command: string, seen: readonly string[]): readonly string[] =>
   stepsNamed(command).flatMap((gate) => {
-    if (seen.includes(gate)) throw new Error(`${gate} is a step of itself: ${seen.join(" -> ")}`);
+    if (seen.includes(gate))
+      throw new Error(
+        `${gate} runs itself through ${seen.join(" -> ")}. Remove the loop from the root scripts.`,
+      );
 
     const under = expand(rootScripts()[gate] ?? "", [...seen, gate]);
     return under.length === 0 ? [gate] : under;

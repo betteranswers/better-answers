@@ -28,5 +28,5 @@ for (const one of found) process.stdout.write(`${one}\n`);
 if (found.length > 0) process.exit(1);
 
 process.stdout.write(
-  `each of the ${String(counts.size)} folders read holds ${String(LOOSE_FILE_LIMIT)} tracked files or fewer, or exactly its cap\n`,
+  `all ${String(counts.size)} folders checked hold ${String(LOOSE_FILE_LIMIT)} tracked files or fewer, or exactly their listed cap\n`,
 );

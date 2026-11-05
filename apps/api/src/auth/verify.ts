@@ -57,7 +57,7 @@ const headerOf = (token: string): ProtectedHeaderParameters => {
   try {
     return decodeProtectedHeader(token);
   } catch {
-    throw invalid("the bearer is not a JWT");
+    throw invalid("the bearer token is not a JWT");
   }
 };
 
@@ -68,11 +68,12 @@ type SurfaceToken = {
 
 const surfaceTokenOf = (verified: JWTPayload): SurfaceToken => {
   const parsed = accessTokenClaims.safeParse(verified);
-  if (!parsed.success) throw invalid("the bearer's claims are not the surface's");
+  if (!parsed.success)
+    throw invalid("the bearer token's claims are not those of an MCP access token");
   const { data } = parsed;
   const userId = data.user ?? data.sub;
   if (data.workspace === null || data.workspace === undefined || userId === undefined) {
-    throw invalid("the bearer names no workspace");
+    throw invalid("the bearer token does not name both a workspace and a user");
   }
   return {
     payload: data,
@@ -107,13 +108,16 @@ export const createTokenVerifier = (options: {
     try {
       return (await verify(token)).payload;
     } catch (cause) {
-      throw invalid(cause instanceof Error ? cause.message : "the bearer did not verify");
+      throw invalid(
+        cause instanceof Error ? cause.message : "the bearer token failed verification",
+      );
     }
   };
 
   return {
     async verifyAccessToken(token) {
-      if (headerOf(token).alg === undefined) throw invalid("the bearer names no algorithm");
+      if (headerOf(token).alg === undefined)
+        throw invalid("the bearer token's header names no algorithm");
       const { payload, claims } = surfaceTokenOf(await payloadOf(token));
       return {
         token,

@@ -27,7 +27,7 @@ describe("pnpm ops", () => {
     const A_DAY_MS = 24 * 60 * 60_000;
     const sessionRead = z.object({ session: z.object({ id: z.string() }) });
     const CHECK_LINE =
-      "restore-sign-in: run this only once you have checked who they are by a channel other than their email, and hand them the code by that same channel, never by email";
+      "restore-sign-in: run this only after you confirm who they are through a channel other than email. Give them the code through that same channel, never by email.";
 
     const capturingMail = (send?: Mail["send"]) => {
       const sent: EmailMessage[] = [];
@@ -141,8 +141,8 @@ describe("pnpm ops", () => {
       const run = await restoring(person.email, { mail });
 
       expect(run.lines.slice(0, 2)).toEqual([
-        `restore-sign-in: done — ${person.email} holds no passkey, authenticator or recovery code now, and every session of theirs is signed out`,
-        `restore-sign-in: a notice of the restore went to ${person.email}`,
+        `restore-sign-in: done — removed every passkey, authenticator and recovery code of ${person.email}, and signed out all their sessions`,
+        `restore-sign-in: sent a notice of the restore to ${person.email}`,
       ]);
       expect((await identityRowsOf(person.id)).slice(before.length)).toEqual([
         { action: "people.person.sign_in_restored", actor: IDENTITY_ACTOR, detail: {} },
@@ -170,7 +170,7 @@ describe("pnpm ops", () => {
       const run = await restoring(person.email, {}, { clock: { now: () => RESTORED_AT } });
 
       expect(run.lines.slice(2)).toEqual([
-        `restore-sign-in: their restore code, good once until 2026-10-04T09:00:00.000Z: ${codeIn(run)}`,
+        `restore-sign-in: their restore code, which works once until 2026-10-04T09:00:00.000Z: ${codeIn(run)}`,
         CHECK_LINE,
       ]);
       expect(codeIn(run)).toMatch(RESTORE_CODE);
@@ -184,7 +184,7 @@ describe("pnpm ops", () => {
       expect(run).toMatchObject({
         exitCode: 6,
         lines: [
-          "restore-sign-in: REFUSED — no-such-user: nobody@acme.invalid is no one's address here; nothing changed",
+          "restore-sign-in: REFUSED — no-such-user: no person has the email address nobody@acme.invalid. Nothing changed.",
         ],
       });
       expect(sent).toEqual([]);
@@ -200,7 +200,7 @@ describe("pnpm ops", () => {
       expect(run).toMatchObject({
         exitCode: 1,
         lines: [
-          "restore-sign-in: REFUSED — no email transport is configured (SMTP_URL on the api service), so the restore notice cannot go; nothing changed",
+          "restore-sign-in: REFUSED — SMTP_URL is not set on the api service, so the restore notice cannot be sent. Nothing changed.",
         ],
       });
       expect(await factorsOf(person.id)).toEqual(before);
@@ -217,7 +217,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines[1]).toBe(
-        `restore-sign-in: the notice to ${person.email} did not go; tell them of the restore yourself`,
+        `restore-sign-in: the notice to ${person.email} could not be sent. Tell them about the restore yourself.`,
       );
       expect(codeIn(run)).toMatch(RESTORE_CODE);
       expect((await factorsOf(person.id))?.["restoreRequiredAt"]).not.toBeNull();

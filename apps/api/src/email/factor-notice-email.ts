@@ -32,11 +32,12 @@ type Change = {
 const CHANGES = {
   "passkey-added": {
     subject: `A passkey was added to your ${PRODUCT_NAME} account`,
-    happened: "A passkey was added to your account. It signs you in with no email.",
+    happened:
+      "A passkey was added to your account. You can now sign in with it, without an email code.",
   },
   "passkey-removed": {
     subject: `A passkey was removed from your ${PRODUCT_NAME} account`,
-    happened: "A passkey was removed from your account, so it no longer signs you in.",
+    happened: "A passkey was removed from your account. You can no longer sign in with it.",
   },
   "authenticator-added": {
     subject: `An authenticator was set up on your ${PRODUCT_NAME} account`,
@@ -48,7 +49,7 @@ const CHANGES = {
   },
   "codes-made": {
     subject: `Recovery codes were made for your ${PRODUCT_NAME} account`,
-    happened: "Ten recovery codes were made for your account. Each signs you in once.",
+    happened: "Ten recovery codes were made for your account. You can use each code once.",
   },
   "codes-replaced": {
     subject: `Your ${PRODUCT_NAME} recovery codes were replaced`,
@@ -115,7 +116,7 @@ export const sendFactorNotice = async (
   if (!sent.ok) {
     ctx.log.warn(
       { event: "auth.factor_notice_failed", change },
-      "a second-factor notice did not go",
+      "could not send the second-factor notice",
     );
   }
   return sent.ok;

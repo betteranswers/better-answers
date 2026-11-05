@@ -107,7 +107,7 @@ export const NO_ACTORS_SWEPT: ActorsSwept = new Map();
 const sweptBy = async (tx: Tx, sweep: ActorSweep, subject: ActorSweepSubject): Promise<Counts> => {
   const answered = await tx.query<Counts>(sweep.statement, [...sweep.parameters(subject)]);
   const [counts] = answered.rows;
-  if (counts === undefined) throw new Error(`erasure: the ${sweep.family} sweep answered no row`);
+  if (counts === undefined) throw new Error(`erasure: the ${sweep.family} sweep returned no row`);
   return counts;
 };
 

@@ -276,7 +276,7 @@ describe("several shared test postgres servers under one project stem", () => {
   it("lists the other servers still running under its stem", () => {
     expect(outcomeOf(upBeside)).toEqual("ran");
     expect(upBeside.stdout.split("\n")).toContain(
-      `test-postgres: also running: ${allStem} — deploy/test-postgres.sh down --all clears them`,
+      `test-postgres: also running: ${allStem}. Run deploy/test-postgres.sh down --all to stop them.`,
     );
   });
 

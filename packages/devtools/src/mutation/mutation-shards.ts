@@ -108,7 +108,7 @@ export const shardSlices = (
 ): readonly (readonly string[])[] => {
   if (of > weights.size) {
     throw new Error(
-      `a leg of ${String(weights.size)} files cannot be cut into ${String(of)} shards: each needs a file to mutate`,
+      `the leg has ${String(weights.size)} files, so it cannot be split into ${String(of)} shards, because each shard needs at least one file. Set --of to ${String(weights.size)} or fewer.`,
     );
   }
   const weighed = [...weights]
@@ -246,7 +246,7 @@ export const piecesOf = async (
   const safe = cutsBetween(spans, lastLine);
   if (safe.length < count - 1) {
     throw new Error(
-      `${file} cannot be cut into ${String(count)} pieces: its mutants leave room for ${String(safe.length + 1)} at most`,
+      `${file} cannot be split into ${String(count)} pieces. Only ${String(safe.length)} line boundaries fall between its mutants, so it splits into ${String(safe.length + 1)} pieces at most. Lower its count in the leg's split map.`,
     );
   }
   const cuts = chosenCuts(spans, safe, count);
@@ -268,7 +268,9 @@ const legSlices = async (
   const cut = await Promise.all(
     [...split].map(async ([file, count]) => {
       if (!files.includes(file)) {
-        throw new Error(`${file} is named to be cut, but the ${name} leg does not mutate it`);
+        throw new Error(
+          `${file} is in the split map, but the ${name} leg does not mutate it. Remove it from the split map, or add it to the leg's mutate patterns.`,
+        );
       }
       const lines = await piecesOf(root, file, count, baseline);
       return lines.map((piece): Part[] => [{ file, lines: piece }]);
@@ -278,7 +280,7 @@ const legSlices = async (
   const rest = files.filter((file) => !split.has(file));
   if (rest.length > 0 && of <= pieces.length) {
     throw new Error(
-      `a leg whose cut files take ${String(pieces.length)} shards cannot be cut into ${String(of)}: its other ${String(rest.length)} files need at least one`,
+      `the split files take ${String(pieces.length)} of the ${String(of)} shards, which leaves none for the leg's other ${String(rest.length)} files. Set --of above ${String(pieces.length)}.`,
     );
   }
   const dealt = shardSlices(weightsOf(root, rest, baseline), of - pieces.length);
@@ -390,11 +392,13 @@ const shardLines = (
     ...(stopped.length === 0
       ? []
       : [
-          `- stopped before writing a report, what they had not tested waiting for the next run: ${stopped.join(", ")}`,
+          `- shards that stopped before writing a report, so the next run tests the mutants they did not reach: ${stopped.join(", ")}`,
         ]),
     ...(silent.length === 0
       ? []
-      : [`- left no results, their files keeping the previous run's: ${silent.join(", ")}`]),
+      : [
+          `- shards that left no results, so their files keep the previous run's results: ${silent.join(", ")}`,
+        ]),
   ];
 };
 
@@ -463,7 +467,7 @@ const readResults = (file: string): Results | undefined => {
 const positive = (value: string | undefined, name: string): number => {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) {
-    throw new Error(`--${name} takes a whole number from 1\n${USAGE}`);
+    throw new Error(`--${name} must be a whole number of 1 or more\n${USAGE}`);
   }
   return parsed;
 };
@@ -496,7 +500,9 @@ const writtenMerge = (merged: Merged, out: string): string => {
 const sliceNamed = (slices: readonly (readonly Part[])[], shard: number): string => {
   const slice = slices[shard - 1];
   if (slice === undefined) {
-    throw new Error(`--shard ${String(shard)} is past --of ${String(slices.length)}`);
+    throw new Error(
+      `--shard ${String(shard)} is greater than --of ${String(slices.length)}. Pick a shard from 1 to ${String(slices.length)}.`,
+    );
   }
   return slice.map(partName).join(",");
 };

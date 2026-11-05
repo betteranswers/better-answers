@@ -37,7 +37,7 @@ export const jobAfterWaiting = async (
     !JOB_IS_OVER.includes(read.value.status) &&
     doors.clock.now().getTime() < deadline
   ) {
-    // oxlint-disable-next-line eslint/no-await-in-loop -- the poll sleeps out its interval before it reads the job again
+    // oxlint-disable-next-line eslint/no-await-in-loop -- the poll waits out its interval before it reads the job again
     await after(Math.min(pollMs, Math.max(deadline - doors.clock.now().getTime(), 0)));
     // oxlint-disable-next-line eslint/no-await-in-loop -- each read of the job decides whether the poll goes on
     read = await jobById(platform, doors.postgres, jobKey);
@@ -51,7 +51,7 @@ export const unfinished = (
   consequence: string,
 ): string =>
   JOB_IS_OVER.includes(jobState.status)
-    ? `${jobState.status} after ${counted(jobState.attempts, "attempt")}; the job's own row says what it found`
+    ? `${jobState.status} after ${counted(jobState.attempts, "attempt")}. The job's row in the database records why.`
     : `still ${jobState.status} after ${counted(seconds, "second")}, so ${consequence}`;
 
 export const waitForJob = async (
@@ -70,7 +70,7 @@ export const waitForJob = async (
     return DONE;
   }
   io.say(
-    `map-rebuild: REFUSED — job ${jobId} is ${unfinished(waited.value, seconds, "nothing has rebuilt this map")}`,
+    `map-rebuild: REFUSED — job ${jobId} is ${unfinished(waited.value, seconds, "the map has not been rebuilt")}`,
   );
   return REFUSED;
 };

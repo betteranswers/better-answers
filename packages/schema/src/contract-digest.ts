@@ -13,8 +13,8 @@ const OUTSIDE_THE_DIGEST = "README.md";
 const NEWLINE = Buffer.from([0x0a]);
 
 /**
- * JavaScript orders strings by UTF-16 code unit, which ranks an astral path where a byte
- * sort does not.
+ * JavaScript sorts strings by UTF-16 code unit, which orders a path with characters outside the
+ * Basic Multilingual Plane differently from a byte sort.
  */
 const byByte = (a: string, b: string): number =>
   Buffer.compare(Buffer.from(a, "utf8"), Buffer.from(b, "utf8"));

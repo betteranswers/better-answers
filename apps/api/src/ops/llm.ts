@@ -34,7 +34,7 @@ const modelKeyReason = (refusal: SetModelKeyRefusal | Error, workspaceId: string
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
     case "malformed":
-      return `malformed: give --workspace a workspace id, --provider one of ${MODEL_PROVIDERS.join(" · ")}, and on standard input one key with no space or line break in it, for cloudflare the account id, a colon, then the API token`;
+      return `malformed: --workspace must be a workspace id and --provider one of ${MODEL_PROVIDERS.join(", ")}. Standard input must hold one key with no spaces or line breaks. For cloudflare, the key is the account id, a colon, then the API token.`;
     case "no-such-workspace":
       return noSuchWorkspace(workspaceId);
   }
@@ -54,7 +54,7 @@ export const setModelKeyCommand = async (
   io: OpsIo,
 ): Promise<number> => {
   if (!io.modelKeySetting.ok) {
-    io.say(`set-model-key: REFUSED — ${io.modelKeySetting.error}; nothing changed`);
+    io.say(`set-model-key: REFUSED — ${io.modelKeySetting.error}. Nothing changed.`);
     return REFUSED;
   }
   const typed = await io.stdin();
@@ -67,9 +67,7 @@ export const setModelKeyCommand = async (
     io.say(`set-model-key: REFUSED — ${modelKeyReason(set.error, workspaceId)}`);
     return exitOf(set.error);
   }
-  io.say(
-    `set-model-key: done — workspace ${workspaceId} holds a new key for ${set.value.provider}`,
-  );
+  io.say(`set-model-key: done — workspace ${workspaceId} has a new key for ${set.value.provider}`);
   return DONE;
 };
 
@@ -80,7 +78,7 @@ const spendingLimitReason = (
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
     case "malformed":
-      return "malformed: give --workspace a workspace id and --gbp a sum in pounds, such as 50 or 12.50";
+      return "malformed: --workspace must be a workspace id and --gbp a sum in pounds, such as 50 or 12.50";
     case "no-such-workspace":
       return noSuchWorkspace(workspaceId);
   }
@@ -123,17 +121,17 @@ const modelChoiceReason = (
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
     case "malformed":
-      return `malformed: give --workspace a workspace id, --purpose one of ${CHOSEN_PURPOSES.join(" · ")}, and --provider and --model in lower case letters, digits, dots and hyphens`;
+      return `malformed: --workspace must be a workspace id, --purpose one of ${CHOSEN_PURPOSES.join(", ")}, and --provider and --model only lower case letters, digits, dots and hyphens`;
     case "no-such-workspace":
       return noSuchWorkspace(asked.workspaceId);
     case "fixed-model-choice":
-      return "fixed-model-choice: the embedding model is fixed, since the index's vectors are its own; nothing changed";
+      return "fixed-model-choice: the embedding model cannot be changed, because the index's vectors were made with it. Nothing changed.";
     case "no-decision-threshold":
-      return `no-decision-threshold: ${asked.provider} ${asked.model} is a decision model with no threshold; set one with set-decision-threshold first; nothing changed`;
+      return `no-decision-threshold: ${asked.provider} ${asked.model} is a decision model with no threshold. Set one with set-decision-threshold first. Nothing changed.`;
     case "no-sub-processor":
-      return `no-sub-processor: ${asked.provider} is no model provider the DPIA names as a sub-processor (${[...CHOOSABLE_PROVIDERS].join(" · ")}); nothing changed`;
+      return `no-sub-processor: the DPIA does not name ${asked.provider} as a sub-processor. Choose one of ${[...CHOOSABLE_PROVIDERS].join(", ")}. Nothing changed.`;
     case "no-model-price":
-      return `no-model-price: ${asked.provider} ${asked.model} has no price in effect today; set one with set-model-price first; nothing changed`;
+      return `no-model-price: ${asked.provider} ${asked.model} has no price in effect today. Set one with set-model-price first. Nothing changed.`;
   }
 };
 
@@ -209,20 +207,22 @@ export const setModelPriceCommand = async (
   const price = { provider, model, effectiveFrom, gbpPerMillionIn, gbpPerMillionOut };
   const table = getTableName(modelPrice);
   if ((await tablesPresent(doors.postgres, [table])).length === 0) {
-    io.say(`set-model-price: not built — ${table} absent from this schema`);
+    io.say(
+      `set-model-price: not built — the database is missing the ${table} table. Run the migrations that create it.`,
+    );
     return NOT_BUILT;
   }
   const set = await setModelPrice(BOOTSTRAP, doors.postgres, price);
   if (!set.ok) {
     const reason =
       set.error === "malformed"
-        ? `malformed: ${MODEL_PRICE_NAMED}, the model lower case letters, digits, dots and hyphens, the day one the calendar has and each sum in pounds a decimal such as 3 or 0.25`
+        ? `malformed: give ${MODEL_PRICE_NAMED}. The model may hold only lower case letters, digits, dots and hyphens, the day must be a real calendar date, and each price must be a decimal number of pounds, such as 3 or 0.25.`
         : set.error.message;
     io.say(`set-model-price: REFUSED — ${reason}`);
     return exitOf(set.error);
   }
   io.say(
-    `set-model-price: done — ${set.value.provider} ${set.value.model} is priced from ${set.value.effectiveFrom}`,
+    `set-model-price: done — ${set.value.provider} ${set.value.model} has a price from ${set.value.effectiveFrom}`,
   );
   return DONE;
 };
@@ -255,7 +255,9 @@ export const setDecisionThresholdCommand = async (
 ): Promise<number> => {
   const table = getTableName(decisionThreshold);
   if ((await tablesPresent(doors.postgres, [table])).length === 0) {
-    io.say(`set-decision-threshold: not built — ${table} absent from this schema`);
+    io.say(
+      `set-decision-threshold: not built — the database is missing the ${table} table. Run the migrations that create it.`,
+    );
     return NOT_BUILT;
   }
   const set = await setDecisionThreshold(BOOTSTRAP, doors.postgres, { provider, model, threshold });
@@ -264,7 +266,7 @@ export const setDecisionThresholdCommand = async (
     return exitOf(set.error);
   }
   io.say(
-    `set-decision-threshold: done — ${set.value.provider} ${set.value.model} judges at ${String(set.value.threshold)}`,
+    `set-decision-threshold: done — ${set.value.provider} ${set.value.model} now has a threshold of ${String(set.value.threshold)}`,
   );
   return DONE;
 };
@@ -276,8 +278,8 @@ const thresholdReason = (
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
     case "malformed":
-      return `malformed: ${THRESHOLD_NAMED}, the model lower case letters, digits, dots and hyphens and the threshold a decimal between 0 and 1, such as 0.7`;
+      return `malformed: give ${THRESHOLD_NAMED}. The model may hold only lower case letters, digits, dots and hyphens, and the threshold must be a decimal between 0 and 1, such as 0.7.`;
     case "not-a-decision-model":
-      return `not-a-decision-model: ${provider} speaks no decision shape; only ${DECISION_PROVIDERS.join(" · ")} take a threshold; nothing changed`;
+      return `not-a-decision-model: ${provider} models do not return a yes-or-no decision, so they take no threshold. Only ${DECISION_PROVIDERS.join(", ")} models do. Nothing changed.`;
   }
 };

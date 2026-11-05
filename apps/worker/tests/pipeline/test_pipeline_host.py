@@ -260,9 +260,7 @@ def test_rejects_a_cache_size_below_two_handles(
 ) -> None:
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
 
-    with pytest.raises(
-        ValueError, match="a connected source's 2 handles and was bounded at 1"
-    ):
+    with pytest.raises(ValueError, match=r"environments_held is 1\b.*at least 2"):
         Host(bootstrap, environments_held=1)
 
     with Host(bootstrap, environments_held=2) as host:

@@ -17,8 +17,8 @@ import { z } from "zod";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 /**
- * What `execFileSync` throws once the tool ran; a spawn that never started carries a null
- * status and no streams, so nothing is required.
+ * The error `execFileSync` throws after the tool ran. A spawn that never started has a null
+ * status and no streams, so every field is optional.
  */
 const spawnFailure = z.object({
   status: z.number().nullish(),
@@ -81,13 +81,13 @@ export const executableOf = (executable: Tool["executable"]): string => {
   const root = packageRoot(from, executable.package);
   if (root === undefined) {
     throw new Error(
-      `\`${executable.package}\` is not in @better-answers/devtools's dependency tree, so its binary cannot be resolved. Declare it as a devDependency of packages/devtools.`,
+      `\`${executable.package}\` is not in the dependency tree of @better-answers/devtools, so its binary cannot be found. Add it as a devDependency of packages/devtools.`,
     );
   }
   const binary = path.join(root, ...executable.path);
   if (!existsSync(binary)) {
     throw new Error(
-      `${executable.package}: the package is installed but carries no executable at ${executable.path.join("/")} (looked at ${binary}).`,
+      `${executable.package} is installed, but it has no executable at ${executable.path.join("/")} (looked at ${binary}).`,
     );
   }
   return binary;
@@ -128,7 +128,7 @@ const timeoutMsFor = (tool: UnprovenTool): number => {
   const timeoutMs = tool.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (timeoutMs >= STALE_AFTER_MS) {
     throw new Error(
-      `${tool.executable.package}: a time limit of ${String(timeoutMs)} ms lets a live tree reach the age at which the sweep removes it; keep it under ${String(STALE_AFTER_MS)} ms.`,
+      `${tool.executable.package}: the time limit of ${String(timeoutMs)} ms is too long, because a tree still in use could reach the age at which the sweep deletes it. Set a limit under ${String(STALE_AFTER_MS)} ms.`,
     );
   }
   return timeoutMs;
@@ -221,7 +221,7 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
   const smoked = run(tool.smoke.tree);
   if (!tool.smoke.reports(smoked)) {
     throw new Error(
-      `${tool.executable.package} (${binary}) failed its smoke case: it ran over a tree that must produce a report, and what it wrote is not something the caller's reading can find. Until this passes, a silence from this tool means nothing.\nRaw output was:\n${smoked}`,
+      `${tool.executable.package} (${binary}) failed its smoke case. It ran over a tree that must produce a finding, but the caller found no finding in its output. Until the smoke case passes, a clean result from this tool proves nothing.\nRaw output:\n${smoked}`,
     );
   }
 
@@ -241,14 +241,14 @@ const pathsIn = (output: string): readonly string[] =>
 const tsgolintPath = (): string => {
   const suffix = process.platform === "win32" ? ".exe" : "";
   try {
-    // From the package that depends on the build, since no NODE_PATH reaches the hoisted store.
+    // Resolve from oxlint-tsgolint itself, because no NODE_PATH reaches pnpm's hoisted store.
     const from = createRequire(
       createRequire(import.meta.url).resolve("oxlint-tsgolint/package.json"),
     );
     return from.resolve(`@oxlint-tsgolint/${process.platform}-${process.arch}/tsgolint${suffix}`);
   } catch {
     throw new Error(
-      `oxlint's type-aware linter has no binary for ${process.platform}-${process.arch}, so a type-aware rule over a throwaway tree would read as silent — the one thing this runner exists to make impossible. Either \`oxlint-tsgolint\` is not a devDependency of packages/devtools, or it ships no build for this platform.`,
+      `oxlint's type-aware linter has no binary for ${process.platform}-${process.arch}, so type-aware rules over a throwaway tree would report nothing and look clean. Add \`oxlint-tsgolint\` as a devDependency of packages/devtools, or run on a platform it ships a build for.`,
     );
   }
 };
@@ -269,8 +269,8 @@ export const oxlintOver = (
   const expected = [...smoke.flagged].sort(byCodeUnit);
   const run = runsOverThrowawayTree({
     executable: { package: "oxlint", path: ["bin", "oxlint"] },
-    // Pinned, never left to oxlint: under Actions it picks the annotation reporter, whose
-    // lines `pathsIn` cannot read, and every rule then looks silent.
+    // Set the format: under GitHub Actions oxlint picks the annotation reporter, which `pathsIn`
+    // cannot read, so every rule would look silent.
     argv: [...flags, "--config", ".oxlintrc.json", "--format=unix", "."],
     scaffold: { ".oxlintrc.json": configJson },
     env: { OXLINT_TSGOLINT_PATH: tsgolintPath() },
@@ -405,7 +405,7 @@ const batchOver = <Planned, Result>(spec: BatchSpec<Planned, Result>) => {
       if (results !== undefined) return;
       if (!planned.some(spec.isControl)) {
         throw new Error(
-          `${name}: a batch with no control case. Plan one tree that must report, or a silence from this tool means nothing.`,
+          `${name}: the batch has no control case. Plan one tree that must produce a finding, so that a clean result from this tool proves something.`,
         );
       }
       const { binary, run } = runnerFor(spec.tool);
@@ -417,7 +417,7 @@ const batchOver = <Planned, Result>(spec: BatchSpec<Planned, Result>) => {
       );
       if (failed !== -1) {
         throw new Error(
-          `${name} (${binary}) failed a control case of its batch: a tree that must produce a report did not. Until this passes, a silence from this tool means nothing.\nCase ${folderOfCase(failed)} read ${JSON.stringify(found.get(folderOfCase(failed)) ?? spec.none)}`,
+          `${name} (${binary}) failed a control case of its batch. A tree that must produce a finding produced none. Until the control case passes, a clean result from this tool proves nothing.\nCase ${folderOfCase(failed)} found ${JSON.stringify(found.get(folderOfCase(failed)) ?? spec.none)}`,
         );
       }
       results = found;
@@ -514,7 +514,7 @@ const findingsByFolder = (output: string): ReadonlyMap<string, readonly KnipFind
     const folder = folderOfPath(finding.file);
     if (folder === undefined) {
       throw new Error(
-        `knip reported ${finding.kind} ${finding.name} in ${finding.file}, outside every case.`,
+        `knip reported ${finding.kind} ${finding.name} in ${finding.file}, which is outside every planned case.`,
       );
     }
     const own = grouped.get(folder) ?? [];

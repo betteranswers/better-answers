@@ -531,12 +531,16 @@ describe("comment-inventory apply refuses and changes no file", () => {
   const narrationAt4 = { [`${SAMPLE}:4`]: { class: "narration", unit: "1" } };
 
   it.each([
-    ["text found nowhere", `${HOLDER} › drops the answer`, "holds this text 0 times"],
-    ["text found twice", `${SAMPLE} › export const`, "holds this text 2 times"],
-    ["text that overlaps itself", `${HOLDER} › keeps keeps`, "holds this text 2 times"],
+    ["text found nowhere", `${HOLDER} › drops the answer`, "appears 0 times"],
+    ["text found twice", `${SAMPLE} › export const`, "appears 2 times"],
+    ["text that overlaps itself", `${HOLDER} › keeps keeps`, "appears 2 times"],
     ["text a deletion removes", `${SAMPLE} › second line of a block`, "0 times"],
-    ["in a missing file", "test/missing.test.ts › keeps the answer", "names no file"],
-    ["a line number", `${HOLDER}:3`, "is not path › text: anchor it on text"],
+    [
+      "in a missing file",
+      "test/missing.test.ts › keeps the answer",
+      "names a file that does not exist",
+    ],
+    ["a line number", `${HOLDER}:3`, "is not in the form `path › text`"],
   ])("when a held row's holder is %s", (_form, holder, why) => {
     const stderr = refusedOver(
       { [SAMPLE]: SAMPLE_SOURCE, [HOLDER]: HOLDER_SOURCE },
@@ -555,7 +559,7 @@ describe("comment-inventory apply refuses and changes no file", () => {
       { [SAMPLE]: SAMPLE_SOURCE, [HOLDER]: HOLDER_SOURCE },
       { ...narrationAt4, [`${SAMPLE}:8`]: { class: "open", unit: "1", holder } },
     );
-    expect(stderr).toContain(`${SAMPLE}:8: an open row's holder is the tracker issue`);
+    expect(stderr).toContain(`${SAMPLE}:8: an open row's holder must be the tracker issue`);
   });
 
   it("when a holder's text only a later unit's deletion holds", () => {
@@ -566,7 +570,7 @@ describe("comment-inventory apply refuses and changes no file", () => {
         [`${SAMPLE}:13`]: { class: "narration", unit: "2" },
       },
     );
-    expect(stderr).toContain("holds this text 0 times");
+    expect(stderr).toContain("appears 0 times");
   });
 
   it("when a row's text is no longer in the file", () => {
@@ -577,7 +581,7 @@ describe("comment-inventory apply refuses and changes no file", () => {
         writeFileSync(path.join(root, SAMPLE), SAMPLE_SOURCE.replace("a lone", "an edited"));
       },
     );
-    expect(stderr).toContain(`${SAMPLE}:13: the file holds this block 0 times`);
+    expect(stderr).toContain(`${SAMPLE}:13: the file has this block 0 times`);
   });
 
   it("when a row's text is found twice", () => {
@@ -586,7 +590,7 @@ describe("comment-inventory apply refuses and changes no file", () => {
       { [SAMPLE]: source },
       { [`${SAMPLE}:3`]: { class: "narration", unit: "1" } },
     );
-    expect(stderr).toContain(`${SAMPLE}:3: the file holds this block 2 times`);
+    expect(stderr).toContain(`${SAMPLE}:3: the file has this block 2 times`);
   });
 
   it("when a row names a file of neither language", () => {
@@ -597,7 +601,7 @@ describe("comment-inventory apply refuses and changes no file", () => {
     );
     const ran = applied(root, tsv, "1");
     expect(ran.status).toBe(1);
-    expect(ran.stderr).toContain("src/notes.md:1: neither TypeScript nor Python");
+    expect(ran.stderr).toContain("src/notes.md:1: the file is neither TypeScript nor Python");
     expect(read(root, "src/notes.md")).toBe("// a note\n");
   });
 
@@ -606,7 +610,7 @@ describe("comment-inventory apply refuses and changes no file", () => {
       { [SAMPLE]: SAMPLE_SOURCE },
       { ...narrationAt4, [`${SAMPLE}:13`]: { class: "", unit: "1" } },
     );
-    expect(stderr).toContain(`${SAMPLE}:13: unclassified`);
+    expect(stderr).toContain(`${SAMPLE}:13: the row has no class`);
   });
 });
 

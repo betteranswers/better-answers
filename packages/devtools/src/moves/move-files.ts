@@ -316,7 +316,7 @@ export const reportOf = (report: MoveReport): string =>
   [
     `${report.dryRun ? "would move" : "moved"} ${String(report.moved)} files; rewrote ${String(report.rewritten.length)} files\n`,
     listed(
-      "relative specifiers in moved files that resolve to nothing (fixture text or a break):",
+      "relative specifiers in moved files that resolve to nothing (each is fixture text or a broken import):",
       report.unresolved,
     ),
     listed(

@@ -6,15 +6,15 @@ export const mcpEntryAnnotationsRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description: "Every MCP entry declares `annotations` (readOnlyHint at least).",
+      description: "Every MCP entry declares `annotations`, with at least `readOnlyHint`.",
     },
     messages: {
       missing:
-        "This MCP entry declares no `annotations`; every entry carries readOnlyHint and its siblings.",
+        "This MCP entry declares no `annotations`. Add an `annotations` object with `readOnlyHint` and the other MCP tool hints.",
       noReadOnlyHint:
-        "This MCP entry's `annotations` carry no `readOnlyHint`; the host splits read from write tools on it alone.",
+        "This MCP entry's `annotations` has no `readOnlyHint`. Add it, because the MCP host uses `readOnlyHint` alone to tell read tools from write tools.",
       opaque:
-        "This MCP entry's config is not an object literal, so its `annotations` cannot be checked here; declare it inline.",
+        "This MCP entry's config is not an object literal, so the rule cannot check its `annotations`. Write the config inline.",
     },
   },
   createOnce(context) {

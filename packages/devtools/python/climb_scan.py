@@ -20,8 +20,8 @@ HELPERS = {
 }
 
 CLIMBS = (
-    "`{written}` climbs to the root of `{workspace}` or out of it, so a move breaks "
-    "the path. Import {helper} and join the path from there."
+    "`{written}` climbs to the root of `{workspace}` or above it, so the path breaks "
+    "when the file moves. Import {helper} and join the path from there."
 )
 
 MAX_WRITTEN = 60
@@ -216,7 +216,7 @@ def main(argv: list[str]) -> int:
     if scanned.findings:
         return 1
     print(
-        "climb_scan: no module climbs to the root of its workspace or out of it "
+        "climb_scan: no module climbs to the root of its workspace or above it "
         f"(modules read: {scanned.modules})"
     )
     return 0

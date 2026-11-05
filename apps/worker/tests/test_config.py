@@ -55,7 +55,7 @@ def test_bootstrap_refuses_max_concurrent_runs_above_one() -> None:
     with pytest.raises(BootstrapError) as refusal:
         read_bootstrap({**COMPLETE, "MAX_CONCURRENT_RUNS": "2"})
 
-    assert "MAX_CONCURRENT_RUNS is one" in str(refusal.value)
+    assert "MAX_CONCURRENT_RUNS is 2" in str(refusal.value)
     assert (
         read_bootstrap({**COMPLETE, "MAX_CONCURRENT_RUNS": "1"}).engine.concurrent_runs
         == 1

@@ -51,7 +51,7 @@ button[data-variant=outline]{border-color:var(--border-default);background-color
 button[data-variant=outline]:hover{background-color:var(--surface-hover)}
 button[data-variant=outline]:active{background-color:var(--surface-active)}
 :is(button,a):focus-visible{outline:none;box-shadow:var(--focus-ring)}
-/* Tailwind's md, which no token carries. */
+/* Tailwind's md breakpoint. No design token holds it. */
 @media (min-width:48rem){body>header,main{padding-inline:var(--space-8)}[data-slot=card]{margin-top:var(--space-16)}}
 `;
 

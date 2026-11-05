@@ -23,7 +23,8 @@ export const withRLS = <TName extends string, TColumns extends Record<string, Pg
     pgPolicy(`${name}_workspace_isolation`, {
       as: "permissive",
       for: "all",
-      // Wrapped in a select so a bulk statement pays the seam function once, not once per row.
+      // Wrapped in a select so Postgres evaluates `current_workspace_id()` once per statement, not
+      // once per row.
       using: sql`${table[tenantColumn]} = (select current_workspace_id())`,
       withCheck: sql`${table[tenantColumn]} = (select current_workspace_id())`,
     }),

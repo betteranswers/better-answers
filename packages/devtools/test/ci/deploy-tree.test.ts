@@ -495,7 +495,7 @@ describe("the deploy tree", () => {
 
     const guard = fencedIn(drill, "workspace id");
     assert(guard !== undefined, "restore-drill.sh has no `>>> workspace id` fence");
-    expect(drill.indexOf("# >>> workspace id")).toBeLessThan(drill.indexOf("## 0 wipe staging"));
+    expect(drill.indexOf("# >>> workspace id")).toBeLessThan(drill.indexOf("## 0 Wipe staging"));
     expect(guard).toContain(`[[ "\${DRILL_WORKSPACE}" =~ ${ULID_PATTERN} ]]`);
 
     const ran = (workspace: string): BashRun =>
@@ -510,7 +510,7 @@ describe("the deploy tree", () => {
     expect(ran("ws_synthetic")).toEqual({
       code: 1,
       output:
-        "REFUSED: DRILL_WORKSPACE ws_synthetic is not a workspace id; the synthetic fixture's is 01M2SYNTHET1CAAAAAAAAAAAAA\n",
+        "REFUSED: DRILL_WORKSPACE ws_synthetic is not a workspace id (a ULID). To drill the synthetic fixture, set it to 01M2SYNTHET1CAAAAAAAAAAAAA.\n",
     });
     expect(ran("01m2synthet1caaaaaaaaaaaaa").code).toEqual(1);
   });
@@ -587,7 +587,7 @@ describe("the deploy tree", () => {
     expect(ran(NOT_BUILT_EXIT)).toEqual({
       code: 1,
       output:
-        "REHEARSAL FAILED: the synthetic seed answered not built, so a table the erasure slice needs is absent from the restored copy\n",
+        "REHEARSAL FAILED: the synthetic seed exited 3 (not built). A table the erasure needs is missing from the restored copy.\n",
     });
     expect(ran(1)).toEqual({
       code: 1,
@@ -618,7 +618,7 @@ describe("the deploy tree", () => {
       code: NOT_BUILT_EXIT,
       output:
         "ran: exec -T api pnpm --silent ops map-sweep --workspace a-workspace\n" +
-        "DRILL FAILED: 'pnpm ops map-sweep' answered not built, so a table its slice needs is absent from the restored copy\n",
+        "DRILL FAILED: 'pnpm ops map-sweep' exited 3 (not built). A table it needs is missing from the restored copy.\n",
     });
     expect(ran(1)).toEqual({
       code: 1,
@@ -635,7 +635,7 @@ describe("the deploy tree", () => {
     expect(ran).toEqual({
       code: NOT_BUILT_EXIT,
       output:
-        "DRILL FAILED: 'pnpm ops map-counts' answered not built, so a table its slice needs is absent from the restored copy\n",
+        "DRILL FAILED: 'pnpm ops map-counts' exited 3 (not built). A table it needs is missing from the restored copy.\n",
     });
   });
 
@@ -650,7 +650,7 @@ describe("the deploy tree", () => {
     expect(countsRan(STAGING_COUNTS, 0)).toEqual({
       code: 0,
       output:
-        "production records no run of the map's counts: staging counts recorded, not compared\n" +
+        "staging counts recorded but not compared: production records no run of the map's counts\n" +
         `report: ${STAGING_COUNTS}\n`,
     });
   });
@@ -678,11 +678,12 @@ describe("the deploy tree", () => {
     expect(inNoPassage).toEqual({
       code: 1,
       output:
-        "REHEARSAL FAILED: the seeded subject is in no passage of the pre-erasure dump, so the dump grep after would prove nothing of the index\n",
+        "REHEARSAL FAILED: no passage table in the pre-erasure dump contains the seeded subject, so the grep after the erasure cannot test the index\n",
     });
     expect(inNoTable).toEqual({
       code: 1,
-      output: "REHEARSAL FAILED: the seeded subject is in no table of the pre-erasure dump\n",
+      output:
+        "REHEARSAL FAILED: the pre-erasure dump does not contain the seeded subject in any table\n",
     });
   });
 

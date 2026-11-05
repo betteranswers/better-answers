@@ -20,7 +20,10 @@ const unlocking = async (
   }
 };
 
-/** A session lock outlives the connection's return to the pool, so it holds a connection alone. */
+/**
+ * A session lock survives the connection's return to the pool, so the lock gets a connection of its
+ * own.
+ */
 const onOwnConnection = async <T>(
   door: PostgresDoor,
   use: (holder: pg.PoolClient) => Promise<T>,

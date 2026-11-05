@@ -590,9 +590,7 @@ describe("reading the groups of findings for a connected source", () => {
 
     assert(!read.ok);
     expect(read.error).toEqual(
-      new Error(
-        "the connected source's last sync names the kept spans an erasure overrode in a shape the review cannot read",
-      ),
+      new Error("the last sync's list of spans that an erasure overrode does not parse"),
     );
   });
 

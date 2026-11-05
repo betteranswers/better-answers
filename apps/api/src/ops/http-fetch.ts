@@ -1,8 +1,8 @@
 import http from "node:http";
 
 /**
- * Undici drops a `host` header silently, so the smoke test's request would arrive as the
- * loopback and the hostname fence would refuse it.
+ * Undici silently drops a `host` header. Without it, the smoke test's request names the loopback
+ * address, and the hostname check refuses it.
  */
 export const fetchHonouringHost = (url: string, init?: RequestInit): Promise<Response> => {
   const target = new URL(url);

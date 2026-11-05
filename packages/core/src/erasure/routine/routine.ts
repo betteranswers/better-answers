@@ -39,13 +39,12 @@ import type {
   ErasureRun,
 } from "./vocabulary.ts";
 
-const QUESTIONS_STEP_LOGGED = "erasure: what the questions step rewrote and removed";
+const QUESTIONS_STEP_LOGGED = "erasure: questions step rewrote and removed rows";
 
 const QUESTIONS_SINCE_LOGGED =
-  "erasure: what was asked or flagged after the questions step, rewritten and removed as the member ended";
+  "erasure: rewrote and removed questions and flags made after the questions step";
 
-const IDENTITY_STEP_LOGGED =
-  "erasure: the identity step's arm, and what it pseudonymised and deleted";
+const IDENTITY_STEP_LOGGED = "erasure: identity step pseudonymised and deleted rows";
 
 const DUMP_LOCK = 41;
 
@@ -155,7 +154,8 @@ const openTheRoutine = async (
   const opened = await tx.query<ErasureRow>(OPENED, [workspaceId, request.id]);
   const erasure = opened.rows[0];
 
-  if (erasure === undefined) throw new Error("erasure: the request's routine row did not open");
+  if (erasure === undefined)
+    throw new Error("erasure: opening the request's routine returned no row");
   return ok({
     request,
     erasure: erasureRecordOf(erasure),
@@ -260,7 +260,9 @@ const completeTheRequest = async (
       );
       const row = standing.rows[0];
       if (row?.completed_at == null || row.report === null) {
-        throw new Error("erasure: the routine did not complete the request it opened");
+        throw new Error(
+          "erasure: the routine ended, but the request it opened has no completion time or report",
+        );
       }
       const auditEventId = ulid();
 

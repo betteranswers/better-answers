@@ -1047,7 +1047,7 @@ describe("parsing the find, open and ask inputs", () => {
       error: { word: "malformed", fields: { query: "refused" } },
     });
     expect(messagesOf(findInput.safeParse({ query: "audit\u0000logs" }))).toEqual([
-      "a query holds no NUL character",
+      "a query must not contain a NUL character",
     ]);
   });
 

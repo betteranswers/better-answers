@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: better_answers
       POSTGRES_DB: better_answers
     ports: ["127.0.0.1:${LOCAL_DATABASE_PORT:?deploy/local-database.sh sets it}:5432"]
-    # Over TCP: the image's first-boot server listens on the socket alone, and must not read as up.
+    # Over TCP: during first boot, the image's temporary server listens only on the socket and must not count as up.
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "better_answers", "-d", "better_answers"]
       interval: 2s

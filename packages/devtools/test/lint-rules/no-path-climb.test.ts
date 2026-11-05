@@ -45,7 +45,7 @@ describe("the no-path-climb rule", () => {
 
     expect(output).toContain("better-answers(no-path-climb)");
     expect(output).toContain(
-      '`path.resolve(import.meta.dirname, "../../../../deploy/x.sh")` climbs to the root of `apps/api` or out of it, so a move breaks the path. Import `repositoryRoot` or `workspaceRoot` from `apps/api/tests/support/roots/roots.ts` and join the path from there.',
+      '`path.resolve(import.meta.dirname, "../../../../deploy/x.sh")` climbs to the root of `apps/api` or above it, so the path breaks when the file moves. Import `repositoryRoot` or `workspaceRoot` from `apps/api/tests/support/roots/roots.ts` and join the path from there.',
     );
   });
 
@@ -101,7 +101,7 @@ describe("the no-path-climb rule", () => {
     };
 
     expect(lint.output(tree)).toContain(
-      '`path.join(import.meta.dirname, "../../..")` climbs to the root of `packages/devtools` or out of it, so a move breaks the path. Import `repositoryRoot` from `packages/devtools/src/paths.ts` and join the path from there.',
+      '`path.join(import.meta.dirname, "../../..")` climbs to the root of `packages/devtools` or above it, so the path breaks when the file moves. Import `repositoryRoot` from `packages/devtools/src/paths.ts` and join the path from there.',
     );
   });
 
@@ -110,7 +110,7 @@ describe("the no-path-climb rule", () => {
     const code = 'export const at = path.join(import.meta.dirname, "../..");';
 
     expect(lint.output(reading(file, code))).toContain(
-      '`path.join(import.meta.dirname, "../..")` climbs to the root of `packages/design-system` or out of it, so a move breaks the path. `packages/design-system` has no roots helper yet, so add one beside its tests and join the path from there.',
+      '`path.join(import.meta.dirname, "../..")` climbs to the root of `packages/design-system` or above it, so the path breaks when the file moves. `packages/design-system` has no roots helper yet. Add one beside its tests and join the path from there.',
     );
   });
 });
@@ -164,7 +164,7 @@ describe("the no-path-climb rule on the toolchain root", () => {
 
   it("sends a workspace to its own roots helper", () => {
     expect(lint.output(reading(file, `${IMPORT}\nexport const at = repositoryRoot;`))).toContain(
-      "`apps/api` takes `repositoryRoot` from its roots helper, so import `repositoryRoot` or `workspaceRoot` from `apps/api/tests/support/roots/roots.ts`, not from `@better-answers/devtools/paths`.",
+      "`apps/api` must take `repositoryRoot` from its own roots helper. Import `repositoryRoot` or `workspaceRoot` from `apps/api/tests/support/roots/roots.ts`, not from `@better-answers/devtools/paths`.",
     );
   });
 

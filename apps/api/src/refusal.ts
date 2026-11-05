@@ -53,8 +53,8 @@ export const fieldsSaid = (refusal: Refusal): string =>
         .join(", ")}.`;
 
 /**
- * The refusal rides the protocol error's cause, the one field handed back untouched; a message
- * alone would lose a malformed input's fields.
+ * The refusal travels on the protocol error's cause, the only field passed back unchanged. The
+ * message alone would lose a malformed input's fields.
  */
 export class RefusedError extends Error {
   readonly refusal: Refusal;

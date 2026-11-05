@@ -1,8 +1,8 @@
 import { customType } from "drizzle-orm/pg-core";
 
 /**
- * A query under one configuration matches nothing stored under another. A generated column takes it
- * through `sql.raw`: the `sql` tag binds strings.
+ * A query under one text-search configuration matches nothing stored under another. Generated
+ * columns inline the name with `sql.raw`, because `sql` binds strings.
  */
 export const FULL_TEXT_LANGUAGE = "'english'";
 
@@ -40,10 +40,12 @@ const BM25_K1 = 1.2;
 const TS_RANK_DEFAULT_WEIGHTS =
   "CASE place WHEN 'A' THEN 1.0 WHEN 'B' THEN 0.4 WHEN 'C' THEN 0.2 ELSE 0.1 END";
 
-/** How many rows a reader may read, and how many of them hold each of the query's words. */
+/** How many rows a reader may read, and how many of them contain each of the query's words. */
 export type CorpusCounts = { readonly size: number; readonly frequencies: readonly number[] };
 
-/** In `anyWordMatch`'s order. Quoted by Postgres's own output, so nothing typed is query syntax. */
+/**
+ * In `anyWordMatch`'s order. Postgres quotes each word, so no typed text is read as query syntax.
+ */
 export const QUERY_WORDS = `SELECT array_to_tsvector(ARRAY[parsed.lexeme])::text AS word
     FROM unnest(tsvector_to_array(to_tsvector(${FULL_TEXT_LANGUAGE}, $1))) WITH ORDINALITY AS parsed(lexeme, at)
    ORDER BY parsed.at`;
@@ -62,8 +64,8 @@ export const corpusCounts = (documents: string, words: number, first: number): s
      FROM (${documents}) AS document`;
 
 /**
- * BM25F with no length normalisation. The rarities come from `counts`, bound as a `CorpusCounts`, so
- * a cursor can hold them fixed.
+ * BM25F with no length normalisation. The rarities come from `counts`, bound as a `CorpusCounts`,
+ * so a cursor can keep them fixed across pages.
  */
 export const anyWordMatch = (
   vector: string,
@@ -103,8 +105,8 @@ export const anyWordMatch = (
 });
 
 /**
- * pg_dump carries no mark on a pg_catalog function, so a restore drops it: migrate runs this on
- * every invocation, never once from the journal.
+ * pg_dump drops the LEAKPROOF mark on a pg_catalog function, so a restore loses it. migrate runs
+ * this on every invocation, not once from the journal.
  */
 export const MARK_THE_MATCH_LEAKPROOF =
   "ALTER FUNCTION pg_catalog.ts_match_vq(tsvector, tsquery) LEAKPROOF";

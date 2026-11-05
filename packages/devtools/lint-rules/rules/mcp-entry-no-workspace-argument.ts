@@ -44,11 +44,11 @@ export const mcpEntryNoWorkspaceArgumentRule = defineRule({
     },
     messages: {
       forbidden:
-        "`{{name}}` is not an argument an MCP entry may take: the principal comes from the token, never from an argument.",
+        "An MCP entry must not take `{{name}}` as an argument, because the principal comes from the access token. Remove `{{name}}` from the input.",
       opaque:
-        "This MCP entry's input is not an inline `z.object({ … })` or raw shape, so its keys cannot be checked here; declare the shape inline (the runtime test over the emitted schema is the fence for a registration from data).",
+        "This MCP entry's input is not an inline `z.object({ … })` or raw shape, so the rule cannot check its keys. Write the shape inline. For an entry registered from data, the runtime test over the emitted schema checks the keys instead.",
       spread:
-        "A spread or computed key in an MCP entry's input cannot be checked for a workspace argument; write the keys out.",
+        "The rule cannot check a spread or computed key in an MCP entry's input for a workspace argument. Write each key out.",
     },
   },
   createOnce(context) {

@@ -137,7 +137,9 @@ describe("a leg's mutate set, cut into shards", () => {
   it("refuses more shards than files", () => {
     expect(shardSlices(weightsOf(root, mutateSet(root, PATTERNS), undefined), 5)).toHaveLength(5);
     expect(() => shardSlices(weightsOf(root, mutateSet(root, PATTERNS), undefined), 6)).toThrow(
-      new Error("a leg of 5 files cannot be cut into 6 shards: each needs a file to mutate"),
+      new Error(
+        "the leg has 5 files, so it cannot be split into 6 shards, because each shard needs at least one file. Set --of to 5 or fewer.",
+      ),
     );
   });
 });
@@ -338,7 +340,7 @@ describe("a leg's results, merged from its shards", () => {
     });
     expect(merged.report).toBeUndefined();
     expect(merged.summary).toBe(
-      "### core shards: 0 of 2 finished\n- stopped before writing a report, what they had not tested waiting for the next run: 1, 2\n",
+      "### core shards: 0 of 2 finished\n- shards that stopped before writing a report, so the next run tests the mutants they did not reach: 1, 2\n",
     );
   });
 
@@ -352,7 +354,7 @@ describe("a leg's results, merged from its shards", () => {
     });
     expect(merged.report).toBeUndefined();
     expect(merged.summary).toBe(
-      "### core shards: 1 of 2 finished\n- left no results, their files keeping the previous run's: 2\n",
+      "### core shards: 1 of 2 finished\n- shards that left no results, so their files keep the previous run's results: 2\n",
     );
   });
 
@@ -464,7 +466,7 @@ describe("a leg's results, merged from its shards", () => {
     expect(merged.checkpoint).toBeUndefined();
     expect(merged.report).toBeUndefined();
     expect(merged.summary).toBe(
-      "### core shards: 0 of 2 finished\n- left no results, their files keeping the previous run's: 1, 2\n",
+      "### core shards: 0 of 2 finished\n- shards that left no results, so their files keep the previous run's results: 1, 2\n",
     );
   });
 });
@@ -620,7 +622,9 @@ describe("a file too heavy for one shard, cut by line", () => {
 
   it("refuses more pieces than the file has safe cuts", async () => {
     await expect(piecesOf(root, "src/cut.ts", 4, undefined)).rejects.toThrow(
-      new Error("src/cut.ts cannot be cut into 4 pieces: its mutants leave room for 3 at most"),
+      new Error(
+        "src/cut.ts cannot be split into 4 pieces. Only 2 line boundaries fall between its mutants, so it splits into 3 pieces at most. Lower its count in the leg's split map.",
+      ),
     );
   });
 
@@ -711,11 +715,13 @@ describe("a file too heavy for one shard, cut by line", () => {
 
     it("refuses cutting an unmutated file, and too few shards", async () => {
       await expect(sliced(new Map([["src/gone.ts", 2]]), 1, 4)).rejects.toThrow(
-        new Error("src/gone.ts is named to be cut, but the core leg does not mutate it"),
+        new Error(
+          "src/gone.ts is in the split map, but the core leg does not mutate it. Remove it from the split map, or add it to the leg's mutate patterns.",
+        ),
       );
       await expect(sliced(new Map([["src/cut.ts", 3]]), 1, 3)).rejects.toThrow(
         new Error(
-          "a leg whose cut files take 3 shards cannot be cut into 3: its other 3 files need at least one",
+          "the split files take 3 of the 3 shards, which leaves none for the leg's other 3 files. Set --of above 3.",
         ),
       );
     });
@@ -821,7 +827,7 @@ describe("the shards command", () => {
     );
 
     expect(summary).toBe(
-      "### core shards: 1 of 2 finished\n- left no results, their files keeping the previous run's: 2\n",
+      "### core shards: 1 of 2 finished\n- shards that left no results, so their files keep the previous run's results: 2\n",
     );
     expect(writtenTo(out)).toEqual({ files: ["src/a.ts"], report: false });
   });
@@ -838,7 +844,7 @@ describe("the shards command", () => {
     );
 
     expect(summary).toBe(
-      "### core shards: 0 of 2 finished\n- stopped before writing a report, what they had not tested waiting for the next run: 1\n- left no results, their files keeping the previous run's: 2\n",
+      "### core shards: 0 of 2 finished\n- shards that stopped before writing a report, so the next run tests the mutants they did not reach: 1\n- shards that left no results, so their files keep the previous run's results: 2\n",
     );
     expect(
       writtenTo(out),
@@ -867,7 +873,7 @@ describe("the shards command", () => {
     const out = path.join(scratch, "merged-four");
 
     expect(await merging(downloaded({}), out)).toBe(
-      "### core shards: 0 of 2 finished\n- left no results, their files keeping the previous run's: 1, 2\n",
+      "### core shards: 0 of 2 finished\n- shards that left no results, so their files keep the previous run's results: 1, 2\n",
     );
     expect(writtenTo(out)).toEqual({ files: [], report: false });
   });
@@ -899,7 +905,7 @@ describe("the shards command", () => {
     );
 
     expect(summary).toBe(
-      "### core shards: 1 of 2 finished\n- left no results, their files keeping the previous run's: 2\n",
+      "### core shards: 1 of 2 finished\n- shards that left no results, so their files keep the previous run's results: 2\n",
     );
   });
 
@@ -961,27 +967,27 @@ describe("the shards command", () => {
     {
       what: "no shards",
       argv: ["slice", "--leg", "core", "--shard", "1", "--of", "0", "--baseline", "."],
-      says: `--of takes a whole number from 1\n${USAGE}`,
+      says: `--of must be a whole number of 1 or more\n${USAGE}`,
     },
     {
       what: "part of a shard",
       argv: ["slice", "--leg", "core", "--shard", "1", "--of", "1.5", "--baseline", "."],
-      says: `--of takes a whole number from 1\n${USAGE}`,
+      says: `--of must be a whole number of 1 or more\n${USAGE}`,
     },
     {
       what: "a non-numeric count",
       argv: ["slice", "--leg", "core", "--shard", "1", "--of", "two", "--baseline", "."],
-      says: `--of takes a whole number from 1\n${USAGE}`,
+      says: `--of must be a whole number of 1 or more\n${USAGE}`,
     },
     {
       what: "shard nought",
       argv: ["slice", "--leg", "core", "--shard", "0", "--of", "2", "--baseline", "."],
-      says: `--shard takes a whole number from 1\n${USAGE}`,
+      says: `--shard must be a whole number of 1 or more\n${USAGE}`,
     },
     {
       what: "a shard past the count",
       argv: ["slice", "--leg", "core", "--shard", "3", "--of", "2", "--baseline", "."],
-      says: "--shard 3 is past --of 2",
+      says: "--shard 3 is greater than --of 2. Pick a shard from 1 to 2.",
     },
   ])("refuses $what, saying what it takes", async ({ argv, says }) => {
     await expect(mutationShardsFromArgv(argv, legs(root))).rejects.toThrow(new Error(says));

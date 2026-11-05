@@ -6,7 +6,7 @@ import { jscpdConfig } from "../jscpd.config.mjs";
 import { jscpdArgv } from "../packages/devtools/src/scans/jscpd.ts";
 
 const require = createRequire(import.meta.url);
-/** Where pnpm puts jscpd's executable for this package; a wrong path would pass as a clean gate. */
+/** Where pnpm installs jscpd's executable. A wrong path would make the gate pass without running. */
 const binary = path.join(path.dirname(require.resolve("jscpd/package.json")), "run-jscpd.js");
 
 const run = spawnSync(binary, [...jscpdArgv(jscpdConfig)], {

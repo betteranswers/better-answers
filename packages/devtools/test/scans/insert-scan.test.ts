@@ -125,7 +125,7 @@ describe("the scan over a throwaway tree", () => {
     const output = scan(withTypescriptInsert());
 
     expect(output).toContain(`${WORKSPACE}/test/one.test.ts:2:`);
-    expect(output).toContain("move it into one of the modules");
+    expect(output).toContain("move this insert into one of the modules");
   });
 
   it("names where the list of factory modules lives", () => {
@@ -153,7 +153,7 @@ describe("the scan over a throwaway tree", () => {
       ["packages/schema/test/support/probes.ts"]: `const q = \`${insert("workspace")}\`;\n`,
     };
 
-    expect(scan(tree)).toContain("no raw insert");
+    expect(scan(tree)).toMatch(/^none of the \d+ suite files checked has a raw insert/u);
   });
 
   it("passes a named Python factory module that contains one", () => {
@@ -162,7 +162,7 @@ describe("the scan over a throwaway tree", () => {
       ["apps/worker/tests/support/factories.py"]: `Q = "${insert("workspace")}"\n`,
     };
 
-    expect(scan(tree)).toContain("no raw insert");
+    expect(scan(tree)).toMatch(/^none of the \d+ suite files checked has a raw insert/u);
   });
 
   it.each([
@@ -171,7 +171,7 @@ describe("the scan over a throwaway tree", () => {
   ])("passes a test containing %s", (_what, line) => {
     const tree = { ...CLEAN, [`${WORKSPACE}/test/one.test.ts`]: line };
 
-    expect(scan(tree)).toContain("no raw insert");
+    expect(scan(tree)).toMatch(/^none of the \d+ suite files checked has a raw insert/u);
   });
 
   it("ignores production code, where a raw insert belongs", () => {
@@ -180,7 +180,7 @@ describe("the scan over a throwaway tree", () => {
       [`${WORKSPACE}/src/workspaces.ts`]: `const q = \`${insert("workspace")}\`;\n`,
     };
 
-    expect(scan(tree)).toContain("no raw insert");
+    expect(scan(tree)).toMatch(/^none of the \d+ suite files checked has a raw insert/u);
   });
 
   it("refuses a run that read no suite file", () => {

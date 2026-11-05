@@ -14,10 +14,13 @@ import { notSignedIn } from "./workspaces.ts";
 const OPERATOR_USAGE = "--email <email> and one of --grant or --revoke are required";
 
 const MARK_SAID = {
-  grant: { changed: "is the operator", unchanged: "was already the operator; nothing written" },
+  grant: {
+    changed: "is now the operator",
+    unchanged: "was already the operator. Nothing changed.",
+  },
   revoke: {
     changed: "is no longer the operator",
-    unchanged: "was not the operator; nothing written",
+    unchanged: "was not the operator. Nothing changed.",
   },
 } as const;
 
@@ -49,15 +52,15 @@ export const operatorCommand = async (
 const RESTORE_USAGE = "--email <email> is required";
 
 const NO_MAIL =
-  "no email transport is configured (SMTP_URL on the api service), so the restore notice cannot go; nothing changed";
+  "SMTP_URL is not set on the api service, so the restore notice cannot be sent. Nothing changed.";
 
 const restoredSaid = (restored: SignInRestored, noticed: boolean): readonly string[] => [
-  `restore-sign-in: done — ${restored.email} holds no passkey, authenticator or recovery code now, and every session of theirs is signed out`,
+  `restore-sign-in: done — removed every passkey, authenticator and recovery code of ${restored.email}, and signed out all their sessions`,
   noticed
-    ? `restore-sign-in: a notice of the restore went to ${restored.email}`
-    : `restore-sign-in: the notice to ${restored.email} did not go; tell them of the restore yourself`,
-  `restore-sign-in: their restore code, good once until ${restored.expiresAt.toISOString()}: ${restored.code}`,
-  "restore-sign-in: run this only once you have checked who they are by a channel other than their email, and hand them the code by that same channel, never by email",
+    ? `restore-sign-in: sent a notice of the restore to ${restored.email}`
+    : `restore-sign-in: the notice to ${restored.email} could not be sent. Tell them about the restore yourself.`,
+  `restore-sign-in: their restore code, which works once until ${restored.expiresAt.toISOString()}: ${restored.code}`,
+  "restore-sign-in: run this only after you confirm who they are through a channel other than email. Give them the code through that same channel, never by email.",
 ];
 
 type RestoreSignInAsked = { readonly email: string };
@@ -83,7 +86,7 @@ export const restoreSignInCommand = async (
   if (!restored.ok) {
     const reason =
       restored.error === "no-such-user"
-        ? `no-such-user: ${email} is no one's address here; nothing changed`
+        ? `no-such-user: no person has the email address ${email}. Nothing changed.`
         : restored.error.message;
     io.say(`restore-sign-in: REFUSED — ${reason}`);
     return exitOf(restored.error);

@@ -162,7 +162,10 @@ type GrantHeld = {
   readonly expiresAt: string;
 };
 
-/** Marked when a session ends or at the assistant's own revocation: the row never says which. */
+/**
+ * Set when a session ends or when the assistant revokes its own access. The row does not record
+ * which.
+ */
 type EndedByTheServer = { readonly kind: "authorization-server" };
 
 type EndedGrantInspected = GrantNamed & {
@@ -340,8 +343,8 @@ const endedGrantsOf = async (tx: Tx, personId: UserId): Promise<readonly EndedGr
 };
 
 /**
- * Sessions by last use. A grant is a refresh token's line: an assistant that asked for none holds
- * only an access token no row keeps.
+ * Sessions by last use. Each grant is one refresh token. An assistant that asked for none has only
+ * an access token, which no row stores.
  */
 export const inspectPerson = async (
   _operator: OperatorPrincipal,

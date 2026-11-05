@@ -64,12 +64,13 @@ def _one_run_only(source: Mapping[str, str]) -> int:
         runs = int(stated)
     except ValueError:
         raise BootstrapError(
-            f"MAX_CONCURRENT_RUNS is not a number: {stated!r}"
+            f"MAX_CONCURRENT_RUNS is {stated!r}, which is not a whole number. Set it to"
+            f" {CONCURRENT_RUNS} or leave it unset"
         ) from None
     if runs != CONCURRENT_RUNS:
         raise BootstrapError(
-            "MAX_CONCURRENT_RUNS is one: this worker runs a single job at a time,"
-            f" and the environment asks for {runs}"
+            f"MAX_CONCURRENT_RUNS is {runs}, but this worker runs one job at a time."
+            f" Set it to {CONCURRENT_RUNS} or leave it unset"
         )
     return runs
 
@@ -81,9 +82,11 @@ def _positive_bytes(source: Mapping[str, str], name: str, fallback: int) -> int:
     try:
         value = int(stated)
     except ValueError:
-        raise BootstrapError(f"{name} is not a number: {stated!r}") from None
+        raise BootstrapError(
+            f"{name} is {stated!r}, which is not a whole number of bytes"
+        ) from None
     if value <= 0:
-        raise BootstrapError(f"{name} is not a size: {value}")
+        raise BootstrapError(f"{name} is {value}, and it must be a positive byte count")
     return value
 
 
@@ -93,7 +96,8 @@ def read_bootstrap(environment: Mapping[str, str] | None = None) -> Bootstrap:
     missing = [name for name in REQUIRED if not source.get(name)]
     if missing:
         raise BootstrapError(
-            "bootstrap configuration is incomplete: " + ", ".join(missing)
+            "the worker cannot start because these environment variables are unset"
+            " or empty: " + ", ".join(missing)
         )
 
     return Bootstrap(

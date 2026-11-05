@@ -19,7 +19,7 @@ describe("the string rule refuses a citation a reader cannot open", () => {
     const output = lint.output(saying("Ask the owner about T-243 first."));
 
     expect(output).toContain("This string cites a ticket id (`T-243`)");
-    expect(output).toContain("Say the thing instead.");
+    expect(output).toContain("Say what the reader needs to know or do instead.");
     expect(output).toContain("better-answers(string-cites-nothing)");
   });
 

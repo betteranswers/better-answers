@@ -51,7 +51,7 @@ export const reconcileWatermark = async (
   const found = `head ${head ?? "none"}, watermark ${watermark ?? "none"}, replayed ${replayed.length}, already landed ${skipped.length}`;
   if (stopped !== undefined) {
     io.say(
-      `reconcile-watermark: REFUSED — stopped at ${stopped.sha} (${reasonOf(stopped.reason)}); ${found}; every commit before it landed and nothing after it was attempted, and this workspace stays behind that commit until a person steps in`,
+      `reconcile-watermark: REFUSED — stopped at ${stopped.sha} (${reasonOf(stopped.reason)}); ${found}. Every commit before it landed, and no later commit was tried. The workspace stays at that commit until someone fixes the cause: see RUNBOOK page 10.`,
     );
     return REFUSED;
   }
@@ -62,33 +62,34 @@ export const reconcileWatermark = async (
 const UNSOUND_WORDS = {
   "manifest-missing": () => "the tree has no manifest.yaml at its root",
   "manifest-malformed": (about) =>
-    `manifest.yaml does not carry the five keys the platform reads (${about})`,
+    `manifest.yaml is missing some of the five keys the platform reads (${about})`,
   "does-not-parse": (about) => `does not parse (${about})`,
   "type-or-title-missing": (about) => `has no ${about}`,
-  "reserved-path": (about) => `sits at a path the platform keeps for itself (${about})`,
-  "path-refused": (about) => `sits at a path the platform cannot hold (${about})`,
+  "reserved-path": (about) => `is at a path the platform reserves (${about})`,
+  "path-refused": (about) => `is at a path the platform cannot store (${about})`,
   "link-outside-tree": (about) => `links to ${about}, which is not a concept in the tree`,
   "verifier-not-a-member": (about) =>
-    `is verified by ${about}, who is not a member of this workspace; invite them first`,
+    `is verified by ${about}, who is not a member of this workspace. Invite them first`,
   "document-not-catalogued": (about) =>
-    `cites ${about}, which names no document this workspace's catalogue holds; connect its source first, or remove the citation`,
-  "merge-key-clash": (about) => `derives the same merge key as ${about}`,
+    `cites ${about}, which is not a document in this workspace's catalogue. Connect its source first, or remove the citation`,
+  "merge-key-clash": (about) => `has the same merge key as ${about}`,
 } satisfies Readonly<Record<UnsoundReason, (about: string) => string>>;
 
 const linksOf = (rewritten: readonly ConceptRewritten[]): number =>
   rewritten.reduce((sum, concept) => sum + concept.links, 0);
 
 const UNRECORDED_HEAD =
-  "the bundle's head is a commit whose rows were lost, and the reconciler has not replayed it yet; nothing was written, so run again in a minute, and if it is refused the same way the replay stopped: RUNBOOK page 10";
+  "the bundle's latest commit has lost its database rows, and the reconciler has not replayed it yet. Nothing was written. Run again in a minute. If it refuses the same way, the replay has stopped: see RUNBOOK page 10.";
 
 const IMPORT_WORDS = {
   "role-forbids": (email: string) =>
-    `${email} is not an Admin of this workspace; the import runs as an Admin`,
+    `${email} is not an Admin of this workspace. Run the import as an Admin.`,
   "manifest-taken": () =>
-    "a manifest with another bundle id already stands in this workspace's bundle",
-  "no-such-repository": () => "this workspace has no bundle repository; provision it first",
+    "this workspace's bundle already has a manifest with a different bundle id",
+  "no-such-repository": () =>
+    "this workspace has no bundle repository. Create it, then run this again.",
   "stale-precondition": () =>
-    "this workspace's bundle could not be moved while the import was writing its manifest, because another writer moved it or holds its lock; nothing was written, so run the import again, and if it is refused the same way a lock was left on refs/heads/main",
+    "another writer changed this workspace's bundle, or held its lock, while the import was writing the manifest. Nothing was written. Run the import again. If it refuses the same way, a stale lock is left on refs/heads/main.",
   "unrecorded-head": () => UNRECORDED_HEAD,
 };
 
@@ -102,10 +103,10 @@ const importReason = (refusal: ImportBundleRefusal | Error, email: string): stri
   if (refusal instanceof Error) return refusal.message;
   if (typeof refusal === "string") return importWordSaid(refusal, email);
   if (refusal.kind === "unsound") {
-    return `${refusal.file}: ${UNSOUND_WORDS[refusal.reason](refusal.about)}; nothing was written`;
+    return `${refusal.file}: ${UNSOUND_WORDS[refusal.reason](refusal.about)}. Nothing was written.`;
   }
   const { landed, skipped, verifications, rewritten } = refusal.progress;
-  return `stopped at ${refusal.file} (${reasonOf(refusal.reason)}); landed ${landed.length}, skipped ${skipped.length}, verifications ${verifications.recorded} recorded, ${counted(linksOf(rewritten), "link")} rewritten; what landed stays, and a rerun continues from there`;
+  return `stopped at ${refusal.file} (${reasonOf(refusal.reason)}); landed ${landed.length}, skipped ${skipped.length}, verifications ${verifications.recorded} recorded, ${counted(linksOf(rewritten), "link")} rewritten. The concepts that landed stay, and a rerun continues from there.`;
 };
 
 const importRefused = (
@@ -147,13 +148,11 @@ const treeUnder = async (io: OpsIo, from: string): Promise<Result<BundleTree, st
   const readTree = io.readTree;
   if (readTree === undefined) {
     return err(
-      "this process has no way to read a directory, which is a wiring fault and not an operator's",
+      "this process was started without a way to read directories. This is a bug in the ops entry point, not an operator error.",
     );
   }
   const tree = await attempt(() => readTree(from));
-  return tree.ok
-    ? ok(tree.value)
-    : err(`the directory ${from} could not be read: ${tree.error.message}`);
+  return tree.ok ? ok(tree.value) : err(`cannot read the directory ${from}: ${tree.error.message}`);
 };
 
 const sayImported = (io: OpsIo, imported: BundleImported, seconds: string): void => {
@@ -161,14 +160,14 @@ const sayImported = (io: OpsIo, imported: BundleImported, seconds: string): void
   const recorded = `${counted(verifications.recorded, "verification")} recorded (${verifications.present} already present)`;
   const links = counted(linksOf(rewritten), "link");
   if (imported.dryRun) {
-    const standing = manifest === "standing" ? "already stands" : "would be written first";
+    const standing = manifest === "standing" ? "is already written" : "would be written first";
     io.say(
-      `import-bundle: dry run — the tree is sound: ${counted(concepts, "concept")}, of which ${landed.length} would land and ${skipped.length} already stand; ${recorded.replace(" recorded", " would be recorded")}; ${links} in ${counted(rewritten.length, "concept")} would be rewritten; manifest ${bundleId} ${standing}; nothing was written`,
+      `import-bundle: dry run — the tree is sound. Of ${counted(concepts, "concept")}, ${landed.length} would land and ${skipped.length} are already in the bundle. ${recorded.replace(" recorded", " would be recorded")}. ${links} in ${counted(rewritten.length, "concept")} would be rewritten. Manifest ${bundleId} ${standing}. Nothing was written.`,
     );
     return;
   }
   io.say(
-    `import-bundle: manifest ${bundleId} ${manifest === "written" ? "written as the bundle's first commit" : "already stands"}`,
+    `import-bundle: manifest ${bundleId} ${manifest === "written" ? "written as the bundle's first commit" : "is already written"}`,
   );
   const outcomes = [
     ...landed.map((path) => [path, `landed ${path}`] as const),
@@ -198,7 +197,7 @@ const memberOf = async (
   if (principal.ok) return ok(principal.value);
   const said =
     principal.error === "not-a-member"
-      ? `${email} is not a member of workspace ${workspaceId}; invite them first`
+      ? `${email} is not a member of workspace ${workspaceId}. Invite them first.`
       : undefined;
   return err(refused(command, workspaceId, principal.error, io, said));
 };
@@ -252,19 +251,19 @@ export const bodyAskedOf = (flags: Flags): Result<BodyAsked, string> => {
   const base = flagValue(flags, "expect");
   const dryRun = flags.get("dry-run");
   if (iri === undefined || email === undefined) {
-    return err("--iri <iri> and --as <member email> are required, with the new body on stdin");
+    return err("--iri <iri> and --as <member email> are required, and the new body goes on stdin");
   }
   if (dryRun !== undefined && dryRun !== true) return err("--dry-run takes no value");
   if (dryRun === true) return ok({ iri, email, run: { dryRun, base } });
   if (base === undefined) {
     return err(
-      "--expect <content hash> is required on a write; run with --dry-run to read the hash the concept stands at",
+      "--expect <content hash> is required unless you pass --dry-run. Run with --dry-run to print the concept's current hash.",
     );
   }
   return ok({ iri, email, run: { dryRun: false, base } });
 };
 
-const BODY_KEPT = "frontmatter, status, verification and citations kept";
+const BODY_KEPT = "The frontmatter, status, verification and citations are kept.";
 
 const BODY_WORDS: Partial<
   Record<
@@ -273,21 +272,23 @@ const BODY_WORDS: Partial<
   >
 > = {
   "owner-forbids": (asked) =>
-    `${asked.email} neither owns ${asked.iri} nor is an Admin of this workspace; nothing was written`,
+    `${asked.email} does not own ${asked.iri} and is not an Admin of this workspace. Nothing was written.`,
   malformed: (asked) =>
-    `--iri ${asked.iri} is not a concept iri, or the body is longer than a concept holds; nothing was written`,
+    `--iri ${asked.iri} is not a concept IRI, or the body is longer than a concept allows. Nothing was written.`,
   "no-such-concept": (asked, workspaceId) =>
-    `no concept ${asked.iri} stands in workspace ${workspaceId} that ${asked.email} can read; a Restricted concept needs an Admin; nothing was written`,
-  unchanged: (asked) => `the body given is the one ${asked.iri} already holds; nothing was written`,
+    `${asked.email} cannot read a concept ${asked.iri} in workspace ${workspaceId}. It does not exist, or it is Restricted and only an Admin can read it. Nothing was written.`,
+  unchanged: (asked) =>
+    `the new body is the same as the body ${asked.iri} already has. Nothing was written.`,
   "widening-refused": (asked) =>
-    `${asked.iri} is held narrower than the sources it cites, as after a replay whose file cited a document the catalogue no longer holds; a body update would widen it, so nothing was written`,
+    `${asked.iri} has narrower access than the sources it cites, which happens after a replay of a file that cites a document no longer in the catalogue. Updating the body would widen its access, so nothing was written.`,
   "no-such-document": (asked) =>
-    `${asked.iri} cites a document the catalogue no longer holds, so its file cannot be written again by this command; escalate it; nothing was written`,
+    `${asked.iri} cites a document that is no longer in the catalogue, so this command cannot rewrite its file. Escalate it. Nothing was written.`,
   "body-locator-refused": (asked) =>
-    `the body names a passage locator that ${asked.iri}'s sources do not cite; cite the passage in its sources first; nothing was written`,
+    `the body names a passage locator that ${asked.iri}'s sources do not cite. Add the passage to its sources first. Nothing was written.`,
   "stale-precondition": (asked) =>
-    `${asked.iri} moved: ${asked.run.base === undefined ? "its" : `it no longer stands at ${asked.run.base}, or its`} file at the bundle's head is ahead of its row; nothing was written. Run with --dry-run again, and if that refuses the same way a minute later, the rows are behind the bundle: RUNBOOK page 10`,
-  "no-such-repository": () => "this workspace has no bundle repository; provision it first",
+    `${asked.iri} has changed: ${asked.run.base === undefined ? "its" : `its content hash is no longer ${asked.run.base}, or its`} file in the bundle is newer than its database row. Nothing was written. Run with --dry-run again. If it refuses the same way a minute later, the database rows are behind the bundle: see RUNBOOK page 10.`,
+  "no-such-repository": () =>
+    "this workspace has no bundle repository. Create it, then run this again.",
   "unrecorded-head": () => UNRECORDED_HEAD,
 };
 
@@ -314,15 +315,17 @@ const bodyUpdateRefused = (
 const sayBodyUpdate = (io: OpsIo, update: ConceptBodyUpdate): void => {
   const { path, from, to, written } = update;
   if (written === undefined) {
-    io.say(`update-concept-body: ${path} stands at ${from.contentHash}; pass it as --expect`);
+    io.say(
+      `update-concept-body: ${path} has content hash ${from.contentHash}. Pass it as --expect.`,
+    );
     for (const line of bodyDiffLines(from.body, to.body)) io.say(line);
     io.say(
-      `update-concept-body: dry run — the body would move ${path} from ${from.contentHash} to ${to.contentHash}; ${BODY_KEPT}; nothing was written`,
+      `update-concept-body: dry run — the new body would change ${path} from ${from.contentHash} to ${to.contentHash}. ${BODY_KEPT} Nothing was written.`,
     );
     return;
   }
   io.say(
-    `update-concept-body: done — ${path} moved from ${from.contentHash} to ${written.contentHash}, commit ${written.sha.slice(0, 7)}; ${BODY_KEPT}`,
+    `update-concept-body: done — ${path} changed from ${from.contentHash} to ${written.contentHash} in commit ${written.sha.slice(0, 7)}. ${BODY_KEPT}`,
   );
 };
 
@@ -334,7 +337,7 @@ export const updateConceptBodyCommand = async (
 ): Promise<number> => {
   const body = await io.stdin();
   if (body.trim() === "") {
-    io.say("update-concept-body: the new body is read from stdin, and stdin was empty");
+    io.say("update-concept-body: stdin was empty. Pipe the new body to stdin.");
     return USAGE;
   }
   const git = bundleStore(doors, "the bundle the update writes into cannot be opened");

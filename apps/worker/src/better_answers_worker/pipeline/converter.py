@@ -61,7 +61,8 @@ def converted(body: bytes, media_type: str) -> str:
     converter = CONVERTERS.get(media_type)
     if converter is None:
         raise UnreadableError(
-            "UnsupportedMediaType", f"this tier converts no {media_type}"
+            "UnsupportedMediaType",
+            f"the worker has no converter for media type {media_type}",
         )
     return converter(body)
 
@@ -71,7 +72,8 @@ def _decoded(body: bytes, media_type: str) -> str:
         return body.decode(TEXT_ENCODING)
     except UnicodeDecodeError as cause:
         raise UnreadableError(
-            type(cause).__name__, f"a {media_type} document that is not {TEXT_ENCODING}"
+            type(cause).__name__,
+            f"the {media_type} document is not valid {TEXT_ENCODING}",
         ) from cause
 
 
@@ -88,7 +90,8 @@ def _pdf(body: bytes) -> str:
         raise UnreadableError(
             "NeedsOcrError",
             f"{len(classified.pages_needing_ocr)} of"
-            f" {classified.page_count} pages have no text layer",
+            f" {classified.page_count} pages have no text layer, and the worker"
+            " does not run OCR",
         )
     try:
         return str(pdf_inspector.process_pdf_bytes(body).markdown)

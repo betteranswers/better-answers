@@ -62,7 +62,7 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
 
   const start = async (context: Context, person: SignedIn): Promise<Response> => {
     const held = await heldBy(deps, person);
-    if (held === undefined) return unanswered(context, "the second factor was not read");
+    if (held === undefined) return unanswered(context, "could not read the person's factors");
     const refused = refusedAFirstSetup(context, held);
     if (refused !== undefined) return refused;
     if (held.authenticator === "set-up") return context.json(REFUSALS.held, 409);
@@ -88,14 +88,14 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
     if (!recorded.ok) {
       log.error(
         { event: "auth.authenticator_not_recorded", principal: person.user.id },
-        "an authenticator was set up but not recorded",
+        "the authenticator was set up, but recording it failed",
       );
       return undefined;
     }
     if (!recorded.value.stamped) {
       log.warn(
         { event: "auth.authenticator_not_stamped", principal: person.user.id },
-        "an authenticator was set up but its session was gone",
+        "the authenticator was set up after its session had ended",
       );
     }
     return recorded.value;
@@ -133,7 +133,7 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
     const asked = await parsedBody(context, codeAsked);
     if (!asked.success) return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
     const held = await heldBy(deps, person);
-    if (held === undefined) return unanswered(context, "the second factor was not read");
+    if (held === undefined) return unanswered(context, "could not read the person's factors");
     const refused = refusedAFirstSetup(context, held);
     if (refused !== undefined) return refused;
     if (held.authenticator !== "awaiting-code") return context.json(REFUSALS.noSetupWaiting, 409);

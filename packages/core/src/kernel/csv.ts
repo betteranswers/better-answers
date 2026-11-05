@@ -1,4 +1,7 @@
-/** A spreadsheet runs a cell starting so as a formula; spaces before the sign do not stop it. */
+/**
+ * A spreadsheet runs a cell that starts with one of these characters as a formula, even after
+ * leading spaces.
+ */
 const FORMULA_START = /^ *[=+\-@\t\r]/u;
 
 const cellOf = (value: string): string => {

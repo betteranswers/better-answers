@@ -26,7 +26,7 @@ describe("the doc-block rule refuses a declaration's line comment", () => {
   it("names the form to write and why", () => {
     const output = docBlockLint.output(holding("// Kept short.\nexport const keep = 1;\n"));
 
-    expect(output).toContain("`/** */`");
+    expect(output).toContain("`/** … */` doc block");
     expect(output).toContain("wherever the name is used");
     expect(output).toContain("better-answers(declaration-doc-block)");
   });

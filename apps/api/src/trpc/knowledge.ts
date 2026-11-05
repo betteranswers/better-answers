@@ -133,7 +133,7 @@ const guideAnswered = async (
     owner: owner.value,
     sections: guide.sections.map(({ citedIris: _cited, ...section }, at) => {
       const held = trust.value[at];
-      if (held === undefined) throw new Error(`section ${section.sectionId} has no trust`);
+      if (held === undefined) throw new Error(`no trust was read for section ${section.sectionId}`);
       return {
         ...section,
         trustWords: trustWords(held),

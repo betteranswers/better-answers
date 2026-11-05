@@ -20,7 +20,7 @@ const counts = z
   })
   .refine(
     ({ size, frequencies }) => frequencies.every((held) => held <= size),
-    "a word is held by more rows than were counted",
+    "a word's row count is larger than the counted rows",
   );
 
 const FIND_POSITION = z.discriminatedUnion("run", [
@@ -62,7 +62,7 @@ export const findCursor = z
   .transform((text, context) => {
     const position = positionOf(text);
     if (position === undefined) {
-      context.addIssue({ code: "custom", message: "not a cursor find handed out" });
+      context.addIssue({ code: "custom", message: "not a cursor that find returned" });
     }
     return position ?? z.NEVER;
   });

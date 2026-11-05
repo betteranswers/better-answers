@@ -1,5 +1,5 @@
 #!/bin/sh
-# git names each ref being pushed on stdin: <local ref> <local sha> <remote ref> <remote sha>.
+# git writes each pushed ref to stdin as: <local ref> <local sha> <remote ref> <remote sha>.
 # A deletion's local sha is all zeros.
 while read -r _ local_sha remote_ref _; do
   case "$remote_ref" in refs/heads/*) ;; *) continue ;; esac

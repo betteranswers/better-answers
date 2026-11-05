@@ -159,7 +159,9 @@ const principalOf = async (
   return resolved.ok
     ? ok(resolved.value)
     : err(
-        new Error(`erasure: the synthetic subject's principal did not resolve: ${resolved.error}`),
+        new Error(
+          `erasure: could not resolve the rehearsal subject's principal: ${resolved.error}`,
+        ),
       );
 };
 
@@ -190,7 +192,9 @@ const conceptSeeded = async (
     },
   );
   if (written.ok || written.error === "merge-key-taken") return ok(undefined);
-  return err(new Error(`erasure: the rehearsal's concept was refused: ${String(written.error)}`));
+  return err(
+    new Error(`erasure: writing the rehearsal's concept failed: ${String(written.error)}`),
+  );
 };
 
 const connectedSourceHolding = (
@@ -232,7 +236,9 @@ const documentSeeded = async (
     body: new Blob([text]).stream(),
   });
   if (!bound.ok) {
-    return err(new Error(`erasure: the rehearsal's document was refused: ${String(bound.error)}`));
+    return err(
+      new Error(`erasure: binding the rehearsal's document failed: ${String(bound.error)}`),
+    );
   }
   return ok({
     connectedSourceId: bound.value.connectedSourceId,
@@ -257,7 +263,7 @@ export const seedSyntheticSubject = async (
   );
   if (!person.ok) return err(person.error);
   if (person.value === undefined) {
-    return err(new Error("erasure: the rehearsal's person row was neither written nor found"));
+    return err(new Error("erasure: the rehearsal's person row was not written and not found"));
   }
   const subject = subjectOf(workspaceId, person.value);
 
@@ -341,19 +347,19 @@ export const rehearseErasure = async (
   );
   if (!opened.ok) {
     return err(
-      new Error(`erasure: the synthetic subject's principal was refused: ${opened.error}`),
+      new Error(`erasure: opening the rehearsal subject's principal failed: ${opened.error}`),
     );
   }
   const recorded = opened.value;
   if (!recorded.ok) {
     const word = refusalWordOf(recorded.error);
-    return err(new Error(`erasure: the rehearsal's request was refused: ${word}`));
+    return err(new Error(`erasure: recording the rehearsal's request failed: ${word}`));
   }
   const subjectRequestId = recorded.value.requestId;
 
   const run = await runErasure(platform, doors, { workspaceId, subjectRequestId });
   if (!run.ok) {
-    return err(new Error(`erasure: the rehearsal's routine refused: ${String(run.error)}`));
+    return err(new Error(`erasure: the rehearsal's routine failed: ${String(run.error)}`));
   }
 
   const event = await attempt(() =>

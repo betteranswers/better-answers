@@ -132,7 +132,7 @@ beforeAll(spawn.run);
 const INTERNAL = "only through its own index.ts";
 
 const REFUSED: Readonly<Record<string, readonly (readonly [string, string, string])[]>> = {
-  "packages/core is transport-agnostic": [
+  "packages/core must stay transport-agnostic": [
     ["a slice importing hono", SLICE, "hono"],
     ["a slice importing a hono subpath", SLICE, "hono/streaming"],
     ["a slice importing the node adapter", SLICE, "@hono/node-server"],
@@ -189,7 +189,7 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
     ["a slice reaching a sibling's nested face", SLICE, "../guides/internal/index.ts"],
     ["the catalogue reaching a slice's internal file", CATALOGUE, "../concepts/vocabulary.ts"],
   ],
-  "is a face packages/core's exports map does not name": [
+  "is not in the exports map of packages/core": [
     ["a slice reaching an unmapped face", SLICE, "../store/objects/index.ts"],
     ["a slice reaching an unmapped sibling", SLICE, "../sources/index.ts"],
     ["a slice reaching an unmapped directory", SLICE, "../sources"],
@@ -197,13 +197,13 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
     ["a test reaching another slice's unmapped face", MIRRORED, "../../src/sources/index.ts"],
     ["a self-reference to an unmapped entry", SLICE, "@better-answers/core/sources"],
   ],
-  "only a test reaches it": [
+  "only a test may import it": [
     ["a slice importing erasure's face", SLICE, "../erasure/index.ts"],
     ["a slice importing erasure by its directory", SLICE, "../erasure"],
     ["a slice importing erasure's internal", SLICE, "../erasure/replay.ts"],
     ["a slice importing erasure by self-reference", SLICE, "@better-answers/core/erasure"],
   ],
-  "Nothing in core imports the refusal catalogue": [
+  "Nothing in core may import the refusal catalogue": [
     ["a slice importing the catalogue", SLICE, "../refusals/index.ts"],
     ["a slice importing the catalogue by its directory", SLICE, "../refusals"],
     ["a slice importing the catalogue by self-reference", SLICE, "@better-answers/core/refusals"],
@@ -211,7 +211,7 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
     ["a layer importing the catalogue", AUDIT, "../refusals/index.ts"],
     ["a door importing the catalogue", POSTGRES_DOOR, "../../refusals/index.ts"],
   ],
-  "the refusal catalogue imports kernel and each slice's face, and nothing else": [
+  "the refusal catalogue imports only kernel and each slice's index.ts": [
     ["the catalogue importing a door's face", CATALOGUE, "../store/postgres/index.ts"],
     ["the catalogue importing a layer's face", CATALOGUE, "../audit/index.ts"],
     ["the catalogue importing access's face", CATALOGUE, "../access/index.ts"],
@@ -227,15 +227,16 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
     ["access importing a door's face", ACCESS, "../store/postgres/index.ts"],
     ["access importing a slice's face", ACCESS, "../concepts/index.ts"],
   ],
-  "a store door imports only kernel, and store/map alone also imports access": [
-    ["the postgres door importing access", POSTGRES_DOOR, "../../access/index.ts"],
-    ["the map door importing a slice's face", MAP_DOOR, "../../concepts/index.ts"],
-    ["the map door importing a layer's face", MAP_DOOR, "../../audit/index.ts"],
-    ["a door importing another door", MAP_DOOR, "../postgres/index.ts"],
-    ["a door importing the store barrel", POSTGRES_DOOR, "../index.ts"],
-    ["the store barrel importing a door", STORE_BARREL, "./postgres/index.ts"],
-  ],
-  "llm and audit import kernel, access and the doors": [
+  "a store door (a folder under store/) imports only kernel, and only store/map may also import access":
+    [
+      ["the postgres door importing access", POSTGRES_DOOR, "../../access/index.ts"],
+      ["the map door importing a slice's face", MAP_DOOR, "../../concepts/index.ts"],
+      ["the map door importing a layer's face", MAP_DOOR, "../../audit/index.ts"],
+      ["a door importing another door", MAP_DOOR, "../postgres/index.ts"],
+      ["a door importing the store barrel", POSTGRES_DOOR, "../index.ts"],
+      ["the store barrel importing a door", STORE_BARREL, "./postgres/index.ts"],
+    ],
+  "llm and audit import only kernel, access and the store doors": [
     ["audit importing llm", AUDIT, "../llm/index.ts"],
     ["llm importing audit", LLM, "../audit/index.ts"],
     ["llm importing a slice's face", LLM, "../concepts/index.ts"],
@@ -270,8 +271,8 @@ describe("the rule flags a forbidden import and states its clause", () => {
   it("names the fix for a test outside its mirror folder", () => {
     const message = statedBy(ELSEWHERE, "../../src/concepts/file.ts");
 
-    expect(message).toContain("never `file.ts`");
-    expect(message).toContain("Import the face, or move the test to `test/concepts/`");
+    expect(message).toContain("not `file.ts`");
+    expect(message).toContain("Import from the index.ts, or move the test to `test/concepts/`");
     expect(message).toContain("mirrors `src/concepts`");
   });
 
@@ -283,14 +284,14 @@ describe("the rule flags a forbidden import and states its clause", () => {
 
   it("tells a misplaced test to import an entry point", () => {
     expect(statedBy(MIRRORED, "../../src/sources/index.ts")).toContain(
-      "a test outside its mirror folder reaches an entry point",
+      "tests outside their mirror folder all import the same entry point",
     );
   });
 
   it("treats a sibling's nested index.ts as internal, not a face", () => {
     const message = statedBy(SLICE, "../guides/internal/index.ts");
 
-    expect(message).toContain("never `internal/index.ts`");
+    expect(message).toContain("not `internal/index.ts`");
     expect(message).not.toContain("Add `./guides`");
   });
 

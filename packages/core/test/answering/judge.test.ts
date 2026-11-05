@@ -384,7 +384,7 @@ describe("ask with a judge", () => {
     assert(!failed.ok);
     assert(failed.error instanceof Error);
     expect(failed.error.message).toBe(
-      "llm: the workspace's model key did not open (envelope-not-authentic)",
+      "llm: could not open the workspace's model key (envelope-not-authentic)",
     );
     await expectNoCall(workspaceId, wire);
   });

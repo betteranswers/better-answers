@@ -157,7 +157,7 @@ describe("the next step", () => {
     expect(lines(result.report)).toContain("cubic\tpending (in_progress)");
     expect(lines(result.report)).toContain("a bot is still running, so this is not final");
     expect(nextOf(result.report)).toBe(
-      "next: wait for the running bot, then run pnpm run review-coverage 7 again. After 20 minutes this treats a bot still running as one that did not run",
+      "next: wait for the running bot, then run pnpm run review-coverage 7 again. After 20 minutes, review-coverage counts a bot that is still running as not run",
     );
   });
 

@@ -26,8 +26,8 @@ const keyed = (key: Uint8Array): Uint8Array => {
 export const sealEnvelope = (key: Uint8Array, plaintext: Uint8Array): Uint8Array => {
   const version = Uint8Array.of(ENVELOPE_VERSION);
   /**
-   * Never a counter: two processes share the key and would hand out one number twice, which
-   * under GCM hands out the plaintexts.
+   * Random, not a counter. Two processes share the key and could reuse a counter value, and a
+   * reused GCM nonce exposes the plaintexts.
    */
   const nonce = randomBytes(ENVELOPE_NONCE_BYTES);
   const cipher = createCipheriv(ENVELOPE_AEAD, keyed(key), nonce, {

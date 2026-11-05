@@ -129,64 +129,72 @@ const isSliceCommand = (command: string): command is SliceCommand => Object.hasO
 export const SLICE_COMMANDS: readonly SliceCommand[] = Object.keys(NEEDS).filter(isSliceCommand);
 
 const USAGE_TEXT = `usage: pnpm ops <command> [options]
-  replay-erasures --since <dump stamp | ISO instant>      re-apply every erasure completed after a dump (mandatory in every restore)
-  map-rebuild --workspace <id> [--reason <word>] [--wait | --wait-seconds <n>]   the map made again by the worker
-    --reason  one of ${REBUILD_REASONS.join(" · ")} (default ${REBUILD_DEFAULT_REASON})
-    --wait    poll the job until it is over, ${WAIT_SECONDS} seconds — the rebuild's own budget
-    --wait-seconds <n>  the same, for a whole number of seconds an operator names instead
-  map-sweep --workspace <id>                                delete every generation of the map but the live one
-  map-counts --workspace <id>                               nodes per label and edges, as JSON, for the drill's diff
-  unmapped-passage-rate --workspace <id>                    the records flagged incomplete, and how many of them showed unmapped passages, by the map's state, as JSON
-  reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed
-  object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed connect or a lost race left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
-    --list         say how many there are, removing none
-  reindex-connected-sources --workspace <id>                every connected source wiped and queued to index again, as a release that renames the engine's target needs
+  replay-erasures --since <dump stamp | ISO instant>      Re-applies every erasure completed after the dump was taken. Run it in every restore.
+  map-rebuild --workspace <id> [--reason <word>] [--wait | --wait-seconds <n>]
+                                                            Queues a job for the worker to rebuild the workspace's map.
+    --reason  The reason recorded with the job: ${REBUILD_REASONS.join(", ")} (default ${REBUILD_DEFAULT_REASON}).
+    --wait    Waits for the job to finish, for up to ${WAIT_SECONDS} seconds, the time a rebuild is allowed.
+    --wait-seconds <n>  Waits for the job to finish, for up to <n> seconds.
+  map-sweep --workspace <id>                                Deletes every generation of the map except the live one.
+  map-counts --workspace <id>                               Prints the map's nodes per label and its edges as JSON, for the restore drill to compare.
+  unmapped-passage-rate --workspace <id>                    Prints as JSON, for each map state, how many questions asked were flagged incomplete and how many of those showed unmapped passages.
+  reconcile-watermark --workspace <id>                      Replays the bundle commits that the database rows are missing. This is step 2 of the recovery order.
+  object-store-orphans --workspace <id> [--list]            Removes uploaded files that no document row names and that are older than ${ORPHANED_UPLOAD_GRACE_HOURS} hours, such as those a failed connect left. This is step 5 of the recovery order.
+    --list         Prints how many there are and removes none.
+  reindex-connected-sources --workspace <id>                Clears every connected source's passages and queues each source to index again. Run it after a release that renames the table the worker's index engine tracks.
   smoke --url <origin> [--workspace <id>] [--find] [--guide] [--ask]
+                                                            Checks that the API at <origin> answers health, MCP discovery, MCP sign-in and app requests. Exits ${REFUSED} if any check fails.
+    --find, --guide, --ask  Prints a reminder to test that MCP tool by hand, because it needs a signed-in token.
   erasure-rehearsal --workspace <id> --synthetic --seed [--wait-seconds <n>]
-                                                            phase one: the synthetic subject and a document naming them, waited on until indexed; its tokens on the last line
-    --wait-seconds <n>  how long to wait for the document's index job (default ${WAIT_SECONDS})
-  erasure-rehearsal --workspace <id> --synthetic --run --report <file>   phase two: erase them, write the report, print the tokens again
-  dump-grep --tokens <a,b,…>                                stdin: a plain-SQL dump; per token, which COPY section holds it and in how many lines — never a line
+                                                            Phase one: creates a synthetic subject and a document that names them, then waits until the document is indexed. The last line holds the subject's tokens.
+    --wait-seconds <n>  How long to wait for the document's index job, in seconds (default ${WAIT_SECONDS}).
+  erasure-rehearsal --workspace <id> --synthetic --run --report <file>
+                                                            Phase two: erases the synthetic subject, writes the report to <file>, and prints the tokens again.
+  dump-grep --tokens <a,b,…>                                Reads a plain-SQL dump on stdin. For each token, prints which COPY sections hold it and in how many lines, but never the lines.
   provision-workspace --name <name> --short-name <short name> --admin <email>
-                                                            a customer's workspace with its first Admin, a person who has signed in; the id it minted is first on the done line
+                                                            Creates a customer workspace whose first Admin is a person who has signed in. The done line starts with the new workspace id.
   add-person --email <address> --name <display name>
-                                                            a person named before their first sign-in, so add-member can take them; the id it minted is first on the done line
+                                                            Adds a person before their first sign-in, so that add-member can add them to a workspace. The done line starts with the new person id.
   add-member --workspace <id> --email <email> --role <${ROLES.join("|")}>
-                                                            a signed-in person made a member of the workspace; a repeat is refused and never changes a role
+                                                            Makes a signed-in person a member of the workspace. It refuses a person who is already a member and never changes a role.
   rename-workspace --workspace <id> [--name <name>] [--short-name <short name>]
-                                                            the workspace's name, its short name, or both; at least one is named, and the other kept
+                                                            Changes the workspace's name, its short name, or both. Give at least one. The other stays as it is.
   set-model-key --workspace <id> --provider <${MODEL_PROVIDERS.join("|")}>
-                                                            stdin: the workspace's key for that model provider, sealed and never printed; a second run replaces it
-  set-spending-limit --workspace <id> --gbp <pounds>        the most the workspace's model calls may spend each calendar month; a second run replaces it, and with none set no model is called
+                                                            Reads the workspace's key for that model provider from stdin and stores it encrypted. It never prints the key. A second run replaces it.
+  set-spending-limit --workspace <id> --gbp <pounds>        Sets the most the workspace's model calls may spend each calendar month. A second run replaces it. With no limit set, no model is called.
   set-model-choice --workspace <id> --purpose <${CHOSEN_PURPOSES.join("|")}> --provider <${[...CHOOSABLE_PROVIDERS].join("|")}> --model <model>
-                                                            the model the workspace calls for that purpose, priced and named by the DPIA; a second run replaces it
+                                                            Sets the model the workspace calls for that purpose. The model needs a price, and its provider must be a sub-processor the DPIA names. A second run replaces it.
   set-model-price --provider <${MODEL_PROVIDERS.join("|")}> --model <model> --from <yyyy-mm-dd> --gbp-per-million-in <pounds> --gbp-per-million-out <pounds>
-                                                            what a model costs from that day on, per million tokens sent and returned; a model with no price is never called
+                                                            Sets what a model costs from that day on, per million tokens sent and per million returned. A model with no price is never called.
   set-decision-threshold --provider <${DECISION_PROVIDERS.join("|")}> --model <model> --threshold <probability>
-                                                            the probability at or above which a decision model's yes is taken; a second run replaces it, and with none set the model never judges
-  operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
-  restore-sign-in --email <email>                           a person who lost every factor and code, once you have checked who they are another way: their factors and sessions ended, a notice sent, a one-time restore code printed
+                                                            Sets the probability at or above which a decision model's yes counts. A second run replaces it. A model with no threshold makes no decisions.
+  operator --email <email> --grant|--revoke                 Makes a signed-in person the platform operator, or removes them. Each change is written to the identity-set audit log.
+  restore-sign-in --email <email>                           For a person who lost every factor and recovery code: ends their factors and sessions, emails them a notice, and prints a one-time restore code. Confirm who they are another way first.
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <sensitivity>] [--dry-run]
-                                                            the company's bundle landed through the governed write, its verifications imported, its links rewritten to iris
-    --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
-    --dry-run      validate the tree and say what a run would do, writing nothing
+                                                            Writes the company's bundle through the governed write, imports its verifications, and rewrites its links to IRIs.
+    --sensitivity  The sensitivity of the imported concepts: ${SENSITIVITIES.join(", ")} (default ${IMPORT_SENSITIVITY_DEFAULT}).
+    --dry-run      Checks the tree and prints what a run would do, without writing anything.
   update-concept-body --workspace <id> --iri <iri> --as <member email> [--expect <content hash>] [--dry-run]
-                                                            stdin: the concept's new body; it replaces the body alone, keeping frontmatter, status, verification and citations
-    --expect   the content hash the concept stands at, required on a write; a dry run prints it
-    --dry-run  print the hash the concept stands at and the body's diff, writing nothing
-exit codes: ${DONE} done · ${REFUSED} refused in no refusal word, stop · ${USAGE} usage, or a malformed argument · ${NOT_BUILT} the slice this needs has no tables yet
-  a refusal word exits with its class's code: ${Object.entries(EXIT_OF_CLASS)
+                                                            Replaces the concept's body with the one on stdin. It keeps the frontmatter, status, verification and citations.
+    --expect   The concept's current content hash. A write needs it, and a dry run prints it.
+    --dry-run  Prints the concept's current content hash and the diff of its body, without writing anything.
+exit codes:
+  ${DONE} The command finished.
+  ${REFUSED} The command refused with no refusal word. Stop and read the output.
+  ${USAGE} The command or an argument is wrong.
+  ${NOT_BUILT} This database does not have the tables the command needs yet.
+  A refusal word exits with the code of its class: ${Object.entries(EXIT_OF_CLASS)
     .map(([refusalClass, code]) => `${code} ${refusalClass}`)
-    .join(" · ")}
-  a run that names the file or commit it stopped at exits ${REFUSED}, whatever word it names: import-bundle's unsound tree and stopped import, reconcile-watermark's stopped replay
-  an import whose manifest commit is refused as malformed exits ${REFUSED} too: only a defect in the import can cause it`;
+    .join(", ")}.
+  A run that stops at a named file or commit exits ${REFUSED}, whatever refusal word it prints. These runs are import-bundle with an unsound tree or a stopped import, and reconcile-watermark with a stopped replay.
+  An import whose manifest commit is refused as malformed also exits ${REFUSED}, because only a defect in the import can cause that refusal.`;
 
 const notBuiltSaid = async (doors: Doors, command: SliceCommand): Promise<string | undefined> => {
   const tables: readonly Table[] = NEEDS[command];
   const needed = tables.map((table) => getTableName(table));
   const present = await tablesPresent(doors.postgres, needed);
   return present.length < needed.length
-    ? `${command}: not built — ${needed.filter((name) => !present.includes(name)).join(", ")} absent from this schema; the slice that owns them has not landed`
+    ? `${command}: not built — the database is missing these tables: ${needed.filter((name) => !present.includes(name)).join(", ")}. Run the migrations that create them.`
     : undefined;
 };
 

@@ -55,7 +55,7 @@ const escaped = (value: string): string =>
 
 const field = z
   .string()
-  .refine((raw) => WELL_ESCAPED.test(raw), "a backslash escapes only \\, t, n or r")
+  .refine((raw) => WELL_ESCAPED.test(raw), "a backslash may escape only \\, t, n or r")
   .transform((raw) => raw.replace(/\\([\\tnr])/gu, (_, one: string) => UNESCAPED.get(one) ?? one));
 
 const counted = (least: number) => field.pipe(z.coerce.number<string>().int().min(least));
@@ -74,7 +74,7 @@ const rowSchema = z
     structure: field,
     unit: field,
   })
-  .refine((row) => row.end >= row.start, { message: "ends before it starts", path: ["end"] });
+  .refine((row) => row.end >= row.start, { message: "is before start", path: ["end"] });
 
 export type Row = Readonly<z.output<typeof rowSchema>>;
 
@@ -95,7 +95,7 @@ const rowAt = (line: string, number: number): Outcome<Row> => {
 
 export const rowsIn = (tsv: string): Outcome<readonly Row[]> => {
   const [header, ...lines] = tsv.replace(/\n$/u, "").split("\n");
-  if (header !== HEADER) return { refused: [`line 1: the header is not ${COLUMNS.join(", ")}`] };
+  if (header !== HEADER) return { refused: [`line 1: the header must be ${COLUMNS.join(", ")}`] };
   const rows: Row[] = [];
   for (const [index, line] of lines.entries()) {
     const read = rowAt(line, index + 2);

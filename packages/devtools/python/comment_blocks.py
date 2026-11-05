@@ -29,7 +29,7 @@ EXEMPT_OPENING = re.compile(
     r")"
 )
 
-# A suppression's codes are machinery; whatever follows them is its reason, and counts.
+# Text after a suppression's rule codes is its reason, and counts towards the limit.
 SUPPRESSION = re.compile(
     r"^(?:noqa(?::\s*[A-Z]+[0-9]+(?:[,\s]+[A-Z]+[0-9]+)*)?"
     r"|type:\s*ignore(?:\[[^\]]*\])?)"

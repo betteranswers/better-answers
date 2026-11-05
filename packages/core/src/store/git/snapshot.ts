@@ -12,7 +12,10 @@ const KNOWLEDGE = "knowledge/";
 /** `<mode> <type> <object> <size>\t<path>`, as `ls-tree -l` writes each entry. */
 const LISTED = /^(?:100644|100755) blob ([0-9a-f]+) +(\d+)\t(.+)$/su;
 
-/** An object id, a type and a size around two line feeds, with room for a SHA-256 id. */
+/**
+ * Bytes for each blob's header line (object id, type and size) and its two line feeds, with room
+ * for a SHA-256 id.
+ */
 const BATCH_FRAMING = 128;
 
 type Listed = { readonly path: string; readonly object: string; readonly size: number };
@@ -31,7 +34,7 @@ const blobsIn = (batch: Buffer, kept: readonly Listed[]): readonly SnapshotFile[
     const lineEnd = batch.indexOf(0x0a, at);
     const header = batch.toString("utf8", at, lineEnd);
     if (header !== `${object} blob ${String(size)}`) {
-      throw new Error(`git: read ${header} where blob ${object} of ${path} was asked for`);
+      throw new Error(`git: expected blob ${object} for ${path}, but read header ${header}`);
     }
     at = lineEnd + 1 + size + 1;
     return { path, bytes: batch.subarray(lineEnd + 1, lineEnd + 1 + size) };

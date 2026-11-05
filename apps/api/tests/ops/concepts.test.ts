@@ -124,7 +124,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([
-        "reconcile-watermark: REFUSED — no repositories' root is configured (GIT_STORE_DIR), so the bundle cannot be opened; the estate sets it to /data/git on the api service",
+        "reconcile-watermark: REFUSED — GIT_STORE_DIR is not set, so the bundle cannot be opened. Set it to /data/git on the api service.",
       ]);
     });
 
@@ -141,7 +141,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([
-        `reconcile-watermark: REFUSED — the repositories' root is no-such-root (GIT_STORE_DIR=${missing})`,
+        `reconcile-watermark: REFUSED — GIT_STORE_DIR ${missing} cannot be opened: no-such-root`,
       ]);
     });
 
@@ -662,7 +662,7 @@ describe("pnpm ops", () => {
 
       expect(again.exitCode).toBe(0);
       expect(again.lines).toEqual([
-        `import-bundle: manifest ${BUNDLE_ID} already stands`,
+        `import-bundle: manifest ${BUNDLE_ID} is already written`,
         ...IMPORTED_PATHS.map((file) => `import-bundle: skipped ${file} — already landed`),
         "import-bundle: done — landed 0, skipped 6, 0 verifications recorded (7 already present), 0 links rewritten, 0.0 seconds",
       ]);
@@ -693,7 +693,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
-        `import-bundle: dry run — the tree is sound: 6 concepts, of which 6 would land and 0 already stand; 7 verifications would be recorded (0 already present); 4 links in 3 concepts would be rewritten; manifest ${BUNDLE_ID} would be written first; nothing was written`,
+        `import-bundle: dry run — the tree is sound. Of 6 concepts, 6 would land and 0 are already in the bundle. 7 verifications would be recorded (0 already present). 4 links in 3 concepts would be rewritten. Manifest ${BUNDLE_ID} would be written first. Nothing was written.`,
       ]);
       expect(await commitsOf(served(), workspaceId)).toEqual([]);
       expect(await indexRowsOf(served(), workspaceId)).toEqual([]);
@@ -721,7 +721,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.forbidden);
       expect(run.lines).toEqual([
-        `import-bundle: REFUSED — ${viewer.email} is not an Admin of this workspace; the import runs as an Admin`,
+        `import-bundle: REFUSED — ${viewer.email} is not an Admin of this workspace. Run the import as an Admin.`,
       ]);
       expect(await commitsOf(served(), workspaceId)).toEqual([]);
     });
@@ -733,7 +733,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.forbidden);
       expect(run.lines).toEqual([
-        `import-bundle: REFUSED — ${MONA} is not an Admin of this workspace; the import runs as an Admin`,
+        `import-bundle: REFUSED — ${MONA} is not an Admin of this workspace. Run the import as an Admin.`,
       ]);
       expect(await commitsOf(served(), workspaceId)).toEqual([]);
     });
@@ -745,7 +745,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.precondition);
       expect(run.lines).toEqual([
-        "import-bundle: REFUSED — this workspace has no bundle repository; provision it first",
+        "import-bundle: REFUSED — this workspace has no bundle repository. Create it, then run this again.",
       ]);
     });
 
@@ -758,7 +758,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.conflict);
       expect(run.lines).toEqual([
-        "import-bundle: REFUSED — this workspace's bundle could not be moved while the import was writing its manifest, because another writer moved it or holds its lock; nothing was written, so run the import again, and if it is refused the same way a lock was left on refs/heads/main",
+        "import-bundle: REFUSED — another writer changed this workspace's bundle, or held its lock, while the import was writing the manifest. Nothing was written. Run the import again. If it refuses the same way, a stale lock is left on refs/heads/main.",
       ]);
       expect(await commitsOf(served(), workspaceId)).toEqual([]);
     });
@@ -771,7 +771,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([
-        "import-bundle: REFUSED — manifest.yaml: the tree has no manifest.yaml at its root; nothing was written",
+        "import-bundle: REFUSED — manifest.yaml: the tree has no manifest.yaml at its root. Nothing was written.",
       ]);
       expect(await commitsOf(served(), workspaceId)).toEqual([]);
     });
@@ -783,7 +783,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.unauthenticated);
       expect(run.lines).toEqual([
-        `import-bundle: REFUSED — nobody@acme.invalid is not a member of workspace ${workspaceId}; invite them first`,
+        `import-bundle: REFUSED — nobody@acme.invalid is not a member of workspace ${workspaceId}. Invite them first.`,
       ]);
     });
 
@@ -806,7 +806,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines.join("\n")).toContain(
-        "import-bundle: REFUSED — the directory /nowhere/bundle could not be read:",
+        "import-bundle: REFUSED — cannot read the directory /nowhere/bundle:",
       );
     });
 

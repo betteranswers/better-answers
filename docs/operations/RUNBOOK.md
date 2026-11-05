@@ -147,15 +147,15 @@ The routine rewrites what the platform wrote, the actor ids across history. It d
 **Fires.**
 
 - `release.yml`'s post-deploy smoke is red. That shows as a red `build` run on `main`, whose last job is the release, or a red nightly `release` run.
-- The step `set digests, redeploy production and wait for the deployment` is red.
+- The step `Set the digests, redeploy production, and wait for the deployment` is red.
 - The uptime check goes red within minutes of a promotion.
 - The orchestrator mails *failed deployment* or *unhealthy container*.
 
-**Read a red smoke.** `deploy/await-release.sh` polls `/health` for six minutes until it answers healthy **and** names the promoted api digest. Its error names *expected*, the promoted digest, and *answering*, the digest of the last answer, with that answer's status in brackets.
+**Read a red smoke.** `deploy/await-release.sh` polls `/health` for six minutes until it answers healthy **and** names the promoted api digest. Its error gives *Expected image*, the promoted digest, *Last image reported*, the digest in the last answer, and *Last status*, that answer's status.
 
-- *answering* the replaced build, `healthy`. The promoted image never took over. The orchestrator's deploy log says why.
-- *answering* the promoted digest, `unhealthy`. `/health`'s body names the store it cannot reach.
-- *answering no image named*, `no health answer`. Production is down, with the old container gone and the new one not up. *the last image named* is the build that answered last.
+- *Last image reported* is the replaced build, and *Last status* is `healthy`. The promoted image never took over. The orchestrator's deploy log says why.
+- *Last image reported* is the promoted digest, and *Last status* is `unhealthy`. `/health`'s body names the store it cannot reach.
+- *Last image reported: none* and *Last status: no health answer*. Production is down, with the old container gone and the new one not up. *The last image any answer reported* is the build that answered last.
 
 **Read a red redeploy step.** The step waits up to 30 minutes for the orchestrator's deployment, and its error names that deployment. Read the deployment's log. None of these cases pushed a tag.
 
@@ -190,7 +190,7 @@ The routine rewrites what the platform wrote, the actor ids across history. It d
    1. Find its run, a `build` run on `main` or a `release` run, with `gh run list --status in_progress`.
    2. Cancel the run with `gh run cancel <run id>`. That does not stop its deployment.
    3. Read the deployment's name in the run's redeploy step log. Cancel the deployment on its page in the orchestrator, or let it end. While it is queued or running, the rollback's redeploy step stops before it sets anything and names it.
-6. Run `release` with the tag's two digests as the inputs and `rehearsed_by: hotfix: rollback of <the failed tag>`. If the tag's api was built before `/health` named its digest, the smoke ends red with *answering no image named* and a `healthy` last answer. Read `/health` by hand. `healthy` with no `image` means the rollback is done, and it pushed no tag, so tag it by hand as `deploy/RELEASES.md` shows. `healthy` naming the failed digest means the failed build is still up.
+6. Run `release` with the tag's two digests as the inputs and `rehearsed_by: hotfix: rollback of <the failed tag>`. If the tag's api was built before `/health` named its digest, the smoke ends red with *Last image reported: none* and *Last status: healthy*. Read `/health` by hand. `healthy` with no `image` means the rollback is done, and it pushed no tag, so tag it by hand as `deploy/RELEASES.md` shows. `healthy` naming the failed digest means the failed build is still up.
 7. If step 4 listed a `.sql` file, the rollback crosses a migration (§ Migrations that no digest rollback crosses). Once the release ends, run page 1's restore: `restore-production.sh --tier <tier> --dump <file>`. Use the last dump stamped before the first promotion after the tag, because a dump taken after that promotion already carries its migration. An untagged release's time is in its run.
 8. Unless `RELEASE_MODE` is `drill`, merge nothing else until the fix, or the revert, has merged. Outside `drill`, a rollback holds only until the next automatic release: the next green build in `per-merge`, or the next night in `nightly`. That release still carries the broken change. To hold the rollback while the fix is made, set `RELEASE_MODE` to `drill`.
 
@@ -337,7 +337,7 @@ The next sync stops the source answering and deletes its object-store originals.
 
 **Fires.** The api logs `reconciler tick` at warn with a `stopped` entry (`workspace_id`, `commit_sha`, `reason`) every thirty seconds, or `pnpm ops reconcile-watermark --workspace <id>` refuses. The replay of commits the rows missed stopped at a commit the index would not take. Until someone steps in, **every later write to that bundle is refused** (`unrecorded-head`). Connected sources, write-ups, and members are untouched.
 
-**Read the refusal first.** `reconcile-watermark` is the reconciler on demand, step 2 of `BACKUPS.md` § Recovery order. Its refusal reads `reconcile-watermark: REFUSED — stopped at <sha> (<reason>); head <sha>, watermark <sha>, replayed <n>, already landed <n>; …`. *head* is where the repository is. *watermark* is the last commit the rows knew when the run began. *stopped at* is the first commit between them that the index refused.
+**Read the refusal first.** `reconcile-watermark` is the reconciler on demand, step 2 of `BACKUPS.md` § Recovery order. Its refusal reads `reconcile-watermark: REFUSED — stopped at <sha> (<reason>); head <sha>, watermark <sha>, replayed <n>, already landed <n>. …`. *head* is where the repository is. *watermark* is the last commit the rows knew when the run began. *stopped at* is the first commit between them that the index refused.
 
 | Reason | Path |
 | --- | --- |
@@ -609,8 +609,8 @@ Use this procedure to fix a standing concept's content without editing it, such 
 `pnpm ops update-concept-body --workspace <id> --iri <iri> --as <member email> [--expect <content hash>] [--dry-run]`
 
 1. Read the concept's file. `git --git-dir "$GIT_STORE_DIR/<workspace id>.git" ls-tree -r --name-only main` lists the paths, and `git --git-dir "$GIT_STORE_DIR/<workspace id>.git" show main:<path>` prints the file. Its frontmatter carries the `iri`. The body is everything after the frontmatter's closing `---` and the blank line below it.
-2. Save the whole new body to a file on the box, and pipe it into a dry run with no `--expect`: `docker exec -i "$api" pnpm ops update-concept-body … < new-body.md`, with `$api` the `api` service's container. The first line is `update-concept-body: <path> stands at <hash>; pass it as --expect`. The diff follows, marking lines with two spaces (both), `- ` (held only), or `+ ` (new only).
-3. If the diff removes only what you meant to remove, run again without `--dry-run` and with `--expect <the hash from step 2>`. The done line is `update-concept-body: done — <path> moved from <old hash> to <new hash>, commit <short sha>; frontmatter, status, verification and citations kept`.
+2. Save the whole new body to a file on the box, and pipe it into a dry run with no `--expect`: `docker exec -i "$api" pnpm ops update-concept-body … < new-body.md`, with `$api` the `api` service's container. The first line is `update-concept-body: <path> has content hash <hash>. Pass it as --expect.` The diff follows, marking lines with two spaces (both), `- ` (held only), or `+ ` (new only).
+3. If the diff removes only what you meant to remove, run again without `--dry-run` and with `--expect <the hash from step 2>`. The done line is `update-concept-body: done — <path> changed from <old hash> to <new hash> in commit <short sha>. The frontmatter, status, verification and citations are kept.`
 
 The command replaces the body and nothing else. The frontmatter's bytes, the status, the verification rows, and the citations stay. It is one governed commit through the concept page's save route, with reuse taken as confirmed, and one `knowledge.concept.committed` audit event naming both hashes. An imported verification keeps reading *Verified by … · imported*. A hashed verification reads *Changed since verified* until someone verifies again.
 
@@ -742,7 +742,7 @@ Use this procedure to let a workspace's questions call a model. A question calls
 
 **The model choice.** A second run for a purpose replaces it. The provider must be a sub-processor the DPIA names, and a call also needs the workspace's model key (§ Set a workspace's model key). Each run records `platform.workspace.model_choice_set`. The embedding model is fixed.
 
-**No decision model can be chosen yet.** No threshold is set, because the owner's decision reading of 21/10/2026 found none that makes Clef or Clef-flash a judge on the reuse set, and the DPIA does not name Cloudflare. A decision model with no threshold is never called. Its judging fails, and the `api` logs `llm: a model call never sent` with `read` `no-threshold`.
+**No decision model can be chosen yet.** No threshold is set, because the owner's decision reading of 21/10/2026 found none that makes Clef or Clef-flash a judge on the reuse set, and the DPIA does not name Cloudflare. A decision model with no threshold is never called. Its judging fails, and the `api` logs `llm: model call not sent` with `read` `no-threshold`.
 
 **Refusals** write nothing.
 

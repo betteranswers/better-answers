@@ -56,7 +56,7 @@ export const legFor = (tier: string): MatrixLeg => {
     const tiers = matrixLegs()
       .map((candidate) => candidate.tier)
       .join(", ");
-    throw new Error(`build.yml's image job has no \`${tier}\` leg; it builds ${tiers}`);
+    throw new Error(`build.yml's image job has no \`${tier}\` leg. Its legs are ${tiers}.`);
   }
   return leg;
 };

@@ -5,13 +5,13 @@ services:
       - "127.0.0.1:3900:3900"
     # Production's projects meet on Coolify's `coolify` network; staging's run under plain compose, so they meet on this one.
     networks:
-      # Naming any network drops `default`, and backup reaches objectstore there.
+      # Listing any network removes `default`, where backup reaches objectstore, so list it too.
       default: {}
       staging-shared:
         aliases: [objectstore]
 
 networks:
-  # External, so it stands before either project starts and survives their `down`; restore-drill.sh creates it.
+  # External, so it exists before either project starts and survives their `down`. restore-drill.sh creates it.
   staging-shared:
     name: better-answers-staging-shared
     external: true

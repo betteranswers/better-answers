@@ -71,7 +71,9 @@ const directionOf = (event: ReadEvent, personId: UserId): Direction => {
   if (by && to) return "both";
   if (by) return "by";
   if (to) return "to";
-  throw new Error(`activity: event ${event.id} names the person neither by nor to`);
+  throw new Error(
+    `activity: event ${event.id} was neither taken by nor done to person ${personId}`,
+  );
 };
 
 /**

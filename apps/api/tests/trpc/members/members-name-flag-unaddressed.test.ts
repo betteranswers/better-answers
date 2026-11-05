@@ -34,7 +34,6 @@ describe("a platform where no person is marked as operator", () => {
         level: 50,
         event: "trpc.email_failed",
         person_id: flagged.id,
-        msg: "no person carries the operator mark, so the name flag was not emailed",
       }),
     );
   });

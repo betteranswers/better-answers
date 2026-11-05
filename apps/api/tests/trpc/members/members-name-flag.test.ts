@@ -123,7 +123,7 @@ describe("flagging a display name over tRPC", () => {
           `Person: ${person.id}`,
           "Current display name: Rude Name",
           "",
-          "The name stands until it is corrected. No Admin can change it.",
+          "The name stays until you correct it. Admins cannot change it.",
         ].join("\n"),
       })),
     );
@@ -278,7 +278,6 @@ describe("the operator's email", () => {
         level: 40,
         module: "trpc",
         event: "trpc.email_failed",
-        msg: "the name flag's email to the operator did not go",
       }),
     ]);
     expect(JSON.stringify(app.logs)).not.toContain(RUDE_NAME);

@@ -158,10 +158,10 @@ describe("the ceiling's wrapper, run as the root manifest runs it", () => {
     const output = wrapper(OVER);
 
     expect(output).toContain(
-      `${OVER_THE_SOURCE_CEILING}. A comment stays only for a constraint outside this repository`,
+      `${OVER_THE_SOURCE_CEILING}. Keep a comment only for a constraint outside this repository`,
     );
     expect(output).toContain(
-      "Any other comment is deleted: hold its reason in a name, a type, a test, a grant or a lint, or report it open in the tracker.",
+      "Delete every other comment. Move its reason into a name, a type, a test, a grant or a lint, or open an issue for it in the tracker.",
     );
   });
 

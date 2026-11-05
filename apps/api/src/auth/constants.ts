@@ -4,7 +4,7 @@ export const CLIENT_IP_HEADER = "cf-connecting-ip";
 
 export const UNKNOWN_CLIENT_IP = "unknown";
 
-/** The range Anthropic publishes for Claude's servers, which call for every customer from it. */
+/** The range Anthropic publishes for Claude's servers. Requests for every customer come from it. */
 export const ANTHROPIC_EGRESS_RANGE = { network: "160.79.104.0", prefix: 21 } as const;
 
 export const ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60;

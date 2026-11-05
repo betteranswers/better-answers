@@ -43,11 +43,11 @@ export const parameterNeverMutatedRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description: "A function never mutates a parameter; it returns a new value.",
+      description: "A function does not mutate a parameter. It returns a new value.",
     },
     messages: {
       mutated:
-        "`{{method}}` changes the parameter `{{name}}` in place, so the caller's value changes too. Never mutate a parameter: return a new value, built from a copy such as `[...{{name}}]` or `{ ...{{name}} }`, or with a copying method such as `toSorted`.",
+        "`{{method}}` changes the parameter `{{name}}` in place, so the caller's value changes too. Return a new value instead. Build it from a copy such as `[...{{name}}]` or `{ ...{{name}} }`, or use a copying method such as `toSorted`.",
     },
   },
   createOnce(context) {

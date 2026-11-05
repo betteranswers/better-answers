@@ -22,14 +22,14 @@ export const noPathClimbRule = defineRule({
     type: "problem",
     docs: {
       description:
-        "A path built from a file's location does not climb to its workspace's root or out of it, and the root comes from the workspace's roots helper.",
+        "A path built from a file's location does not climb to its workspace root or above it. The root comes from the workspace's roots helper.",
     },
     messages: {
       climbs:
-        "`{{written}}` climbs to the root of `{{workspace}}` or out of it, so a move breaks the path. Import {{exports}} from `{{file}}` and join the path from there.",
+        "`{{written}}` climbs to the root of `{{workspace}}` or above it, so the path breaks when the file moves. Import {{exports}} from `{{file}}` and join the path from there.",
       climbsWithoutHelper:
-        "`{{written}}` climbs to the root of `{{workspace}}` or out of it, so a move breaks the path. `{{workspace}}` has no roots helper yet, so add one beside its tests and join the path from there.",
-      importsToolchainRoot: `\`{{workspace}}\` takes \`repositoryRoot\` from its roots helper, so import {{exports}} from \`{{file}}\`, not from \`${TOOLCHAIN_PATHS}\`.`,
+        "`{{written}}` climbs to the root of `{{workspace}}` or above it, so the path breaks when the file moves. `{{workspace}}` has no roots helper yet. Add one beside its tests and join the path from there.",
+      importsToolchainRoot: `\`{{workspace}}\` must take \`repositoryRoot\` from its own roots helper. Import {{exports}} from \`{{file}}\`, not from \`${TOOLCHAIN_PATHS}\`.`,
     },
   },
   createOnce(context) {

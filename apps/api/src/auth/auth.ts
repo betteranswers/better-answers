@@ -158,7 +158,7 @@ export const passkeyPartyOf = (publicUrl: string) => {
 const userNotVerified = (): APIError =>
   new APIError("BAD_REQUEST", {
     code: USER_NOT_VERIFIED,
-    message: "The device did not verify its user",
+    message: "Your device did not confirm that it was you",
   });
 
 export const createAuth = (deps: AuthDependencies) => {
@@ -449,8 +449,8 @@ export const createAuth = (deps: AuthDependencies) => {
       widenAuthorize(
         oauthProvider({
           /**
-           * No page may carry a query of its own: the signed query is appended with an
-           * unconditional ?, and a second breaks the signature.
+           * The library appends its signed query after a literal ?, so a page URL with its own
+           * query breaks the signature.
            */
           loginPage: `${deps.publicUrl}${SIGN_IN_PATH}`,
 
@@ -483,13 +483,13 @@ export const createAuth = (deps: AuthDependencies) => {
               if (grantLeftItsWorkspace(active)) {
                 throw new APIError("CONFLICT", {
                   error: "workspace_moved",
-                  error_description: "the session left the workspace the consent page named",
+                  error_description: "the session changed workspace after the consent page opened",
                 });
               }
               if (active === undefined) {
                 throw new APIError("BAD_REQUEST", {
                   error: "set_workspace",
-                  error_description: "a workspace must be chosen before consent",
+                  error_description: "choose a workspace before you give consent",
                 });
               }
               return active;

@@ -116,8 +116,8 @@ const flagging = async (
 };
 
 /**
- * The caller's answer is the same for every member and whether or not a flag already waits; only
- * the transport learns whether one was raised.
+ * The caller gets the same answer for every member, whether or not a flag is waiting. Only the
+ * transport learns whether a flag was raised.
  */
 export const flagDisplayName = async (
   principal: UserPrincipal,

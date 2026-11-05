@@ -24,7 +24,7 @@ disk() { df -P / | awk 'NR == 2 { print $5 }'; }
 
 running=$(docker ps --format '{{.Image}}')
 if [[ "${running}" == *coolify-helper* ]]; then
-  say "skipped: a Coolify deployment is running, so its images may not be in use yet"
+  say "skipped: a Coolify deployment is running, and the images it pulled may not be in a container yet. The next run prunes."
   exit 0
 fi
 

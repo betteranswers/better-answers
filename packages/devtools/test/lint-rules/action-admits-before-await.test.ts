@@ -40,8 +40,8 @@ describe("the rule that a declared action admits before it awaits", () => {
   it("refuses an action reading before admitting, naming the fix", () => {
     const output = lint.output(holding(AWAITS_FIRST));
 
-    expect(output).toContain("awaits before it admits");
-    expect(output).toContain("so nothing is opened, read or written");
+    expect(output).toContain("awaits before it calls");
+    expect(output).toContain("so the action opens, reads and writes nothing");
     expect(output).toContain("better-answers(action-admits-before-await)");
   });
 
@@ -54,7 +54,7 @@ describe("the rule that a declared action admits before it awaits", () => {
     const output = lint.output(holding(unused));
 
     expect(output).toContain("`reprocessAction`");
-    expect(output).toContain("states a gate nothing runs");
+    expect(output).toContain("so nothing enforces the declaration");
   });
 
   it("leaves alone a step that declares nothing", () => {
@@ -97,8 +97,8 @@ describe("the rule that a declared action admits before it awaits", () => {
 `;
       const output = lint.output(step(late));
 
-      expect(output).toContain("awaits before it admits");
-      expect(output).toContain(`run \`${shorthand}\` first`);
+      expect(output).toContain("awaits before it calls");
+      expect(output).toContain(`Call \`${shorthand}\` before the first \`await\``);
     });
 
     it("accepts a step that calls it, then awaits", () => {
@@ -123,7 +123,7 @@ describe("the rule that a declared action admits before it awaits", () => {
 `;
     const output = lint.output(holding(mixed));
 
-    expect(output).toContain("run `admit` first");
+    expect(output).toContain("Call `admit` before the first `await`");
   });
 
   it("pairs a declaration with `admit` alone, never a shorthand's argument", () => {
@@ -136,6 +136,6 @@ describe("the rule that a declared action admits before it awaits", () => {
     const output = lint.output(holding(both));
 
     expect(output).toContain("`reprocessAction`");
-    expect(output).toContain("states a gate nothing runs");
+    expect(output).toContain("so nothing enforces the declaration");
   });
 });

@@ -1,7 +1,7 @@
 # Staging only, the platform's side: S3_ENDPOINT names objectstore, which staging.override.yaml puts on this network from the stores project.
 x-on-staging-shared: &on-staging-shared
   networks:
-    # Naming any network drops `default`, the one the platform's own services meet on.
+    # Listing any network removes `default`, which the platform's own services share, so list it too.
     default: {}
     staging-shared: {}
 

@@ -20,12 +20,12 @@ export const actionAdmitsBeforeAwaitRule = defineRule({
     type: "problem",
     docs: {
       description:
-        "A function that admits does so before it awaits, and a declared action is admitted by one.",
+        "A function calls `admit` before its first `await`, and some function passes each declared action to `admit`.",
     },
     messages: {
-      late: "This function awaits before it admits: run `{{name}}` first, so nothing is opened, read or written for a principal the action was never going to serve.",
+      late: "This function awaits before it calls `{{name}}`. Call `{{name}}` before the first `await`, so the action opens, reads and writes nothing for a principal it will refuse.",
       unadmitted:
-        "`{{name}}` declares what an action admits and no function here passes it to `admit`, so the declaration states a gate nothing runs.",
+        "`{{name}}` declares who an action admits, but no function in this file passes it to `admit`, so nothing enforces the declaration. Pass `{{name}}` to `admit` in the function that runs the action.",
     },
   },
   createOnce(context) {

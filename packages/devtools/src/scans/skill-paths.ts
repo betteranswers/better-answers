@@ -99,30 +99,30 @@ const sameList = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((one, index) => one === right[index]);
 
 const recovery = (skill: string): string =>
-  `Run git checkout HEAD -- ${SKILLS_FOLDER}/${skill} to restore it, then update with ${UPDATE_COMMAND}, which installs a real copy. Never delete its row.`;
+  `Run git checkout HEAD -- ${SKILLS_FOLDER}/${skill} to restore it, then run ${UPDATE_COMMAND} to install a real copy. Do not delete its row.`;
 
 const describe = (paths: readonly string[]): string =>
   paths.length === 0 ? "no paths line" : pathsLine(paths);
 
 const unreadableFinding = (one: SkillOnDisk): string | null => {
   if (one.symlink && !(one.skill === SYMLINKED_SKILL && one.linkTargetTracked)) {
-    return `${SKILLS_FOLDER}/${one.skill}: is a symlink, so a commit would delete the tracked skill. ${recovery(one.skill)}`;
+    return `${SKILLS_FOLDER}/${one.skill} is a symlink, so committing it would delete the tracked skill. ${recovery(one.skill)}`;
   }
   if (one.text !== null || !one.tracked) return null;
-  return `${SKILLS_FOLDER}/${one.skill}/SKILL.md: a tracked skill whose SKILL.md cannot be read. ${recovery(one.skill)}`;
+  return `${SKILLS_FOLDER}/${one.skill}/SKILL.md is tracked but cannot be read. ${recovery(one.skill)}`;
 };
 
 const findingOf = (one: SkillOnDisk, scope: SkillScope | undefined): string | null => {
   const folder = `${SKILLS_FOLDER}/${one.skill}`;
   if (scope === undefined) {
     if (one.text === null && !one.symlink) return null;
-    return `${folder}: no row in ${WHERE_THE_PATHS_LIVE}. Add one, with its paths or an empty list for a skill that stays unscoped.`;
+    return `${folder} has no row in SCOPES in ${WHERE_THE_PATHS_LIVE}. Add a row with the skill's paths, or with an empty list if the skill applies to every path.`;
   }
   const unreadable = unreadableFinding(one);
   if (unreadable !== null || one.text === null) return unreadable;
   const held = pathsIn(one.text);
   if (sameList(held, scope.paths)) return null;
-  return `${folder}/SKILL.md: its frontmatter holds ${describe(held)}, and ${WHERE_THE_PATHS_LIVE} wants ${describe(scope.paths)}. Run ${FIX_COMMAND}.`;
+  return `${folder}/SKILL.md has ${describe(held)} in its frontmatter, but SCOPES in ${WHERE_THE_PATHS_LIVE} expects ${describe(scope.paths)}. Run ${FIX_COMMAND}.`;
 };
 
 export const findingsFor = (
@@ -137,7 +137,7 @@ export const findingsFor = (
   for (const scope of scopes) {
     if (scope.local === true || trackedSkills.has(scope.skill)) continue;
     found.push(
-      `${scope.skill}: ${WHERE_THE_PATHS_LIVE} names a skill that is not tracked under ${SKILLS_FOLDER}/. Delete the row, or mark it local when the skill stays untracked.`,
+      `${scope.skill} has a row in SCOPES in ${WHERE_THE_PATHS_LIVE}, but the skill is not tracked under ${SKILLS_FOLDER}/. Delete the row, or set \`local: true\` on it if the skill stays untracked.`,
     );
   }
   return found;

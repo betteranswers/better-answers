@@ -296,7 +296,7 @@ describe("signing in through a link", () => {
     expect(Number(refused.headers.get("retry-after"))).toBeGreaterThan(0);
     expect(await refused.json()).toEqual({
       error: "too_many_requests",
-      error_description: "Too many sign-ins from this address; try again later.",
+      error_description: "Too many sign-ins from this address. Try again later.",
     });
   });
 

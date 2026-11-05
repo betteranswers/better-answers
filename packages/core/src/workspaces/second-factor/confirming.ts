@@ -318,7 +318,7 @@ export const parkAuthenticatorSecret = async (
     },
   );
 
-/** The sealed secret this session parked, while it lasts; reading it leaves it parked. */
+/** The sealed secret this session stored, until it expires. Reading it does not remove it. */
 export const readParkedAuthenticatorSecret = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

@@ -158,7 +158,7 @@ const budgetOf = (door: GitDoor): Budget => {
 };
 
 const overBudget = (budget: Budget): Error =>
-  new Error(`git: the commit ran past its ${budget.ms} ms budget, so its git child was stopped`);
+  new Error(`git: the commit took longer than ${budget.ms} ms, so its git process was stopped`);
 
 const commitWithin = async (
   gitDir: string,

@@ -146,7 +146,7 @@ describe("a workspace's model key", () => {
 
     expect(read).toMatchObject({
       ok: false,
-      error: { message: "credentials: a model key is read inside its workspace's transaction" },
+      error: { message: "credentials: model key read outside a workspace's transaction" },
     });
   });
 
@@ -257,7 +257,9 @@ describe("a workspace's model key", () => {
     const opened = await attempt(async () => open());
 
     assert(!opened.ok, "opening with a short envelope key succeeded");
-    expect(opened.error.message).toBe("credentials: an envelope key is 32 bytes, not 5");
+    expect(opened.error.message).toBe(
+      "credentials: the envelope key is 5 bytes, but it must be 32",
+    );
     const thrown = shown(opened.error);
     expect(printedFormsOf(A_SHORT_ENVELOPE_KEY).filter((form) => thrown.includes(form))).toEqual(
       [],

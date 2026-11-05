@@ -58,7 +58,7 @@ const TAKING = `
   DELETE FROM verification WHERE identifier = $1
   RETURNING value, expires_at > $2 AS live`;
 
-/** The challenge this session was handed, while it lasts; taking it spends it. */
+/** The challenge this session was given, until it expires. Reading it deletes it. */
 export const takePasskeyChallenge = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

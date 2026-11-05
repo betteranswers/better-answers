@@ -159,9 +159,7 @@ export const dpiaInputFor = async (
   const parsed = RULES_IN_FORCE.safeParse(connectedSource.rules_in_force);
 
   if (!parsed.success) {
-    return err(
-      new Error("the connected source's rules in force are not the shape the column holds"),
-    );
+    return err(new Error("the connected source's rules_in_force does not parse"));
   }
   const rulesInForce: Readonly<Record<string, boolean>> = parsed.data;
 

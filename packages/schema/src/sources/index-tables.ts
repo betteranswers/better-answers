@@ -8,7 +8,7 @@ export const indexSchema = pgSchema("index");
 
 export const EMBEDDING_DIMENSIONS = 1024;
 
-/** pgvector's text output is a JSON number array by the column's own contract, read as one. */
+/** pgvector prints a vector as a JSON number array, so the column is parsed as JSON. */
 const embeddingValues = z.array(z.number());
 
 const embeddingVector = customType<{ data: number[]; driverData: string }>({

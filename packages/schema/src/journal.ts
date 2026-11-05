@@ -46,7 +46,7 @@ const entriesIn = (folder: string): readonly JournalEntry[] => {
   if (read.ok) return read.value;
   const { earlier, later } = read.error;
   throw new Error(
-    `the journal's instants must strictly increase, but ${later.tag} (${later.when}) does not follow ${earlier.tag} (${earlier.when}): the worker's stamp check could not tell the two apart`,
+    `journal instants must strictly increase, but ${later.tag} (${later.when}) does not come after ${earlier.tag} (${earlier.when}). The worker's stamp check cannot tell the two apart.`,
   );
 };
 

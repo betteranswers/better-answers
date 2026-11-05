@@ -79,19 +79,19 @@ def refuse_unreachable_entities(
     )
     if unreachable:
         faults.append(
-            "the category table declares entities nothing raises: "
-            + ", ".join(unreachable)
+            "the category table declares entities that no recogniser or model label"
+            " raises: " + ", ".join(unreachable)
         )
     undeclared = sorted(
         entity for entity in asked_of_the_model if entity not in entity_table
     )
     if undeclared:
         faults.append(
-            "the model is asked for entities no descriptor declares: "
+            "GLINER_LABELS asks the model for entities that no descriptor declares: "
             + ", ".join(undeclared)
         )
     if faults:
-        raise ValueError("; ".join(faults))
+        raise ValueError(". ".join(faults))
 
 
 def build_analyzer(model_id: str = GLINER_MODEL_ID) -> "AnalyzerEngine":

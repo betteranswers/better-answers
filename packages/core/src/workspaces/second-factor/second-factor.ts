@@ -252,8 +252,8 @@ const removing = async (
 };
 
 /**
- * The person is the one caller. An Admin in any workspace, or the operator, keeps their last second
- * factor: two removals cannot each leave one.
+ * Only the person may call this. An Admin in any workspace, or the operator, keeps their last
+ * second factor, even under two removals at once.
  */
 export const removeAuthenticator = async (
   platform: PlatformPrincipal,
@@ -323,7 +323,9 @@ export type SecondFactorHeld = {
 
   readonly waits: WaitSeconds;
 
-  /** Only when the read names a session: one the person does not hold is neither. */
+  /**
+   * Present only when the read names a session. Undefined for a session the person does not hold.
+   */
   readonly thisSession: ThisSession | undefined;
 };
 

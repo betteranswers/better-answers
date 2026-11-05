@@ -211,7 +211,7 @@ const changedLinesOf = (run: Run): readonly string[] =>
   run.lines.slice(1, -1).filter((line) => !line.startsWith("  "));
 
 const staleRefusalLine = (iri: string, base: string): string =>
-  `update-concept-body: REFUSED — ${iri} moved: it no longer stands at ${base}, or its file at the bundle's head is ahead of its row; nothing was written. Run with --dry-run again, and if that refuses the same way a minute later, the rows are behind the bundle: RUNBOOK page 10`;
+  `update-concept-body: REFUSED — ${iri} has changed: its content hash is no longer ${base}, or its file in the bundle is newer than its database row. Nothing was written. Run with --dry-run again. If it refuses the same way a minute later, the database rows are behind the bundle: see RUNBOOK page 10.`;
 
 const MODES = [
   ["write", false],
@@ -248,7 +248,7 @@ describe("pnpm ops update-concept-body, which replaces a concept's body", () => 
 
     const row = await conceptAt(scene.workspaceId, RETENTION);
     expect(run.lines).toEqual([
-      `update-concept-body: done — ${RETENTION} moved from ${scene.held.content_hash} to ${to}, commit ${row.commit_sha.slice(0, 7)}; frontmatter, status, verification and citations kept`,
+      `update-concept-body: done — ${RETENTION} changed from ${scene.held.content_hash} to ${to} in commit ${row.commit_sha.slice(0, 7)}. The frontmatter, status, verification and citations are kept.`,
     ]);
     expect(row.content_hash).toBe(to);
   });
@@ -306,11 +306,11 @@ describe("pnpm ops update-concept-body, which replaces a concept's body", () => 
 
     expect(run.exitCode).toBe(0);
     expect(run.lines[0]).toBe(
-      `update-concept-body: ${RETENTION} stands at ${scene.held.content_hash}; pass it as --expect`,
+      `update-concept-body: ${RETENTION} has content hash ${scene.held.content_hash}. Pass it as --expect.`,
     );
     expect(changedLinesOf(run)).toEqual(CHANGED_LINES);
     expect(run.lines.at(-1)).toBe(
-      `update-concept-body: dry run — the body would move ${RETENTION} from ${scene.held.content_hash} to ${to}; frontmatter, status, verification and citations kept; nothing was written`,
+      `update-concept-body: dry run — the new body would change ${RETENTION} from ${scene.held.content_hash} to ${to}. The frontmatter, status, verification and citations are kept. Nothing was written.`,
     );
     expect(await snapshotOf(scene)).toEqual(before);
   });
@@ -374,7 +374,7 @@ describe("pnpm ops update-concept-body, which replaces a concept's body", () => 
 
     expect(run.exitCode).toBe(6);
     expect(run.lines).toEqual([
-      `update-concept-body: REFUSED — no concept ${unknown} stands in workspace ${scene.workspaceId} that ${scene.admin.email} can read; a Restricted concept needs an Admin; nothing was written`,
+      `update-concept-body: REFUSED — ${scene.admin.email} cannot read a concept ${unknown} in workspace ${scene.workspaceId}. It does not exist, or it is Restricted and only an Admin can read it. Nothing was written.`,
     ]);
     expect(await snapshotOf(scene)).toEqual(before);
   });
@@ -390,7 +390,7 @@ describe("pnpm ops update-concept-body, which replaces a concept's body", () => 
 
     expect(run.exitCode).toBe(7);
     expect(run.lines).toEqual([
-      `update-concept-body: REFUSED — the body given is the one ${scene.held.iri} already holds; nothing was written`,
+      `update-concept-body: REFUSED — the new body is the same as the body ${scene.held.iri} already has. Nothing was written.`,
     ]);
     expect(await snapshotOf(scene)).toEqual(before);
   });
@@ -407,7 +407,7 @@ describe("pnpm ops update-concept-body, which replaces a concept's body", () => 
 
     expect(run.exitCode).toBe(2);
     expect(run.lines).toEqual([
-      `update-concept-body: REFUSED — --iri ${scene.held.iri} is not a concept iri, or the body is longer than a concept holds; nothing was written`,
+      `update-concept-body: REFUSED — --iri ${scene.held.iri} is not a concept IRI, or the body is longer than a concept allows. Nothing was written.`,
     ]);
     expect(await snapshotOf(scene)).toEqual(before);
   });
@@ -421,7 +421,7 @@ describe("pnpm ops update-concept-body, which replaces a concept's body", () => 
 
     expect(run.exitCode).toBe(4);
     expect(run.lines).toEqual([
-      `update-concept-body: REFUSED — ${stranger.email} is not a member of workspace ${scene.workspaceId}; invite them first`,
+      `update-concept-body: REFUSED — ${stranger.email} is not a member of workspace ${scene.workspaceId}. Invite them first.`,
     ]);
     expect(await snapshotOf(scene)).toEqual(before);
   });
@@ -436,7 +436,7 @@ describe("pnpm ops update-concept-body, which replaces a concept's body", () => 
 
     expect(run.exitCode).toBe(5);
     expect(run.lines).toEqual([
-      `update-concept-body: REFUSED — ${viewer.email} neither owns ${scene.held.iri} nor is an Admin of this workspace; nothing was written`,
+      `update-concept-body: REFUSED — ${viewer.email} does not own ${scene.held.iri} and is not an Admin of this workspace. Nothing was written.`,
     ]);
     expect(await snapshotOf(scene)).toEqual(before);
   });
@@ -449,7 +449,7 @@ describe("pnpm ops update-concept-body, which replaces a concept's body", () => 
 
     expect(run).toEqual({
       exitCode: 2,
-      lines: ["update-concept-body: the new body is read from stdin, and stdin was empty"],
+      lines: ["update-concept-body: stdin was empty. Pipe the new body to stdin."],
     });
     expect(await snapshotOf(scene)).toEqual(before);
   });

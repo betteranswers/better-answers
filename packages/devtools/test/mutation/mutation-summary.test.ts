@@ -78,7 +78,7 @@ describe("the mutation summary", () => {
       [
         "### api mutation score: 33.3% (1/3 mutants killed)",
         "### api new survivors: 1",
-        "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by their order in the file.",
+        "These mutants survived or had no coverage in this run, but not in the previous run's report. Mutants are matched by their mutated text, not by line number. When one file has two identical spans mutated the same way, they are matched in file order.",
         '- `src/answer.ts:2` — StringLiteral — `""`',
         "### api mutants that ran no test: none",
         "",
@@ -112,7 +112,7 @@ describe("the mutation summary", () => {
     expect(mutationSummary("api", current, undefined).summary).toBe(
       [
         "### api mutation score: 50% (1/2 mutants killed)",
-        "### api new survivors: no baseline — nothing was restored to compare against, so this run's report is the next run's baseline",
+        "### api new survivors: no baseline was restored, so there is nothing to compare against. This run's report becomes the next run's baseline.",
         "### api mutants that ran no test: none",
         "",
       ].join("\n"),
@@ -188,12 +188,12 @@ describe("the mutation summary", () => {
 
     expect(mutationSummary("core", current, baseline).summary).toBe(
       [
-        "### core runner fault: 1 of its 2 covered mutants ran no test — no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again",
+        "### core runner fault: 1 of the leg's 2 covered mutants ran no test. No result in this report can be trusted. The leg fails until the runner is fixed and a run with `force` tests every mutant again.",
         "### core mutation score: 0% (0/2 mutants killed)",
         "### core new survivors: 1",
-        "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by their order in the file.",
-        '- `src/answer.ts:3` — StringLiteral — `""` (no verdict in the baseline)',
-        "### core mutants that ran no test: 1 — the runner ran none of the tests that cover them, which is a runner fault to fix (the vitest-runner patch under `patches/`), never a survivor to triage",
+        "These mutants survived or had no coverage in this run, but not in the previous run's report. Mutants are matched by their mutated text, not by line number. When one file has two identical spans mutated the same way, they are matched in file order.",
+        '- `src/answer.ts:3` — StringLiteral — `""` (no result in the baseline)',
+        "### core mutants that ran no test: 1. The runner ran none of the tests that cover these mutants. That is a runner fault, not a survivor. Fix the vitest-runner patch under `patches/`.",
         '- `src/answer.ts:2` — StringLiteral — `""`',
         "",
       ].join("\n"),
@@ -210,7 +210,7 @@ describe("the mutation summary", () => {
     const { summary, fault } = mutationSummary("api", current, undefined);
 
     expect(fault).toBe(
-      "api runner fault: 1 of its 3 covered mutants ran no test — no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again",
+      "api runner fault: 1 of the leg's 3 covered mutants ran no test. No result in this report can be trusted. The leg fails until the runner is fixed and a run with `force` tests every mutant again.",
     );
     assert(fault !== undefined, "the summary named no runner fault");
     expect(summary.startsWith(`### ${fault}\n### api mutation score: 66.7%`)).toBe(true);
@@ -225,9 +225,9 @@ describe("the mutation summary", () => {
 
     expect(mutationSummary("api", current, undefined).summary).toBe(
       [
-        "### api runner fault: it killed none of its 3 mutants — no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again",
+        "### api runner fault: the leg killed none of its 3 mutants. No result in this report can be trusted. The leg fails until the runner is fixed and a run with `force` tests every mutant again.",
         "### api mutation score: 0% (0/3 mutants killed)",
-        "### api new survivors: no baseline — nothing was restored to compare against, so this run's report is the next run's baseline",
+        "### api new survivors: no baseline was restored, so there is nothing to compare against. This run's report becomes the next run's baseline.",
         "### api mutants that ran no test: none",
         "",
       ].join("\n"),
@@ -254,7 +254,7 @@ describe("the mutation summary", () => {
     expect(summary).toBe(
       [
         "### core mutation score: no mutants",
-        "### core new survivors: no baseline — nothing was restored to compare against, so this run's report is the next run's baseline",
+        "### core new survivors: no baseline was restored, so there is nothing to compare against. This run's report becomes the next run's baseline.",
         "### core mutants that ran no test: none",
         "",
       ].join("\n"),
@@ -266,7 +266,7 @@ describe("the mutation summary", () => {
     const current = report(SOURCE, [mutant("StringLiteral", '""', LABEL, "Survived", 1)]);
 
     expect(mutationSummary("api", current, baseline).summary).toContain(
-      '- `src/answer.ts:2` — StringLiteral — `""` (no verdict in the baseline)\n',
+      '- `src/answer.ts:2` — StringLiteral — `""` (no result in the baseline)\n',
     );
   });
 
@@ -316,7 +316,7 @@ describe("the mutation summary script over files", () => {
       [
         "### api mutation score: 50% (1/2 mutants killed)",
         "### api new survivors: 1",
-        "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by their order in the file.",
+        "These mutants survived or had no coverage in this run, but not in the previous run's report. Mutants are matched by their mutated text, not by line number. When one file has two identical spans mutated the same way, they are matched in file order.",
         '- `src/answer.ts:2` — StringLiteral — `""` (not in the baseline)',
         "### api mutants that ran no test: none",
         "",
@@ -334,7 +334,7 @@ describe("the mutation summary script over files", () => {
       path.join(scratch, "absent.json"),
     );
     expect(noBaseline.status).toBe(0);
-    expect(noBaseline.stdout).toContain("### api new survivors: no baseline — ");
+    expect(noBaseline.stdout).toContain("### api new survivors: no baseline was restored");
 
     const noReport = run("--leg", "core", "--report", path.join(scratch, "absent.json"));
     expect(noReport.status).toBe(0);
@@ -348,7 +348,7 @@ describe("the mutation summary script over files", () => {
     expect(
       mutationSummaryFromArgv(["--leg", "api", "--report", reportFile, "--baseline", halfWritten])
         .summary,
-    ).toContain("### api new survivors: no baseline — ");
+    ).toContain("### api new survivors: no baseline was restored");
   });
 
   it.each([
@@ -400,7 +400,7 @@ describe("the summary script over a runner fault and its checkpoint", () => {
     ),
   );
   const FAULT =
-    "core runner fault: 2 of its 2 covered mutants ran no test — no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again";
+    "core runner fault: 2 of the leg's 2 covered mutants ran no test. No result in this report can be trusted. The leg fails until the runner is fixed and a run with `force` tests every mutant again.";
 
   it("exits non-zero, naming the fault in summary and error", () => {
     const result = run("--leg", "core", "--report", untestedFile);
@@ -421,8 +421,8 @@ describe("the summary script over a runner fault and its checkpoint", () => {
     );
 
     const fromCheckpoint = FAULT.replace(
-      "ran no test —",
-      "ran no test, read from the checkpoint since the run wrote no report —",
+      "ran no test.",
+      "ran no test in the checkpoint, because the run wrote no report.",
     );
     expect(result.status).toBe(1);
     expect(result.stdout).toBe(`### ${fromCheckpoint}\n### core mutation score: no report\n`);

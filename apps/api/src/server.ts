@@ -69,8 +69,8 @@ export function createServer(dependencies: ServerDependencies): Hono {
   });
 
   let identity: "starting" | "ready" | "failed" = "starting";
-  // The oauth-provider plugin defers its resource seed when its table is missing, so a
-  // started context proves no schema; the seed's own lookup does.
+  // The oauth-provider plugin skips its resource seed when the table is missing, so only the
+  // seed's own lookup proves the schema exists.
   const identityInit = (async (): Promise<void> => {
     try {
       const context = await auth.$context;

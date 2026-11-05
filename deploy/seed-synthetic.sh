@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# A fixed ULID: every ops command refuses a workspace id that is not one, and DRILL_WORKSPACE names this one.
+# A fixed ULID, because every ops command refuses a workspace id that is not a ULID. DRILL_WORKSPACE defaults to this id.
 workspace=01M2SYNTHET1CAAAAAAAAAAAAA
 [ "${1:-}" != "--workspace-id" ] || { printf '%s\n' "${workspace}"; exit 0; }
 
 usage() {
-  printf 'usage: seed-synthetic.sh <owner DSN> [--with-concepts], or STAGING_DATABASE_URL set as the drill sets it; seed-synthetic.sh --workspace-id prints the id alone\n' >&2
+  printf 'usage: seed-synthetic.sh <owner DSN> [--with-concepts]. Without a DSN, it reads STAGING_DATABASE_URL, as the drill sets it. seed-synthetic.sh --workspace-id prints only the id.\n' >&2
   exit 64
 }
 dsn="${1:-${STAGING_DATABASE_URL:-}}"
 [ -n "${dsn}" ] || usage
-# Never on staging: its synthetic repository is empty, and a commit git lacks makes the reconciler refuse the workspace.
+# Never use --with-concepts on staging: its synthetic repository is empty, and the reconciler refuses a workspace whose recorded commit git does not have.
 concepts=false
 case "${2:-}" in
   "") ;;
@@ -20,7 +20,7 @@ case "${2:-}" in
 esac
 cases="$(cat "$(dirname "$0")/../contracts/document-passage/cases.json")"
 
-# Staging must never hold an invented person, nor the sort code this redacted case withholds: that is the seam's input, which no row holds.
+# Staging must never hold an invented person, or the sort code that this redacted case withholds. Only the redaction input holds them, and no row stores it.
 PGCLIENTENCODING=UTF8 psql "${dsn}" -v ON_ERROR_STOP=1 -qAt -v cases="${cases}" -v workspace="${workspace}" \
   -v concepts="${concepts}" <<'SQL'
 BEGIN;
@@ -53,13 +53,13 @@ INSERT INTO "index".passage
     FROM fixture, jsonb_array_elements(d -> 'passages') AS c
   ON CONFLICT DO NOTHING;
 \if :concepts
--- Rows alone: no repository holds this commit or these files.
+-- Rows only: no repository holds this commit or these files.
 \set commit 0000000000000000000000000000000000000000
 INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor)
   VALUES (:'workspace', :'commit', '01M2SYNTHET1CC0MM1TAAAAAAA',
           'process:better-answers-synthetic-seed')
   ON CONFLICT DO NOTHING;
--- The invoice answer cites a passage of the unpublished document, so it is Restricted as a write would derive it.
+-- The invoice answer cites a passage of the unpublished document, so it is Restricted, as a real write would set it.
 CREATE TEMPORARY TABLE concept ON COMMIT DROP AS
   SELECT 'https://better-answers.com/c/' || c.ulid AS iri, c.*
     FROM fixture, LATERAL (VALUES
@@ -91,7 +91,7 @@ INSERT INTO concept_index
          'stable', now(), sensitivity, 'everyone'
     FROM concept
   ON CONFLICT DO NOTHING;
--- A source with a locator is a passage of the fixture's document; one without names nothing the platform holds.
+-- A source with a locator is a passage of the fixture's document. A source without one names nothing the platform holds.
 CREATE TEMPORARY TABLE cited ON COMMIT DROP AS
   SELECT iri, d ->> 'source_document_id' AS document_id, s ->> 'locator' AS locator, s ->> 'resource' AS resource
     FROM concept, fixture, jsonb_array_elements(sources) AS s

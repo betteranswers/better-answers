@@ -512,7 +512,7 @@ export const closeFlag = async (
   );
   if (!closed.ok) return err(closed.error);
   if (closed.value.rows.length === 0) {
-    return err(new Error("the flag moved under the lock that was holding it"));
+    return err(new Error("closing the flag updated no row, though the flag was locked"));
   }
   return ok({ feedbackId, recordId: flag.record_id, closedAs });
 };

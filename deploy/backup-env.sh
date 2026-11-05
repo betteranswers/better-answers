@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The orchestrator hands the container every stores variable, the tunnel and Garage secrets
-# among them, so only the names the jobs read pass.
+# The orchestrator gives the container every stores variable, including the tunnel and Garage
+# secrets. Only the variables the jobs read are passed on.
 readonly JOB_VARIABLES=(
   PATH
   HOME
@@ -35,13 +35,13 @@ passes() {
   return 1
 }
 
-# `docker exec` hands a run by hand the whole environment, so it is cleared to match cron's.
+# A manual run through `docker exec` gets the whole environment, so clear it to match what cron gives a job.
 for name in $(compgen -e); do
   passes "${name}" || unset "${name}"
 done
 
-# cron gives a job none of the container's environment. PID 1 holds it, root-only, so no
-# file ever carries a copy.
+# cron gives a job none of the container's environment. Read it from PID 1, which only root
+# can read, so that no file holds a copy.
 while IFS= read -r -d '' pair; do
   # shellcheck disable=SC2163 # `pair` is NAME=value, the form export takes as it stands
   if passes "${pair%%=*}"; then export "${pair}"; fi

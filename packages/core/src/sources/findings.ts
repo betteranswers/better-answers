@@ -88,7 +88,8 @@ export const restoreFinding = async (
   if (!written.ok) return err(written.error);
   const stamped = written.value.rows[0];
 
-  if (stamped === undefined) return err(new Error("the finding was not there to restore"));
+  if (stamped === undefined)
+    return err(new Error("no finding to restore: the update matched no row"));
 
   await record(admin.value, tx, {
     id: auditEventId,

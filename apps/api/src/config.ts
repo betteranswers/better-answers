@@ -42,11 +42,11 @@ const httpsOrigin = z
   }, "PUBLIC_URL must be an https origin with no path, query, fragment or credentials")
   .refine(
     hostIsAsWritten,
-    "PUBLIC_URL must already be written the way a URL parser reads a host: a spelling the parser rewrites (`127.000.000.001`, `0x7f.1`, a percent-encoded label) would derive an `app.` hostname no arriving request can match",
+    "PUBLIC_URL must spell its host the way a URL parser writes it. A spelling the parser rewrites, such as `127.000.000.001`, `0x7f.1` or a percent-encoded label, gives an `app.` hostname that no request can match",
   )
   .refine(
     (value) => bareHostname.safeParse(hostnameOfUrl(value)).success,
-    "PUBLIC_URL's host must be a bare hostname — DNS labels only — because it is the `app.` hostname the fence matches an arriving `Host` against",
+    "PUBLIC_URL's host must be a hostname of DNS labels only, because the hostname fence matches each request's `Host` against it",
   )
 
   .transform((value) => originOfUrl(value));
@@ -69,7 +69,7 @@ const identityBootstrapSchema = z
       parsed.APEX_HOSTNAME,
     ];
     return new Set(hostnames).size === hostnames.length;
-  }, "the three hostnames must differ, the derived `app.` one included: two the same hands one hostname's surface to the other, which is the fence this configuration exists to raise");
+  }, "PUBLIC_URL's host, AGENT_HOSTNAME and APEX_HOSTNAME must all differ. If two are the same, one hostname serves the other's paths and the hostname fence is lost");
 
 const objectStoreSchema = z.object({
   S3_ENDPOINT: z.url({ protocol: /^https?$/u }),
@@ -79,13 +79,13 @@ const objectStoreSchema = z.object({
   S3_SECRET_KEY: z.string().min(1),
 });
 
-/** fetch refuses a URL with credentials in an error that quotes it whole, and that error is logged. */
+/** fetch rejects a URL with credentials with an error that quotes the whole URL, and that error is logged. */
 const deadManPingUrl = z
   .url({ protocol: /^https?$/u, abort: true })
   .refine((value) => {
     const url = new URL(value);
     return url.username === "" && url.password === "";
-  }, "a check's URL must carry no credentials")
+  }, "a healthcheck ping URL must not contain credentials")
   .optional();
 
 const sweepsSchema = z.object({
@@ -97,7 +97,7 @@ const headCheckSchema = z.object({
   HEALTHCHECKS_PING_URL_SCHEDULER: deadManPingUrl,
 });
 
-/** Coolify kills the container 30 s after the signal, so a stop still waiting on a client or a query is cut well before. */
+/** Coolify kills the container 30 s after the signal, so the api stops waiting for clients and queries well before that. */
 const DEFAULT_STOP_DEADLINE_MS = 10_000;
 
 const stopSchema = z.object({
@@ -115,7 +115,7 @@ const envelopeKeySchema = z.object({
   KEK: z.string().regex(new RegExp(`^[0-9a-fA-F]{${String(ENVELOPE_KEY_BYTES * 2)}}$`, "u")),
 });
 
-const NO_ENVELOPE_KEY = `KEK must be set to the envelope key: ${String(ENVELOPE_KEY_BYTES * 2)} hexadecimal characters, its ${String(ENVELOPE_KEY_BYTES)} bytes`;
+const NO_ENVELOPE_KEY = `KEK must be set to the envelope key: ${String(ENVELOPE_KEY_BYTES * 2)} hexadecimal characters, encoding ${String(ENVELOPE_KEY_BYTES)} bytes`;
 
 export type Bootstrap = {
   readonly databaseUrl: string;
@@ -221,7 +221,7 @@ export function readStop(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): Result<StopSettings> {
   const parsed = stopSchema.safeParse(environment);
-  if (!parsed.success) return err(invalid(parsed.error, "the stop's settings"));
+  if (!parsed.success) return err(invalid(parsed.error, "the stop settings"));
   return ok({ deadlineMs: parsed.data.STOP_DEADLINE_MS });
 }
 

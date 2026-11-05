@@ -1,7 +1,4 @@
-/**
- * Cloudflare drops a response quiet for 125 seconds between two reads; the judge alone may take
- * 150.
- */
+/** Cloudflare drops a response that sends nothing for 125 seconds, and the judge alone may take 150. */
 export const ASK_KEEP_ALIVE_MS = 25_000;
 
 export type KeepAlive = { readonly kind: "keep-alive" };

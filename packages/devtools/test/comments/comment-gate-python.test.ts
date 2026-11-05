@@ -50,10 +50,10 @@ describe("the Python check refuses a long or citing comment", () => {
 
     expect(output).toContain("runs to 29 words");
     expect(output).toContain(
-      "A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason.",
+      "Keep a comment only for a constraint outside this repository (a library, a platform or a protocol), a public contract, a generated-file marker, a licence, or the reason for a suppression.",
     );
     expect(output).toContain(
-      "Any other comment is deleted: hold its reason in a name, a type, a test, a grant or a lint, or report it open in the tracker.",
+      "Delete every other comment. Move its reason into a name, a type, a test, a grant or a lint, or open an issue for it in the tracker.",
     );
   });
 
@@ -126,7 +126,7 @@ describe("the Python check refuses a comment that counts its callers", () => {
 
     expect(output).toContain("this comment counts the code that uses it (`Two specs`).");
     expect(output).toContain(
-      "Delete it: hold a reason the callers share in a name or a test title.",
+      "Delete the count. If the callers share a reason, put it in a name or a test title.",
     );
   });
 
@@ -225,7 +225,7 @@ describe("a directive's reason counts against the twenty-five words", () => {
     const output = run({ [FILE]: `${line}  # ${wordsOf(26)}\n` });
 
     expect(output).toContain("reason runs to 26 words");
-    expect(output).toContain("Say the constraint alone.");
+    expect(output).toContain("Shorten it to the constraint alone.");
   });
 
   it("counts a reason apart from the comment above it", () => {
@@ -271,8 +271,8 @@ describe("a suppression gives its reason on the same line", () => {
   ])("refuses %s, naming the fix", (_what, line) => {
     const output = run({ [FILE]: `${line}\n` });
 
-    expect(output).toMatch(/^probe\.py:1: this suppression gives no reason; /m);
-    expect(output).toContain("Add the reason after a second `#`.");
+    expect(output).toMatch(/^probe\.py:1: this suppression gives no reason\. /m);
+    expect(output).toContain("After a second `#` on the same");
   });
 
   it.each([
@@ -322,7 +322,7 @@ describe("a docstring is limited to twenty-five words anywhere", () => {
     const output = run({ [file]: source });
 
     expect(output).toContain("runs to 26 words");
-    expect(output).toContain("over the cap of 25");
+    expect(output).toContain("over the limit of 25");
   });
 });
 

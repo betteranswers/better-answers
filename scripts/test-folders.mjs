@@ -22,5 +22,5 @@ for (const one of report.findings) process.stdout.write(`${one}\n`);
 if (report.findings.length > 0) process.exit(1);
 
 process.stdout.write(
-  `each of the ${String(report.read)} test folders read mirrors a source folder or is a named kind\n`,
+  `all ${String(report.read)} test folders checked mirror a source folder or are listed with their kind\n`,
 );

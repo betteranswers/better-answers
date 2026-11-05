@@ -37,13 +37,13 @@ const findingsOf = (
 ): readonly string[] => reportFor(files, pins, trees).findings;
 
 const strayLine = (folder: string): string =>
-  `${folder}: mirrors no source folder and is not a kind folder. Move its files to the folder of the entry they drive, or add a row to PINS in ${WHERE_THE_PINS_LIVE} with the kind and the reason.`;
+  `${folder} mirrors no source folder and is not a helper, gates or pinned folder. Move its files into the folder that mirrors the source they test, or add a row for it to PINS in ${WHERE_THE_PINS_LIVE} with its kind and reason.`;
 
 const staleLine = (folder: string): string =>
-  `${folder}: its row in ${WHERE_THE_PINS_LIVE} is stale, since the folder holds no tracked file. Delete the row.`;
+  `${folder} has no tracked files, so its row in PINS in ${WHERE_THE_PINS_LIVE} is not needed. Delete the row.`;
 
 const goneLine = (folder: string, reason: string): string =>
-  `${folder}: its row names ${reason}, which holds no tracked file. Point the row at the tree it mirrors, or move the tests into their mirror folder and delete the row.`;
+  `${folder} has a PINS row that names ${reason}, but ${reason} has no tracked files. Change the row to name the tree the folder mirrors, or move the tests into the folder that mirrors their source and delete the row.`;
 
 describe("a folder that mirrors a source folder", () => {
   it("passes, however deep", () => {
@@ -278,7 +278,7 @@ describe("the gate over a throwaway repository", () => {
     const ran = gateIn(tracked(...MIRRORED, ...everyPinHeld()));
 
     expect(ran.stdout).toMatch(
-      /^each of the \d+ test folders read mirrors a source folder or is a named kind\n$/u,
+      /^all \d+ test folders checked mirror a source folder or are listed with their kind\n$/u,
     );
     expect(ran.status).toBe(0);
   });
@@ -340,7 +340,7 @@ describe("the gate over this repository", () => {
     const ran = gateIn(repositoryRoot);
 
     expect(ran.stdout).toMatch(
-      /^each of the \d+ test folders read mirrors a source folder or is a named kind\n$/u,
+      /^all \d+ test folders checked mirror a source folder or are listed with their kind\n$/u,
     );
     expect(ran.status).toBe(0);
   });

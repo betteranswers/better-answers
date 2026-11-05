@@ -111,8 +111,8 @@ export const restoredByTheOperator = async (tx: Tx, personId: UserId): Promise<b
 };
 
 /**
- * The person is the one caller: a transport hands the id of the session's own person. A first set
- * is refused while one stands.
+ * Only the person may call this. A transport passes the id of the session's own person. A first set
+ * is refused while a set exists.
  */
 export const replaceRecoveryCodes = async (
   platform: PlatformPrincipal,
@@ -162,7 +162,7 @@ export const spendingARecoveryCode = async (
   return left.rows[0]?.unused ?? 0;
 };
 
-/** The set the person saved, named by the instant its issue answered. */
+/** The set the person saved, identified by the issue time that issuing the set returned. */
 export const acknowledgeRecoveryCodesInput = z.object({ madeAt: z.iso.datetime() });
 
 type AcknowledgeRecoveryCodesInput = RecoveryCodesInput & { readonly madeAt: string };

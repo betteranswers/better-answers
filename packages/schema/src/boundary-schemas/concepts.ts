@@ -42,7 +42,10 @@ const withKeysRenamed = <Value>(
 ): Record<string, Value> =>
   Object.fromEntries(Object.entries(record).map(([key, value]) => [rename(key), value]));
 
-/** zod's record drops an own "__proto__" key unvalidated, so the key is escaped past it and restored. */
+/**
+ * zod's record drops an own `__proto__` key without validating it, so the key is renamed before
+ * parsing and restored after.
+ */
 export const recordKeepingEveryKey = <Value extends z.ZodType>(value: Value) =>
   z
     .preprocess(
@@ -61,7 +64,7 @@ export const recordKeepingEveryKey = <Value extends z.ZodType>(value: Value) =>
 const frontmatterEntry = recordKeepingEveryKey(
   z.union([z.string(), z.number(), z.boolean(), z.null()]),
 ).refine((entry) => Object.keys(entry).length > 0, {
-  message: "a list entry carries at least one key",
+  message: "a list entry must have at least one key",
 });
 
 const namesAResource = (entry: z.infer<typeof frontmatterEntry> | string): boolean =>
@@ -82,7 +85,7 @@ export const conceptFrontmatter = recordKeepingEveryKey(
   if (characters > CONCEPT_FRONTMATTER_MAX) {
     context.addIssue({
       code: "custom",
-      message: `a concept's frontmatter is at most ${CONCEPT_FRONTMATTER_MAX} characters of JSON`,
+      message: `a concept's frontmatter is ${String(characters)} characters of JSON, and the limit is ${CONCEPT_FRONTMATTER_MAX}`,
     });
   }
   const sources = value["sources"];
@@ -92,7 +95,7 @@ export const conceptFrontmatter = recordKeepingEveryKey(
     context.addIssue({
       code: "custom",
       path: ["sources", index],
-      message: "a sources[] entry names the resource it cites",
+      message: "a sources[] entry must name the resource it cites",
     });
   }
 });
@@ -123,14 +126,14 @@ const conceptIndexRefinements = {
   ...conceptFileRefinements,
   body: (schema: z.ZodString) =>
     schema
-      .refine((body) => body.trim() !== "", { message: "a concept's body is not empty" })
+      .refine((body) => body.trim() !== "", { message: "a concept's body must not be blank" })
       .refine(
         (body) => {
           let characters = 0;
           for (const _ of body) characters += 1;
           return characters <= CONCEPT_BODY_MAX;
         },
-        { message: `a concept's body is at most ${CONCEPT_BODY_MAX} characters` },
+        { message: `a concept's body must be at most ${CONCEPT_BODY_MAX} characters` },
       ),
   kind: conceptKind,
   contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),

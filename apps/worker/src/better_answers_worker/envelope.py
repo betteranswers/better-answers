@@ -33,8 +33,8 @@ def _keyed(key: bytes) -> AESGCM:
 def sealed(key: bytes, plaintext: bytes) -> bytes:
     cipher = _keyed(key)
     version = bytes([ENVELOPE_VERSION])
-    # Random: a GCM nonce repeated under one key leaks the plaintexts' XOR and the
-    # authentication key.
+    # The nonce is random because a GCM nonce repeated under one key leaks the XOR of
+    # the plaintexts and the authentication key.
     nonce = secrets.token_bytes(ENVELOPE_NONCE_BYTES)
 
     return version + nonce + cipher.encrypt(nonce, plaintext, version)
@@ -43,12 +43,19 @@ def sealed(key: bytes, plaintext: bytes) -> bytes:
 def opened(key: bytes, frame: bytes) -> bytes:
     cipher = _keyed(key)
     if not frame:
-        raise UnopenableError("envelope-malformed", "envelope: a frame has no version")
+        message = "envelope: the frame is empty, so it has no version byte"
+        raise UnopenableError("envelope-malformed", message)
     if frame[0] != ENVELOPE_VERSION:
-        message = f"envelope: this tier opens no version {frame[0]}"
+        message = (
+            f"envelope: the frame has version {frame[0]}, and this worker opens only"
+            f" version {ENVELOPE_VERSION}"
+        )
         raise UnopenableError("envelope-version-unknown", message)
     if len(frame) < _SHORTEST_FRAME:
-        message = f"envelope: a frame is {_SHORTEST_FRAME} bytes or more"
+        message = (
+            f"envelope: the frame is {len(frame)} bytes, and a frame needs at least"
+            f" {_SHORTEST_FRAME}"
+        )
         raise UnopenableError("envelope-malformed", message)
 
     nonce = frame[
@@ -61,5 +68,8 @@ def opened(key: bytes, frame: bytes) -> bytes:
             frame[:ENVELOPE_VERSION_BYTES],
         )
     except InvalidTag as refused:
-        message = "envelope: this frame did not open"
+        message = (
+            "envelope: the frame failed authentication. It was sealed under a different"
+            " key, or it was altered"
+        )
         raise UnopenableError("envelope-not-authentic", message) from refused

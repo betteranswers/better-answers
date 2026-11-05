@@ -85,8 +85,8 @@ const citedByKeys = (entry: SourceEntry): CitedSource | undefined => {
 };
 
 /**
- * A string splits at its last `#`. Undefined means the resource is missing or blank; it is trimmed,
- * the locator never.
+ * A string splits at its last `#`. Undefined means the resource is missing or blank. The resource
+ * is trimmed, and the locator is not.
  */
 export const citedSourceOf = (entry: SourceEntry | string): CitedSource | undefined =>
   typeof entry === "string" ? citedByText(entry) : citedByKeys(entry);
@@ -111,7 +111,10 @@ export const citedSourcesOf = (value: SourcesValue): readonly CitedSource[] =>
     return cited === undefined ? [] : [cited];
   });
 
-/** A citation of a connected source's passage is evidence, never lineage: its resource is a label. */
+/**
+ * A citation of a connected source's passage is evidence, not lineage, so its resource is only a
+ * label.
+ */
 export const quotedPassageOf = ({
   resource,
   locator,
@@ -145,8 +148,8 @@ export const CONCEPT_STABLE_STATUS = "stable" satisfies (typeof PUBLISHED_STATUS
 export const CONTENT_HASH = /^[0-9a-f]{64}$/u;
 
 /**
- * No CHECK over the stored jsonb: Postgres renders a numeric in full, so a bound there would
- * refuse payloads the boundary passed.
+ * No CHECK on the stored jsonb. Postgres prints a numeric in full, so a length limit there would
+ * reject payloads the boundary accepted.
  */
 export const CONCEPT_FRONTMATTER_MAX = 64_000;
 
@@ -171,8 +174,8 @@ export const conceptIdentity = withRLS(
 );
 
 /**
- * Every cross-table key names the workspace beside the id: a foreign-key check bypasses
- * row-level security and would confirm another tenant's row.
+ * Every cross-table key includes the workspace with the id. A foreign-key check bypasses row-level
+ * security, so an id-only key could match another tenant's row.
  */
 export const attachedByIri = (
   table: { readonly workspaceId: AnyPgColumn; readonly iri: AnyPgColumn },

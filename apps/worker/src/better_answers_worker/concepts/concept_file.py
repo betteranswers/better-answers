@@ -26,27 +26,38 @@ AGREEMENT = "concept-file"
 
 
 def _not_a_number(constant: str) -> NoReturn:
-    raise MalformedConceptFileError(f"not a JSON value: {constant!r}")
+    raise MalformedConceptFileError(
+        f"frontmatter value {constant} is not allowed in JSON"
+    )
 
 
 def _scalar_of(text: str) -> Scalar:
     try:
         value: Any = json.loads(text, parse_constant=_not_a_number)
     except ValueError as cause:
-        raise MalformedConceptFileError(f"not a JSON value: {text!r}") from cause
+        raise MalformedConceptFileError(
+            f"frontmatter value {text!r} is not valid JSON"
+        ) from cause
 
     if value is None or isinstance(value, str | bool | int | float):
         return value
-    raise MalformedConceptFileError(f"not a scalar the renderer writes: {text!r}")
+    raise MalformedConceptFileError(
+        f"frontmatter value {text!r} is a JSON array or object. A value here is a"
+        " string, a number, a boolean or null"
+    )
 
 
 def _pair_of(line: str) -> tuple[str, str | None]:
     match = _FRONTMATTER_LINE.match(line)
     if match is None:
-        raise MalformedConceptFileError(f"not a frontmatter line: {line!r}")
+        raise MalformedConceptFileError(
+            f"frontmatter line {line!r} is not a quoted key followed by a colon"
+        )
     key = _scalar_of(match.group(1))
     if not isinstance(key, str):
-        raise MalformedConceptFileError(f"not a frontmatter key: {line!r}")
+        raise MalformedConceptFileError(
+            f"the key in frontmatter line {line!r} is not a string"
+        )
     return key, match.group(2)
 
 
@@ -56,7 +67,9 @@ def _opener_of(line: str) -> str | tuple[str, str | None]:
     except MalformedConceptFileError:
         item = _scalar_of(line)
         if not isinstance(item, str):
-            raise MalformedConceptFileError(f"not a list item: {line!r}") from None
+            raise MalformedConceptFileError(
+                f"list item {line!r} is neither a string nor a key-value pair"
+            ) from None
         return item
 
 
@@ -68,10 +81,13 @@ def _object_item_of(
     while True:
         if rest is None:
             raise MalformedConceptFileError(
-                f"a nested list is not written here: {key!r}"
+                f"key {key!r} in a list item has no value. A list item cannot hold a"
+                " nested list"
             )
         if key in entry:
-            raise MalformedConceptFileError(f"a key written twice: {key!r}")
+            raise MalformedConceptFileError(
+                f"key {key!r} appears twice in one list item"
+            )
         entry[key] = _scalar_of(rest)
         if at >= close or not lines[at].startswith("    "):
             return entry, at
@@ -94,25 +110,32 @@ def _list_items_of(
         entry, at = _object_item_of(lines, opener, at, close)
         entries.append(entry)
     if at == start:
-        raise MalformedConceptFileError("a key with no value and no items")
+        raise MalformedConceptFileError(
+            f"the key on line {start} has no value and no list items"
+        )
     if strings and entries:
-        raise MalformedConceptFileError("a list is strings or objects, never a mix")
+        raise MalformedConceptFileError(
+            f"the list under the key on line {start} mixes strings and key-value"
+            " items. A list holds only one of the two"
+        )
     return (entries if entries else strings), at
 
 
 def parse_concept_file(content: str) -> tuple[Frontmatter, str]:
     lines = content.split("\n")
     if not lines or lines[0] != "---":
-        raise MalformedConceptFileError("no frontmatter fence")
+        raise MalformedConceptFileError(
+            "the file does not start with a '---' frontmatter fence"
+        )
     try:
         close = lines.index("---", 1)
     except ValueError:
         raise MalformedConceptFileError(
-            "the frontmatter fence does not close"
+            "the frontmatter has no closing '---' line"
         ) from None
     if close + 1 >= len(lines) or lines[close + 1] != "":
         raise MalformedConceptFileError(
-            "no blank line between the frontmatter and the body"
+            "the closing '---' line of the frontmatter is not followed by a blank line"
         )
 
     frontmatter: dict[str, FrontmatterValue] = {}
@@ -121,7 +144,7 @@ def parse_concept_file(content: str) -> tuple[Frontmatter, str]:
         key, rest = _pair_of(lines[at])
 
         if key in frontmatter:
-            raise MalformedConceptFileError(f"a key written twice: {key!r}")
+            raise MalformedConceptFileError(f"frontmatter key {key!r} appears twice")
         at += 1
         if rest is not None:
             frontmatter[key] = [] if rest == "[]" else _scalar_of(rest)
@@ -191,7 +214,7 @@ def _number_text(value: int | float) -> str:
         return "0"
     sign, digits, exponent = Decimal(repr(number)).normalize().as_tuple()
     if not isinstance(exponent, int):
-        raise MalformedConceptFileError(f"not a finite number: {value!r}")
+        raise MalformedConceptFileError(f"frontmatter number {value!r} is not finite")
     figures = "".join(str(digit) for digit in digits)
     k = len(figures)
     n = exponent + k
@@ -225,7 +248,9 @@ def _json_text(value: object) -> str:
             for key in sorted(value, key=_utf16_order)
         )
         return "{" + ",".join(pairs) + "}"
-    raise MalformedConceptFileError(f"not a value the hash can carry: {value!r}")
+    raise MalformedConceptFileError(
+        f"the content hash cannot encode a {type(value).__name__}: {value!r}"
+    )
 
 
 def _reduced_sources(value: FrontmatterValue, path: str) -> list[list[str | None]]:

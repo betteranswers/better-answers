@@ -58,7 +58,7 @@ const codeAsk = z
 
 const secureOrigin = (publicUrl: string): boolean => publicUrl.startsWith("https:");
 
-/** Better Auth drops its own secure prefix on plain http, as the browser suite's loopback is. */
+/** Better Auth drops its secure cookie prefix on plain http, which the browser suite's loopback uses. */
 const bindingCookieName = (publicUrl: string): string =>
   secureOrigin(publicUrl) ? `__Host-${SIGN_IN_LINK_COOKIE}` : SIGN_IN_LINK_COOKIE;
 
@@ -108,7 +108,7 @@ const linkSignInBody = (use: LinkUse): FlowBody =>
 
 const nameGiven = z.object({ user: z.object({ name: z.string() }) });
 
-/** The library answers a carried flow's next step rather than the person; the next page reads the name. */
+/** For a carried flow the library returns the next step, not the person, so the name may be absent. */
 const displayNameGivenIn = async (answered: Response): Promise<boolean> => {
   const named = nameGiven.safeParse(
     await answered
@@ -136,7 +136,7 @@ export const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): 
     if (counted.allowed) return undefined;
     return tooManyRequests(
       counted.retryAfterSeconds,
-      "Too many tries of this link; try again later.",
+      "Too many attempts with this link. Try again later.",
     );
   };
 
@@ -150,7 +150,7 @@ export const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): 
   const unanswered = (context: Context, reason: string): Response => {
     deps.logger.warn(
       { event: "auth.link_sign_in_failed", reason },
-      "a sign-in through a link went unanswered",
+      "a sign-in through a link failed",
     );
     return context.json(LINK_REFUSALS.unanswered, 502);
   };
@@ -162,14 +162,14 @@ export const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): 
     answered: Response,
   ): Promise<Response> => {
     if (answered.status >= SERVER_FAILED)
-      return unanswered(context, `library ${String(answered.status)}`);
+      return unanswered(context, `the auth library answered ${String(answered.status)}`);
     if (!answered.ok) return context.json(LINK_REFUSALS.dead, 410);
     forwardCookies(answered, context.res.headers);
     const dropped = await attempt(() => dropALink(door, token));
     if (!dropped.ok) {
       deps.logger.warn(
         { event: "auth.link_drop_failed", reason: dropped.error.message },
-        "a used sign-in link was not deleted",
+        "deleting a used sign-in link failed",
       );
     }
     return context.json({
@@ -188,7 +188,7 @@ export const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): 
     if (!counted.allowed) {
       return tooManyRequests(
         counted.retryAfterSeconds,
-        "Too many sign-ins from this address; try again later.",
+        "Too many sign-ins from this address. Try again later.",
       );
     }
     const flowed = await attempt(() =>

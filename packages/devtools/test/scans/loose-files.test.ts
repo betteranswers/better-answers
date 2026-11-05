@@ -78,17 +78,17 @@ describe("a folder with no cap", () => {
     const [report, ...rest] = findings(filesIn(PROBE, LOOSE_FILE_LIMIT + 1));
 
     expect(rest).toEqual([]);
-    expect(report).toContain(`${PROBE}: 16 files`);
-    expect(report).toContain("limit of 15");
-    expect(report).toContain("Move files into a subfolder by capability");
+    expect(report).toContain(`${PROBE} has 16 files`);
+    expect(report).toContain("limit is 15");
+    expect(report).toContain("Move files into subfolders by capability");
   });
 
   it("fails each folder over the limit, in order", () => {
     const files = [...filesIn("packages/probe/test", 16), ...filesIn(PROBE, 17)];
 
     expect(findings(files)).toEqual([
-      expect.stringContaining("packages/probe/src: 17 files"),
-      expect.stringContaining("packages/probe/test: 16 files"),
+      expect.stringContaining("packages/probe/src has 17 files"),
+      expect.stringContaining("packages/probe/test has 16 files"),
     ]);
   });
 
@@ -110,20 +110,18 @@ describe("a folder with a cap", () => {
     const [report, ...rest] = findings(filesIn(PROBE, 21), probeCap(20));
 
     expect(rest).toEqual([]);
-    expect(report).toContain(`${PROBE}: 21 files`);
-    expect(report).toContain("cap of 20");
-    expect(report).toContain(WHERE_THE_CAPS_LIVE);
-    expect(report).toContain("pinned (a tool writes there)");
+    expect(report).toContain(`${PROBE} has 21 files`);
+    expect(report).toContain(`cap in ${WHERE_THE_CAPS_LIVE} is 20`);
+    expect(report).toContain("because a tool writes there");
     expect(report).toContain("Raise the cap to 21 in the same change");
-    expect(report).not.toContain("Move files into a subfolder");
+    expect(report).not.toContain("Move files into subfolders");
   });
 
   it("fails as stale once the folder holds fewer", () => {
     const [report, ...rest] = findings(filesIn(PROBE, 19), probeCap(20));
 
     expect(rest).toEqual([]);
-    expect(report).toContain(`${PROBE}: its cap of 20`);
-    expect(report).toContain("holds 19");
+    expect(report).toContain(`${PROBE} has 19 files, fewer than its cap of 20`);
     expect(report).toContain("Lower the cap to 19");
   });
 
@@ -131,13 +129,13 @@ describe("a folder with a cap", () => {
     const [report, ...rest] = findings(filesIn(PROBE, LOOSE_FILE_LIMIT), probeCap(20));
 
     expect(rest).toEqual([]);
-    expect(report).toContain("holds 15, within the limit of 15");
+    expect(report).toContain("has 15 files, within the limit of 15");
     expect(report).toContain("Delete the entry");
   });
 
   it("fails as stale under the limit", () => {
     expect(findings(filesIn(PROBE, 10), probeCap(20))).toEqual([
-      expect.stringContaining("holds 10, within the limit of 15"),
+      expect.stringContaining("has 10 files, within the limit of 15"),
     ]);
   });
 
@@ -145,13 +143,13 @@ describe("a folder with a cap", () => {
     const [report, ...rest] = findings(filesIn("packages/probe/test", 3), probeCap(20));
 
     expect(rest).toEqual([]);
-    expect(report).toContain("holds no tracked file");
+    expect(report).toContain("has no tracked files");
     expect(report).toContain("Delete the entry");
   });
 
   it("fails as stale when only a fixtures folder holds files", () => {
     expect(findings(filesIn(`${PROBE}/fixtures`, 25), probeCap(20))).toEqual([
-      expect.stringContaining("holds no tracked file"),
+      expect.stringContaining("has no tracked files"),
     ]);
   });
 });
@@ -211,7 +209,7 @@ describe("the gate over a throwaway repository", () => {
 
     expect(ran.status).toBe(1);
     expect(
-      linesOf(ran.stdout).filter((line) => line.startsWith(`${PROBE}: 16 files`)),
+      linesOf(ran.stdout).filter((line) => line.startsWith(`${PROBE} has 16 files`)),
     ).toHaveLength(1);
   });
 
@@ -220,7 +218,7 @@ describe("the gate over a throwaway repository", () => {
 
     expect(ran.status).toBe(1);
     expect(ran.stdout).toContain(
-      `${REDACTION.folder}: ${String(REDACTION.cap + 1)} files directly inside, over its cap of ${String(REDACTION.cap)}`,
+      `${REDACTION.folder} has ${String(REDACTION.cap + 1)} files directly inside it. Its cap in ${WHERE_THE_CAPS_LIVE} is ${String(REDACTION.cap)}.`,
     );
   });
 
@@ -228,8 +226,8 @@ describe("the gate over a throwaway repository", () => {
     const ran = spawned(repositoryOf(filesIn("apps/web/src/shared/ui", 30)));
 
     expect(ran.status).toBe(1);
-    expect(ran.stdout).toContain("apps/web/src/shared/ui: 30 files directly inside, over its cap");
-    expect(ran.stdout).toContain("shadcn CLI's target");
+    expect(ran.stdout).toContain("apps/web/src/shared/ui has 30 files directly inside it");
+    expect(ran.stdout).toContain("because the shadcn CLI writes its components there");
     expect(ran.stdout).toContain("Raise the cap to 30 in the same change");
   });
 
@@ -237,7 +235,7 @@ describe("the gate over a throwaway repository", () => {
     const ran = spawned(repositoryOf(filesIn("apps/web/src/shared/ui", 20)));
 
     expect(ran.status).toBe(1);
-    expect(ran.stdout).toContain("apps/web/src/shared/ui: its cap of 29");
+    expect(ran.stdout).toContain("apps/web/src/shared/ui has 20 files, fewer than its cap of 29");
     expect(ran.stdout).toContain("Lower the cap to 20");
   });
 
@@ -245,7 +243,7 @@ describe("the gate over a throwaway repository", () => {
     const ran = spawned(repositoryOf(filesIn(REDACTION.folder, 14)));
 
     expect(ran.status).toBe(1);
-    expect(ran.stdout).toContain(`${REDACTION.folder}: its cap of ${String(REDACTION.cap)}`);
+    expect(ran.stdout).toContain(`${REDACTION.folder} has 14 files, within the limit`);
     expect(ran.stdout).toContain("Delete the entry");
   });
 
@@ -289,7 +287,7 @@ describe("the gate over this repository", () => {
   it("passes with no oversized folder and no stale cap", () => {
     const ran = spawned(repositoryRoot);
 
-    expect(ran.stdout).toMatch(/^each of the \d+ folders read holds 15 tracked files or fewer/u);
+    expect(ran.stdout).toMatch(/^all \d+ folders checked hold 15 tracked files or fewer/u);
     expect(ran.status).toBe(0);
   });
 });

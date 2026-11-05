@@ -65,7 +65,7 @@ const reservedFor = async (
     return err(
       to.error instanceof Error
         ? to.error
-        : new Error(`llm: the workspace's model key did not open (${to.error})`),
+        : new Error(`llm: could not open the workspace's model key (${to.error})`),
     );
   }
   if (to.value === undefined) return ok(undefined);
@@ -88,9 +88,7 @@ export const reserveJudge = async (
     most: (shape) => reserving.most[shape],
   });
 
-/**
- * A model of the decision shape writes no prose, so none is reserved for it.
- */
+/** A model of the decision shape writes no prose, so no prose tokens are reserved for it. */
 export const reserveDrafting = async (
   asker: UserPrincipal,
   tx: Tx,

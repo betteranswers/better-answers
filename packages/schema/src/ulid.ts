@@ -51,8 +51,8 @@ const encodeTime = (milliseconds: number): string => {
 };
 
 /**
- * Never a secret. Each sorts after this process's last, even when the clock steps back.
- * @throws once the clock passes the 48-bit time half.
+ * Not a secret. Each ULID sorts after this process's previous one, even if the clock steps back.
+ * @throws once the clock passes the 48-bit limit.
  */
 export const ulid = (): Ulid => {
   const now = Date.now();
@@ -64,7 +64,9 @@ export const ulid = (): Ulid => {
     drawRandom();
   }
   if (lastTimeMs > MAX_TIME_MS) {
-    throw new Error("the ULID time half holds 48 bits of milliseconds; the clock is past it");
+    throw new Error(
+      `ULID time ${String(lastTimeMs)} ms is past the 48-bit limit of a ULID's time field`,
+    );
   }
 
   let encoded = encodeTime(lastTimeMs);

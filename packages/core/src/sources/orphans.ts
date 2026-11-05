@@ -137,15 +137,19 @@ const removeOrphans = async (
   const gone: KeyIds[] = [];
   for (const orphan of orphaned) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- the sweep stops at the first refused key and records what it removed before it
-    const removed = await asDefect("an orphaned original's key was refused", () =>
+    const removed = await asDefect("removing an orphaned original failed", () =>
       removeWorkspaceObject(platform, doors.objects, workspaceId, orphan.key),
     );
     if (!removed.ok) {
       // oxlint-disable-next-line eslint/no-await-in-loop -- the sweep stops at the first refused key and records what it removed before it
       const kept = await recordTheSweep(platform, doors.postgres, workspaceId, gone);
-      const unrecorded = kept.ok ? "" : `, and its audit events too: ${kept.error.message}`;
+      const unrecorded = kept.ok
+        ? ""
+        : `, and recording those removals failed: ${kept.error.message}`;
       return err(
-        new Error(`${removed.error.message}; ${String(gone.length)} removed first${unrecorded}`),
+        new Error(
+          `${removed.error.message}. ${String(gone.length)} were removed before it${unrecorded}`,
+        ),
       );
     }
     gone.push(orphan.ids);
@@ -155,8 +159,8 @@ const removeOrphans = async (
 };
 
 /**
- * Removes each original under `uploads/` that no document names once past the grace hours.
- * `dryRun` only counts. A failed removal is an Error.
+ * Removes each original under `uploads/` that no document references and that is past the grace
+ * period. `dryRun` only counts. A failed removal returns an Error.
  */
 export const sweepOrphanedUploads = async (
   platform: UploadSweepPrincipal,
@@ -175,7 +179,7 @@ export const sweepOrphanedUploads = async (
   if (!named.ok) return err(named.error);
   const held = new Set(named.value.rows.map((row) => row.original_key));
 
-  const stored = await asDefect("the originals' prefix was refused", () =>
+  const stored = await asDefect("listing the originals failed", () =>
     listWorkspaceObjects(platform, doors.objects, workspaceId, UPLOAD_ORIGINALS_PREFIX),
   );
   if (!stored.ok) return err(stored.error);

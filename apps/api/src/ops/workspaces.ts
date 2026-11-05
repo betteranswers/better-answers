@@ -20,13 +20,13 @@ import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { DONE, REFUSED, type OpsIo, type Flags, flagValue, bundleStore, exitOf } from "./cli.ts";
 
 export const notSignedIn = (email: string): string =>
-  `no-such-user: ${email} has not signed in; have them sign in with an email code first, or add them with add-person, then run this again`;
+  `no-such-user: ${email} has not signed in. Ask them to sign in with an email code, or add them with add-person, then run this again.`;
 
 const noDisplayName = (email: string): string =>
-  `no-display-name: ${email} has given no display name; have them sign in and give one, then run this again`;
+  `no-display-name: ${email} has no display name. Ask them to sign in and give one, then run this again.`;
 
 export const noSuchWorkspace = (workspaceId: string): string =>
-  `no-such-workspace: ${workspaceId} is not a workspace`;
+  `no-such-workspace: no workspace has the id ${workspaceId}`;
 
 const provisionReason = (
   refusal: ProvisionRefusal | Error,
@@ -40,11 +40,11 @@ const provisionReason = (
     case "no-display-name":
       return noDisplayName(email);
     case "slug-taken":
-      return `slug-taken: another workspace already holds the short name ${shortName}`;
+      return `slug-taken: another workspace already has the short name ${shortName}`;
     case "workspace-exists":
-      return "workspace-exists: a workspace already holds the id this run drew; run it again";
+      return "workspace-exists: the new workspace id this run generated is already in use. Run it again.";
     case "malformed":
-      return "malformed: the name and the short name must each carry at least one character";
+      return "malformed: the name and the short name must each have at least one character";
     default:
       return refusal;
   }
@@ -110,7 +110,7 @@ export const provisionWorkspaceCommand = async (
   const repository = await attempt(() => initRepository(git.value, id));
   if (!repository.ok) {
     io.say(
-      `provision-workspace: REFUSED — workspace ${id} stands with ${email} as its Admin, but its bundle repository could not be created: ${repository.error.message}; a rerun is refused slug-taken, so create the repository by hand before any import`,
+      `provision-workspace: REFUSED — created workspace ${id} with ${email} as its Admin, but could not create its bundle repository: ${repository.error.message}. A rerun is refused as slug-taken, so create the repository by hand before any import.`,
     );
     return REFUSED;
   }
@@ -134,7 +134,7 @@ const memberReason = (
     case "no-such-workspace":
       return noSuchWorkspace(workspaceId);
     case "already-a-member":
-      return `already-a-member: ${email} is already a member of workspace ${workspaceId}; a role change is the Admin's action on the People page`;
+      return `already-a-member: ${email} is already a member of workspace ${workspaceId}. To change their role, an Admin uses the People page.`;
   }
 };
 
@@ -178,13 +178,13 @@ const personReason = (refusal: AddPersonRefusal, email: string): string => {
     case "malformed":
       return `malformed: ${email} is not an email address`;
     case "person-exists":
-      return `person-exists: ${email} is already a person; add-member takes them as they stand`;
+      return `person-exists: a person with the email address ${email} already exists. Add them to a workspace with add-member.`;
     case "display-name-angle-bracket":
     case "display-name-control-character":
     case "display-name-empty":
     case "display-name-not-one-line":
     case "display-name-too-long":
-      return `${refusal}: a display name is one line of 1 to 100 characters, with no angle brackets or control characters`;
+      return `${refusal}: a display name must be one line of 1 to 100 characters, with no angle brackets or control characters`;
     default:
       return refusal;
   }
@@ -216,7 +216,7 @@ export const addPersonCommand = async (
   if (!added.ok) return personRefused(added.error, email, io);
   const person = added.value;
   io.say(
-    `add-person: done — ${person.personId}, ${person.email}, named ${person.displayName}; unverified until their first email-code sign-in`,
+    `add-person: done — ${person.personId}, ${person.email}, named ${person.displayName}. Their email address stays unverified until they first sign in with an email code.`,
   );
   return DONE;
 };
@@ -225,11 +225,11 @@ const renameReason = (refusal: RenameRefusal | Error, workspaceId: string): stri
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
     case "malformed":
-      return "malformed: give --workspace a workspace id, and --name, --short-name or both a value that is not blank";
+      return "malformed: --workspace must be a workspace id, and --name, --short-name or both must have a value that is not blank";
     case "no-such-workspace":
       return noSuchWorkspace(workspaceId);
     case "slug-taken":
-      return "slug-taken: another workspace already holds that short name";
+      return "slug-taken: another workspace already has that short name";
   }
 };
 

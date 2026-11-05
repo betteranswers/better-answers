@@ -37,7 +37,7 @@ export const sentInvitation = async (
   if (!sent.ok) {
     ctx.log.warn(
       { event: "trpc.email_failed", invitation_id: invitation.invitationId },
-      "the invitation email did not go",
+      "could not send the invitation email",
     );
   }
   return sent.ok;

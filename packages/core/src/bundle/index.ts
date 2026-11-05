@@ -148,7 +148,7 @@ export const authorOf = async (
   );
   const row = found.rows[0];
   if (row === undefined) {
-    throw new Error("the running member has no user row to sign the commits with");
+    throw new Error(`person ${personId} has no user row, so their commits cannot be signed`);
   }
   return row;
 };

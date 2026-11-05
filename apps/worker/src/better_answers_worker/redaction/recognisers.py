@@ -18,12 +18,13 @@ A_SORT_CODE_WITH_AN_ACCOUNT = re.compile(
     r"\b\d{2}[- ]?\d{2}[- ]?\d{2}\b.{0,40}?\b\d{8}\b", re.DOTALL
 )
 A_PAIR_ON_ITS_OWN = 0.2
-# Presidio's context enhancer lifts a pair named before it to this score.
+# Presidio's context enhancer gives this score to a pair with a context word before
+# it. A word between the numbers gets the same score.
 A_PAIR_NAMED_BETWEEN_ITS_NUMBERS = 0.55
 
 
-# Presidio's own pattern allows a space between its prefix refusal and the first letter,
-# so it takes that space and reads the refusal at it.
+# Presidio's own pattern allows a space before the first letter, so its check for a
+# forbidden prefix reads the space instead of the letters.
 A_NATIONAL_INSURANCE_NUMBER = (
     r"\b(?!bg|gb|nk|kn|nt|tn|zz|BG|GB|NK|KN|NT|TN|ZZ)"
     r"([a-ceghj-pr-tw-zA-CEGHJ-PR-TW-Z]{1}[a-ceghj-npr-tw-zA-CEGHJ-NPR-TW-Z]{1})"
@@ -112,8 +113,8 @@ class SeamRecogniser(LocalRecognizer):
 
 
 class SortCodeWithAccountRecogniser(SeamRecogniser):
-    """Presidio's context enhancer reads naming words only before a span, never
-    inside it."""
+    """Presidio's context enhancer looks for context words only before a span, so
+    this recogniser looks for them between the numbers itself."""
 
     def spans(
         self, text: str, nlp_artifacts: NlpArtifacts | None

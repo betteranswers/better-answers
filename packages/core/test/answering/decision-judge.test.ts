@@ -280,7 +280,7 @@ describe("ask with a decision model", () => {
           seconds: 0,
           request_id: null,
         },
-        message: "llm: a model call never sent",
+        message: "llm: model call not sent",
       },
     ]);
   });

@@ -73,8 +73,8 @@ const marking = async (
 };
 
 /**
- * Grants or revokes the operator mark of the person holding `email`, matched case-insensitively. A
- * person already as asked is left alone, with nothing written.
+ * Grants or revokes the operator mark of the person with address `email`, matched
+ * case-insensitively. If the person already has the requested mark, nothing is written.
  */
 export const setOperatorMark = async (
   platform: PlatformPrincipal,
@@ -102,7 +102,7 @@ type RestoreSignInInput = {
 export type SignInRestored = {
   readonly personId: UserId;
 
-  /** As the person's row holds it. */
+  /** As stored on the person's row. */
   readonly email: string;
 
   readonly code: string;
@@ -170,8 +170,8 @@ const restoring = async (
 };
 
 /**
- * Their factors, codes and sessions end, and setting up a factor waits on a one-time restore code.
- * Answers the code, which replaces any earlier one.
+ * Ends their second factors, recovery codes and sessions. A new factor then needs a one-time
+ * restore code. Returns the code, which replaces any earlier one.
  */
 export const restoreSignIn = async (
   platform: PlatformPrincipal,
@@ -203,8 +203,8 @@ type OperatorStanding =
   | { readonly operator: true; readonly name: string };
 
 /**
- * Whether a signed-in person stands as the operator, by the rule every console action is resolved
- * on. It answers no rather than refusing.
+ * Whether a signed-in person is the operator, by the same rule every console action uses. Returns
+ * false instead of refusing.
  */
 export const standingAsOperator = async (
   door: PostgresDoor,

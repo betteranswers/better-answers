@@ -129,7 +129,7 @@ describe("a mention of a path", () => {
 
     expect(rest).toEqual([]);
     expect(report).toContain("contracts/README.md names docs/gone.md");
-    expect(report).toContain("Point it at the file's new path");
+    expect(report).toContain("Change the mention to the file's new path");
     expect(report).toContain("git log -1 --format=%h -- docs/gone.md");
   });
 });
@@ -161,7 +161,7 @@ describe("this repository's tier contract", () => {
     );
 
     expect(reports).toEqual([
-      expect.stringContaining(`${file} names ${moved}, which the repository does not hold`),
+      expect.stringContaining(`${file} names ${moved}, but that path does not exist`),
     ]);
   });
 });

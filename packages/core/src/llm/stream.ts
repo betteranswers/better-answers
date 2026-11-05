@@ -121,7 +121,7 @@ async function* heardFrom(
   const reader = body.getReader();
   const cancel = (): void => {
     reader.cancel().catch(() => {
-      // Cancelling a reader already closed or errored has nothing left to end.
+      // The reader is already closed or errored, so there is nothing to cancel.
     });
   };
   signal.addEventListener("abort", cancel, { once: true });
@@ -204,7 +204,7 @@ export const openStreamingClient = (doors: ModelClientDoors): StreamingClient =>
   const logged = (to: ModelToCall, attempted: number, tried: Tried, seconds: number): void => {
     doors.log.info(
       attemptLine(to, attempted, { ...tried, read: readOf(tried), seconds }),
-      "llm: a model call's attempt",
+      "llm: model call attempted",
     );
   };
 

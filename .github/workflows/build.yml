@@ -13,10 +13,10 @@ permissions:
   contents: read
 
 jobs:
-  # A pull request's cache entries sit under its own ref, which no other run reads, so
-  # `check.yml`'s legs only restore the detector's weights; this job writes them on main, where
-  # every ref reads them. It holds no token that publishes, and nothing here ships.
-  # A failure here leaves the run green, which the nightly release reads; the next push retries.
+  # A pull request's cache entries are visible only to its own ref, so `check.yml` only restores
+  # the detector's weights, and this job saves them on main, where every ref can read them.
+  # It holds no publishing token and ships nothing. A failure leaves the run green, which the
+  # nightly release reads; the next push retries.
   caches:
     continue-on-error: true
     runs-on: ubuntu-26.04
@@ -25,8 +25,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # `check.yml` restores this path and key; the pins hashed name the models.
-      - name: whether main already holds the detector's weights
+      # `check.yml` restores this path and key; the hashed pins file names the models.
+      - name: Check whether main already has the detector's weights cached
         id: weights
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -34,7 +34,7 @@ jobs:
           key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
           lookup-only: true
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      # Saves the store only when main holds no entry for this lockfile.
+      # Saves the pnpm store only when main has no cache entry for this lockfile.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         id: node
         with:
@@ -51,11 +51,11 @@ jobs:
         run: uv sync --frozen
         working-directory: apps/worker
       - if: steps.weights.outputs.cache-hit != 'true'
-        name: HF_HOME on the runner's own temp directory, not the checkout
+        name: Put HF_HOME in the runner's temp directory, outside the checkout
         run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
-      # The image's own fetch: loading each pinned model also fetches the encoder it names.
+      # Uses the image's own fetch: loading each pinned model also fetches the encoder it names.
       - if: steps.weights.outputs.cache-hit != 'true'
-        name: the detector's weights, fetched as the worker image fetches them
+        name: Fetch the detector's weights the way the worker image does
         run: uv run --frozen python -c 'from better_answers_worker.redaction.weights import fetch; fetch()'
         working-directory: apps/worker
       - if: steps.weights.outputs.cache-hit != 'true'
@@ -65,8 +65,8 @@ jobs:
           key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
 
   check:
-    # Replacing the workflow's grant, this must cover every called job, though some never run on a
-    # push, or the run fails at startup.
+    # This replaces the workflow's grant, so it must cover every called job, including jobs that
+    # never run on a push, or the run fails at startup.
     permissions:
       contents: read
       packages: read
@@ -154,9 +154,9 @@ jobs:
       - if: matrix.probe-toolchain == 'python'
         run: uv sync --frozen --only-group probe
         working-directory: apps/worker
-      # The leg's one build. A second build for the push could re-run a step BuildKit's cache
-      # missed, and the weights and suffix list steps fetch afresh, so it would ship bytes
-      # the probe never read.
+      # The leg's only build. A second build for the push could re-run a step that missed
+      # BuildKit's cache, and the weights and suffix list steps fetch afresh, so it could ship
+      # bytes the probe never tested.
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         id: load
         if: matrix.probe
@@ -169,28 +169,28 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # In the registry, not the Actions cache, which any run on main can write: these
-          # layers ship, and only a job holding `packages: write` can write here. A failed
-          # export warns rather than fails, so a refused cache never stops a built image
-          # from being probed and pushed. Only a run on main writes the tag, because a branch run
-          # that did would decide which layers main's next build reads and ships; it still reads.
+          # layers ship, and only a job with `packages: write` can write here. A failed export
+          # warns instead of failing, so a refused cache never blocks probing and pushing. Only a
+          # run on main writes the cache tag, so a branch run cannot choose the layers that
+          # main's next build ships. Branch runs still read it.
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}:buildcache
           cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/{0}/{1}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true', github.repository_owner, matrix.tier) || '' }}
-      # With no id the probe would build an image of its own, and the leg would push
-      # something nothing read.
-      - name: the image is read before it ships
+      # Without an id, the probe would build its own image, and the leg would push an
+      # untested one.
+      - name: Probe the image before pushing it
         if: matrix.probe
         env:
           IMAGE_ID: ${{ steps.load.outputs.imageid }}
           PROBE: ${{ matrix.probe }}
         run: |
           if [ -z "${IMAGE_ID}" ]; then
-            echo "::error::the load reported no image id, so there is no built image to probe"
+            echo "::error::The load step reported no image id, so there is no built image to probe. Read the build step's log."
             exit 1
           fi
           ${PROBE}
-      # The daemon keeps images in containerd, which pushes the manifest the load wrote
+      # The daemon keeps images in containerd, which pushes the manifest the load wrote,
       # byte for byte. The digest is read back from the registry, not from the runner.
-      - name: the image the probe read is the image pushed
+      - name: Push the probed image and read its digest from the registry
         id: push
         env:
           LOADED: ${{ steps.load.outputs.imageid }}
@@ -198,17 +198,17 @@ jobs:
           TAG: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
         run: |
           if [ -z "${LOADED}" ]; then
-            echo "::error::no image was built and probed, so there is nothing to push: a leg ships only the image its probe read"
+            echo "::error::No image was built and probed, so there is nothing to push. A leg pushes only the image its probe tested."
             exit 1
           fi
           if ! docker info --format '{{json .DriverStatus}}' | grep -q io.containerd.snapshotter.v1; then
-            echo "::error::the daemon does not keep images in containerd, so a push would write a manifest the probe never read"
+            echo "::error::The Docker daemon does not store images in containerd, so a push would write a manifest the probe never tested. Enable the containerd image store on the runner."
             exit 1
           fi
           docker push --quiet --all-tags "${IMAGE}"
           digest="$(docker buildx imagetools inspect "${TAG}" --format '{{json .Manifest}}' | jq -r .digest)"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
-      - name: digest to the job summary
+      - name: Write the digest to the job summary
         env:
           TIER: ${{ matrix.tier }}
           OWNER: ${{ github.repository_owner }}
@@ -221,10 +221,10 @@ jobs:
             echo ""
             echo "\`ghcr.io/${OWNER}/${TIER}@${PUSHED}\`"
           } >> "$GITHUB_STEP_SUMMARY"
-          # Keyed on whether the leg was probed, or a missing digest would drop the claim.
+          # Checks whether the leg was probed, so a missing digest fails the step instead of being skipped.
           if [ -n "${PROBE}" ]; then
             if [ -z "${PROBED}" ]; then
-              echo "::error::${TIER} was probed but its load reported no digest, so this run cannot say what was tested"
+              echo "::error::${TIER} was probed, but its load step reported no digest, so this run cannot say which image was tested."
               exit 1
             fi
             {
@@ -232,7 +232,7 @@ jobs:
               echo "tested \`${PROBED}\`, pushed \`${PUSHED}\`"
             } >> "$GITHUB_STEP_SUMMARY"
             if [ "${PROBED}" != "${PUSHED}" ]; then
-              echo "::error::${TIER} probed ${PROBED} and the registry answers ${PUSHED}: the push did not ship the manifest the probe read"
+              echo "::error::${TIER}: the probe tested ${PROBED}, but the registry has ${PUSHED}. The push did not ship the manifest the probe tested."
               exit 1
             fi
           fi
@@ -246,7 +246,7 @@ jobs:
   release:
     needs: image
     if: ${{ !cancelled() && needs.image.result == 'success' && github.ref == 'refs/heads/main' }}
-    # Exactly release.yml's asks: the tag, the digests, and the nightly release's reading of runs.
+    # Exactly what release.yml needs: tag pushes, package reads, and run reads for the nightly release.
     permissions:
       contents: write
       packages: read
@@ -254,8 +254,8 @@ jobs:
     uses: ./.github/workflows/release.yml
     with:
       commit: ${{ github.sha }}
-    # Empty here, being the production environment's: passing each name is what lets the called
-    # job that names that environment read it.
+    # These are production environment secrets, empty at this level. Passing each name lets the
+    # called job that uses that environment read it.
     secrets:
       COOLIFY_DEPLOY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
       CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}

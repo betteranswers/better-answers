@@ -145,7 +145,7 @@ describe("collecting the declared audit actions", () => {
     expect(() =>
       // @ts-expect-error the type refuses this too, and the test checks the runtime refusal.
       declareActions("platform", { added: action("people.member.added", {}) }),
-    ).toThrow(/not a platform action/);
+    ).toThrow(/does not have the form platform\.subject\.verb/);
   });
 
   it("rejects a fifth family, by type and at runtime", () => {
@@ -153,7 +153,7 @@ describe("collecting the declared audit actions", () => {
     expect(() =>
       // @ts-expect-error billing is not one of the four families.
       declareActions("billing", { sent: action("billing.invoice.sent", {}) }),
-    ).toThrow(/not a billing action/);
+    ).toThrow(/does not have the form billing\.subject\.verb/);
   });
 
   it("rejects an action on a subject that is never audited", () => {
@@ -458,7 +458,7 @@ describe("record, which takes the actor from the Principal", () => {
         subjectId: adminUserId,
         detail: { adminUserId: "priya@example.invalid", confirmed: true },
       }),
-    ).rejects.toThrow(/adminUserId is not an id, or absent/);
+    ).rejects.toThrow(/detail field adminUserId must be an id or absent/);
   });
 
   it("rejects a content hash that is not SHA-256 hex", async () => {
@@ -474,7 +474,7 @@ describe("record, which takes the actor from the Principal", () => {
         subjectId: adminUserId,
         detail: { contentHash: "sha256:not-a-digest" },
       }),
-    ).rejects.toThrow(/contentHash is not a contentHash$/);
+    ).rejects.toThrow(/detail field contentHash must be a contentHash$/);
   });
 
   it("writes a known flag closing and rejects an unknown one", async () => {
@@ -495,7 +495,7 @@ describe("record, which takes the actor from the Principal", () => {
     expect(await rowById(id)).toEqual(
       matching.objectContaining({ detail: { closedAs: "no-fault-in-the-knowledge" } }),
     );
-    await expect(closing("fixed")).rejects.toThrow(/closedAs is not a flagClosing$/);
+    await expect(closing("fixed")).rejects.toThrow(/detail field closedAs must be a flagClosing$/);
   });
 
   it("rejects a detail field the action does not declare", async () => {
@@ -512,7 +512,7 @@ describe("record, which takes the actor from the Principal", () => {
           subjectId: adminUserId,
         }),
       ),
-    ).rejects.toThrow(/names a field the action does not: email/);
+    ).rejects.toThrow(/detail field email is not declared/);
     expect(await rowById(id)).toBeUndefined();
   });
 
@@ -527,7 +527,7 @@ describe("record, which takes the actor from the Principal", () => {
         subjectId: adminUserId,
         detail: { adminUserId: "priya@example.invalid", role: "Admin", confirmed: true },
       }),
-    ).rejects.toThrow(/adminUserId is not an id$/);
+    ).rejects.toThrow(/detail field adminUserId must be an id$/);
     await expect(
       write({
         id: ulid(),
@@ -544,7 +544,7 @@ describe("record, which takes the actor from the Principal", () => {
         subjectId: adminUserId,
         detail: {},
       }),
-    ).rejects.toThrow(/never declared/);
+    ).rejects.toThrow(/is not declared/);
 
     await expect(
       write({
@@ -554,7 +554,7 @@ describe("record, which takes the actor from the Principal", () => {
         detail: { confirmed: true },
       }),
     ).rejects.toMatchObject({
-      message: matching.stringContaining("refused at the boundary"),
+      message: matching.stringContaining("does not match the audit table's schema"),
       cause: matching.objectContaining({ issues: matching.any(Array) }),
     });
   });
@@ -703,7 +703,7 @@ describe("writing the identity-set audit log through record or recordFor", () =>
           detail: { confirmed: true, name: "Priya Shah" },
         }),
       ),
-    ).rejects.toThrow(/names a field the action does not: name/);
+    ).rejects.toThrow(/detail field name is not declared/);
     expect(await identityRowById(id)).toBeUndefined();
   });
 
@@ -811,7 +811,7 @@ describe("a detail's list of ended grants", () => {
         // @ts-expect-error each case breaks the grant's shape, and the test checks the runtime.
         detail: { grants: [grant] },
       }),
-    ).rejects.toThrow(/grants is not a list of ended grants$/);
+    ).rejects.toThrow(/detail field grants must be a list of ended grants$/);
   });
 
   const writingGrants = async (grants: (workspaceId: WorkspaceId) => unknown) => {
@@ -834,12 +834,14 @@ describe("a detail's list of ended grants", () => {
       return [rest];
     };
 
-    await expect(writingGrants(unplaced)).rejects.toThrow(/grants is not a list of ended grants$/);
+    await expect(writingGrants(unplaced)).rejects.toThrow(
+      /detail field grants must be a list of ended grants$/,
+    );
   });
 
   it("rejects text in place of the list", async () => {
     await expect(writingGrants(() => "Claude")).rejects.toThrow(
-      /grants is not a list of ended grants$/,
+      /detail field grants must be a list of ended grants$/,
     );
   });
 });

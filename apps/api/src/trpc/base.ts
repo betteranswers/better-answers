@@ -113,7 +113,7 @@ const throttled = (log: Logger, action: string, met: CeilingMet): TRPCError => {
   log.info({ event: "trpc.throttled", action, retryAfterSeconds }, "throttled");
   return new TRPCError({
     code: "TOO_MANY_REQUESTS",
-    message: `Too many calls; ask again in ${retryAfterSeconds} seconds.`,
+    message: `Too many requests. Try again in ${retryAfterSeconds} seconds.`,
     cause: met,
   });
 };
@@ -235,10 +235,7 @@ const settled = <Ran>(
   return resolved.value.value;
 };
 
-/**
- * tRPC returns a failed procedure rather than throwing it, so without the throw the transaction it
- * failed inside commits.
- */
+/** Without the throw, tRPC returns the failure as a value and the transaction around it commits. */
 const thrownIfFailed = <
   Ran extends { readonly ok: true } | { readonly ok: false; readonly error: Error },
 >(

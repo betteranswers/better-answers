@@ -74,7 +74,7 @@ export const writeReplayCopy = async (
     streamOf(new TextEncoder().encode(JSON.stringify(copy, null, 2))),
   );
   if (!written.ok) {
-    throw new Error(`erasure: the replay copy's key was refused (${written.error})`);
+    throw new Error(`erasure: writing the replay copy failed (${written.error})`);
   }
 };
 
@@ -115,11 +115,10 @@ const copyAt = async (
   key: string,
 ): Promise<ReplayCopy> => {
   const got = await getPlatformObject(platform, door, key);
-  if (!got.ok)
-    throw new Error(`erasure: the replay copy at ${key} was not readable (${got.error})`);
+  if (!got.ok) throw new Error(`erasure: could not read the replay copy at ${key} (${got.error})`);
   const parsed = COPY_AS_READ.safeParse(JSON.parse(await new Response(got.value).text()));
   if (!parsed.success) {
-    throw new Error(`erasure: the replay copy at ${key} is not a replay copy`, {
+    throw new Error(`erasure: the object at ${key} does not parse as a replay copy`, {
       cause: parsed.error,
     });
   }
@@ -134,7 +133,7 @@ export const replayCopiesSince = async (
   const listed = await attempt(() => listPlatformObjects(platform, door, REPLAY_PREFIX));
   if (!listed.ok) return err(listed.error);
   if (!listed.value.ok) {
-    return err(new Error(`erasure: the replay prefix was refused (${listed.value.error})`));
+    return err(new Error(`erasure: listing the replay copies failed (${listed.value.error})`));
   }
 
   const reads = await Promise.all(

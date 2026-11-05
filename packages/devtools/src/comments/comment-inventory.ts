@@ -52,26 +52,36 @@ const survivorOf = (root: string, rows: readonly Row[]): Survivor => {
 const holderRefusal = (survivor: Survivor, holder: string): string | undefined => {
   const named = HOLDER.exec(holder)?.groups;
   if (named === undefined) {
-    return `holder \`${holder}\` is not path › text: anchor it on text its file holds once, not a line number`;
+    return `holder \`${holder}\` is not in the form \`path › text\`. Anchor it on text that appears once in its file, not on a line number.`;
   }
   const source = survivor(String(named["file"]));
-  if (source === undefined) return `holder \`${holder}\` names no file`;
+  if (source === undefined) return `holder \`${holder}\` names a file that does not exist`;
   const times = timesIn(source, String(named["text"]));
-  return times === 1 ? undefined : `holder \`${holder}\`: the file holds this text ${times} times`;
+  return times === 1
+    ? undefined
+    : `holder \`${holder}\`: its text appears ${times} times in the file. Anchor it on text that appears exactly once.`;
 };
 
 const at = (row: Row): string => `${row.path}:${row.start}`;
 
 const rowRefusals = (survivor: Survivor, row: Row): readonly string[] => {
-  if (row.class === "") return [`${at(row)}: unclassified, so nothing says its reason may go`];
+  if (row.class === "")
+    return [
+      `${at(row)}: the row has no class, so nothing records why the comment may be deleted. Give the row a class.`,
+    ];
   if (row.class === "open") {
     return TRACKER_ISSUE.test(row.holder)
       ? []
-      : [`${at(row)}: an open row's holder is the tracker issue its reason went to, as BA-196`];
+      : [
+          `${at(row)}: an open row's holder must be the tracker issue that now holds its reason, such as BA-196`,
+        ];
   }
   if (!NEEDS_A_HOLDER.has(row.class)) return [];
   const holders = row.holder.split("; ").filter((one) => one !== "");
-  if (holders.length === 0) return [`${at(row)}: a ${row.class} row names no holder`];
+  if (holders.length === 0)
+    return [
+      `${at(row)}: a ${row.class} row names no holder. Name the place that now holds its reason.`,
+    ];
   return holders.flatMap((holder) => {
     const refused = holderRefusal(survivor, holder);
     return refused === undefined ? [] : [`${at(row)}: ${refused}`];
@@ -88,7 +98,7 @@ const located = (
   if (source === undefined) return { refused: rows.map((row) => `${at(row)}: no such file`) };
   const language = languageOf(file);
   if (language === undefined) {
-    return { refused: rows.map((row) => `${at(row)}: neither TypeScript nor Python`) };
+    return { refused: rows.map((row) => `${at(row)}: the file is neither TypeScript nor Python`) };
   }
   const found = language.foundIn(file, source);
   const cuts: Found[] = [];
@@ -102,7 +112,7 @@ const located = (
       refused.push(
         ...same.map(
           (row) =>
-            `${at(row)}: the file holds this block ${matches.length} times and the unit deletes it ${same.length}`,
+            `${at(row)}: the file has this block ${matches.length} times, but the unit deletes it ${same.length} times. Make the rows match the file.`,
         ),
       );
     }
@@ -170,7 +180,7 @@ const withoutCut = (source: string, { start, end, replacement }: Cut): string =>
 
 const BOM = "\uFEFF";
 
-/** String.prototype.trim takes U+FEFF for white space, so a byte order mark waits outside the cuts. */
+/** String.prototype.trim treats U+FEFF as white space, so the cuts must skip a leading byte order mark. */
 const withCuts = ({ source, cuts }: Planned): string => {
   const mark = source.startsWith(BOM) ? BOM.length : 0;
   const rest = [...cuts]
@@ -259,7 +269,7 @@ const apply = (root: string, argv: readonly string[]): number => {
   if (unit === undefined) return refuse([USAGE], 2);
   const plan = planFor(root, rows, unit);
   if ("refused" in plan)
-    return refuse([`unit ${unit} refused, no file changed:`, ...plan.refused], 1);
+    return refuse([`unit ${unit} refused, so no file changed:`, ...plan.refused], 1);
   for (const one of plan.value) writeFileSync(path.resolve(root, one.file), withCuts(one));
   const failed = formatFailures(
     root,

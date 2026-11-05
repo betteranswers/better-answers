@@ -153,7 +153,7 @@ describe("operator, which grants or revokes the operator flag", () => {
 
     expect(run).toEqual({
       exitCode: 0,
-      lines: [`operator: done — ${person.email} is the operator`],
+      lines: [`operator: done — ${person.email} is now the operator`],
     });
     expect(await operatorFlagOf(person.id)).toBe(true);
     expect(await operatorRowsOf(person.id)).toEqual([
@@ -194,11 +194,11 @@ describe("operator, which grants or revokes the operator flag", () => {
     expect([again, never]).toEqual([
       {
         exitCode: 0,
-        lines: [`operator: done — ${person.email} was already the operator; nothing written`],
+        lines: [`operator: done — ${person.email} was already the operator. Nothing changed.`],
       },
       {
         exitCode: 0,
-        lines: [`operator: done — ${someoneElse.email} was not the operator; nothing written`],
+        lines: [`operator: done — ${someoneElse.email} was not the operator. Nothing changed.`],
       },
     ]);
     expect(await operatorRowsOf(person.id)).toHaveLength(1);
@@ -213,7 +213,7 @@ describe("operator, which grants or revokes the operator flag", () => {
     expect(run).toEqual({
       exitCode: 6,
       lines: [
-        "operator: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
+        "operator: REFUSED — no-such-user: nobody@acme.invalid has not signed in. Ask them to sign in with an email code, or add them with add-person, then run this again.",
       ],
     });
     expect(await operatorRowCount()).toBe(before);

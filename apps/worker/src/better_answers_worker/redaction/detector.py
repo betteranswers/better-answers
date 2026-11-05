@@ -140,8 +140,8 @@ class ModelRecogniser(EntityRecognizer):
         with torch.utils.serialization.config.patch(  # type: ignore[attr-defined]  # torch installs `patch` at runtime; this module never imports the stub declaring it
             "load.mmap", True
         ):
-            # Mapped, and assigned in place on the meta device, the weights are file
-            # pages the kernel drops, not anonymous memory held twice and swapped.
+            # Loaded by mmap, the weights stay file-backed pages that the kernel can
+            # drop. A normal load copies them into anonymous memory, which swaps.
             self.gliner = GLiNERRecognizer(
                 model_name=model_name,
                 map_location="cpu",

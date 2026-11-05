@@ -25,7 +25,7 @@ services:
       - better_answers.image=${TEST_POSTGRES_IMAGE}
     # Parallel queries take dynamic shared memory from /dev/shm, and Docker's 64 MB default runs short.
     shm_size: 256m
-    # Over TCP: the image's first-boot server listens on the socket alone, and must not read as up.
+    # Over TCP: during first boot, the image's temporary server listens only on the socket and must not count as up.
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "postgres"]
       interval: 2s

@@ -147,7 +147,7 @@ describe("pnpm ops argument parsing", () => {
     ])("gives a usage error for %s", (_shape, flags) => {
       expect(parsed(["map-rebuild", "--workspace", WORKSPACE, ...flags])).toEqual({
         refusal:
-          "map-rebuild: --wait takes no value; --wait-seconds takes a whole number of seconds",
+          "map-rebuild: --wait takes no value, and --wait-seconds takes a whole number of seconds",
       });
     });
 
@@ -223,13 +223,13 @@ describe("pnpm ops argument parsing", () => {
 
   describe("erasure-rehearsal", () => {
     const SYNTHETIC_MISSING =
-      "erasure-rehearsal: --synthetic is required — this command creates a synthetic subject and then erases them, and the flag is the caller saying this workspace is somewhere that may happen";
+      "erasure-rehearsal: --synthetic is required. This command creates a synthetic subject and then erases them, so pass the flag to confirm this workspace is one where that may happen.";
 
     const PHASE_MISSING =
-      "erasure-rehearsal: exactly one of --seed (phase one) or --run --report <file> (phase two); the drill takes a dump between them";
+      "erasure-rehearsal: pass either --seed (phase one) or --run --report <file> (phase two), not both. The drill takes a dump between the two phases.";
 
     const REPORT_MISSING =
-      "erasure-rehearsal: --run needs --report <file> — the report is what the drill keeps, and a run whose report went nowhere proved nothing";
+      "erasure-rehearsal: --run needs --report <file>. The drill keeps the report as its evidence, so a run without one proves nothing.";
 
     const WAIT_MALFORMED = "erasure-rehearsal: --wait-seconds takes a whole number of seconds";
 
@@ -443,7 +443,7 @@ describe("pnpm ops argument parsing", () => {
     const FLAGS = ["--iri", IRI, "--as", "a@b.c"];
 
     const REQUIRED =
-      "update-concept-body: --iri <iri> and --as <member email> are required, with the new body on stdin";
+      "update-concept-body: --iri <iri> and --as <member email> are required, and the new body goes on stdin";
 
     it("writes with --expect as the expected content hash", () => {
       expect(
@@ -499,7 +499,7 @@ describe("pnpm ops argument parsing", () => {
       [
         "a write with no --expect",
         FLAGS,
-        "update-concept-body: --expect <content hash> is required on a write; run with --dry-run to read the hash the concept stands at",
+        "update-concept-body: --expect <content hash> is required unless you pass --dry-run. Run with --dry-run to print the concept's current hash.",
       ],
       [
         "a --dry-run with a value",
@@ -829,7 +829,8 @@ describe("pnpm ops argument parsing", () => {
     });
 
     it("gives a usage error without --url", () => {
-      const refusal = "smoke: --url <origin> is required (http://127.0.0.1:3000 inside the stack)";
+      const refusal =
+        "smoke: --url <origin> is required, such as http://127.0.0.1:3000 inside the stack";
 
       expect(parsed(["smoke"])).toEqual({ refusal });
       expect(parsed(["smoke", "--url"])).toEqual({ refusal });

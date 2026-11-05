@@ -41,7 +41,7 @@ type ModelKeySet = {
 
 export type SetModelKeyRefusal = KernelRefusal<"malformed"> | WorkspaceRefusal<"no-such-workspace">;
 
-/** The key is neither answered nor recorded. */
+/** The key is not returned and not recorded. */
 export const setModelKey = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

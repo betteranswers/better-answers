@@ -228,7 +228,10 @@ const blankedSpans = (body: string): string => {
   return pieces.join("");
 };
 
-/** The body with fenced blocks and code spans blanked to spaces, so an offset into one is into both. */
+/**
+ * The body with fenced blocks and code spans blanked to spaces, so an offset into the result is
+ * also an offset into the body.
+ */
 export const proseOf = (body: string): string => {
   const pieces: string[] = [];
   let cursor = 0;
@@ -373,7 +376,7 @@ export type BodyReading = {
 };
 
 /**
- * A link's ordinal counts every prose link, images and links naming nothing included. A footnote
+ * A link's ordinal counts every prose link, including images and links with no target. A footnote
  * naming a source is a citation mark: no ordinal.
  */
 export const linksAndMarksOf = (body: string, sources: readonly CitedSource[]): BodyReading => {

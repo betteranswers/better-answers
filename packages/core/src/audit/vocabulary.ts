@@ -199,10 +199,10 @@ const declarationRefusal = (
 ): string | undefined => {
   const [prefix, subject] = name.split(".");
   if (!ACTION.test(name) || prefix !== family) {
-    return `${name} is not a ${family} action of the form family.subject.verb`;
+    return `${name} does not have the form ${family}.subject.verb`;
   }
   if (subject !== undefined && NEVER_A_SUBJECT.has(subject)) {
-    return `${name} names a record that is never an audit event`;
+    return `${name} has subject ${subject}, which is kept as its own record and is never an audit event`;
   }
   if (declaredNames.has(name) || earlierInCall.has(name)) return `${name} is declared twice`;
   return undefined;

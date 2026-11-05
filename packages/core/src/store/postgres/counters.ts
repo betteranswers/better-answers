@@ -41,8 +41,8 @@ const countInWindow = async (
 };
 
 /**
- * Counts one attempt in the fixed window `now` falls in. It commits at once. `retryAfterSeconds`
- * runs to the window's end, 1 at least.
+ * Counts one attempt in the fixed window that `now` falls in, and commits at once.
+ * `retryAfterSeconds` is the time left in the window, minimum 1.
  */
 export const consumeIngress = async (
   door: PostgresDoor,

@@ -63,8 +63,8 @@ const NEUTRAL_CONSTRAINTS = {
 } as const;
 
 /**
- * Acknowledges alike whether a request was written, one already waits, the requester is a member or
- * unknown, or no workspace has the short name.
+ * Returns the same acknowledgement if a request was written or waits, the requester is a
+ * member or unknown, or no workspace has the short name.
  */
 export const requestAccess = async (
   platform: PlatformPrincipal,
@@ -202,8 +202,8 @@ export type ApproveRefusal = MemberRefusal<RefusalOf<typeof approveRequestAction
 export type Approved = InvitationToSend & { readonly requestId: AccessRequestId };
 
 /**
- * Mints an invitation to the requester's address at `role`, or `REQUEST_ROLE_DEFAULT`. Of two
- * decisions at once, the second answers `already-decided`.
+ * Mints an invitation to the requester's address at `role`, or `REQUEST_ROLE_DEFAULT`. If two
+ * decisions race, the second returns `already-decided`.
  */
 export const approveRequest = async (
   principal: UserPrincipal,

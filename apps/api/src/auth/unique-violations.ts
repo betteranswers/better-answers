@@ -6,8 +6,8 @@ type AdapterFactory = ReturnType<typeof drizzleAdapter>;
 const UNIQUE_VIOLATION = "23505";
 
 /**
- * The oauth-provider plugin skips a concurrent insert only when the message names a unique
- * violation. In place: Better Auth keys its schema check on it.
+ * The oauth-provider plugin skips a concurrent insert only on a unique-violation error. Patched
+ * in place because Better Auth keys a schema check on the adapter.
  */
 export const surfacingUniqueViolations =
   (factory: AdapterFactory): AdapterFactory =>

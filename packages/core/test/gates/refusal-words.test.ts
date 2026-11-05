@@ -233,7 +233,7 @@ describe("the refusal catalogue", () => {
 
   it("throws on a word that is not lower-case and hyphenated", () => {
     expect(() => refusalsIn({ sources: { NoSuchThing: "absent" } })).toThrow(
-      "refusal: NoSuchThing is not a refusal word, which is lower case and hyphenated",
+      "refusal: NoSuchThing is not a valid refusal word. Refusal words are lower case and hyphenated.",
     );
   });
 

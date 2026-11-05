@@ -117,7 +117,7 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     person: SignedIn,
   ): Promise<SecondFactorHeld | Response> => {
     const held = await heldBy(deps, person);
-    if (held === undefined) return unanswered(context, "the second factor was not read");
+    if (held === undefined) return unanswered(context, "could not read the person's factors");
     if (waitsOnTheRestoreCode(held)) {
       return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
     }
@@ -157,7 +157,7 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     if (!recorded.ok) {
       log.error(
         { event: "auth.passkey_not_recorded", principal: person.user.id },
-        "a passkey was added but not recorded",
+        "the passkey was added, but recording it failed",
       );
       return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);
     }
@@ -175,7 +175,7 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     if (!replaced.ok) {
       log.error(
         { event: "auth.factors_not_replaced", principal: person.user.id },
-        "a passkey was added but the factors were not replaced",
+        "the passkey was added, but replacing the other factors failed",
       );
       return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);
     }

@@ -134,7 +134,7 @@ const unsentReturned = async (ctx: Emailing, unsent: readonly InvitationToSend[]
   if (returned.ok && returned.value.ok) return;
   ctx.log.warn(
     { event: "trpc.unsent_emails_kept_counted", invitations: counted.length },
-    "the unsent invitation emails still count against their ceilings",
+    "returning the unsent invitation emails failed, so they still count against the invitation ceilings",
   );
 };
 

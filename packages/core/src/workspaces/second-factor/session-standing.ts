@@ -97,8 +97,8 @@ const judging = async (
 };
 
 /**
- * Starts a pending session's hour on its first pending read, stops it once not pending, and ends
- * one pending past its hour, answering `session-gone`.
+ * A pending session's hour starts at its first pending read and stops when it stops pending. Still
+ * pending after the hour, it ends with `session-gone`.
  */
 export const judgeTheSession = async (
   platform: PlatformPrincipal,

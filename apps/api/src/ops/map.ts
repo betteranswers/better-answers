@@ -33,7 +33,7 @@ export const mapRebuildAskedOf = (flags: Flags): Result<MapRebuildAsked, string>
   if (reason === undefined) return err(`--reason must be one of ${REBUILD_REASONS.join(", ")}`);
   const wait = waitSecondsOf(flags);
   if (wait === "malformed") {
-    return err("--wait takes no value; --wait-seconds takes a whole number of seconds");
+    return err("--wait takes no value, and --wait-seconds takes a whole number of seconds");
   }
   return ok({ reason, wait });
 };

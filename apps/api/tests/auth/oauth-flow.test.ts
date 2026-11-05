@@ -1523,7 +1523,7 @@ describe("the rate limits", () => {
     const others = await exceed(() => aSend(asking), 4);
 
     expect(await refused.json()).toMatchObject({
-      error_description: "Too many codes requested for this address; try again later.",
+      error_description: "Too many codes requested for this address. Try again later.",
     });
     expect(others).toEqual([200, 200, 200, 200, 200]);
   });

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-root=${1:?the mirror root, e.g. /data/mirror}
+root=${1:?pass the mirror root, for example /data/mirror}
 requested=${SSH_ORIGINAL_COMMAND:-}
 refuse() { printf 'mirror-shell: refused: %s\n' "$1" >&2; exit 255; }
 
-# A `/`, a `..` or a space is not a workspace id; it is an attempt to leave the root.
+# Rejects `/`, `..` and spaces, which could reach paths outside the root.
 is_workspace() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$ ]]; }
 
-# Not `git-shell`: it takes git-receive-pack alone, so a workspace's first push would fail.
+# Not `git-shell`: it accepts only git-receive-pack, so the first push to a new workspace would fail.
 case "${requested}" in
   "init-repo "*)
     ws=${requested#init-repo }
@@ -22,10 +22,10 @@ case "${requested}" in
     case "${arg}" in "${root}/"*.git) ;; *) refuse "git-receive-pack: path outside ${root}";; esac
     ws=${arg#"${root}/"}; ws=${ws%.git}
     is_workspace "${ws}" || refuse "git-receive-pack: not a workspace id"
-    [ -d "${arg}" ] || refuse "git-receive-pack: no such mirror (init-repo first)"
+    [ -d "${arg}" ] || refuse "git-receive-pack: no such mirror. Run init-repo first."
     exec git-receive-pack "${arg}"
     ;;
-  # Without this the mirror keeps the objects an erasure replaced on VPC 1.
+  # Without this, the mirror keeps the objects that an erasure replaced on VPC 1.
   "prune-repo "*)
     ws=${requested#prune-repo }
     is_workspace "${ws}" || refuse "prune-repo: not a workspace id"

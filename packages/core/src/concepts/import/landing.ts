@@ -511,7 +511,7 @@ export const carryVerificationsOntoRewrite = async (
     if (content === null) continue;
     const read = parseConceptFile(content);
     if (!read.ok) {
-      throw new Error(`concepts: the bundle holds a file the platform cannot read: ${row.path}`);
+      throw new Error(`concepts: bundle file ${row.path} does not parse as a concept file`);
     }
     const contentHash = contentHashOf(read.value.frontmatter, read.value.body, row.path);
 

@@ -26,8 +26,8 @@ from .host import FINDINGS_STORE, LANDED_APP, Host, Sync
 from .objects import LandedCopies
 from .passages import PASSAGE_SIZE_BYTES, Passage, split_into_passages
 
-# cocoindex fetches a function memo by a prefix scan of its calling component's
-# path, so these names are part of its identity.
+# cocoindex finds a function's memo by the path of the component that called it.
+# Renaming either component discards every memo.
 A_DOCUMENTS_COMPONENT = "a-document"
 THE_SEAMS_COMPONENT = "the-seam"
 
@@ -239,7 +239,7 @@ def _document_of(stable_path: str) -> str | None:
 
 
 def _fail_the_sync(error: BaseException, ctx: coco.ExceptionContext) -> None:
-    # cocoindex's default exception handler logs a component's failure and carries on.
+    # cocoindex's default handler logs a failed component and continues the sync.
     raise DocumentFailedError(ctx.stable_path, error) from error
 
 
@@ -262,8 +262,8 @@ async def _every_document(
             refused,
             wave,
         )
-        # cocoindex surfaces the handler's raise only at `ready()`; unawaited, the sync
-        # still finishes.
+        # cocoindex raises the handler's error only from `ready()`. Without this
+        # await, a failed document does not fail the sync.
         await mounted.ready()
     return len(landings)
 

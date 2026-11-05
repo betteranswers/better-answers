@@ -32,7 +32,7 @@ const erasureDoors = (doors: Doors, log: ErasureLog): Result<ErasureDoors, strin
   if (!git.ok) return err(git.error);
   const objects = doorTold(
     doors.objects,
-    "no object store is configured (S3_ENDPOINT, S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY on the api service), so the replay copies an erasure leaves cannot be read",
+    "the object store is not configured, so the replay copies that erasures leave cannot be read. Set S3_ENDPOINT, S3_BUCKET, S3_REGION, S3_ACCESS_KEY and S3_SECRET_KEY on the api service.",
   );
   if (!objects.ok) return err(objects.error);
   return ok({
@@ -63,18 +63,20 @@ export const replayErasuresCommand = async (
   const present = await tablesPresent(doors.postgres, [requests]);
   if (present.length === 0) {
     io.say(
-      `replayed 0 erasures since ${since.toISOString()}: no ${requests} table exists in this schema, so no erasure has ever been recorded here`,
+      `replayed 0 erasures since ${since.toISOString()}: the database has no ${requests} table, so no erasure was ever recorded in it`,
     );
     return DONE;
   }
   const opened = erasureDoors(doors, io.logger);
   if (!opened.ok) {
-    io.say(`replay-erasures: REFUSED — ${opened.error}; do not start api`);
+    io.say(
+      `replay-erasures: REFUSED — ${opened.error.replace(/\.$/u, "")}. Do not start the api service.`,
+    );
     return REFUSED;
   }
   const replayed = await replayErasures(ERASURE, opened.value, { since });
   if (!replayed.ok) {
-    io.say(`replay-erasures: REFUSED — ${replayed.error.message}; do not start api`);
+    io.say(`replay-erasures: REFUSED — ${replayed.error.message}. Do not start the api service.`);
     return REFUSED;
   }
   for (const erasure of replayed.value) {
@@ -92,7 +94,7 @@ export const replayErasuresCommand = async (
 
 const rehearsalSaid = (reason: RehearsalRefusal | Error): string | undefined =>
   reason === "not-seeded"
-    ? "no synthetic subject stands in this workspace — phase one (--seed) has not been run here, or its subject has already been erased"
+    ? "this workspace has no synthetic subject. Either phase one (--seed) has not run here, or its subject is already erased."
     : undefined;
 
 const seedingToBeDumped = async (
@@ -116,12 +118,12 @@ const seedingToBeDumped = async (
   if (!indexed.ok) return refused("erasure-rehearsal", workspaceId, indexed.error, io);
   if (indexed.value.status !== "done") {
     io.say(
-      `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${indexJobId} is ${unfinished(indexed.value, waitSeconds, "no worker has indexed it")}`,
+      `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed. Job ${indexJobId} is ${unfinished(indexed.value, waitSeconds, "no worker has indexed it")}`,
     );
     return REFUSED;
   }
   io.say(
-    `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin member, one concept file and one indexed document naming them); take the dump, then run phase two`,
+    `erasure-rehearsal: done — created the synthetic subject in ${workspaceId}: a user row, an Admin member, one concept file and one indexed document that names them. Take the dump, then run phase two.`,
   );
   io.say(seeded.value.tokens.join(","));
   return DONE;
@@ -136,13 +138,13 @@ const WAIT_SECONDS_MALFORMED = "--wait-seconds takes a whole number of seconds";
 export const rehearsalAskedOf = (flags: Flags): Result<RehearsalAsked, string> => {
   if (flags.get("synthetic") !== true) {
     return err(
-      "--synthetic is required — this command creates a synthetic subject and then erases them, and the flag is the caller saying this workspace is somewhere that may happen",
+      "--synthetic is required. This command creates a synthetic subject and then erases them, so pass the flag to confirm this workspace is one where that may happen.",
     );
   }
   const seeding = flags.get("seed") === true;
   if (seeding === (flags.get("run") === true)) {
     return err(
-      "exactly one of --seed (phase one) or --run --report <file> (phase two); the drill takes a dump between them",
+      "pass either --seed (phase one) or --run --report <file> (phase two), not both. The drill takes a dump between the two phases.",
     );
   }
   const wait = waitSecondsOf(flags);
@@ -154,7 +156,7 @@ export const rehearsalAskedOf = (flags: Flags): Result<RehearsalAsked, string> =
   const reportPath = flagValue(flags, "report");
   if (reportPath === undefined) {
     return err(
-      "--run needs --report <file> — the report is what the drill keeps, and a run whose report went nowhere proved nothing",
+      "--run needs --report <file>. The drill keeps the report as its evidence, so a run without one proves nothing.",
     );
   }
   return wait === "malformed" ? err(WAIT_SECONDS_MALFORMED) : ok({ phase: "run", reportPath });
@@ -179,12 +181,12 @@ const erasedToTheReport = async (
   const written = await writeTheReport(reportPath, rehearsed.value.report, io);
   if (written !== undefined) {
     io.say(
-      `erasure-rehearsal: REFUSED — the erasure ran and completed at ${rehearsed.value.completedAt.toISOString()}, but its report could not be written to ${reportPath}: ${written}`,
+      `erasure-rehearsal: REFUSED — the erasure completed at ${rehearsed.value.completedAt.toISOString()}, but the report could not be written to ${reportPath}: ${written}`,
     );
     return REFUSED;
   }
   io.say(
-    `erasure-rehearsal: done — erased the synthetic subject of ${workspaceId} under request ${rehearsed.value.subjectRequestId}; the report is at ${reportPath}`,
+    `erasure-rehearsal: done — erased the synthetic subject in ${workspaceId} under request ${rehearsed.value.subjectRequestId}. The report is at ${reportPath}.`,
   );
   io.say(rehearsed.value.tokens.join(","));
   return DONE;
@@ -213,7 +215,7 @@ const writeTheReport = async (
   io: OpsIo,
 ): Promise<string | undefined> => {
   if (io.writeReport === undefined) {
-    return "this process has no way to write a file, which is a wiring fault and not an operator's";
+    return "this process was started without a way to write files. This is a bug in the ops entry point, not an operator error.";
   }
   try {
     await io.writeReport(path, body);

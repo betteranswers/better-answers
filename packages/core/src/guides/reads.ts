@@ -427,7 +427,8 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
           of: section.facts.length,
           facts: section.facts.map((fact) => {
             const shape = shapeOf.get(fact.factId);
-            if (shape === undefined) throw new Error(`guides: fact ${fact.factId} has no shape`);
+            if (shape === undefined)
+              throw new Error(`guides: no kind and tags were read for fact ${fact.factId}`);
             return { ...fact, kind: shape.kind, tags: shape.tags };
           }),
         },

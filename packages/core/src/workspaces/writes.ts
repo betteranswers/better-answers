@@ -174,7 +174,7 @@ const RENAME_CONSTRAINTS = {
 } as const satisfies Record<string, RenameRefusal>;
 
 /**
- * A field the input leaves out keeps what it holds. An input naming neither is malformed, and one
+ * A field the input leaves out keeps its value. An input with neither field is malformed. An input
  * that changes neither writes nothing.
  */
 export const renameWorkspace = async (

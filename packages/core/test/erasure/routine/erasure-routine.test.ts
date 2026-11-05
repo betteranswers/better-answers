@@ -2584,8 +2584,8 @@ describe("the questions a person asked", () => {
     const logged = questionsLines.filter((line) => line.erasure_request_id === row?.id);
     expect(logged).toEqual([sweep, sweep]);
     expect(logged.map((line) => saidWith.get(line))).toEqual([
-      "erasure: what the questions step rewrote and removed",
-      "erasure: what was asked or flagged after the questions step, rewritten and removed as the member ended",
+      "erasure: questions step rewrote and removed rows",
+      "erasure: rewrote and removed questions and flags made after the questions step",
     ]);
   });
 
@@ -3297,7 +3297,7 @@ describe("a commit made as the person while the routine runs", () => {
 
     expect(written).toMatchObject({
       ok: false,
-      error: { message: matching.stringContaining("ran past its 500 ms budget") },
+      error: { message: matching.stringContaining("took longer than 500 ms") },
     });
     expect(freeWhileGitHangs).toBe(true);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);

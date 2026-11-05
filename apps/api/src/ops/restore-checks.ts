@@ -12,7 +12,7 @@ type SmokeAsked = {
 export const smokeAskedOf = (flags: Flags): Result<SmokeAsked, string> => {
   const url = flagValue(flags, "url");
   return url === undefined
-    ? err("--url <origin> is required (http://127.0.0.1:3000 inside the stack)")
+    ? err("--url <origin> is required, such as http://127.0.0.1:3000 inside the stack")
     : ok({ url, byHand: BY_HAND.filter((entry) => flags.get(entry) === true) });
 };
 
@@ -44,7 +44,7 @@ export const smoke = async ({ url, byHand }: SmokeAsked, io: OpsIo): Promise<num
     async (response) => response.status === 200,
   );
   await check(
-    "/.well-known/oauth-protected-resource/mcp names the MCP surface",
+    "/.well-known/oauth-protected-resource/mcp names the /mcp resource",
     () => io.fetch(`${origin}/.well-known/oauth-protected-resource/mcp`, asApp),
     async (response) => {
       if (response.status !== 200) return false;
@@ -59,19 +59,21 @@ export const smoke = async ({ url, byHand }: SmokeAsked, io: OpsIo): Promise<num
     },
   );
   await check(
-    "/mcp without a bearer is refused with a challenge",
+    "/mcp without a bearer token answers 401 with a challenge",
     () => io.fetch(`${origin}/mcp`, { ...asApp, method: "POST" }),
     async (response) =>
       response.status === 401 && (response.headers.get("www-authenticate") ?? "") !== "",
   );
   await check(
-    "/ serves the shell",
+    "/ serves the web app's HTML",
     () => io.fetch(`${origin}/`, asApp),
     async (response) =>
       response.status === 200 && (response.headers.get("content-type") ?? "").includes("text/html"),
   );
   for (const entry of byHand) {
-    io.say(`note ${entry}: needs a minted token — proved by hand through the connector, not here`);
+    io.say(
+      `note ${entry}: this check needs a signed-in token, so test it by hand through the connector`,
+    );
   }
   return failed === 0 ? DONE : REFUSED;
 };

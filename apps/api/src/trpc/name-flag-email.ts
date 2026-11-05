@@ -18,7 +18,7 @@ const nameFlagEmail = (to: string, raised: RaisedFlag): EmailMessage => ({
     `Person: ${raised.personId}`,
     `Current display name: ${raised.displayName}`,
     "",
-    "The name stands until it is corrected. No Admin can change it.",
+    "The name stays until you correct it. Admins cannot change it.",
   ].join("\n"),
 });
 
@@ -32,18 +32,18 @@ export const tellTheOperator = async (
   if (!addresses.ok) {
     log.error(
       { ...facts, err: addresses.error },
-      "the operator's address was not read, so the name flag was not emailed",
+      "could not read the operator's email address, so the name flag was not emailed",
     );
     return;
   }
   if (addresses.value.length === 0) {
-    log.error(facts, "no person carries the operator mark, so the name flag was not emailed");
+    log.error(facts, "no one is the platform operator, so the name flag was not emailed");
     return;
   }
   await Promise.all(
     addresses.value.map(async (address) => {
       const sent = await attempt(() => mail.send(nameFlagEmail(address, raised)));
-      if (!sent.ok) log.warn(facts, "the name flag's email to the operator did not go");
+      if (!sent.ok) log.warn(facts, "could not send the name flag email to the operator");
     }),
   );
 };

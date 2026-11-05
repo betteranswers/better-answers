@@ -384,8 +384,8 @@ export const eventsNamed = async (
 };
 
 /**
- * The workspace's own audit log, newest first. A grant an action ended is named from its assistant
- * and workspace as they stand now.
+ * The workspace's own audit log, newest first. An ended grant is named by its assistant and
+ * workspace as they are now.
  */
 export const readAuditLog = async (
   principal: UserPrincipal,

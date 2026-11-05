@@ -16,7 +16,7 @@ export const CAPS: readonly Cap[] = [
   {
     folder: "apps/web/src/shared/ui",
     cap: 29,
-    reason: "the shadcn CLI's target, named in apps/web/components.json",
+    reason: "the shadcn CLI writes its components there, as apps/web/components.json sets",
   },
   {
     folder: "apps/worker/src/better_answers_worker/redaction",
@@ -46,20 +46,21 @@ export const countsIn = (files: readonly string[]): ReadonlyMap<string, number> 
 };
 
 const overReport = (folder: string, count: number, cap: Cap | undefined): string => {
-  const held = `${folder}: ${String(count)} files directly inside, over`;
+  const held = `${folder} has ${String(count)} files directly inside it.`;
   if (cap === undefined) {
-    return `${held} the limit of ${String(LOOSE_FILE_LIMIT)}. Move files into a subfolder by capability.`;
+    return `${held} The limit is ${String(LOOSE_FILE_LIMIT)}. Move files into subfolders by capability.`;
   }
-  return `${held} its cap of ${String(cap.cap)} in ${WHERE_THE_CAPS_LIVE}. The folder is pinned (${cap.reason}), so it cannot be split by capability. Raise the cap to ${String(count)} in the same change.`;
+  return `${held} Its cap in ${WHERE_THE_CAPS_LIVE} is ${String(cap.cap)}. The folder cannot be split, because ${cap.reason}. Raise the cap to ${String(count)} in the same change.`;
 };
 
 const staleReport = ({ folder, cap }: Cap, count: number): string => {
-  const stale = `${folder}: its cap of ${String(cap)} in ${WHERE_THE_CAPS_LIVE} is stale, since the folder`;
-  if (count === 0) return `${stale} holds no tracked file. Delete the entry.`;
+  const entry = `its cap of ${String(cap)} in ${WHERE_THE_CAPS_LIVE}`;
+  if (count === 0)
+    return `${folder} has no tracked files, so ${entry} is not needed. Delete the entry.`;
   if (count <= LOOSE_FILE_LIMIT) {
-    return `${stale} holds ${String(count)}, within the limit of ${String(LOOSE_FILE_LIMIT)}. Delete the entry.`;
+    return `${folder} has ${String(count)} files, within the limit of ${String(LOOSE_FILE_LIMIT)}, so ${entry} is not needed. Delete the entry.`;
   }
-  return `${stale} holds ${String(count)}. Lower the cap to ${String(count)}.`;
+  return `${folder} has ${String(count)} files, fewer than ${entry}. Lower the cap to ${String(count)}.`;
 };
 
 export const findingsFor = (

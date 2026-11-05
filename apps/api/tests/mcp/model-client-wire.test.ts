@@ -116,7 +116,7 @@ describe("the server's model client", () => {
     await asking("How long are audit logs kept?");
 
     const lines = app().logs.slice(from);
-    const attempts = lines.filter((line) => line["msg"] === "llm: a model call's attempt");
+    const attempts = lines.filter((line) => "attempt" in line);
     expect(attempts).toEqual([
       expect.objectContaining({
         module: "llm",

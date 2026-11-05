@@ -192,7 +192,7 @@ const seeded = async (
   });
   if (!written.ok) return err(written.error);
   if (!written.value.written) {
-    return err(new Error(`guides: a skeleton already stood at new guide ${guideId}'s path`));
+    return err(new Error(`guides: a skeleton already exists at new guide ${guideId}'s path`));
   }
   return ok({ guideId, sha: written.value.sha, auditEventId });
 };

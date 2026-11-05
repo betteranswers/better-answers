@@ -162,7 +162,7 @@ const conceptOpened = async (
   });
 };
 
-/** A concept or passage that is not there answers `found: false`, not an error. */
+/** A concept or passage that is not there returns `found: false`, not an error. */
 export const open = async (
   principal: UserPrincipal,
   tx: Tx,

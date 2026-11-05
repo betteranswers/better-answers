@@ -202,7 +202,7 @@ describe("seeding the synthetic subject", () => {
 
     expect(seeded).toEqual({
       ok: false,
-      error: new Error("erasure: the rehearsal's concept was refused: path-taken"),
+      error: new Error("erasure: writing the rehearsal's concept failed: path-taken"),
     });
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([other.value.sha]);
   });
@@ -239,7 +239,7 @@ describe("the rehearsal", () => {
     expect(rehearsed).toEqual({
       ok: false,
       error: new Error(
-        "erasure: the synthetic subject's principal was refused: credentials-revoked",
+        "erasure: opening the rehearsal subject's principal failed: credentials-revoked",
       ),
     });
   });

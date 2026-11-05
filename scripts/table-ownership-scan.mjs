@@ -13,7 +13,7 @@ import {
   WHERE_THE_MAP_LIVES,
 } from "../packages/devtools/src/scans/table-ownership-scan.ts";
 
-/** The tree it is run in, not the tree it lives in, so a suite can spawn it over a throwaway. */
+/** The working directory, not this file's tree, so a test can run it over a throwaway tree. */
 const root = process.cwd();
 const roots = process.argv.slice(2);
 
@@ -40,7 +40,7 @@ try {
   process.exit(2);
 }
 
-// A walk that read no file, or a map that names no table, is a gate that proved nothing.
+// If the walk read no file or the map names no table, the gate proved nothing, so refuse.
 if (files.length === 0 || Object.keys(map.TABLE_OWNERS ?? {}).length === 0) {
   process.stderr.write(
     `table-ownership-scan: no source file under ${roots.join(", ")}, or no table in the map\n`,
@@ -55,5 +55,5 @@ for (const one of found) process.stdout.write(`${one}\n`);
 if (found.length > 0) process.exit(1);
 
 process.stdout.write(
-  `every table named in the ${String(files.length)} source files read is owned or declared, and every declared read is made\n`,
+  `every table named in the ${String(files.length)} source files checked has an owner or a declared read, and every declared read occurs\n`,
 );

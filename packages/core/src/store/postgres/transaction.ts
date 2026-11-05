@@ -8,7 +8,7 @@ const rollbackQuietly = async (client: pg.PoolClient): Promise<void> => {
   try {
     await client.query("ROLLBACK");
   } catch {
-    // The connection is already gone; releasing it below is all that is left.
+    // The connection is already broken, so the only step left is to release it below.
   }
 };
 
@@ -17,13 +17,13 @@ const commit = async (client: pg.PoolClient): Promise<void> => {
 
   if (answer.command !== "COMMIT") {
     throw new Error(
-      `the transaction did not commit: Postgres answered "${answer.command}" — a failed statement was caught inside the work, and nothing landed`,
+      `the transaction did not commit: Postgres answered "${answer.command}". A statement failed inside the transaction and its error was caught, so nothing was written.`,
     );
   }
 };
 
 const SETTLED =
-  "the transaction has settled: a query kept past its commit or rollback reaches no transaction";
+  "query sent after its transaction committed or rolled back. Send every query before the work callback returns.";
 
 const lent = async <T>(client: pg.PoolClient, work: (tx: Tx) => Promise<T>): Promise<T> => {
   let settled = false;

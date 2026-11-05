@@ -160,14 +160,14 @@ describe("the bearer token verifier", () => {
   });
 
   it.each<[string, (key: Key) => Promise<string>, string]>([
-    ["a non-JWT bearer", async () => "not-a-jwt", "the bearer is not a JWT"],
+    ["a non-JWT bearer", async () => "not-a-jwt", "the bearer token is not a JWT"],
     [
       "an alg-less bearer",
       async (key) =>
         [encoded({ kid: key.jwk.kid }), encoded({ sub: "user-1" }), "bm90LWEtc2lnbmF0dXJl"].join(
           ".",
         ),
-      "the bearer names no algorithm",
+      "the bearer token's header names no algorithm",
     ],
     [
       "a claims-less bearer",
@@ -177,7 +177,7 @@ describe("the bearer token verifier", () => {
           .setIssuer(ISSUER)
           .setAudience(AUDIENCE)
           .sign(key.privateKey),
-      "the bearer's claims are not the surface's",
+      "the bearer token's claims are not those of an MCP access token",
     ],
   ])("refuses %s and gives the reason", async (_case, bearer, reason) => {
     const key = await keyed();

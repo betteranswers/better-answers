@@ -77,7 +77,7 @@ describe("pnpm ops", () => {
     });
 
     const MALFORMED =
-      "set-model-key: REFUSED — malformed: give --workspace a workspace id, --provider one of anthropic · mistral · cloudflare, and on standard input one key with no space or line break in it, for cloudflare the account id, a colon, then the API token";
+      "set-model-key: REFUSED — malformed: --workspace must be a workspace id and --provider one of anthropic, mistral, cloudflare. Standard input must hold one key with no spaces or line breaks. For cloudflare, the key is the account id, a colon, then the API token.";
 
     it("encrypts the key from standard input and audits the provider", async () => {
       const { workspaceId } = await served().provision();
@@ -86,7 +86,7 @@ describe("pnpm ops", () => {
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 0,
-        lines: [`set-model-key: done — workspace ${workspaceId} holds a new key for anthropic`],
+        lines: [`set-model-key: done — workspace ${workspaceId} has a new key for anthropic`],
       });
       expect(await keyHeld(served(), workspaceId, "anthropic")).toBe(A_KEY);
       expect(await rowsOfAction(served(), workspaceId, ACTION)).toEqual([
@@ -151,7 +151,7 @@ describe("pnpm ops", () => {
 
       expect({ exitCode: refused.exitCode, lines: refused.lines }).toEqual({
         exitCode: 1,
-        lines: ["set-model-key: REFUSED — KEK must be set to the envelope key; nothing changed"],
+        lines: ["set-model-key: REFUSED — KEK must be set to the envelope key. Nothing changed."],
       });
       expect(await rowsHeld(served(), workspaceId)).toEqual([]);
     });
@@ -212,7 +212,7 @@ describe("pnpm ops", () => {
         expect(run).toEqual({
           status: 0,
           printed: matching.stringContaining(
-            `set-model-key: done — workspace ${workspaceId} holds a new key for anthropic`,
+            `set-model-key: done — workspace ${workspaceId} has a new key for anthropic`,
           ),
         });
         expect(await keyHeld(served(), workspaceId, "anthropic")).toBe(A_KEY);
@@ -231,7 +231,7 @@ describe("pnpm ops", () => {
       expect(run).toEqual({
         status: 1,
         printed: matching.stringContaining(
-          "set-model-key: REFUSED — KEK must be set to the envelope key: 64 hexadecimal characters, its 32 bytes; nothing changed",
+          "set-model-key: REFUSED — KEK must be set to the envelope key: 64 hexadecimal characters, encoding 32 bytes. Nothing changed.",
         ),
       });
       expect(
@@ -265,7 +265,7 @@ describe("pnpm ops", () => {
 
       expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
-        `set-model-key: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
+        `set-model-key: REFUSED — no-such-workspace: no workspace has the id ${nowhere}`,
       ]);
       expect(await auditLogOf(served(), nowhere)).toEqual([]);
     });
@@ -331,7 +331,7 @@ describe("pnpm ops", () => {
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
         lines: [
-          "set-spending-limit: REFUSED — malformed: give --workspace a workspace id and --gbp a sum in pounds, such as 50 or 12.50",
+          "set-spending-limit: REFUSED — malformed: --workspace must be a workspace id and --gbp a sum in pounds, such as 50 or 12.50",
         ],
       });
       expect(await limitHeld(served(), workspaceId)).toEqual([]);
@@ -344,7 +344,9 @@ describe("pnpm ops", () => {
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 6,
-        lines: [`set-spending-limit: REFUSED — no-such-workspace: ${nowhere} is not a workspace`],
+        lines: [
+          `set-spending-limit: REFUSED — no-such-workspace: no workspace has the id ${nowhere}`,
+        ],
       });
     });
   });
@@ -382,7 +384,7 @@ describe("pnpm ops", () => {
 
       expect({ exitCode: first.exitCode, lines: first.lines }).toEqual({
         exitCode: 0,
-        lines: [`set-model-price: done — anthropic ${SONNET} is priced from 2026-10-14`],
+        lines: [`set-model-price: done — anthropic ${SONNET} has a price from 2026-10-14`],
       });
       expect(again.exitCode).toBe(0);
       expect(await pricesHeld(served())).toEqual([
@@ -463,11 +465,11 @@ describe("pnpm ops", () => {
       expect([first, again].map(({ exitCode, lines }) => ({ exitCode, lines }))).toEqual([
         {
           exitCode: 0,
-          lines: [`set-decision-threshold: done — cloudflare ${model} judges at 0.7`],
+          lines: [`set-decision-threshold: done — cloudflare ${model} now has a threshold of 0.7`],
         },
         {
           exitCode: 0,
-          lines: [`set-decision-threshold: done — cloudflare ${model} judges at 0.65`],
+          lines: [`set-decision-threshold: done — cloudflare ${model} now has a threshold of 0.65`],
         },
       ]);
       expect(await thresholdsHeld(served(), model)).toEqual([
@@ -483,7 +485,7 @@ describe("pnpm ops", () => {
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
         lines: [
-          "set-decision-threshold: REFUSED — malformed: --provider <cloudflare>, --model <model> and --threshold <probability>, the model lower case letters, digits, dots and hyphens and the threshold a decimal between 0 and 1, such as 0.7",
+          "set-decision-threshold: REFUSED — malformed: give --provider <cloudflare>, --model <model> and --threshold <probability>. The model may hold only lower case letters, digits, dots and hyphens, and the threshold must be a decimal between 0 and 1, such as 0.7.",
         ],
       });
       expect(await thresholdsHeld(served(), model)).toEqual([]);
@@ -497,7 +499,7 @@ describe("pnpm ops", () => {
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 7,
         lines: [
-          "set-decision-threshold: REFUSED — not-a-decision-model: anthropic speaks no decision shape; only cloudflare take a threshold; nothing changed",
+          "set-decision-threshold: REFUSED — not-a-decision-model: anthropic models do not return a yes-or-no decision, so they take no threshold. Only cloudflare models do. Nothing changed.",
         ],
       });
       expect(await thresholdsHeld(served(), model)).toEqual([]);
@@ -608,7 +610,7 @@ describe("pnpm ops", () => {
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 9,
         lines: [
-          "set-model-choice: REFUSED — no-sub-processor: openai is no model provider the DPIA names as a sub-processor (anthropic · mistral); nothing changed",
+          "set-model-choice: REFUSED — no-sub-processor: the DPIA does not name openai as a sub-processor. Choose one of anthropic, mistral. Nothing changed.",
         ],
       });
       expect(await choicesHeld(served(), workspaceId)).toEqual([]);
@@ -622,7 +624,7 @@ describe("pnpm ops", () => {
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 9,
         lines: [
-          "set-model-choice: REFUSED — no-sub-processor: local is no model provider the DPIA names as a sub-processor (anthropic · mistral); nothing changed",
+          "set-model-choice: REFUSED — no-sub-processor: the DPIA does not name local as a sub-processor. Choose one of anthropic, mistral. Nothing changed.",
         ],
       });
       expect(await choicesHeld(served(), workspaceId)).toEqual([]);
@@ -636,7 +638,7 @@ describe("pnpm ops", () => {
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 9,
         lines: [
-          `set-model-choice: REFUSED — no-decision-threshold: cloudflare ${HAIKU} is a decision model with no threshold; set one with set-decision-threshold first; nothing changed`,
+          `set-model-choice: REFUSED — no-decision-threshold: cloudflare ${HAIKU} is a decision model with no threshold. Set one with set-decision-threshold first. Nothing changed.`,
         ],
       });
       expect(await choicesHeld(served(), workspaceId)).toEqual([]);
@@ -650,7 +652,7 @@ describe("pnpm ops", () => {
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 9,
         lines: [
-          `set-model-choice: REFUSED — no-model-price: mistral ${HAIKU} has no price in effect today; set one with set-model-price first; nothing changed`,
+          `set-model-choice: REFUSED — no-model-price: mistral ${HAIKU} has no price in effect today. Set one with set-model-price first. Nothing changed.`,
         ],
       });
     });
@@ -663,7 +665,7 @@ describe("pnpm ops", () => {
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 7,
         lines: [
-          "set-model-choice: REFUSED — fixed-model-choice: the embedding model is fixed, since the index's vectors are its own; nothing changed",
+          "set-model-choice: REFUSED — fixed-model-choice: the embedding model cannot be changed, because the index's vectors were made with it. Nothing changed.",
         ],
       });
     });
@@ -678,10 +680,10 @@ describe("pnpm ops", () => {
 
       expect([malformed.exitCode, absent.exitCode]).toEqual([2, 6]);
       expect(malformed.lines).toEqual([
-        "set-model-choice: REFUSED — malformed: give --workspace a workspace id, --purpose one of extraction · enrichment · answering · judging, and --provider and --model in lower case letters, digits, dots and hyphens",
+        "set-model-choice: REFUSED — malformed: --workspace must be a workspace id, --purpose one of extraction, enrichment, answering, judging, and --provider and --model only lower case letters, digits, dots and hyphens",
       ]);
       expect(absent.lines).toEqual([
-        `set-model-choice: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
+        `set-model-choice: REFUSED — no-such-workspace: no workspace has the id ${nowhere}`,
       ]);
     });
 

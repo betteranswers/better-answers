@@ -184,7 +184,7 @@ describe("the scan over a throwaway tree, slice to map", () => {
     const file = `packages/core/src/${name}/index.ts`;
     const tree = { ...CLEAN, [file]: statement("SELECT 1 FROM job") };
     expect(findings(tree)).toEqual([
-      expect.stringContaining(`${file}:2: names public.job outside every slice`),
+      expect.stringContaining(`${file}:2: names public.job from a file that belongs to no slice`),
     ]);
   });
 
@@ -217,7 +217,7 @@ describe("the scan over a throwaway tree, map to slice", () => {
 
   it("refuses a declared read no statement in its slice makes", () => {
     expect(findings(declaring({ table: "public.job", by: "workspaces", access: "read" }))).toEqual([
-      `${WHERE_THE_MAP_LIVES}: declares that workspaces reads public.job, and no statement under workspaces reads it; remove the entry, or correct its access to a write if the slice only writes it.`,
+      `${WHERE_THE_MAP_LIVES}: CROSS_OWNER_TABLE_ACCESS declares that workspaces reads public.job, but no statement under workspaces reads it. Remove the entry, or set its access to "write" if the slice only writes the table.`,
     ]);
   });
 

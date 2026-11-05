@@ -28,7 +28,10 @@ const SORT_COLUMNS = ["title", "kind", "collection", "owner", "checked"] as cons
 
 type SortColumn = (typeof SORT_COLUMNS)[number];
 
-/** A concept with nothing to sort by sorts as the greatest, except that never checked is the oldest. */
+/**
+ * A concept with no value for the sort key sorts as the greatest, except that a never-checked
+ * concept sorts as the oldest.
+ */
 const SORT_KEYS = {
   title: `c.title COLLATE "C"`,
   kind: `c.kind COLLATE "C"`,

@@ -30,7 +30,7 @@ export const refusalsIn = (catalogue: Catalogue): readonly CataloguedRefusal[] =
     for (const [word, refusalClass] of Object.entries(vocabulary)) {
       if (!WORD.test(word)) {
         throw new Error(
-          `refusal: ${word} is not a refusal word, which is lower case and hyphenated`,
+          `refusal: ${word} is not a valid refusal word. Refusal words are lower case and hyphenated.`,
         );
       }
       const first = held.get(word);

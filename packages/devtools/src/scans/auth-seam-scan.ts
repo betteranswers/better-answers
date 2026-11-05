@@ -49,7 +49,7 @@ export const refusalsOf = (root: string, seam: Seam, tscOutput: string): readonl
     if (said?.["file"] === undefined) return [];
     if (path.resolve(root, said["file"]) !== path.resolve(root, seam.file)) return [];
     return [
-      `${seam.file}:${String(said["line"])}: TypeScript refused the file (${String(said["code"])}: ${String(said["said"])}), so its declarations cannot be read. Where an export's inferred type cannot be named, write the type out in the platform's own types.`,
+      `${seam.file}:${String(said["line"])}: TypeScript could not emit declarations for this file (${String(said["code"])}: ${String(said["said"])}), so the scan cannot check its exports. If an export's inferred type cannot be named, give the export an explicit type built from the platform's own types.`,
     ];
   });
 
@@ -68,6 +68,6 @@ export const libraryNamed = (seam: Seam, declaration: string): readonly string[]
   }
   return [...leaks].map(
     ([exportName, named]) =>
-      `${seam.file}: the declaration of \`${exportName}\` names \`${named}\`. Map Better Auth's answer to the platform's own type inside this file, and give \`${exportName}\` that type.`,
+      `${seam.file}: the declared type of \`${exportName}\` names \`${named}\`, which comes from Better Auth. Inside this file, convert the value to one of the platform's own types, and give \`${exportName}\` that type.`,
   );
 };

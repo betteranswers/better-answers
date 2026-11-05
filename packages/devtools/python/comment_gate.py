@@ -26,41 +26,38 @@ UNREADABLE = (OSError, SyntaxError, tokenize.TokenError, UnicodeDecodeError)
 WORD_LIMIT = 25
 
 TOO_LONG = (
-    "{path}:{line}: this comment runs to {words} words, over the cap of {limit}. A "
-    "comment stays only for a constraint outside this repository (a library, platform "
-    "or protocol), a public contract, a generated-file marker, a license, or a "
-    "suppression's reason. Any other comment is deleted: hold its reason in a name, a "
-    "type, a test, a grant or a lint, or report it open in the tracker."
+    "{path}:{line}: this comment runs to {words} words, over the limit of {limit}. "
+    "Keep a comment only for a constraint outside this repository (a library, a "
+    "platform or a protocol), a public contract, a generated-file marker, a licence, "
+    "or the reason for a suppression. Delete every other comment. Move its reason into "
+    "a name, a type, a test, a grant or a lint, or open an issue for it in the tracker."
 )
 
 REASON_TOO_LONG = (
-    "{path}:{line}: this directive's reason runs to {words} words, and a reason counts "
-    "against the comment cap of {limit}. Say the constraint alone."
+    "{path}:{line}: this directive's reason runs to {words} words, and the reason "
+    "counts towards the comment limit of {limit}. Shorten it to the constraint alone."
 )
 
 NO_REASON = (
-    "{path}:{line}: this suppression gives no reason; a `noqa` or a `type: ignore` "
-    "says on the same line why the rule does not hold here. Add the reason after a "
-    "second `#`."
+    "{path}:{line}: this suppression gives no reason. After a second `#` on the same "
+    "line as the `noqa` or `type: ignore`, say why the rule does not apply here."
 )
 
 CITES = (
-    "{path}:{line}: this comment cites {what} (`{cited}`); a comment never says which "
-    "ticket, decision or rule asked for the code. git, a spec and an ADR are where "
-    "that is read."
+    "{path}:{line}: this comment cites {what} (`{cited}`). A comment does not say "
+    "which ticket, decision or rule asked for the code, because git history, the specs "
+    "and the ADRs record that. Delete the citation and keep only the constraint."
 )
 
 COUNTS_CALLERS = (
-    "{path}:{line}: this comment counts the code that uses it (`{counted}`). Who calls "
-    "the code is this repository's own code, which a search reads, and the count is "
-    "wrong once the next caller lands. Delete it: hold a reason the callers share in a "
-    "name or a test title."
+    "{path}:{line}: this comment counts the code that uses it (`{counted}`). A search "
+    "finds the callers, and the count is wrong as soon as another caller is added. "
+    "Delete the count. If the callers share a reason, put it in a name or a test title."
 )
 
 STRING_CITES = (
-    "{path}:{line}: this string cites {what} (`{cited}`); a string that reaches a "
-    "person names what they can act on, never a document they cannot open from where "
-    "they read it. Say the thing instead."
+    "{path}:{line}: this string cites {what} (`{cited}`), which the reader cannot open "
+    "from where they read the string. Say what the reader needs to know or do instead."
 )
 
 

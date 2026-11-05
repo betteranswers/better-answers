@@ -233,7 +233,7 @@ describe("a door whose work returns a refusal after writing", () => {
   });
 });
 
-const SETTLED = "the transaction has settled";
+const SETTLED = "query sent after its transaction committed or rolled back";
 
 describe("a Tx used after its transaction ends", () => {
   it.each(DOORS)("refuses a query once %s door commits", async (door) => {

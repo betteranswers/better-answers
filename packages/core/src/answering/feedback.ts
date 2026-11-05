@@ -29,7 +29,7 @@ const written = (what: string) =>
     .trim()
     .min(1)
     .max(WRITTEN_CHARACTERS_AT_MOST)
-    .refine(holdsNoNul, `${what} holds no NUL character`);
+    .refine(holdsNoNul, `${what} must not contain a NUL character`);
 
 const recordId = boundarySchemas.questionAsked.select.shape.id;
 

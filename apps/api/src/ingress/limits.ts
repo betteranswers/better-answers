@@ -110,7 +110,7 @@ export const limitByIp = (
     if (!outcome.allowed) {
       return tooManyRequests(
         outcome.retryAfterSeconds,
-        "Too many requests from this address; try again shortly.",
+        "Too many requests from this address. Try again shortly.",
       );
     }
     await next();

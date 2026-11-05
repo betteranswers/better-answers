@@ -23,7 +23,7 @@ const HEADER_OF_FIELD = Object.entries(
   UPLOAD_HEADER_OF_FIELD satisfies HeaderOfEachField<z.input<typeof connectUploadFields>>,
 );
 
-/** A header carries bytes and a name may not be one, so each value is its JSON, percent-encoded. */
+/** A header value must be bytes and a name may not be ASCII, so each value is sent as percent-encoded JSON. */
 const decoded = (sent: string): Result<z.JSONType, IssueWord> => {
   try {
     return ok(z.json().parse(JSON.parse(decodeURIComponent(sent))));
@@ -54,5 +54,5 @@ export const uploadDoorsOf = (doors: Doors): Result<UploadDoors> => {
   const objects = doorTold(doors.objects, "no object store is configured");
   return objects.ok
     ? ok({ postgres: doors.postgres, objects: objects.value })
-    : err(new Error(`the upload has nowhere to land: ${objects.error}`));
+    : err(new Error(`cannot store the upload: ${objects.error}`));
 };

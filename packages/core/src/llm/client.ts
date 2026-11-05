@@ -161,14 +161,20 @@ export type ModelClientDoors = {
   readonly timeout?: (ms: number) => AbortSignal;
 };
 
-/** Each method calls a model of its own wire shape, and sends nothing to a model of the other. */
+/**
+ * Each method calls only models of its own wire shape. A call to a model of the other shape sends
+ * nothing.
+ */
 export type ModelClient = {
   readonly callModel: <T>(to: ModelToCall, call: ModelCall<T>) => Promise<ModelOutcome<T>>;
   readonly decide: (
     to: ModelToCall,
     call: DecisionModelCall,
   ) => Promise<ModelOutcome<Probabilities>>;
-  /** Takes a probability at or above the model's stored threshold as yes, and sends nothing without one. */
+  /**
+   * A probability at or above the model's stored threshold counts as yes. With no stored threshold,
+   * nothing is sent.
+   */
   readonly decideYesNo: (
     to: ModelToCall,
     call: DecisionModelCall,
@@ -331,14 +337,14 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
   const logged = (to: ModelToCall, attempted: number, tried: Attempted): void => {
     doors.log.info(
       attemptLine(to, attempted, { ...tried, read: tried.read.read }),
-      "llm: a model call's attempt",
+      "llm: model call attempted",
     );
   };
 
   const unsent = <T>(to: ModelToCall, read: Unsent): ModelOutcome<T> => {
     doors.log.info(
       attemptLine(to, 0, { status: null, read, seconds: 0, requestId: null }),
-      "llm: a model call never sent",
+      "llm: model call not sent",
     );
     return { outcome: "failed", spent: [] };
   };

@@ -5,8 +5,8 @@ import cocoindex as coco
 
 from ..redaction.engine import Span, spans_detected
 
-# cocoindex fingerprints the memo by this in place of the body's syntax tree, so a
-# body edit reprocesses nothing and a bump reprocesses everything.
+# cocoindex keys the memo on this version instead of the function body. Editing the
+# body reprocesses no document. Bump the version to reprocess every document.
 THE_MEMOS_VERSION = 1
 
 
@@ -30,8 +30,8 @@ def detected(normalised_text: str, detection_key: str) -> tuple[Span, ...]:
 
 
 def raised_by_the_detector(normalised_text: str, detection_key: str) -> Raised:
-    # cocoindex runs a memo miss inline on this thread, so `detected` appends here;
-    # a memo hit leaves it empty.
+    # On a memo miss, cocoindex runs `detected` on this thread, and `detected` appends
+    # to `read`. A memo hit leaves `read` empty.
     read: list[bool] = []
     token = _READ_AFRESH.set(read)
     try:

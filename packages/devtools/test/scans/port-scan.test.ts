@@ -63,7 +63,7 @@ const findings = (tree: Tree): readonly string[] =>
     .filter((line) => line !== "");
 
 const passed = (modules: number): string =>
-  `port_scan: every port names TypeScript modules the tree holds and an agreement in contracts/manifest.json (ports: 1, modules read: ${String(modules)})`;
+  `port_scan: every port names TypeScript modules that exist and an agreement in contracts/manifest.json (ports: 1, modules read: ${String(modules)})`;
 
 const refusal = (message: string): RegExp =>
   new RegExp(`exit 2\\n\\nport_scan: ${message.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n$`);
@@ -76,26 +76,26 @@ const SHAPES = {
 } as const;
 
 const notALiteral = (line: number, name: keyof typeof SHAPES): string =>
-  `${MODULE}:${String(line)}: \`${name}\` is not assigned alone as a literal of the shape the gate reads. The gate reads only that form, so any other would pass unchecked. Write it as ${SHAPES[name]}.`;
+  `${MODULE}:${String(line)}: \`${name}\` is not assigned as a single literal. The gate reads only that form, so any other form would pass unchecked. Write it as ${SHAPES[name]}.`;
 
 const notAModule = (ported: string): string =>
-  `${MODULE}:1: \`PORT_OF\` names \`${ported}\`, which is not a TypeScript module the tree holds, so the port does not say what it mirrors. Name each module as it now stands, by its path from the repository root, with no \`..\` segment, ending \`.ts\` or \`.tsx\`.`;
+  `${MODULE}:1: \`PORT_OF\` names \`${ported}\`, but no TypeScript module exists at that path, so the port does not say what it mirrors. Give each module's current path from the repository root, with no \`..\` segment, ending in \`.ts\` or \`.tsx\`.`;
 
 const unknownAgreement = (line: number, agreement: string): string =>
-  `${MODULE}:${String(line)}: \`AGREEMENT\` names \`${agreement}\`, which contracts/manifest.json's agreements do not hold, so no fixture holds this port. Name a key of contracts/manifest.json's agreements, or add the agreement to contracts/ in its own pull request.`;
+  `${MODULE}:${String(line)}: \`AGREEMENT\` names \`${agreement}\`, but that key is not in the agreements of contracts/manifest.json, so no fixture checks this port. Use a key from those agreements, or add the agreement to contracts/ in its own pull request.`;
 
 const halfDeclared = (
   line: number,
   present: keyof typeof SHAPES,
   missing: keyof typeof SHAPES,
 ): string =>
-  `${MODULE}:${String(line)}: this module declares \`${present}\` but not \`${missing}\`, and a port declares both, so that what it mirrors and the fixture holding the two tiers to one behaviour are both named. Add ${SHAPES[missing]}.`;
+  `${MODULE}:${String(line)}: this module declares \`${present}\` but not \`${missing}\`. A port declares both: \`PORT_OF\` names the TypeScript it mirrors, and \`AGREEMENT\` names the contract fixture that checks both tiers behave the same. Add ${SHAPES[missing]}.`;
 
 const declaredTwice = (line: number, name: keyof typeof SHAPES): string =>
-  `${MODULE}:${String(line)}: \`${name}\` is declared twice in this module, so which value holds depends on the order. Declare it once.`;
+  `${MODULE}:${String(line)}: \`${name}\` is declared twice in this module, so its value depends on which declaration runs last. Declare it once.`;
 
 const augmented = (line: number, name: keyof typeof SHAPES, module = MODULE): string =>
-  `${module}:${String(line)}: \`${name}\` is extended by an augmented assignment, which the gate does not read, so what it adds would pass unchecked. Declare the whole value once, as ${SHAPES[name]}.`;
+  `${module}:${String(line)}: \`${name}\` is extended with an augmented assignment such as \`+=\`. The gate does not read that form, so the added values would pass unchecked. Declare the whole value once, as ${SHAPES[name]}.`;
 
 describe("the port scan over a throwaway tree", () => {
   it("passes a port naming an agreement the manifest has", () => {
@@ -218,7 +218,7 @@ describe("the port scan over a throwaway tree", () => {
 
   it("refuses a manifest that names no agreement", () => {
     expect(() => run({ ...declaring(), [MANIFEST]: '{"agreements": {}}' })).toThrow(
-      refusal("contracts/manifest.json names no agreement, so no port could name one"),
+      refusal("contracts/manifest.json has no agreements, so no port can name one"),
     );
   });
 
@@ -233,7 +233,7 @@ describe("the port scan over a throwaway tree", () => {
   it("refuses a walk that found no port", () => {
     expect(() => run({ ...declaring(), [MODULE]: "KEEP = 1\n" })).toThrow(
       refusal(
-        "no module under apps/worker/src declares `PORT_OF` or `AGREEMENT`, so the walk proved nothing",
+        "no module under apps/worker/src declares `PORT_OF` or `AGREEMENT`, so the scan checked nothing",
       ),
     );
   });
@@ -261,7 +261,7 @@ describe("the port scan over the repository", () => {
     });
 
     expect(output).toMatch(
-      /^port_scan: every port names TypeScript modules the tree holds and an agreement in contracts\/manifest\.json \(ports: \d+, modules read: \d+\)\n$/,
+      /^port_scan: every port names TypeScript modules that exist and an agreement in contracts\/manifest\.json \(ports: \d+, modules read: \d+\)\n$/,
     );
   });
 });

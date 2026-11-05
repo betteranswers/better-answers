@@ -89,7 +89,7 @@ describe("the gate", () => {
       TABLE,
     );
 
-    expect(found[0]).toContain("wants no paths line");
+    expect(found[0]).toContain("expects no paths line");
   });
 
   it("fails a skill with no row", () => {

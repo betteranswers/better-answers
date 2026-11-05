@@ -20,8 +20,8 @@ ping() {
   curl -fsS -m 10 --retry 3 -o /dev/null --data-raw "${body}" "${url}${suffix}" || true
   echo "backup.sh ${JOB}: ${body}"
 }
-# `bundle verify` refuses to run outside a repository, and a pass names its file on stderr,
-# where the log would carry the path.
+# `bundle verify` must run inside a repository. On success it prints the bundle's path to
+# stderr, so drop that line before it reaches the log.
 bundle_verifies() {
   git -C "$1" bundle verify --quiet "$2" 2>&1 | { grep -v ' is okay$' || true; } >&2
 }
@@ -32,8 +32,8 @@ verify() {
   local size; size=$(rclone size --json "$2" | jq -r .bytes)
   [ "${size}" = "$(stat -c %s "$1")" ]
 }
-# Before its first write a repository has no ref, which `bundle create` and `push --mirror` refuse.
-# An unreadable one is listed, to fail.
+# Skips a repository with no ref yet, which `bundle create` and `push --mirror` refuse.
+# Lists an unreadable repository so that its job fails.
 repositories() {
   local repo refs
   while read -r repo; do
@@ -50,10 +50,10 @@ tier_for_now() {
 
 job_pg() {
   local started t0; started=$(date -u +%FT%TZ); t0=$(date +%s)
-  if erasure_running; then echo "erasure routine running — hourly dump skipped"; return 0; fi
+  if erasure_running; then echo "hourly dump skipped: an erasure is running"; return 0; fi
   read -r tier life <<<"$(tier_for_now)"
   local file="${STAGING}/pg-${NOW}.dump.age" remote="dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/pg-${NOW}.dump.age"
-  # pg_dumpall takes no positional DSN: bare, it echoes the password into the log.
+  # Pass the DSN with --dbname: pg_dumpall takes no positional DSN and would print the password to the log.
   if { pg_dumpall --globals-only --dbname="${DATABASE_URL}" | age -r "${BACKUP_AGE_RECIPIENT}" > "${STAGING}/globals-${NOW}.sql.age"; } \
      && { pg_dump --format=custom --no-owner "${DATABASE_URL}" | age -r "${BACKUP_AGE_RECIPIENT}" > "${file}"; } \
      && rclone copyto --s3-no-check-bucket "${file}" "${remote}" \
@@ -95,10 +95,10 @@ job_git_mirror() {
   local started rc=0; started=$(date -u +%FT%TZ)
   while read -r repo; do
     ws=$(basename "${repo}" .git)
-    # -n: without it ssh forwards its stdin, the rest of this loop's list, and the loop ends.
+    # -n stops ssh reading stdin, which holds the rest of this loop's repository list.
     ssh -n -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" init-repo "${ws}" >/dev/null || { rc=1; continue; }
     if ! pushed=$(git -C "${repo}" push --mirror --porcelain "${GIT_MIRROR_SSH_TARGET}/${ws}.git"); then rc=1; continue; fi
-    # The objects a rewrite replaced stay readable there through the reflog until pruned.
+    # After a rewrite, the mirror's reflog keeps the replaced objects readable until they are pruned.
     if printf '%s\n' "${pushed}" | grep -qE '^[+-]'; then
       ssh -n -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" prune-repo "${ws}" >/dev/null || rc=1
     fi
@@ -107,7 +107,7 @@ job_git_mirror() {
   return "${rc}"
 }
 
-# Anything left here for a day is a failed upload of personal data.
+# A file left here for a day is personal data from a failed upload, so delete it.
 find "${STAGING}" -type f -mmin +1440 -delete || true
 
 case "${1:-}" in

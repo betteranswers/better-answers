@@ -252,7 +252,7 @@ const included = async (
   });
   if (!written.ok) return err(written.error);
   if (!written.value.written) {
-    return err(new Error(`guides: guide ${inclusion.guideId}'s skeleton stood unchanged`));
+    return err(new Error(`guides: writing guide ${inclusion.guideId}'s skeleton changed nothing`));
   }
   return ok({ included: inclusion.added.length, sha: written.value.sha });
 };

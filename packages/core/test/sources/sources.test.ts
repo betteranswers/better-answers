@@ -1298,7 +1298,7 @@ describe("an Admin reprocesses a connected source", () => {
           reason: "spring-clean",
         }),
       ),
-    ).rejects.toThrow(/the sync was refused \(malformed\)/);
+    ).rejects.toThrow(/the sync was not queued \(malformed\)/);
 
     expect(await connectedSourceHolds(scenario.workspaceId, connectedSourceId)).toEqual(
       AS_IT_WAS_INDEXED,

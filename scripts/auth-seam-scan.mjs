@@ -17,7 +17,7 @@ const ranIn = process.cwd();
 const named = process.argv.slice(2);
 
 if (named.length !== 2) {
-  process.stderr.write("auth-seam-scan: name the workspace's tsconfig and the seam file\n");
+  process.stderr.write("usage: auth-seam-scan <workspace tsconfig> <seam file>\n");
   process.exit(2);
 }
 

@@ -286,7 +286,7 @@ const REFUSED_AT_THE_CEILING = {
   refusedBefore: 0,
   status: 429,
   hasRetryAfter: true,
-  sentence: matching.stringContaining("an Admin can raise the ceiling in System"),
+  sentence: matching.stringContaining("An Admin can raise the limit in System"),
 };
 
 /**
@@ -564,7 +564,7 @@ describe("the MCP endpoint under either protocol version", () => {
     );
 
     expect(refused.isError).toBe(true);
-    expect(firstText(refused)).toContain("a query holds no NUL character");
+    expect(firstText(refused)).toContain("query: a query must not contain a NUL character");
     expect(loggedEvents(before)).not.toContain("mcp.failed");
   });
 
@@ -579,7 +579,7 @@ describe("the MCP endpoint under either protocol version", () => {
 
     expect(refused.isError).toBe(true);
     expect(refused.structuredContent).toBeUndefined();
-    expect(firstText(refused)).toContain("a question holds no NUL character");
+    expect(firstText(refused)).toContain("question: a question must not contain a NUL character");
     expect(loggedEvents(before)).not.toContain("mcp.failed");
   });
 
@@ -632,7 +632,7 @@ describe("the MCP endpoint under either protocol version", () => {
 
     expect(refused.isError).toBe(true);
     expect(refused.structuredContent).toBeUndefined();
-    expect(firstText(refused)).toContain("not a cursor find handed out");
+    expect(firstText(refused)).toContain("cursor: not a cursor that find returned");
   });
 
   it("answers find, ask and give_feedback for a connected Admin", async () => {

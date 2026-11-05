@@ -54,7 +54,10 @@ const stringsIn = (file: string, text: string): readonly string[] => {
   try {
     return stringsOf(jsonValue.parse(JSON.parse(text)));
   } catch (cause) {
-    throw new Error(`${file} is not valid JSON, so its strings cannot be read`, { cause });
+    throw new Error(
+      `${file} is not valid JSON, so the scan cannot read the paths it names. Fix the JSON syntax.`,
+      { cause },
+    );
   }
 };
 
@@ -74,7 +77,7 @@ export const findingsFor = (
     .filter((mention) => !exists(mention.path))
     .map(
       ({ file, path: missing }) =>
-        `${file} names ${missing}, which the repository does not hold. Point it at the file's new path: \`git log -1 --format=%h -- ${missing}\` names the commit that moved it, and \`git show --name-status -M <commit>\` lists where it went.`,
+        `${file} names ${missing}, but that path does not exist in the repository. Change the mention to the file's new path. To find it, run \`git log -1 --format=%h -- ${missing}\` for the commit that moved the file, then \`git show --name-status -M <commit>\` to see where it went.`,
     );
 
 export const tierContractIn = (root: string): TierContract => {

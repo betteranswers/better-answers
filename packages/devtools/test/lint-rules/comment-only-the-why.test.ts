@@ -40,10 +40,10 @@ describe("the comment rule refuses a long or citing comment", () => {
 
     expect(output).toContain("runs to 29 words");
     expect(output).toContain(
-      "A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason.",
+      "Keep a comment only for a constraint outside this repository (a library, a platform or a protocol), a public contract, a generated-file marker, a licence, or the reason for a suppression.",
     );
     expect(output).toContain(
-      "Any other comment is deleted: hold its reason in a name, a type, a test, a grant or a lint, or report it open in the tracker.",
+      "Delete every other comment. Move its reason into a name, a type, a test, a grant or a lint, or open an issue for it in the tracker.",
     );
     expect(output).toContain("better-answers(comment-only-the-why)");
   });
@@ -185,7 +185,7 @@ describe("the comment rule refuses a comment that counts its callers", () => {
 
     expect(output).toContain("This comment counts the code that uses it (`Two specs`).");
     expect(output).toContain(
-      "Delete it: hold a reason the callers share in a name or a test title.",
+      "Delete the count. If the callers share a reason, put it in a name or a test title.",
     );
   });
 
@@ -279,7 +279,7 @@ describe("the comment rule requires a same-line reason on a directive", () => {
     const output = found.output();
 
     expect(output).toContain("gives no reason");
-    expect(output).toContain("say why on the same line");
+    expect(output).toContain("name what it suppresses and say why");
   });
 
   it.each(
@@ -307,7 +307,7 @@ describe("the comment rule requires a same-line reason on a directive", () => {
     const output = found.output();
 
     expect(output).toContain("reason runs to 26 words");
-    expect(output).toContain("Say the constraint alone.");
+    expect(output).toContain("Shorten it to the constraint alone.");
   });
 
   it.each(

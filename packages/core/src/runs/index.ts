@@ -79,7 +79,7 @@ const outcomeOf = (raw: OutcomeColumn): Result<JobOutcome | null> => {
   const parsed = OUTCOME.safeParse(raw);
   return parsed.success
     ? ok(parsed.data)
-    : err(new Error("the job's outcome is not the shape the queue agreement admits"));
+    : err(new Error("the job's outcome does not match the queue agreement"));
 };
 
 export const JOB_IS_OVER: readonly JobStatus[] = ["done", "failed", "poisoned"];
@@ -164,7 +164,7 @@ const ENQUEUE = `WITH inserted AS (
      AND ${JOB_RUN_KEY_WHERE} AND NOT EXISTS (SELECT 1 FROM inserted)`;
 
 export const syncRefused = (refusal: EnqueueJobRefusal): Error =>
-  new Error(`runs: the sync was refused (${refusal})`);
+  new Error(`runs: the sync was not queued (${refusal})`);
 
 const fitsTheKind = (
   descriptor: JobKindDescriptor,
@@ -206,7 +206,9 @@ const landJob = async (tx: Tx, workspaceId: string, job: JobInsert): Promise<str
   ]);
   const answered = landed.rows[0]?.id;
   if (answered === undefined) {
-    throw new Error("another action queued this subject while this one was enqueueing it");
+    throw new Error(
+      "another action queued this subject at the same time, so this enqueue returned no job",
+    );
   }
   return answered;
 };

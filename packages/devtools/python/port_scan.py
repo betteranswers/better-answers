@@ -17,36 +17,37 @@ TYPESCRIPT = frozenset({".ts", ".tsx"})
 UNREADABLE = (OSError, SyntaxError, ValueError)
 
 HALF_DECLARED = (
-    "this module declares `{present}` but not `{missing}`, and a port declares both, "
-    "so that what it mirrors and the fixture holding the two tiers to one behaviour "
-    "are both named. Add {shape}."
+    "this module declares `{present}` but not `{missing}`. A port declares both: "
+    "`PORT_OF` names the TypeScript it mirrors, and `AGREEMENT` names the contract "
+    "fixture that checks both tiers behave the same. Add {shape}."
 )
 
 UNKNOWN_AGREEMENT = (
-    "`AGREEMENT` names `{agreement}`, which contracts/manifest.json's agreements do "
-    "not hold, so no fixture holds this port. Name a key of contracts/manifest.json's "
+    "`AGREEMENT` names `{agreement}`, but that key is not in the agreements of "
+    "contracts/manifest.json, so no fixture checks this port. Use a key from those "
     "agreements, or add the agreement to contracts/ in its own pull request."
 )
 
 NOT_A_MODULE = (
-    "`PORT_OF` names `{ported}`, which is not a TypeScript module the tree holds, so "
-    "the port does not say what it mirrors. Name each module as it now stands, by its "
-    "path from the repository root, with no `..` segment, ending `.ts` or `.tsx`."
+    "`PORT_OF` names `{ported}`, but no TypeScript module exists at that path, so "
+    "the port does not say what it mirrors. Give each module's current path from the "
+    "repository root, with no `..` segment, ending in `.ts` or `.tsx`."
 )
 
 NOT_A_LITERAL = (
-    "`{name}` is not assigned alone as a literal of the shape the gate reads. The gate "
-    "reads only that form, so any other would pass unchecked. Write it as {shape}."
+    "`{name}` is not assigned as a single literal. The gate reads only that form, so "
+    "any other form would pass unchecked. Write it as {shape}."
 )
 
 TWICE = (
-    "`{name}` is declared twice in this module, so which value holds depends on the "
-    "order. Declare it once."
+    "`{name}` is declared twice in this module, so its value depends on which "
+    "declaration runs last. Declare it once."
 )
 
 AUGMENTED = (
-    "`{name}` is extended by an augmented assignment, which the gate does not read, so "
-    "what it adds would pass unchecked. Declare the whole value once, as {shape}."
+    "`{name}` is extended with an augmented assignment such as `+=`. The gate does "
+    "not read that form, so the added values would pass unchecked. Declare the whole "
+    "value once, as {shape}."
 )
 
 SHAPES = {
@@ -199,7 +200,7 @@ def _agreements() -> frozenset[str] | Refused:
         return Refused(f"{MANIFEST} could not be read: {unread}")
     agreements = read.get("agreements") if isinstance(read, dict) else None
     if not isinstance(agreements, dict) or not agreements:
-        return Refused(f"{MANIFEST} names no agreement, so no port could name one")
+        return Refused(f"{MANIFEST} has no agreements, so no port can name one")
     return frozenset(agreements)
 
 
@@ -244,7 +245,7 @@ def _scan(argv: list[str]) -> Scanned | Refused:
     if not ports:
         return Refused(
             f"no module under {', '.join(argv)} declares `PORT_OF` or `AGREEMENT`, "
-            "so the walk proved nothing"
+            "so the scan checked nothing"
         )
     findings = [said for port in ports for said in _findings_for(port, agreements)]
     return Scanned(findings, len(ports), len(modules))
@@ -260,7 +261,7 @@ def main(argv: list[str]) -> int:
     if scanned.findings:
         return 1
     print(
-        "port_scan: every port names TypeScript modules the tree holds and an "
+        "port_scan: every port names TypeScript modules that exist and an "
         f"agreement in contracts/manifest.json (ports: {scanned.ports}, modules "
         f"read: {scanned.modules})"
     )
