@@ -64,15 +64,15 @@ Day-to-day workflow: `/poteto-mode <goal and definition of done>` - name the goa
 
 The project playbooks in `.agents/playbooks/` add this repository's steps to pstack's.
 
-Cubic's PR bot is the default AI reviewer. It reviews a pull request when it opens, and again only when asked by comment, because each review spends part of Cubic's monthly line allowance. CodeRabbit reviews only a pull request that carries the label `review:coderabbit`. The author runs Cubic's CLI, `pnpm run cubic-review`, before opening a pull request and before each later push. That check is advisory and no verdict counts it as an AI review. CodeQL scans for security alerts and is not an AI reviewer. Any of them can fail to run, and no bot is a required check. `.agents/playbooks/review.md` says what each one reviews, the order the verifier tries them in, and what the verdict does when no AI reviewer ran on the head.
+Cubic's PR bot reviews a pull request when it opens. CodeRabbit only reviews pull requests labelled `review:coderabbit`. Run Cubic's CLI, `pnpm run cubic-review`, before opening a pull request and before each later push. See `.agents/playbooks/review.md` for more information.
 
 Until v0.1 the session lands its own pull request, with no press from the owner, once the verdict is `PASS` or `PASS+NOTES`.
 
-The verifier records its Shipping verdict as a commit status on the verified head, context `verdict`: `success` for PASS or PASS+NOTES, `failure` for FAIL, and a description naming the verdict and the verifier, for example `gh api repos/{owner}/{repo}/statuses/<sha> -f state=success -f context=verdict -f description='PASS by <verifier>'`. The `main` ruleset requires a successful `verdict` and `check` on the head, so GitHub refuses a merge without them. The session lands with `gh pr merge <n> --squash --match-head-commit <verified-sha>`. Before landing, read `main`'s newest completed `build` run (`gh run list --workflow build.yml --branch main --status completed --limit 1`), and when that run is red, land the fix for `main` first.
+The verifier records its Shipping verdict as a commit status on the verified head, context `verdict`: `success` for PASS or PASS+NOTES, `failure` for FAIL, and a description naming the verdict and the verifier, for example `gh api repos/{owner}/{repo}/statuses/<sha> -f state=success -f context=verdict -f description='PASS by <verifier>'`. The `main` ruleset requires a successful `verdict` and `check` on the head. The session lands with `gh pr merge <n> --squash --match-head-commit <verified-sha>`. Before landing, read `main`'s newest completed `build` run (`gh run list --workflow build.yml --branch main --status completed --limit 1`), and when that run is red, land the fix for `main` first.
 
 ### Skills
 
-Every skill lives in `.claude/skills/`, never under an app. A `paths` line in its frontmatter loads it only for the files it serves. The table of lines is in `packages/devtools/src/scans/skill-paths.ts`, and `pnpm run skill-paths` (in `check:gates`) fails when a skill drifts from it. Update skills with `pnpm run skills-update` only. It runs `npx skills update` and then `skill-paths --write`, and every `skills-lock.json` entry sets `installMode: copy`, so a skill stays a real tracked folder. It sets `AI_AGENT=claude`, so the CLI writes only Claude Code's folders. The gate refuses a symlinked skill folder (only `better-answers-design`, pointing at a tracked path in the repository, may be one) and a missing `SKILL.md`. Restore with `git checkout HEAD -- .claude/skills/<name>` (`git checkout origin/main -- ...` once a bad link is committed) and update again.
+A `paths` line in a skills frontmatter loads it for the files it serves. The table of lines is in `packages/devtools/src/scans/skill-paths.ts`. Update skills with `pnpm run skills-update` only. It runs `npx skills update` and then `skill-paths --write`, and every `skills-lock.json` entry sets `installMode: copy`.
 
 ### Issue tracker
 
@@ -90,20 +90,11 @@ A mutation survivor is a hypothesis until a probe verifies it. See `docs/agents/
 
 When a session runs in a cloud environment, see `docs/agents/cloud-sessions.md`.
 
-## Code and doc exploration
-
-The jCodeMunch policy, its front-door tools and how to read their results are here: `~/.claude/CLAUDE.md`. A global hook refuses raw reads of code. Its strict mode refuses a `Read` of a code file of 4 KB (4096 bytes) or more unless the call passes `offset` or `limit`. Pass both, the read before an Edit included.
-
-### After editing files
-
-- A login service reindexes on any change on disk.
-- After a change made another way (a Bash edit, a delete, a rename), call `order { "action": "register_edit", "args": { "paths": [...] } }`.
-
-### Docs 
+## Doc exploration
 
 Use jDocMunch to find and read this repository's indexed Markdown:
 
-- Start with `doc_resolve_repo` on `.`.
+- Start with `doc_resolve_repo` on `"<repo's absolute path>"`.
 - Find a passage with `search_sections`, and read it with `get_section` or `get_sections`.
 - Open a long file's structure with `get_document_outline` before reading any of it.
 

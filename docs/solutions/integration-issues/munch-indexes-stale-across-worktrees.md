@@ -101,7 +101,7 @@ Paths under `jcodemunch_mcp/` and `jdocmunch_mcp/` (and the short forms `cli/…
 
    The `hook-event create` entry was removed from `~/.claude/settings.json` on 28/10/2026 at 15:07. The `hook-event remove` entry stays, because it is now the only `WorktreeRemove` hook and it only runs `git worktree remove --force` and `git branch -D`.
 
-One related find: for this project, two unpinned "Local config" entries in `~/.claude.json` overrode `.mcp.json`'s version pins (`jcodemunch-mcp==1.108.319`, `jdocmunch-mcp==1.145.0`). The pins were dropped later on 30/09/2026, so `.mcp.json` now runs each server's latest release through `uvx`, as those entries do.
+One related find: for this project, two unpinned "Local config" entries in `~/.claude.json` overrode `.mcp.json`'s version pins (`jcodemunch-mcp==1.108.319`, `jdocmunch-mcp==1.145.0`). The pins were dropped later on 30/09/2026. An unpinned `uvx` does not fetch the latest release: it runs the copy `uv tool install` put in `~/.local/bin`, the same copy the hooks and the login-service watchers run. That copy moves on `uv tool upgrade jcodemunch-mcp jdocmunch-mcp`, which keeps the `[watch]` extra the install named, or on the `uv tool install --force` of the Solution above. Follow either with `launchctl kickstart -k gui/$(id -u)/us.gravelle.jcodemunch-watch` and the same for `us.gravelle.jdocmunch-watch` so the watchers load it. On 05/11/2026 it ran 1.108.370 while PyPI held 1.108.417. Both servers are now registered at user scope, so every project gets them, and `.mcp.json` registers the same commands for this repository. The local entries are gone.
 
 ## Why This Works
 
@@ -122,6 +122,6 @@ Since #893, jCodeMunch resolves a linked worktree's index to that worktree alone
 
 ## Related Issues
 
-- PR #488: the per-worktree doc index and its removal, the hook tests stubbing both indexers, and AGENTS.md's "After editing files" note.
+- PR #488: the per-worktree doc index and its removal, the hook tests stubbing both indexers, and the "After editing files" note AGENTS.md held until 05/11/2026, when it moved to the global jCodeMunch policy.
 - Upstream jcodemunch-mcp #893: the IdentityModeAmbiguous fix, merged to its `main` on 26/09/2026 and released in 1.108.364. #882 is the original report and PR, closed unmerged.
 - PR #921: cut the worktree hooks down to `.claude/hooks/worktree-create-hook.sh`.
