@@ -21,6 +21,8 @@ import { aRefusalAnswer, GRACE, NORTHERN, openAt, read } from "@test/two-workspa
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
+await import("@/features/knowledge/editing/concept-session.tsx");
+
 placedWithoutMeasuring();
 
 beforeEach(() => {
