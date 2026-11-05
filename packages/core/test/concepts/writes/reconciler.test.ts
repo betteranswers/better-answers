@@ -1069,6 +1069,62 @@ describe("an acceptance whose rows were lost", () => {
   });
 });
 
+const acceptedAgain = async (
+  scenario: Scenario,
+  item: { readonly suggestionId: string; readonly target: string | null },
+) => {
+  const again = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+    decisions: [{ suggestionId: item.suggestionId, expectedTarget: item.target }],
+  });
+  assert(again.ok, "the accept was admitted");
+  return again.value.map(({ outcome }) => (outcome.ok ? "accepted" : outcome.error));
+};
+
+const neverStopsAfter = async (scenario: Scenario, lost: string) => {
+  expect(await reconciled(scenario)).toMatchObject({ replayed: [lost], stopped: undefined });
+  expect(await reconciled(scenario)).toMatchObject({ replayed: [], stopped: undefined });
+
+  await landed(scenario, scenario.editor, guideline("Fuel", { expects: { head: lost } }));
+  expect(await reconciled(scenario)).toMatchObject({ replayed: [], stopped: undefined });
+};
+
+describe("a suggestion accepted again before its lost commit is replayed", () => {
+  it("is refused, so an edit cannot stop the reconciler", async () => {
+    const scenario = await arrange();
+    const input = guideline("Expenses");
+    const standing = await landed(scenario, scenario.editor, input);
+    const item = await raised(
+      scenario,
+      requestFor("Expenses", {
+        mergeKey: input.mergeKey,
+        path: input.path,
+        baseContentHash: standing.contentHash,
+        frontmatter: { title: "Expenses", type: "Guideline", tags: ["finance", "travel"] },
+        body: "# Expenses\n\nClaim within two months.",
+      }),
+    );
+    const lost = await acceptInTheWindow(scenario, item);
+
+    const again = await acceptedAgain(scenario, item);
+
+    await neverStopsAfter(scenario, lost);
+    expect(again).toEqual(["unrecorded-head"]);
+    expect(await decisionOf(item.suggestionId)).toMatchObject({ status: "accepted" });
+  });
+
+  it("is refused, so a new concept cannot stop the reconciler", async () => {
+    const scenario = await arrange();
+    const item = await raised(scenario, requestFor("Remote working"));
+    const lost = await acceptInTheWindow(scenario, item);
+
+    const again = await acceptedAgain(scenario, item);
+
+    await neverStopsAfter(scenario, lost);
+    expect(again).toEqual(["unrecorded-head"]);
+    expect(await decisionOf(item.suggestionId)).toMatchObject({ status: "accepted" });
+  });
+});
+
 describe("a concept carrying a __proto__ front-matter key", () => {
   const withProto = (title: string): Frontmatter =>
     Object.fromEntries<FrontmatterValue>([
