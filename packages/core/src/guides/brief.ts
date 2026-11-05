@@ -5,6 +5,7 @@ import { markersOf } from "@better-answers/schema/brief-marker";
 
 import { readableClause, readableParameters } from "../access/index.ts";
 import { record } from "../audit/index.ts";
+import { withBundleWrite } from "../bundle/index.ts";
 import {
   admit,
   attempt,
@@ -17,7 +18,8 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { folded, withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { folded, withMember, type Tx } from "../store/postgres/index.ts";
+import type { GuideDoors } from "./skeleton.ts";
 import {
   GUIDE_ACTIONS,
   includeSnapshot,
@@ -149,13 +151,15 @@ const saved = async (
 
 export const saveBrief = async (
   principal: UserPrincipal,
-  door: PostgresDoor,
+  doors: GuideDoors,
   input: SaveBriefInput,
 ): Promise<Result<BriefSaved, SaveBriefRefusal>> => {
   const admitted = admit(saveBriefAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
-  const written = await attempt(() =>
-    withMember(admitted.value, door, (fresh, tx) => saved(fresh, tx, input)),
-  );
-  return written.ok ? folded(written.value) : err(written.error);
+  return withBundleWrite(principal, doors, async () => {
+    const written = await attempt(() =>
+      withMember(admitted.value, doors.postgres, (fresh, tx) => saved(fresh, tx, input)),
+    );
+    return written.ok ? folded(written.value) : err(written.error);
+  });
 };

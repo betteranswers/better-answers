@@ -70,4 +70,4 @@ export const saveBriefAs = (
   scenario: Scenario,
   as: UserPrincipal,
   input: { readonly writeUpId: string; readonly markdown: string; readonly base: number },
-) => saveBrief(as, doorsOf(scenario).postgres, input);
+) => saveBrief(as, doorsOf(scenario), input);

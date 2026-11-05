@@ -769,13 +769,19 @@ const northgateBodyOf = (title: string): string => {
 const paragraphsOf = (section: SeededSection): string =>
   section.includes.map(({ id, title }) => `${northgateBodyOf(title)}[^${id}]`).join("\n\n");
 
+const guideDoors = (app: TestApp) => ({
+  git: openTestGit(app),
+  postgres: app.doors.postgres,
+  clock: app.doors.clock,
+});
+
 const briefsWritten = async (
   app: TestApp,
   principal: UserPrincipal,
   sections: readonly SeededSection[],
 ) => {
   for (const section of sections) {
-    const saved = await saveBrief(principal, app.doors.postgres, {
+    const saved = await saveBrief(principal, guideDoors(app), {
       writeUpId: section.writeUpId,
       markdown: paragraphsOf(section),
       base: 1,
@@ -806,11 +812,7 @@ export const seedGuide = async (app: TestApp, asked: GuideAsked): Promise<GuideS
   );
 
   const principal = await actingIn(app, { workspaceId, userId }, async (resolved) => resolved);
-  const seeded = await seedGuideRows(
-    principal,
-    { git: openTestGit(app), postgres: app.doors.postgres, clock: app.doors.clock },
-    BID_LIBRARY,
-  );
+  const seeded = await seedGuideRows(principal, guideDoors(app), BID_LIBRARY);
   if (!seeded.ok) throw new Error(`the guide was refused: ${String(seeded.error)}`);
   const { guideId } = seeded.value;
   const sections = await sectionsOf(app, { workspaceId, userId }, guideId);

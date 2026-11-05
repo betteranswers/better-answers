@@ -39,7 +39,7 @@ import { passageAt } from "@better-answers/core/sources";
 import type { Tx } from "@better-answers/core/store/postgres";
 
 import { MCP_TOKEN_RULE } from "../auth/constants.ts";
-import { doorTold } from "../doors.ts";
+import { doorTold, type Doors } from "../doors.ts";
 import {
   answeredBy,
   crossing,
@@ -114,6 +114,17 @@ const guideAnswered = async (
   });
 };
 
+type GuideDoors = Parameters<typeof includeAvailable>[1];
+
+const writingGuide = <Value, Refused>(
+  doors: Doors,
+  write: (guide: GuideDoors) => Promise<Result<Value, Refused | Error>>,
+): Promise<Result<Value, Refused | Error>> => {
+  const bundle = doorTold(doors.git, "no bundle store is configured");
+  if (!bundle.ok) return Promise.resolve(err(new Error(bundle.error)));
+  return write({ git: bundle.value, postgres: doors.postgres, clock: doors.clock });
+};
+
 export const KNOWLEDGE_CEILING: RoadCeiling = { budget: "knowledge", rule: MCP_TOKEN_RULE };
 
 export const knowledgeReadProcedure = queryCeiling(KNOWLEDGE_CEILING);
@@ -163,7 +174,9 @@ export const knowledgeRouter = router({
     crossing(
       ctx,
       saveBrief.name,
-      given(input, (asked) => saveBrief(ctx.principal, ctx.doors.postgres, asked)),
+      given(input, (asked) =>
+        writingGuide(ctx.doors, (doors) => saveBrief(ctx.principal, doors, asked)),
+      ),
     ),
   ),
   includeAvailable: ownTransactionProcedure
@@ -172,15 +185,9 @@ export const knowledgeRouter = router({
       crossing(
         ctx,
         includeAvailable.name,
-        given(input, (asked) => {
-          const bundle = doorTold(ctx.doors.git, "no bundle store is configured");
-          if (!bundle.ok) return Promise.resolve(err(new Error(bundle.error)));
-          return includeAvailable(
-            ctx.principal,
-            { git: bundle.value, postgres: ctx.doors.postgres, clock: ctx.doors.clock },
-            asked,
-          );
-        }),
+        given(input, (asked) =>
+          writingGuide(ctx.doors, (doors) => includeAvailable(ctx.principal, doors, asked)),
+        ),
       ),
     ),
   collections: queryProcedure.query(({ ctx }) =>
