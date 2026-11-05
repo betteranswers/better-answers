@@ -1,15 +1,17 @@
 import { assert, describe, expect, it } from "vitest";
 
 import { withRepositoryLock } from "@better-answers/core/store/git";
-import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
+import { conceptIriOf, passageLocatorOf, ulid, type ConceptIri } from "@better-answers/schema";
 
 import {
   collectionsAndOwners,
   nameOwner,
+  nameOwnerOfEach,
   ownedBy,
   ownerOf,
   writeConcept,
   type ConceptWritten,
+  type NameOwnerOfEachInput,
   type OwnedConcept,
   type WriteConceptInput,
 } from "../../src/concepts/index.ts";
@@ -17,6 +19,7 @@ import { eraseFromTheIdentitySet } from "../../src/erasure/index.ts";
 import type { PlatformPrincipal, Result, UserPrincipal } from "../../src/kernel/index.ts";
 import { withMember } from "../../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts, gatingRefUpdates } from "../fixtures/bundle.ts";
+import { shelve, shelveOne, type Shelved } from "../fixtures/concept-shelf.ts";
 import { connectedSourceHolding } from "../fixtures/sourced-concept.ts";
 import {
   doorsOf,
@@ -26,6 +29,7 @@ import {
   type Scenario,
 } from "../fixtures/workspace-with-bundle.ts";
 import {
+  answered,
   holdingTable,
   isBlockedOnTable,
   lendingOnceSettled,
@@ -512,6 +516,248 @@ describe("naming an owner", () => {
       { detail: { collection: "policy", personId: scenario.viewer.userId } },
       { detail: { collection: "policy" } },
     ]);
+  });
+});
+
+const OWNER_EVENTS = `SELECT actor, subject_id, detail, batch_id FROM audit_event
+    WHERE workspace_id = $1 AND action = 'knowledge.owner.named' ORDER BY subject_id`;
+
+const overridesOf = async (scenario: Scenario): Promise<readonly string[]> =>
+  (
+    await db().pool.query<{ iri: string; person_id: string }>(
+      `SELECT iri, person_id FROM concept_owner
+        WHERE workspace_id = $1 AND iri IS NOT NULL ORDER BY iri`,
+      [scenario.workspaceId],
+    )
+  ).rows.map(({ iri, person_id }) => `${iri} ${person_id}`);
+
+const namingEach = (scenario: Scenario, by: UserPrincipal, input: NameOwnerOfEachInput) =>
+  withMember(by, scenario.postgres, (fresh, tx) => nameOwnerOfEach(fresh, tx, input));
+
+const shelvedPolicies = (scenario: Scenario, count: number): Promise<readonly ConceptIri[]> =>
+  shelve(
+    db().pool,
+    scenario.workspaceId,
+    Array.from({ length: count }, (_unused, at) => ({ path: `knowledge/policy/rule-${at}.md` })),
+  );
+
+describe("naming one owner on many concepts", () => {
+  it("names one owner of many under one batch id", async () => {
+    const scenario = await arrange();
+    const iris = await shelvedPolicies(scenario, 3);
+
+    const named = await namingEach(scenario, scenario.admin, {
+      iris: [...iris],
+      personId: scenario.viewer.userId,
+    });
+
+    const { batchId, ...counted } = answered(answered(named));
+    expect(counted).toEqual({ named: 3 });
+    expect(batchId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/u);
+    const events = await db().pool.query(OWNER_EVENTS, [scenario.workspaceId]);
+    expect(events.rows).toEqual(
+      iris.toSorted().map((iri) => ({
+        actor: `human:${scenario.admin.userId}`,
+        subject_id: iri,
+        detail: { iri, personId: scenario.viewer.userId },
+        batch_id: batchId,
+      })),
+    );
+    expect(await overridesOf(scenario)).toEqual(
+      iris.toSorted().map((iri) => `${iri} ${scenario.viewer.userId}`),
+    );
+  });
+
+  it("lets the new override beat the collection's owner", async () => {
+    const scenario = await arrange();
+    const iri = await shelveOne(db().pool, scenario.workspaceId, {
+      path: "knowledge/policy/rule-0.md",
+    });
+
+    await namingEach(scenario, scenario.admin, { iris: [iri], personId: scenario.viewer.userId });
+
+    expect(await ownerRead(scenario, { iri, path: "knowledge/policy/rule-0.md" })).toBe(
+      scenario.viewer.userId,
+    );
+    expect(await ownerRead(scenario, { iri: null, path: "knowledge/policy/other.md" })).toBe(
+      scenario.editor.userId,
+    );
+  });
+
+  it("writes one concept's event with no batch id", async () => {
+    const scenario = await arrange();
+    const iri = await shelveOne(db().pool, scenario.workspaceId, {
+      path: "knowledge/policy/rule-0.md",
+    });
+
+    const named = await namingEach(scenario, scenario.admin, {
+      iris: [iri],
+      personId: scenario.viewer.userId,
+    });
+
+    expect(named).toEqual({
+      ok: true,
+      value: { ok: true, value: { named: 1, batchId: undefined } },
+    });
+    const events = await db().pool.query(OWNER_EVENTS, [scenario.workspaceId]);
+    expect(events.rows).toMatchObject([{ subject_id: iri, batch_id: null }]);
+  });
+
+  it("collapses a repeated concept into one override and one event", async () => {
+    const scenario = await arrange();
+    const iris = await shelvedPolicies(scenario, 2);
+
+    const named = await namingEach(scenario, scenario.admin, {
+      iris: [...iris, ...iris.toReversed()],
+      personId: scenario.viewer.userId,
+    });
+
+    expect(named).toMatchObject({ ok: true, value: { ok: true, value: { named: 2 } } });
+    expect((await db().pool.query(OWNER_EVENTS, [scenario.workspaceId])).rowCount).toBe(2);
+    expect(await overridesOf(scenario)).toHaveLength(2);
+  });
+
+  it("replaces an override already named, keeping one row", async () => {
+    const scenario = await arrange();
+    const kept = await shelveOne(db().pool, scenario.workspaceId, {
+      path: "knowledge/policy/kept.md",
+    });
+    const replaced = await shelveOne(db().pool, scenario.workspaceId, {
+      path: "knowledge/policy/replaced.md",
+    });
+    for (const iri of [kept, replaced]) {
+      await nameOwnerAs(scenario.admin, scenario.postgres, {
+        iri,
+        personId: scenario.editor.userId,
+      });
+    }
+
+    await namingEach(scenario, scenario.admin, {
+      iris: [replaced],
+      personId: scenario.viewer.userId,
+    });
+
+    expect(await overridesOf(scenario)).toEqual(
+      [`${kept} ${scenario.editor.userId}`, `${replaced} ${scenario.viewer.userId}`].toSorted(),
+    );
+  });
+
+  it("refuses the batch when one concept is unreadable", async () => {
+    const scenario = await arrange();
+    const group = await seedingWith(db().pool, (seed) =>
+      seed.group({ workspaceId: scenario.workspaceId, name: "HR team" }),
+    );
+    const shelved = (concept: Shelved) => shelveOne(db().pool, scenario.workspaceId, concept);
+    const open = await shelved({ path: "knowledge/policy/open.md" });
+    const withheld = await shelved({
+      path: "knowledge/people/grievances.md",
+      audienceGroups: [group.id],
+    });
+    const unpublished = await shelved({ path: "knowledge/policy/draft.md", draft: true });
+    const batchWith = (stray: ConceptIri) =>
+      namingEach(scenario, scenario.admin, {
+        iris: [open, stray],
+        personId: scenario.viewer.userId,
+      });
+
+    const answers = [
+      await batchWith(withheld),
+      await batchWith(unpublished),
+      await batchWith(conceptIriOf(ulid())),
+    ];
+
+    const refused = { ok: true, value: { ok: false, error: "no-such-concept" } };
+    expect(answers).toEqual([refused, refused, refused]);
+    expect(await overridesOf(scenario)).toEqual([]);
+    expect((await db().pool.query(OWNER_EVENTS, [scenario.workspaceId])).rowCount).toBe(0);
+  });
+
+  it("names a Restricted concept for an Admin", async () => {
+    const scenario = await arrange();
+    const iri = await shelveOne(db().pool, scenario.workspaceId, {
+      path: "knowledge/held/salaries.md",
+      sensitivity: "Restricted",
+    });
+
+    const named = await namingEach(scenario, scenario.admin, {
+      iris: [iri],
+      personId: scenario.viewer.userId,
+    });
+
+    expect(named).toMatchObject({ ok: true, value: { ok: true } });
+  });
+
+  it("refuses anyone but an Admin, writing nothing", async () => {
+    const scenario = await arrange();
+    const iris = await shelvedPolicies(scenario, 2);
+    const asked = { iris: [...iris], personId: scenario.viewer.userId };
+
+    const byAnEditor = await namingEach(scenario, scenario.editor, asked);
+    const byAViewer = await namingEach(scenario, scenario.viewer, asked);
+
+    const refused = { ok: true, value: { ok: false, error: "role-forbids" } };
+    expect([byAnEditor, byAViewer]).toEqual([refused, refused]);
+    expect(await overridesOf(scenario)).toEqual([]);
+    expect((await db().pool.query(OWNER_EVENTS, [scenario.workspaceId])).rowCount).toBe(0);
+  });
+
+  it("refuses a person outside the workspace, writing nothing", async () => {
+    const scenario = await arrange();
+    const iris = await shelvedPolicies(scenario, 2);
+
+    const named = await namingEach(scenario, scenario.admin, {
+      iris: [...iris],
+      personId: await outsider(),
+    });
+
+    expect(named).toEqual({ ok: true, value: { ok: false, error: "no-such-member" } });
+    expect(await overridesOf(scenario)).toEqual([]);
+  });
+
+  it.each<[string, () => readonly unknown[]]>([
+    ["an empty batch", () => []],
+    ["over two hundred concepts", () => Array.from({ length: 201 }, () => conceptIriOf(ulid()))],
+    ["a name that is no concept", () => ["policy/rule-0"]],
+  ])("refuses %s as malformed", async (_name, iris) => {
+    const scenario = await arrange();
+
+    const named = await namingEach(scenario, scenario.admin, {
+      // @ts-expect-error an untyped transport could send anything.
+      iris: iris(),
+      personId: scenario.viewer.userId,
+    });
+
+    expect(named).toEqual({ ok: true, value: { ok: false, error: "malformed" } });
+  });
+
+  it("waits for a write holding one of its concepts", async () => {
+    const scenario = await arrange();
+    const iris = await shelvedPolicies(scenario, 2);
+    const writer = await db().pool.connect();
+    let naming: ReturnType<typeof namingEach> | undefined;
+    try {
+      await writer.query("BEGIN");
+      await writer.query(
+        "SELECT 1 FROM concept_identity WHERE workspace_id = $1 AND iri = $2 FOR SHARE",
+        [scenario.workspaceId, iris[1]],
+      );
+      naming = namingEach(scenario, scenario.admin, {
+        iris: [...iris],
+        personId: scenario.viewer.userId,
+      });
+      await until(async () =>
+        (await statementsWaitingOnALock(db().pool)).some((query) =>
+          query.includes("FROM concept_identity"),
+        ),
+      );
+      expect(await overridesOf(scenario)).toEqual([]);
+    } finally {
+      await writer.query("COMMIT");
+      writer.release();
+    }
+
+    expect(await naming).toMatchObject({ ok: true, value: { ok: true } });
+    expect(await overridesOf(scenario)).toHaveLength(2);
   });
 });
 
