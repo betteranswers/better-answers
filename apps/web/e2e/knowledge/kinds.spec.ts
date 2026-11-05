@@ -4,7 +4,6 @@ import {
   KINDS_KEYSTROKES as KEY,
   KINDS_LIST,
 } from "@/features/knowledge/curation/curation-state.ts";
-import { KINDS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -85,14 +84,15 @@ const disclosureOf = (page: Page, kind: string): Locator =>
   kinds(page).getByRole("button", { name: new RegExp(`^${kind}`) });
 
 const collectionsOf = (page: Page, kind: string): Locator =>
-  kinds(page).getByRole("list", { name: WORDS.collectionsOf(kind) });
+  kinds(page).getByRole("list", { name: `Concepts of ${kind} by collection` });
 
-const listed = async (page: Page): Promise<string[]> =>
+const rowTexts = async (page: Page): Promise<string[]> =>
   (await kinds(page).locator("tbody tr").allInnerTexts()).map((row) =>
-    row.replace(WORDS.byCollection, "").replace(/\s+/gu, " ").trim(),
+    row.replace("by collection", "").replace(/\s+/gu, " ").trim(),
   );
 
-const filter = (page: Page): Locator => kinds(page).getByRole("button", { name: WORDS.tail });
+const filter = (page: Page): Locator =>
+  kinds(page).getByRole("button", { name: "Kinds With Two or Fewer Concepts" });
 
 test.describe("Kinds", () => {
   test("an Admin filters, sorts, and opens kinds by keyboard", async ({
@@ -120,7 +120,7 @@ test.describe("Kinds", () => {
         - status: 3 kinds
         - status
         - button "Kinds With Two or Fewer Concepts"
-        - table "Kinds of concept in the knowledge base, with how many concepts hold each.":
+        - table "Kinds in the knowledge base and how many concepts each has.":
           - /children: equal
           - caption
           - rowgroup:
@@ -163,10 +163,10 @@ test.describe("Kinds", () => {
       await page.keyboard.press("Enter");
       await expect(filter(page)).toHaveAttribute("aria-pressed", "true");
       await expect(page).toHaveURL(new RegExp(`${KINDS_LIST}\\.tail=small`));
-      expect(await listed(page)).toEqual(["Procedure 2", "Term 1"]);
+      expect(await rowTexts(page)).toEqual(["Procedure 2", "Term 1"]);
       await page.keyboard.press("Enter");
       await expect(filter(page)).toHaveAttribute("aria-pressed", "false");
-      expect(await listed(page)).toHaveLength(3);
+      expect(await rowTexts(page)).toHaveLength(3);
     });
 
     await test.step("sorts by the Concepts column by keyboard alone", async () => {
@@ -177,11 +177,11 @@ test.describe("Kinds", () => {
       await expect(concepts).toBeFocused();
       await page.keyboard.press("Enter");
       await expect(page).toHaveURL(new RegExp(`${KINDS_LIST}\\.sort=count`));
-      expect(await listed(page)).toEqual(["Term 1", "Procedure 2", "Policy 3"]);
+      expect(await rowTexts(page)).toEqual(["Term 1", "Procedure 2", "Policy 3"]);
       await page.keyboard.press("Enter");
       await expect(page).toHaveURL(new RegExp(`${KINDS_LIST}\\.sort=-count`));
       await expect(concepts).toBeFocused();
-      expect(await listed(page)).toEqual(["Policy 3", "Procedure 2", "Term 1"]);
+      expect(await rowTexts(page)).toEqual(["Policy 3", "Procedure 2", "Term 1"]);
     });
 
     await test.step("opens and closes a kind by keyboard alone", async () => {
@@ -201,7 +201,7 @@ test.describe("Kinds", () => {
       await expect(filter(page)).toHaveAttribute("aria-pressed", "true");
       await page.reload();
       await expect(filter(page)).toHaveAttribute("aria-pressed", "true");
-      expect(await listed(page)).toEqual(["Procedure 2", "Term 1"]);
+      expect(await rowTexts(page)).toEqual(["Procedure 2", "Term 1"]);
       await expect(kinds(page).getByRole("columnheader", { name: "Concepts" })).toHaveAttribute(
         "aria-sort",
         "descending",
@@ -223,7 +223,7 @@ test.describe("Kinds", () => {
     await signedIn(page, request, at.editor.email);
     await kindsDrawn(page);
 
-    expect(await listed(page), "the counts include withheld concepts").toEqual([
+    expect(await rowTexts(page), "the counts include withheld concepts").toEqual([
       "Policy 2",
       "Procedure 2",
       "Term 1",
@@ -236,7 +236,7 @@ test.describe("Kinds", () => {
     await test.step("shows all three kinds when the Kinds With Two or Fewer Concepts filter is on", async () => {
       await filter(page).click();
       await expect(filter(page)).toHaveAttribute("aria-pressed", "true");
-      expect(await listed(page)).toEqual(["Policy 2", "Procedure 2", "Term 1"]);
+      expect(await rowTexts(page)).toEqual(["Policy 2", "Procedure 2", "Term 1"]);
       await expect(kinds(page).getByText("3 kinds")).toBeVisible();
     });
 

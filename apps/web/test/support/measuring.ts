@@ -10,7 +10,7 @@ const measuresNothing = class {
   disconnect = NOTHING;
 };
 
-/** jsdom lays nothing out, and a select scrolls its chosen choice into view as it opens. */
+/** jsdom lacks scrollIntoView, which a select calls on its chosen option as it opens. */
 export const choosing = (trigger: HTMLElement, choice: string): void => {
   Object.defineProperty(Element.prototype, "scrollIntoView", {
     value: NOTHING,

@@ -8,7 +8,7 @@ const INVITER = "Morgan Reid";
 
 export const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
 
-const AT_A_MEMBER_PAGE = new RegExp(`${MEMBERS_PAGE}/[0-9A-HJKMNP-TV-Z]{26}$`);
+const MEMBER_PAGE_URL = new RegExp(`${MEMBERS_PAGE}/[0-9A-HJKMNP-TV-Z]{26}$`);
 
 const INVITE = "Invite a Person";
 
@@ -40,7 +40,7 @@ export const personHeading = (page: Page, name: string): Locator =>
 
 export const openedByName = async (page: Page, name: string): Promise<void> => {
   await memberLink(page, name).click();
-  await expect(page).toHaveURL(AT_A_MEMBER_PAGE);
+  await expect(page).toHaveURL(MEMBER_PAGE_URL);
   await expect(personHeading(page, name)).toBeVisible();
 };
 

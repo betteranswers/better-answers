@@ -8,7 +8,7 @@ import {
   signIn,
 } from "./harness.ts";
 
-const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
+const controlCentreNav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 
 export const connectedSourcesRegion = (page: Page) =>
   page.getByRole("region", { name: "Connected Sources" });
@@ -21,18 +21,20 @@ export const connectedSourceNamed = (page: Page, name: string): Locator =>
     .getByRole("listitem")
     .filter({ has: page.getByRole("heading", { level: 3, name, exact: true }) });
 
-const leadOf = (page: Page, name: string, term: string): Locator =>
+const firstDefinitionOf = (page: Page, name: string, term: string): Locator =>
   connectedSourceNamed(page, name)
     .getByRole("term")
     .filter({ hasText: new RegExp(`^${term}$`) })
     .first()
     .locator("xpath=following-sibling::dd[1]");
 
-export const stateOf = (page: Page, name: string) => leadOf(page, name, "State");
+export const stateOf = (page: Page, name: string) => firstDefinitionOf(page, name, "State");
 
-export const lastSyncedOf = (page: Page, name: string) => leadOf(page, name, "Last Synced");
+export const lastSyncedOf = (page: Page, name: string) =>
+  firstDefinitionOf(page, name, "Last Synced");
 
-export const sensitivityOf = (page: Page, name: string) => leadOf(page, name, "Sensitivity");
+export const sensitivityOf = (page: Page, name: string) =>
+  firstDefinitionOf(page, name, "Sensitivity");
 
 const ROW_ACTIONS = {
   review: "Review Findings",
@@ -63,7 +65,7 @@ export const anAdminAtSources = async (
         });
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await nav(page).getByRole("link", { name: "Connected Sources" }).click();
+  await controlCentreNav(page).getByRole("link", { name: "Connected Sources" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
   return { workspace, seeded };
 };

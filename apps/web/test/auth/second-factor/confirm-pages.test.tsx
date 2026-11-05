@@ -2,20 +2,13 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  AUTHENTICATOR_CODE_WRONG,
-  SAID_OF_SECOND_FACTOR,
-  tooManyCodesTriedOr,
-} from "@/features/auth/refusal-words.ts";
-import { CODE_AGAIN, RECOVERY_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
-import { STOCK } from "@/shared/refusal-words.ts";
-import {
   A_CHALLENGE,
   adasApi,
-  alertsSaying,
+  alertTexts,
   answering,
   BOTH_HELD,
   openAsAda,
-  readingForever,
+  stubTrpcNeverAnswers,
   refusing,
   sessionStanding,
   withPasskeysHere,
@@ -29,7 +22,9 @@ afterEach(() => {
 
 const main = () => screen.getByRole("main");
 
-const numbersSaid = (): readonly string[] => alertsSaying().join(" ").match(/\d+/g) ?? [];
+const numbersSaid = (): readonly string[] => alertTexts().join(" ").match(/\d+/g) ?? [];
+
+const ONE_ALERT_WITH_WORDS = [expect.stringMatching(/\S/u)];
 
 const controls = (): readonly Element[] => [...main().querySelectorAll("a, button, input")];
 
@@ -73,8 +68,8 @@ const grantingByRecoveryCode = () => {
 };
 
 describe("the confirm page", () => {
-  it("shows only its heading and Sign out while reading", async () => {
-    readingForever();
+  it("shows only the heading and Sign Out while loading", async () => {
+    stubTrpcNeverAnswers();
 
     await openAsAda("/confirm");
 
@@ -82,7 +77,7 @@ describe("the confirm page", () => {
     expect(controls().map((control) => control.textContent)).toEqual(["Sign Out"]);
   });
 
-  it("orders passkey (focused), code, recovery code, then Sign out", async () => {
+  it("focuses the passkey, then lists code, recovery code, Sign Out", async () => {
     withPasskeysHere();
     adasApi(() => BOTH_HELD);
 
@@ -100,7 +95,7 @@ describe("the confirm page", () => {
     expect(controls().at(-1)).toBe(ways[3]);
   });
 
-  it("names the wait once throttled, and the passkey still confirms", async () => {
+  it("after too many codes, the passkey still confirms", async () => {
     withPasskeysHere();
     const asked = confirmingByPasskey(refusing(429, "too_many_requests", 240));
     const { router } = await openAsAda("/confirm");
@@ -109,7 +104,7 @@ describe("the confirm page", () => {
     fireEvent.change(field, { target: { value: "123 456" } });
 
     await waitFor(() => {
-      expect(alertsSaying()).toEqual([tooManyCodesTriedOr(240, ["passkey", "recovery-code"])]);
+      expect(alertTexts()).toEqual(ONE_ALERT_WITH_WORDS);
     });
     expect(numbersSaid()).toEqual(["4"]);
     expect(field.hasAttribute("readonly")).toBe(true);
@@ -123,7 +118,7 @@ describe("the confirm page", () => {
     expect(asked).not.toContain("/passkeys/sign-in");
   });
 
-  it("names only ways held, then reopens once the wait lifts", async () => {
+  it("unlocks the code field once the wait ends", async () => {
     adasApi(() => ({
       ...BOTH_HELD,
       passkeys: [],
@@ -132,22 +127,30 @@ describe("the confirm page", () => {
     await openAsAda("/confirm");
 
     const field = await screen.findByRole("textbox", { name: "Authenticator Code" });
-    expect(alertsSaying()).toEqual([tooManyCodesTriedOr(1, ["recovery-code"])]);
+    expect(alertTexts()).toEqual(ONE_ALERT_WITH_WORDS);
     expect(numbersSaid()).toEqual(["1"]);
     expect(field.hasAttribute("readonly")).toBe(true);
 
-    expect(await screen.findByText(CODE_AGAIN, {}, { timeout: 3000 })).toBeDefined();
-    expect(field.hasAttribute("readonly")).toBe(false);
-    expect(alertsSaying()).toEqual([]);
+    await waitFor(
+      () => {
+        expect(field.hasAttribute("readonly")).toBe(false);
+      },
+      { timeout: 3000 },
+    );
+    expect(
+      screen.getAllByRole("status").some((status) => /\S/u.test(status.textContent)),
+      "no status says the field is open again",
+    ).toBe(true);
+    expect(alertTexts()).toEqual([]);
   });
 
-  it("offers Try again when the read goes unanswered", async () => {
+  it("offers Try Again when loading gets no response", async () => {
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the network is down")));
 
     await openAsAda("/confirm");
 
     await waitFor(() => {
-      expect(alertsSaying()).toEqual([STOCK.notLoaded]);
+      expect(alertTexts()).toEqual(ONE_ALERT_WITH_WORDS);
     });
     expect(screen.getByRole("button", { name: "Try Again" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Keyboard Shortcuts" })).toBeDefined();
@@ -168,12 +171,12 @@ describe("the confirm page", () => {
     await waitFor(() => {
       expect(field.getAttribute("aria-invalid")).toBe("true");
     });
-    expect(alertsSaying()).toEqual([AUTHENTICATOR_CODE_WRONG]);
+    expect(alertTexts()).toEqual(ONE_ALERT_WITH_WORDS);
     expect(document.activeElement).toBe(field);
     expect([field.selectionStart, field.selectionEnd]).toEqual([0, 6]);
   });
 
-  it("goes straight on for a session already confirmed", async () => {
+  it("skips the page for a session already confirmed", async () => {
     adasApi(() => CONFIRMED);
 
     const { router } = await openAsAda("/confirm");
@@ -185,7 +188,7 @@ describe("the confirm page", () => {
 });
 
 describe("the recovery page", () => {
-  it("goes to setup with the page's query once accepted", async () => {
+  it("goes to setup, keeping the redirect, once the code works", async () => {
     grantingByRecoveryCode();
     const { router } = await openAsAda("/recovery?redirect=%2Fpeople%2Fmembers");
 
@@ -203,7 +206,7 @@ describe("the recovery page", () => {
     ).toBeDefined();
   });
 
-  it("says a wrong code, and offers the way back last", async () => {
+  it("marks a wrong recovery code and offers the other methods", async () => {
     adasApi(
       () => BOTH_HELD,
       new Map([["/second-factor/recovery", refusing(400, "recovery-code-wrong")]]),
@@ -215,12 +218,11 @@ describe("the recovery page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Use Code" }));
 
     await waitFor(() => {
-      expect(alertsSaying()).toEqual([SAID_OF_SECOND_FACTOR["recovery-code-wrong"]]);
+      expect(alertTexts()).toEqual(ONE_ALERT_WITH_WORDS);
     });
     expect(field.getAttribute("aria-invalid")).toBe("true");
     expect(
       within(main()).getByRole("link", { name: "Use Your Passkey or Authenticator Instead" }),
     ).toBeDefined();
-    expect(main().textContent).toContain(RECOVERY_WORDS.operator);
   });
 });

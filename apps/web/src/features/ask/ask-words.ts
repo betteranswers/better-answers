@@ -7,17 +7,21 @@ import type { Phase } from "./ask-api.ts";
 type Unwritten = "refused" | "failed" | "paused";
 
 export const ASK_WORDS = {
-  lead: { before: "Ask a question, or ", link: "connect Claude", after: " to ask from there." },
+  lead: {
+    before: "Ask a question, or ",
+    link: "connect Claude",
+    after: " to ask questions from Claude.",
+  },
   heading: "New Question",
   question: "Question",
   questionNeeded: "Please enter a question.",
   ask: "Ask",
   collections: "Collections",
-  collectionsHelp: "Tick none to ask across every collection.",
+  collectionsHelp: "Leave every box unticked to search all collections.",
   phase: {
-    reading: "Reading this workspace’s knowledge.",
-    judging: "Checking which Answers fit your question.",
-    drafting: "Drafting from the related knowledge.",
+    reading: "Searching this workspace’s knowledge.",
+    judging: "Checking which Q&A pairs answer your question.",
+    drafting: "Writing an answer from related knowledge.",
   } satisfies Readonly<Record<Phase, string>>,
   verdictHeading: {
     ok: "Answered",
@@ -29,30 +33,32 @@ export const ASK_WORDS = {
     ok: "Answered from this workspace’s knowledge.",
     warn: "Answered from this workspace’s knowledge, with a warning.",
     refuse: "Not answered from the company's knowledge.",
-    related: "No Answer fits your question as asked, so here is the related knowledge.",
+    related: "No Q&A pair answers your question, so here is related knowledge.",
   } satisfies Readonly<Record<QuestionVerdict, string>>,
   judge: JUDGE_WORDS satisfies Readonly<Record<JudgeState, string>>,
   noCollection: "No Collection",
-  unmapped: "Unmapped Passages",
+  unmapped: "Passages Not in the Knowledge Base",
   unwritten: {
-    refused: "Nothing was drafted, because no sentence could cite this knowledge.",
-    failed: "Nothing was drafted. Please try again.",
-    paused: "Drafting is paused because this workspace has reached its monthly AI spending limit.",
+    refused:
+      "No answer was written, because no sentence could be checked against the knowledge below.",
+    failed: "There was a problem writing an answer. Please try again.",
+    paused:
+      "No answer was written, because this workspace has reached its monthly AI spending limit.",
   } satisfies Readonly<Record<Unwritten, string>>,
   cites: (place: number, title: string): string => `[${String(place)}] Cites ${title}`,
   helpful: "Mark as Helpful",
   markedHelpful: "Marked Helpful",
-  helpfulSaid: "Your feedback has been sent successfully.",
+  helpfulSaid: "Your feedback has been sent.",
   flag: "Flag",
   flagAnswer: "Flag This Answer",
   flagOf: (words: string): string => `Flag “${words}”`,
   flagged: "Flagged",
-  flagSaid: "Your flag has been sent successfully.",
+  flagSaid: "Your flag has been sent.",
   reason: "Reason",
   reasonNeeded: "Please choose a reason.",
   reasons: REASON_WORDS,
   note: "Note",
-  noteHelp: "Optional. Say what was wrong.",
+  noteHelp: "Optional. Tell us what was wrong.",
   sendFlag: "Send Flag",
 } as const;
 

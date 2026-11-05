@@ -13,7 +13,7 @@ describe("the visual editor's round trip", () => {
     const body =
       "## Retention\n\nWe keep **audit logs** for [seven years](https://example.com/policy).\n\n- Logs\n- Backups\n\n1. Ask\n2. Wait";
 
-    expect(losesMarkdown(body), "nothing here changes when the visual editor writes it back").toBe(
+    expect(losesMarkdown(body), "the visual editor would change plain paragraphs or lists").toBe(
       false,
     );
   });
@@ -21,14 +21,15 @@ describe("the visual editor's round trip", () => {
   it("keeps a footnote reference as written", () => {
     expect(
       losesMarkdown("We keep audit logs.[^source-1] They go back seven years.[^source-2]"),
-      "the citation to a source stays as it was typed",
+      "the visual editor would rewrite the citation to a source",
     ).toBe(false);
   });
 
   it("keeps a footnote reference with an underscore label", () => {
-    expect(losesMarkdown("Kept for seven years.[^audit_log-2]"), "the label stays whole").toBe(
-      false,
-    );
+    expect(
+      losesMarkdown("Kept for seven years.[^audit_log-2]"),
+      "the visual editor would split the underscore label",
+    ).toBe(false);
   });
 
   it("finds an image the visual editor would lose", () => {
@@ -63,7 +64,7 @@ describe("the visual editor's round trip", () => {
   });
 
   it("does not count a trailing newline as a loss", () => {
-    expect(losesMarkdown("A plain paragraph.\n\n"), "only the final line break differs").toBe(
+    expect(losesMarkdown("A plain paragraph.\n\n"), "a trailing newline counted as a loss").toBe(
       false,
     );
   });
@@ -71,19 +72,21 @@ describe("the visual editor's round trip", () => {
   it("keeps an ampersand as written", () => {
     expect(
       losesMarkdown("Terms & Conditions apply to R&D and AT&T."),
-      "& stays & and is not spelled &amp;",
+      "& would be written as &amp;",
     ).toBe(false);
   });
 
   it("keeps comparison signs in running text", () => {
     expect(
       losesMarkdown("Fewer than 5 staff means x < 5, and 5 > 3."),
-      "< and > stay as typed",
+      "< and > would be escaped",
     ).toBe(false);
   });
 
   it("keeps a typed tag as escaped text", () => {
-    expect(losesMarkdown("Type &lt;b&gt; for bold."), "the escaped tag stays escaped").toBe(false);
+    expect(losesMarkdown("Type &lt;b&gt; for bold."), "the escaped tag would be unescaped").toBe(
+      false,
+    );
   });
 
   it("finds an entity the author spelled out", () => {
@@ -93,7 +96,7 @@ describe("the visual editor's round trip", () => {
   it("keeps code as written", () => {
     expect(
       losesMarkdown("Use `a && b` or\n\n```\nif (x < 5 && y) {}\n```"),
-      "code is never spelled out",
+      "the visual editor would escape characters inside code",
     ).toBe(false);
   });
 

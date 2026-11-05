@@ -14,11 +14,11 @@ import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 const wrongCodeLead = (): string => codeWrong(2).split(/\d/)[0] ?? "";
 
 describe("what a refused sign-in code says", () => {
-  it.each([2, 1])("names %i left of the code's tries", (left) => {
+  it.each([2, 1])("names the %i tries left", (left) => {
     expect(codeWrong(left).match(/\d+/g)).toEqual([String(left)]);
   });
 
-  it("says a code with no tries left expired, not wrong", () => {
+  it("says a code with no tries left has expired", () => {
     const spent = codeWrong(0);
 
     expect(spent).not.toMatch(/\d/);
@@ -35,8 +35,8 @@ const WAYS_HELD: readonly (readonly OtherWay[])[] = [
   ["passkey", "recovery-code"],
 ];
 
-describe("the wait a throttled code field names", () => {
-  it("names the carried wait in whole minutes, rounded up", () => {
+describe("the wait shown after too many code attempts", () => {
+  it("names the wait in whole minutes, rounded up", () => {
     expect(tooManyCodesTriedOr(61, ["passkey"]).match(/\d+/g)).toEqual(["2"]);
   });
 
@@ -44,7 +44,7 @@ describe("the wait a throttled code field names", () => {
     expect(tooManyCodesTriedOr(undefined, ["passkey"])).not.toMatch(/\d/);
   });
 
-  it("says something different for each set of other ways", () => {
+  it("names each combination of other sign-in methods differently", () => {
     const sentences = WAYS_HELD.map((others) => tooManyCodesTriedOr(60, others));
 
     expect(new Set(sentences).size).toBe(WAYS_HELD.length);
@@ -52,7 +52,7 @@ describe("the wait a throttled code field names", () => {
 });
 
 describe("a second-factor action refused after a workspace switch", () => {
-  it("shows the switch's own sentence, never its class's", () => {
+  it("explains the workspace switch, not a generic conflict", () => {
     const sentence = saidOfASecondFactorRefusal({ word: "workspace-switched", class: "conflict" });
 
     expect(sentence).toBe(refusalSentence({}, "workspace-switched", "conflict"));
@@ -61,7 +61,7 @@ describe("a second-factor action refused after a workspace switch", () => {
 });
 
 describe("what a refused ask to join says", () => {
-  it("says every refusal but a missing reason alike", () => {
+  it("gives one message for every refusal except a missing reason", () => {
     const sentences = [
       saidOfAnAskToJoinRefusal({ word: "no-session", class: "unauthenticated" }),
       saidOfAnAskToJoinRefusal({ word: "role-forbids", class: "forbidden" }),

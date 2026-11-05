@@ -22,19 +22,19 @@ describe("a console list's count", () => {
     expect(words.counted(2)).toMatch(/\b2\b/);
   });
 
-  it.each(LISTS)("gives one of the %s a form of its own", (_, words) => {
+  it.each(LISTS)("uses a singular form for one of the %s", (_, words) => {
     expect(formOf(words.counted(1))).not.toBe(formOf(words.counted(2)));
     expect(formOf(words.counted(2))).toBe(formOf(words.counted(3)));
   });
 
-  it("gives no name waiting a form of its own", () => {
+  it("words zero names waiting differently from one or two", () => {
     const none = formOf(NAMES_WAITING_WORDS.counted(0));
 
     expect(none).not.toBe(formOf(NAMES_WAITING_WORDS.counted(1)));
     expect(none).not.toBe(formOf(NAMES_WAITING_WORDS.counted(2)));
   });
 
-  it("counts each list in its own noun", () => {
+  it("uses each list's own noun in its count", () => {
     for (const count of [1, 2]) {
       const lines = LISTS.map(([, words]) => words.counted(count));
       expect(new Set(lines).size).toBe(LISTS.length);
@@ -42,20 +42,20 @@ describe("a console list's count", () => {
   });
 });
 
-describe("what a console list's search left", () => {
+describe("a console list's search count", () => {
   it.each(LISTS)("shows how many %s match, and the search", (_, words) => {
     expect(words.matching(1, "priya")).toMatch(/\b1\b/);
     expect(words.matching(2, "priya")).toMatch(/\b2\b/);
     for (const count of [0, 1, 2]) expect(words.matching(count, "priya")).toContain("priya");
   });
 
-  it.each(LISTS)("gives one of the %s matching its own form", (_, words) => {
+  it.each(LISTS)("uses a singular form when one of the %s matches", (_, words) => {
     expect(formOf(words.matching(1, "priya"))).not.toBe(formOf(words.matching(2, "priya")));
     expect(formOf(words.matching(1, "priya"))).not.toBe(formOf(words.matching(0, "priya")));
     expect(formOf(words.matching(2, "priya"))).toBe(formOf(words.matching(3, "priya")));
   });
 
-  it("says what matches in each list's own noun", () => {
+  it("uses each list's own noun in its search count", () => {
     for (const count of [1, 2]) {
       const lines = LISTS.map(([, words]) => words.matching(count, "priya"));
       expect(new Set(lines).size).toBe(LISTS.length);

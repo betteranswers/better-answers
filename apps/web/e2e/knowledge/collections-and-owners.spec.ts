@@ -99,7 +99,7 @@ const pickerOf = (page: Page, collection: string): Locator =>
 const saveOf = (page: Page, collection: string): Locator =>
   page.getByRole("button", { name: `Save the new owner of ${collection}` });
 
-const said = (page: Page): Locator => collections(page).getByRole("status").nth(1);
+const statusOf = (page: Page): Locator => collections(page).getByRole("status").nth(1);
 
 test.describe("Collections and Owners", () => {
   test("a collection-owning Editor finds Collections and Owners under Curation", async ({
@@ -157,13 +157,13 @@ test.describe("Collections and Owners", () => {
             - heading "policy" [level=3]
             - term: Owner
             - definition: ${JSON.stringify(EDITOR)}
-            - term: Concepts with Their Own Owner
+            - term: Concepts With Their Own Owner
             - definition: /\\b1\\b/
           - listitem "safety":
             - heading "safety" [level=3]
             - term: Owner
             - definition
-            - term: Concepts with Their Own Owner
+            - term: Concepts With Their Own Owner
             - definition
     `);
     await passesTheAccessibilityGate();
@@ -191,7 +191,7 @@ test.describe("Collections and Owners", () => {
       await expect(saveOf(page, "policy")).toBeFocused();
       await page.keyboard.press("Enter");
       await expect(ownerOf(page, "policy")).not.toContainText(EDITOR);
-      await expect(said(page)).toHaveText(/\S/);
+      await expect(statusOf(page)).toHaveText(/\S/);
 
       await page.keyboard.press("Tab");
       await expect(pickerOf(page, "safety")).toBeFocused();

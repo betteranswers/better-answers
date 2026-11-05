@@ -48,7 +48,7 @@ export const countOf = (list: Locator): Locator => list.getByRole("status").firs
 
 export const skipLinkReachesThePage = async (page: Page): Promise<void> => {
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Skip to Main Content" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("main")).toBeFocused();
 };
@@ -106,7 +106,7 @@ const SIGN_IN_HEADINGS = {
 export const signInHeading = (page: Page, carriedOn: CarriedOn | "nothing" = "nothing"): Locator =>
   page.getByRole("heading", { level: 1, name: SIGN_IN_HEADINGS[carriedOn], exact: true });
 
-export const signInSaysWhy = async (page: Page): Promise<string> => {
+export const signInStatusText = async (page: Page): Promise<string> => {
   await expect(signInHeading(page)).toBeVisible();
   await expect(page.getByRole("status"), "the sign-in page shows no status message").toHaveText(
     /\S/,
@@ -167,48 +167,48 @@ const ACTION_BUDGET_MS = 100;
 /** On CI, the shared runner's processor decides the timing more than the page does, so there the test records the timing without asserting it. */
 const BUDGET_ASSERTED = !process.env["CI"];
 
-const ANSWER_HELD_AT_MOST_MS = 2_000;
+const RESPONSE_HELD_AT_MOST_MS = 2_000;
 
-type Landed = { readonly at: string; readonly reads: string };
+type ExpectedText = { readonly at: string; readonly reads: string };
 
-type TheServersAnswer = "held" | "sent";
+type ServerResponse = "held" | "sent";
 
-const startTheClock = (page: Page, landed: Landed, answer: TheServersAnswer) =>
+const startTheClock = (page: Page, expected: ExpectedText, answer: ServerResponse) =>
   page.evaluate(
-    (asked) => {
-      const reads = () =>
+    (target) => {
+      const showsText = () =>
         document
-          .evaluate(asked.at, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE)
-          .singleNodeValue?.textContent?.includes(asked.reads) === true;
-      const sent = window.fetch;
+          .evaluate(target.at, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE)
+          .singleNodeValue?.textContent?.includes(target.reads) === true;
+      const originalFetch = window.fetch;
       const held: (() => void)[] = [];
-      const released = () => {
-        window.fetch = sent;
+      const releaseFetches = () => {
+        window.fetch = originalFetch;
         for (const send of held.splice(0)) send();
       };
-      const holdTheFetches = () => {
+      const holdFetches = () => {
         window.fetch = (...request) =>
-          new Promise<void>((send) => held.push(send)).then(() => sent(...request));
+          new Promise<void>((send) => held.push(send)).then(() => originalFetch(...request));
       };
       const clocked = new Promise((resolve) => {
         document.addEventListener(
           "keydown",
           () => {
             const pressedAt = performance.now();
-            if (asked.answer === "held") holdTheFetches();
+            if (target.answer === "held") holdFetches();
             const giveUp = setTimeout(() => {
-              const waited = held.length > 0;
-              released();
-              if (!waited) return;
+              const heldAny = held.length > 0;
+              releaseFetches();
+              if (!heldAny) return;
               observer.disconnect();
-              resolve({ kind: "waited", heldMs: asked.heldAtMostMs, reads: asked.reads });
-            }, asked.heldAtMostMs);
+              resolve({ kind: "timedOut", heldMs: target.heldAtMostMs, reads: target.reads });
+            }, target.heldAtMostMs);
             const observer = new MutationObserver(() => {
-              if (!reads()) return;
+              if (!showsText()) return;
               observer.disconnect();
               clearTimeout(giveUp);
-              released();
-              resolve({ kind: "landed", ms: performance.now() - pressedAt });
+              releaseFetches();
+              resolve({ kind: "shown", ms: performance.now() - pressedAt });
             });
             observer.observe(document.body, {
               subtree: true,
@@ -221,25 +221,27 @@ const startTheClock = (page: Page, landed: Landed, answer: TheServersAnswer) =>
       });
       Reflect.set(window, "actionClocked", clocked);
     },
-    { ...landed, answer, heldAtMostMs: ANSWER_HELD_AT_MOST_MS },
+    { ...expected, answer, heldAtMostMs: RESPONSE_HELD_AT_MOST_MS },
   );
 
-export const clockTheNextKey = (page: Page, landed: Landed) => startTheClock(page, landed, "held");
+export const clockTheNextKey = (page: Page, expected: ExpectedText) =>
+  startTheClock(page, expected, "held");
 
-export const clockTheNextDraw = (page: Page, landed: Landed) => startTheClock(page, landed, "sent");
+export const clockTheNextDraw = (page: Page, expected: ExpectedText) =>
+  startTheClock(page, expected, "sent");
 
 export const ACTION_SAMPLES = 5;
 
-const CLOCKED = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("landed"), ms: z.number() }),
-  z.object({ kind: z.literal("waited"), heldMs: z.number(), reads: z.string() }),
+const CLOCK_RESULT = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("shown"), ms: z.number() }),
+  z.object({ kind: z.literal("timedOut"), heldMs: z.number(), reads: z.string() }),
 ]);
 
 export const actionClocked = async (page: Page): Promise<number> => {
-  const clocked = CLOCKED.parse(
+  const clocked = CLOCK_RESULT.parse(
     await page.evaluate((): unknown => Reflect.get(window, "actionClocked")),
   );
-  if (clocked.kind === "landed") return clocked.ms;
+  if (clocked.kind === "shown") return clocked.ms;
   throw new Error(
     `The page did not show ${JSON.stringify(clocked.reads)} while the server response was held for ${String(clocked.heldMs)} ms. Either the action waits for a server round trip, or the page never shows that text.`,
   );
@@ -252,10 +254,7 @@ const medianOf = (samples: readonly number[]): number => {
   return sorted.length % 2 === 1 ? upper : ((sorted[middle - 1] ?? Number.NaN) + upper) / 2;
 };
 
-export const theActionsLandedWithinTheirBudget = (
-  action: string,
-  samples: readonly number[],
-): void => {
+export const medianActionWithinBudget = (action: string, samples: readonly number[]): void => {
   expect(samples.length, `no timing was recorded for the ${action}`).toBeGreaterThan(0);
   const median = medianOf(samples);
   test.info().annotations.push({
@@ -269,30 +268,30 @@ export const theActionsLandedWithinTheirBudget = (
   ).toBeLessThan(ACTION_BUDGET_MS);
 };
 
-export const theActionLandedWithinItsBudget = async (page: Page, action: string): Promise<void> => {
-  theActionsLandedWithinTheirBudget(action, [await actionClocked(page)]);
+export const actionWithinBudget = async (page: Page, action: string): Promise<void> => {
+  medianActionWithinBudget(action, [await actionClocked(page)]);
 };
 
-export const saysARefusal = (
+export const alertHasText = (
   alert: Locator,
   within?: { readonly timeout: number },
 ): Promise<void> => expect(alert, "the alert has no text").toHaveText(/\S/, within);
 
-export const saysOfItsRead = (list: Locator): Promise<void> =>
+export const listStatusHasText = (list: Locator): Promise<void> =>
   expect(
     list.locator('[aria-live="polite"]'),
     "the list's aria-live region has no text",
   ).toHaveText(/\S/);
 
-export const saysSomethingNew = (region: Locator, earlier: string): Promise<void> =>
+export const regionShowsNewText = (region: Locator, earlier: string): Promise<void> =>
   expect
     .poll(
       async () => ["", earlier.trim()].includes((await region.innerText()).trim()),
-      "The region shows new text",
+      "the region still shows its earlier text or nothing",
     )
     .toBe(false);
 
-export const saysTheWait = async (
+export const alertShowsWait = async (
   alert: Locator,
   waitSeconds: number | undefined,
 ): Promise<void> => {
@@ -303,7 +302,7 @@ export const saysTheWait = async (
   );
 };
 
-export const keepsItsWordOffThePage = (page: Page, word: RefusalWord): Promise<void> =>
+export const pageHidesRefusalWord = (page: Page, word: RefusalWord): Promise<void> =>
   expect(page.locator("body"), `the page shows the refusal word ${word}`).not.toContainText(word);
 
 const KEY_IN_FOURS = /^[A-Z2-7]{4}(?: [A-Z2-7]{1,4})+$/;
@@ -313,11 +312,11 @@ export const keyShown = async (page: Page): Promise<string> =>
 
 export const tokenPainted = (page: Page, token: string, property: string): Promise<string> =>
   page.evaluate(
-    ([name, painted]) => {
+    ([name, cssProperty]) => {
       const probe = document.createElement("span");
-      probe.style.setProperty(painted, `var(${name})`);
+      probe.style.setProperty(cssProperty, `var(${name})`);
       document.body.append(probe);
-      const value = getComputedStyle(probe).getPropertyValue(painted);
+      const value = getComputedStyle(probe).getPropertyValue(cssProperty);
       probe.remove();
       return value;
     },
@@ -387,11 +386,11 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
       return [mix(0), mix(1), mix(2), 1];
     };
     const over = (top: Rgba, under: Rgba): Rgba => mixed(top, under, top[3]);
-    const painted = ([red, green, blue]: Rgba) =>
+    const asRgb = ([red, green, blue]: Rgba) =>
       `rgb(${[red, green, blue].map((channel) => String(Math.round(channel))).join(", ")})`;
     const fillOf = (element: Element) => rgba(getComputedStyle(element).backgroundColor);
     const WHITE: Rgba = [255, 255, 255, 1];
-    const shownThrough = (element: Element | null, layers: readonly Rgba[]): Rgba => {
+    const compositeColour = (element: Element | null, layers: readonly Rgba[]): Rgba => {
       const down: Element[] = [];
       for (let at = element; at !== null; at = at.parentElement) down.unshift(at);
       const from = (depth: number, under: Rgba): Rgba => {
@@ -413,11 +412,11 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
       return sides
         .filter((side) => Number.parseFloat(style.getPropertyValue(`border-${side}-width`)) > 0)
         .map((side) =>
-          painted(shownThrough(element, [rgba(style.getPropertyValue(`border-${side}-color`))])),
+          asRgb(compositeColour(element, [rgba(style.getPropertyValue(`border-${side}-color`))])),
         );
     };
-    const words = (element: Element) => element.textContent.trim();
-    const seen = (control: HTMLElement): boolean =>
+    const textOf = (element: Element) => element.textContent.trim();
+    const isVisibleAndEnabled = (control: HTMLElement): boolean =>
       control.getBoundingClientRect().width > 1 &&
       control.checkVisibility({ opacityProperty: true, visibilityProperty: true }) &&
       control.closest("[aria-hidden=true], [inert]") === null &&
@@ -431,29 +430,29 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
     };
     const measured = (control: HTMLElement) => {
       const parent = control.parentElement;
-      const wordless =
-        parent !== null && parent !== document.body && words(parent) === words(control)
+      const sameTextParent =
+        parent !== null && parent !== document.body && textOf(parent) === textOf(control)
           ? parent
           : undefined;
-      const hugged = wordless === undefined ? [] : sidesHugging(control, wordless);
-      const wrapper = hugged.length > 0 ? wordless : undefined;
+      const hugged = sameTextParent === undefined ? [] : sidesHugging(control, sameTextParent);
+      const wrapper = hugged.length > 0 ? sameTextParent : undefined;
       return {
         control: nameOf(control),
         edges: [...sidesOf(control), ...(wrapper === undefined ? [] : sidesOf(wrapper, hugged))],
-        fill: painted(shownThrough(control, [])),
-        behind: painted(shownThrough((wrapper ?? control).parentElement, [])),
+        fill: asRgb(compositeColour(control, [])),
+        behind: asRgb(compositeColour((wrapper ?? control).parentElement, [])),
       };
     };
-    const BY_EDGE =
+    const FIELDS =
       "input:not([type=hidden], [type=checkbox], [type=radio], [type=button], [type=submit], [type=reset], [type=image], [type=file], [type=range], [type=color]), textarea, select, [role=combobox]";
-    const BY_EDGE_UNLESS_WORDED =
+    const CHECKABLE_CONTROLS =
       "input[type=checkbox], input[type=radio], [role=checkbox], [role=radio], [role=switch]";
     return [
-      ...document.querySelectorAll<HTMLElement>(BY_EDGE),
-      ...[...document.querySelectorAll<HTMLElement>(BY_EDGE_UNLESS_WORDED)].filter(
-        (control) => words(control) === "",
+      ...document.querySelectorAll<HTMLElement>(FIELDS),
+      ...[...document.querySelectorAll<HTMLElement>(CHECKABLE_CONTROLS)].filter(
+        (control) => textOf(control) === "",
       ),
     ]
-      .filter(seen)
+      .filter(isVisibleAndEnabled)
       .map(measured);
   });

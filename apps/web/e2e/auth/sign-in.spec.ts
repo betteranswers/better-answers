@@ -15,15 +15,15 @@ import {
   landedAtHome,
   person,
   provision,
-  saysSomethingNew,
-  saysTheWait,
+  regionShowsNewText,
+  alertShowsWait,
   signedInAtHome,
   signIn,
   signInHeading,
-  signInSaysWhy,
+  signInStatusText,
   signOutFromTheShell,
   tabUntilFocused,
-  theActionLandedWithinItsBudget,
+  actionWithinBudget,
 } from "../harness.ts";
 import { scrolledSideways } from "../knowledge.ts";
 
@@ -60,7 +60,7 @@ const saysANewEmailWent = async (page: Page, earlier: string): Promise<void> => 
     page.getByRole("button", { name: "Send a New Code" }),
     "the new email is still sending",
   ).toHaveAttribute("aria-disabled", "false");
-  await saysSomethingNew(page.getByRole("status"), earlier);
+  await regionShowsNewText(page.getByRole("status"), earlier);
 };
 
 const asXPath = (words: string): string =>
@@ -250,9 +250,9 @@ test("Sign In works by keyboard and shows the rate-limit wait", async ({
   });
   const answered = theSendsAnswer(page);
   await page.keyboard.press("n");
-  await theActionLandedWithinItsBudget(page, "send a new code");
+  await actionWithinBudget(page, "send a new code");
 
-  await saysTheWait(page.getByRole("alert"), await waitNamedBy(answered));
+  await alertShowsWait(page.getByRole("alert"), await waitNamedBy(answered));
   await passesTheAccessibilityGate();
 
   await page.keyboard.press("e");
@@ -369,7 +369,7 @@ test("signing in after an expired session returns to the page", async ({
   await context.clearCookies();
   await page.reload();
 
-  const ended = await signInSaysWhy(page);
+  const ended = await signInStatusText(page);
   await passesTheAccessibilityGate();
   await signIn(page, request, email);
 
@@ -378,7 +378,7 @@ test("signing in after an expired session returns to the page", async ({
 
   await signOutFromTheShell(page, workspace.admin.name);
   expect(
-    await signInSaysWhy(page),
+    await signInStatusText(page),
     "after sign-out, the sign-in page gives the ended-session reason",
   ).not.toBe(ended);
 });

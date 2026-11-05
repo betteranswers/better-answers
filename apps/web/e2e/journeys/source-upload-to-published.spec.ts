@@ -15,16 +15,16 @@ import {
 import {
   clockTheNextKey,
   moveTheSync,
-  saysOfItsRead,
+  listStatusHasText,
   seedConnectedSources,
   skipLinkReachesThePage,
-  theActionLandedWithinItsBudget,
+  actionWithinBudget,
 } from "../harness.ts";
-import { heldBack } from "../knowledge.ts";
+import { holdRequests } from "../knowledge.ts";
 
 const EVERYONE = "Everyone in the workspace";
 
-const saidNowIn = async (region: Locator): Promise<string> => (await region.textContent()) ?? "";
+const textOf = async (region: Locator): Promise<string> => (await region.textContent()) ?? "";
 
 const A_SYNC_UNDER_WAY = /^\D+\d{2}:\d{2}/;
 
@@ -38,12 +38,12 @@ const answeredTheList = async (answer: Response): Promise<boolean> => {
 };
 
 const listsNothingConnected = async (page: Page, open: () => Promise<unknown>): Promise<void> => {
-  const list = await heldBack(page, isTheList);
+  const list = await holdRequests(page, isTheList);
   await open();
   await list.reached;
   const region = connectedSourcesRegion(page);
-  await saysOfItsRead(region);
-  const whileLoading = await saidNowIn(region.locator('[aria-live="polite"]'));
+  await listStatusHasText(region);
+  const whileLoading = await textOf(region.locator('[aria-live="polite"]'));
   const answered = page.waitForResponse((answer) => isTheList(new URL(answer.url())));
   list.release();
   expect(
@@ -54,7 +54,7 @@ const listsNothingConnected = async (page: Page, open: () => Promise<unknown>): 
     region.locator('[aria-live="polite"]'),
     "the list still says it is loading",
   ).not.toHaveText(whileLoading);
-  await saysOfItsRead(region);
+  await listStatusHasText(region);
   await expect(region.getByRole("listitem")).toHaveCount(0);
 };
 
@@ -125,7 +125,7 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
     await expect(dialog.getByRole("button", { name: "Connect", exact: true })).toBeFocused();
     await page.keyboard.press("Enter");
 
-    await expect(dialog.getByRole("progressbar", { name: "Upload of handbook.md" })).toBeVisible();
+    await expect(dialog.getByRole("progressbar", { name: "Uploading handbook.md" })).toBeVisible();
     await expect(dialog).toHaveCount(0);
     await devtools.send("Network.emulateNetworkConditions", {
       offline: false,
@@ -140,7 +140,7 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
     await expect(stateOf(page, "The staff handbook")).toHaveText("Received");
     const lastSynced = lastSyncedOf(page, "The staff handbook");
     await expect(lastSynced).toHaveText(A_SYNC_UNDER_WAY);
-    const whileQueued = await saidNowIn(lastSynced);
+    const whileQueued = await textOf(lastSynced);
     await expect(sensitivityOf(page, "The staff handbook")).toHaveText("Restricted");
 
     await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "claimed" });
@@ -188,8 +188,8 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
     await expect(commit).toBeDisabled();
     await expect(commit).toHaveAccessibleDescription(/\S/);
 
-    const carried = dialog.getByRole("region", { name: "What the Audit Log Will Record" });
-    await expect(carried).toMatchAriaSnapshot(`
+    const auditRecord = dialog.getByRole("region", { name: "What the Audit Log Will Record" });
+    await expect(auditRecord).toMatchAriaSnapshot(`
       - region "What the Audit Log Will Record":
         - heading "What the Audit Log Will Record" [level=3]
         - term: Action
@@ -208,35 +208,35 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
         - definition
         - term: DPIA Reference Recorded
         - definition
-        - term: Findings, Special Category
+        - term: Special Category Findings
         - definition: "0"
-        - term: Findings, Bank Details
+        - term: Bank Details Findings
         - definition: "2"
-        - term: Findings, Government Identifier
+        - term: Government Identifier Findings
         - definition: "0"
-        - term: Findings, Date of Birth
+        - term: Date of Birth Findings
         - definition: "0"
-        - term: Findings, Home Address
+        - term: Home Address Findings
         - definition: "1"
-        - term: Findings, Personal Contact
+        - term: Personal Contact Findings
         - definition: "0"
-        - term: Findings, Person Name
+        - term: Person Name Findings
         - definition: "0"
-        - term: Findings, Job Title
+        - term: Job Title Findings
         - definition: "0"
         - term: DPIA Input
         - definition
     `);
 
-    const waiting = carried.getByRole("definition").filter({
-      hasText: await saidNowIn(
-        carried
+    const unconfirmed = auditRecord.getByRole("definition").filter({
+      hasText: await textOf(
+        auditRecord
           .getByRole("term")
           .filter({ hasText: "Lawful Basis Recorded" })
           .locator("xpath=following-sibling::dd[1]"),
       ),
     });
-    await expect(waiting).toHaveCount(3);
+    await expect(unconfirmed).toHaveCount(3);
     await expect(dialog.getByRole("checkbox", { name: "Lawful basis recorded" })).toBeFocused();
     await page.keyboard.press("Space");
     await page.keyboard.press("Tab");
@@ -248,8 +248,8 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
     await expect(dialog.getByRole("checkbox", { name: "DPIA reference recorded" })).toBeFocused();
     await page.keyboard.press("Space");
     await expect(
-      waiting,
-      "What the Audit Log Will Record lists a ticked confirmation as not made",
+      unconfirmed,
+      "the audit record still shows a ticked confirmation as not confirmed",
     ).toHaveCount(0);
     await page.keyboard.press("Tab");
     await page.keyboard.press("Tab");
@@ -260,7 +260,7 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
       reads: "Published",
     });
     await page.keyboard.press("Enter");
-    await theActionLandedWithinItsBudget(page, "publish");
+    await actionWithinBudget(page, "publish");
 
     await expect(saidIn(page)).toContainText("Staff handbook");
     await expect(stateOf(page, "Staff handbook")).toHaveText("Published");

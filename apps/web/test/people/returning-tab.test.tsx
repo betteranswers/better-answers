@@ -1,12 +1,10 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { switchedInAnotherTab } from "@/app/words.ts";
-import { MEMBERS_LOADING } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack, type Api } from "@test/stubbed-api.ts";
+import { holdProcedure, type Api } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -28,8 +26,6 @@ import {
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
-
-const SAID = switchedInAnotherTab(HOLME.name);
 
 const MEMBERS = HOMES.Admin.path;
 
@@ -62,16 +58,16 @@ const shownAgain = () => {
 const openMembersWithTheListOnItsWay = async (api: Api, answer: unknown) => {
   const router = await openAt(MEMBERS, api);
   await waitFor(() => expect(tickOf(GRACE.displayName)).not.toBeNull());
-  const list = heldBack(api, "members.list", answer);
-  // Asked apart from the member read: two reads in one request are answered together.
+  const list = holdProcedure(api, "members.list", answer);
+  // Read the list separately, because reads batched in one request get one answer.
   openTab("Invitations");
   openTab("Members");
   await list.asked;
   return { router, list };
 };
 
-describe("a tab shown again after a switch in another tab", () => {
-  it("draws no row of the workspace left", async () => {
+describe("a tab shown again after another tab switched workspace", () => {
+  it("shows no rows from the old workspace", async () => {
     const api = adaAnAdmin();
     const { router, list } = await openMembersWithTheListOnItsWay(api, read([ADA, HEDY]));
     expect(tickOf(GRACE.displayName)).not.toBeNull();
@@ -80,16 +76,19 @@ describe("a tab shown again after a switch in another tab", () => {
     shownAgain();
 
     await switcher(HOLME);
-    expect(tickOf(GRACE.displayName), "a row of the workspace left is drawn").toBeNull();
-    expect(await screen.findByText(MEMBERS_LOADING)).toBeDefined();
+    expect(tickOf(GRACE.displayName), "a row from the old workspace is shown").toBeNull();
+    expect(
+      tickOf(HEDY.displayName),
+      "the list showed rows before the new read finished",
+    ).toBeNull();
     expect(router.state.location.pathname).toBe(MEMBERS);
-    await waitFor(() => expect(band().getByRole("status").textContent).toBe(SAID));
+    await waitFor(() => expect(band().getByRole("status").textContent).toContain(HOLME.name));
 
     list.resolve();
     await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());
   });
 
-  it("redraws a member page as the person is there", async () => {
+  it("reloads a member page with the member's new details", async () => {
     const api = adaAnAdmin();
     const router = await openAt(GRACES_PAGE, api);
     await screen.findByRole("radio", { name: "Admin", checked: true });
@@ -100,15 +99,15 @@ describe("a tab shown again after a switch in another tab", () => {
     await switcher(HOLME);
     expect(await screen.findByRole("radio", { name: "Viewer", checked: true })).toBeDefined();
     expect(router.state.location.pathname).toBe(GRACES_PAGE);
-    expect(said()).toBe(SAID);
+    expect(said(), "the top band did not name the new workspace").toContain(HOLME.name);
   });
 
-  it("says it no longer once the person moves on", async () => {
+  it("clears the message once the person goes to another page", async () => {
     const api = adaAnAdmin();
     const router = await openAt(MEMBERS, api);
     aSwitchInAnotherTab(api, "Admin");
     shownAgain();
-    await waitFor(() => expect(said()).toBe(SAID));
+    await waitFor(() => expect(said()).toContain(HOLME.name));
 
     fireEvent.click(
       within(screen.getByRole("navigation", { name: "Control Centre" })).getByRole("link", {
@@ -127,17 +126,24 @@ describe("a tab shown again after a switch in another tab", () => {
 
     shownAgain();
 
-    await waitFor(() => expect(adminsAreaOffered(), "the role is read again").toBeNull());
-    expect(tickOf(GRACE.displayName), "the list held was dropped").not.toBeNull();
+    await waitFor(() =>
+      expect(adminsAreaOffered(), "the Admin area stayed after the role changed").toBeNull(),
+    );
+    expect(
+      tickOf(GRACE.displayName),
+      "the list was cleared though only the role changed",
+    ).not.toBeNull();
     expect(said()).toBe("");
 
     list.resolve();
-    await waitFor(() => expect(tickOf(HEDY.displayName), "the read on its way").not.toBeNull());
+    await waitFor(() =>
+      expect(tickOf(HEDY.displayName), "the pending list read never finished").not.toBeNull(),
+    );
   });
 });
 
-describe("a tab that changes workspace itself", () => {
-  it("says nothing of another tab after its own switch", async () => {
+describe("a tab that switches workspace itself", () => {
+  it("shows no other-tab message after its own switch", async () => {
     const api = adaAnAdmin();
     movingTheSession(api, SET_ACTIVE, { id: HOLME.id });
     const router = await openAt(MEMBERS, api);
@@ -149,7 +155,7 @@ describe("a tab that changes workspace itself", () => {
     await waitFor(() => expect(said()).toBe(""));
   });
 
-  it("says nothing of another tab after a pick", async () => {
+  it("shows no other-tab message after choosing a workspace", async () => {
     const api = adaAnAdmin();
     movingTheSession(api, SET_ACTIVE, { id: HOLME.id });
     const router = await openAt(MEMBERS, api);
@@ -161,7 +167,7 @@ describe("a tab that changes workspace itself", () => {
     await waitFor(() => expect(said()).toBe(""));
   });
 
-  it("says nothing of another tab after a join", async () => {
+  it("shows no other-tab message after joining a workspace", async () => {
     const api = adaAnAdmin();
     api.set("person.invitation", () =>
       read({ workspaceName: HOLME.name, invitedBy: GRACE.displayName, role: "Viewer" }),

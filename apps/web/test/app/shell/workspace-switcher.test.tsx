@@ -43,7 +43,7 @@ import {
   addressOf,
   answered,
   answeringAs,
-  heldBack,
+  holdProcedure,
   type Api,
   type Held,
 } from "@test/stubbed-api.ts";
@@ -69,20 +69,20 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
-type Drawn = Parameters<typeof WorkspaceSwitcher>[0];
+type SwitcherProps = Parameters<typeof WorkspaceSwitcher>[0];
 
-type Switching = Drawn["switching"];
+type Switching = SwitcherProps["switching"];
 
 const HOLME_LISTED = { ...HOLME, role: "Viewer" };
 
-type Standing = Pick<Drawn, "here"> & Pick<Switching, "workspaces">;
+type MenuState = Pick<SwitcherProps, "here"> & Pick<Switching, "workspaces">;
 
-const IN_NORTHERN: Standing = {
+const IN_NORTHERN: MenuState = {
   here: { name: "Northern Tooling", workspaceId: "w", role: "Admin" },
   workspaces: [HOLME_LISTED],
 };
 
-const aSwitch = (pending: boolean, workspaces: Switching["workspaces"]): Switching => ({
+const switchingProps = (pending: boolean, workspaces: Switching["workspaces"]): Switching => ({
   open: true,
   onOpenChange: () => undefined,
   pending,
@@ -91,24 +91,24 @@ const aSwitch = (pending: boolean, workspaces: Switching["workspaces"]): Switchi
   outcome: undefined,
 });
 
-const openTheMenu = async (pending: boolean, standing: Standing = IN_NORTHERN) => {
+const renderSwitcherMenu = async (pending: boolean, state: MenuState = IN_NORTHERN) => {
   const root = createRootRoute({
     component: () => (
       <>
         <WorkspaceSwitcher
-          here={standing.here}
+          here={state.here}
           offersTheConsole
-          switching={aSwitch(pending, standing.workspaces)}
+          switching={switchingProps(pending, state.workspaces)}
         />
         <Outlet />
       </>
     ),
   });
-  const ways = ["/people/members", "/choose-workspace", "/console"].map((path) =>
+  const routes = ["/people/members", "/choose-workspace", "/console"].map((path) =>
     createRoute({ getParentRoute: () => root, path, component: () => null }),
   );
   const router = createRouter({
-    routeTree: root.addChildren(ways),
+    routeTree: root.addChildren(routes),
     history: createMemoryHistory({ initialEntries: ["/people/members"] }),
   });
   await router.load();
@@ -120,7 +120,7 @@ const openTheMenu = async (pending: boolean, standing: Standing = IN_NORTHERN) =
   return router;
 };
 
-const answeringTheSwitch =
+const answeringSetActiveWith =
   (answer: () => Promise<Response>) =>
   (input: Asked): Promise<Response> =>
     addressOf(input).pathname === "/organization/set-active"
@@ -135,7 +135,7 @@ const refusedWith = (code: string) => () =>
     }),
   );
 
-const renderTheHook = async <TResult,>(hook: () => TResult) => {
+const renderWithRouter = async <TResult,>(hook: () => TResult) => {
   const clients = createAppClients();
   const router = createRouter({
     routeTree: createRootRoute(),
@@ -151,66 +151,70 @@ const renderTheHook = async <TResult,>(hook: () => TResult) => {
   return { queryClient: clients.queryClient, result };
 };
 
-const switchHeld = () => renderTheHook(() => ({ switching: useSwitchWorkspace(), api: useTRPC() }));
+const renderSwitchHook = () =>
+  renderWithRouter(() => ({ switching: useSwitchWorkspace(), api: useTRPC() }));
 
-const overTheListHeld = async <TResult,>(hook: () => TResult) => {
-  const { queryClient, result } = await renderTheHook(() => ({ held: hook(), api: useTRPC() }));
+const renderWithCachedWorkspaceList = async <TResult,>(hook: () => TResult) => {
+  const { queryClient, result } = await renderWithRouter(() => ({
+    mutation: hook(),
+    api: useTRPC(),
+  }));
   const listKey = result.current.api.person.workspaces.queryKey();
   queryClient.setQueryData(listKey, []);
   return { queryClient, result, listKey };
 };
 
-const answeringTheJoin = (input: Asked): Promise<Response> =>
+const answeringAcceptInvitation = (input: Asked): Promise<Response> =>
   addressOf(input).pathname.includes("person.acceptInvitation")
     ? answered([{ result: { data: { workspaceId: HOLME.id } } }])
     : answeringAs("Admin")(input);
 
-const itemsListed = () =>
+const workspaceItems = () =>
   screen.getAllByRole("menuitemradio").map((workspace) => workspace.textContent);
 
 describe("the workspace switcher's list", () => {
-  it("says each workspace's role after its name, the open first", async () => {
-    await openTheMenu(false);
+  it("shows each workspace's role after its name, current first", async () => {
+    await renderSwitcherMenu(false);
 
-    expect(itemsListed()).toEqual(["Northern Tooling Admin", "Holme Valley Tools Viewer"]);
+    expect(workspaceItems()).toEqual(["Northern Tooling Admin", "Holme Valley Tools Viewer"]);
   });
 
-  it("says the open workspace's role before the list answers", async () => {
-    await openTheMenu(false, { ...IN_NORTHERN, workspaces: [] });
+  it("shows the current workspace's role before the list loads", async () => {
+    await renderSwitcherMenu(false, { ...IN_NORTHERN, workspaces: [] });
 
-    expect(itemsListed()).toEqual(["Northern Tooling Admin"]);
+    expect(workspaceItems()).toEqual(["Northern Tooling Admin"]);
   });
 
-  it("says each role from the list alone in the console", async () => {
-    await openTheMenu(false, {
+  it("shows only the listed workspaces in the console", async () => {
+    await renderSwitcherMenu(false, {
       here: { name: "Console", workspaceId: undefined },
       workspaces: [HOLME_LISTED],
     });
 
-    expect(itemsListed()).toEqual(["Holme Valley Tools Viewer"]);
+    expect(workspaceItems()).toEqual(["Holme Valley Tools Viewer"]);
   });
 });
 
-describe("the workspace switcher's ways out", () => {
-  it.each(["All Workspaces", "Console"])("holds %s while a switch is pending", async (name) => {
-    const router = await openTheMenu(true);
-    const navigating = vi.spyOn(router, "navigate");
+describe("the workspace switcher's navigation items", () => {
+  it.each(["All Workspaces", "Console"])("disables %s while a switch is pending", async (name) => {
+    const router = await renderSwitcherMenu(true);
+    const navigate = vi.spyOn(router, "navigate");
 
-    const way = screen.getByRole("menuitem", { name });
-    fireEvent.click(way);
+    const item = screen.getByRole("menuitem", { name });
+    fireEvent.click(item);
 
-    expect(way.getAttribute("aria-disabled")).toBe("true");
-    expect(navigating).not.toHaveBeenCalled();
+    expect(item.getAttribute("aria-disabled")).toBe("true");
+    expect(navigate).not.toHaveBeenCalled();
     expect(router.state.location.pathname).toBe("/people/members");
   });
 
-  it("takes the person to all workspaces once nothing is pending", async () => {
-    const router = await openTheMenu(false);
+  it("opens All Workspaces when no switch is pending", async () => {
+    const router = await renderSwitcherMenu(false);
 
-    const way = screen.getByRole("menuitem", { name: "All Workspaces" });
-    fireEvent.click(way);
+    const item = screen.getByRole("menuitem", { name: "All Workspaces" });
+    fireEvent.click(item);
 
-    expect(way.getAttribute("aria-disabled")).toBeNull();
+    expect(item.getAttribute("aria-disabled")).toBeNull();
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/choose-workspace"));
   });
 });
@@ -219,9 +223,9 @@ describe("a switch's refusal", () => {
   it.each([
     ["USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION", true],
     ["FORBIDDEN", false],
-  ])("turns a switch refused with %s into the platform's terms", async (code, noLongerAMember) => {
-    server.answer = answeringTheSwitch(refusedWith(code));
-    const { result } = await switchHeld();
+  ])("maps a switch refused with %s to SwitchRefused", async (code, noLongerAMember) => {
+    server.answer = answeringSetActiveWith(refusedWith(code));
+    const { result } = await renderSwitchHook();
 
     act(() => result.current.switching.mutate(HOLME));
 
@@ -233,9 +237,9 @@ describe("a switch's refusal", () => {
   it.each([
     ["USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION", true],
     ["FORBIDDEN", false],
-  ])("turns a pick refused with %s into the platform's terms", async (code, noLongerAMember) => {
-    server.answer = answeringTheSwitch(refusedWith(code));
-    const { result } = await renderTheHook(useSetActiveOrganization);
+  ])("maps a pick refused with %s to SwitchRefused", async (code, noLongerAMember) => {
+    server.answer = answeringSetActiveWith(refusedWith(code));
+    const { result } = await renderWithRouter(useSetActiveOrganization);
 
     act(() => result.current.mutate({ organizationId: HOLME.id }));
 
@@ -245,10 +249,10 @@ describe("a switch's refusal", () => {
   });
 });
 
-describe("a switch that lands", () => {
-  it("keeps the console's reads and drops the workspace's", async () => {
-    server.answer = answeringTheSwitch(() => answered({ id: HOLME.id }));
-    const { queryClient, result } = await switchHeld();
+describe("a successful switch", () => {
+  it("keeps console queries and removes workspace queries", async () => {
+    server.answer = answeringSetActiveWith(() => answered({ id: HOLME.id }));
+    const { queryClient, result } = await renderSwitchHook();
     const { api } = result.current;
     const consoleKey = api.console.workspaces.list.queryKey();
     const membersKey = api.members.list.queryKey();
@@ -263,34 +267,37 @@ describe("a switch that lands", () => {
   });
 });
 
-describe("the person's workspace list, held", () => {
-  it("stays through a switch, so the menu opens on it", async () => {
-    server.answer = answeringTheSwitch(() => answered({ id: HOLME.id }));
-    const { queryClient, result, listKey } = await overTheListHeld(useSwitchWorkspace);
+describe("the cached workspace list", () => {
+  it("survives a switch so the menu opens with it", async () => {
+    server.answer = answeringSetActiveWith(() => answered({ id: HOLME.id }));
+    const { queryClient, result, listKey } =
+      await renderWithCachedWorkspaceList(useSwitchWorkspace);
 
-    act(() => result.current.held.mutate(HOLME));
+    act(() => result.current.mutation.mutate(HOLME));
 
-    await vi.waitFor(() => expect(result.current.held.isSuccess).toBe(true));
+    await vi.waitFor(() => expect(result.current.mutation.isSuccess).toBe(true));
     expect(queryClient.getQueryData(listKey)).toEqual([]);
   });
 
-  it("stays through a pick, marked stale", async () => {
-    server.answer = answeringTheSwitch(() => answered({ id: HOLME.id }));
-    const { queryClient, result, listKey } = await overTheListHeld(useSetActiveOrganization);
+  it("survives a pick and is marked stale", async () => {
+    server.answer = answeringSetActiveWith(() => answered({ id: HOLME.id }));
+    const { queryClient, result, listKey } =
+      await renderWithCachedWorkspaceList(useSetActiveOrganization);
 
-    act(() => result.current.held.mutate({ organizationId: HOLME.id }));
+    act(() => result.current.mutation.mutate({ organizationId: HOLME.id }));
 
-    await vi.waitFor(() => expect(result.current.held.isSuccess).toBe(true));
+    await vi.waitFor(() => expect(result.current.mutation.isSuccess).toBe(true));
     expect(queryClient.getQueryState(listKey)).toMatchObject({ data: [], isInvalidated: true });
   });
 
-  it("is dropped by a join, which adds a workspace", async () => {
-    server.answer = answeringTheJoin;
-    const { queryClient, result, listKey } = await overTheListHeld(useAcceptInvitation);
+  it("is removed after joining a workspace", async () => {
+    server.answer = answeringAcceptInvitation;
+    const { queryClient, result, listKey } =
+      await renderWithCachedWorkspaceList(useAcceptInvitation);
 
-    act(() => result.current.held.mutate({ invitationId: "i" }));
+    act(() => result.current.mutation.mutate({ invitationId: "i" }));
 
-    await vi.waitFor(() => expect(result.current.held.isSuccess).toBe(true));
+    await vi.waitFor(() => expect(result.current.mutation.isSuccess).toBe(true));
     expect(queryClient.getQueryState(listKey)).toBeUndefined();
   });
 });
@@ -305,60 +312,62 @@ const GRACES_PAGE = memberPageOf(GRACE.personId);
 
 const textOf = (items: readonly HTMLElement[]) => items.map((item) => item.textContent);
 
-const openedMenu = async (here = NORTHERN) => {
+const openSwitcherMenu = async (here = NORTHERN) => {
   fireEvent.keyDown(await switcher(here), { key: "ArrowDown" });
   return screen.findByRole("menu", { name: here.name });
 };
 
-const switchedToHolme = async () => {
-  const menu = await openedMenu();
+const switchToHolme = async () => {
+  const menu = await openSwitcherMenu();
   fireEvent.click(await within(menu).findByRole("menuitemradio", { name: `${HOLME.name} Viewer` }));
 };
 
-const landingInHolme = (api: Api, whenAnswered: () => void = () => undefined) => {
+const setActiveLandsInHolme = (api: Api, onSetActive: () => void = () => undefined) => {
   api.set(SET_ACTIVE, () => {
     api.set("session.member", () => adaAt("Admin", HOLME));
     api.set("members.invitations", () => read([]));
-    whenAnswered();
+    onSetActive();
     return { id: HOLME.id };
   });
 };
 
-const answeringTheSwitchWith = (answer: () => Promise<Response>) => {
-  const rest = server.answer;
+const answerSetActiveWith = (answer: () => Promise<Response>) => {
+  const answerOthers = server.answer;
   server.answer = (asked, init) =>
-    addressOf(asked).pathname === SET_ACTIVE ? answer() : rest(asked, init);
+    addressOf(asked).pathname === SET_ACTIVE ? answer() : answerOthers(asked, init);
 };
 
-const openAtTheMembers = async (api: Api = adaAnAdmin()) => {
+const openMembersPage = async (api: Api = adaAnAdmin()) => {
   const router = await openAt(MEMBERS, api);
   await waitFor(() => expect(tickOf(GRACE.displayName)).not.toBeNull());
   return router;
 };
 
-const newMembersLoaded = async (list: Held) => {
+const loadNewMembers = async (list: Held) => {
   expect(await screen.findByText(MEMBERS_LOADING)).toBeDefined();
   list.resolve();
   await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());
 };
 
-const BOTH = [`${NORTHERN.name} Admin`, `${HOLME.name} Viewer`];
+const BOTH_WORKSPACES = [`${NORTHERN.name} Admin`, `${HOLME.name} Viewer`];
 
-const home = (name: string) => screen.findByRole("heading", { level: 1, name });
+const findPageHeading = (name: string) => screen.findByRole("heading", { level: 1, name });
 
 describe("the workspace switcher in the app", () => {
   afterEach(() => {
     onlineManager.setOnline(true);
   });
 
-  it("lists the operator's workspaces and Console, others none", async () => {
-    const operators = adaAnAdmin();
-    operators.set("session.operator", () => read({ operator: true, name: ADA.displayName }));
-    const router = await openAt(MEMBERS, operators);
+  it("lists workspaces for everyone and Console only for operatorApi", async () => {
+    const operatorApi = adaAnAdmin();
+    operatorApi.set("session.operator", () => read({ operator: true, name: ADA.displayName }));
+    const router = await openAt(MEMBERS, operatorApi);
 
-    const menu = await openedMenu();
+    const menu = await openSwitcherMenu();
 
-    await waitFor(() => expect(textOf(within(menu).getAllByRole("menuitemradio"))).toEqual(BOTH));
+    await waitFor(() =>
+      expect(textOf(within(menu).getAllByRole("menuitemradio"))).toEqual(BOTH_WORKSPACES),
+    );
     expect(within(menu).getAllByRole("menuitemradio")[0]?.getAttribute("aria-checked")).toBe(
       "true",
     );
@@ -366,7 +375,7 @@ describe("the workspace switcher in the app", () => {
     fireEvent.keyDown(menu, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
     expect(document.activeElement).toBe(await switcher());
-    fireEvent.click(within(await openedMenu()).getByRole("menuitem", { name: "Console" }));
+    fireEvent.click(within(await openSwitcherMenu()).getByRole("menuitem", { name: "Console" }));
     await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.operator.path));
     fireEvent.keyDown(await band().findByRole("button", { name: ADA.displayName }), {
       key: "Enter",
@@ -377,47 +386,52 @@ describe("the workspace switcher in the app", () => {
 
     cleanup();
     await openAt(MEMBERS, adaAnAdmin());
-    const theirs = await openedMenu();
+    const nonOperatorMenu = await openSwitcherMenu();
 
-    await waitFor(() => expect(textOf(within(theirs).getAllByRole("menuitemradio"))).toEqual(BOTH));
-    expect(textOf(within(theirs).getAllByRole("menuitem"))).toEqual([ALL_WORKSPACES]);
+    await waitFor(() =>
+      expect(textOf(within(nonOperatorMenu).getAllByRole("menuitemradio"))).toEqual(
+        BOTH_WORKSPACES,
+      ),
+    );
+    expect(textOf(within(nonOperatorMenu).getAllByRole("menuitem"))).toEqual([ALL_WORKSPACES]);
   });
 
-  it("switching from a member page lands home, showing no one", async () => {
+  it("goes to Members after switching from a member page", async () => {
     const api = adaAnAdmin();
     const router = await openAt(GRACES_PAGE, api);
     await within(screen.getByRole("main")).findByRole("heading", {
       level: 2,
       name: GRACE.displayName,
     });
-    landingInHolme(api);
-    const list = heldBack(api, "members.list", read([ADA, HEDY]));
+    setActiveLandsInHolme(api);
+    const list = holdProcedure(api, "members.list", read([ADA, HEDY]));
 
-    await switchedToHolme();
+    await switchToHolme();
 
     await switcher(HOLME);
-    expect(await home("People")).toBeDefined();
+    expect(await findPageHeading("People")).toBeDefined();
     expect(router.state.location.pathname).toBe(MEMBERS);
-    expect(document.body.textContent, "drew a person from the left workspace").not.toContain(
-      GRACE.displayName,
-    );
-    await newMembersLoaded(list);
+    expect(
+      document.body.textContent,
+      "the page shows a person from the previous workspace",
+    ).not.toContain(GRACE.displayName);
+    await loadNewMembers(list);
   });
 
-  it("drops the left workspace's members when All workspaces picks another", async () => {
+  it("clears old members after picking from All Workspaces", async () => {
     const api = adaAnAdmin();
-    const router = await openAtTheMembers(api);
-    landingInHolme(api);
+    const router = await openMembersPage(api);
+    setActiveLandsInHolme(api);
 
-    const menu = await openedMenu();
+    const menu = await openSwitcherMenu();
     fireEvent.click(within(menu).getByRole("menuitem", { name: ALL_WORKSPACES }));
     const holme = await screen.findByRole("button", { name: HOLME.name });
-    const list = heldBack(api, "members.list", read([ADA, HEDY]));
+    const list = holdProcedure(api, "members.list", read([ADA, HEDY]));
     fireEvent.click(holme);
 
     await waitFor(() => expect(switcherDrawn(HOLME)).not.toBeNull());
     expect(router.state.location.pathname).toBe(MEMBERS);
-    expect(tickOf(GRACE.displayName), "drew the left workspace's members").toBeNull();
+    expect(tickOf(GRACE.displayName), "the list shows the previous workspace's members").toBeNull();
     fireEvent.click(band().getByRole("button", { name: JUMP_TO.name }));
     const jumpTo = await screen.findByRole("dialog", { name: JUMP_TO.name });
     const search = within(jumpTo).getByRole("combobox");
@@ -425,7 +439,7 @@ describe("the workspace switcher in the app", () => {
     expect(within(jumpTo).getByRole("status").textContent).toBe(JUMP_TO.membersLoading);
     expect(
       within(jumpTo).queryByRole("group", { name: JUMP_TO.groups.members }),
-      "jump-to offered the left workspace's members",
+      "jump-to offers the previous workspace's members",
     ).toBeNull();
 
     list.resolve();
@@ -436,11 +450,11 @@ describe("the workspace switcher in the app", () => {
     await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());
   });
 
-  it("says a refused switch in the band, keeping the page", async () => {
-    const router = await openAtTheMembers();
-    answeringTheSwitchWith(refusedWith(NOT_A_MEMBER));
+  it("shows a refused switch in the band, keeping the page", async () => {
+    const router = await openMembersPage();
+    answerSetActiveWith(refusedWith(NOT_A_MEMBER));
 
-    await switchedToHolme();
+    await switchToHolme();
 
     await waitFor(() =>
       expect(band().getByRole("alert").textContent).toBe(noLongerAMemberOf(HOLME.name)),
@@ -448,15 +462,15 @@ describe("the workspace switcher in the app", () => {
     expect(document.activeElement, "focus left the switcher").toBe(await switcher());
     expect(router.state.location.pathname).toBe(MEMBERS);
     expect(tickOf(GRACE.displayName)).not.toBeNull();
-    const menu = await openedMenu();
+    const menu = await openSwitcherMenu();
     expect(textOf(within(menu).getAllByRole("menuitemradio"))).toEqual([`${NORTHERN.name} Admin`]);
   });
 
-  it("says an unanswered switch in the band, keeping the page", async () => {
-    const router = await openAtTheMembers();
-    answeringTheSwitchWith(() => Promise.reject(new TypeError("Failed to fetch")));
+  it("shows a network failure in the band, keeping the page", async () => {
+    const router = await openMembersPage();
+    answerSetActiveWith(() => Promise.reject(new TypeError("Failed to fetch")));
 
-    await switchedToHolme();
+    await switchToHolme();
 
     await waitFor(() => expect(band().getByRole("alert").textContent).toBe(STOCK.general));
     expect(document.activeElement, "focus left the switcher").toBe(await switcher());
@@ -464,14 +478,14 @@ describe("the workspace switcher in the app", () => {
     expect(tickOf(GRACE.displayName)).not.toBeNull();
   });
 
-  it("drops the left workspace's name when the member read fails", async () => {
+  it("removes the old workspace name when the member read fails", async () => {
     const api = adaAnAdmin();
-    const router = await openAtTheMembers(api);
-    landingInHolme(api, () => {
+    const router = await openMembersPage(api);
+    setActiveLandsInHolme(api, () => {
       api.set("session.member", () => LOST);
     });
 
-    await switchedToHolme();
+    await switchToHolme();
 
     await drawnWithNoWorkspace();
     expect(within(screen.getByRole("main")).getByRole("alert").textContent).toMatch(/\S/);
@@ -484,17 +498,17 @@ describe("the workspace switcher in the app", () => {
     expect(router.state.location.pathname).toBe(MEMBERS);
   });
 
-  it("drops the left workspace's name while the switch waits offline", async () => {
+  it("removes the old workspace name while the switch waits offline", async () => {
     const api = adaAnAdmin();
-    const router = await openAtTheMembers(api);
-    landingInHolme(api, () => {
+    const router = await openMembersPage(api);
+    setActiveLandsInHolme(api, () => {
       onlineManager.setOnline(false);
     });
 
-    await switchedToHolme();
+    await switchToHolme();
 
     await waitFor(() =>
-      expect(switcherDrawn(NORTHERN), "the band still names the workspace left").toBeNull(),
+      expect(switcherDrawn(NORTHERN), "the band still shows the previous workspace").toBeNull(),
     );
     expect(band().getByRole("status").textContent).toBe(PICKER_WORDS.opening);
 

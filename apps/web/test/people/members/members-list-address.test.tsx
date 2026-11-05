@@ -51,8 +51,8 @@ const pressed = (key: string) => {
   fireEvent.keyDown(document.activeElement ?? document.body, { key });
 };
 
-describe("bulk actions on the members ticked", () => {
-  it("filters by group and sorts, both held in the address", async () => {
+describe("the Members list's address", () => {
+  it("keeps the group filter and sort order in the address", async () => {
     const api = apiOf(ADA, PRIYA, SAM);
     const router = await openAt(MEMBERS, api);
     await screen.findByRole("link", { name: SAM.displayName });
@@ -63,7 +63,7 @@ describe("bulk actions on the members ticked", () => {
     });
     expect(
       listed().getAllByRole("status").at(0)?.textContent,
-      "the count says one of three match",
+      "the count did not say one of three match",
     ).toMatch(/\b1\b\D+\b3\b/);
     picked("Filter by Group", "Any Group");
     await waitFor(() => {
@@ -87,7 +87,7 @@ describe("bulk actions on the members ticked", () => {
     expect(namesShown()).toEqual([SAM.displayName, PRIYA.displayName, ADA.displayName]);
   });
 
-  it("page 2 of Editors comes back on Back", async () => {
+  it("returns to page 2 of Editors on Back", async () => {
     const router = await openAt(MEMBERS, apiOf(ADA, ...thirtyEditors));
     await screen.findByRole("link", { name: "Person 01" });
 
@@ -112,7 +112,7 @@ describe("bulk actions on the members ticked", () => {
   });
 });
 
-describe("keys on a member paged out of view", () => {
+describe("keys after paging away from the focused member", () => {
   const openedPagedAwayFromPersonOne = async () => {
     const router = await openAt(MEMBERS, apiOf(ADA, ...thirtyEditors));
     await screen.findByRole("link", { name: "Person 01" });
@@ -124,7 +124,7 @@ describe("keys on a member paged out of view", () => {
     return router;
   };
 
-  const saysToPickAMemberAfter = async (
+  const asksToSelectAMemberAfter = async (
     key: string,
     router: Awaited<ReturnType<typeof openAt>>,
   ) => {
@@ -133,31 +133,31 @@ describe("keys on a member paged out of view", () => {
     await waitFor(() => {
       expect(outcome()?.textContent).toMatch(/\S/);
     });
-    expect(router.state.location.pathname, "the keystroke left Members").toBe(MEMBERS);
+    expect(router.state.location.pathname, "the key opened another page").toBe(MEMBERS);
     expect(
       screen.queryByRole("toolbar", { name: "Selected Members" }),
-      "the keystroke selected a member",
+      "the key selected a member on another page",
     ).toBeNull();
   };
 
-  describe("acts on no member paged out of view by key", () => {
+  describe("ignores a member on another page", () => {
     it.each([
       PEOPLE_KEYSTROKES.open,
       PEOPLE_KEYSTROKES.changeRole,
       PEOPLE_KEYSTROKES.remove,
       PEOPLE_KEYSTROKES.tick,
-    ])("$key says to pick a member first", async ({ key }) => {
+    ])("$key asks you to select a member first", async ({ key }) => {
       const router = await openedPagedAwayFromPersonOne();
-      await saysToPickAMemberAfter(key, router);
-      expect(outcome()?.textContent, "the keystroke says to pick a member").toMatch(/\S/);
+      await asksToSelectAMemberAfter(key, router);
+      expect(outcome()?.textContent, "the key showed no message").toMatch(/\S/);
     });
   });
 
-  it("acts on a member paged back only once focused", async () => {
+  it("acts on a member paged back to only once focused", async () => {
     const router = await openedPagedAwayFromPersonOne();
     pressed(PEOPLE_KEYSTROKES.previousPage.key);
     await screen.findByRole("link", { name: "Person 01" });
-    await saysToPickAMemberAfter(PEOPLE_KEYSTROKES.open.key, router);
+    await asksToSelectAMemberAfter(PEOPLE_KEYSTROKES.open.key, router);
 
     memberLink("Person 01").focus();
     pressed(PEOPLE_KEYSTROKES.open.key);

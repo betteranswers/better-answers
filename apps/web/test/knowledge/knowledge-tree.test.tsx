@@ -46,7 +46,7 @@ describe("the knowledge tree", () => {
     pressed("ArrowDown");
     expect(focused()).toBe(item("No collection"));
     pressed("ArrowDown");
-    expect(focused(), "Down past the last item moved on").toBe(item("No collection"));
+    expect(focused(), "Down moved focus past the last item").toBe(item("No collection"));
     pressed("ArrowUp");
     expect(focused()).toBe(item("product"));
     expect(item("product").tabIndex).toBe(0);
@@ -61,20 +61,20 @@ describe("the knowledge tree", () => {
 
     pressed("ArrowRight");
     expect(item("company").getAttribute("aria-expanded")).toBe("true");
-    expect(focused(), "the first Right moved focus").toBe(item("company"));
+    expect(focused(), "the first Right moved focus instead of opening").toBe(item("company"));
     pressed("ArrowRight");
     expect(focused()).toBe(item("insurance policy"));
     expect(item("insurance policy").getAttribute("aria-level")).toBe("2");
   });
 
-  it("a typed letter moves to the next match", () => {
+  it("moves to the next item starting with a typed letter", () => {
     drawn({ collection: "company", kind: "lease" });
     fromCompany();
 
-    expect(pressed("l"), "the tree left a letter to the page").toBe(false);
+    expect(pressed("l"), "the tree let the typed letter reach the page").toBe(false);
     expect(focused()).toBe(item("lease"));
     pressed("L");
-    expect(focused(), "the letter stayed on the match in focus").toBe(item("licence"));
+    expect(focused(), "the letter did not move past the match in focus").toBe(item("licence"));
     pressed("l");
     expect(focused()).toBe(item("lease"));
     pressed("P");
@@ -93,7 +93,7 @@ describe("the knowledge tree", () => {
     expect(focused()).toBe(item("company"));
   });
 
-  it("Home and End reach the first and last items", () => {
+  it("reaches the first item by Home, the last by End", () => {
     drawn({ collection: null, kind: "policy" });
     item("policy").focus();
 
@@ -103,7 +103,7 @@ describe("the knowledge tree", () => {
     expect(focused()).toBe(item("policy"));
   });
 
-  it("the left arrow climbs to a collection, then closes it", () => {
+  it("moves up to a collection with Left, then closes it", () => {
     drawn({ collection: "company", kind: "lease" });
     item("lease").focus();
 
@@ -114,7 +114,7 @@ describe("the knowledge tree", () => {
     expect(item("company").getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("Enter or a click on a kind opens it", () => {
+  it("opens a kind with Enter or a click", () => {
     const onOpen = drawn({ collection: "company", kind: "lease" });
     expect(item("lease").getAttribute("aria-selected")).toBe("true");
     item("insurance policy").focus();

@@ -14,9 +14,9 @@ const action = (label: string, destructive?: boolean) => ({
   onSelect: NOTHING,
 });
 
-const menuOf = (actions: readonly ReturnType<typeof action>[]) => {
+const openMenuItems = (actions: readonly ReturnType<typeof action>[]) => {
   render(<RowMenu name="Ada Lovelace" actions={actions} />);
-  // The registry's menus open on a key or a press, never on a click.
+  // The menus open on a key or pointer press, never on a click.
   fireEvent.keyDown(screen.getByRole("button", { name: "Actions for Ada Lovelace" }), {
     key: "Enter",
   });
@@ -26,9 +26,9 @@ const menuOf = (actions: readonly ReturnType<typeof action>[]) => {
 };
 
 describe("a row's menu", () => {
-  it("draws a leading destructive action last, below a separator", () => {
+  it("moves a leading destructive action last, below a separator", () => {
     expect(
-      menuOf([action("Remove from workspace", true), action("Open"), action("Change Role")]),
+      openMenuItems([action("Remove from workspace", true), action("Open"), action("Change Role")]),
     ).toEqual(["Open", "Change Role", "—", "Remove from workspace"]);
   });
 
@@ -40,14 +40,17 @@ describe("a row's menu", () => {
       action("Revoke", true),
     ];
 
-    expect(menuOf(actions)).toEqual(["Open", "Change Role", "—", "Remove", "Revoke"]);
+    expect(openMenuItems(actions)).toEqual(["Open", "Change Role", "—", "Remove", "Revoke"]);
   });
 
-  it("draws no separator when every action is destructive", () => {
-    expect(menuOf([action("Remove", true), action("Revoke", true)])).toEqual(["Remove", "Revoke"]);
+  it("shows no separator when every action is destructive", () => {
+    expect(openMenuItems([action("Remove", true), action("Revoke", true)])).toEqual([
+      "Remove",
+      "Revoke",
+    ]);
   });
 
-  it("lands focus where an action that took its row asks", async () => {
+  it("moves focus to the target a row-removing action names", async () => {
     render(
       <>
         <h2 tabIndex={-1}>Invitations</h2>
@@ -74,7 +77,7 @@ describe("a row's menu", () => {
     });
   });
 
-  it("hands focus back to its trigger after any other action", async () => {
+  it("returns focus to the trigger after any other action", async () => {
     render(<RowMenu name="Ada Lovelace" actions={[action("Resend")]} />);
     const trigger = screen.getByRole("button", { name: "Actions for Ada Lovelace" });
     fireEvent.keyDown(trigger, { key: "Enter" });

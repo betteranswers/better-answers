@@ -15,12 +15,12 @@ type Revocation = ReturnType<typeof useEndEverySignInEverywhere>;
 
 const outcomeOf = (revocation: Revocation, name: string): Outcome | undefined => {
   if (revocation.isPending) {
-    return { tone: "said", words: `Ending every sign-in and token ${name} holds, everywhere.` };
+    return { tone: "said", words: `Signing ${name} out everywhere.` };
   }
   if (revocation.isSuccess) {
     return {
       tone: "said",
-      words: `${name}’s sessions and assistant access were ended successfully at ${instantWords(revocation.data.revokedAt)}.`,
+      words: `${name} has been signed out everywhere at ${instantWords(revocation.data.revokedAt)}.`,
     };
   }
   return revocation.isError ? revocationRefused(revocation.error, "action") : undefined;
@@ -42,9 +42,9 @@ export function EndEverySignInEverywhere(properties: {
   };
 
   return (
-    <SheetPart title="End Every Sign-In Everywhere">
+    <SheetPart title="Sign Out Everywhere">
       <p id={consequenceId} className="text-muted-foreground">
-        This will end every session and every assistant’s access {name} holds, in every workspace.
+        This signs {name} out on every device and ends every assistant’s access, in every workspace.
         They can sign in again afterwards.
       </p>
       <SheetActionButton
@@ -55,7 +55,7 @@ export function EndEverySignInEverywhere(properties: {
           setConfirming(true);
         }}
       >
-        End Every Sign-In and Token
+        Sign Out Everywhere
       </SheetActionButton>
       <OutcomeLine outcome={outcomeOf(revocation, name)} />
 
@@ -68,11 +68,11 @@ export function EndEverySignInEverywhere(properties: {
             actionRef.current?.focus();
           },
         }}
-        title={`End Every Sign-In and Token for ${name}`}
-        consequence={`Are you sure you want to end every session and every assistant’s access ${name} holds, in every workspace? This action cannot be undone.`}
+        title={`Sign Out ${name} Everywhere`}
+        consequence={`This signs ${name} out on every device and ends every assistant’s access, in every workspace. This action cannot be undone.`}
         commit={
           <Button variant="destructive" onClick={commit}>
-            End Every Sign-In Everywhere
+            Sign Out Everywhere
           </Button>
         }
       />

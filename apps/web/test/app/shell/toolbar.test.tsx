@@ -14,10 +14,10 @@ const shellAt = async (path: string) => (await openApp(path)).router;
 
 const tabs = () => screen.getByRole("tablist", { name: "Models and Spend" });
 
-const openTab = () => within(tabs()).getByRole("tab", { selected: true }).textContent;
+const selectedTab = () => within(tabs()).getByRole("tab", { selected: true }).textContent;
 
-/** The registry opens a tab where a pointer commits — the press — and not on the click. */
-const pick = (name: string) => fireEvent.mouseDown(within(tabs()).getByRole("tab", { name }));
+/** Tabs open on mouse down, not on click. */
+const chooseTab = (name: string) => fireEvent.mouseDown(within(tabs()).getByRole("tab", { name }));
 
 const A_TABBED_PAGE: PageToolbar = {
   tabs: [
@@ -57,9 +57,9 @@ function AnotherPagesAction() {
   );
 }
 
-function ReviewView(properties: { readonly throwsOnATick: boolean }) {
+function ReviewView(properties: { readonly throwsAfterTick: boolean }) {
   const [ticked, tick] = useTickedGroups();
-  if (properties.throwsOnATick && ticked !== undefined) throw new Error("the page's own bug");
+  if (properties.throwsAfterTick && ticked !== undefined) throw new Error("review view failed");
 
   return (
     <button type="button" onClick={() => tick(2)}>
@@ -75,18 +75,15 @@ const A_REVIEW_VIEW: PageToolbar = {
   ],
 };
 
-const drawReview = (throwsOnATick: boolean) =>
+const renderReview = (throwsAfterTick: boolean) =>
   render(
     <PageTabsRoot tabs={A_REVIEW_VIEW.tabs}>
       <Toolbar name="Review" toolbar={A_REVIEW_VIEW} />
       <NarrowAction />
       <AnotherPagesAction />
       <PagePanel>
-        <CatchBoundary
-          getResetKey={() => "the panel's own subtree"}
-          errorComponent={() => <p>The page failed to draw.</p>}
-        >
-          <ReviewView throwsOnATick={throwsOnATick} />
+        <CatchBoundary getResetKey={() => "panel"} errorComponent={() => <p>Error fallback</p>}>
+          <ReviewView throwsAfterTick={throwsAfterTick} />
         </CatchBoundary>
       </PagePanel>
     </PageTabsRoot>,
@@ -97,11 +94,11 @@ const narrowAction = () => screen.getByRole("button", { name: /^Narrow (these|\d
 const anotherPagesAction = () =>
   screen.getByRole("button", { name: "Narrow another page's documents" });
 
-const reviewTab = (name: string) =>
+const chooseReviewTab = (name: string) =>
   fireEvent.mouseDown(screen.getByRole("tab", { name, selected: false }));
 
-describe("the toolbar the open page fills", () => {
-  it("carries the page's tabs in order, the open one selected", async () => {
+describe("the page toolbar", () => {
+  it("shows the page's tabs in order, open one selected", async () => {
     await shellAt(MODELS_AND_SPEND);
 
     expect(
@@ -109,15 +106,15 @@ describe("the toolbar the open page fills", () => {
         .getAllByRole("tab")
         .map((tab) => tab.textContent),
     ).toEqual(["Model Choices", "Spend"]);
-    expect(openTab()).toBe("Model Choices");
+    expect(selectedTab()).toBe("Model Choices");
   });
 
-  it("opens the picked tab, and says when it is unbuilt", async () => {
+  it("opens the chosen tab and shows a placeholder when unbuilt", async () => {
     await shellAt(MODELS_AND_SPEND);
 
-    pick("Spend");
+    chooseTab("Spend");
 
-    expect(openTab()).toBe("Spend");
+    expect(selectedTab()).toBe("Spend");
     const panel = screen.getByRole("tabpanel");
     expect(panel.getAttribute("aria-labelledby")).toBe(
       within(tabs()).getByRole("tab", { name: "Spend" }).id,
@@ -127,22 +124,22 @@ describe("the toolbar the open page fills", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models");
   });
 
-  it("opens another page on its own first tab", () => {
-    const shell = (toolbar: PageToolbar, name: string) => (
+  it("opens a different page on that page's first tab", () => {
+    const toolbarFor = (toolbar: PageToolbar, name: string) => (
       <PageTabsRoot tabs={toolbar.tabs}>
         <Toolbar name={name} toolbar={toolbar} />
       </PageTabsRoot>
     );
-    const { rerender } = render(shell(A_TABBED_PAGE, "Connected Sources"));
+    const { rerender } = render(toolbarFor(A_TABBED_PAGE, "Connected Sources"));
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Gone at source" }));
     expect(screen.getByRole("tab", { selected: true }).textContent).toBe("Gone at source");
 
-    rerender(shell(ANOTHER_TABBED_PAGE, "Ceiling"));
+    rerender(toolbarFor(ANOTHER_TABBED_PAGE, "Ceiling"));
 
     expect(screen.getByRole("tab", { selected: true }).textContent).toBe("Spend");
   });
 
-  it("gives the open tab its own panel, holding the page", async () => {
+  it("renders the page inside the open tab's panel", async () => {
     await shellAt(MODELS_AND_SPEND);
 
     const panel = screen.getByRole("tabpanel");
@@ -152,14 +149,14 @@ describe("the toolbar the open page fills", () => {
     expect(within(panel).getByRole("region", { name: "Model Choices" })).toBeDefined();
   });
 
-  it("draws no toolbar or panel without tabs", async () => {
+  it("renders no toolbar or panel for a page without tabs", async () => {
     await shellAt("/ask");
 
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("tabpanel")).toBeNull();
   });
 
-  it("draws a page's first heading before its tabs", async () => {
+  it("renders the page heading before its tabs", async () => {
     await shellAt(MODELS_AND_SPEND);
 
     const page = screen.getByRole("main");
@@ -171,9 +168,9 @@ describe("the toolbar the open page fills", () => {
   });
 });
 
-describe("the slot a page writes and its other parts read", () => {
-  it("gives an action what its own page wrote, not another's", () => {
-    drawReview(false);
+describe("page view state shared with toolbar actions", () => {
+  it("gives an action its own page's state, not another page's", () => {
+    renderReview(false);
 
     expect(narrowAction().textContent).toBe("Narrow these documents");
     expect(narrowAction().hasAttribute("disabled")).toBe(true);
@@ -185,16 +182,16 @@ describe("the slot a page writes and its other parts read", () => {
     expect(anotherPagesAction().hasAttribute("disabled")).toBe(true);
   });
 
-  it("empties the slot when a page that threw is reopened", () => {
-    drawReview(true);
+  it("clears the state when a page that threw is reopened", () => {
+    renderReview(true);
 
     fireEvent.click(screen.getByRole("button", { name: "Tick two groups" }));
 
-    expect(screen.getByText("The page failed to draw.")).toBeDefined();
+    expect(screen.getByText("Error fallback")).toBeDefined();
     expect(screen.getByRole("tab", { selected: true }).textContent).toBe("Open");
 
-    reviewTab("Done");
-    reviewTab("Open");
+    chooseReviewTab("Done");
+    chooseReviewTab("Open");
 
     expect(screen.getByRole("button", { name: "Tick two groups" })).toBeDefined();
     expect(narrowAction().textContent).toBe("Narrow these documents");

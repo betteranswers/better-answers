@@ -13,8 +13,8 @@ const A_RECORD = detailAt(
   "01JXRECRD0000000000000000A",
 );
 
-describe("a record of Your Questions", () => {
-  it("draws not found when the api names no such record", async () => {
+describe("a question on Your Questions", () => {
+  it("shows Page Not Found when the question does not exist", async () => {
     const drawn = await openedWhereTheApiNamesNone(A_RECORD, "ask.yourRecord");
 
     expect(drawn.notFound).toBeDefined();

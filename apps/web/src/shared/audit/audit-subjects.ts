@@ -10,7 +10,7 @@ export type Thing = keyof typeof THING_NOUNS;
 
 const UNNAMED_BECAUSE = {
   removed: "(removed)",
-  withheld: "you cannot read",
+  withheld: "you don't have access to",
 } as const;
 
 export const unnamedWords = (thing: {

@@ -1,25 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { WHILE_A_CEILING_HOLDS as HOLDS } from "@/shared/api/query-client.ts";
+import { WHILE_A_CEILING_HOLDS as RATE_LIMITED_OPTIONS } from "@/shared/api/query-client.ts";
 import { carrying } from "@test/stubbed-api.ts";
 
 const NOON_MS = new Date("2026-10-10T12:00:00Z").getTime();
 
 const failedAtNoon = (error: Error | null) => ({ state: { error, errorUpdatedAt: NOON_MS } });
 
-const PAST_ITS_CEILING = failedAtNoon(carrying({ retryAfterSeconds: 30 }));
+const RATE_LIMITED = failedAtNoon(carrying({ retryAfterSeconds: 30 }));
 
-const { retry, ...unasked } = HOLDS;
+const { retry, ...refetchRules } = RATE_LIMITED_OPTIONS;
 
-const UNASKED = Object.entries(unasked);
+const REFETCH_RULES = Object.entries(refetchRules);
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("a read that met a ceiling", () => {
-  it("is held on every road but the reader's own ask", () => {
-    expect(Object.keys(unasked).toSorted()).toEqual([
+describe("a rate-limited read", () => {
+  it("suppresses every automatic refetch", () => {
+    expect(Object.keys(refetchRules).toSorted()).toEqual([
       "refetchOnMount",
       "refetchOnReconnect",
       "refetchOnWindowFocus",
@@ -27,35 +27,35 @@ describe("a read that met a ceiling", () => {
     ]);
   });
 
-  it.each(UNASKED)("is not asked again by %s while its wait runs", (_, asksAgain) => {
+  it.each(REFETCH_RULES)("skips %s until the retry wait ends", (_, refetches) => {
     vi.useFakeTimers({ now: NOON_MS + 29_999 });
 
-    expect(asksAgain(PAST_ITS_CEILING)).toBe(false);
+    expect(refetches(RATE_LIMITED)).toBe(false);
   });
 
-  it.each(UNASKED)("is asked again by %s once its wait is over", (_, asksAgain) => {
+  it.each(REFETCH_RULES)("allows %s after the retry wait ends", (_, refetches) => {
     vi.useFakeTimers({ now: NOON_MS + 30_000 });
 
-    expect(asksAgain(PAST_ITS_CEILING)).toBe(true);
+    expect(refetches(RATE_LIMITED)).toBe(true);
   });
 
-  it("is not retried at once", () => {
+  it("is not retried immediately", () => {
     expect(retry(0, carrying({ retryAfterSeconds: 30 }))).toBe(false);
   });
 });
 
-describe("a read that met no ceiling", () => {
-  it.each(UNASKED)("is asked again by %s after a failure", (_, asksAgain) => {
+describe("a read that is not rate-limited", () => {
+  it.each(REFETCH_RULES)("allows %s after a failure", (_, refetches) => {
     vi.useFakeTimers({ now: NOON_MS });
 
-    expect(asksAgain(failedAtNoon(new TypeError("the network is down")))).toBe(true);
+    expect(refetches(failedAtNoon(new TypeError("the network is down")))).toBe(true);
   });
 
-  it.each(UNASKED)("is asked again by %s once it has answered", (_, asksAgain) => {
-    expect(asksAgain(failedAtNoon(null))).toBe(true);
+  it.each(REFETCH_RULES)("allows %s after a success", (_, refetches) => {
+    expect(refetches(failedAtNoon(null))).toBe(true);
   });
 
-  it("is retried after a failure with no word", () => {
+  it("is retried after a network failure", () => {
     expect(retry(0, new TypeError("the network is down"))).toBe(true);
   });
 });

@@ -41,6 +41,6 @@ export const clipboardTaking = (
 
 export const partOf = async (item: Item | undefined, type: string): Promise<string> => {
   const part = item?.parts[type];
-  if (part === undefined) throw new Error(`the clipboard item holds no ${type}`);
+  if (part === undefined) throw new Error(`the clipboard item has no ${type}`);
   return (await part).text();
 };

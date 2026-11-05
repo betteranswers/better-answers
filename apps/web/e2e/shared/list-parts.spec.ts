@@ -11,10 +11,10 @@ import { tabUntilFocused } from "../harness.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-let parts: string | undefined;
+let membersListScript: string | undefined;
 
 test.beforeAll(async () => {
-  parts = await bundledHarness({
+  membersListScript = await bundledHarness({
     name: "list-parts",
     file: pathToFileURL(path.join(workspaceRoot, "test/support/members-list.tsx")),
     component: "MembersList",
@@ -22,33 +22,35 @@ test.beforeAll(async () => {
   });
 });
 
-const drawn = async (page: Page, request: APIRequestContext) => {
-  await harnessDrawn(page, request, { title: "Members", script: parts ?? "" });
+const renderMembersList = async (page: Page, request: APIRequestContext) => {
+  await harnessDrawn(page, request, { title: "Members", script: membersListScript ?? "" });
   await expect(page.getByRole("table")).toBeVisible();
 };
 
-const bar = (page: Page) => page.getByRole("toolbar", { name: "Selected Members" });
+const selectedMembersToolbar = (page: Page) =>
+  page.getByRole("toolbar", { name: "Selected Members" });
 
-const tickOf = (page: Page, name: string) => page.getByRole("checkbox", { name: `Select ${name}` });
+const selectCheckbox = (page: Page, name: string) =>
+  page.getByRole("checkbox", { name: `Select ${name}` });
 
-const roomAtTheEdge = () => {
+const widthsAtTheEdge = () => {
   const edge = document.documentElement.clientWidth;
   const table = document.querySelector('[data-slot="table-container"]');
   const outside = [...document.querySelectorAll("main *")].filter(
     (node) => table === null || !table.contains(node),
   );
   return {
-    scrolls: document.documentElement.scrollWidth,
-    holds: edge,
-    pastTheEdge: outside
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: edge,
+    overflowing: outside
       .filter((node) => node.getBoundingClientRect().right > edge)
       .map((node) => node.outerHTML.slice(0, 120)),
-    tableScrolls: table?.scrollWidth ?? 0,
-    tableHolds: table?.clientWidth ?? 0,
+    tableScrollWidth: table?.scrollWidth ?? 0,
+    tableClientWidth: table?.clientWidth ?? 0,
   };
 };
 
-test.describe("the shared list components rendered together", () => {
+test.describe("the shared list components on one page", () => {
   test("select, row menu, and clear selection work by keyboard", async ({
     page,
     request,
@@ -56,7 +58,7 @@ test.describe("the shared list components rendered together", () => {
   }) => {
     await test.step("renders the list within one second", async () => {
       const started = Date.now();
-      await drawn(page, request);
+      await renderMembersList(page, request);
       const elapsed = Date.now() - started;
       test.info().annotations.push({ type: "list parts", description: `${elapsed} ms` });
       expect(elapsed, "the list took longer than one second to render").toBeLessThan(
@@ -67,9 +69,9 @@ test.describe("the shared list components rendered together", () => {
     const trigger = page.getByRole("button", { name: "Actions for Cy Twombly" });
 
     await test.step("selects a row and opens its Actions menu by keyboard", async () => {
-      await tabUntilFocused(page, tickOf(page, "Cy Twombly"));
+      await tabUntilFocused(page, selectCheckbox(page, "Cy Twombly"));
       await page.keyboard.press("Space");
-      await expect(bar(page).getByRole("status")).toHaveText(/\b1\b/);
+      await expect(selectedMembersToolbar(page).getByRole("status")).toHaveText(/\b1\b/);
 
       await tabUntilFocused(page, trigger);
       await page.keyboard.press("Enter");
@@ -106,32 +108,34 @@ test.describe("the shared list components rendered together", () => {
       `);
     });
 
-    await test.step("passes the accessibility gate with a row selected and the selection bar showing", async () => {
-      await expect(bar(page)).toBeVisible();
+    await test.step("passes the accessibility gate with a row selected", async () => {
+      await expect(selectedMembersToolbar(page)).toBeVisible();
       await passesTheAccessibilityGate();
     });
 
     await test.step("clears the selection by keyboard", async () => {
       await page.keyboard.press("x");
-      await expect(bar(page)).toBeHidden();
+      await expect(selectedMembersToolbar(page)).toBeHidden();
     });
 
-    await test.step("keeps everything except the table within 320 pixels", async () => {
+    await test.step("fits everything except the table within 320 pixels", async () => {
       await page.setViewportSize({ width: 320, height: 720 });
-      await tickOf(page, "Cy Twombly").click();
-      await tickOf(page, "Ada Lovelace").click();
-      await expect(bar(page).getByRole("status")).toHaveText(/\b2\b/);
+      await selectCheckbox(page, "Cy Twombly").click();
+      await selectCheckbox(page, "Ada Lovelace").click();
+      await expect(selectedMembersToolbar(page).getByRole("status")).toHaveText(/\b2\b/);
       await expect(page.getByRole("navigation", { name: "Pages of Members" })).toBeVisible();
 
-      const room = await page.evaluate(roomAtTheEdge);
-      expect(room.scrolls, "the page scrolls sideways").toBeLessThanOrEqual(room.holds);
+      const widths = await page.evaluate(widthsAtTheEdge);
+      expect(widths.scrollWidth, "the page scrolls sideways").toBeLessThanOrEqual(
+        widths.clientWidth,
+      );
       expect(
-        room.pastTheEdge,
+        widths.overflowing,
         "an element outside the table extends past the screen's right edge",
       ).toEqual([]);
       test.info().annotations.push({
         type: "table at 320 pixels",
-        description: `${String(room.tableScrolls)} px of columns in ${String(room.tableHolds)} px`,
+        description: `${String(widths.tableScrollWidth)} px of columns in ${String(widths.tableClientWidth)} px`,
       });
     });
   });

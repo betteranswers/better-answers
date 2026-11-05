@@ -7,12 +7,12 @@ afterEach(cleanup);
 
 type Modifier = { readonly metaKey: true } | { readonly ctrlKey: true };
 
-const pressTheChord = (modifier: Modifier, repeat = false): boolean => {
-  let browsers = true;
+const pressChord = (modifier: Modifier, repeat = false): boolean => {
+  let notPrevented = true;
   act(() => {
-    browsers = fireEvent.keyDown(document, { key: "k", ...modifier, repeat });
+    notPrevented = fireEvent.keyDown(document, { key: "k", ...modifier, repeat });
   });
-  return browsers;
+  return notPrevented;
 };
 
 describe.each<[string, Modifier]>([
@@ -22,26 +22,26 @@ describe.each<[string, Modifier]>([
   it("opens jump-to, and closes it when pressed again", () => {
     const { result } = renderHook(() => useJumping(true));
 
-    pressTheChord(modifier);
+    pressChord(modifier);
     expect(result.current.open).toBe(true);
-    pressTheChord(modifier);
+    pressChord(modifier);
     expect(result.current.open).toBe(false);
   });
 
   it("leaves jump-to open while the chord is held", () => {
     const { result } = renderHook(() => useJumping(true));
 
-    pressTheChord(modifier);
-    pressTheChord(modifier, true);
+    pressChord(modifier);
+    pressChord(modifier, true);
 
     expect(result.current.open).toBe(true);
   });
 
-  it("keeps a held chord from the browser's own search bar", () => {
+  it("blocks the browser's default action for a held chord", () => {
     renderHook(() => useJumping(true));
 
-    pressTheChord(modifier);
+    pressChord(modifier);
 
-    expect(pressTheChord(modifier, true)).toBe(false);
+    expect(pressChord(modifier, true)).toBe(false);
   });
 });

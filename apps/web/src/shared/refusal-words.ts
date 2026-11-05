@@ -39,7 +39,7 @@ export type OwnSentences = Partial<Record<RefusalWord, string>>;
 const OWN_ON_EVERY_SURFACE = {
   "workspace-switched":
     "You switched workspace in another tab, so this tab now shows that workspace.",
-  "workspace-unnamed": "This tab hasn't loaded which workspace it shows. Please reload the page.",
+  "workspace-unnamed": "This tab couldn't load your workspace. Please reload the page.",
   "confirmation-too-old":
     "It's been over an hour since you confirmed your second factor. Please confirm it again.",
 } satisfies OwnSentences;

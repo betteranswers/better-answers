@@ -153,7 +153,7 @@ export const holdingInvitations = (
   return { api, held, moveTo, reachable: (address: string) => down.delete(address) };
 };
 
-export const refusalNaming = (
+export const refusalWithItems = (
   word: string,
   refusalClass: string,
   httpStatus: number,
@@ -174,7 +174,7 @@ export const tooManyAttempts = (retryAfterSeconds: number) => ({
   },
 });
 
-/** user-event runs Enter's default action on a field or a native button, and none on a `div` with a button role. */
+/** user-event runs Enter's default action on fields and native buttons, not on a `div` with a button role. */
 export const pressEnter = async (element: HTMLElement): Promise<void> => {
   act(() => {
     element.focus();
@@ -183,7 +183,7 @@ export const pressEnter = async (element: HTMLElement): Promise<void> => {
 };
 
 export const found = <Item>(item: Item | undefined): Item => {
-  if (item === undefined) throw new Error("the page drew one thing fewer");
+  if (item === undefined) throw new Error("the expected element is missing");
   return item;
 };
 
@@ -205,7 +205,7 @@ export const pressedOn = (key: string, shiftKey = false) => {
 
 export const focused = (element: HTMLElement) =>
   waitFor(() => {
-    if (document.activeElement !== element) throw new Error("focus is elsewhere");
+    if (document.activeElement !== element) throw new Error("the element does not have focus");
   });
 
 export const openPeople = async (api: Api, tab: "Members" | "Invitations" | "Requests") => {
@@ -267,7 +267,7 @@ const selectionBar = () => screen.getByRole("toolbar", { name: "Selected Invitat
 export const selectionAction = (name: string) =>
   within(selectionBar()).getByRole("button", { name });
 
-export const selectionSaid = () => within(selectionBar()).getByRole("status").textContent;
+export const selectionStatusText = () => within(selectionBar()).getByRole("status").textContent;
 
 export const outcomeIn = () => within(invitationsRegion()).getAllByRole("status")[1];
 

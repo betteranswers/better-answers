@@ -9,7 +9,7 @@ import {
   anAdminWith,
   anId,
   describedBy,
-  leadOf,
+  firstDefinitionOf,
   openSources,
   drawSourcesThrough,
   panelOf,
@@ -22,7 +22,7 @@ import {
   connectedSourcesRegion,
 } from "@test/sources/stubbed-sources.ts";
 import { server, type Asked } from "@test/stub-server.ts";
-import { addressOf, heldBack, settlingAfter } from "@test/stubbed-api.ts";
+import { addressOf, holdProcedure, settlingAfter } from "@test/stubbed-api.ts";
 import {
   aRefusalAnswer,
   read,
@@ -35,7 +35,7 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
-// jsdom lays nothing out, and a select scrolls its chosen choice into view as it opens.
+// jsdom has no layout, and a select scrolls its chosen option into view when it opens.
 beforeEach(() => {
   Object.defineProperty(Element.prototype, "scrollIntoView", {
     value: () => undefined,
@@ -65,7 +65,7 @@ const widenedTo = (
   moved: { readonly concepts?: readonly string[]; readonly writeUps?: readonly string[] } = {},
 ) => ({ visibility: { sensitivity, audience }, concepts: [], writeUps: [], ...moved });
 
-const aWideningOpened = async () => {
+const openWidenPanel = async () => {
   await openSources(anAdminWith(aConnectedSource("Staff handbook", { sensitivity: "Restricted" })));
   const row = await rowOf("Staff handbook");
   const opener = rowAction(row, "widen");
@@ -77,7 +77,7 @@ const aWideningOpened = async () => {
 };
 
 describe("publishing, narrowing and widening a connected source", () => {
-  it("narrows a published source inline, its citing concepts moving too", async () => {
+  it("narrows a published source in its row, updating citing concepts", async () => {
     const citing = "https://better-answers.test/concepts/payment-terms";
     const published = aConnectedSource("Supplier payments", {
       state: "published",
@@ -119,7 +119,7 @@ describe("publishing, narrowing and widening a connected source", () => {
       within(row).getByRole("heading", { level: 3, name: "Supplier payments" }),
     );
     await waitFor(() => {
-      expect(leadOf(row, "Sensitivity").textContent).toBe("Restricted");
+      expect(firstDefinitionOf(row, "Sensitivity").textContent).toBe("Restricted");
     });
     await waitFor(() => {
       expect(saidIn()?.textContent).toMatch(/Supplier payments\D+Restricted\D+\b1\b\D+\b1\b/v);
@@ -127,7 +127,7 @@ describe("publishing, narrowing and widening a connected source", () => {
     expect(screen.getByText(citing)).toBeDefined();
   });
 
-  it("lists the audience among the changes once it widens too", async () => {
+  it("lists the audience as a change when it widens too", async () => {
     const handbook = aConnectedSource("Staff handbook", {
       sensitivity: "Restricted",
       audience: "groups",
@@ -172,13 +172,13 @@ describe("publishing, narrowing and widening a connected source", () => {
       expect(saidIn()?.textContent).toMatch(/Staff handbook\D+Internal/v);
     });
     await waitFor(() => {
-      expect(leadOf(row, "Sensitivity").textContent).toBe("Internal");
+      expect(firstDefinitionOf(row, "Sensitivity").textContent).toBe("Internal");
     });
-    expect(leadOf(row, "Audience").textContent).toBe(EVERYONE);
+    expect(firstDefinitionOf(row, "Audience").textContent).toBe(EVERYONE);
   });
 
-  it("closes a widening on Escape, focus back on Widen", async () => {
-    const { opener, panel } = await aWideningOpened();
+  it("closes the Widen panel on Escape and refocuses Widen", async () => {
+    const { opener, panel } = await openWidenPanel();
     const commit = commitIn(panel, "Widen");
     commit.focus();
 
@@ -195,7 +195,7 @@ describe("publishing, narrowing and widening a connected source", () => {
   });
 
   it("Escape closes an open select, not the panel", async () => {
-    const { opener, sensitivityPicked } = await aWideningOpened();
+    const { opener, sensitivityPicked } = await openWidenPanel();
     fireEvent.keyDown(sensitivityPicked, { key: "Enter" });
     expect(await screen.findByRole("option", { name: "Internal" })).toBeDefined();
     await waitFor(() => {
@@ -249,9 +249,9 @@ describe("publishing, narrowing and widening a connected source", () => {
     expandedAre({ narrow: "false", widen: "false" });
   });
 
-  it("holds a second widening while the first is still pending", async () => {
+  it("blocks a second widening while the first is pending", async () => {
     const api = anAdminWith(aConnectedSource("Bid library"), aConnectedSource("Case studies"));
-    const widening = heldBack(api, "sources.widen", read(widenedTo("Public", "everyone")));
+    const widening = holdProcedure(api, "sources.widen", read(widenedTo("Public", "everyone")));
     await openSources(api);
     const bidLibrary = await rowOf("Bid library");
     const caseStudies = await rowOf("Case studies");
@@ -260,7 +260,7 @@ describe("publishing, narrowing and widening a connected source", () => {
     pressed(commitIn(thePanelOf("widen", "Bid library"), "Widen"));
     await widening.asked;
     await waitFor(() => {
-      expect(leadOf(bidLibrary, "Sensitivity").textContent).toBe("Public");
+      expect(firstDefinitionOf(bidLibrary, "Sensitivity").textContent).toBe("Public");
     });
 
     pressed(rowAction(caseStudies, "widen"));
@@ -270,7 +270,7 @@ describe("publishing, narrowing and widening a connected source", () => {
     second.focus();
     fireEvent.click(second);
     expect(panelOf("widen", "Case studies")).not.toBeNull();
-    expect(leadOf(caseStudies, "Sensitivity").textContent).toBe("Internal");
+    expect(firstDefinitionOf(caseStudies, "Sensitivity").textContent).toBe("Internal");
     widening.resolve();
 
     await waitFor(() => {
@@ -281,7 +281,7 @@ describe("publishing, narrowing and widening a connected source", () => {
     expect(widening.asks, "the second press asked the api while the first was pending").toBe(1);
   });
 
-  it("refuses widening with a special category finding unreviewed", async () => {
+  it("refuses widening while special category findings are unreviewed", async () => {
     const api = anAdminWith(
       aConnectedSource("Service records", {
         sensitivity: "Restricted",
@@ -302,10 +302,10 @@ describe("publishing, narrowing and widening a connected source", () => {
       const refusals = within(connectedSourcesRegion())
         .getAllByRole("alert")
         .filter((alert) => alert.textContent !== "");
-      expect(refusals, "the alert says nothing").toHaveLength(1);
+      expect(refusals, "the page shows no refusal, or more than one").toHaveLength(1);
     });
     await waitFor(() => {
-      expect(leadOf(row, "Sensitivity").textContent).toBe("Restricted");
+      expect(firstDefinitionOf(row, "Sensitivity").textContent).toBe("Restricted");
     });
   });
 });
@@ -321,14 +321,14 @@ const A_FAILED_READ = {
 const proceduresOf = (asked: Asked): string[] =>
   addressOf(asked).pathname.replace("/trpc/", "").split(",");
 
-/** The shell's first member read is dropped. Its retry, asked alone, waits to land. */
-const memberUnreadUntil = (landed: Promise<void>) => (answer: Answering) => {
-  let theShellsReadToDrop = true;
+/** Drops the shell's first member read. The retry, sent alone, waits until `landed` resolves. */
+const memberReadHeldUntil = (landed: Promise<void>) => (answer: Answering) => {
+  let dropNextRead = true;
   return async (asked: Asked, init?: RequestInit): Promise<Response> => {
     const procedures = proceduresOf(asked);
     if (!procedures.includes("session.member")) return answer(asked, init);
-    if (theShellsReadToDrop) {
-      theShellsReadToDrop = false;
+    if (dropNextRead) {
+      dropNextRead = false;
       throw new TypeError("the request was dropped");
     }
     if (procedures.length === 1) {
@@ -343,23 +343,26 @@ const memberUnreadUntil = (landed: Promise<void>) => (answer: Answering) => {
   };
 };
 
-describe("a page drawn before the reader's member read lands", () => {
-  it("an open panel stays open as the member read lands", async () => {
+describe("the page while the member read is pending", () => {
+  it("keeps an open panel open when the member read arrives", async () => {
     const api = anAdminWith(
       aConnectedSource("Supplier payments", { state: "published", publishedAt: A_PUBLICATION }),
     );
     const landed = Promise.withResolvers<void>();
-    drawSourcesThrough(api, memberUnreadUntil(landed.promise));
+    drawSourcesThrough(api, memberReadHeldUntil(landed.promise));
     const row = await rowOf("Supplier payments");
     pressed(rowAction(row, "narrow"));
     const panel = thePanelOf("narrow", "Supplier payments");
     const sensitivityPicked = within(panel).getByRole("combobox", { name: "Sensitivity" });
     expect(document.activeElement).toBe(sensitivityPicked);
-    expect(switcherDrawn(), "the member read landed before it was let through").toBeNull();
+    expect(switcherDrawn(), "the member read arrived before the test released it").toBeNull();
 
     landed.resolve();
 
     await switcher();
-    expect(thePanelOf("narrow", "Supplier payments"), "the page was drawn again").toBe(panel);
+    expect(
+      thePanelOf("narrow", "Supplier payments"),
+      "the panel was replaced when the member read arrived",
+    ).toBe(panel);
   });
 });

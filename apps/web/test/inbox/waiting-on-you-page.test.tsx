@@ -31,7 +31,7 @@ const mainAlertText = () =>
     .join(" ");
 
 describe("Waiting on You", () => {
-  it("tells the person an unconfirmed acceptance may need accepting again", async () => {
+  it("alerts by title when an acceptance is unconfirmed", async () => {
     const api = adaAnAdmin();
     api.set("inbox.waiting", () => read({ items: [LEAVE, CLAIMS] }));
     api.set("inbox.accept", () =>
@@ -50,13 +50,12 @@ describe("Waiting on You", () => {
     fireEvent.click(screen.getByRole("button", { name: "Accept Selected" }));
 
     await waitFor(() =>
-      expect(mainAlertText()).toContain(
-        "Expense claims: This suggestion couldn’t be confirmed as saved. If it’s still waiting in a minute, please accept it again.",
-      ),
+      expect(mainAlertText(), "no alert named the unconfirmed suggestion").toContain(CLAIMS.title),
     );
+    expect(screen.getAllByRole("checkbox", { name: `Select ${CLAIMS.title}` })).toHaveLength(1);
   });
 
-  it("asks the person to wait while an earlier change saves", async () => {
+  it("alerts and keeps the suggestion while an earlier change saves", async () => {
     const api = adaAnAdmin();
     api.set("inbox.waiting", () => read({ items: [CLAIMS] }));
     api.set("inbox.accept", () =>
@@ -68,9 +67,7 @@ describe("Waiting on You", () => {
     fireEvent.click(screen.getByRole("button", { name: "Accept Selected" }));
 
     await waitFor(() =>
-      expect(mainAlertText()).toContain(
-        "This workspace is still saving an earlier change. If this suggestion is still waiting in a minute, please accept it again.",
-      ),
+      expect(mainAlertText(), "no alert appeared for the pending save").toMatch(/\S/v),
     );
     expect(screen.getAllByRole("checkbox", { name: `Select ${CLAIMS.title}` })).toHaveLength(1);
   });

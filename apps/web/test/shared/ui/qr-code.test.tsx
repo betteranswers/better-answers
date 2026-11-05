@@ -7,7 +7,7 @@ afterEach(cleanup);
 
 const ADDRESS = "otpauth://totp/better-answers:ada%40example.test?secret=JBSWY3DPEHPK3PXP";
 
-const drawnWith = async (foreground: string) => {
+const renderedWith = async (foreground: string) => {
   const { container } = render(<QRCode data={ADDRESS} foreground={foreground} />);
   await waitFor(() => {
     expect(container.querySelector("svg")).not.toBeNull();
@@ -16,16 +16,16 @@ const drawnWith = async (foreground: string) => {
 };
 
 describe("QRCode", () => {
-  it("draws a hex colour as given", async () => {
-    const drawn = await drawnWith("#123456");
+  it("renders a hex colour unchanged", async () => {
+    const container = await renderedWith("#123456");
 
-    expect(drawn.innerHTML).toContain('stroke="#123456"');
+    expect(container.innerHTML).toContain('stroke="#123456"');
   });
 
-  it("draws no markup a colour carries", async () => {
-    const drawn = await drawnWith('#"/><i>');
+  it("falls back to black when the colour contains markup", async () => {
+    const container = await renderedWith('#"/><i>');
 
-    expect(drawn.querySelector("i")).toBeNull();
-    expect(drawn.innerHTML).toContain('stroke="#000000"');
+    expect(container.querySelector("i")).toBeNull();
+    expect(container.innerHTML).toContain('stroke="#000000"');
   });
 });

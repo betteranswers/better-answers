@@ -4,10 +4,9 @@ import { z } from "zod";
 
 import type { AskedRecord } from "@/features/questions/questions-api.ts";
 import { QUESTIONS_KEYSTROKES as KEY } from "@/features/questions/questions-state.ts";
-import { QUESTIONS_WORDS } from "@/features/questions/questions-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 import { adaAnAdmin, FORBIDDEN, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -82,20 +81,25 @@ const rowButtonOf = (region: HTMLElement, question: string) =>
 
 const recordOf = (question: string) => screen.queryByRole("dialog", { name: question });
 
+const statusesWithText = (region: HTMLElement) =>
+  within(region)
+    .getAllByRole("status")
+    .filter((status) => /\S/v.test(status.textContent));
+
 const press = (key: string): void => {
   fireEvent.keyDown(document.activeElement ?? document.body, { key });
 };
 
 describe("Questions asked", () => {
-  it("a refused closing puts the flag back and says so", async () => {
+  it("keeps the flag open and alerts when closing is refused", async () => {
     const { api, region } = await openQuestions(aFlagAndANewerQuestion());
-    const closeFlag = heldBack(api, "questions.closeFlag");
+    const closeFlag = holdProcedure(api, "questions.closeFlag");
     fireEvent.click(rowButtonOf(region, FLAGGED_QUESTION));
     const record = await screen.findByRole("dialog", { name: FLAGGED_QUESTION });
 
     fireEvent.click(
       within(within(record).getByRole("group", { name: "Close This Flag" })).getByRole("button", {
-        name: "No Fault in the Knowledge",
+        name: "Knowledge Was Correct",
       }),
     );
     closeFlag.reject(FORBIDDEN);
@@ -104,7 +108,7 @@ describe("Questions asked", () => {
       const refusals = within(record)
         .getAllByRole("alert")
         .filter((alert) => alert.textContent !== "");
-      expect(refusals, "the refused closing said nothing").toHaveLength(1);
+      expect(refusals, "no alert appeared after the closing was refused").toHaveLength(1);
     });
     await waitFor(() => {
       expect(document.activeElement).toBe(
@@ -117,7 +121,7 @@ describe("Questions asked", () => {
     await waitFor(() => {
       expect(recordOf(FLAGGED_QUESTION)).toBeNull();
     });
-    const flagged = within(region).getByRole("region", { name: QUESTIONS_WORDS.flagged });
+    const flagged = within(region).getByRole("region", { name: "Flagged" });
     expect(rowsOf(flagged).map((row) => row.textContent)).toEqual([
       expect.stringContaining(FLAGGED_QUESTION),
     ]);
@@ -125,19 +129,16 @@ describe("Questions asked", () => {
 
   it("opens no question by key after focus leaves the list", async () => {
     const { region } = await openQuestions(aFlagAndANewerQuestion());
-    expect(
-      within(region).queryByText(QUESTIONS_WORDS.selectFirst),
-      "the list says nothing at rest",
-    ).toBeNull();
+    const atRest = statusesWithText(region).length;
     rowButtonOf(region, FLAGGED_QUESTION).focus();
     within(region).getByRole("heading", { level: 2 }).focus();
 
     press(KEY.open.key);
 
     expect(
-      within(region).getByText(QUESTIONS_WORDS.selectFirst),
-      "a keystroke with no question in focus said nothing",
-    ).toBeDefined();
+      statusesWithText(region),
+      "pressing the open key with no question in focus showed no message",
+    ).toHaveLength(atRest + 1);
     expect(recordOf(FLAGGED_QUESTION)).toBeNull();
   });
 

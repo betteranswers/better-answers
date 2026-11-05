@@ -15,9 +15,9 @@ const openAt = async (path: string) => {
   return (await openApp(path)).rendered;
 };
 
-const closer = () => screen.getByRole("button", { name: "Hide Menu" });
+const hideButton = () => screen.getByRole("button", { name: "Hide Menu" });
 
-const opener = () => screen.getByRole("button", { name: "Show Menu" });
+const showButton = () => screen.getByRole("button", { name: "Show Menu" });
 
 const menu = () => screen.queryByRole("navigation", { name: "Control Centre" });
 
@@ -26,53 +26,53 @@ describe("whether the menu is showing", () => {
     await openAt("/system/audit-log");
 
     expect(menu()).not.toBeNull();
-    expect(closer().getAttribute("aria-expanded")).toBe("true");
+    expect(hideButton().getAttribute("aria-expanded")).toBe("true");
   });
 
   it("hides the nav and shows it again on one button", async () => {
     await openAt("/system/audit-log");
 
-    fireEvent.click(closer());
+    fireEvent.click(hideButton());
     expect(menu()).toBeNull();
-    expect(opener().getAttribute("aria-expanded")).toBe("false");
+    expect(showButton().getAttribute("aria-expanded")).toBe("false");
 
-    fireEvent.click(opener());
+    fireEvent.click(showButton());
     expect(menu()).not.toBeNull();
   });
 
-  it("keeps one toggle in the band, nav hidden or shown", async () => {
+  it("uses one band button to hide and show the nav", async () => {
     await openAt("/system/audit-log");
-    const toggle = closer();
+    const toggle = hideButton();
 
     fireEvent.click(toggle);
-    expect(opener()).toBe(toggle);
+    expect(showButton()).toBe(toggle);
     fireEvent.click(toggle);
-    expect(closer()).toBe(toggle);
+    expect(hideButton()).toBe(toggle);
     expect(screen.getByRole("banner").contains(toggle)).toBe(true);
   });
 
-  it("names the nav as the region the button controls", async () => {
+  it("points the toggle's aria-controls at the nav", async () => {
     await openAt("/system/audit-log");
 
-    expect(closer().getAttribute("aria-controls")).toBe(menu()?.id);
+    expect(hideButton().getAttribute("aria-controls")).toBe(menu()?.id);
   });
 
   it("remembers the nav closed for the next visit", async () => {
     const first = await openAt("/system/audit-log");
-    fireEvent.click(closer());
+    fireEvent.click(hideButton());
     first.unmount();
 
     await openAt("/people/members");
 
     expect(menu()).toBeNull();
-    expect(opener()).toBeDefined();
+    expect(showButton()).toBeDefined();
     expect(screen.getByRole("navigation", { name: "Areas" })).toBeDefined();
   });
 
   it("remembers the nav reopened for the next visit", async () => {
     const first = await openAt("/system/audit-log");
-    fireEvent.click(closer());
-    fireEvent.click(opener());
+    fireEvent.click(hideButton());
+    fireEvent.click(showButton());
     first.unmount();
 
     await openAt("/system/audit-log");

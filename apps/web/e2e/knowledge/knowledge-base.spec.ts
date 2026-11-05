@@ -28,7 +28,7 @@ const signedIn = async (page: Page, api: APIRequestContext, email: string): Prom
 };
 
 const treeOf = (page: Page): Locator =>
-  page.getByRole("tree", { name: "Collections and kinds", exact: true });
+  page.getByRole("tree", { name: "Collections and Kinds", exact: true });
 
 const itemOf = (page: Page, name: string): Locator =>
   treeOf(page).getByRole("treeitem", { name: new RegExp(`^${name},`) });
@@ -59,7 +59,7 @@ const topOf = async (drawn: Locator): Promise<number> => {
   return box.y;
 };
 
-const clearOfTheBand = async (page: Page, focused: Locator): Promise<void> => {
+const focusedBelowTheBanner = async (page: Page, focused: Locator): Promise<void> => {
   await expect(focused).toBeFocused();
   await expect(focused).toBeInViewport();
   expect(await topOf(focused), "the page banner covers the focused item").toBeGreaterThanOrEqual(
@@ -222,8 +222,8 @@ test.describe("Knowledge Base", () => {
     await page.keyboard.press(KEY.tree.key);
     await expect(itemOf(page, "Insurance Policy")).toBeFocused();
     await page.keyboard.press("Home");
-    await clearOfTheBand(page, itemOf(page, "company"));
+    await focusedBelowTheBanner(page, itemOf(page, "company"));
     await page.keyboard.press("Tab");
-    await clearOfTheBand(page, concepts.getByRole("link").first());
+    await focusedBelowTheBanner(page, concepts.getByRole("link").first());
   });
 });

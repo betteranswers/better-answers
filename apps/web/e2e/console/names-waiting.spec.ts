@@ -20,7 +20,7 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const NAMES_WAITING_PAGE = pageNamed(menuGroupIn(CONSOLE, "people"), "Names Waiting").path;
+const NAMES_WAITING_PAGE = pageNamed(menuGroupIn(CONSOLE, "people"), "Flagged Names").path;
 
 const INSTANT_WORDS = String.raw`\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}`;
 
@@ -36,7 +36,7 @@ const dialogToCorrect = (page: Page, name: string): Locator =>
 const nameFieldOf = (dialog: Locator): Locator =>
   dialog.getByRole("textbox", { name: "Display Name" });
 
-const namesWaiting = (page: Page) => page.getByRole("region", { name: "Names Waiting" });
+const namesWaiting = (page: Page) => page.getByRole("region", { name: "Flagged Names" });
 
 const waitingCount = (page: Page): Locator => countOf(namesWaiting(page));
 
@@ -69,7 +69,7 @@ const priyaFlagged = async (page: Page, api: APIRequestContext) => {
   return { operators, priya, name };
 };
 
-test.describe("the console's Names Waiting page", () => {
+test.describe("the console's Flagged Names page", () => {
   test("lists each flagged name with every workspace that flagged it", async ({
     page,
     request,
@@ -92,7 +92,7 @@ test.describe("the console's Names Waiting page", () => {
       const elapsed = Date.now() - started;
 
       test.info().annotations.push({ type: "names waiting list", description: `${elapsed} ms` });
-      expect(elapsed, "Names Waiting took longer than one second to render").toBeLessThan(
+      expect(elapsed, "Flagged Names took longer than one second to render").toBeLessThan(
         LIST_BUDGET_MS,
       );
     });
@@ -105,9 +105,9 @@ test.describe("the console's Names Waiting page", () => {
         page.getByRole("dialog"),
         "c opened a dialog when no name had focus",
       ).toHaveCount(0);
-      const listed = await keystrokesListed(page, "Names Waiting");
+      const listed = await keystrokesListed(page, "Flagged Names");
       await expect(listed.getByRole("definition")).toHaveText([
-        "Search the Names Waiting by Name or Workspace",
+        "Search Flagged Names by Name or Workspace",
         "Correct the Display Name in Focus",
         "Show This List",
         "Jump To",
@@ -163,8 +163,8 @@ test.describe("the console's Names Waiting page", () => {
       - main "Page":
         - heading "People" [level=1]
         - paragraph
-        - region "Names Waiting":
-          - heading "Names Waiting" [level=2]
+        - region "Flagged Names":
+          - heading "Flagged Names" [level=2]
           - paragraph
           - status: /\\b1\\b/
           - searchbox "Search by name or workspace": ${JSON.stringify(name)}

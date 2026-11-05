@@ -43,7 +43,7 @@ export const createQueryClient = (heard: FailureHeard = () => undefined) =>
     }),
     mutationCache: new MutationCache({
       onError: (failure, variables, _context, mutation) => {
-        // As the observer's own `mutate` does: the act's answer reaches it, not this call.
+        // Like the observer's own `mutate`: the mutation's result goes to the observer, not to this retry.
         heard(failure, "action", {
           retry: () => void mutation.execute(variables).catch(() => undefined),
         });

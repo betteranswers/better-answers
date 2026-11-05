@@ -11,22 +11,22 @@ import { Band } from "@/app/shell/band.tsx";
 
 const MEASURED = 84;
 
-/** jsdom lays nothing out, so the band answers the height a browser would measure. */
-const measuresTheBand = class {
-  readonly #seen: () => void;
+/** jsdom has no layout, so this observer reports the stubbed height straight away. */
+const ImmediateResizeObserver = class {
+  readonly #onResize: () => void;
 
-  constructor(seen: () => void) {
-    this.#seen = seen;
+  constructor(onResize: () => void) {
+    this.#onResize = onResize;
   }
 
-  observe = () => this.#seen();
+  observe = () => this.#onResize();
   disconnect = () => undefined;
 };
 
-const drawnHeight = () => document.documentElement.style.getPropertyValue("--band-drawn-h");
+const bandHeightVariable = () => document.documentElement.style.getPropertyValue("--band-drawn-h");
 
-const openTheWideBand = async () => {
-  vi.stubGlobal("ResizeObserver", measuresTheBand);
+const renderWideBand = async () => {
+  vi.stubGlobal("ResizeObserver", ImmediateResizeObserver);
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
     DOMRect.fromRect({ height: MEASURED }),
   );
@@ -43,7 +43,7 @@ const openTheWideBand = async () => {
         person={undefined}
         signingOut={false}
         onSignOut={() => undefined}
-        outcome={{ tone: "said", words: "A line the band says." }}
+        outcome={{ tone: "said", words: "Changes saved." }}
       />
     ),
   });
@@ -61,13 +61,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("the wide band's drawn height", () => {
-  it("publishes its whole height while drawn, and lets it go", async () => {
-    await openTheWideBand();
-    expect(drawnHeight()).toBe(`${String(MEASURED)}px`);
+describe("the wide band's height variable", () => {
+  it("is set while rendered and cleared on unmount", async () => {
+    await renderWideBand();
+    expect(bandHeightVariable()).toBe(`${String(MEASURED)}px`);
 
     cleanup();
 
-    expect(drawnHeight(), "a narrow layout would keep the wide band's height").toBe("");
+    expect(bandHeightVariable(), "--band-drawn-h was not cleared on unmount").toBe("");
   });
 });

@@ -41,7 +41,7 @@ export type Answering = {
 export const useAnswering = (): Answering => {
   const client = useTRPCClient();
   const [told, setTold] = useState<readonly Told[]>([]);
-  /** Held apart from the mutation's state, so two presses in one task still start one question. */
+  /** A ref, not mutation state, so two presses before React re-renders start only one question. */
   const reading = useRef<AbortController | undefined>(undefined);
 
   useEffect(
@@ -82,7 +82,7 @@ export const useAnswering = (): Answering => {
   };
 };
 
-/** One per control, so a second control's press never drops the first's answer. */
+/** Each control calls this hook, so pressing one control never drops another control's result. */
 export const useGiveFeedback = () => {
   const api = useTRPC();
   return useMutation(api.ask.giveFeedback.mutationOptions());

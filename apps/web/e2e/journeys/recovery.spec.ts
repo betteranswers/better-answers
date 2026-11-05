@@ -15,31 +15,31 @@ import {
   codesTicked,
   heading,
   recoveryField,
-  saidOfTheSet,
+  recoveryCodesParagraphs,
   signedInAgain,
   theRefusal,
 } from "../second-factor-steps.ts";
 
 const CONFIRM_BY_CODE = "/second-factor/confirm/authenticator";
 
-const authenticatorInstead = (page: Page) =>
+const setUpAuthenticatorInsteadButton = (page: Page) =>
   page.getByRole("button", { name: "Set Up an Authenticator Instead" });
 
-const codeUsed = async (field: Locator, code: string): Promise<void> => {
+const submitCode = async (field: Locator, code: string): Promise<void> => {
   await field.fill(code);
   await field.page().getByRole("button", { name: "Use Code" }).click();
 };
 
-const recoveryCodeSpent = async (page: Page, code: string): Promise<void> => {
+const useRecoveryCode = async (page: Page, code: string): Promise<void> => {
   await page.goto("/recovery");
   await expect(recoveryField(page)).toBeFocused();
-  await codeUsed(recoveryField(page), code);
+  await submitCode(recoveryField(page), code);
   await expect(heading(page, "Set Up a New Second Factor")).toBeVisible();
   await expect(page).toHaveURL(/\/setup$/);
 };
 
-const authenticatorSetUpThere = async (page: Page): Promise<string> => {
-  await authenticatorInstead(page).click();
+const setUpAuthenticator = async (page: Page): Promise<string> => {
+  await setUpAuthenticatorInsteadButton(page).click();
   const key = await keyShown(page);
   await page.getByLabel("Authenticator Code").fill(codeOf(key));
   await expect(heading(page, "Save Your Recovery Codes")).toBeVisible();
@@ -54,15 +54,15 @@ test("an Admin uses a recovery code to replace their authenticator", async ({
 }) => {
   const { email, key, codes } = await anAdminWithAnAuthenticator(page, request);
   const [code] = codes;
-  assert.ok(code !== undefined, "the admin holds no recovery code");
+  assert.ok(code !== undefined, "the seeded Admin has no recovery code");
 
-  await recoveryCodeSpent(page, code);
+  await useRecoveryCode(page, code);
   await passesTheAccessibilityGate();
-  const newKey = await authenticatorSetUpThere(page);
+  const newKey = await setUpAuthenticator(page);
 
   await expect(
-    saidOfTheSet(page),
-    "Save Your Recovery Codes does not say that the new codes replace the old ones",
+    recoveryCodesParagraphs(page),
+    "Save Your Recovery Codes lacks the paragraph about replacing old codes",
   ).toHaveCount(2);
   await codesTicked(page, "Finish Setup");
   await landedAtHome(page, "Admin");

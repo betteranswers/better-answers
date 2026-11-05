@@ -17,7 +17,7 @@ import {
   signInByEmail,
   withAnAuthenticator,
 } from "../harness.ts";
-import { accountFromTheBand, codesListed, regionOf } from "../second-factor-steps.ts";
+import { openAccountFromPersonMenu, codesListed, regionOf } from "../second-factor-steps.ts";
 
 const MEMBERS = HOMES.Admin.path;
 
@@ -28,9 +28,9 @@ const confirmHeading = (page: Page) =>
 
 const codeField = (page: Page) => page.getByRole("textbox", { name: "Authenticator Code" });
 
-const landedAt = (page: Page): URL => new URL(page.url());
+const currentUrl = (page: Page): URL => new URL(page.url());
 
-const codesBlock = (page: Page) => regionOf(page, "Save Your Recovery Codes");
+const recoveryCodesRegion = (page: Page) => regionOf(page, "Save Your Recovery Codes");
 
 const setUpButton = (page: Page) =>
   page.getByRole("button", { name: "Set Up an Authenticator", exact: true });
@@ -38,14 +38,14 @@ const setUpButton = (page: Page) =>
 const removeButton = (page: Page) =>
   regionOf(page, "Authenticator").getByRole("button", { name: "Remove", exact: true });
 
-const outcomeOf = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
+const shownStatus = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
 
-const tenCodesInTheList = Array.from(
+const recoveryCodeItems = Array.from(
   { length: RECOVERY_CODES_IN_A_SET },
   () => `          - listitem: ${String(RECOVERY_CODE)}`,
 ).join("\n");
 
-const anAdminWaiting = async (page: Page, api: APIRequestContext, email: string) => {
+const signInToConfirm = async (page: Page, api: APIRequestContext, email: string) => {
   const key = await withAnAuthenticator(api, email);
   await page.goto("/sign-in");
   await signInByEmail(page, api, email);
@@ -67,13 +67,13 @@ test("Admins confirm before Members opens, and Editors add an authenticator", as
     workspaceId: workspace.workspaceId,
   });
 
-  await test.step("an Admin who opens Members enters an authenticator code on Confirm It's You, then lands on Members", async () => {
-    const key = await anAdminWaiting(page, request, workspace.admin.email);
+  await test.step("an Admin enters an authenticator code before Members opens", async () => {
+    const key = await signInToConfirm(page, request, workspace.admin.email);
 
     await page.goto(MEMBERS);
 
     await expect(confirmHeading(page)).toBeVisible();
-    expect(`${landedAt(page).pathname}${landedAt(page).search}`).toBe(
+    expect(`${currentUrl(page).pathname}${currentUrl(page).search}`).toBe(
       `/confirm?redirect=${encodeURIComponent(MEMBERS)}`,
     );
     await expect(codeField(page)).toBeFocused();
@@ -85,11 +85,13 @@ test("Admins confirm before Members opens, and Editors add an authenticator", as
   await test.step("an Editor sets up an authenticator from the avatar menu", async () => {
     await page.context().clearCookies();
     await signedInAtHome(page, request, editorAddress, "Editor");
-    await accountFromTheBand(page, editor.name);
+    await openAccountFromPersonMenu(page, editor.name);
     await expect(setUpButton(page)).toBeVisible();
 
     await setUpButton(page).click();
-    await expect(page.getByRole("img", { name: "QR code for your authenticator" })).toBeVisible();
+    await expect(
+      page.getByRole("img", { name: "QR code for your authenticator app" }),
+    ).toBeVisible();
     const key = await keyShown(page);
     await page.getByLabel("Authenticator Code").fill(authenticatorCodeAt(key, new Date()));
     await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
@@ -100,19 +102,19 @@ test("Admins confirm before Members opens, and Editors add an authenticator", as
       "a recovery code does not match the format the API issues",
     ).toBe(true);
     await expect(
-      outcomeOf(page),
-      "the page shows no message after the authenticator is set up",
+      shownStatus(page),
+      "no status appears after setting up the authenticator",
     ).toBeVisible();
-    await expect(removeButton(page), "the page does not list the authenticator").toBeVisible();
+    await expect(removeButton(page), "the Authenticator region has no Remove button").toBeVisible();
     await expect(
-      codesBlock(page).getByRole("heading", { name: "Save Your Recovery Codes" }),
+      recoveryCodesRegion(page).getByRole("heading", { name: "Save Your Recovery Codes" }),
     ).toBeFocused();
-    await expect(codesBlock(page)).toMatchAriaSnapshot(`
+    await expect(recoveryCodesRegion(page)).toMatchAriaSnapshot(`
       - region "Save Your Recovery Codes":
         - heading "Save Your Recovery Codes" [level=3]
         - paragraph
         - list "Recovery Codes":
-${tenCodesInTheList}
+${recoveryCodeItems}
         - button "Copy Codes"
         - link "Download"
         - button "Print"

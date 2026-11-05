@@ -27,9 +27,9 @@ afterEach(() => {
 
 const REGION = "[aria-live=polite]";
 
-const HOLDS_TEXT = /\S/v;
+const NOT_EMPTY = /\S/v;
 
-const mounted = (selector: string, children: ReactNode) => {
+const regionTextsWhileMounting = (selector: string, children: ReactNode) => {
   const { seen, Seen } = regionsSeen(selector);
   render(
     <Providers clients={createAppClients()}>
@@ -57,8 +57,8 @@ const A_CONNECTED_SOURCE: ListedConnectedSource = {
   unreadableByReason: {},
 };
 
-describe("a page's read, said after its region mounts", () => {
-  it("fills a loading state beside a refusal line after mount", async () => {
+describe("live regions that fill in after mounting", () => {
+  it("shows the groups loading state only after mount", async () => {
     const { seen, Seen } = regionsSeen("[data-slot='empty-title'] output");
     await openPages(
       {
@@ -75,27 +75,30 @@ describe("a page's read, said after its region mounts", () => {
     );
 
     expect(seen[0]).toBe("");
-    expect(seen.at(-1)).toMatch(HOLDS_TEXT);
+    expect(seen.at(-1)).toMatch(NOT_EMPTY);
     expect(screen.queryByText(EMPTY_LINES.groups)).toBeNull();
   });
 
-  it("fills a region of lines a render after it mounts", () => {
-    const seen = mounted(REGION, <ModelChoicesCard />);
+  it("shows model choices loading one render after mount", () => {
+    const seen = regionTextsWhileMounting(REGION, <ModelChoicesCard />);
 
     expect(seen[0]).toBe("");
     expect(seen.at(-1)).toBe(MODEL_CHOICES_WORDS.loading);
   });
 
-  it("fills a region drawing one state after mount", () => {
-    const seen = mounted(REGION, <WorkspacesPage />);
+  it("shows workspaces loading one render after mount", () => {
+    const seen = regionTextsWhileMounting(REGION, <WorkspacesPage />);
 
     expect(seen[0]).toBe("");
     expect(seen.at(-1)).toBe(WORKSPACES_WORDS.loading);
   });
 
-  it("fills a disclosure's region a render after opening mounts it", () => {
+  it("fills a disclosure's region one render after it opens", () => {
     const passages = "[data-slot=collapsible-content] [aria-live=polite]";
-    const seen = mounted(passages, <Review connectedSource={A_CONNECTED_SOURCE} />);
+    const seen = regionTextsWhileMounting(
+      passages,
+      <Review connectedSource={A_CONNECTED_SOURCE} />,
+    );
     const closed = seen.length;
 
     fireEvent.click(screen.getByRole("button", { name: "Preview Passages" }));
@@ -103,7 +106,7 @@ describe("a page's read, said after its region mounts", () => {
     const opened = seen.slice(closed);
     expect(seen.slice(0, closed).every((text) => text === undefined)).toBe(true);
     expect(opened[0]).toBe("");
-    expect(opened.at(-1)).toMatch(HOLDS_TEXT);
+    expect(opened.at(-1)).toMatch(NOT_EMPTY);
     expect(opened.at(-1)).not.toContain(REVIEW_WORDS.noPassages);
   });
 });

@@ -29,7 +29,7 @@ const refusedOnce = async () => {
 };
 
 describe("the Create a Group dialog", () => {
-  it("opens clean from its keystroke after a refusal", async () => {
+  it("reopens by keystroke with no alert after a refusal", async () => {
     await refusedOnce();
     fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());

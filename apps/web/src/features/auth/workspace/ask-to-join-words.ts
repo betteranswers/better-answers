@@ -10,7 +10,7 @@ export const ASK_TO_JOIN_WORDS = {
   reasonHint: `This will be visible to the workspace’s Admins. Must be ${REASON_MAX_CHARACTERS.toLocaleString("en-GB")} characters or fewer.`,
   ask: "Ask to Join",
   asking: "Asking",
-  sent: "Request sent",
+  sent: "Request Sent",
   whatHappensNext:
     "If that workspace exists, its Admins will review your request. You’ll get an email if it’s approved.",
 } as const;

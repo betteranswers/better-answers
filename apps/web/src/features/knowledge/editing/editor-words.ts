@@ -20,40 +20,41 @@ export const EDITOR_WORDS = {
   source: (number: number): string => `Source ${String(number)}`,
   remove: "Remove",
   removeSource: (number: number): string => `Remove source ${String(number)}`,
-  addSource: "Add a source",
+  addSource: "Add a Source",
   withheld: (count: number): string =>
     count === 1
-      ? "1 source you cannot open stays as it is"
-      : `${String(count)} sources you cannot open stay as they are`,
+      ? "1 source you can’t open won’t be changed"
+      : `${String(count)} sources you can’t open won’t be changed`,
   editAs: "Edit as",
   visual: "Visual",
   markdown: "Markdown",
   lossy: "This text uses markdown the visual editor would change, so it opens as markdown.",
   warning: "Warning",
-  commits: "Saving changes this concept for everyone who reads it.",
+  commits: "When you save, everyone who can read this concept sees the change.",
   commitsNew: (collection: string): string =>
-    `Saving adds this concept for everyone who can read ${collection}.`,
-  suggests: "Saving sends your edit to the concept's owner. Nothing changes until they decide.",
+    `When you save, everyone who can read ${collection} can see this concept.`,
+  suggests:
+    "When you save, your edit is sent to the concept’s owner for review. Nothing changes until they accept it.",
   suggestsNew:
-    "Saving sends your new concept to the collection's owner or an Admin. Nothing is added until they decide.",
+    "When you save, your new concept is sent to the collection’s owner or an Admin for review. Nothing is added until they accept it.",
   reuse: (places: number): string =>
-    `It is used in ${String(places)} places, and each one will show the change.`,
+    `This concept is used in ${String(places)} places. Each one will show the change.`,
   save: "Save",
-  keepEditing: "Keep editing",
-  close: "Close editor",
+  keepEditing: "Keep Editing",
+  close: "Close Editor",
   leave: "Leave",
-  leaving: "You have changes that are not saved.",
+  leaving: "You have unsaved changes.",
   cannotSave: {
     collection: "Choose a collection before you save.",
     title: "Add a title before you save.",
     kind: "Add a kind before you save.",
-    body: "Add some text to the body before you save. A concept cannot be saved empty.",
+    body: "Add some text to the body before you save.",
   },
   saving: "Saving.",
   saved: "Saved.",
-  unchanged: "Nothing changed, so nothing was saved.",
+  unchanged: "There are no changes to save.",
   stale: "This concept changed after you opened it.",
-  reload: "Reload the concept",
+  reload: "Reload the Concept",
 } as const;
 
 export const SAID_OF_EDITING = {
@@ -64,16 +65,15 @@ export const SAID_OF_EDITING = {
   "unrecorded-head":
     "This workspace is still saving an earlier change. Nothing was saved. Please save again in a minute.",
   "source-label-refused":
-    "A source is written as the address of a passage. Please name the document it comes from instead.",
+    "A source can’t be the address of a passage. Please enter the name of its document instead.",
   "body-locator-refused":
     "The body refers to a passage that is not in the sources. Please remove that reference, or add its source.",
   "path-taken":
     "A concept with that title already exists in this collection. Please change the title.",
   "merge-key-taken":
     "A concept with the same kind and title already exists. Please change the title or the kind.",
-  "rename-refused":
-    "An edit cannot move a concept to a new place. Please undo the change to its title.",
-  "reclassification-refused": "An edit cannot change who is allowed to read this concept.",
+  "rename-refused": "An edit can’t rename a concept. Please change the title back.",
+  "reclassification-refused": "An edit can’t change who can read this concept.",
   "no-such-concept": "This concept is no longer available. Please go back to Search.",
   "owner-forbids":
     "Only this concept's owner or an Admin can change it directly. Please suggest an edit instead.",

@@ -132,7 +132,7 @@ function RequestsList(properties: {
     heading.current?.focus();
     setOutcome({
       tone: "said",
-      words: `The request from ${requesterName(request)} has been declined. They can ask again.`,
+      words: `The request from ${requesterName(request)} has been declined. They can send a new request.`,
     });
     decline.mutate(
       { requestId: request.id },
@@ -180,7 +180,7 @@ function RequestsList(properties: {
           focusAfterRetry={searchRef}
         >
           <p id={consequenceId} className="px-3 pt-3 text-muted-foreground">
-            Approving a request sends the person an invitation. Declining sends nothing.
+            Approving a request sends the person an invitation. Declining it sends them nothing.
           </p>
           <RequestsActionsContext
             value={{ consequenceId, onApprove: toApprove, onDecline: declined }}

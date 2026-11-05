@@ -6,7 +6,7 @@ import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import type { WaitingRequest } from "@/features/people/requests/requests-api.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { asksOf, blurred, found, openPeople, pressedOn } from "@test/people/invitations-stubbed.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 import { adaAnAdmin, aRefusalAnswer, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -58,31 +58,37 @@ const approveDialog = (name: string) =>
   screen.findByRole("dialog", { name: `Approve Request from ${name}` });
 
 describe("the People page's Requests tab", () => {
-  it("brings a request back when the api refuses its decline", async () => {
+  it("restores a request when the api refuses its decline", async () => {
     const api = requestsApi(PRIYA);
     await openPeople(api, "Requests");
     await waitFor(() => {
       expect(rowsOf(PRIYA.requester.name)).toHaveLength(1);
     });
-    const decline = heldBack(api, "members.declineRequest");
-    const reread = heldBack(api, "members.requests");
+    const decline = holdProcedure(api, "members.declineRequest");
+    const reread = holdProcedure(api, "members.requests");
 
     fireEvent.click(buttonOf("Decline", PRIYA.requester.name));
     await decline.asked;
-    expect(rowsOf(PRIYA.requester.name), "the row waited for the api").toHaveLength(0);
+    expect(
+      rowsOf(PRIYA.requester.name),
+      "the row stayed while the decline was pending",
+    ).toHaveLength(0);
 
     decline.reject(aRefusalAnswer("role-forbids", "forbidden", 403));
     await reread.asked;
-    expect(rowsOf(PRIYA.requester.name), "the refused decline left the row gone").toHaveLength(1);
+    expect(
+      rowsOf(PRIYA.requester.name),
+      "the row did not return after the refused decline",
+    ).toHaveLength(1);
 
     reread.resolve();
     await waitFor(() => {
-      expect(alert().textContent, "the refused decline said nothing").not.toBe("");
+      expect(alert().textContent, "the refused decline showed no alert").not.toBe("");
     });
     expect(rowsOf(PRIYA.requester.name)).toHaveLength(1);
   });
 
-  it("drops the select-first line once a key approves", async () => {
+  it("clears the select-first message once a key approves", async () => {
     await openPeople(requestsApi(KEPT), "Requests");
     await waitFor(() => {
       expect(rowsOf(KEPT.requester.name)).toHaveLength(1);
@@ -91,17 +97,17 @@ describe("the People page's Requests tab", () => {
     blurred();
 
     pressedOn(PEOPLE_KEYSTROKES.approve.key);
-    expect(line.textContent, "an approve with no request in focus said nothing").not.toBe("");
+    expect(line.textContent, "approving with no request in focus showed no message").not.toBe("");
 
     act(() => {
       buttonOf("Approve", KEPT.requester.name).focus();
     });
     pressedOn(PEOPLE_KEYSTROKES.approve.key);
     await approveDialog(KEPT.requester.name);
-    expect(line.textContent, "the select-first line outlived the approve").toBe("");
+    expect(line.textContent, "the select-first message stayed after the approve").toBe("");
   });
 
-  it("says a request was decided meanwhile, and what next", async () => {
+  it("alerts when someone else already decided the request", async () => {
     const api = requestsApi(PRIYA);
     api.set("members.approveRequest", () => {
       api.set("members.requests", () => read([]));
@@ -120,7 +126,7 @@ describe("the People page's Requests tab", () => {
       expect(screen.queryByRole("dialog")).toBeNull();
     });
     await waitFor(() => {
-      expect(alert().textContent, "the decided-meanwhile refusal said nothing").not.toBe("");
+      expect(alert().textContent, "the already-decided refusal showed no alert").not.toBe("");
     });
     await waitFor(() => {
       expect(rowsOf(PRIYA.requester.name)).toHaveLength(0);
@@ -129,7 +135,7 @@ describe("the People page's Requests tab", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(heading());
     });
-    expect(document.body.textContent, "the refusal names an organisation").not.toMatch(
+    expect(document.body.textContent, "the page says organisation, not workspace").not.toMatch(
       NAMES_AN_ORGANISATION,
     );
   });

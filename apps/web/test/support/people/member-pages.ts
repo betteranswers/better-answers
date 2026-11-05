@@ -1,8 +1,11 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { expect } from "vitest";
 
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import type { Api } from "@test/stubbed-api.ts";
 import { ADA, adaAnAdmin, GRACE, read } from "@test/two-workspaces.ts";
+
+export const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
 
 export const idOf = (seed: string): string => `01J${seed}`.padEnd(26, "0");
 

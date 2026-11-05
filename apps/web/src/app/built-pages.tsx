@@ -95,10 +95,12 @@ const HOME_PAGES: readonly Page[] = Object.values(HOMES);
 export const detailOf = (page: Page): BuiltDetail | undefined => {
   const built = BUILT_DETAILS.get(page.path);
   if (page.detail !== undefined && built === undefined) {
-    throw new Error(`the list declares an address beneath ${page.path}, and nothing draws it`);
+    throw new Error(`navigation.ts gives ${page.path} a detail page, but no route renders it`);
   }
   if (page.detail === undefined && built !== undefined) {
-    throw new Error(`something draws an address beneath ${page.path}, and the list declares none`);
+    throw new Error(
+      `a route renders a detail page under ${page.path}, but navigation.ts declares none`,
+    );
   }
   return built;
 };
@@ -106,10 +108,10 @@ export const detailOf = (page: Page): BuiltDetail | undefined => {
 export const drawOf = (page: Page): BuiltPage | undefined => {
   const built = BUILT_PAGES.get(page.path);
   if (page.built && built === undefined) {
-    throw new Error(`the list calls ${page.path} built, and nothing draws it`);
+    throw new Error(`navigation.ts marks ${page.path} as built, but no route renders it`);
   }
   if (!page.built && built !== undefined) {
-    throw new Error(`the list calls ${page.path} unbuilt, and something draws it`);
+    throw new Error(`navigation.ts marks ${page.path} as not built, but a route renders it`);
   }
   return (
     built ?? (HOME_PAGES.includes(page) ? { draw: () => <UnbuiltPage home={page} /> } : undefined)

@@ -42,8 +42,7 @@ const ENTER_IT = "Please enter it below.";
 export const codeSent = (address: string): string =>
   `We’ve sent a 6-digit code to ${address}. ${ENTER_IT}`;
 
-export const sendingANewCode = (address: string): string =>
-  `Sending a new sign-in email to ${address}.`;
+export const sendingANewCode = (address: string): string => `Sending a new code to ${address}.`;
 
 export const newCodeSent = (address: string): string =>
   `We’ve sent a new 6-digit code to ${address}. ${ENTER_IT}`;

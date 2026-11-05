@@ -132,24 +132,24 @@ export const unreadableWordOf = (error: string): string =>
   UNREADABLE_WORDS.get(error) ?? "could not be read";
 
 export const unreadableCounted = (unreadable: number, needingOcr: number): string => {
-  const all = `${counted(unreadable, "document", "documents")} unreadable.`;
+  const all = `${counted(unreadable, "document", "documents")} could not be read.`;
   return needingOcr === 0
     ? all
     : `${all} ${counted(needingOcr, "is a scan that needs", "are scans that need")} OCR.`;
 };
 
 export const AUDITED_CATEGORIES = [
-  { category: "special-category", term: "Findings, Special Category" },
-  { category: "bank-details", term: "Findings, Bank Details" },
-  { category: "government-identifier", term: "Findings, Government Identifier" },
-  { category: "date-of-birth", term: "Findings, Date of Birth" },
-  { category: "home-address", term: "Findings, Home Address" },
-  { category: "personal-contact", term: "Findings, Personal Contact" },
-  { category: "person-name", term: "Findings, Person Name" },
-  { category: "job-title", term: "Findings, Job Title" },
+  { category: "special-category", term: "Special Category Findings" },
+  { category: "bank-details", term: "Bank Details Findings" },
+  { category: "government-identifier", term: "Government Identifier Findings" },
+  { category: "date-of-birth", term: "Date of Birth Findings" },
+  { category: "home-address", term: "Home Address Findings" },
+  { category: "personal-contact", term: "Personal Contact Findings" },
+  { category: "person-name", term: "Person Name Findings" },
+  { category: "job-title", term: "Job Title Findings" },
 ] as const;
 
-const spokenWord = (word: string): string => word.replaceAll("-", " ");
+export const spokenWord = (word: string): string => word.replaceAll("-", " ");
 
 export const sentenceCased = (word: string): string => {
   const spoken = spokenWord(word);
@@ -249,31 +249,33 @@ type NamedGroup = {
 
 export const REVIEW_WORDS = {
   heading: (name: string): string => `Review of ${name}`,
-  lead: "Findings from the last sync. Values are never shown.",
+  lead: "These findings come from the last sync. The personal data itself is never shown.",
   selectFirst: "Select a group of findings first.",
   select: (group: NamedGroup): string =>
-    `Select ${spokenWord(group.category)} by ${ruleWordOf(group.ruleId)} in ${group.title}`,
+    `Select ${spokenWord(group.category)} findings in ${group.title} found by the ${ruleWordOf(group.ruleId)} rule`,
   noPassages: "No passages yet",
   alreadyNarrowed: {
     tag: "Already narrowed",
-    says: "A special category finding narrowed this document.",
+    says: "This document was narrowed because it contains special category data.",
   },
   dismissed: {
     tag: "Dismissed",
-    says: (findings: number): string => `${findingsCounted(findings)}.`,
+    says: (findings: number): string =>
+      `${findingsCounted(findings)} dismissed as not special category.`,
   },
   keptStillWithheld: {
-    tag: "Kept, still withheld",
+    tag: "Still withheld",
     says: (findings: number): string =>
-      `${findingsCounted(findings)} overridden by an erasure request.`,
+      `${findingsCounted(findings)} kept in text, but still withheld because of an erasure request.`,
   },
   keep: {
     label: "Keep in Text",
     named: (groups: number): string => `Keep ${groupsCountedInATitle(groups)} in Text`,
-    consequence: "These findings will be restored on the next sync. Your reason will be recorded.",
+    consequence:
+      "These findings will be shown in the text after the next sync. Your reason will be recorded.",
     pending: "Keeping in text.",
     done: (groups: number, findings: number): string =>
-      `${groupsCounted(groups)} kept successfully. ${findingsCounted(findings)} will be restored on the next sync.`,
+      `${groupsCounted(groups)} kept in text successfully. ${findingsCounted(findings)} will be shown after the next sync.`,
   },
   narrowDocuments: { label: "Narrow These Documents" },
   dismiss: {

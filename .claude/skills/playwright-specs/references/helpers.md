@@ -14,7 +14,7 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `signIn` | `signInByEmail`, then, once the first page draws, past the confirm or setup page an Admin or the operator meets: it gives the person the harness's authenticator through `withAnAuthenticator`, opens the confirm page afresh with the page's own query, and types the code — the gate passed through the real page, never around it. Anyone else is left where the sign-in sends them. Most specs sign in with this |
 | `confirmedWhenAsked` | Waits for the confirm or setup page an action sent the person to, such as joining as an Admin, then passes it as `signIn` does |
 | `memberOfTwoWorkspaces` | A person who is the Admin of one new workspace and holds a role, Viewer unless named, in a second. It answers both, and `inTwoWorkspaces` builds on it |
-| `signInSaysWhy` | Asserts the sign-in page's heading and a status that holds words, and answers the status' text |
+| `signInStatusText` | Asserts the sign-in page's heading and a status that holds words, and answers the status' text |
 | `signedInAsTheOperator` | Provisions a workspace, marks its Admin the operator, signs them in at home and answers the workspace with a run tag, for the console specs |
 | `landedAtHome` | Asserts the page is on a role's home: its address, read off the navigation list, and its heading. The heading is the page's group's name, or its area's where it has none |
 | `notFoundOfferingHome` | Asserts the not-found page and its link to a role's home. A page hidden from the role shows it, as an address that never existed does |
@@ -38,13 +38,13 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later. A key pressed sooner keeps the focus it moved |
 | `clockTheNextKey` | Starts the action's clock in the page: from the next key to the node an XPath names reading a given text. Every `fetch` the page sends after the key is held until then, because an action never waits on a round trip. A request in flight at the key is not held |
 | `clockTheNextDraw` | The same clock with nothing held, for a timed draw that waits on the server, such as jump-to's list |
-| `theActionLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the action's 100 ms. On CI it only annotates |
-| `saysARefusal` | Asserts an alert holds words. A refusal's region can stand empty from the first draw, so being in the tree shows no refusal |
-| `saysSomethingNew` | Asserts a status or an alert says something other than what it said before, which the spec read from it and hands over. Holding words would pass on what it already said |
+| `actionWithinBudget` | Reads that clock, annotates the test with it and asserts it under the action's 100 ms. On CI it only annotates |
+| `alertHasText` | Asserts an alert holds words. A refusal's region can stand empty from the first draw, so being in the tree shows no refusal |
+| `regionShowsNewText` | Asserts a status or an alert says something other than what it said before, which the spec read from it and hands over. Holding words would pass on what it already said |
 | `countOf` | A list's count: the first status its region holds, which its head says |
-| `saysOfItsRead` | Asserts a list's live region holds words, where a list says its read's state in a paragraph and no alert. No role names that region, so it is found by its `aria-live`, apart from the words the list's head always shows |
-| `saysTheWait` | Asserts an alert names a ceiling's wait, given in seconds as the answer named it, as the page counts it: whole minutes, rounded up, matched by their number. A wait the answer did not name fails |
-| `keepsItsWordOffThePage` | Asserts the api's word for a refusal is nowhere on the page: the word is for the logs and the wire |
+| `listStatusHasText` | Asserts a list's live region holds words, where a list says its read's state in a paragraph and no alert. No role names that region, so it is found by its `aria-live`, apart from the words the list's head always shows |
+| `alertShowsWait` | Asserts an alert names a ceiling's wait, given in seconds as the answer named it, as the page counts it: whole minutes, rounded up, matched by their number. A wait the answer did not name fails |
+| `pageHidesRefusalWord` | Asserts the api's word for a refusal is nowhere on the page: the word is for the logs and the wire |
 | `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
 | `tokenColour` | A design-system token's colour as the browser paints it, so a computed style is compared with the token rather than a copied value |
 | `contrastBetween` | WCAG's contrast ratio between two painted `rgb()` colours, as `apps/web/e2e/app/frame.spec.ts` measures each focus edge against the surface behind it |
@@ -52,10 +52,10 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `switched` | Opens the switcher named for where the person is and picks the radio item holding another workspace's name. It waits for nothing after the pick, so the spec asserts where the person landed |
 | `inTwoWorkspaces` | A new person who is the Admin of one new workspace and holds a role in a second, Admin unless Viewer is named. It signs them in through `signIn`, picks the first workspace, waits for the Admin's home and the switcher named for it, and answers the address and both workspaces. A spec about moving between workspaces starts from it |
 | `authenticatorCodeField` | The *Authenticator Code* field, by its exact label. `signIn` fills it on the confirm page |
-| `memberUnreadUntil` | Drops the shell's member read, fails the member read in the frame's batch, and holds the lone retry until the promise it is given settles. The page then draws with the member unread. A spec sets it up, reloads, and acts before it lets the read land, as `apps/web/e2e/journeys/self-removal-to-the-chooser.spec.ts` does |
+| `failMemberReadUntil` | Drops the shell's member read, fails the member read in the frame's batch, and holds the lone retry until the promise it is given settles. The page then draws with the member unread. A spec sets it up, reloads, and acts before it lets the read land, as `apps/web/e2e/journeys/self-removal-to-the-chooser.spec.ts` does |
 | `ACTION_SAMPLES` | How many times a spec clocks one action before it judges it, five. A spec seeds `ACTION_SAMPLES - 1` extra rows, so each sample has a row to act on |
-| `actionClocked` | Waits for the clock `clockTheNextKey` started and answers it in milliseconds. It fails when no clock was started, and fails by name when the node had not read its text 2 s after the key while a request was held. A spec collects one per sample for `theActionsLandedWithinTheirBudget` |
-| `theActionsLandedWithinTheirBudget` | Annotates the test with every sample of an action and their median, and asserts the median under the action's 100 ms, which on CI it only annotates. It fails by name when the action was never clocked. `theActionLandedWithinItsBudget` is the same check over one sample |
+| `actionClocked` | Waits for the clock `clockTheNextKey` started and answers it in milliseconds. It fails when no clock was started, and fails by name when the node had not read its text 2 s after the key while a request was held. A spec collects one per sample for `medianActionWithinBudget` |
+| `medianActionWithinBudget` | Annotates the test with every sample of an action and their median, and asserts the median under the action's 100 ms, which on CI it only annotates. It fails by name when the action was never clocked. `actionWithinBudget` is the same check over one sample |
 | `tokenPainted` | A design-system token's value for a named CSS property as the browser paints it. It is read off a probe element styled with the token. `tokenColour` is this for `color`. `apps/web/e2e/app/frame.spec.ts` reads `--focus-ring` as `box-shadow` with it |
 | `drawnMarks` | The visible elements holding `data-marks` whose `::before` draws, each named by its `data-slot` or its tag. `apps/web/e2e/auth/consent.spec.ts` asserts the card alone draws them |
 
@@ -90,10 +90,10 @@ Six more play Claude's part in its OAuth flow on the suite's own origin — `app
 | `anAdminWithAnAuthenticator` | A new Admin whose authenticator is enrolled, with its recovery codes saved or none |
 | `recoveryField` | The *Recovery Code* field |
 | `codesListed` | The recovery codes' list items |
-| `saidOfTheSet` | The paragraph that says what the set of codes is |
+| `recoveryCodesParagraphs` | The paragraph that says what the set of codes is |
 | `codesTicked` | Ticks *I have saved these codes* and presses the named finishing button |
 | `regionOf` | A region by its exact name |
-| `accountFromTheBand` | Opens Account from the avatar menu in the band |
+| `openAccountFromPersonMenu` | Opens Account from the avatar menu in the band |
 
 ## The page modules
 
@@ -149,8 +149,8 @@ still shown the api refused.
 
 | Helper | What it does |
 | --- | --- |
-| `isAFind` | Matches a request whose path names `knowledge.find` anywhere, because the tRPC client batches its reads. A spec hands it to `heldBack`, `page.route` or a request wait to catch a search's read |
-| `heldBack` | Holds every request a matcher picks until the spec releases it. It answers `reached`, which settles when the first arrives, and `release`. A spec reads the page while a read is still out with it. `apps/web/e2e/knowledge/search.spec.ts` uses it during a search and `apps/web/e2e/journeys/source-upload-to-published.spec.ts` while the sources list loads |
+| `isKnowledgeFind` | Matches a request whose path names `knowledge.find` anywhere, because the tRPC client batches its reads. A spec hands it to `holdRequests`, `page.route` or a request wait to catch a search's read |
+| `holdRequests` | Holds every request a matcher picks until the spec releases it. It answers `reached`, which settles when the first arrives, and `release`. A spec reads the page while a read is still out with it. `apps/web/e2e/knowledge/search.spec.ts` uses it during a search and `apps/web/e2e/journeys/source-upload-to-published.spec.ts` while the sources list loads |
 | `scrolledSideways` | How far the page scrolls sideways in pixels, the document's scroll width less its client width. A spec at a narrow width asserts it is 0 |
 | `listsItsKeystrokes` | Opens the page's list of keystrokes through `keystrokesListed`. It asserts each given key is among the list's terms and each named action is in it, then dismisses the list through `keystrokesDismissed`. A page's keystroke spec runs it with the page's own keys |
 | `conceptsSeeded` | Runs `seedConcepts` and answers a map from each concept's title to what the harness answered for it, its IRI, path and cited documents. `apps/web/e2e/knowledge/concept.spec.ts` and `apps/web/e2e/inbox/waiting-on-you.spec.ts` look concepts up in it by title |

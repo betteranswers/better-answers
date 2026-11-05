@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "../browser.ts";
-import { anAddress, clockTheNextKey, signIn, theActionLandedWithinItsBudget } from "../harness.ts";
+import { anAddress, clockTheNextKey, signIn, actionWithinBudget } from "../harness.ts";
 
 const displayNameHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Your Name" });
@@ -45,7 +45,7 @@ test("asks a new person for a display name first", async ({
   await page.keyboard.type("Priya Shah");
   await clockTheNextKey(page, { at: "//main//button[@type='submit']", reads: "Saving" });
   await page.keyboard.press("Enter");
-  await theActionLandedWithinItsBudget(page, "display name save");
+  await actionWithinBudget(page, "display name save");
 
   await expect(noWorkspaceHeading(page)).toBeVisible();
 });

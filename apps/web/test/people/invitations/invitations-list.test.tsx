@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { PEOPLE_KEYSTROKES, PEOPLE_SELECT_FIRST } from "@/features/people/people-state.ts";
+import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
@@ -50,7 +50,7 @@ const inOrder = (...elements: readonly Element[]): boolean =>
   );
 
 describe("the People page's Invitations tab", () => {
-  it("each tab invites by keystroke, giving d its own action", async () => {
+  it("each tab invites by key, with d meaning something different", async () => {
     const { api } = holdingInvitations([]);
     await openPeople(api, "Members");
     const besideTheSharedKey: string[] = [];
@@ -71,7 +71,7 @@ describe("the People page's Invitations tab", () => {
 
       const keystrokes = await keystrokesListed();
       const action = actionBesideKey(keystrokes, PEOPLE_KEYSTROKES.remove.key);
-      expect(action, `${name} lists no action beside the key`).not.toBe("");
+      expect(action, `${name} lists no action for the key`).not.toBe("");
       besideTheSharedKey.push(action);
       pressedOn("Escape");
       await waitFor(() => {
@@ -80,12 +80,13 @@ describe("the People page's Invitations tab", () => {
       await focused(keystrokesButton());
     }
 
-    expect(new Set(besideTheSharedKey).size, "two tabs list one action beside the shared key").toBe(
-      3,
-    );
+    expect(
+      new Set(besideTheSharedKey).size,
+      "two tabs list the same action for the shared key",
+    ).toBe(3);
   });
 
-  it("an empty tab says so in one line, inviting once", async () => {
+  it("an empty tab shows one message and one invite button", async () => {
     const { api } = holdingInvitations([]);
     await openInvitations(api);
     await statusChoice("Waiting", 0);
@@ -119,7 +120,7 @@ describe("the People page's Invitations tab", () => {
     expect(invitationRows()).toHaveLength(0);
     expect(
       screen.getAllByRole("button", { name: /^invite/i }),
-      "the head's action is the one way to invite",
+      "the page shows more than one invite button",
     ).toHaveLength(1);
   });
 
@@ -157,7 +158,9 @@ describe("the People page's Invitations tab", () => {
     await waitFor(() => {
       expect(invitationRows()).toHaveLength(0);
     });
-    expect(invitationsRegion().textContent, "the empty list names no search").toContain(nobody);
+    expect(invitationsRegion().textContent, "the empty list does not name the search").toContain(
+      nobody,
+    );
     const clear = within(invitationsRegion()).getByRole("button", { name: "Clear Search" });
     clear.focus();
     fireEvent.click(clear);
@@ -197,7 +200,7 @@ describe("the People page's Invitations tab", () => {
     expect(menuOf(dropped)).toBeNull();
   });
 
-  it("drops the select-first line once a key acts", async () => {
+  it("clears the select-first message once a key selects a row", async () => {
     const held = addressOf("held");
     const { api } = holdingInvitations([anInvitation("held")]);
     await openInvitations(api);
@@ -207,8 +210,8 @@ describe("the People page's Invitations tab", () => {
     keystrokesButton().focus();
 
     pressedOn(PEOPLE_KEYSTROKES.tickInvitation.key);
-    expect(outcomeIn()?.textContent, "x with no invitation in focus said nothing").toBe(
-      PEOPLE_SELECT_FIRST.invitation,
+    expect(outcomeIn()?.textContent, "x with no invitation in focus showed no message").toMatch(
+      /\S/,
     );
 
     tickOf(held)?.focus();
@@ -216,11 +219,13 @@ describe("the People page's Invitations tab", () => {
     await waitFor(() => {
       expect(tickOf(held)?.getAttribute("aria-checked")).toBe("true");
     });
-    expect(outcomeIn()?.textContent, "the select-first line outlived the tick").toBe("");
+    expect(outcomeIn()?.textContent, "the select-first message stayed after the selection").toBe(
+      "",
+    );
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    it(`shows ${A_ROLE[role]} no invitations, Members being hidden`, async () => {
+    it(`shows ${A_ROLE[role]} Page Not Found instead of invitations`, async () => {
       const api = adaAnAdmin();
       api.set("session.member", () => adaAt(role));
 

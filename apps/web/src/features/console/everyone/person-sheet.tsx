@@ -50,7 +50,7 @@ function Sessions(properties: { readonly sessions: readonly HeldSession[] }) {
           {sessions.map((session) => (
             <li key={`${session.createdAt} ${session.expiresAt}`}>
               <Facts>
-                <SummaryRow term="Began">
+                <SummaryRow term="Signed In">
                   <At iso={session.createdAt} />
                 </SummaryRow>
                 <SummaryRow term="Last Used">
@@ -96,7 +96,7 @@ function GrantItem(properties: {
       <Collapsible className="mt-1">
         <CollapsibleTrigger asChild>
           <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
-            More About {assistant}’s Grant
+            More About {assistant}’s Access
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -163,7 +163,7 @@ function Grants(properties: {
   return (
     <SheetPart title="Assistant Access">
       {grants.length === 0 && ended.length === 0 ? (
-        <p>No assistants connected as {properties.name} yet</p>
+        <p>{properties.name} hasn’t connected an assistant yet.</p>
       ) : (
         <ul className="grid gap-4">
           {grants.map((grant) => (
@@ -250,9 +250,9 @@ export function PersonSheet(properties: {
         <SheetPart title="Sign-In">
           <Facts>
             <SummaryRow term="Last Sign-In">
-              <Instant at={person.lastSignedInAt} none="None on record" />
+              <Instant at={person.lastSignedInAt} none="Never" />
             </SummaryRow>
-            <SummaryRow term="Every Sign-In and Token Ended">
+            <SummaryRow term="Signed Out Everywhere">
               <Instant at={person.credentialsRevokedAt} none="Never" />
             </SummaryRow>
           </Facts>

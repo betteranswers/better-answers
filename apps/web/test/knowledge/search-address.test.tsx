@@ -11,8 +11,8 @@ import {
   matchRows,
   openedSearch,
   placedForSearch,
-  said,
-  saidNow,
+  searchStatus,
+  searchStatusText,
   searchBox,
   typed,
   AUDIT_COMMITTEE,
@@ -64,15 +64,15 @@ describe("the Knowledge Search page", () => {
     const api = aSearchApi();
     const router = await openedSearch(api);
 
-    await waitFor(() => expect(saidNow()).toMatch(/\S/));
+    await waitFor(() => expect(searchStatusText()).toMatch(/\S/));
     expect(matchRows()).toHaveLength(0);
-    const nothingAsked = saidNow();
+    const nothingAsked = searchStatusText();
 
     typed("   ");
     await waitFor(() =>
       expect(router.state.location.searchStr).toMatch(/knowledge\.search=(?:\+|%20){3}/),
     );
-    expect(saidNow(), "a blank search is not said as nothing asked").toBe(nothingAsked);
+    expect(searchStatusText(), "a blank search changed the empty-search status").toBe(nothingAsked);
     expect(findsAsked(), "the page asked for matches with nothing asked").toHaveLength(0);
 
     await foundNothing(api, "audit");
@@ -94,13 +94,13 @@ describe("the Knowledge Search page", () => {
     expect(findsAsked().map((asked) => asked.query)).toEqual(["forklift"]);
   });
 
-  it("says nothing matches, for stop words alone too", async () => {
+  it("says nothing matches, including for stop words alone", async () => {
     const api = aSearchApi();
     await openedSearch(api);
 
     await foundNothing(api, "zzz-nowhere");
     await foundNothing(api, "the and of");
-    expect(said().textContent).toContain("the and of");
+    expect(searchStatus().textContent).toContain("the and of");
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
@@ -120,7 +120,7 @@ describe("the Knowledge Search page", () => {
           .getAllByRole("link")
           .map((link) => link.textContent),
       ).toEqual(["Search", "Guides", "Knowledge Base"]);
-      expect(saidNow()).toMatch(/\S/);
+      expect(searchStatusText()).toMatch(/\S/);
       expect(matchRows()).toHaveLength(0);
     });
   }

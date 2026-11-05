@@ -18,7 +18,7 @@ const workspacesIn = (menu: Locator): Locator => menu.getByRole("menuitemradio")
 const memberLink = (page: Page, name: string): Locator =>
   page.getByRole("main").getByRole("link", { name, exact: true });
 
-const aMemberOnlyOf = async (api: APIRequestContext, workspaceId: string, name: string) => {
+const addViewerTo = async (api: APIRequestContext, workspaceId: string, name: string) => {
   const member = await person(api, anAddress("only"), { displayName: name });
   await addMember(api, { workspaceId, userId: member.id, role: "Viewer" });
   return member.id;
@@ -29,8 +29,8 @@ test("an Admin switches workspace and sees its home and members", async ({ page,
     first: "Wharfe Joinery",
     second: "Aire Joinery",
   });
-  await aMemberOnlyOf(request, first.workspaceId, "Only In Wharfe");
-  await aMemberOnlyOf(request, second.workspaceId, "Only In Aire");
+  await addViewerTo(request, first.workspaceId, "Only In Wharfe");
+  await addViewerTo(request, second.workspaceId, "Only In Aire");
   await page.reload();
   await expect(memberLink(page, "Only In Wharfe")).toBeVisible();
 

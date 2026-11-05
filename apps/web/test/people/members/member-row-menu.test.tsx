@@ -30,8 +30,8 @@ const rowMenuOpened = async (name: string) => {
   return screen.findByRole("menu");
 };
 
-describe("bulk actions on the members ticked", () => {
-  it("the row menu's Change Role changes its one member alone", async () => {
+describe("a member row's menu", () => {
+  it("Change Role changes only that member's role", async () => {
     const api = apiOf();
     api.set("members.changeRole", () => {
       api.set("members.list", () => read([ADA, { ...SAM, role: "Editor" }]));
@@ -68,7 +68,7 @@ describe("bulk actions on the members ticked", () => {
     expect(screen.queryByRole("toolbar", { name: "Selected Members" })).toBeNull();
   });
 
-  it("the row menu's Add to Group opens the page's groups", async () => {
+  it("Add to Group opens the member's Groups section", async () => {
     const api = apiOf();
     api.set("members.addToGroup", () => {
       api.set("members.list", () =>
@@ -92,7 +92,7 @@ describe("bulk actions on the members ticked", () => {
     });
     expect(
       thePage().getAllByText("Site leads", { exact: true }),
-      "the group is named outside its checklist",
+      "the group name appears outside its checklist",
     ).toHaveLength(1);
     router.history.back();
 

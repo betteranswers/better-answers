@@ -107,7 +107,7 @@ export const tooManyCodesTriedOr = (
 ): string => `Too many attempts. Please try again ${waitNamed(waitSeconds)}${orUsing(others)}.`;
 
 export const AUTHENTICATOR_CODE_WRONG =
-  "Verification code is incorrect. Please enter the code your authenticator shows now.";
+  "Verification code is incorrect. Please enter the code your authenticator app shows now.";
 
 export const PASSKEY_NOT_YOURS =
   "That passkey isn't linked to your account. Please try another way below.";

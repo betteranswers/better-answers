@@ -60,7 +60,7 @@ describe("the run summary", () => {
     expect(run.summary).not.toContain("jump-to");
   }, 60_000);
 
-  it("names nothing when every test passes at first", async () => {
+  it("stays empty when every test passes on the first attempt", async () => {
     const run = await runSummaryOver(
       ['import { test } from "@playwright/test";', 'test("takes a payment", () => {});', ""].join(
         "\n",

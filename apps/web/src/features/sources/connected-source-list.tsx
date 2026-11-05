@@ -113,7 +113,7 @@ function RowAction(properties: {
       variant="outline"
       size="sm"
       aria-expanded={properties.expanded}
-      // Not `disabled`: a disabled button drops the focus the keyboard left on it.
+      // Not `disabled`, because a disabled button loses keyboard focus.
       aria-disabled={properties.held ? true : undefined}
       className="aria-disabled:opacity-50"
       aria-keyshortcuts={SOURCES_KEYSTROKES[properties.action].key}

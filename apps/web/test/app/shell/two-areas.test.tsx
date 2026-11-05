@@ -62,7 +62,7 @@ const openAt = async (path: string) => {
     createRoute({
       getParentRoute: () => root,
       path: each.path,
-      component: () => <p>{each.name} drew.</p>,
+      component: () => <p>{each.name} page</p>,
     }),
   );
   const router = createRouter({
@@ -80,17 +80,17 @@ const openAt = async (path: string) => {
 const railLinks = () =>
   within(screen.getByRole("navigation", { name: "Areas" })).getAllByRole("link");
 
-const tooltipsShowing = () => screen.queryAllByRole("tooltip").map((each) => each.textContent);
+const visibleTooltips = () => screen.queryAllByRole("tooltip").map((each) => each.textContent);
 
 /** The popper measures its arrow, which jsdom cannot. */
-const measuresNothing = class {
+const NoopResizeObserver = class {
   observe = () => undefined;
   unobserve = () => undefined;
   disconnect = () => undefined;
 };
 
 beforeEach(() => {
-  vi.stubGlobal("ResizeObserver", measuresNothing);
+  vi.stubGlobal("ResizeObserver", NoopResizeObserver);
 });
 
 afterEach(() => {
@@ -99,18 +99,18 @@ afterEach(() => {
 });
 
 describe("a rail of two areas", () => {
-  it("opens one tooltip at a time across its entries", async () => {
+  it("shows one tooltip at a time across its links", async () => {
     await openAt(QUESTIONS.path);
     const [first, second] = railLinks();
-    assert(first !== undefined, "the rail lists a first area");
-    assert(second !== undefined, "the rail lists a second area");
+    assert(first !== undefined, "the rail has no first area link");
+    assert(second !== undefined, "the rail has no second area link");
 
     act(() => first.focus());
     expect(await screen.findByRole("tooltip")).toBeDefined();
-    expect(tooltipsShowing()).toEqual(["First"]);
+    expect(visibleTooltips()).toEqual(["First"]);
 
     fireEvent.pointerMove(second, { pointerType: "mouse" });
-    await vi.waitFor(() => expect(tooltipsShowing()).toEqual(["Second"]));
+    await vi.waitFor(() => expect(visibleTooltips()).toEqual(["Second"]));
     expect(document.activeElement).toBe(first);
   });
 
@@ -119,7 +119,7 @@ describe("a rail of two areas", () => {
     expect(screen.getByRole("navigation", { name: "First" })).toBeDefined();
 
     const second = railLinks()[1];
-    assert(second !== undefined, "the rail lists a second area");
+    assert(second !== undefined, "the rail has no second area link");
     fireEvent.click(second);
 
     const swapped = await screen.findByRole("navigation", { name: "Second" });

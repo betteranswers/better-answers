@@ -29,7 +29,7 @@ const termsOf = (row: HTMLElement) =>
     .map((term) => [term.textContent, term.nextElementSibling?.textContent]);
 
 describe("the Sources page's list of connected sources", () => {
-  it("reads an Admin a row's stored values as words", async () => {
+  it("shows an Admin each row's stored values as words", async () => {
     await openSources(anAdminWith(aConnectedSource("Staff handbook")));
 
     const handbook = await rowOf("Staff handbook");
@@ -59,7 +59,7 @@ describe("the Sources page's list of connected sources", () => {
     }
   });
 
-  it("tells an Admin more about a source in sentences", async () => {
+  it("shows more details about a source in sentences", async () => {
     await openSources(anAdminWith(aConnectedSource("Staff handbook")));
     const handbook = await rowOf("Staff handbook");
     const destinations = (): string[] =>
@@ -82,7 +82,7 @@ describe("the Sources page's list of connected sources", () => {
     expect(detailOf(handbook, "Retention").textContent).toMatch(aSentence);
   });
 
-  it("tells an Admin why documents are unreadable, scans counted apart", async () => {
+  it("says why documents are unreadable and counts scans separately", async () => {
     const unreadable = (title: string, reason: string) => ({
       documentId: anId(),
       title,
@@ -138,11 +138,11 @@ describe("the Sources page's list of connected sources", () => {
     fireEvent.click(moreDetailsOf(minutes));
     expect(
       within(detailOf(minutes, "Unreadable")).getByRole("paragraph").textContent,
-      "scans are counted where no document is one",
+      "the count mentions scans when no document is a scan",
     ).toMatch(/^\D*\b1\b\D*$/v);
   });
 
-  it("shows an Editor Connected Sources as not found, connecting nothing", async () => {
+  it("shows an Editor Page Not Found and connects nothing", async () => {
     const api = adaAnAdmin();
     api.set("session.member", () => adaAt("Editor"));
     api.set("sources.list", () => read([aConnectedSource("Staff handbook")]));

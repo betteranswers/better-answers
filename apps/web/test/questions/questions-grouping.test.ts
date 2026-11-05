@@ -23,8 +23,8 @@ const at = (minute: number): string => `2026-10-15T09:${String(minute).padStart(
 const idsOf = (records: readonly AskedRecord[]): readonly string[] =>
   records.map((record) => record.id);
 
-describe("the questions asked grouping", () => {
-  it("puts every flagged record first, a refusal among them", () => {
+describe("grouping questions asked", () => {
+  it("puts flagged records first, including an unanswered one", () => {
     const grouped = groupedForReading([
       aRecord({ id: "f1", askedAt: at(1), verdict: "refuse", flagged: true }),
       aRecord({ id: "f2", askedAt: at(2), verdict: "ok", flagged: true }),
@@ -36,7 +36,7 @@ describe("the questions asked grouping", () => {
     expect(grouped.notAnswered).toEqual([]);
   });
 
-  it("lists the rest newest first, once-flagged records included", () => {
+  it("lists other records newest first, including closed flags", () => {
     const grouped = groupedForReading([
       aRecord({ id: "flagged-once", askedAt: at(5), verdict: "warn", flagged: false }),
       aRecord({ id: "newer", askedAt: at(9), verdict: "related", flagged: false }),
@@ -46,7 +46,7 @@ describe("the questions asked grouping", () => {
     expect(idsOf(grouped.others)).toEqual(["newer", "flagged-once", "oldest"]);
   });
 
-  it("keeps the unflagged refusals in one group, newest first", () => {
+  it("groups unflagged unanswered records together, newest first", () => {
     const grouped = groupedForReading([
       aRecord({ id: "r1", askedAt: at(1), verdict: "refuse", flagged: false }),
       aRecord({ id: "o1", askedAt: at(2), verdict: "ok", flagged: false }),
@@ -60,8 +60,8 @@ describe("the questions asked grouping", () => {
   });
 });
 
-describe("the records a read has served", () => {
-  it("keeps one copy of a record two pages served", () => {
+describe("records returned across pages", () => {
+  it("keeps the latest copy of a record returned twice", () => {
     const flaggedThen = aRecord({ id: "x", askedAt: at(1), verdict: "ok", flagged: true });
     const closedSince = aRecord({ id: "x", askedAt: at(1), verdict: "ok", flagged: false });
     const other = aRecord({ id: "y", askedAt: at(2), verdict: "ok", flagged: false });

@@ -18,7 +18,7 @@ const files = new Map(sourceFiles(/\.tsx?$/).map(({ file, text }) => [file, text
 const specifiersOf = (text: string): readonly string[] =>
   [...text.matchAll(STATIC_IMPORT)].flatMap((found) => (found[1] === undefined ? [] : [found[1]]));
 
-const placeOf = (from: string, specifier: string): string | undefined => {
+const sourcePathOf = (from: string, specifier: string): string | undefined => {
   if (specifier.startsWith("@/")) return specifier.slice(2);
   return specifier.startsWith(".") ? path.join(path.dirname(from), specifier) : undefined;
 };
@@ -36,21 +36,21 @@ const reachedStatically = (): {
     reached.add(file);
     for (const specifier of specifiersOf(text)) {
       if (EDITOR_LIBRARY.test(specifier)) libraries.push(`${file} imports ${specifier}`);
-      const place = placeOf(file, specifier);
-      if (place !== undefined) pending.push(place);
+      const sourcePath = sourcePathOf(file, specifier);
+      if (sourcePath !== undefined) pending.push(sourcePath);
     }
   }
   return { reached, libraries };
 };
 
-const importsALibrary = (name: string): boolean =>
+const importsEditorLibrary = (name: string): boolean =>
   specifiersOf(files.get(`${EDITING}/${name}`) ?? "").some((each) => EDITOR_LIBRARY.test(each));
 
 describe("the concept editor's libraries", () => {
-  it("stay out of the entry's static imports", () => {
+  it("are not statically imported from the entry", () => {
     const { reached, libraries } = reachedStatically();
 
-    expect(reached, "the walk did not reach the concept page's launcher").toContain(
+    expect(reached, "the import walk did not reach concept-actions.tsx").toContain(
       `${EDITING}/concept-actions.tsx`,
     );
     expect(reached, "the editing session is imported statically").not.toContain(
@@ -60,10 +60,10 @@ describe("the concept editor's libraries", () => {
   });
 
   it("are imported by the editor's own files", () => {
-    const own = ["visual-body.tsx", "source-body.tsx", "markdown-round-trip.ts"].map(
-      importsALibrary,
+    const editorFiles = ["visual-body.tsx", "source-body.tsx", "markdown-round-trip.ts"].map(
+      importsEditorLibrary,
     );
 
-    expect(own).toEqual([true, true, true]);
+    expect(editorFiles).toEqual([true, true, true]);
   });
 });

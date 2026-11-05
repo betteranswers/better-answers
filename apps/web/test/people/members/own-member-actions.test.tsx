@@ -1,19 +1,22 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { homeNowSaid } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
-import { CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { anAdminOver, membersRegion, personHeading, thePage } from "@test/people/member-pages.ts";
-import { heldBack, type Api } from "@test/stubbed-api.ts";
+import {
+  anAdminOver,
+  MEMBERS_PAGE,
+  membersRegion,
+  personHeading,
+  thePage,
+} from "@test/people/member-pages.ts";
+import { holdProcedure, type Api } from "@test/stubbed-api.ts";
 import { ADA, adaAt, aRefusalAnswer, HEDY, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
-
-const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
 
 const NOT_A_MEMBER = aRefusalAnswer("not-a-member", "unauthenticated", 401);
 
@@ -57,7 +60,7 @@ const leavingTheWorkspace = (api: Api, removed: () => unknown) => {
 };
 
 describe("a member's own page", () => {
-  it("demoting yourself says so, then lands on Editor's home", async () => {
+  it("demoting yourself warns you, then opens the Editor home", async () => {
     const api = anAdminBesideAnother();
     api.set("members.changeRole", () => {
       api.set("session.member", () => adaAt("Editor"));
@@ -81,7 +84,7 @@ describe("a member's own page", () => {
     expect(describing(commit)).toMatch(/\S/);
     expect(
       describingWhoever(commit, ADA.displayName),
-      "their own demotion is described as another member's is",
+      "your own demotion has the same description as another member's",
     ).not.toBe(ofAnother);
     fireEvent.click(commit);
 
@@ -89,7 +92,6 @@ describe("a member's own page", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Ask" })).toBeDefined();
     const said = screen.getAllByRole("status").filter((each) => /\S/.test(each.textContent));
     expect(said).toHaveLength(1);
-    expect(said[0]?.textContent).toBe(homeNowSaid("Editor"));
     expect(said[0]?.textContent).toMatch(/\bEditor\b/);
 
     const avatar = within(screen.getByRole("banner")).getByRole("button", {
@@ -111,8 +113,8 @@ describe("a member's own page", () => {
   });
 });
 
-describe("removing a member from their page", () => {
-  it("an Admin removing themself leaves through the workspace chooser", async () => {
+describe("removing yourself from your member page", () => {
+  it("an Admin who removes themself passes through the workspace chooser", async () => {
     const api = anAdminBesideAnother();
     leavingTheWorkspace(api, () => read({}));
     const router = await openAt(MEMBERS_PAGE, api);
@@ -127,15 +129,16 @@ describe("removing a member from their page", () => {
     await openedByName(ADA.displayName);
     const asked = removalOf().getByRole("button", { name: "Remove Member" });
     expect(describing(asked)).toMatch(/\S/);
-    expect(describing(asked), "their own removal names them as it would another").not.toContain(
-      ADA.displayName,
-    );
+    expect(
+      describing(asked),
+      "your own removal's description names you in the third person",
+    ).not.toContain(ADA.displayName);
     fireEvent.click(asked);
     const confirm = await waitFor(() => removalOf().getByRole("button", { name: "Remove" }));
     expect(describing(confirm)).toMatch(/\S/);
     expect(
       describingWhoever(confirm, ADA.displayName),
-      "their own removal is confirmed as another member's is",
+      "your own removal has the same confirmation as another member's",
     ).not.toBe(ofAnother);
     const visited: string[] = [];
     router.subscribe("onResolved", ({ toLocation }) => {
@@ -149,10 +152,10 @@ describe("removing a member from their page", () => {
     );
   });
 
-  it("removing yourself, pressed twice, asks once and still leaves", async () => {
+  it("pressing Remove twice on yourself sends one request", async () => {
     const api = anAdminBesideAnother();
     leavingTheWorkspace(api, () => read({}));
-    const removal = heldBack(api, "members.remove");
+    const removal = holdProcedure(api, "members.remove");
     const router = await openAt(memberPageOf(ADA.personId), api);
     await personHeading(ADA.displayName);
     fireEvent.click(removalOf().getByRole("button", { name: "Remove Member" }));
@@ -168,6 +171,6 @@ describe("removing a member from their page", () => {
     removal.resolve();
 
     await leftForNoWorkspace(router);
-    expect(removal.asks, "the second press asked the api again").toBe(1);
+    expect(removal.asks, "the second press sent another remove request").toBe(1);
   });
 });

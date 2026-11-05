@@ -6,14 +6,14 @@ const quoted = (query: string): string => `“${query}”`;
 
 export const COLLECTIONS_WORDS = {
   about:
-    "A collection is one part of the company’s knowledge, such as a product, a service or a sector. Its owner keeps the concepts in it checked and up to date, unless a concept names an owner of its own.",
+    "A collection is one part of the company’s knowledge, such as a product, a service or a sector. Its owner keeps its concepts verified and up to date. A concept can also have an owner of its own.",
   loading: "The collections are still loading.",
   none: "No collections to show yet. A collection appears here once it holds a concept you can read.",
   count: (count: number): string => counted(count, "collection", "collections"),
   owner: "Owner",
-  unowned: "No owner yet. Until an Admin names one, only Admins can edit its concepts.",
-  unnamed: "A member with no display name yet",
-  ownOwners: "Concepts with Their Own Owner",
+  unowned: "No owner yet. Only Admins can edit its concepts until an owner is set.",
+  unnamed: "Unnamed member",
+  ownOwners: "Concepts With Their Own Owner",
   noOwnOwners: "None",
   ownOwnersCount: (count: number): string => counted(count, "concept", "concepts"),
   newOwner: "New Owner",
@@ -23,14 +23,14 @@ export const COLLECTIONS_WORDS = {
   saveOf: (collection: string): string => ` the new owner of ${collection}`,
   named: (name: string, collection: string): string => `${name} now owns ${quoted(collection)}.`,
   cleared: (collection: string): string =>
-    `${quoted(collection)} has no owner now, so only Admins can edit its concepts.`,
+    `${quoted(collection)} no longer has an owner. Only Admins can edit its concepts.`,
   alreadyOwns: (name: string, collection: string): string =>
     `${name} already owns ${quoted(collection)}.`,
   alreadyUnowned: (collection: string): string => `${quoted(collection)} already has no owner.`,
 } as const;
 
 export const SAID_OF_COLLECTIONS = {
-  "owner-forbids": "You no longer own a collection, so this page is no longer open to you.",
+  "owner-forbids": "You no longer own any collections, so you can’t view this page.",
   "no-such-member":
     "That person is no longer a member of this workspace. Please choose someone else.",
 } satisfies OwnSentences;
@@ -50,15 +50,15 @@ export const SEARCH_WORDS = {
   selectFirst: "Please select a match first.",
   more: "More Matches",
   document: "Document",
-  newConcept: "Type it as a new concept",
+  newConcept: "New Concept",
 } as const;
 
 export const LAUNCH_WORDS = {
   edit: "Edit",
-  suggest: "Suggest an edit",
+  suggest: "Suggest an Edit",
   loading: "The editor is still loading.",
-  suggested: "Your suggestion is waiting for the concept's owner to decide.",
-  suggestedNew: "Your suggestion is waiting for the collection's owner or an Admin to decide.",
+  suggested: "Your suggestion was sent to the concept’s owner for review.",
+  suggestedNew: "Your suggestion was sent to the collection’s owner or an Admin for review.",
 } as const;
 
 const conceptsCounted = (count: number): string => counted(count, "concept", "concepts");
@@ -68,16 +68,16 @@ const collectionNamed = (collection: string | null): string =>
 
 export const KNOWLEDGE_BASE_WORDS = {
   about: "Every concept you can read, by collection and kind.",
-  tree: "Collections and kinds",
+  tree: "Collections and Kinds",
   collection: collectionNamed,
   labelled: (name: string, count: number): string => `${name}, ${conceptsCounted(count)}`,
   count: conceptsCounted,
   loading: "The knowledge base is still loading.",
   none: "No concepts in the knowledge base yet. A concept appears here once it is saved.",
   concepts: "Concepts",
-  openAKind: "Open a kind to list its concepts.",
+  openAKind: "Select a kind to see its concepts.",
   kindIn: (kind: string, collection: string | null): string =>
-    collection === null ? `${kind}, in no collection` : `${kind} in ${collection}`,
+    collection === null ? `${kind} without a collection` : `${kind} in ${collection}`,
   conceptsLoading: "The concepts are still loading.",
   noneOfTheKind: "No concepts of this kind yet.",
   columns: { title: "Title", kind: "Kind", trust: "Trust" },

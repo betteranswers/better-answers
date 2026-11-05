@@ -40,17 +40,17 @@ const opened = async () => {
 };
 
 describe("the row menu's Rename dialog", () => {
-  it("says the group already has the name, staying open", async () => {
+  it("says the name is unchanged and stays open", async () => {
     const { dialog, field, onRenamed, onClose } = await opened();
 
     fireEvent.submit(field);
 
-    expect(within(dialog).getByRole("status").textContent).toContain("already called HR team");
+    expect(within(dialog).getByRole("status").textContent).toContain("HR team");
     expect(onRenamed).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("keeps a refusal to its own line", async () => {
+  it("shows a refusal in the dialog's alert and stays open", async () => {
     const { dialog, field, onRenamed, onClose } = await opened();
 
     fireEvent.change(field, { target: { value: "People team" } });

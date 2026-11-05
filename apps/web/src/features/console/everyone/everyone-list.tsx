@@ -73,7 +73,7 @@ const columnsFor = (actions: PersonActions) =>
     }),
     column.accessor("lastSignedInAt", {
       header: "Last Sign-In",
-      cell: ({ getValue }) => <Instant at={getValue()} none="None on record" />,
+      cell: ({ getValue }) => <Instant at={getValue()} none="Never" />,
     }),
   ]);
 

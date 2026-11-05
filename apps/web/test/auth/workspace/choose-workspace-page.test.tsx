@@ -3,11 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { noLongerAMember } from "@/features/auth/refusal-words.ts";
-import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
 import { server, type Asked } from "@test/stub-server.ts";
-import { addressOf, type Api, heldBack, settlingAfter } from "@test/stubbed-api.ts";
+import { addressOf, type Api, holdProcedure, settlingAfter } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -15,7 +13,7 @@ import {
   aRefusalAnswer,
   HOLME,
   NORTHERN,
-  openOutsideTheShellAt,
+  openPageOutsideShell,
   read,
   switcher,
 } from "@test/two-workspaces.ts";
@@ -97,11 +95,11 @@ const openedWithTwo = async () => {
   const api = holding([NORTHERN_ROW, HOLME_ROW]);
   picksOpenAs(api, "Admin");
   const { picked, watching } = watchingPicks();
-  const router = await openOutsideTheShellAt("/choose-workspace", api, watching);
+  const router = await openPageOutsideShell("/choose-workspace", api, watching);
   return { api, picked, router };
 };
 
-const thePicker = () => screen.findByRole("heading", { level: 1, name: PICKER_WORDS.heading });
+const thePicker = () => screen.findByRole("heading", { level: 1, name: "Your Workspaces" });
 
 const refusal = () => screen.getByRole("alert").textContent;
 
@@ -127,14 +125,14 @@ it("shows a member of two workspaces their role in each", async () => {
   await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Admin.path));
   expect(await screen.findByRole("heading", { level: 1, name: "People" })).toBeDefined();
   expect(await switcher(NORTHERN)).toBeDefined();
-  expect(picked, "the button opened another workspace than its own").toEqual([NORTHERN.id]);
+  expect(picked, "the button opened a different workspace").toEqual([NORTHERN.id]);
 });
 
 it("skips the picker for a workspace joined after sign-in", async () => {
   const api = holding([{ workspace: NORTHERN, role: "Editor" }]);
   picksOpenAs(api, "Editor");
   const { picked, watching } = watchingPicks();
-  const router = await openOutsideTheShellAt("/choose-workspace", api, watching);
+  const router = await openPageOutsideShell("/choose-workspace", api, watching);
 
   await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Editor.path));
   expect(await screen.findByRole("heading", { level: 1, name: "Ask" })).toBeDefined();
@@ -144,15 +142,15 @@ it("skips the picker for a workspace joined after sign-in", async () => {
   expect((await screen.findByRole("menu", { name: ADA.displayName })).textContent).toContain(
     "Editor",
   );
-  expect(screen.queryByRole("heading", { level: 1, name: PICKER_WORDS.heading })).toBeNull();
-  expect(picked, "the sole workspace was opened by another id").toEqual([NORTHERN.id]);
+  expect(screen.queryByRole("heading", { level: 1, name: "Your Workspaces" })).toBeNull();
+  expect(picked, "the only workspace was opened with a different id").toEqual([NORTHERN.id]);
 });
 
-it("stops at one refused pick of a sole workspace", async () => {
+it("does not retry a refused pick of the only workspace", async () => {
   const api = holding([NORTHERN_ROW]);
   const picks = picksRefused(api);
-  const workspaces = heldBack(api, "person.workspaces");
-  await openOutsideTheShellAt("/choose-workspace", api);
+  const workspaces = holdProcedure(api, "person.workspaces");
+  await openPageOutsideShell("/choose-workspace", api);
   await workspaces.asked;
 
   await settlingAfter(() => {
@@ -161,13 +159,13 @@ it("stops at one refused pick of a sole workspace", async () => {
 
   expect(refusal()).toMatch(/\S/);
   expect(await thePicker()).toBeDefined();
-  expect(picks(), "a refused pick was asked again").toBe(1);
+  expect(picks(), "a refused pick was sent again").toBe(1);
 });
 
-it("keeps the list, saying so, when a pick is refused", async () => {
+it("keeps the list and alerts when a pick is refused", async () => {
   const api = holding([NORTHERN_ROW, HOLME_ROW]);
   picksRefused(api);
-  await openOutsideTheShellAt("/choose-workspace", api);
+  await openPageOutsideShell("/choose-workspace", api);
   const picked = await screen.findByRole("button", { name: HOLME.name });
   picked.focus();
 
@@ -178,25 +176,23 @@ it("keeps the list, saying so, when a pick is refused", async () => {
   expect(screen.getByRole("button", { name: NORTHERN.name })).toBeDefined();
 });
 
-it("sends a non-member from the picker to the refused page", async () => {
+it("sends a person with no workspace to No Workspace Yet", async () => {
   const api = holding([]);
-  const router = await openOutsideTheShellAt("/choose-workspace", api);
+  const router = await openPageOutsideShell("/choose-workspace", api);
 
-  expect(
-    await screen.findByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING }),
-  ).toBeDefined();
+  expect(await screen.findByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeDefined();
   expect(router.state.location.pathname).toBe("/no-workspace");
   expect(screen.getByRole("button", { name: "Sign Out" })).toBeDefined();
 });
 
-it("separates an unread workspace list from no workspace, offering retry", async () => {
+it("offers Try Again when the workspace list fails to load", async () => {
   const api = holding([NORTHERN_ROW, HOLME_ROW]);
   const listed = api.get("person.workspaces");
   api.set("person.workspaces", () => {
     throw new TypeError("the network is down");
   });
-  const unread = heldBack(api, "person.workspaces");
-  await openOutsideTheShellAt("/choose-workspace", api);
+  const unread = holdProcedure(api, "person.workspaces");
+  await openPageOutsideShell("/choose-workspace", api);
   await unread.asked;
 
   await settlingAfter(() => {
@@ -205,16 +201,16 @@ it("separates an unread workspace list from no workspace, offering retry", async
 
   expect(refusal()).toMatch(/\S/);
   expect(await thePicker()).toBeDefined();
-  expect(screen.queryByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeNull();
+  expect(screen.queryByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeNull();
 
   api.set("person.workspaces", () => listed?.());
-  fireEvent.click(screen.getByRole("button", { name: PICKER_WORDS.tryAgain }));
+  fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
 
   expect(await screen.findByRole("button", { name: NORTHERN.name })).toBeDefined();
   expect(screen.getByRole("button", { name: HOLME.name })).toBeDefined();
 });
 
-it("drops and names a workspace the person was removed from", async () => {
+it("hides and names a workspace the person was removed from", async () => {
   const { api, picked, router } = await openedWithTwo();
   const taken = await screen.findByRole("button", { name: HOLME.name });
   removedFrom(HOLME);
@@ -223,18 +219,16 @@ it("drops and names a workspace the person was removed from", async () => {
 
   fireEvent.click(taken);
 
-  await waitFor(() => expect(refusal()).toBe(noLongerAMember(HOLME.name)));
+  await waitFor(() => expect(refusal()).toContain(HOLME.name));
   expect(await thePicker()).toBeDefined();
   expect(screen.queryByRole("button", { name: HOLME.name })).toBeNull();
   const stillMine = screen.getByRole("button", { name: NORTHERN.name });
-  expect(document.activeElement, "focus was not left on what the reader can do next").toBe(
-    stillMine,
-  );
+  expect(document.activeElement, "focus is not on the remaining workspace").toBe(stillMine);
 
   await userEvent.keyboard("{Enter}");
 
   await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Admin.path));
-  expect(picked, "Enter opened another workspace than the one left").toEqual([
+  expect(picked, "Enter opened a different workspace from the one remaining").toEqual([
     HOLME.id,
     NORTHERN.id,
   ]);

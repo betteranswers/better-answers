@@ -7,7 +7,7 @@ import {
   clockTheNextKey,
   provision,
   signedInWithNoWorkspace,
-  theActionLandedWithinItsBudget,
+  actionWithinBudget,
 } from "../harness.ts";
 
 const REASON = "I run the estimating desk and need the tender library.";
@@ -16,7 +16,7 @@ const shortNameField = (page: Page) => page.getByLabel("Workspace Short Name");
 
 const reasonField = (page: Page) => page.getByLabel("Reason");
 
-const requestSent = (page: Page) => page.getByRole("alert", { name: "Request sent" });
+const requestSent = (page: Page) => page.getByRole("alert", { name: "Request Sent" });
 
 test("a person with no workspace asks to join by keyboard", async ({
   page,
@@ -57,11 +57,11 @@ test("a person with no workspace asks to join by keyboard", async ({
   await page.keyboard.type(REASON);
   await clockTheNextKey(page, { at: "//main//button[@type='submit']", reads: "Asking" });
   await page.keyboard.press("Enter");
-  await theActionLandedWithinItsBudget(page, "ask to join");
+  await actionWithinBudget(page, "ask to join");
 
   await expect(requestSent(page)).toBeFocused();
   await expect(requestSent(page)).toMatchAriaSnapshot(`
-    - alert "Request sent":
+    - alert "Request Sent":
       - paragraph
       - paragraph
   `);

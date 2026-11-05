@@ -123,7 +123,7 @@ export function SensitivityPanel(properties: {
   readonly change: SensitivityChange;
   readonly connectedSource: ListedConnectedSource;
   readonly groupRef: RefObject<HTMLFieldSetElement | null>;
-  /** A second action sent before the first answers would drop the first one's answer. */
+  /** A second change sent before the first one answers would lose the first answer. */
   readonly pending: boolean;
   readonly onCancel: () => void;
   readonly onCommit: (asked: SensitivityAndAudience) => void;
@@ -205,7 +205,7 @@ export function SensitivityPanel(properties: {
         <Button
           type="button"
           variant="accent"
-          // Not `disabled`: a disabled button drops the focus the keyboard left on it.
+          // Not `disabled`, because a disabled button loses keyboard focus.
           aria-disabled={refusedWhy !== undefined}
           aria-describedby={refusedWhy === undefined ? undefined : refusedWhyId}
           className="h-auto min-h-8 max-w-full shrink py-1 text-left whitespace-normal aria-disabled:opacity-50"

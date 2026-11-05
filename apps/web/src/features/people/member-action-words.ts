@@ -21,7 +21,7 @@ export const MEMBER_PAGE_WORDS = {
   sections: "On This Page",
   access: "Access",
   activity: "Activity",
-  removeAndEndEverySignIn: "Remove and End Every Sign-In",
+  removeAndSignOut: "Remove and Sign Out",
   changeRole: "Change Role",
   holdsRole: (name: string, role: Role) =>
     `${name} is ${aRole(role)}. Select another role to change it.`,
@@ -30,13 +30,13 @@ export const MEMBER_PAGE_WORDS = {
   changesYourRole: (role: Role) => `This will change your own role to ${role}.`,
   roleChanged: (name: string, role: Role) =>
     `${name}’s role has been changed to ${role} successfully.`,
-  signInsAndTokens: "Sign-Ins and Personal Tokens",
-  signInsAndTokensHere: "Sign-Ins and Personal Tokens Here",
-  endEverySignInAndToken: "End Every Sign-In and Token Here",
-  endsAtOnce: (name: string) =>
-    `This will end every session and token ${name} holds for this workspace. They can sign in again afterwards.`,
-  everySignInEnded: (name: string) =>
-    `Every sign-in and token ${name} held here has been ended successfully.`,
+  lastSignedOut: "Last Signed Out of This Workspace",
+  signOutHere: "Sign Out of This Workspace",
+  signOutHint: (name: string) =>
+    `This signs ${name} out of this workspace on every device and ends their assistants’ access to it. They can sign in again.`,
+  signOutHintForYou: " You will be signed out too.",
+  signedOut: (name: string) =>
+    `${name} has been signed out of this workspace, and their assistants’ access to it has ended.`,
   loading: "The member is still loading.",
   noSuchMember: "Member not found",
   toMembers: "Go to Members",
@@ -92,7 +92,7 @@ export const BULK_WORDS = {
     action: "Remove",
     title: (count: number) => `Remove ${membersTitled(count)}`,
     consequence: (count: number) =>
-      `Are you sure you want to remove ${count === 1 ? "this member" : "these members"} from the workspace? They will lose access on every session and assistant they hold.`,
+      `Are you sure you want to remove ${count === 1 ? "this member" : "these members"} from this workspace? They will be signed out, and any assistant they connected will lose access.`,
     pending: (count: number) => `Removing ${members(count)} from this workspace.`,
     done: (changed: number, skipped: number) =>
       `${changedSaid(changed, "No members were removed.", "removed from this workspace")}${andAlready(skipped, "no longer a member")}`,

@@ -6,13 +6,13 @@ import { PaginationEllipsis } from "@/shared/ui/pagination.tsx";
 afterEach(cleanup);
 
 describe("a pagination's ellipsis", () => {
-  it("names the pages it stands for to assistive technology", () => {
+  it("has an accessible name for screen readers", () => {
     render(<PaginationEllipsis />);
 
     expect(isInaccessible(screen.getByText("More pages"))).toBe(false);
   });
 
-  it("hides its icon, which the name already says", () => {
+  it("hides its icon from screen readers", () => {
     const { container } = render(<PaginationEllipsis />);
 
     expect(container.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");

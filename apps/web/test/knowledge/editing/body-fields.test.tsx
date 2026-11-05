@@ -31,7 +31,7 @@ describe("the visual body field", () => {
     expect(field().querySelector("strong")?.textContent).toBe("logs");
   });
 
-  it("points the field at the text that describes it", () => {
+  it("links the field to its description", () => {
     render(
       <>
         <p id="hint">Write in plain words.</p>
@@ -42,7 +42,7 @@ describe("the visual body field", () => {
     expect(field().getAttribute("aria-describedby")).toBe("hint");
   });
 
-  it("hands typed text back as markdown", async () => {
+  it("returns typed text as markdown", async () => {
     const onChange = vi.fn<(markdown: string) => void>();
     render(<VisualBody label="Body" value="Start" onChange={onChange} />);
 
@@ -52,7 +52,7 @@ describe("the visual body field", () => {
     expect(onChange).toHaveBeenLastCalledWith("Start more");
   });
 
-  it("hands back the ending the starting text had", async () => {
+  it("keeps the trailing newline the starting text had", async () => {
     const onChange = vi.fn<(markdown: string) => void>();
     render(<VisualBody label="Body" value={"Start\n"} onChange={onChange} />);
 
@@ -62,7 +62,7 @@ describe("the visual body field", () => {
     expect(onChange).toHaveBeenLastCalledWith("Start more\n");
   });
 
-  it("hands back no ending to a body that had none", async () => {
+  it("adds no trailing newline to a body without one", async () => {
     const onChange = vi.fn<(markdown: string) => void>();
     render(<VisualBody label="Body" value="" onChange={onChange} />);
 
@@ -109,7 +109,7 @@ describe("the source body field", () => {
     expect(field().textContent).toBe("## Retention_logs_");
   });
 
-  it("points the field at the text that describes it", () => {
+  it("links the field to its description", () => {
     render(
       <>
         <p id="hint">Write in plain words.</p>

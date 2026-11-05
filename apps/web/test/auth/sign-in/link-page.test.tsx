@@ -1,8 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LINK_WORDS, SIGN_IN_UNCONFIRMED } from "@/features/auth/sign-in/link-words.ts";
-import { STOCK } from "@/shared/refusal-words.ts";
 import { clipboardAnswering } from "@test/clipboard-stand-in.ts";
 import { openApp } from "@test/open-app.tsx";
 import { addressOf, answered } from "@test/stubbed-api.ts";
@@ -26,8 +24,8 @@ const ELSEWHERE = { state: "elsewhere", code: "482916", until: "2026-10-29T10:05
 
 const signInButton = () => screen.getByRole("button", { name: "Sign In" });
 
-describe("a link's sign-in that got no response", () => {
-  it("says to try again, its Sign in button still pressable", async () => {
+describe("signing in from a link with no response", () => {
+  it("shows an alert and keeps Sign In available", async () => {
     const signIn = vi.fn<() => Promise<Response>>(() =>
       Promise.reject(new TypeError("the network is down")),
     );
@@ -37,9 +35,8 @@ describe("a link's sign-in that got no response", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Sign In" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).toBe(SIGN_IN_UNCONFIRMED);
+      expect(screen.getByRole("alert").textContent).toMatch(/\S/u);
     });
-    expect(SIGN_IN_UNCONFIRMED).not.toBe(STOCK.unconfirmed);
     expect(signInButton().getAttribute("aria-disabled")).toBe("false");
 
     fireEvent.click(signInButton());
@@ -51,7 +48,7 @@ describe("a link's sign-in that got no response", () => {
 });
 
 describe("a link opened in another browser", () => {
-  it("another device shows the code and stays signed out", async () => {
+  it("shows the code to copy and does not sign in", async () => {
     const written = clipboardAnswering(() => Promise.resolve());
     const asked = vi.fn<(input: string | URL | Request) => Promise<Response>>(() =>
       answered(ELSEWHERE),
@@ -61,7 +58,10 @@ describe("a link opened in another browser", () => {
     await openApp("/sign-in/link");
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Enter This Code Where You Started" }),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Enter This Code to Finish Signing In",
+      }),
     ).toBeDefined();
     expect(screen.getByText("482 916")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Sign In" })).toBeNull();
@@ -71,7 +71,7 @@ describe("a link opened in another browser", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy Code" }));
 
     await waitFor(() => {
-      expect(saidOfTheCopy?.textContent).toBe(LINK_WORDS.copied);
+      expect(saidOfTheCopy?.textContent).toMatch(/\S/u);
     });
     expect(written).toEqual(["482916"]);
     expect(

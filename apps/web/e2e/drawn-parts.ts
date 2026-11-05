@@ -58,7 +58,7 @@ export const bundledHarness = async (harness: {
   );
 };
 
-const servedStylesheets = async (request: APIRequestContext): Promise<string> => {
+const servedStylesheetLinks = async (request: APIRequestContext): Promise<string> => {
   const served = await (await request.get("/")).text();
   const links = served.match(/<link[^>]*rel="stylesheet"[^>]*>/g) ?? [];
   expect(links, "the served page links no stylesheet").not.toHaveLength(0);
@@ -68,14 +68,14 @@ const servedStylesheets = async (request: APIRequestContext): Promise<string> =>
 export const harnessDrawn = async (
   page: Page,
   request: APIRequestContext,
-  drawn: { readonly title: string; readonly script: string },
+  content: { readonly title: string; readonly script: string },
 ): Promise<void> => {
-  const head = await servedStylesheets(request);
+  const head = await servedStylesheetLinks(request);
   await page.goto("/health");
   await page.setContent(
-    `<!doctype html><html lang="en-GB"><head><title>${drawn.title}</title>${head}</head><body>` +
+    `<!doctype html><html lang="en-GB"><head><title>${content.title}</title>${head}</head><body>` +
       '<main class="px-4 py-6"><div data-page-content class="max-w-page"><div id="root"></div>' +
       "</div></main></body></html>",
   );
-  await page.addScriptTag({ content: drawn.script });
+  await page.addScriptTag({ content: content.script });
 };

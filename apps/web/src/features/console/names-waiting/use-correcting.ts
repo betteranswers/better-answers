@@ -12,7 +12,7 @@ type CorrectName = ReturnType<typeof useCorrectDisplayName>;
 export type Refused = { readonly displayName: string; readonly byTheRule: Outcome | undefined };
 
 const outcomeOf = (correctName: CorrectName, was: string): Outcome | undefined => {
-  if (correctName.isPending) return { tone: "said", words: "Saving the name." };
+  if (correctName.isPending) return { tone: "said", words: "Saving the display name." };
   if (correctName.isSuccess) {
     return { tone: "said", words: correctedWords(was, correctName.data.displayName) };
   }

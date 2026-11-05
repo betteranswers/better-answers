@@ -5,20 +5,20 @@ import { holdTitle } from "@better-answers/schema/testing/test-title";
 
 import { contrastBetween, controlEdges, drawnMarks } from "./locators.ts";
 
-let issued = 0;
+let addressesIssued = 0;
 
 const CLIENT_IP_HEADER = "cf-connecting-ip";
 
-const anAddress = (workerIndex: number): string => {
-  issued += 1;
-  return `198.18.${workerIndex % 250}.${issued % 250}`;
+const clientAddress = (workerIndex: number): string => {
+  addressesIssued += 1;
+  return `198.18.${workerIndex % 250}.${addressesIssued % 250}`;
 };
 
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
-const transitionsHaveEnded = async (page: Page): Promise<void> => {
+const waitForTransitions = async (page: Page): Promise<void> => {
   await page.evaluate(async () => {
-    const ending = (): Animation[] =>
+    const finiteAnimations = (): Animation[] =>
       document
         .getAnimations()
         .filter(
@@ -26,49 +26,49 @@ const transitionsHaveEnded = async (page: Page): Promise<void> => {
             animation.playState === "running" &&
             animation.effect?.getComputedTiming().endTime !== Infinity,
         );
-    for (let running = ending(); running.length > 0; running = ending()) {
+    for (let running = finiteAnimations(); running.length > 0; running = finiteAnimations()) {
       await Promise.allSettled(running.map(async (animation) => animation.finished));
     }
   });
 };
 
-const MOST_MARKED = 3;
+const MAX_MARKED_ELEMENTS = 3;
 
-const TEXTURES_ASIDE =
+const HIDE_TEXTURES_CSS =
   "[data-grid-pattern], [data-dot-pattern] { background-image: none !important; } [data-marks]::before { content: none !important; }";
 
-const UNDECIDED_BEHIND = new Set(["bgImage", "bgGradient", "pseudoContent"]);
+const UNDECIDED_BACKGROUND_KEYS = new Set(["bgImage", "bgGradient", "pseudoContent"]);
 
-const undecidedBehind = (check: { readonly data: unknown }): boolean => {
+const isUndecidedOverBackground = (check: { readonly data: unknown }): boolean => {
   const { data } = check;
   return (
     typeof data === "object" &&
     data !== null &&
     "messageKey" in data &&
-    UNDECIDED_BEHIND.has(String(data.messageKey))
+    UNDECIDED_BACKGROUND_KEYS.has(String(data.messageKey))
   );
 };
 
-const CONTROL_EDGE = 3;
+const MIN_CONTROL_CONTRAST = 3;
 
-const faintEdges = async (page: Page): Promise<readonly string[]> =>
+const lowContrastControls = async (page: Page): Promise<readonly string[]> =>
   (await controlEdges(page)).flatMap(({ control, edges, fill, behind }) => {
     const ratio = Math.max(...[fill, ...edges].map((painted) => contrastBetween(painted, behind)));
-    return ratio < CONTROL_EDGE ? [`${control} at ${ratio.toFixed(2)}:1`] : [];
+    return ratio < MIN_CONTROL_CONTRAST ? [`${control} at ${ratio.toFixed(2)}:1`] : [];
   });
 
-const auditIn = async (page: Page, theme: string): Promise<void> => {
-  await transitionsHaveEnded(page);
+const auditInTheme = async (page: Page, theme: string): Promise<void> => {
+  await waitForTransitions(page);
   const where = `${page.url()} in ${theme}`;
   const marked = await drawnMarks(page);
   expect(
     marked.length,
     `${where} has decorative marks on ${String(marked.length)} elements, over the limit: ${marked.join(" ")}`,
-  ).toBeLessThanOrEqual(MOST_MARKED);
+  ).toBeLessThanOrEqual(MAX_MARKED_ELEMENTS);
 
-  const aside = await page.addStyleTag({ content: TEXTURES_ASIDE });
+  const texturesHidden = await page.addStyleTag({ content: HIDE_TEXTURES_CSS });
   const audit = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
-  await aside.evaluate((style) => {
+  await texturesHidden.evaluate((style) => {
     style.parentNode?.removeChild(style);
   });
 
@@ -76,21 +76,22 @@ const auditIn = async (page: Page, theme: string): Promise<void> => {
   const undecided = audit.incomplete
     .filter((result) => result.id === "color-contrast")
     .flatMap((result) => result.nodes)
-    .filter((node) => node.any.some(undecidedBehind))
+    .filter((node) => node.any.some(isUndecidedOverBackground))
     .map((node) => node.target.join(" "));
   expect(
     undecided,
     `axe could not check the text contrast over a background texture on ${where}`,
   ).toEqual([]);
-  expect(await faintEdges(page), `controls on ${where} have an edge contrast below 3:1`).toEqual(
-    [],
-  );
+  expect(
+    await lowContrastControls(page),
+    `controls on ${where} have an edge contrast below 3:1`,
+  ).toEqual([]);
 };
 
 const themeOf = (page: Page): Promise<string | undefined> =>
   page.evaluate(() => document.documentElement.dataset["theme"]);
 
-const themeSet = (page: Page, theme: string | undefined): Promise<void> =>
+const setTheme = (page: Page, theme: string | undefined): Promise<void> =>
   page.evaluate((next) => {
     if (next === undefined) delete document.documentElement.dataset["theme"];
     else document.documentElement.dataset["theme"] = next;
@@ -98,28 +99,28 @@ const themeSet = (page: Page, theme: string | undefined): Promise<void> =>
 
 type Scrolled = readonly [left: number, top: number];
 
-const returnedToItsTop = (page: Page): Promise<Scrolled> =>
+const scrollToTop = (page: Page): Promise<Scrolled> =>
   page.evaluate((): Scrolled => {
     const was = [window.scrollX, window.scrollY] as const;
     window.scrollTo(0, 0);
     return was;
   });
 
-const scrolledBackTo = (page: Page, was: Scrolled): Promise<void> =>
+const scrollBackTo = (page: Page, was: Scrolled): Promise<void> =>
   page.evaluate(([left, top]) => {
     window.scrollTo(left, top);
   }, was);
 
-const auditOf = async (page: Page): Promise<void> => {
-  const was = await returnedToItsTop(page);
-  const own = await themeOf(page);
-  await auditIn(page, own ?? "light");
-  const other = own === "dark" ? "light" : "dark";
-  await themeSet(page, other);
-  await auditIn(page, other);
-  await themeSet(page, own);
-  await transitionsHaveEnded(page);
-  await scrolledBackTo(page, was);
+const auditBothThemes = async (page: Page): Promise<void> => {
+  const was = await scrollToTop(page);
+  const ownTheme = await themeOf(page);
+  await auditInTheme(page, ownTheme ?? "light");
+  const other = ownTheme === "dark" ? "light" : "dark";
+  await setTheme(page, other);
+  await auditInTheme(page, other);
+  await setTheme(page, ownTheme);
+  await waitForTransitions(page);
+  await scrollBackTo(page, was);
 };
 
 export type BrowserFixtures = {
@@ -139,7 +140,7 @@ export const test = base.extend<BrowserFixtures>({
 
   context: async ({ browser }, use, testInfo) => {
     const context = await browser.newContext({
-      extraHTTPHeaders: { [CLIENT_IP_HEADER]: anAddress(testInfo.workerIndex) },
+      extraHTTPHeaders: { [CLIENT_IP_HEADER]: clientAddress(testInfo.workerIndex) },
     });
     await use(context);
     await context.close();
@@ -151,7 +152,7 @@ export const test = base.extend<BrowserFixtures>({
   request: async ({ playwright, baseURL }, use, testInfo) => {
     const api = await playwright.request.newContext({
       ...(baseURL === undefined ? {} : { baseURL }),
-      extraHTTPHeaders: { [CLIENT_IP_HEADER]: anAddress(testInfo.workerIndex) },
+      extraHTTPHeaders: { [CLIENT_IP_HEADER]: clientAddress(testInfo.workerIndex) },
     });
     await use(api);
     await api.dispose();
@@ -161,14 +162,14 @@ export const test = base.extend<BrowserFixtures>({
     async ({ page, baseURL }, use, testInfo) => {
       let audited = false;
       await use(async () => {
-        await auditOf(page);
+        await auditBothThemes(page);
         audited = true;
       });
 
       if (testInfo.errors.length > 0) return;
       const left = page.url();
       if (baseURL !== undefined && new URL(left).origin === new URL(baseURL).origin) {
-        await auditOf(page);
+        await auditBothThemes(page);
         return;
       }
       expect(

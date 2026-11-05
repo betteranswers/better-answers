@@ -18,6 +18,11 @@ placedWithoutMeasuring();
 
 const main = () => within(screen.getByRole("main"));
 
+const numbersInTheRow = () =>
+  within(main().getByRole("list", { name: "Guides" }))
+    .getByRole("listitem")
+    .textContent.match(/\d+/gu);
+
 describe("the Guides list", () => {
   it("counts the guides and names each by its subject", async () => {
     await openAt(GUIDES_PAGE.path, aGuideApi("Editor"));
@@ -37,27 +42,22 @@ describe("the Guides list", () => {
     expect(await main().findByRole("link", { name: "northgate" })).toBeDefined();
   });
 
-  it("says how many sections need review", async () => {
-    const api = aGuideApi("Viewer");
-    api.set("knowledge.guides", () => read([aGuideSummary({ needsReview: 2 })]));
-    await openAt(GUIDES_PAGE.path, api);
+  for (const needsReview of [1, 2]) {
+    it(`counts ${String(needsReview)} needing review beside the section count`, async () => {
+      const api = aGuideApi("Viewer");
+      api.set("knowledge.guides", () => read([aGuideSummary({ needsReview })]));
+      await openAt(GUIDES_PAGE.path, api);
 
-    expect(await main().findByText("2 sections need review")).toBeDefined();
-  });
+      await main().findByRole("link", { name: "Northgate Ltd" });
+      expect(numbersInTheRow()).toEqual(["8", String(needsReview)]);
+    });
+  }
 
-  it("says a single section needs review in the singular", async () => {
-    const api = aGuideApi("Viewer");
-    api.set("knowledge.guides", () => read([aGuideSummary({ needsReview: 1 })]));
-    await openAt(GUIDES_PAGE.path, api);
-
-    expect(await main().findByText("1 section needs review")).toBeDefined();
-  });
-
-  it("says nothing needs review when no section does", async () => {
+  it("shows no review count when no section needs review", async () => {
     await openAt(GUIDES_PAGE.path, aGuideApi("Viewer"));
 
     await main().findByRole("link", { name: "Northgate Ltd" });
-    expect(main().queryByText(/need review/u)).toBeNull();
+    expect(numbersInTheRow()).toEqual(["8"]);
   });
 
   it("opens a guide from its row", async () => {
@@ -73,12 +73,12 @@ describe("the Guides list", () => {
     expect(await main().findByRole("heading", { level: 2, name: "Northgate Ltd" })).toBeDefined();
   });
 
-  it("says when there is no guide to list", async () => {
+  it("lists no guides and counts zero when there are none", async () => {
     const api = aGuideApi("Editor");
     api.set("knowledge.guides", () => read([]));
     await openAt(GUIDES_PAGE.path, api);
 
-    expect(await main().findByText(/No guides to show yet/u)).toBeDefined();
-    expect(main().getByText("0 Guides").tagName).toBe("OUTPUT");
+    expect((await main().findByText("0 Guides")).tagName).toBe("OUTPUT");
+    expect(main().queryByRole("list", { name: "Guides" })).toBeNull();
   });
 });

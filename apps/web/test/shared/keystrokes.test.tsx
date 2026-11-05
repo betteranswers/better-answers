@@ -34,13 +34,13 @@ function APage() {
   );
 }
 
-/** Radix hands focus back a task after the list goes, so the test lets that task run. */
-const aTaskLater = () =>
+/** Radix restores focus one task after the dialog closes. */
+const nextTask = () =>
   new Promise((resolve) => {
     setTimeout(resolve, 0);
   });
 
-const listDismissedByEscape = () => {
+const openAndEscapeList = () => {
   fireEvent.keyDown(document.body, { key: "?" });
   expect(screen.getByRole("dialog")).toHaveProperty("isConnected", true);
   fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
@@ -48,21 +48,21 @@ const listDismissedByEscape = () => {
 };
 
 describe("the keystrokes list", () => {
-  it("hands focus back to its button once dismissed", async () => {
+  it("returns focus to its button after closing", async () => {
     render(<APage />);
-    listDismissedByEscape();
+    openAndEscapeList();
 
-    await aTaskLater();
+    await nextTask();
 
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Keyboard Shortcuts" }));
   });
 
-  it("leaves focus where a sooner key moved it", async () => {
+  it("keeps focus where the user moved it before closing", async () => {
     render(<APage />);
-    listDismissedByEscape();
+    openAndEscapeList();
     screen.getByRole("textbox", { name: SEARCH }).focus();
 
-    await aTaskLater();
+    await nextTask();
 
     expect(document.activeElement).toBe(screen.getByRole("textbox", { name: SEARCH }));
   });
@@ -77,7 +77,7 @@ const MEMBERS_KEYSTROKES: readonly Keystroke[] = [
 
 const GROUPS_KEYSTROKES: readonly Keystroke[] = [{ key: "n", action: "Create a Group" }];
 
-function Registering(properties: { readonly keystrokes: readonly Keystroke[] }) {
+function RegisterKeystrokes(properties: { readonly keystrokes: readonly Keystroke[] }) {
   usePageKeystrokes(properties.keystrokes);
   return null;
 }
@@ -91,60 +91,60 @@ function AShell(properties: { readonly page: string | undefined; readonly childr
   );
 }
 
-const listedOnQuestionMark = (heading: string) => {
+const openListWithQuestionMark = (heading: string) => {
   fireEvent.keyDown(document.body, { key: "?" });
   return screen.getByRole("dialog", { name: heading });
 };
 
-const actionsIn = (listed: HTMLElement) =>
-  [...listed.querySelectorAll("dd")].map((definition) => definition.textContent);
+const actionsIn = (list: HTMLElement) =>
+  [...list.querySelectorAll("dd")].map((definition) => definition.textContent);
 
 describe("the shell's keystrokes list", () => {
-  it("lists the open page's keystrokes under its name, shell's last", () => {
+  it("lists the page's keystrokes first, then the shell's", () => {
     render(
       <AShell page="Members">
-        <Registering keystrokes={MEMBERS_KEYSTROKES} />
+        <RegisterKeystrokes keystrokes={MEMBERS_KEYSTROKES} />
       </AShell>,
     );
 
-    const listed = listedOnQuestionMark("Keyboard Shortcuts on Members");
+    const list = openListWithQuestionMark("Keyboard Shortcuts on Members");
 
-    expect(actionsIn(listed)).toStrictEqual([
+    expect(actionsIn(list)).toStrictEqual([
       "Search the Members",
       "Open the Member in Focus",
       "Show This List",
       "Jump To",
     ]);
-    expect(listed.textContent).not.toContain(KEYSTROKE_WORDS.noneOfItsOwn);
+    expect(list.textContent).not.toContain(KEYSTROKE_WORDS.noneOfItsOwn);
   });
 
-  it("follows the open page, dropping the one that left", () => {
+  it("updates when the page changes, dropping the old keystrokes", () => {
     const { rerender } = render(
       <AShell page="Members">
-        <Registering key="members" keystrokes={MEMBERS_KEYSTROKES} />
+        <RegisterKeystrokes key="members" keystrokes={MEMBERS_KEYSTROKES} />
       </AShell>,
     );
     rerender(
       <AShell page="Groups">
-        <Registering key="groups" keystrokes={GROUPS_KEYSTROKES} />
+        <RegisterKeystrokes key="groups" keystrokes={GROUPS_KEYSTROKES} />
       </AShell>,
     );
 
-    const listed = listedOnQuestionMark("Keyboard Shortcuts on Groups");
+    const list = openListWithQuestionMark("Keyboard Shortcuts on Groups");
 
-    expect(actionsIn(listed)).toStrictEqual(["Create a Group", "Show This List", "Jump To"]);
+    expect(actionsIn(list)).toStrictEqual(["Create a Group", "Show This List", "Jump To"]);
   });
 
-  it("says a page registering nothing has none, listing the shell's", () => {
+  it("lists only shell keystrokes for a page without any", () => {
     render(<AShell page={undefined} />);
 
-    const listed = listedOnQuestionMark("Keyboard Shortcuts on This Page");
+    const list = openListWithQuestionMark("Keyboard Shortcuts on This Page");
 
-    expect(listed.textContent).toContain(KEYSTROKE_WORDS.noneOfItsOwn);
-    expect(actionsIn(listed)).toStrictEqual(["Show This List", "Jump To"]);
+    expect(list.textContent).toContain(KEYSTROKE_WORDS.noneOfItsOwn);
+    expect(actionsIn(list)).toStrictEqual(["Show This List", "Jump To"]);
   });
 
-  it("opens from its trigger, which names `?` as its keystroke", () => {
+  it("opens from its button, which declares the `?` shortcut", () => {
     render(<AShell page="Members" />);
 
     const trigger = screen.getByRole("button", { name: "Keyboard Shortcuts" });
@@ -157,7 +157,7 @@ describe("the shell's keystrokes list", () => {
     );
   });
 
-  it("leaves a key typed on a select’s trigger to it", () => {
+  it("ignores `?` typed on a select trigger", () => {
     render(
       <AShell page="Members">
         <Select defaultValue="Viewer">
@@ -176,14 +176,14 @@ describe("the shell's keystrokes list", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("stops answering `?` once single-key keystrokes are turned off", () => {
+  it("ignores `?` after single-key shortcuts are turned off", () => {
     render(<AShell page="Members" />);
-    const listed = listedOnQuestionMark("Keyboard Shortcuts on Members");
+    const list = openListWithQuestionMark("Keyboard Shortcuts on Members");
 
     fireEvent.click(
       screen.getByRole("checkbox", { name: "Use single-key shortcuts on this browser" }),
     );
-    fireEvent.keyDown(listed, { key: "Escape" });
+    fireEvent.keyDown(list, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.keyDown(document.body, { key: "?" });
 

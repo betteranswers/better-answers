@@ -19,13 +19,13 @@ import {
   addMember,
   anAddress,
   inTwoWorkspaces,
-  keepsItsWordOffThePage,
+  pageHidesRefusalWord,
   landedAtHome,
   modelCallsIn,
   person,
   railOf,
   releaseTheModel,
-  saysARefusal,
+  alertHasText,
   scriptAsking,
   signIn,
   switched,
@@ -69,9 +69,9 @@ const aViewerAsking = async (
   return asking;
 };
 
-const said = (page: Page) => newQuestion(page).getByRole("status");
+const statusOf = (page: Page) => newQuestion(page).getByRole("status");
 
-const alerted = (page: Page) => newQuestion(page).getByRole("alert");
+const alertOf = (page: Page) => newQuestion(page).getByRole("alert");
 
 const asked = async (page: Page, question = QUESTION): Promise<void> => {
   await questionBox(page).fill(question);
@@ -109,7 +109,7 @@ test.describe("Ask › New question", () => {
 
     const flagging = await flagSent(page, result);
 
-    await saysARefusal(result.getByRole("alert"));
+    await alertHasText(result.getByRole("alert"));
     await expect(result.getByRole("button", { name: "Flagged" })).toHaveCount(0);
     await expect(flagging.getByRole("radio", { name: "Incomplete" })).toBeChecked();
     await expect(flagging.getByRole("textbox", { name: "Note" })).toHaveValue(NOTE);
@@ -141,10 +141,10 @@ test.describe("Ask › New question", () => {
       "spending-limit-met",
     );
     expect(await modelCallsIn(request, workspaceId)).toEqual({ judge: 0, draft: 0 });
-    await saysARefusal(alerted(page));
+    await alertHasText(alertOf(page));
     await expect(answered(page, "Answered")).toHaveCount(0);
     await expect(answered(page, "Related Knowledge")).toHaveCount(0);
-    await keepsItsWordOffThePage(page, "spending-limit-met");
+    await pageHidesRefusalWord(page, "spending-limit-met");
   });
 
   test("ignores Enter and Ask while an answer is streaming", async ({ page, request }) => {
@@ -173,7 +173,7 @@ test.describe("Ask › New question", () => {
 
     await questionBox(page).press("Enter");
 
-    await saysARefusal(alerted(page));
+    await alertHasText(alertOf(page));
     await expect(questionBox(page)).toHaveAttribute("aria-invalid", "true");
     await questionBox(page).fill("How do buyers");
     await questionBox(page).press("Shift+Enter");
@@ -226,7 +226,7 @@ test.describe("Ask › New question", () => {
       await expect(audits.getByText("Verified automatically")).toBeVisible();
       await expect(result.getByText("Judged", { exact: true })).toBeVisible();
       await expect(result.getByText(SUPPLIER.body)).toHaveCount(0);
-      await expect(said(page)).toHaveText(/\S/);
+      await expect(statusOf(page)).toHaveText(/\S/);
       await expect(questionBox(page), "focus left the question box").toBeFocused();
     });
 

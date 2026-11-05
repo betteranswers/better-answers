@@ -165,7 +165,7 @@ export const movedWords = (moved: {
 }): ReactNode => (
   <>
     {counted(moved.concepts.length, "concept", "concepts")} and{" "}
-    {counted(moved.writeUps.length, "write-up", "write-ups")} were updated with it.
+    {counted(moved.writeUps.length, "write-up", "write-ups")} that cite it were also updated.
     {moved.concepts.length === 0 ? null : (
       <span className="block">
         Concepts:{" "}

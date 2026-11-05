@@ -7,27 +7,27 @@ import {
   LABELLED_DETAIL_KEYS,
 } from "@/shared/audit/audit-details.ts";
 
-const said = (action: string, key: string): string => `${action} ${key}`;
+const pairName = (action: string, key: string): string => `${action} ${key}`;
 
-const keptOff = (action: (typeof DETAIL_KEYS)[number][0], key: string): boolean =>
+const isKeptOff = (action: (typeof DETAIL_KEYS)[number][0], key: string): boolean =>
   KEPT_OFF_DETAIL_KEYS[action]?.includes(key) ?? false;
 
-const accountedFor = ([action, key]: (typeof DETAIL_KEYS)[number]): boolean =>
-  LABELLED_DETAIL_KEYS.includes(key) || keptOff(action, key);
+const isLabelledOrKeptOff = ([action, key]: (typeof DETAIL_KEYS)[number]): boolean =>
+  LABELLED_DETAIL_KEYS.includes(key) || isKeptOff(action, key);
 
 describe("the audit log's detail labels", () => {
-  it("cover every declared key, or keep it off the page", () => {
-    const unlabelled = DETAIL_KEYS.filter((entry) => !accountedFor(entry)).map(([action, key]) =>
-      said(action, key),
+  it("cover every declared key not kept off the page", () => {
+    const unlabelled = DETAIL_KEYS.filter((entry) => !isLabelledOrKeptOff(entry)).map(
+      ([action, key]) => pairName(action, key),
     );
 
     expect(
       unlabelled,
-      "a detail key core writes with no label in audit-details.ts. Label it, or keep it off the page for its action.",
+      "detail keys with no label in audit-details.ts; add a label or keep the key off for its action",
     ).toEqual([]);
   });
 
-  it("are each written in sentence case", () => {
+  it("are written in sentence case", () => {
     const labels = detailLinesOf({
       detail: Object.fromEntries(LABELLED_DETAIL_KEYS.map((key) => [key, "held"])),
       named: {},
@@ -35,39 +35,39 @@ describe("the audit log's detail labels", () => {
 
     expect(
       labels.filter((label) => /\s[A-Z][a-z]/.test(label)),
-      "a detail label with a capital past its first word",
+      "detail labels with a capital letter after the first word",
     ).toEqual([]);
   });
 
-  it("name no key that no action declares", () => {
+  it("label only keys that some action declares", () => {
     const declared = new Set<string>(DETAIL_KEYS.map(([, key]) => key));
 
     expect(
       LABELLED_DETAIL_KEYS.filter((key) => !declared.has(key)),
-      "a label for a detail key no audit action declares",
+      "labels for detail keys that no audit action declares",
     ).toEqual([]);
   });
 
-  it("keep off only keys their action declares", () => {
-    const declared = new Set(DETAIL_KEYS.map(([action, key]) => said(action, key)));
+  it("keep off only keys that their action declares", () => {
+    const declared = new Set(DETAIL_KEYS.map(([action, key]) => pairName(action, key)));
     const keptOffPairs = Object.entries(KEPT_OFF_DETAIL_KEYS).flatMap(([action, keys]) =>
-      keys.map((key) => said(action, key)),
+      keys.map((key) => pairName(action, key)),
     );
 
     expect(
       keptOffPairs.filter((pair) => !declared.has(pair)),
-      "a kept-off detail key its action does not declare",
+      "kept-off detail keys that their action does not declare",
     ).toEqual([]);
   });
 
-  it("label no key that any action keeps off", () => {
+  it("do not label any key an action keeps off", () => {
     const labelledAndKeptOff = Object.entries(KEPT_OFF_DETAIL_KEYS).flatMap(([action, keys]) =>
-      keys.filter((key) => LABELLED_DETAIL_KEYS.includes(key)).map((key) => said(action, key)),
+      keys.filter((key) => LABELLED_DETAIL_KEYS.includes(key)).map((key) => pairName(action, key)),
     );
 
     expect(
       labelledAndKeptOff,
-      "a detail key labelled in audit-details.ts that an action keeps off. A label shows its key for every action, so remove the key from every kept-off list, or drop the label.",
+      "detail keys both labelled in audit-details.ts and kept off by an action; a label applies to every action, so remove the key from the kept-off lists or remove the label",
     ).toEqual([]);
   });
 });

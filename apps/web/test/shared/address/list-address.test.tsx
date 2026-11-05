@@ -93,9 +93,9 @@ const typeIn = (box: HTMLInputElement, typed: string) => {
   });
 };
 
-const shown = () => screen.getByRole("status").textContent;
+const listState = () => screen.getByRole("status").textContent;
 
-describe("a list's state in the address", () => {
+describe("a list's state in the URL", () => {
   it("keeps a search and a role filter across a reload", async () => {
     const { at } = await openMembers("/members");
 
@@ -106,19 +106,19 @@ describe("a list's state in the address", () => {
     await openMembers("/members?members.search=priya&members.role=Editor");
 
     expect(searchBox().value).toBe("priya");
-    expect(shown()).toBe("Editor, page 1");
+    expect(listState()).toBe("Editor, page 1");
   });
 
-  it.each(["abc", "0", "-2", "2.5", ""])("reads page %j as page 1", async (page) => {
+  it.each(["abc", "0", "-2", "2.5", ""])("treats page %j as page 1", async (page) => {
     await openMembers(`/members?members.page=${page}`);
 
-    expect(shown()).toBe("every role, page 1");
+    expect(listState()).toBe("every role, page 1");
   });
 
-  it("reads page 3, and an unknown role as every role", async () => {
+  it("reads page 3 and ignores an unknown role", async () => {
     await openMembers("/members?members.page=3&members.role=Owner");
 
-    expect(shown()).toBe("every role, page 3");
+    expect(listState()).toBe("every role, page 3");
   });
 
   it("replaces the history entry on each keystroke", async () => {
@@ -127,7 +127,7 @@ describe("a list's state in the address", () => {
     for (const typed of ["p", "pr", "pri"]) typeIn(searchBox(), typed);
     await at("/members?members.search=pri");
 
-    expect(history.length, "a keystroke pushed an entry of its own").toBe(2);
+    expect(history.length, "typing in search added a history entry").toBe(2);
   });
 
   it("keeps a number-like search exactly as typed", async () => {
@@ -141,7 +141,7 @@ describe("a list's state in the address", () => {
     expect(searchBox().value).toBe("0.50");
   });
 
-  it("drops a value back at its default from the address", async () => {
+  it("removes values reset to their defaults from the URL", async () => {
     const { at } = await openMembers("/members?members.search=priya&members.page=2");
 
     fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
@@ -149,19 +149,19 @@ describe("a list's state in the address", () => {
     typeIn(searchBox(), "");
 
     await at("/members");
-    expect(shown()).toBe("every role, page 1");
+    expect(listState()).toBe("every role, page 1");
   });
 
-  it("lands both of two writes made in one handler", async () => {
+  it("applies two writes made in one handler", async () => {
     const { at } = await openMembers("/members?members.search=priya");
 
     fireEvent.click(screen.getByRole("button", { name: "Viewers, page 2" }));
 
     await at("/members?members.search=priya&members.role=Viewer&members.page=2");
-    expect(shown()).toBe("Viewer, page 2");
+    expect(listState()).toBe("Viewer, page 2");
   });
 
-  it("holds each tab's search under its own prefix", async () => {
+  it("stores each tab's search under its own prefix", async () => {
     const { at } = await openPages({ "/people": Tabs }, ["/people"]);
 
     typeIn(searchBox("members"), "priya");

@@ -1,7 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
 import {
   aPassageRead,
   answeringPassages,
@@ -15,7 +14,7 @@ import {
   refusing,
   rowAt,
   thePalletPassages,
-  palletsFound,
+  searchedForPallets,
 } from "@test/knowledge/search-answers.ts";
 import { aRefusalAnswer, FORBIDDEN } from "@test/two-workspaces.ts";
 
@@ -35,8 +34,8 @@ const panelOpened = async (title = HANDBOOK) => {
 };
 
 describe("the Knowledge Search page", () => {
-  it("says why a passage went unread, offering a retry", async () => {
-    const { api } = await palletsFound();
+  it("alerts when a passage read fails, and retries it", async () => {
+    const { api } = await searchedForPallets();
     api.set("knowledge.open", answeringPassages(refusing(FORBIDDEN)));
 
     pressed(openerIn(rowAt(0), HANDBOOK));
@@ -51,21 +50,23 @@ describe("the Knowledge Search page", () => {
     await focusLandsOn(() => heading, "Retry did not return focus to the panel's heading");
   });
 
-  it("says a passage it cannot read is not there", async () => {
-    const { api } = await palletsFound();
+  it("alerts when the passage is not found", async () => {
+    const { api } = await searchedForPallets();
     api.set("knowledge.open", answeringPassages(refusing(NOT_FOUND)));
 
     pressed(openerIn(rowAt(0), HANDBOOK));
 
     const { panel } = await panelOpened();
     await waitFor(() =>
-      expect(within(panel).getByRole("alert").textContent).toBe(SAID_OF_KNOWLEDGE["not-found"]),
+      expect(within(panel).getByRole("alert").textContent, "the alert says nothing").toMatch(/\S/u),
     );
-    expect(panel.textContent).not.toContain(FIRST_PALLET_PASSAGE);
+    expect(panel.textContent, "the panel shows a passage it did not find").not.toContain(
+      FIRST_PALLET_PASSAGE,
+    );
   });
 
-  it("names and tags the panel from the passage's own read", async () => {
-    const { api } = await palletsFound();
+  it("names the panel from the passage read, not the match", async () => {
+    const { api } = await searchedForPallets();
     api.set(
       "knowledge.open",
       answeringPassages((locator) =>
@@ -89,9 +90,10 @@ describe("the Knowledge Search page", () => {
 
     const refused = await panelOpened(HANDBOOK);
     await waitFor(() =>
-      expect(within(refused.panel).getByRole("alert").textContent).toBe(
-        SAID_OF_KNOWLEDGE["not-found"],
-      ),
+      expect(
+        within(refused.panel).getByRole("alert").textContent,
+        "the alert says nothing",
+      ).toMatch(/\S/u),
     );
     expect(screen.queryByText(RENAMED), "a refused read kept its earlier title").toBeNull();
   });

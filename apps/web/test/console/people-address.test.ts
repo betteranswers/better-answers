@@ -13,20 +13,20 @@ afterEach(() => {
   openAt("/");
 });
 
-describe("the address a sheet's action reopens from", () => {
-  it("reads the person and the action their address names", () => {
+describe("reading the person and action from the address", () => {
+  it("reads the person and action named in the address", () => {
     openAt(addressOf(EVERYONE_PATH, { search: PRIYA.email, person: PRIYA.id, action: "correct" }));
 
     expect(arrival()).toEqual({ search: PRIYA.email, personId: PRIYA.id, action: "correct" });
   });
 
-  it("reopens an action an address names under its older key", () => {
+  it("reads an action from the older act key", () => {
     openAt(`${EVERYONE_PATH}?search=priya%40acme.invalid&person=p1&act=correct`);
 
     expect(arrival()).toEqual({ search: PRIYA.email, personId: PRIYA.id, action: "correct" });
   });
 
-  it("reopens at ending every sign-in when no action is named", () => {
+  it("opens Sign Out Everywhere when no action is named", () => {
     openAt(`${EVERYONE_PATH}?person=p1`);
 
     expect(arrival()).toEqual({ search: "", personId: "p1", action: "revoke" });

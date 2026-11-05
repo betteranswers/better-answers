@@ -49,25 +49,25 @@ const namesIn = (region: HTMLElement, role: "link" | "heading" = "link") =>
     .map((each) => each.textContent);
 
 describe("the shell's regions", () => {
-  it("names an Admin's areas, Ask among them, in the rail", async () => {
+  it("lists an Admin's areas in the rail", async () => {
     await openAs("Admin", "/people/members");
 
     expect(namesIn(rail())).toEqual(["Ask", "Knowledge", "Inbox", "Control Centre"]);
   });
 
-  it("names Ask and Knowledge in a Viewer's icon rail", async () => {
+  it("lists Ask and Knowledge in a Viewer's rail", async () => {
     await openAs("Viewer", "/ask/new-question");
 
     expect(namesIn(rail())).toEqual(["Ask", "Knowledge"]);
   });
 
-  it("names no area while the role is unknown", async () => {
+  it("lists no areas while the role is unknown", async () => {
     await openWithNoRoleAt("/people/members");
 
     expect(namesIn(rail())).toEqual([]);
   });
 
-  it("carries four landmark regions and a skip link first", async () => {
+  it("has four landmark regions and a leading skip link", async () => {
     const { container } = await openAs("Admin", "/models/models-and-spend");
 
     expect(rail()).toBeDefined();
@@ -76,11 +76,11 @@ describe("the shell's regions", () => {
     expect(screen.getByRole("main")).toBeDefined();
 
     const first = container.querySelector("a");
-    expect(first?.textContent).toBe("Skip to the Page");
+    expect(first).toBe(screen.getByRole("link", { name: "Skip to Main Content" }));
     expect(first?.getAttribute("href")).toBe(`#${screen.getByRole("main").id}`);
   });
 
-  it("lists the open area's groups over their pages", async () => {
+  it("lists the open area's group headings and page links", async () => {
     await openAs("Admin", "/system/audit-log");
 
     expect(namesIn(menu(), "heading")).toEqual([
@@ -114,7 +114,7 @@ describe("the shell's regions", () => {
     expect(current.textContent).toBe("Groups");
   });
 
-  it("names area, group and page in the band", async () => {
+  it("shows the area, group and page in the band", async () => {
     await openAs("Admin", "/models/models-and-spend");
 
     const bar = screen.getByRole("banner");
@@ -124,7 +124,7 @@ describe("the shell's regions", () => {
     expect(within(bar).getByRole("button", { name: JUMP_TO })).toBeDefined();
   });
 
-  it("names an area's home once in the band", async () => {
+  it("shows an area's home page name once in the band", async () => {
     await openAs("Viewer", HOMES.Viewer.path);
 
     expect(within(screen.getByRole("banner")).getAllByText("Ask")).toHaveLength(1);
@@ -137,14 +137,14 @@ describe("the shell's regions", () => {
     expect(logo.getAttribute("href")).toBe(HOMES.Admin.path);
   });
 
-  it("links the logo to the index with no role held", async () => {
+  it("links the logo to / while the role is unknown", async () => {
     await openWithNoRoleAt("/people/members");
 
     const logo = within(screen.getByRole("banner")).getByRole("link", { name: "better-answers" });
     expect(logo.getAttribute("href")).toBe("/");
   });
 
-  it("names the menu with no heading repeating the rail", async () => {
+  it("does not repeat the area name as a menu heading", async () => {
     await openAs("Admin", "/people/members");
 
     const headings = within(menu())
@@ -156,40 +156,40 @@ describe("the shell's regions", () => {
   it("gives every page in the menu its icon", async () => {
     await openAs("Admin", "/people/members");
 
-    const bare = within(menu())
+    const withoutIcon = within(menu())
       .getAllByRole("link")
       .filter((link) => link.querySelector("svg") === null)
       .map((link) => link.textContent);
-    expect(bare).toEqual([]);
+    expect(withoutIcon).toEqual([]);
   });
 
-  it("says nothing about the person until it knows them", async () => {
+  it("hides sign-out until the person is known", async () => {
     const { container } = await openWithNoRoleAt("/people/members");
 
     expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
     expect(container.textContent).not.toMatch(/sign out/i);
   });
 
-  it("gives Models the model choices card", async () => {
+  it("shows the Model Choices card on Models and Spend", async () => {
     await openAs("Admin", "/models/models-and-spend");
 
     expect(screen.getByRole("heading", { level: 2, name: "Model Choices" })).toBeDefined();
   });
 
-  it("says an unknown address names no page", async () => {
+  it("shows Page Not Found for an unknown address", async () => {
     await openApp("/not-a-page");
 
     expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe("Page Not Found");
   });
 
-  it("sends a reader of unknown role home by the index", async () => {
+  it("links a reader with an unknown role home through /", async () => {
     await openApp("/not-a-page");
 
     const home = await screen.findByRole("link", { name: "Go to Your Home Page" });
     expect(home.getAttribute("href")).toBe("/");
   });
 
-  it("says an unknown page names no place, rail kept", async () => {
+  it("shows Page Not Found inside an area, keeping the rail", async () => {
     await openAs("Admin", "/system/not-a-page");
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Page Not Found");
@@ -199,25 +199,26 @@ describe("the shell's regions", () => {
   });
 });
 
-describe("a page's older address", () => {
-  it("never shows a Viewer an address under /system/", async () => {
-    const neverExisted = await openAs("Viewer", "/people/not-a-page");
+describe("a page's old address", () => {
+  it("matches a missing page for a Viewer without access", async () => {
+    const missingPage = await openAs("Viewer", "/people/not-a-page");
     await screen.findByRole("link", { name: "Go to New Question" });
-    const mainOfNeverExisted = screen.getByRole("main").innerHTML;
-    neverExisted.unmount();
+    const missingPageMain = screen.getByRole("main").innerHTML;
+    missingPage.unmount();
 
     vi.stubGlobal("fetch", answeringAs("Viewer"));
     const { router } = await openApp("/people/audit-log");
 
     await screen.findByRole("link", { name: "Go to New Question" });
     expect(router.history.location.pathname).toBe("/people/audit-log");
-    expect(screen.getByRole("main").innerHTML, "a hidden page gives itself away").toBe(
-      mainOfNeverExisted,
-    );
+    expect(
+      screen.getByRole("main").innerHTML,
+      "the hidden page renders differently from a missing page",
+    ).toBe(missingPageMain);
   });
 });
 
-describe("jump to, while no role is held", () => {
+describe("jump to, while the role is unknown", () => {
   it("is not offered in the band", async () => {
     await openWithNoRoleAt("/people/members");
 
@@ -225,16 +226,16 @@ describe("jump to, while no role is held", () => {
     expect(band.queryByRole("button", { name: JUMP_TO })).toBeNull();
   });
 
-  it("leaves its chord to the browser", async () => {
+  it("leaves its keyboard shortcut to the browser", async () => {
     await openWithNoRoleAt("/people/members");
 
-    const unclaimed = fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    const notPrevented = fireEvent.keyDown(document, { key: "k", ctrlKey: true });
 
-    expect(unclaimed).toBe(true);
+    expect(notPrevented).toBe(true);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("is left off the keystrokes list", async () => {
+  it("is missing from the keyboard shortcuts list", async () => {
     await openWithNoRoleAt("/people/members");
 
     fireEvent.keyDown(document.body, { key: "?" });
@@ -302,7 +303,7 @@ const navigatedPaths = async (role: Role): Promise<readonly string[]> => {
 const shownPaths = (role: Role): readonly string[] =>
   pagesOf(visibleTo(readerOf(role), AREAS).areas).map((each) => each.path);
 
-describe("the routes and navigation built from the one list", () => {
+describe("routes and navigation built from the navigation list", () => {
   it("routes every built page, its detail and each role's home", () => {
     const routed = routedPaths();
 
@@ -310,20 +311,20 @@ describe("the routes and navigation built from the one list", () => {
     expect(routed).toContain("/people/members/$personId");
   });
 
-  it("routes nothing but built pages, details, homes and moves", () => {
+  it("routes only built pages, details, homes and moved addresses", () => {
     const known = new Set([...destinations, ...moved.map((each) => each.from)]);
 
     expect(routedPaths().filter((path) => !known.has(path))).toEqual([]);
   });
 
-  it("routes every moved address, each leading to a built page", () => {
+  it("routes every moved address to a built page", () => {
     const routed = routedPaths();
-    const leadsNowhere = moved
+    const withoutBuiltPage = moved
       .filter((each) => !each.to.some((page) => page.built))
       .map((each) => each.from);
 
     expect(moved.filter((each) => !routed.includes(each.from))).toEqual([]);
-    expect(leadsNowhere).toEqual([]);
+    expect(withoutBuiltPage).toEqual([]);
   });
 
   for (const role of ["Admin", "Editor", "Viewer"] as const) {
@@ -336,7 +337,7 @@ describe("the routes and navigation built from the one list", () => {
     });
   }
 
-  it("opens every built page under its group's heading", async () => {
+  it("opens every built page with its expected heading", async () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
 
     for (const each of pagesOf(AREAS).filter((candidate) => candidate.built)) {

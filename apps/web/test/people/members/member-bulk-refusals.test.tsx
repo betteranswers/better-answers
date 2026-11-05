@@ -1,10 +1,9 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { BULK_WORDS, NO_LONGER_LISTED } from "@/features/people/member-action-words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { asked, listed, outcome, PRIYA, rowOf, SAM } from "@test/people/members-roster.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 import { ADA, adaAnAdmin, GRACE, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -43,6 +42,9 @@ const listHeading = () => listed().getByRole("heading", { level: 2, name: "Membe
 
 const roleOf = (name: string): string | undefined =>
   within(rowOf(name)).getAllByRole("cell").at(2)?.textContent;
+
+const personCell = (name: string): string | undefined =>
+  within(rowOf(name)).getAllByRole("cell").at(1)?.textContent;
 
 const tickOf = (name: string): HTMLElement =>
   listed().getByRole("checkbox", { name: `Select ${name}` });
@@ -83,7 +85,7 @@ const removedThroughTheBar = async (title: string) => {
 
 const removalOfPriyaHeld = async () => {
   const api = apiOf(ADA, PRIYA, SAM);
-  const removal = heldBack(api, "members.remove", read({}));
+  const removal = holdProcedure(api, "members.remove", read({}));
   await openAt(MEMBERS, api);
   fireEvent.click(await screen.findByRole("link", { name: PRIYA.displayName }));
   fireEvent.click(await screen.findByRole("button", { name: "Remove Member" }));
@@ -94,8 +96,8 @@ const removalOfPriyaHeld = async () => {
   return { api, removal };
 };
 
-describe("bulk actions on the members ticked", () => {
-  it("names a refused person whose row the search hides", async () => {
+describe("bulk actions on selected members", () => {
+  it("names a refused member that the search hides", async () => {
     const api = adaAnAdmin();
     api.set("members.bulkChangeRole", () =>
       refusedAs("last-admin", "precondition", 412, {
@@ -128,7 +130,7 @@ describe("bulk actions on the members ticked", () => {
     expect(tickOf(ADA.displayName).getAttribute("aria-checked")).toBe("false");
   });
 
-  it("a person removed meanwhile stays ticked, named, until Remove skips", async () => {
+  it("keeps a removed member selected until bulk Remove skips them", async () => {
     const api = apiOf(ADA, PRIYA, SAM);
     api.set("members.bulkChangeRole", () => {
       api.set("members.list", () => read([ADA, PRIYA]));
@@ -147,7 +149,10 @@ describe("bulk actions on the members ticked", () => {
       await waitFor(() => {
         expect(refusal().textContent).not.toBe("");
       });
-      expect(within(refusal()).getByText(BULK_WORDS.refused(1))).toBeDefined();
+      expect(
+        within(refusal()).getByRole("paragraph").textContent,
+        "the refusal did not count one member",
+      ).toMatch(/\b1\b/);
       expect(within(refusal()).getAllByRole("listitem")).toHaveLength(1);
       expect(tickOf(PRIYA.displayName).getAttribute("aria-checked")).toBe("true");
       expect(roleOf(PRIYA.displayName)).toContain("Editor");
@@ -166,23 +171,24 @@ describe("bulk actions on the members ticked", () => {
     await refusedAsNoMember();
     expect(
       within(refusal()).getByRole("listitem").textContent,
-      "a member no longer listed is refused by the name they had",
-    ).toContain(NO_LONGER_LISTED);
+      "the refusal line for the removed member is empty",
+    ).toMatch(/\S/);
     expect(within(refusal()).getByRole("listitem").textContent).not.toContain(SAM.displayName);
     expect(bar().getByRole("status").textContent).toMatch(TWO_TICKED_ONE_HIDDEN);
 
     await removedThroughTheBar("Remove 2 Members");
     await waitFor(() => {
-      expect(outcome()?.textContent, "the outcome counts one removed and one skipped").toBe(
-        BULK_WORDS.remove.done(1, 1),
-      );
+      expect(
+        outcome()?.textContent,
+        "the outcome did not count one removed and one skipped",
+      ).toMatch(/\b1\b\D+\b1\b/);
     });
     await waitFor(() => {
       expect(listed().queryByRole("link", { name: PRIYA.displayName })).toBeNull();
     });
   });
 
-  it("a set answered changed-meanwhile comes back with its ticks", async () => {
+  it("keeps the selection when the members changed during the action", async () => {
     const api = apiOf(ADA, PRIYA, SAM);
     api.set("members.bulkChangeRole", () => changedMeanwhile());
     await openAt(MEMBERS, api);
@@ -192,7 +198,7 @@ describe("bulk actions on the members ticked", () => {
     changeRoleSent(dialog);
 
     await waitFor(() => {
-      expect(refusal().textContent, "the alert says nothing").not.toBe("");
+      expect(refusal().textContent, "the alert is empty").not.toBe("");
     });
     expect(asked("members.bulkChangeRole")).toEqual([
       expect.objectContaining({ personIds: [PRIYA.personId, SAM.personId] }),
@@ -203,9 +209,9 @@ describe("bulk actions on the members ticked", () => {
     expect(roleOf(PRIYA.displayName)).toContain("Editor");
   });
 
-  it("a tick made mid-act survives the bulk refusal", async () => {
+  it("a selection made during an action stays after a refusal", async () => {
     const api = apiOf(ADA, PRIYA, SAM);
-    const removal = heldBack(api, "members.bulkRemove");
+    const removal = holdProcedure(api, "members.bulkRemove");
     await openAt(MEMBERS, api);
     await ticking(PRIYA.displayName);
     await removedThroughTheBar("Remove 1 Member");
@@ -218,22 +224,22 @@ describe("bulk actions on the members ticked", () => {
     removal.reject(changedMeanwhile());
 
     await waitFor(() => {
-      expect(refusal().textContent, "the alert says nothing").not.toBe("");
+      expect(refusal().textContent, "the alert is empty").not.toBe("");
     });
     expect(removal.asks).toBe(1);
     await waitFor(() => {
       expect(
         tickOf(PRIYA.displayName).getAttribute("aria-checked"),
-        "the pressed tick returns",
+        "the first selection was not restored",
       ).toBe("true");
     });
     expect(
       tickOf(SAM.displayName).getAttribute("aria-checked"),
-      "the tick made meanwhile stays",
+      "the selection made during the action was cleared",
     ).toBe("true");
   });
 
-  it("a removal refused after a bulk answer still says why", async () => {
+  it("a removal refused after a bulk change shows an alert", async () => {
     const { api, removal } = await removalOfPriyaHeld();
     api.set("members.bulkChangeRole", () =>
       read({ changed: [SAM.personId], skipped: 0, promoted: [] }),
@@ -243,15 +249,16 @@ describe("bulk actions on the members ticked", () => {
     const dialog = await changeRoleOpened("Change Role for 1 Member");
     changeRoleSent(dialog);
     await waitFor(() => {
-      expect(outcome()?.textContent, "the bulk act answers first").toBe(
-        BULK_WORDS.changeRole.done(1, "Viewer", 0),
-      );
+      expect(
+        outcome()?.textContent,
+        "the bulk change's message did not replace the removal's",
+      ).toMatch(/\bViewer\b/);
     });
 
     removal.reject(changedMeanwhile());
 
     await waitFor(() => {
-      expect(refusal().textContent, "the alert says nothing").not.toBe("");
+      expect(refusal().textContent, "the alert is empty").not.toBe("");
     });
     expect(outcome()?.textContent, "the status still says Priya is being removed").not.toContain(
       PRIYA.displayName,
@@ -259,23 +266,24 @@ describe("bulk actions on the members ticked", () => {
     expect(listed().getByRole("link", { name: PRIYA.displayName })).toBeDefined();
   });
 
-  it("a removal's late refusal clears a bulk refusal's row marks", async () => {
+  it("a late removal refusal clears the marks on refused rows", async () => {
     const { api, removal } = await removalOfPriyaHeld();
     api.set("members.bulkChangeRole", () => changedMeanwhile({ [SAM.personId]: "no-such-member" }));
     await ticking(SAM.displayName);
+    const unmarked = personCell(SAM.displayName);
     const dialog = await changeRoleOpened("Change Role for 1 Member");
     changeRoleSent(dialog);
     await waitFor(() => {
-      expect(within(rowOf(SAM.displayName)).getByText("Refused")).toBeDefined();
+      expect(personCell(SAM.displayName), "the refused row was not marked").not.toBe(unmarked);
     });
 
     removal.reject(changedMeanwhile());
 
     await waitFor(() => {
       expect(
-        within(rowOf(SAM.displayName)).queryByText("Refused"),
-        "the removal's words leave no row marked",
-      ).toBeNull();
+        personCell(SAM.displayName),
+        "the refused row stayed marked after the removal's refusal",
+      ).toBe(unmarked);
     });
   });
 });

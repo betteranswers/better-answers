@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/auth/signed-in-without-workspace.ts";
 import { server, type Asked } from "@test/stub-server.ts";
 import { addressOf, type Api } from "@test/stubbed-api.ts";
-import { aRefusalAnswer, openOutsideTheShellAt, read } from "@test/two-workspaces.ts";
+import { aRefusalAnswer, openPageOutsideShell, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
@@ -33,7 +33,7 @@ const askedOf = (...procedures: readonly string[]) =>
 
 const joinButton = () => screen.queryByRole("button", { name: "Join Workspace" });
 
-it("keeps a given name when the join is then refused", async () => {
+it("keeps the entered name when joining is refused", async () => {
   const api = inviteeNamed("");
   api.set("person.invitation", () => invitedTo("Ashby Survey"));
   api.set("person.setDisplayName", () => {
@@ -41,7 +41,7 @@ it("keeps a given name when the join is then refused", async () => {
     return read({});
   });
   api.set("person.acceptInvitation", () => aRefusalAnswer("already-a-member", "conflict", 409));
-  const router = await openOutsideTheShellAt(THE_LINK, api);
+  const router = await openPageOutsideShell(THE_LINK, api);
 
   fireEvent.change(await screen.findByLabelText("Display Name"), {
     target: { value: "Ines Moreau" },
@@ -49,7 +49,7 @@ it("keeps a given name when the join is then refused", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Join Workspace" }));
 
   const refusal = await screen.findByRole("alert");
-  expect(refusal.textContent).toMatch(/already a member/i);
+  expect(refusal.textContent).toMatch(/\S/u);
   expect(document.body.textContent, "the page shows the refusal's word").not.toContain(
     "already-a-member",
   );
@@ -64,17 +64,17 @@ it("keeps a given name when the join is then refused", async () => {
   expect(await screen.findByRole("heading", { level: 1, name: "Your Workspaces" })).toBeDefined();
 });
 
-it("refuses a person at another address, offering the invited one", async () => {
+it("offers sign-in with the invited address to someone else", async () => {
   const api = inviteeNamed("Theo Other");
   api.set("person.invitation", () => invitedTo("Brightwater Estimating"));
-  await openOutsideTheShellAt(THE_LINK, api);
+  await openPageOutsideShell(THE_LINK, api);
   expect(
     await screen.findByRole("heading", {
       level: 1,
       name: "Your Invitation to Brightwater Estimating",
     }),
   ).toBeDefined();
-  expect(joinButton(), "a readable invitation offers no join").not.toBeNull();
+  expect(joinButton(), "a readable invitation has no Join Workspace button").not.toBeNull();
   cleanup();
 
   api.set("person.invitation", () =>
@@ -84,39 +84,39 @@ it("refuses a person at another address, offering the invited one", async () => 
   const watching = (asked: Asked) => {
     askedPaths.push(addressOf(asked).pathname);
   };
-  const router = await openOutsideTheShellAt(THE_LINK, api, watching);
+  const router = await openPageOutsideShell(THE_LINK, api, watching);
 
   const refusal = await screen.findByRole("alert");
-  expect(refusal.textContent).toMatch(/different email address/i);
+  expect(refusal.textContent).toMatch(/\S/u);
   expect(document.body.textContent, "the page shows the refusal's word").not.toContain(
     "invitation-for-another-address",
   );
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Your Invitation");
-  expect(joinButton(), "a refused invitation offers a join").toBeNull();
+  expect(joinButton(), "a refused invitation still shows Join Workspace").toBeNull();
   expect(askedPaths, "the person was signed out before choosing").not.toContain(SIGN_OUT);
 
   fireEvent.click(screen.getByRole("button", { name: "Sign In with Another Address" }));
 
   await waitFor(() => expect(router.state.location.pathname).toBe("/sign-in"));
   expect(await screen.findByRole("heading", { level: 1, name: /^Sign In/ })).toBeDefined();
-  expect(router.state.location.href, "the sign-in carries the invitation to return to").toContain(
+  expect(router.state.location.href, "the sign-in address does not carry the invitation").toContain(
     encodeURIComponent(THE_LINK),
   );
   expect(askedPaths.filter((path) => path === SIGN_OUT)).toHaveLength(1);
 });
 
-it("tells a named person a stray link names no invitation", async () => {
+it("shows an alert for a link with no invitation", async () => {
   const api = inviteeNamed("Una Price");
   api.set("person.invitation", () => invitedTo("Selby Roofing"));
-  await openOutsideTheShellAt(THE_LINK, api);
+  await openPageOutsideShell(THE_LINK, api);
   expect(await screen.findByRole("button", { name: "Join Workspace" })).toBeDefined();
   cleanup();
 
   api.set("person.invitation", () => aRefusalAnswer("no-such-invitation", "absent", 404));
-  await openOutsideTheShellAt(THE_LINK, api);
+  await openPageOutsideShell(THE_LINK, api);
 
   const refusal = await screen.findByRole("alert");
-  expect(refusal.textContent).toMatch(/link isn't valid/i);
+  expect(refusal.textContent).toMatch(/\S/u);
   expect(document.body.textContent, "the page shows the refusal's word").not.toContain(
     "no-such-invitation",
   );

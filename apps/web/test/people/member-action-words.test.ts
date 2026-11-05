@@ -32,7 +32,7 @@ describe("the Role card's words", () => {
 
 describe("the sign-ins part's words", () => {
   it("names the member whose sign-ins ended", () => {
-    expect(MEMBER_PAGE_WORDS.everySignInEnded(AMARA)).toContain(AMARA);
+    expect(MEMBER_PAGE_WORDS.signedOut(AMARA)).toContain(AMARA);
   });
 });
 

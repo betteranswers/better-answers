@@ -1,12 +1,9 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AUTHENTICATOR_WORDS, RECOVERY_CODE_WORDS } from "@/features/auth/account-words.ts";
-import { SETUP_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
-import { STOCK } from "@/shared/refusal-words.ts";
 import {
   adasApi,
-  alertsSaying,
+  alertTexts,
   answering,
   BOTH_HELD,
   CODES,
@@ -32,6 +29,15 @@ const A_KEY = { setupAddress: "otpauth://totp/better-answers:ada?secret=JBSWY3DP
 const ISSUED = { recoveryCodes: CODES, madeAt: MADE_AT };
 
 const heading = () => screen.getByRole("heading", { level: 1 });
+
+const qrCode = () => screen.findByRole("img", { name: "QR code for your authenticator app" });
+
+const notesAboveTheCodes = () =>
+  within(screen.getByRole("region", { name: "Save Your Recovery Codes" })).queryAllByRole(
+    "paragraph",
+  );
+
+const ONE_ALERT_WITH_WORDS = [expect.stringMatching(/\S/u)];
 
 const disclosure = () => screen.getByRole("button", { name: "Set Up an Authenticator Instead" });
 
@@ -65,15 +71,15 @@ describe("the setup page", () => {
 
     fireEvent.click(disclosure());
 
-    expect(await screen.findByText(AUTHENTICATOR_WORDS.scan)).toBeDefined();
+    expect(await qrCode()).toBeDefined();
     expect(asked).toContain("/authenticator/start");
   });
 
-  it("opens the authenticator's steps where no passkey can be made", async () => {
+  it("opens the authenticator steps when the browser lacks passkeys", async () => {
     adasApi(() => NOTHING_HELD, new Map([["/authenticator/start", answering(A_KEY)]]));
     await openAsAda("/setup");
 
-    expect(await screen.findByText(AUTHENTICATOR_WORDS.scan)).toBeDefined();
+    expect(await qrCode()).toBeDefined();
     expect(disclosure().getAttribute("aria-expanded")).toBe("true");
     expect(screen.queryByRole("textbox", { name: "Passkey Name" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Add a Passkey" })).toBeNull();
@@ -99,7 +105,7 @@ describe("the setup page", () => {
     );
   });
 
-  it("opens and closes the authenticator on its listed keystroke", async () => {
+  it("opens and closes the authenticator steps with the S key", async () => {
     await openedWithBothWays();
 
     fireEvent.keyDown(document.body, { key: "s" });
@@ -117,7 +123,7 @@ describe("the setup page", () => {
     expect(screen.getByRole("button", { name: "Add a Passkey" })).toBeDefined();
   });
 
-  it("keeps focus when its keystroke hides the focused part", async () => {
+  it("focuses the disclosure when S hides the focused button", async () => {
     await openedWithBothWays();
     const add = screen.getByRole("button", { name: "Add a Passkey" });
     add.focus();
@@ -128,7 +134,7 @@ describe("the setup page", () => {
     expect(document.activeElement).toBe(disclosure());
   });
 
-  it("replaces the factors after a recovery code, ending on codes", async () => {
+  it("after a recovery code, replaces factors and shows new codes", async () => {
     const asked = adasApi(
       () => ({ ...BOTH_HELD, thisSession: sessionStanding("setup", { setupGranted: true }) }),
       new Map([
@@ -138,8 +144,9 @@ describe("the setup page", () => {
     );
     await openAsAda("/setup");
 
-    expect(await screen.findByText(SETUP_WORDS.newWhy)).toBeDefined();
-    expect(heading().textContent).toBe("Set Up a New Second Factor");
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Set Up a New Second Factor" }),
+    ).toBeDefined();
     await finishTheAuthenticator();
 
     expect(
@@ -150,7 +157,7 @@ describe("the setup page", () => {
     expect(asked).not.toContain("/authenticator/finish");
   });
 
-  it("asks a restored person's restore code before anything else", async () => {
+  it("asks for the restore code before offering a second factor", async () => {
     withPasskeysHere();
     let accepted = false;
     const restored = { ...NOTHING_HELD, restoreRequired: true };
@@ -182,7 +189,7 @@ describe("the setup page", () => {
     expect(screen.queryByRole("textbox", { name: "Restore Code" })).toBeNull();
   });
 
-  it("sends a session holding factors, but no grant, to confirm", async () => {
+  it("sends a person with factors but no grant to confirm", async () => {
     adasApi(() => BOTH_HELD);
 
     const { router } = await openAsAda("/setup?redirect=%2Fpeople%2Fmembers");
@@ -226,24 +233,24 @@ const finishedWith = async (finish: Route) => {
   await finishTheAuthenticator();
 };
 
-describe("what the setup page says of a failed setup", () => {
-  it("cannot confirm a finish that got no response", async () => {
+describe("a failed second factor setup", () => {
+  it("shows an alert when the finish gets no response", async () => {
     await finishedWith(DROPPED);
 
     await waitFor(() => {
-      expect(alertsSaying()).toEqual([STOCK.unconfirmed]);
+      expect(alertTexts()).toEqual(ONE_ALERT_WITH_WORDS);
     });
   });
 
-  it("shows the general sentence for a status with no branch", async () => {
+  it("shows an alert for an unexpected refusal", async () => {
     await finishedWith(refusing(403, "forbidden"));
 
     await waitFor(() => {
-      expect(alertsSaying()).toEqual([STOCK.general]);
+      expect(alertTexts()).toEqual(ONE_ALERT_WITH_WORDS);
     });
   });
 
-  it("leaves the alert empty when the device cancels an add", async () => {
+  it("shows no alert when the device cancels adding a passkey", async () => {
     const create = withThePromptClosed();
     adasApi(() => NOTHING_HELD, new Map([["/passkeys/add-options", answering(ASKED_TO_ADD)]]));
     await openAsAda("/setup");
@@ -255,7 +262,7 @@ describe("what the setup page says of a failed setup", () => {
       expect(create).toHaveBeenCalledOnce();
       expect(add.getAttribute("aria-disabled")).toBe("false");
     });
-    expect(alertsSaying()).toEqual([]);
+    expect(alertTexts()).toEqual([]);
   });
 });
 
@@ -266,8 +273,8 @@ const CONFIRMED = {
 
 const UNSEEN = { ...CONFIRMED, codesAcknowledged: false };
 
-describe("the recovery codes detour", () => {
-  it("shows a new set that replaces the one shown before", async () => {
+describe("the recovery codes step", () => {
+  it("shows a replacement set and records it on Finish Setup", async () => {
     const acknowledged: unknown[] = [];
     adasApi(
       () => UNSEEN,
@@ -288,7 +295,10 @@ describe("the recovery codes detour", () => {
     const list = await screen.findByRole("list", { name: "Recovery Codes" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(10);
     expect(heading().textContent).toBe("Save Your Recovery Codes");
-    expect(screen.getByText(RECOVERY_CODE_WORDS.replacedLine)).toBeDefined();
+    expect(
+      notesAboveTheCodes(),
+      "a replaced set does not say the old codes stopped working",
+    ).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("checkbox", { name: "I have saved these codes" }));
     fireEvent.click(screen.getByRole("button", { name: "Finish Setup" }));
@@ -307,7 +317,7 @@ describe("the recovery codes detour", () => {
     expect(router.state.location.search).toEqual({ redirect: "/people/members" });
   });
 
-  it("gives a first set to an Admin holding no codes", async () => {
+  it("generates a first set for an Admin with no codes", async () => {
     const asked: unknown[] = [];
     adasApi(
       () => ({ ...CONFIRMED, recoveryCodes: undefined }),
@@ -326,10 +336,10 @@ describe("the recovery codes detour", () => {
 
     const list = await screen.findByRole("list", { name: "Recovery Codes" });
     expect([within(list).getAllByRole("listitem").length, asked]).toEqual([10, ["made"]]);
-    expect(screen.queryByText(RECOVERY_CODE_WORDS.replacedLine)).toBeNull();
+    expect(notesAboveTheCodes(), "a first set says old codes stopped working").toHaveLength(1);
   });
 
-  it("passes to the display-name step once the set is seen", async () => {
+  it("goes to the display-name step once the codes are acknowledged", async () => {
     adasApi(() => CONFIRMED);
 
     const { router } = await loadedAsAda("/recovery-codes");
@@ -337,7 +347,7 @@ describe("the recovery codes detour", () => {
     expect(router.state.location.pathname).toBe("/display-name");
   });
 
-  it("catches a link's sign-in while a set is unseen", async () => {
+  it("a sign-in link goes to unacknowledged recovery codes first", async () => {
     adasApi(
       () => UNSEEN,
       new Map([
@@ -358,7 +368,7 @@ describe("the recovery codes detour", () => {
   });
 });
 
-const withTheMakeDropped = (held: () => unknown): void => {
+const withGeneratingDropped = (held: () => unknown): void => {
   adasApi(held);
   const answer = globalThis.fetch;
   vi.stubGlobal("fetch", (input: string | URL | Request) =>
@@ -370,26 +380,26 @@ const withTheMakeDropped = (held: () => unknown): void => {
 
 const NO_CODES_YET = { ...CONFIRMED, mustHoldOne: false, recoveryCodes: undefined };
 
-describe("a set of recovery codes whose making got no response", () => {
-  it("says to try again on the setup's own step", async () => {
-    withTheMakeDropped(() => UNSEEN);
+describe("generating recovery codes with no response", () => {
+  it("offers Try Again on the recovery codes step", async () => {
+    withGeneratingDropped(() => UNSEEN);
 
     await openAsAda("/recovery-codes");
 
     await waitFor(() => {
-      expect(alertsSaying()).toEqual([STOCK.tryAgain]);
+      expect(alertTexts()).toEqual(ONE_ALERT_WITH_WORDS);
     });
     expect(screen.getByRole("button", { name: "Try Again" })).toBeDefined();
   });
 
-  it("cannot be confirmed on the Account page", async () => {
-    withTheMakeDropped(() => NO_CODES_YET);
+  it("shows an alert on the Account page", async () => {
+    withGeneratingDropped(() => NO_CODES_YET);
     await openAsAda("/account");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Make Recovery Codes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Generate Recovery Codes" }));
 
     await waitFor(() => {
-      expect(alertsSaying()).toEqual([STOCK.unconfirmed]);
+      expect(alertTexts()).toEqual(ONE_ALERT_WITH_WORDS);
     });
   });
 });

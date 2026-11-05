@@ -173,7 +173,7 @@ export const adasApi = (
   return asked;
 };
 
-export const readingForever = (): void => {
+export const stubTrpcNeverAnswers = (): void => {
   vi.stubGlobal("fetch", (input: string | URL | Request) =>
     addressOf(input).pathname.startsWith("/trpc/")
       ? new Promise<never>(() => undefined)
@@ -193,7 +193,7 @@ export const openAsAda = (path: string) => openApp(path, clientsAt(path));
 
 export const loadedAsAda = (path: string) => appAt(path, clientsAt(path));
 
-export const alertsSaying = (): readonly string[] =>
+export const alertTexts = (): readonly string[] =>
   [...document.querySelectorAll('[role="alert"]')]
     .map((alert) => alert.textContent)
     .filter((words) => words !== "");

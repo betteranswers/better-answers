@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import { Button } from "@/shared/ui/button.tsx";
 
-const marked = (name: string) => screen.getByRole("button", { name }).hasAttribute("data-marks");
+const hasMarks = (name: string) => screen.getByRole("button", { name }).hasAttribute("data-marks");
 
 describe("the button's registration marks", () => {
-  it("marks the primary at 32px and up, and nothing else", () => {
+  it("marks only primary buttons that are 32px or taller", () => {
     render(
       <>
         <Button>Primary</Button>
@@ -28,7 +28,7 @@ describe("the button's registration marks", () => {
         "Icon primary",
         "Accent",
         "Outline",
-      ].map(marked),
+      ].map(hasMarks),
     ).toEqual([true, true, true, false, false, false, false]);
   });
 });

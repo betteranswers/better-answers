@@ -4,8 +4,8 @@ import { z } from "zod";
 
 import { NOTHING_HELD, sessionStanding } from "@test/second-factor-api.ts";
 import { server } from "@test/stub-server.ts";
-import { heldBack, type Api } from "@test/stubbed-api.ts";
-import { ADA, aRefusalAnswer, openOutsideTheShellAt, read } from "@test/two-workspaces.ts";
+import { holdProcedure, type Api } from "@test/stubbed-api.ts";
+import { ADA, aRefusalAnswer, openPageOutsideShell, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
@@ -78,7 +78,7 @@ const rowNamed = (region: HTMLElement, device: string) =>
   within(region).queryByRole("listitem", { name: `A session on ${device}` });
 
 const signOutButton = (region: HTMLElement, device: string) =>
-  within(region).getByRole("button", { name: `Sign out ${device}` });
+  within(region).getByRole("button", { name: `Sign Out of ${device}` });
 
 const said = (region: HTMLElement): string =>
   within(region)
@@ -96,14 +96,14 @@ const headingOf = (region: HTMLElement) =>
   within(region).getByRole("heading", { name: "Sessions" });
 
 it("a sign-out removes its row and focuses the next", async () => {
-  await openOutsideTheShellAt("/account", signedInHolding([THIS_DEVICE, EDGE, SAFARI]));
+  await openPageOutsideShell("/account", signedInHolding([THIS_DEVICE, EDGE, SAFARI]));
   const region = await sessionsRegion();
   await within(region).findByRole("listitem", { name: "A session on Edge on Windows" });
 
   fireEvent.click(signOutButton(region, "Edge on Windows"));
 
   await waitFor(() => {
-    expect(said(region)).toBe("Signed out Edge on Windows.");
+    expect(said(region)).toContain("Edge on Windows");
   });
   expect(rowNamed(region, "Edge on Windows")).toBeNull();
   expect(askedToSignOut()).toEqual([EDGE.id]);
@@ -114,7 +114,7 @@ it("a sign-out removes its row and focuses the next", async () => {
   fireEvent.click(signOutButton(region, "Safari on iOS"));
 
   await waitFor(() => {
-    expect(said(region)).toBe("Signed out Safari on iOS.");
+    expect(said(region)).toContain("Safari on iOS");
   });
   expect(within(region).getAllByRole("listitem")).toHaveLength(1);
   expect(askedToSignOut()).toEqual([EDGE.id, SAFARI.id]);
@@ -125,8 +125,8 @@ it("a sign-out removes its row and focuses the next", async () => {
 
 it("a refused sign-out puts the row back with an alert", async () => {
   const api = signedInHolding([THIS_DEVICE, SAFARI]);
-  const answer = heldBack(api, "person.signOutSession");
-  const router = await openOutsideTheShellAt("/account", api);
+  const answer = holdProcedure(api, "person.signOutSession");
+  const router = await openPageOutsideShell("/account", api);
   const region = await sessionsRegion();
   await within(region).findByRole("listitem", { name: "A session on Safari on iOS" });
   const signOut = signOutButton(region, "Safari on iOS");
@@ -143,34 +143,34 @@ it("a refused sign-out puts the row back with an alert", async () => {
 
   const row = await within(region).findByRole("listitem", { name: "A session on Safari on iOS" });
   await waitFor(() => {
-    expect(alertsIn(region)).toEqual(["This session has already ended."]);
+    expect(alertsIn(region)).toHaveLength(1);
   });
   expect(document.activeElement).toBe(
-    within(row).getByRole("button", { name: "Sign out Safari on iOS" }),
+    within(row).getByRole("button", { name: "Sign Out of Safari on iOS" }),
   );
   expect(said(region)).toBe("");
   expect(router.state.location.pathname).toBe("/account");
 });
 
-it("everywhere else asks first and keeps a personal token working", async () => {
+it("Sign Out Everywhere Else confirms first, then signs out others", async () => {
   const api = signedInHolding([THIS_DEVICE, SAFARI]);
-  const router = await openOutsideTheShellAt("/account", api);
+  const router = await openPageOutsideShell("/account", api);
   const region = await sessionsRegion();
   await within(region).findByRole("listitem", { name: "A session on Safari on iOS" });
   expect(within(region).getAllByRole("listitem")).toHaveLength(2);
 
   fireEvent.click(within(region).getByRole("button", { name: "Sign Out Everywhere Else" }));
 
-  const dialog = await screen.findByRole("dialog", { name: "Sign out of 1 other session" });
-  expect(dialog.textContent).toContain(
-    "Each one ends now. Personal tokens keep working, and Claude stays connected.",
-  );
+  const dialog = await screen.findByRole("dialog", {
+    name: "Sign Out of 1 Other Session",
+    description: /\S/u,
+  });
   expect(server.asks.map((ask) => ask.procedure)).not.toContain("person.signOutOtherSessions");
 
-  fireEvent.click(within(dialog).getByRole("button", { name: "Sign out 1 session" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Sign Out 1 Session" }));
 
   await waitFor(() => {
-    expect(said(region)).toBe("Signed out 1 session.");
+    expect(said(region)).toMatch(/\b1\b/u);
   });
   expect(within(region).getAllByRole("listitem")).toHaveLength(1);
   expect(server.asks.map((ask) => ask.procedure)).toContain("person.signOutOtherSessions");

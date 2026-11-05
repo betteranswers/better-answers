@@ -19,7 +19,7 @@ const partsAt = (role: RoleOrOperator, path: string, below?: string) => {
 const MEMBER_PAGE = "/people/members/01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
 
 describe("the band's breadcrumb", () => {
-  it("names four parts, linking all but the open tab", () => {
+  it("shows four parts, linking all but the open tab", () => {
     expect(partsAt("Admin", "/people/members", "Invitations")).toEqual([
       { name: "Control Centre", to: "/people/members" },
       { name: "People", to: "/people/members" },
@@ -44,7 +44,7 @@ describe("the band's breadcrumb", () => {
     ]);
   });
 
-  it("names a tab once where it shares its page's name", () => {
+  it("leaves out a tab whose name matches its page", () => {
     expect(partsAt("Admin", "/people/members", "Members")).toEqual([
       { name: "Control Centre", to: "/people/members" },
       { name: "People", to: "/people/members" },
@@ -52,26 +52,26 @@ describe("the band's breadcrumb", () => {
     ]);
   });
 
-  it("names Ask and its page, with no group part", () => {
+  it("shows Ask and its page, with no group part", () => {
     expect(partsAt("Viewer", "/ask/new-question")).toEqual([
       { name: "Ask", to: "/ask/new-question" },
       { name: "New Question", to: undefined },
     ]);
   });
 
-  it("names the console's area, group and page", () => {
+  it("shows the console's area, group and page", () => {
     expect(partsAt("operator", "/console/people/names-waiting")).toEqual([
       { name: "Console", to: "/console/workspaces/every-workspace" },
       { name: "People", to: "/console/people/everyone" },
-      { name: "Names Waiting", to: undefined },
+      { name: "Flagged Names", to: undefined },
     ]);
   });
 
-  it("names nothing where the address is no page", () => {
+  it("is empty for an address that is not a page", () => {
     expect(partsAt("Admin", "/system/not-a-page")).toEqual([]);
   });
 
-  it("names the page's own part where no place is open", () => {
+  it("shows only the given last part for an unknown address", () => {
     expect(partsAt("Admin", "/system/not-a-page", "Page Not Found")).toEqual([
       { name: "Page Not Found", to: undefined },
     ]);
@@ -86,7 +86,7 @@ describe("the band's breadcrumb", () => {
     ]);
   });
 
-  it("names a person whose name repeats a part above", () => {
+  it("keeps a person's name that matches a part above", () => {
     expect(partsAt("Admin", MEMBER_PAGE, "Members").map((part) => part.name)).toEqual([
       "Control Centre",
       "People",
@@ -95,7 +95,7 @@ describe("the band's breadcrumb", () => {
     ]);
   });
 
-  it("makes Members current on a member page lacking a name", () => {
+  it("makes Members current on a member page without a name", () => {
     expect(partsAt("Admin", MEMBER_PAGE)).toEqual([
       { name: "Control Centre", to: "/people/members" },
       { name: "People", to: "/people/members" },

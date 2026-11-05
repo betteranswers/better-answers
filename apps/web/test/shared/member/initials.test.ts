@@ -16,17 +16,17 @@ describe("a person's initials", () => {
     expect(initialsOf("  Sam   Okoro ")).toBe("SO");
   });
 
-  it("takes a character outside the basic plane whole", () => {
+  it("keeps a character outside the basic plane whole", () => {
     expect(initialsOf("😀 Okoro")).toBe("😀O");
     expect(initialsOf("𝐀da Lovelace")).toBe("𝐀L");
   });
 
-  it("takes a letter with its accent, however it was typed", () => {
+  it("keeps an accent with its letter, composed or decomposed", () => {
     expect(initialsOf("e\u0301mile Zola")).toBe("E\u0301Z");
     expect(initialsOf("\u00e9mile Zola")).toBe("\u00c9Z");
   });
 
-  it("takes a flag whole", () => {
+  it("keeps a flag emoji whole", () => {
     expect(initialsOf("🇬🇧 Team")).toBe("🇬🇧T");
   });
 
@@ -36,12 +36,12 @@ describe("a person's initials", () => {
   });
 });
 
-describe("a person's initials where the browser has no segmenter", () => {
+describe("a person's initials without Intl.Segmenter", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("keeps flags, accents typed apart and joined emoji whole", async () => {
+  it("keeps flags, decomposed accents and joined emoji whole", async () => {
     const descriptors = Object.getOwnPropertyDescriptors(Intl);
     Reflect.deleteProperty(descriptors, "Segmenter");
     vi.stubGlobal("Intl", Object.defineProperties({}, descriptors));

@@ -327,7 +327,7 @@ const headingAt = (depth: number) => (properties: ComponentProps<"h1"> & ExtraPr
   );
 };
 
-/** The parser hands each part its node, which is no attribute of the element drawn. */
+/** The parser passes each component its syntax-tree node, which is not a valid DOM attribute. */
 const withoutNode = <Properties extends ExtraProps>({
   node: _node,
   ...rest

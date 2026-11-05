@@ -11,11 +11,11 @@ const OPENED: AskStreamEvent<Result> = { kind: "result", result: RESULT };
 const POLICY = "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP";
 const LMS = "https://better-answers.com/c/01J6QQQQQQQQQQQQQQQQQQQQQQ";
 
-const sentence = (collection: string | null, said: string, concepts: readonly string[]) =>
-  ({ kind: "sentence", collection, sentence: said, concepts }) as const;
+const sentence = (collection: string | null, text: string, concepts: readonly string[]) =>
+  ({ kind: "sentence", collection, sentence: text, concepts }) as const;
 
-describe("folding an answer's stream", () => {
-  it("holds nothing until the result arrives", () => {
+describe("building an answer from its stream events", () => {
+  it("returns nothing until the result event arrives", () => {
     const events: AskStreamEvent<Result>[] = [
       { kind: "phase", phase: "reading" },
       { kind: "keep-alive" },
@@ -26,25 +26,25 @@ describe("folding an answer's stream", () => {
   });
 
   it("ignores keep-alives and phases wherever they fall", () => {
-    const told: AskStreamEvent<Result>[] = [
+    const withoutNoise: AskStreamEvent<Result>[] = [
       OPENED,
       sentence("audits", "Claims close within 30 days.", [POLICY]),
       { kind: "part", collection: "audits", outcome: "drafted" },
     ];
-    const kept: AskStreamEvent<Result>[] = [
+    const withNoise: AskStreamEvent<Result>[] = [
       { kind: "phase", phase: "reading" },
       { kind: "keep-alive" },
       OPENED,
       { kind: "phase", phase: "drafting" },
       { kind: "keep-alive" },
-      ...told.slice(1),
+      ...withoutNoise.slice(1),
       { kind: "keep-alive" },
     ];
 
-    expect(askedFrom(kept)).toEqual(askedFrom(told));
+    expect(askedFrom(withNoise)).toEqual(askedFrom(withoutNoise));
   });
 
-  it("gathers each collection's sentences into its own part", () => {
+  it("groups each collection's sentences into its own part", () => {
     const events: AskStreamEvent<Result>[] = [
       OPENED,
       sentence("audits", "Claims close within 30 days.", [POLICY]),

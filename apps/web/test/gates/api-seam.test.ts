@@ -14,16 +14,13 @@ const tsc = (() => {
   return binary;
 })();
 
-/**
- * The icon set declares a file per glyph, which puts this listing past Node's default
- * megabyte; truncation fails as a spawn error, not a finding.
- */
+/** The icon set has one file per glyph, so the listing exceeds Node's default 1 MB buffer. */
 const LISTING_BUFFER_BYTES = 64 * 1024 * 1024;
 
 const AUTH_FILES_THE_WEB_MAY_PULL = new Set(["verify.ts", "constants.ts"]);
 
 describe("the AppRouter seam", () => {
-  it("pulls nothing of the auth server into the web program", () => {
+  it("keeps auth server code out of the web build", () => {
     const listing = execFileSync(process.execPath, [tsc, "--noEmit", "--listFiles"], {
       cwd: workspaceRoot,
       encoding: "utf8",
@@ -37,7 +34,7 @@ describe("the AppRouter seam", () => {
 
     expect(authFiles).toContain("verify.ts");
 
-    const intruders = authFiles.filter((file) => !AUTH_FILES_THE_WEB_MAY_PULL.has(file));
-    expect(intruders).toEqual([]);
+    const disallowedAuthFiles = authFiles.filter((file) => !AUTH_FILES_THE_WEB_MAY_PULL.has(file));
+    expect(disallowedAuthFiles).toEqual([]);
   }, 60_000);
 });

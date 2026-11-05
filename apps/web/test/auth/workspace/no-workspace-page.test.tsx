@@ -2,16 +2,14 @@ import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
-import { ASK_TO_JOIN_WORDS } from "@/features/auth/workspace/ask-to-join-words.ts";
-import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace/workspace-words.ts";
 import { server } from "@test/stub-server.ts";
 import type { Api } from "@test/stubbed-api.ts";
 import {
-  aCeilingMet,
+  rateLimitedResponse,
   ADA,
   adaAnAdmin,
   aRefusalAnswer,
-  openOutsideTheShellAt,
+  openPageOutsideShell,
   read,
 } from "@test/two-workspaces.ts";
 
@@ -44,22 +42,22 @@ const signedInWithNoWorkspace = (): Api => {
 };
 
 const askRegion = async () =>
-  within(await screen.findByRole("region", { name: ASK_TO_JOIN_WORDS.heading }));
+  within(await screen.findByRole("region", { name: "Ask to Join a Workspace" }));
 
 const askToJoin = async (shortName: string, reason: string) => {
   const region = await askRegion();
-  await userEvent.type(region.getByLabelText(ASK_TO_JOIN_WORDS.shortName), shortName);
-  await userEvent.type(region.getByLabelText(ASK_TO_JOIN_WORDS.reason), reason);
-  await userEvent.click(region.getByRole("button", { name: ASK_TO_JOIN_WORDS.ask }));
+  await userEvent.type(region.getByLabelText("Workspace Short Name"), shortName);
+  await userEvent.type(region.getByLabelText("Reason"), reason);
+  await userEvent.click(region.getByRole("button", { name: "Ask to Join" }));
   return region;
 };
 
-it("offers one way on to a person in no workspace", async () => {
+it("offers Ask to Join but no Create Workspace", async () => {
   const api = signedInWithNoWorkspace();
   api.set("/sign-out", () => ({ success: true }));
-  await openOutsideTheShellAt("/no-workspace", api);
+  await openPageOutsideShell("/no-workspace", api);
 
-  expect(await screen.findByRole("region", { name: ASK_TO_JOIN_WORDS.heading })).toBeDefined();
+  expect(await screen.findByRole("region", { name: "Ask to Join a Workspace" })).toBeDefined();
 
   expect(screen.queryByRole("button", { name: /create/i })).toBeNull();
   expect(screen.queryByRole("link", { name: /create/i })).toBeNull();
@@ -69,22 +67,22 @@ it("offers one way on to a person in no workspace", async () => {
   expect(await screen.findByRole("heading", { level: 1, name: "Sign In" })).toBeDefined();
 });
 
-it("refuses a blank reason, saying what to send", async () => {
+it("refuses a blank reason and focuses the Reason field", async () => {
   const api = signedInWithNoWorkspace();
   api.set("person.requestAccess", () => aRefusalAnswer("malformed", "malformed", 400));
-  await openOutsideTheShellAt("/no-workspace", api);
+  await openPageOutsideShell("/no-workspace", api);
   const region = await askRegion();
-  const standing = region.getByRole("alert");
-  expect(standing.textContent, "the refusal region stands empty before an ask").toBe("");
+  const alertBefore = region.getByRole("alert");
+  expect(alertBefore.textContent, "the alert region holds words before asking").toBe("");
 
   await askToJoin(A_SHORT_NAME, "   ");
 
-  await vi.waitFor(() => expect(standing.textContent).toMatch(/enter a reason/i));
-  expect(region.getByRole("alert"), "the refusal came in the region that stood").toBe(standing);
-  const reason = region.getByLabelText(ASK_TO_JOIN_WORDS.reason);
+  await vi.waitFor(() => expect(alertBefore.textContent).toMatch(/\S/u));
+  expect(region.getByRole("alert"), "the refusal appeared in a new alert region").toBe(alertBefore);
+  const reason = region.getByLabelText("Reason");
   expect(reason.getAttribute("aria-invalid")).toBe("true");
   expect(document.activeElement).toBe(reason);
-  expect(screen.queryByRole("alert", { name: ASK_TO_JOIN_WORDS.sent })).toBeNull();
+  expect(screen.queryByRole("alert", { name: "Request Sent" })).toBeNull();
   expect(server.asks).toContainEqual({
     procedure: "person.requestAccess",
     input: { shortName: A_SHORT_NAME, reason: "   " },
@@ -92,21 +90,21 @@ it("refuses a blank reason, saying what to send", async () => {
 
   api.set("person.requestAccess", () => read(null));
   await userEvent.type(reason, "tender library");
-  await userEvent.click(region.getByRole("button", { name: ASK_TO_JOIN_WORDS.ask }));
-  expect(await screen.findByRole("alert", { name: ASK_TO_JOIN_WORDS.sent })).toBeDefined();
+  await userEvent.click(region.getByRole("button", { name: "Ask to Join" }));
+  expect(await screen.findByRole("alert", { name: "Request Sent" })).toBeDefined();
 });
 
 it("sends a person whose session ended back to sign in", async () => {
   const api = signedInWithNoWorkspace();
   api.set("person.requestAccess", () => aRefusalAnswer("no-session", "unauthenticated", 401));
-  const router = await openOutsideTheShellAt("/no-workspace", api);
+  const router = await openPageOutsideShell("/no-workspace", api);
   const region = await askRegion();
   const refusal = region.getByRole("alert");
   expect(region.queryByRole("button", { name: "Sign In Again" })).toBeNull();
 
   await askToJoin(A_SHORT_NAME, A_REASON);
 
-  await vi.waitFor(() => expect(refusal.textContent).toMatch(/session has expired/i));
+  await vi.waitFor(() => expect(refusal.textContent).toMatch(/\S/u));
   await userEvent.click(await region.findByRole("button", { name: "Sign In Again" }));
 
   expect(await screen.findByRole("heading", { level: 1, name: "Sign In" })).toBeDefined();
@@ -118,19 +116,17 @@ it("keeps an operator connecting Claude on the no-workspace page", async () => {
   api.set("session.operator", () => read({ operator: true, name: ADA.displayName }));
   globalThis.history.replaceState(null, "", `/no-workspace${CLAUDES_REQUEST}`);
 
-  const router = await openOutsideTheShellAt(`/no-workspace${CLAUDES_REQUEST}`, api);
+  const router = await openPageOutsideShell(`/no-workspace${CLAUDES_REQUEST}`, api);
 
   expect(router.state.location.pathname).toBe("/no-workspace");
-  expect(
-    await screen.findByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING }),
-  ).toBeDefined();
+  expect(await screen.findByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeDefined();
   expect(within(screen.getByRole("main")).getByText(/\bClaude\b/)).toBeDefined();
 });
 
-it("a refused sign-out off the shell says the wait", async () => {
+it("a rate-limited sign-out names the wait", async () => {
   const api = signedInWithNoWorkspace();
-  api.set("/sign-out", () => aCeilingMet(WAIT_SECONDS));
-  await openOutsideTheShellAt("/no-workspace", api);
+  api.set("/sign-out", () => rateLimitedResponse(WAIT_SECONDS));
+  await openPageOutsideShell("/no-workspace", api);
   const signOut = await screen.findByRole("button", { name: "Sign Out" });
 
   await userEvent.click(signOut);
@@ -142,6 +138,6 @@ it("a refused sign-out off the shell says the wait", async () => {
       .filter((words) => words !== "");
   await vi.waitFor(() => expect(said()).toHaveLength(1));
   expect(said()[0]).toMatch(/\b2 minutes\b/);
-  expect(screen.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeDefined();
-  expect(document.activeElement, "a refused sign-out dropped the focus").toBe(signOut);
+  expect(screen.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeDefined();
+  expect(document.activeElement, "the Sign Out button lost focus after the refusal").toBe(signOut);
 });

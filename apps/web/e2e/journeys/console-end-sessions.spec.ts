@@ -17,7 +17,7 @@ import {
   provision,
   signedInAtHome,
   signIn,
-  theActionLandedWithinItsBudget,
+  actionWithinBudget,
 } from "../harness.ts";
 import { personButton, sheetOf } from "../people-pages.ts";
 
@@ -25,7 +25,7 @@ const EVERYONE_PAGE = pageNamed(menuGroupIn(CONSOLE, "people"), "Everyone").path
 
 const INSTANT = /^\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}$/;
 
-const REVOKE = "End Every Sign-In and Token";
+const SIGN_OUT = "Sign Out Everywhere";
 
 const ENDED_AT = /\d{2}:\d{2}/;
 
@@ -37,7 +37,7 @@ const regionOf = (sheet: Locator, name: string): Locator =>
 const sessionsOf = (sheet: Locator): Locator => regionOf(sheet, "Sessions").getByRole("listitem");
 
 const confirmationOf = (page: Page): Locator =>
-  page.getByRole("dialog", { name: `${REVOKE} for Priya Shah` });
+  page.getByRole("dialog", { name: "Sign Out Priya Shah Everywhere" });
 
 const theOperatorsWorkspace = async (api: APIRequestContext, tag: string) => {
   const email = anAddress(`${tag}-operator`);
@@ -94,7 +94,7 @@ const openPriya = async (page: Page, tag: string): Promise<Locator> => {
 };
 
 test.describe("a person's sheet, opened from the Everyone page", () => {
-  test("an operator cancels, then ends every sign-in and token", async ({
+  test("an operator cancels, then signs a person out everywhere", async ({
     page,
     request,
     baseURL,
@@ -103,21 +103,21 @@ test.describe("a person's sheet, opened from the Everyone page", () => {
     const tag = aTag();
     const { operators } = await priyaConnected(page, request, baseURL, tag);
     const sheet = await openPriya(page, tag);
-    const revoke = sheet.getByRole("button", { name: REVOKE });
+    const signOut = sheet.getByRole("button", { name: SIGN_OUT });
     const grant = regionOf(sheet, "Assistant Access").getByRole("listitem", { name: "Claude" });
     await expect(grant).toBeVisible();
 
-    await revoke.click();
+    await signOut.click();
     const confirmation = confirmationOf(page);
     await expect(confirmation).toHaveAccessibleDescription(/Priya Shah/);
     await passesTheAccessibilityGate();
     await confirmation.getByRole("button", { name: "Cancel" }).click();
     await expect(confirmation).toHaveCount(0);
-    await expect(revoke).toBeFocused();
+    await expect(signOut).toBeFocused();
     await expect(sessionsOf(sheet)).toHaveCount(1);
 
-    await revoke.click();
-    await confirmation.getByRole("button", { name: "End Every Sign-In Everywhere" }).focus();
+    await signOut.click();
+    await confirmation.getByRole("button", { name: SIGN_OUT }).focus();
     await clockTheNextKey(page, {
       at: "//section[div[@data-slot='card-header']/h3[normalize-space(.)='Sessions']][not(.//li)]",
       reads: "Sessions",
@@ -125,11 +125,9 @@ test.describe("a person's sheet, opened from the Everyone page", () => {
     await page.keyboard.press("Enter");
 
     await expect(sessionsOf(sheet)).toHaveCount(0);
-    await theActionLandedWithinItsBudget(page, "end every sign-in everywhere");
-    await expect(regionOf(sheet, "End Every Sign-In Everywhere").getByRole("status")).toHaveText(
-      ENDED_AT,
-    );
-    await expect(revoke).toBeFocused();
+    await actionWithinBudget(page, "sign out everywhere");
+    await expect(regionOf(sheet, SIGN_OUT).getByRole("status")).toHaveText(ENDED_AT);
+    await expect(signOut).toBeFocused();
     const endedEverywhere = `
       - listitem "Claude":
         - heading "Claude" [level=4]
@@ -143,7 +141,7 @@ test.describe("a person's sheet, opened from the Everyone page", () => {
         - definition: ${operators.admin.name}
         - term: Ended In
         - definition: /^(?!${operators.name}$).+/
-        - button "More About Claude’s Grant"
+        - button "More About Claude’s Access"
     `;
     await expect(grant).toMatchAriaSnapshot(endedEverywhere);
     await expect(regionOf(sheet, "Sign-In").getByRole("definition").nth(1)).toHaveText(INSTANT);

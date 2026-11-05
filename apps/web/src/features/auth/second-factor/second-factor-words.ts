@@ -13,7 +13,7 @@ export const CONFIRM_WORDS = {
   passkeyWaiting: "Waiting for your passkey.",
   passkeyNotUsed: "No passkey was used. Please try again, or use another way below.",
   codeField: "Authenticator Code",
-  codeHint: "Authenticator code must be 6 digits.",
+  codeHint: "Enter the 6-digit code from your authenticator app.",
   confirm: "Confirm",
   toTheCode: "Go to the Authenticator Code",
   recoveryCode: "Use a Recovery Code",
@@ -33,7 +33,7 @@ export const UNSAVED_AFTER_CONFIRMING =
 
 export const RECOVERY_WORDS = {
   heading: "Use a Recovery Code",
-  why: "Each code works once. You’ll then set up a new second factor.",
+  why: "You can use each code only once. After you sign in, you’ll set up a new second factor.",
   field: "Recovery Code",
   instead: "Use Your Passkey or Authenticator Instead",
   operator: `No codes left? Contact ${PRODUCT_NAME} support to restore your sign-in.`,
@@ -41,10 +41,10 @@ export const RECOVERY_WORDS = {
 
 export const SETUP_WORDS = {
   heading: "Set Up a Second Factor",
-  why: "Admins need a passkey or an authenticator to confirm each sign-in.",
+  why: "Admins need a passkey or an authenticator app to confirm each sign-in.",
   nowAnAdmin: (workspace: string) => `You’re now an Admin of ${workspace}.`,
   newHeading: "Set Up a New Second Factor",
-  newWhy: "Finishing replaces your old passkeys, authenticator and recovery codes.",
+  newWhy: "When you finish, your old passkeys, authenticator app and recovery codes stop working.",
   restoreField: "Restore Code",
   restoreAccepted: "Your restore code has been accepted successfully.",
   passkey: "Sign in with your fingerprint, face or device PIN.",

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { useOAuthContinue } from "@/features/auth/auth-hooks.ts";
 
-/** Better Auth's client keeps the `fetch` it finds when made, so this one stands first. */
+/** Better Auth's client keeps the `fetch` it sees when created, so the stub is hoisted above the imports. */
 vi.hoisted(() => {
   globalThis.fetch = () =>
     Promise.resolve(
@@ -18,8 +18,8 @@ vi.hoisted(() => {
 
 afterEach(cleanup);
 
-describe("a refused resume of a carried connection", () => {
-  it("refuses with the platform's own error, not the provider's", async () => {
+describe("resuming a connection the api refuses after sign-in", () => {
+  it("fails with the app's own error, not the auth library's", async () => {
     const clients = createAppClients();
     const wrapper = (properties: { readonly children: ReactNode }) => (
       <Providers clients={clients}>{properties.children}</Providers>

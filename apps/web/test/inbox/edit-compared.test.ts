@@ -5,7 +5,7 @@ import { paragraphsCompared, sourceLinesOf } from "@/features/inbox/edit-compare
 const changedOf = (paragraphs: readonly { readonly changed: boolean }[]) =>
   paragraphs.map((paragraph) => paragraph.changed);
 
-describe("an edit compared with the current version", () => {
+describe("comparing a suggested edit with the current version", () => {
   it("marks only the paragraphs the other version lacks", () => {
     const compared = paragraphsCompared(
       "Leave is 25 days.\n\nCarry over five days.\n\nAsk your manager.",
@@ -17,7 +17,7 @@ describe("an edit compared with the current version", () => {
     expect(compared.proposed[0]?.text).toBe("Leave is 28 days.");
   });
 
-  it("keeps an inserted paragraph from marking those after it", () => {
+  it("marks an inserted paragraph but not the paragraphs after it", () => {
     const compared = paragraphsCompared("One.\n\nTwo.\n\n", "\n\nOne.\n\nNew.\n  \nTwo.");
 
     expect(changedOf(compared.current)).toEqual([false, false]);
@@ -32,8 +32,8 @@ describe("an edit compared with the current version", () => {
   });
 });
 
-describe("the suggested sources as words", () => {
-  it("names a source by its title, else its resource, alone", () => {
+describe("listing suggested sources", () => {
+  it("names a source by its title, or else its resource", () => {
     expect(
       sourceLinesOf([
         { title: "Board minutes", resource: "Board minutes", locator: "p.4" },
@@ -43,7 +43,7 @@ describe("the suggested sources as words", () => {
     ).toEqual(["Board minutes", "Pay policy"]);
   });
 
-  it("keeps text sources as given, and absent sources as none", () => {
+  it("keeps text sources and lists none when sources are missing", () => {
     expect(sourceLinesOf(["Handbook#p.2", ""])).toEqual(["Handbook#p.2"]);
     expect(sourceLinesOf(undefined)).toEqual([]);
     expect(sourceLinesOf("Handbook")).toEqual([]);

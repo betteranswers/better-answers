@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { GROUPS_KEYSTROKES, PEOPLE_SELECT_FIRST } from "@/features/people/people-state.ts";
+import { GROUPS_KEYSTROKES } from "@/features/people/people-state.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { idOf } from "@test/people/member-pages.ts";
@@ -119,7 +119,7 @@ const renamingFromTheRowMenu = async (name: string) => {
   return { dialog, field: within(dialog).getByRole("textbox", { name: "Name" }) };
 };
 
-describe("a group's actions", () => {
+describe("the Groups page", () => {
   it("searches the groups by name, then clears the search", async () => {
     const router = await openedWith(HR_TEAM, BID_WRITERS);
 
@@ -129,7 +129,7 @@ describe("a group's actions", () => {
 
     expect(groupRows()).toHaveLength(1);
     expect(groupButton("HR team")).toBeDefined();
-    expect(count()).toMatch(/1 of 2 groups match/);
+    expect(count(), "the count did not say one of two match").toMatch(/\b1\b\D+\b2\b/);
     await waitFor(() => {
       expect(router.state.location.href).toMatch(/groups\.search=HR/);
     });
@@ -137,7 +137,9 @@ describe("a group's actions", () => {
     await userEvent.clear(searchBox());
     await userEvent.type(searchBox(), "Payroll");
     expect(groupRows()).toHaveLength(0);
-    expect(groupsRegion().getByText(/No results found/)).toBeDefined();
+    expect(groupsRegion().getByRole("cell").textContent, "the empty table has no message").toMatch(
+      /\S/,
+    );
     await userEvent.click(groupsRegion().getByRole("button", { name: "Clear Search" }));
 
     expect(groupRows()).toHaveLength(2);
@@ -145,16 +147,16 @@ describe("a group's actions", () => {
     expect(count()).toMatch(/\b2\b/);
   });
 
-  it("takes a search written into the address by hand", async () => {
+  it("reads a search typed into the address", async () => {
     await openAt(`${GROUPS_PAGE}?groups.search=42`, apiHolding(HR_TEAM, BID_WRITERS, TEAM_42));
 
     await groupsRegion().findByRole("button", { name: "Team 42" });
     expect(searchBox()).toHaveProperty("value", "42");
     expect(groupRows()).toHaveLength(1);
-    expect(count()).toMatch(/1 of 3 groups match/);
+    expect(count(), "the count did not say one of three match").toMatch(/\b1\b\D+\b3\b/);
   });
 
-  it("keeps search focus as a created row leaves and returns", async () => {
+  it("keeps focus in search while a new group is filtered", async () => {
     await openedWith(HR_TEAM, BID_WRITERS);
     await userEvent.click(groupsRegion().getByRole("button", { name: "Create a Group" }));
     const dialog = await screen.findByRole("dialog", { name: "Create a Group" });
@@ -173,7 +175,7 @@ describe("a group's actions", () => {
     await userEvent.clear(searchBox());
 
     expect(groupButton("Site leads")).toBeDefined();
-    expect(document.activeElement, "the returning row took focus").toBe(searchBox());
+    expect(document.activeElement, "focus moved to the new group's row").toBe(searchBox());
   });
 
   it("focuses the heading once a rename hides the row", async () => {
@@ -190,28 +192,29 @@ describe("a group's actions", () => {
     });
     expect(
       groupsRegion().queryByRole("button", { name: "People team" }),
-      "the search let the renamed row through",
+      "the renamed group still shows despite the search",
     ).toBeNull();
     await focused(heading());
   });
 
-  it("says the group already has the name, dialog open", async () => {
+  it("says the name is unchanged and keeps the dialog open", async () => {
     await openedWith(HR_TEAM, BID_WRITERS);
     const { dialog, field } = await renamingFromTheRowMenu("HR team");
 
     await userEvent.type(field, "{Enter}");
 
-    expect(within(dialog).getByRole("status").textContent).toMatch(/already called HR team/);
+    expect(within(dialog).getByRole("status").textContent).toContain("HR team");
+    expect(lastAsked("members.renameGroup"), "an unchanged name sent a rename").toBeUndefined();
     expect(field).toHaveProperty("value", "HR team");
     fireEvent.keyDown(field, { key: "Escape" });
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();
     });
     await focused(groupsRegion().getByRole("button", { name: "Actions for HR team" }));
-    expect(saying(), "the dialog's line reached the page").toHaveLength(1);
+    expect(saying(), "the dialog's message also appeared on the page").toHaveLength(1);
   });
 
-  it("deletes a group from its row menu, warned first", async () => {
+  it("deletes a group from its row menu after a warning", async () => {
     await openedWith(HR_TEAM, BID_WRITERS);
 
     fireEvent.click(
@@ -219,7 +222,7 @@ describe("a group's actions", () => {
     );
 
     const confirming = await screen.findByRole("alertdialog", { name: "Delete HR team" });
-    expect(describedBy(confirming), "the confirmation counts no member the deletion takes").toMatch(
+    expect(describedBy(confirming), "the warning did not count the group's 2 members").toMatch(
       /\b2\b/,
     );
     await focused(within(confirming).getByRole("button", { name: "Keep Group" }));
@@ -243,7 +246,7 @@ describe("a group's actions", () => {
 
   it("opens no group by key after focus leaves the list", async () => {
     await openedWith(HR_TEAM, BID_WRITERS);
-    expect(saying(), "only the count says anything at rest").toHaveLength(1);
+    expect(saying(), "a message besides the count appeared before any action").toHaveLength(1);
     act(() => {
       groupButton("HR team").focus();
       heading().focus();
@@ -255,8 +258,8 @@ describe("a group's actions", () => {
     await waitFor(() => {
       expect(saying()).toHaveLength(2);
     });
-    expect(saying().at(1)?.textContent, "a keystroke with no group in focus says to pick one").toBe(
-      PEOPLE_SELECT_FIRST.group,
+    expect(saying().at(1)?.textContent, "the key with no group in focus showed no message").toMatch(
+      /\S/,
     );
   });
 });

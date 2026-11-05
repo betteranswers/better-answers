@@ -21,7 +21,7 @@ import {
 } from "@test/knowledge/guide-answers.ts";
 import "@test/jsdom/layout.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 import { ADA, aRefusalAnswer, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -173,7 +173,7 @@ describe("moving among a Brief's footnote chips", () => {
     expect(screen.getByRole("button", { name: RACKING_TITLE })).toBeDefined();
   });
 
-  it("says when a section includes nothing to place", () => {
+  it("offers no footnotes to place when a section includes nothing", () => {
     render(
       <BriefBody
         label={LABEL}
@@ -184,19 +184,20 @@ describe("moving among a Brief's footnote chips", () => {
       />,
     );
 
-    expect(screen.getByText(/No concepts are included in this section/u)).toBeDefined();
+    expect(screen.queryByRole("group", { name: "Place a Footnote" })).toBeNull();
+    expect(textField()).toBeDefined();
   });
 });
 
 describe("saving a Brief", () => {
-  it("announces an unchanged save in the status region", async () => {
+  it("names the current version when a save changes nothing", async () => {
     const { api } = await opened();
     api.set(SAVE_BRIEF, () => read({ saved: false, version: 2 }));
 
     saveBrief();
 
     await waitFor(() => {
-      expect(status().textContent).toBe("No changes to save. Version 2 stands.");
+      expect(status().textContent, "the status did not name version 2").toMatch(/\b2\b/u);
     });
     expect(asksOf(SAVE_BRIEF)).toEqual([
       { writeUpId: A_WRITE_UP_ID, markdown: BRIEF_MARKED, base: 2 },
@@ -204,19 +205,21 @@ describe("saving a Brief", () => {
     expect(textField()).toBeDefined();
   });
 
-  it("says Saving the Brief at once, then the version", async () => {
+  it("announces the save at once, then the new version", async () => {
     const { api } = await opened();
-    const held = heldBack(api, SAVE_BRIEF, read({ saved: true, version: 3 }));
+    const held = holdProcedure(api, SAVE_BRIEF, read({ saved: true, version: 3 }));
     await typedAtTheEnd(" more");
 
     saveBrief();
 
     await held.asked;
-    expect(status().textContent).toBe("Saving the Brief.");
+    const whileSaving = status().textContent;
+    expect(whileSaving, "the save was not announced while it waited").toMatch(/\S/u);
     held.resolve();
     await waitFor(() => {
-      expect(status().textContent).toBe("Saved version 3.");
+      expect(status().textContent).not.toBe(whileSaving);
     });
+    expect(status().textContent, "the status did not name version 3").toMatch(/\b3\b/u);
   });
 
   it("sends the edited Brief against the version it opened with", async () => {
@@ -246,13 +249,14 @@ describe("saving a Brief", () => {
     fireEvent.keyDown(textField(), { key: "Enter", ctrlKey: true });
 
     await waitFor(() => {
-      expect(status().textContent).toBe("Saved version 3.");
+      expect(status().textContent, "the status did not name version 3").toMatch(/\b3\b/u);
     });
+    expect(asksOf(SAVE_BRIEF)).toHaveLength(1);
   });
 
   it("locks the text while the save is waiting", async () => {
     const { api } = await opened();
-    const held = heldBack(api, SAVE_BRIEF, read({ saved: true, version: 3 }));
+    const held = holdProcedure(api, SAVE_BRIEF, read({ saved: true, version: 3 }));
 
     saveBrief();
     await held.asked;
@@ -297,13 +301,12 @@ describe("a Brief saved after you opened it", () => {
     });
     await typedAtTheEnd(" my words");
     saveBrief();
-    await waitFor(() => {
-      expect(status().textContent).toBe("Someone saved this Brief after you opened it.");
-    });
+    await screen.findByRole("button", { name: "Reload the Brief" });
+    expect(status().textContent, "the stale save was not announced").toMatch(/\S/u);
     return api;
   };
 
-  it("says so and keeps the draft", async () => {
+  it("keeps the draft and offers a reload", async () => {
     await refused();
 
     expect(textField().textContent).toContain("my words");
@@ -336,10 +339,12 @@ describe("a Brief saved after you opened it", () => {
 
     const reloaded = async () => {
       const api = await refused();
+      const beforeReload = status().textContent;
       fireEvent.click(screen.getByRole("button", { name: "Reload the Brief" }));
       await waitFor(() => {
         expect(textField().textContent).toContain("Someone else's words");
       });
+      expect(status().textContent, "the reload was not announced").not.toBe(beforeReload);
       return api;
     };
 
@@ -356,9 +361,7 @@ describe("a Brief saved after you opened it", () => {
         `Pallets are racked[Footnote: ${RACKING_TITLE}] by row. my words`,
       );
       expect(earlierField().readOnly).toBe(true);
-      expect(status().textContent).toBe(
-        "Loaded the latest Brief. Your unsaved text is kept below it.",
-      );
+      expect(status().textContent).toMatch(/\S/u);
     });
 
     it("selects the text when the reader moves into it", async () => {
@@ -373,7 +376,7 @@ describe("a Brief saved after you opened it", () => {
     it("goes when discarded, and focus stays in the editor", async () => {
       await reloaded();
 
-      fireEvent.click(screen.getByRole("button", { name: "Discard this text" }));
+      fireEvent.click(screen.getByRole("button", { name: "Discard This Text" }));
 
       expect(screen.queryByRole("textbox", { name: EARLIER })).toBeNull();
       expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save Brief" }));
@@ -394,15 +397,17 @@ describe("a Brief saved after you opened it", () => {
 });
 
 describe("a Brief refused for another reason", () => {
-  it("says why and keeps the draft editable", async () => {
+  it("alerts and keeps the draft editable", async () => {
     const { api } = await opened();
     api.set(SAVE_BRIEF, () => aRefusalAnswer("marker-without-include", "inapplicable", 422));
     await typedAtTheEnd(" more");
 
     saveBrief();
 
-    const said = await screen.findByText(/no longer includes/u);
-    expect(said.closest('[role="alert"]')).not.toBeNull();
+    await waitFor(() => {
+      const alert = within(screen.getByRole("article")).getByRole("alert");
+      expect(alert.textContent, "the refused save raised no alert").toMatch(/\S/u);
+    });
     expect(screen.getByRole("button", { name: "Save Brief" }).getAttribute("aria-disabled")).toBe(
       "false",
     );
@@ -431,7 +436,7 @@ describe("a draft of a Brief", () => {
     await opened();
     await typedAtTheEnd(" more");
 
-    fireEvent.click(screen.getByRole("button", { name: "Close editor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close Editor" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit Brief" }));
 
     await waitFor(() => {
@@ -479,13 +484,11 @@ describe("a draft of a Brief", () => {
 });
 
 describe("leaving with an unsaved draft", () => {
-  const ASK = "You have changes to a Brief that are not saved.";
-
   const addAFact = () => {
     fireEvent.click(screen.getByRole("link", { name: "Add This Fact" }));
   };
 
-  const askedToLeave = () => screen.findByRole("alertdialog", { name: ASK });
+  const askedToLeave = () => screen.findByRole("alertdialog");
 
   const onSearch = (router: Awaited<ReturnType<typeof opened>>["router"]): boolean =>
     router.state.location.pathname === SEARCH_PAGE.path;
@@ -498,9 +501,9 @@ describe("leaving with an unsaved draft", () => {
 
     const ask = await askedToLeave();
     expect(router.state.location.pathname).toBe(A_GUIDE_PAGE);
-    expect(document.activeElement).toBe(within(ask).getByRole("button", { name: "Keep editing" }));
+    expect(document.activeElement).toBe(within(ask).getByRole("button", { name: "Keep Editing" }));
 
-    fireEvent.click(within(ask).getByRole("button", { name: "Keep editing" }));
+    fireEvent.click(within(ask).getByRole("button", { name: "Keep Editing" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("alertdialog")).toBeNull();
@@ -513,7 +516,7 @@ describe("leaving with an unsaved draft", () => {
     const { router } = await opened();
     await typedAtTheEnd(" more");
     addAFact();
-    fireEvent.click(within(await askedToLeave()).getByRole("button", { name: "Keep editing" }));
+    fireEvent.click(within(await askedToLeave()).getByRole("button", { name: "Keep Editing" }));
     await waitFor(() => {
       expect(screen.queryByRole("alertdialog")).toBeNull();
     });

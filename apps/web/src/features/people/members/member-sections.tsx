@@ -55,7 +55,7 @@ function AccessSummary(properties: { readonly member: ListedMember }) {
       <SummaryRow term="Joined">
         <Day instant={member.joinedAt} />
       </SummaryRow>
-      <SummaryRow term={WORDS.signInsAndTokensHere}>
+      <SummaryRow term={WORDS.lastSignedOut}>
         <CredentialsHere revokedAt={member.credentialsRevokedAt} />
       </SummaryRow>
     </dl>
@@ -179,7 +179,7 @@ function CredentialsRevoker(properties: {
         onSuccess: () => {
           setOutcome({
             tone: "said",
-            words: WORDS.everySignInEnded(name),
+            words: WORDS.signedOut(name),
           });
         },
         onError: (failure: Error | ApiError) => {
@@ -190,7 +190,7 @@ function CredentialsRevoker(properties: {
   };
 
   return (
-    <SheetPart title={WORDS.signInsAndTokens}>
+    <SheetPart title={WORDS.signOutHere}>
       <div className="flex flex-col items-start gap-2">
         <Button
           ref={revokeRef}
@@ -199,11 +199,11 @@ function CredentialsRevoker(properties: {
           aria-disabled={revoke.isPending}
           onClick={commit}
         >
-          {WORDS.endEverySignInAndToken}
+          {WORDS.signOutHere}
         </Button>
         <p id={hintId} className="text-sm text-muted-foreground">
-          {WORDS.endsAtOnce(name)}
-          {member.personId === readerId ? " Your own session here will end too." : null}
+          {WORDS.signOutHint(name)}
+          {member.personId === readerId ? WORDS.signOutHintForYou : null}
         </p>
       </div>
 
@@ -255,8 +255,8 @@ function DisplayNameFlag(properties: {
               Flag Name
             </Button>
             <p id={hintId} className="text-sm text-muted-foreground">
-              This will email better-answers support to correct it. A name already flagged is not
-              flagged again.
+              This emails better-answers support, who will correct it. If the name is already
+              flagged, nothing more is sent.
             </p>
           </div>
           <OutcomeLine outcome={outcome} className="contents" />
@@ -331,7 +331,7 @@ export function Access(properties: { readonly member: ListedMember; readonly lan
   );
 }
 
-export function RemoveAndEndEverySignIn(properties: {
+export function RemoveAndSignOut(properties: {
   readonly member: ListedMember;
   readonly landings: Landings;
   readonly removal: Removal;

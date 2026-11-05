@@ -18,7 +18,7 @@ const foldersUnder = (directory: string): readonly string[] =>
     });
 
 describe("the SPA's folders", () => {
-  it("names every source folder in kebab-case, whatever the filesystem", () => {
+  it("names every source folder in kebab-case", () => {
     const folders = foldersUnder(source);
 
     expect(folders.length).toBeGreaterThan(0);

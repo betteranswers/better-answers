@@ -15,12 +15,12 @@ const WHERE_WORDS = {
 
 const CLOSING_WORDS = {
   "fixed-in-the-knowledge": "Fixed in the knowledge",
-  "no-fault-in-the-knowledge": "No fault in the knowledge",
+  "no-fault-in-the-knowledge": "Knowledge was correct",
 } as const satisfies Readonly<Record<FlagClosing, string>>;
 
 export const CLOSE_AS = {
   "fixed-in-the-knowledge": "Fixed in the Knowledge",
-  "no-fault-in-the-knowledge": "No Fault in the Knowledge",
+  "no-fault-in-the-knowledge": "Knowledge Was Correct",
 } as const satisfies Readonly<Record<FlagClosing, string>>;
 
 export const CLOSINGS = [
@@ -55,7 +55,7 @@ export const QUESTIONS_WORDS = {
     askedBy: "Asked By",
     asked: "Asked",
     where: "Where",
-    collectionsNamed: "Collections Named",
+    collectionsNamed: "Collections Chosen",
     verdict: "Verdict",
     judge: "Judge",
     kind: "Kind",
@@ -63,22 +63,21 @@ export const QUESTIONS_WORDS = {
     trust: "Trust",
     judged: "Judge’s Verdict",
     ...RECORD_WORDS.terms,
-    restedOn: "Rested On",
+    restedOn: "Cited Concept",
     closed: "Closed",
   },
   noneNamed: "None",
   parts: {
     answer: "Answer",
     concepts: "Concepts",
-    drafted: "Drafted Prose",
+    drafted: "Drafted Answer",
     feedback: "Feedback",
   },
-  noConcepts: "No concepts you can read",
+  noConcepts: "No concepts you have access to",
   helpful: RECORD_WORDS.markedHelpful,
   closeTheFlag: "Close This Flag",
   closedSaid: {
-    "fixed-in-the-knowledge": "The flag has been closed as fixed in the knowledge successfully.",
-    "no-fault-in-the-knowledge":
-      "The flag has been closed as no fault in the knowledge successfully.",
+    "fixed-in-the-knowledge": "The flag has been closed as fixed in the knowledge.",
+    "no-fault-in-the-knowledge": "The flag has been closed. The knowledge was correct.",
   } satisfies Readonly<Record<FlagClosing, string>>,
 } as const;

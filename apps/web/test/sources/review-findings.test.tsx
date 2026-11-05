@@ -31,11 +31,11 @@ const findingRow = (row: HTMLElement, document: string, rule: string): HTMLEleme
     .filter((each) => [document, rule].every((word) => each.textContent.includes(word)));
   const [only] = found;
   if (found.length !== 1 || only === undefined)
-    throw new Error(`${document} by ${rule}: ${found.length} rows`);
+    throw new Error(`expected one row for ${document} and ${rule}, found ${found.length}`);
   return only;
 };
 
-const supplierFormsReviewed = async () => {
+const openSupplierFormsReview = async () => {
   const findings = supplierFormsFindings();
   const api = anAdminWith(aConnectedSource("Supplier forms"));
   api.set("sources.findings", () => read(findings));
@@ -47,7 +47,7 @@ const supplierFormsReviewed = async () => {
 };
 
 describe("reviewing a connected source's findings", () => {
-  it("shows an Admin an unmet rule as its id", async () => {
+  it("shows an unknown rule as its id", async () => {
     const findings = [
       aGroupOfFindings({
         title: "Passport scan",
@@ -68,13 +68,13 @@ describe("reviewing a connected source's findings", () => {
     expect(finding.getByRole("cell", { name: "UK_PASSPORT" })).toBeDefined();
     expect(
       finding.getByRole("checkbox", {
-        name: "Select government identifier by UK_PASSPORT in Passport scan",
+        name: "Select government identifier findings in Passport scan found by the UK_PASSPORT rule",
       }),
     ).toBeDefined();
   });
 
-  it("selects no group of findings once focus leaves the table", async () => {
-    const { row, box } = await supplierFormsReviewed();
+  it("x selects nothing once focus leaves the table", async () => {
+    const { row, box } = await openSupplierFormsReview();
     box.focus();
     reviewHeading("Supplier forms").focus();
 
@@ -83,11 +83,11 @@ describe("reviewing a connected source's findings", () => {
     expect(box.getAttribute("aria-checked"), "x selected a group not in focus").toBe("false");
     const keep = within(row).getByRole<HTMLButtonElement>("button", { name: "Keep in Text" });
     expect(keep.disabled).toBe(true);
-    expect(describedBy(keep), "the review stopped saying to select first").toMatch(/\S/v);
+    expect(describedBy(keep), "the disabled Keep in Text has no hint").toMatch(/\S/v);
   });
 
-  it("narrows the source whose review holds focus, by key", async () => {
-    const { row, box } = await supplierFormsReviewed();
+  it("n narrows the source whose review has focus", async () => {
+    const { row, box } = await openSupplierFormsReview();
     box.focus();
 
     press("n");
@@ -95,7 +95,7 @@ describe("reviewing a connected source's findings", () => {
     expect(rowAction(row, "narrow").getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("closes one source's review as an Admin opens another's", async () => {
+  it("closes one review when the Admin opens another", async () => {
     const findings = supplierFormsFindings();
     const api = anAdminWith(
       aConnectedSource("Supplier forms"),
@@ -116,11 +116,11 @@ describe("reviewing a connected source's findings", () => {
     expect(rowAction(supplier, "review").getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("tells an Admin what enables the review's three actions", async () => {
-    const { row } = await supplierFormsReviewed();
+  it("tells the Admin how to enable the three actions", async () => {
+    const { row } = await openSupplierFormsReview();
     const review = within(within(row).getByRole("region", { name: "Review of Supplier forms" }));
-    const enabling = describedBy(review.getByRole("button", { name: "Keep in Text" }));
-    expect(enabling, "Keep in Text is described by what enables it").toMatch(/\S/v);
+    const hint = describedBy(review.getByRole("button", { name: "Keep in Text" }));
+    expect(hint, "Keep in Text has no hint saying how to enable it").toMatch(/\S/v);
 
     for (const name of [
       "Keep in Text",
@@ -129,15 +129,15 @@ describe("reviewing a connected source's findings", () => {
     ]) {
       const action = review.getByRole<HTMLButtonElement>("button", {
         name,
-        description: enabling,
+        description: hint,
       });
       expect(action.disabled).toBe(true);
     }
     fireEvent.click(review.getByRole("checkbox", { name: BANK_ACCOUNT_BOX }));
 
     expect(
-      review.queryByRole("button", { name: "Keep in Text", description: enabling }),
-      "Keep in Text is still described by what enables it",
+      review.queryByRole("button", { name: "Keep in Text", description: hint }),
+      "Keep in Text kept its hint after a group was ticked",
     ).toBeNull();
     expect(
       review.getByRole<HTMLButtonElement>("button", { name: "Keep in Text", description: "" })
@@ -145,7 +145,7 @@ describe("reviewing a connected source's findings", () => {
     ).toBe(false);
   });
 
-  it("shows an Admin a kept group an erasure still withholds", async () => {
+  it("notes kept findings that an erasure request still withholds", async () => {
     const findings = [
       aGroupOfFindings({ title: "March payroll", found: 2, overriddenByErasure: 2 }),
     ];
@@ -162,11 +162,11 @@ describe("reviewing a connected source's findings", () => {
       .map((note) => note.textContent);
     expect(
       notes,
-      "the group is not noted as two kept findings still withheld, and no more",
+      "the group does not have exactly one note counting two withheld findings",
     ).toEqual([expect.stringMatching(/\b2\b/v)]);
   });
 
-  it("previews an unpublished source's passages to the Admin reviewing it", async () => {
+  it("previews the passages of an unpublished source", async () => {
     const passages = ["The handbook says what the company decided.", "Pay goes to [withheld]."];
     const api = anAdminWith(aConnectedSource("Staff handbook"));
     api.set("sources.findings", () => read([]));

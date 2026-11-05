@@ -42,7 +42,9 @@ const markdownIn = (directory: string): string[] =>
   filesIn(directory).filter((file) => file.endsWith(".md"));
 
 const skills = [...markdownIn(verifyDirectory), ...markdownIn(specsDirectory)].map(read).join("\n");
-const named = [...skills.matchAll(NAMED_PATH)].map((match) => match.groups?.["file"] ?? "");
+const referencedPaths = [...skills.matchAll(NAMED_PATH)].map(
+  (match) => match.groups?.["file"] ?? "",
+);
 
 const suiteFiles = filesIn(suiteDirectory).filter((file) => file.endsWith(".ts"));
 const specs = suiteFiles.filter((file) => file.endsWith(".spec.ts")).map(read);
@@ -63,19 +65,19 @@ const drivingCommands = markdownIn(featuresDirectory).map((file) => {
   return { file, commands };
 });
 
-const waitsForTheDraw = (command: string): boolean => {
+const waitsForContent = (command: string): boolean => {
   const body = FUNCTION_WAIT.exec(command)?.groups?.["body"];
   return (
     TEXT_WAIT.test(command) || /\bdocument\b/.test(body?.replaceAll(ADDRESS_OR_LOAD, "") ?? "")
   );
 };
 
-function actsBeforeTheDraw(file: string, commands: DrivingCommand[]): string[] {
+function actionsBeforeContent(file: string, commands: DrivingCommand[]): string[] {
   let opened: string | undefined;
   const acts: string[] = [];
   for (const { command, line } of commands) {
     if (NAVIGATION.test(command)) opened = command;
-    else if (waitsForTheDraw(command)) opened = undefined;
+    else if (waitsForContent(command)) opened = undefined;
     else if (opened !== undefined && PAGE_ACTION.test(command)) {
       acts.push(`${file}:${line}: ${opened} then ${command}`);
       opened = undefined;
@@ -86,14 +88,14 @@ function actsBeforeTheDraw(file: string, commands: DrivingCommand[]): string[] {
 
 describe("the verify and playwright-specs skills", () => {
   it("point at files that are in the tree", () => {
-    const missing = [...new Set(named)].filter(
+    const missing = [...new Set(referencedPaths)].filter(
       (file) => !existsSync(path.join(repositoryRoot, file)),
     );
-    expect(missing, "the web's skills name files that do not exist").toEqual([]);
+    expect(missing, "the skills reference files that do not exist").toEqual([]);
   });
 
-  it("name the suite's own modules, so the check holds something", () => {
-    expect(named).toEqual(
+  it("name the browser suite's core modules", () => {
+    expect(referencedPaths).toEqual(
       expect.arrayContaining([
         "apps/web/e2e/browser.ts",
         "apps/web/e2e/harness.ts",
@@ -111,24 +113,28 @@ describe("the verify and playwright-specs skills", () => {
         )
         .map((name) => ({ module, name })),
     );
-    expect(shared.length, "no shared helper was found, so the check holds nothing").toBeGreaterThan(
-      0,
-    );
+    expect(
+      shared.length,
+      "found no shared helpers, so the check would pass vacuously",
+    ).toBeGreaterThan(0);
     const unnamed = shared.filter(({ name }) => !skills.includes(`\`${name}\``));
-    expect(unnamed, "the web's skills leave out helpers the specs share").toEqual([]);
+    expect(unnamed, "the skills do not document these shared helpers").toEqual([]);
   });
 
-  it("give rows only to helpers the suite still exports", () => {
+  it("list only helpers the browser suite still exports", () => {
     const exported = new Set(modules.flatMap((module) => namesIn(read(module), EXPORTED_NAME)));
     const rows = namesIn(skills, TABLE_ROW_NAME);
     const stale = rows
       .filter((name) => !exported.has(name))
       .filter((name) => !PLAYWRIGHT_FIXTURES.has(name));
-    expect(rows.length, "no table row was found, so the check holds nothing").toBeGreaterThan(0);
-    expect(stale, "the web's skills have rows for helpers the suite no longer exports").toEqual([]);
+    expect(
+      rows.length,
+      "found no helper table rows, so the check would pass vacuously",
+    ).toBeGreaterThan(0);
+    expect(stale, "the skills list helpers the browser suite no longer exports").toEqual([]);
   });
 
-  it("give every page in the navigation list a feature file", () => {
+  it("map every navigation page to a feature file", () => {
     const features = markdownIn(featuresDirectory).map(read).join("\n");
     const unmapped = pagesOf(EVERY_AREA)
       .map((page) => page.path)
@@ -136,21 +142,21 @@ describe("the verify and playwright-specs skills", () => {
     expect(unmapped, `no file under ${featuresDirectory} names these pages`).toEqual([]);
   });
 
-  it("wait for drawn text before acting after an open", () => {
+  it("wait for page content before acting after navigation", () => {
     const navigations = drivingCommands.flatMap(({ commands }) =>
       commands.filter(({ command }) => NAVIGATION.test(command)),
     );
-    const undrawn = drivingCommands.flatMap(({ file, commands }) =>
-      actsBeforeTheDraw(file, commands),
+    const earlyActions = drivingCommands.flatMap(({ file, commands }) =>
+      actionsBeforeContent(file, commands),
     );
     expect(
       navigations.length,
-      "no open or reload was found, so the check holds nothing",
+      "found no open or reload commands, so the check would pass vacuously",
     ).toBeGreaterThan(0);
-    expect(undrawn, "these act on a page with no wait on its text or its elements").toEqual([]);
+    expect(earlyActions, "these commands act on a page before waiting for its content").toEqual([]);
   });
 
-  it("register the verify skill for the model to call", () => {
+  it("let the model invoke the verify skill", () => {
     expect(verifyFrontmatter).toMatch(/^name: verify$/m);
     expect(verifyFrontmatter).not.toMatch(/disable-model-invocation/);
   });

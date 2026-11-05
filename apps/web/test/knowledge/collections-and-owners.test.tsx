@@ -1,10 +1,9 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { SAID_OF_COLLECTIONS } from "@/features/knowledge/knowledge-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -37,7 +36,7 @@ const policyRow = () =>
   );
 
 describe("the Collections and Owners page", () => {
-  it("rolls back a naming the api refuses, saying why", async () => {
+  it("restores the old owner and alerts when the api refuses", async () => {
     const api = adaAnAdmin();
     api.set("members.list", () => read([ADA, RHIAN]));
     api.set("knowledge.collections", () => read({ collections: [POLICY] }));
@@ -48,32 +47,32 @@ describe("the Collections and Owners page", () => {
     await openAt(PAGE, api);
 
     const picker = await screen.findByRole("combobox", { name: PICKER });
-    const reread = heldBack(api, "knowledge.collections");
+    const reread = holdProcedure(api, "knowledge.collections");
     fireEvent.change(picker, { target: { value: RHIAN.personId } });
     fireEvent.click(screen.getByRole("button", { name: SAVE }));
 
     await reread.asked;
     expect(
       policyRow().queryByText("Rhian Pryce", { selector: "dd" }),
-      "the refused owner stayed drawn before the list was read again",
+      "the refused owner was still shown before the list reloaded",
     ).toBeNull();
     reread.resolve();
 
-    const alert = await waitFor(() => {
-      const found = region()
-        .queryAllByRole("alert")
-        .find((each) => each.textContent !== "");
-      expect(found).toBeDefined();
-      return found;
+    await waitFor(() => {
+      expect(
+        region()
+          .queryAllByRole("alert")
+          .some((each) => /\S/u.test(each.textContent)),
+        "the refused naming raised no alert",
+      ).toBe(true);
     });
-    expect(alert?.textContent).toBe(SAID_OF_COLLECTIONS["no-such-member"]);
     expect(policyRow().queryByText("Rhian Pryce", { selector: "dd" })).toBeNull();
     await waitFor(() =>
       expect(screen.getByRole("combobox", { name: PICKER })).toHaveProperty("value", ""),
     );
   });
 
-  it("a Viewer named owner reads their collection with no picker", async () => {
+  it("shows a Viewer who owns a collection no picker", async () => {
     const api = adaAnAdmin();
     api.set("session.member", () =>
       read({

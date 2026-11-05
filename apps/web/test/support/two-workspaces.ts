@@ -44,7 +44,7 @@ export const aRefusalAnswer = (word: string, refusalClass: string, httpStatus: n
 
 export const FORBIDDEN = aRefusalAnswer("forbidden", "forbidden", 403);
 
-export const aCeilingMet = (waitSeconds: number): Response =>
+export const rateLimitedResponse = (waitSeconds: number): Response =>
   new Response(
     JSON.stringify({ error: "too_many_requests", error_description: "Too many requests." }),
     {
@@ -89,25 +89,25 @@ export const aSwitchInAnotherTab = (api: Api, role: Role, members = [ADA, HEDY])
   api.set("members.invitations", () => read([]));
 };
 
-const aTurnLater = () =>
+const nextTask = () =>
   new Promise<void>((resolve) => {
     setTimeout(resolve);
   });
 
-/** A batch carries its inputs keyed by position, in the address of a read and the body of a write. */
+/** A tRPC batch keys inputs by position: in the URL for a query, in the body for a mutation. */
 const inputsOf = (address: URL, init?: RequestInit): Readonly<Record<string, unknown>> => {
   const raw = address.searchParams.get("input") ?? init?.body;
   return typeof raw === "string" ? z.record(z.string(), z.unknown()).parse(JSON.parse(raw)) : {};
 };
 
-/** Starts a fresh record, so a request an earlier test left in flight lands in that test's record. */
+/** Starts a new request log, so a request an earlier test left in flight is logged there. */
 const answering = (api: Api) => {
   const asks: Ask[] = [];
   server.asks = asks;
   return async (asked: Asked, init?: RequestInit): Promise<Response> => {
     const address = addressOf(asked);
     const { pathname } = address;
-    await aTurnLater();
+    await nextTask();
     if (!pathname.startsWith("/trpc/")) {
       const answer = api.get(pathname)?.() ?? A_SESSION;
       return answer instanceof Response ? answer : answered(answer);
@@ -141,7 +141,7 @@ export const changeTheTickedToViewer = async () => {
 
 export const openTab = (name: string) => {
   const tab = screen.getByRole("tab", { name });
-  // The registry's tabs open on a press, never on a click.
+  // Tabs open on mouse down, not on click.
   fireEvent.mouseDown(tab);
 };
 
@@ -168,13 +168,13 @@ export const openAt = async (path: string, api: Api) => {
 
 export type Answering = typeof server.answer;
 
-/** Draws the app at once, as the browser does, and returns without waiting on a read the first draw needs. */
+/** Renders the app immediately, as the browser does, without waiting for reads the first render needs. */
 export const drawnAt = (path: string, api: Api, through: (answer: Answering) => Answering) => {
   server.answer = through(answering(api));
   return drawApp(path);
 };
 
-export const openOutsideTheShellAt = async (
+export const openPageOutsideShell = async (
   path: string,
   api: Api,
   watching?: (asked: Asked, init?: RequestInit) => void,

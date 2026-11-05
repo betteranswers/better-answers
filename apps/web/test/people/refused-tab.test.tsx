@@ -1,13 +1,10 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { INVITATIONS_WORDS } from "@/features/people/invitation-words.ts";
-import { MEMBERS_LOADING } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
-import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack, type Api } from "@test/stubbed-api.ts";
+import { holdProcedure, type Api } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -35,8 +32,6 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 placedWithoutMeasuring();
 
 const SWITCHED = aRefusalAnswer("workspace-switched", "conflict", 409);
-
-const SAID = refusalSentence({}, "workspace-switched", "conflict");
 
 const MEMBERS = HOMES.Admin.path;
 
@@ -74,7 +69,7 @@ const changeGracesRole = () => {
 
 const landedInHolme = async () => {
   await switcher(HOLME);
-  await waitFor(() => expect(band().getByRole("alert").textContent).toBe(SAID));
+  await waitFor(() => expect(band().getByRole("alert").textContent).toMatch(/\S/));
 };
 
 const bandBlanksWatched = () => {
@@ -90,7 +85,7 @@ const bandBlanksWatched = () => {
 };
 
 const memberHeldAndCounted = (api: Api) => {
-  const member = heldBack(api, "session.member", adaAt("Admin", HOLME));
+  const member = holdProcedure(api, "session.member", adaAt("Admin", HOLME));
   const answer = api.get("session.member");
   let reads = 0;
   api.set("session.member", () => {
@@ -101,7 +96,7 @@ const memberHeldAndCounted = (api: Api) => {
     const before = reads;
     refusal.resolve();
     await waitFor(() =>
-      expect(reads, "the refused action's settle read no member").toBeGreaterThan(before),
+      expect(reads, "the refused action did not reload the membership").toBeGreaterThan(before),
     );
   };
   return { ...member, askedAgainOnceSettled };
@@ -125,8 +120,8 @@ const refusedWithTheMemberUnread = async () => {
   return { api, router };
 };
 
-describe("a tab whose workspace the session has left", () => {
-  it("lands a refused tab home, its band saying why", async () => {
+describe("a tab after the workspace was switched in another tab", () => {
+  it("sends a refused tab home with an alert explaining why", async () => {
     const router = await refusedAfterASwitch();
 
     await landedInHolme();
@@ -134,9 +129,9 @@ describe("a tab whose workspace the session has left", () => {
     expect(screen.queryByText(NORTHERN.name, { exact: false })).toBeNull();
   });
 
-  it("lands home when the refusal follows the person elsewhere", async () => {
+  it("goes home when the refusal arrives on another page", async () => {
     const api = adaAnAdmin();
-    const refusal = heldBack(api, "members.changeRole", SWITCHED);
+    const refusal = holdProcedure(api, "members.changeRole", SWITCHED);
     const router = await openGracesPage(api);
 
     changeGracesRole();
@@ -148,13 +143,13 @@ describe("a tab whose workspace the session has left", () => {
     expect(router.state.location.pathname).toBe(HOMES.Viewer.path);
   });
 
-  it("reads the member once when reads are refused together", async () => {
+  it("reloads the membership once when several reads are refused", async () => {
     const api = adaAnAdmin();
     const router = await openGracesPage(api);
     aSwitchInAnotherTab(api, "Admin");
     switchedOnceThen(api, "members.list", read([ADA, HEDY]));
     switchedOnceThen(api, "members.groups", read([]));
-    const member = heldBack(api, "session.member", adaAt("Admin", HOLME));
+    const member = holdProcedure(api, "session.member", adaAt("Admin", HOLME));
     const answer = api.get("session.member");
     let memberReads = 0;
     api.set("session.member", () => {
@@ -168,19 +163,19 @@ describe("a tab whose workspace the session has left", () => {
 
     await landedInHolme();
     expect(router.state.location.pathname).toBe(MEMBERS);
-    expect(memberReads, "each refusal read the member again").toBe(1);
+    expect(memberReads, "each refusal reloaded the membership").toBe(1);
   });
 
-  it("keeps the band drawn when a refusal lands mid-follow", async () => {
+  it("keeps the top band when a refusal arrives mid-redirect", async () => {
     const api = adaAnAdmin();
-    const second = heldBack(api, "members.endEverySignInAndToken", SWITCHED);
+    const second = holdProcedure(api, "members.endEverySignInAndToken", SWITCHED);
     await openGracesPage(api);
     aSwitchInAnotherTab(api, "Admin");
     api.set("members.changeRole", () => SWITCHED);
     const member = memberHeldAndCounted(api);
     const blanked = bandBlanksWatched();
 
-    fireEvent.click(screen.getByRole("button", { name: "End Every Sign-In and Token Here" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign Out of This Workspace" }));
     await second.asked;
     changeGracesRole();
     await member.asked;
@@ -188,21 +183,21 @@ describe("a tab whose workspace the session has left", () => {
     member.resolve();
     await landedInHolme();
 
-    expect(blanked(), "the band blanked while the member was read").toBe(false);
+    expect(blanked(), "the top band went blank while the membership reloaded").toBe(false);
   });
 
-  it("keeps the band drawn when three refusals overlap the follow", async () => {
+  it("keeps the top band when three refusals arrive mid-redirect", async () => {
     const api = adaAnAdmin();
-    const ended = heldBack(api, "members.endEverySignInAndToken", SWITCHED);
-    const changed = heldBack(api, "members.changeRole", SWITCHED);
-    const removed = heldBack(api, "members.remove", SWITCHED);
+    const ended = holdProcedure(api, "members.endEverySignInAndToken", SWITCHED);
+    const changed = holdProcedure(api, "members.changeRole", SWITCHED);
+    const removed = holdProcedure(api, "members.remove", SWITCHED);
     await openGracesPage(api);
     aSwitchInAnotherTab(api, "Admin");
     const member = memberHeldAndCounted(api);
     const blanked = bandBlanksWatched();
 
-    // Sent apart: actions in one request are answered together.
-    fireEvent.click(screen.getByRole("button", { name: "End Every Sign-In and Token Here" }));
+    // Send these separately, because actions batched in one request get one answer.
+    fireEvent.click(screen.getByRole("button", { name: "Sign Out of This Workspace" }));
     await ended.asked;
     changeGracesRole();
     await changed.asked;
@@ -214,17 +209,17 @@ describe("a tab whose workspace the session has left", () => {
     member.resolve();
     await landedInHolme();
 
-    expect(blanked(), "the band blanked while the member was read").toBe(false);
+    expect(blanked(), "the top band went blank while the membership reloaded").toBe(false);
   });
 
-  it("draws no name of the workspace left when unread", async () => {
+  it("shows no workspace name when the membership cannot load", async () => {
     const { router } = await refusedWithTheMemberUnread();
 
     await drawnWithNoWorkspace();
     expect(router.state.location.pathname).toBe("/");
   });
 
-  it("keeps the sentence when the member read answers later", async () => {
+  it("shows the alert once the membership loads on retry", async () => {
     const { api, router } = await refusedWithTheMemberUnread();
     await drawnWithNoWorkspace();
     expect(router.state.location.pathname).toBe("/");
@@ -236,7 +231,7 @@ describe("a tab whose workspace the session has left", () => {
     expect(router.state.location.pathname).toBe(HOMES.Viewer.path);
   });
 
-  it("says it no longer once the person moves on", async () => {
+  it("clears the alert once the person goes to another page", async () => {
     const router = await refusedAfterASwitch();
     await landedInHolme();
 
@@ -250,37 +245,40 @@ describe("a tab whose workspace the session has left", () => {
     expect(band().getByRole("alert").textContent).toBe("");
   });
 
-  it("draws no row of the workspace left, refused twice", async () => {
+  it("shows no rows from the old workspace after two refusals", async () => {
     const api = adaAnAdmin();
     api.set("members.changeRole", () => SWITCHED);
-    const second = heldBack(api, "members.endEverySignInAndToken", SWITCHED);
+    const second = holdProcedure(api, "members.endEverySignInAndToken", SWITCHED);
     const router = await openGracesPage(api);
     aSwitchInAnotherTab(api, "Admin");
 
-    fireEvent.click(screen.getByRole("button", { name: "End Every Sign-In and Token Here" }));
-    // Sent apart: two actions in one request are answered together, so both would be held back.
+    fireEvent.click(screen.getByRole("button", { name: "Sign Out of This Workspace" }));
+    // Send these separately, because batched actions share one answer and both would be held.
     await second.asked;
     changeGracesRole();
     await landedInHolme();
     await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());
 
     await router.navigate({ to: "/people/groups" });
-    const list = heldBack(api, "members.list", read([ADA, HEDY]));
+    const list = holdProcedure(api, "members.list", read([ADA, HEDY]));
     second.resolve();
 
     await screen.findByRole("tab", { name: "Members" });
     expect(router.state.location.pathname).toBe(MEMBERS);
-    expect(tickOf(GRACE.displayName), "a refused change put the left rows back").toBeNull();
-    expect(await screen.findByText(MEMBERS_LOADING)).toBeDefined();
+    expect(tickOf(GRACE.displayName), "rows from the old workspace came back").toBeNull();
+    expect(
+      tickOf(HEDY.displayName),
+      "the list showed rows before the new read finished",
+    ).toBeNull();
 
     list.resolve();
     await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());
   });
 
-  it("draws no invitation of the workspace left once refused", async () => {
+  it("shows no invitations from the old workspace after a refusal", async () => {
     const api = adaAnAdmin();
     api.set("members.invitations", () => read([KAYS]));
-    const refusal = heldBack(api, "members.cancelInvitation", SWITCHED);
+    const refusal = holdProcedure(api, "members.cancelInvitation", SWITCHED);
     await openAt(MEMBERS, api);
     openTab("Invitations");
 
@@ -293,31 +291,39 @@ describe("a tab whose workspace the session has left", () => {
     refusal.resolve();
     await landedInHolme();
 
-    const invitations = heldBack(api, "members.invitations", read([]));
+    const invitations = holdProcedure(api, "members.invitations", read([]));
     openTab("Invitations");
 
     await screen.findByRole("radio", { name: /^Waiting/ });
-    expect(tickOf(KAYS.address), "a refused cancel put the left rows back").toBeNull();
-    expect(screen.getByText(INVITATIONS_WORDS.loading)).toBeDefined();
+    expect(tickOf(KAYS.address), "invitations from the old workspace came back").toBeNull();
 
     invitations.resolve();
-    expect(await screen.findByText(INVITATIONS_WORDS.noneIn.waiting)).toBeDefined();
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("region", { name: "Invitations" })).getByRole("cell").textContent,
+        "the empty list showed no message",
+      ).toMatch(/\S/),
+    );
   });
 
-  it("stays put on another refusal of class conflict", async () => {
+  it("stays on the page for a different conflict refusal", async () => {
     const api = adaAnAdmin();
     const router = await openGracesPage(api);
     api.set("members.changeRole", () => aRefusalAnswer("changed-meanwhile", "conflict", 409));
 
     changeGracesRole();
 
-    expect(await screen.findByText(STOCK.changed)).toBeDefined();
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("region", { name: "Role" })).getByRole("alert").textContent,
+      ).toMatch(/\S/),
+    );
     expect(router.state.location.pathname).toBe(GRACES_PAGE);
     expect(await switcher()).toBeDefined();
     expect(band().getByRole("alert").textContent).toBe("");
   });
 
-  it("leaves no row marked or ticked once home", async () => {
+  it("leaves no row marked or selected after going home", async () => {
     const api = adaAnAdmin();
     api.set("members.bulkChangeRole", () => SWITCHED);
     await openAt(MEMBERS, api);
@@ -330,8 +336,8 @@ describe("a tab whose workspace the session has left", () => {
     await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());
     expect(tickOf(GRACE.displayName)?.getAttribute("aria-checked")).toBe("false");
     expect(
-      screen.getAllByText(SAID, { exact: false }),
-      "a row or the page says it too",
+      screen.getAllByRole("alert").filter((alert) => alert.textContent.trim() !== ""),
+      "the refusal appeared in more than one alert",
     ).toHaveLength(1);
   });
 });

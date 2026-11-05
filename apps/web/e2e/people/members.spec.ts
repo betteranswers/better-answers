@@ -14,19 +14,19 @@ import {
   countOf,
   editorPickedByKeyboard,
   invite,
-  keepsItsWordOffThePage,
+  pageHidesRefusalWord,
   keyListed,
   keystrokesDismissed,
   keystrokesListed,
   person,
   provision,
-  saysARefusal,
+  alertHasText,
   signIn,
   skipLinkReachesThePage,
   tabOpenedByKeyboard,
   tabUntilFocused,
-  theActionLandedWithinItsBudget,
-  theActionsLandedWithinTheirBudget,
+  actionWithinBudget,
+  medianActionWithinBudget,
 } from "../harness.ts";
 import {
   addressField,
@@ -228,14 +228,14 @@ const anAdminAtPeople = async (
   };
 };
 
-const saysToPickAMemberAfter = async (page: Page, key: string): Promise<void> => {
+const asksToSelectAMemberAfter = async (page: Page, key: string): Promise<void> => {
   await expect(outcomeOf(page)).toHaveText("");
   await page.keyboard.press(key);
   await expect(outcomeOf(page)).toHaveText(/\S/);
-  await expect(page, "the keystroke left Members").toHaveURL(
+  await expect(page, "the key opened another page").toHaveURL(
     (url) => url.pathname === MEMBERS_PAGE,
   );
-  await expect(selectionBar(page), "the keystroke selected a member").toHaveCount(0);
+  await expect(selectionBar(page), "the key selected a member").toHaveCount(0);
 };
 
 const listedAfresh = async (page: Page, count: number): Promise<void> => {
@@ -250,11 +250,11 @@ const namesNoMember = async (page: Page): Promise<void> => {
 
 const ENDED_AT = /\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}/;
 
-const endButton = (page: Page): Locator =>
-  thePage(page).getByRole("button", { name: "End Every Sign-In and Token Here" });
+const signOutButton = (page: Page): Locator =>
+  thePage(page).getByRole("button", { name: "Sign Out of This Workspace" });
 
-const credentialsRegion = (page: Page): Locator =>
-  thePage(page).getByRole("region", { name: "Sign-Ins and Personal Tokens" });
+const signOutRegion = (page: Page): Locator =>
+  thePage(page).getByRole("region", { name: "Sign Out of This Workspace" });
 
 const removedAtAKey = async (
   page: Page,
@@ -502,7 +502,7 @@ test.describe("the People group's Members page", () => {
       ).toHaveCount(1);
       await expect(accessOf(page).getByRole("term")).toHaveText([
         "Joined",
-        "Sign-Ins and Personal Tokens Here",
+        "Last Signed Out of This Workspace",
       ]);
 
       await expect(thePage(page)).toMatchAriaSnapshot(`
@@ -517,7 +517,7 @@ test.describe("the People group's Members page", () => {
               - listitem:
                 - link "Activity"
               - listitem:
-                - link "Remove and End Every Sign-In"
+                - link "Remove and Sign Out"
           - region "Access":
             - heading "Access" [level=2]
             - term
@@ -543,11 +543,11 @@ test.describe("the People group's Members page", () => {
               - paragraph
           - region "Activity":
             - heading "Activity" [level=2]
-          - region "Remove and End Every Sign-In":
-            - heading "Remove and End Every Sign-In" [level=2]
-            - region "Sign-Ins and Personal Tokens":
-              - heading "Sign-Ins and Personal Tokens" [level=3]
-              - button "End Every Sign-In and Token Here"
+          - region "Remove and Sign Out":
+            - heading "Remove and Sign Out" [level=2]
+            - region "Sign Out of This Workspace":
+              - heading "Sign Out of This Workspace" [level=3]
+              - button "Sign Out of This Workspace"
               - paragraph: /Priya Shah/
             - region "Removal":
               - heading "Removal" [level=3]
@@ -556,9 +556,9 @@ test.describe("the People group's Members page", () => {
       `);
       await passesTheAccessibilityGate();
 
-      await thePage(page).getByRole("link", { name: "Remove and End Every Sign-In" }).click();
+      await thePage(page).getByRole("link", { name: "Remove and Sign Out" }).click();
       await expect(
-        thePage(page).getByRole("heading", { level: 2, name: "Remove and End Every Sign-In" }),
+        thePage(page).getByRole("heading", { level: 2, name: "Remove and Sign Out" }),
       ).toBeFocused();
       await expect(page, "the section link changed the page URL").toHaveURL(
         new RegExp(`${memberPageAt(priya.id)}$`),
@@ -569,6 +569,10 @@ test.describe("the People group's Members page", () => {
       const desktop = page.viewportSize();
       assert.ok(desktop !== null, "the page has no viewport");
       await page.setViewportSize({ width: 320, height: 720 });
+      await expect(
+        page.getByRole("banner").getByRole("button", { name: "Menu", exact: true }),
+        "the shell kept its wide band at 320 pixels",
+      ).toBeVisible();
 
       const sections = thePage(page).getByRole("navigation", { name: "On This Page" });
       await expect
@@ -593,7 +597,7 @@ test.describe("the People group's Members page", () => {
       await page.keyboard.press("Enter");
 
       await expect(rolePickerRegion(page).getByRole("status")).toHaveText(/Sam Okoro.*Editor/);
-      await theActionLandedWithinItsBudget(page, "role change");
+      await actionWithinBudget(page, "role change");
       await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
 
       await page.reload();
@@ -607,13 +611,13 @@ test.describe("the People group's Members page", () => {
       await listedAfresh(page, 3);
       await skipLinkReachesThePage(page);
 
-      await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.changeRole.key);
+      await asksToSelectAMemberAfter(page, PEOPLE_KEYSTROKES.changeRole.key);
 
       const keystrokes = await keystrokesListed(page, "Members");
       for (const { key } of [
         PEOPLE_KEYSTROKES.open,
         PEOPLE_KEYSTROKES.changeRole,
-        PEOPLE_KEYSTROKES.endEverySignInAndToken,
+        PEOPLE_KEYSTROKES.signOut,
         PEOPLE_KEYSTROKES.remove,
       ]) {
         await expect(
@@ -657,20 +661,20 @@ test.describe("the People group's Members page", () => {
       await expect(cellOf(page, "Priya Shah", "Role")).toHaveText("Viewer");
     });
 
-    await test.step("ends a member's sign-ins within the action time budget, and the end time stays after a reload", async () => {
+    await test.step("signs a member out within the action time budget, and the time stays after a reload", async () => {
       await listedAfresh(page, 3);
       await openedByName(page, "Priya Shah");
       await expect(accessOf(page)).not.toContainText(ENDED_AT);
-      const revoke = endButton(page);
+      const revoke = signOutButton(page);
       await revoke.focus();
       await clockTheNextKey(page, {
-        at: accessLine("Sign-Ins and Personal Tokens Here"),
+        at: accessLine("Last Signed Out of This Workspace"),
         reads: String(new Date().getFullYear()),
       });
       await page.keyboard.press("Enter");
 
-      await expect(credentialsRegion(page).getByRole("status")).toContainText("Priya Shah");
-      await theActionLandedWithinItsBudget(page, "revocation");
+      await expect(signOutRegion(page).getByRole("status")).toContainText("Priya Shah");
+      await actionWithinBudget(page, "revocation");
       await expect(revoke).toBeFocused();
       await expect(accessOf(page)).toContainText(ENDED_AT);
       await passesTheAccessibilityGate();
@@ -703,7 +707,7 @@ test.describe("the People group's Members page", () => {
       await clockTheNextKey(page, { at: THE_INVITATIONS_COUNT, reads: "1" });
       await page.keyboard.press(PEOPLE_KEYSTROKES.cancel.key);
       await expect(invitationRowOf(page, dropped)).toHaveCount(0);
-      await theActionLandedWithinItsBudget(page, "cancel");
+      await actionWithinBudget(page, "cancel");
       await expect(
         invitationsRegion(page).getByRole("heading", { name: "Invitations" }),
       ).toBeFocused();
@@ -800,7 +804,7 @@ test.describe("the People group's Members page", () => {
       await listedAfresh(page, 3);
       await skipLinkReachesThePage(page);
 
-      await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.remove.key);
+      await asksToSelectAMemberAfter(page, PEOPLE_KEYSTROKES.remove.key);
 
       await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
       await page.keyboard.press(PEOPLE_KEYSTROKES.remove.key);
@@ -868,7 +872,7 @@ test.describe("the People group's Members page", () => {
       await expect(rowOf(page, "Priya Shah")).toHaveCount(0);
 
       const more = await removedAtAKey(page, request, workspaceId, 1);
-      theActionsLandedWithinTheirBudget("removal", [priyas, ...more]);
+      medianActionWithinBudget("removal", [priyas, ...more]);
     });
   });
 
@@ -921,8 +925,8 @@ test.describe("a member's own page", () => {
   });
 });
 
-test.describe("ending every sign-in and token a member holds here", () => {
-  test("an Admin ends their own sign-ins, then signs in again", async ({ page, request }) => {
+test.describe("signing a member out of this workspace", () => {
+  test("an Admin signs themself out, then signs in again", async ({ page, request }) => {
     const admin = anAddress("admin");
     await provision(request, { name: "Esk Rolling", adminEmail: admin });
     await page.goto(MEMBERS_PAGE);
@@ -931,12 +935,12 @@ test.describe("ending every sign-in and token a member holds here", () => {
 
     await openedByName(page, "Test person");
     const ownPage = page.url();
-    await expect(endButton(page)).toHaveAccessibleDescription(/Test person/);
+    await expect(signOutButton(page)).toHaveAccessibleDescription(/Test person/);
     const refused = refusalAnswering(page, "session.member");
-    await endButton(page).click();
+    await signOutButton(page).click();
 
     expect(await refused).toMatchObject({ word: "credentials-revoked", class: "unauthenticated" });
-    await saysARefusal(thePage(page).getByRole("alert"));
+    await alertHasText(thePage(page).getByRole("alert"));
     await page.reload();
     await signIn(page, request, admin);
     await expect(page).toHaveURL(ownPage);
@@ -950,7 +954,7 @@ test.describe("a member's page before any action", () => {
     await anAdminAtPeople(page, request, "Swale Bookbinders");
     await openedByName(page, "Priya Shah");
 
-    for (const card of [rolePickerRegion(page), credentialsRegion(page), displayNameRegion(page)]) {
+    for (const card of [rolePickerRegion(page), signOutRegion(page), displayNameRegion(page)]) {
       await endsUnderItsLastLine(card, card.getByRole("paragraph").last());
     }
     await endsUnderItsLastLine(
@@ -960,7 +964,7 @@ test.describe("a member's page before any action", () => {
   });
 });
 
-test.describe("bulk actions on the members ticked", () => {
+test.describe("bulk actions on selected members", () => {
   test("one click selects a member after a bulk role change", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Ribble Joinery");
     await tickOf(page, "Priya Shah").check();
@@ -1014,8 +1018,8 @@ test.describe("bulk actions on the members ticked", () => {
     await passesTheAccessibilityGate();
 
     answered.resolve();
-    await saysARefusal(membersRegion(page).getByRole("alert"));
-    await keepsItsWordOffThePage(page, "changed-meanwhile");
+    await alertHasText(membersRegion(page).getByRole("alert"));
+    await pageHidesRefusalWord(page, "changed-meanwhile");
     await expect(tickOf(page, "Priya Shah")).toBeChecked();
     await expect(action).not.toHaveAttribute("aria-disabled", "true");
   });

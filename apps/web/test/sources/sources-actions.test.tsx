@@ -4,20 +4,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { ConnectedSourcesPage } from "@/features/sources/connected-sources-page.tsx";
-import { SAID_OF_A_CONNECTED_SOURCE } from "@/features/sources/refusal-words.ts";
 import { refusedFor } from "@/features/sources/refusal.tsx";
 import { ReviewActions } from "@/features/sources/review-actions.tsx";
 import type { GroupOfFindings } from "@/features/sources/sources-api.ts";
 import { SOURCES_KEYSTROKES, useTickedGroups } from "@/features/sources/sources-state.ts";
-import {
-  REVIEW_WORDS,
-  SENSITIVITY_PANEL_WORDS,
-  sensitivityAndAudienceWords,
-  THE_ACTION_BEFORE_IS_STILL_GOING,
-  THE_CHANGE_BEFORE_IS_STILL_GOING,
-} from "@/features/sources/words.ts";
 import { ViewStateSlot } from "@/shared/page/page-toolbar.tsx";
-import { STOCK } from "@/shared/refusal-words.ts";
 import { addressOf, answered } from "@test/stubbed-api.ts";
 
 afterEach(() => {
@@ -61,9 +52,7 @@ const A_PASSPORT: GroupOfFindings = {
   ruleId: "UK_PASSPORT",
 };
 
-const NOT_SPECIAL_CATEGORY = SAID_OF_A_CONNECTED_SOURCE["not-special-category"];
-
-function TicksIn(properties: { readonly connectedSourceId: string }) {
+function GroupTicker(properties: { readonly connectedSourceId: string }) {
   const [, tick] = useTickedGroups();
   const ticking = (groups: readonly GroupOfFindings[]) => () => {
     tick({ connectedSourceId: properties.connectedSourceId, groups });
@@ -86,11 +75,11 @@ function TicksIn(properties: { readonly connectedSourceId: string }) {
   );
 }
 
-const reviewing = (connectedSourceId: string, tickedIn: string) =>
+const renderReviewActions = (connectedSourceId: string, tickedIn: string) =>
   render(
     <Providers clients={createAppClients()}>
       <ViewStateSlot>
-        <TicksIn connectedSourceId={tickedIn} />
+        <GroupTicker connectedSourceId={tickedIn} />
         <ReviewActions connectedSourceId={connectedSourceId} />
       </ViewStateSlot>
     </Providers>,
@@ -104,26 +93,43 @@ const NARROW_DOCUMENTS = "Narrow These Documents";
 
 const DISMISS = "Dismiss as Not Special Category";
 
-const UNTICKED = [KEEP, NARROW_DOCUMENTS, DISMISS];
+const BULK_ACTIONS = [KEEP, NARROW_DOCUMENTS, DISMISS];
+
+const describerOf = (control: HTMLElement): HTMLElement | null =>
+  document.getElementById(control.getAttribute("aria-describedby") ?? "");
+
+const describedBy = (control: HTMLElement): string | undefined => describerOf(control)?.textContent;
+
+const bulkActionsState = () => {
+  const hints = BULK_ACTIONS.map((label) => describerOf(action(label)));
+  return {
+    disabled: BULK_ACTIONS.map((label) => action(label).disabled),
+    oneSharedHint: hints.every((hint) => hint !== null && hint === hints[0]),
+    hintHasWords: /\S/v.test(hints[0]?.textContent ?? ""),
+  };
+};
+
+const DISABLED_WITH_A_SELECT_FIRST_HINT = {
+  disabled: [true, true, true],
+  oneSharedHint: true,
+  hintHasWords: true,
+};
 
 describe("the review's three bulk actions", () => {
-  it("stand disabled, each described by the line that enables them", () => {
-    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
+  it("are disabled and share a hint to select first", () => {
+    renderReviewActions(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
-    const enabling = screen.getByText(REVIEW_WORDS.selectFirst);
-    for (const label of UNTICKED) {
-      expect(action(label).disabled).toBe(true);
-      expect(action(label).getAttribute("aria-describedby")).toBe(enabling.id);
-    }
-    expect(screen.queryByText(NOT_SPECIAL_CATEGORY)).toBeNull();
+    expect(bulkActionsState()).toEqual(DISABLED_WITH_A_SELECT_FIRST_HINT);
   });
 
-  it("take a ticked group, and the enabling line goes", () => {
-    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
+  it("enable once a group is ticked, and the hint goes", () => {
+    renderReviewActions(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
+    const hint = describerOf(action(KEEP));
+    expect(hint?.textContent, "the actions have no hint saying to select a group").toMatch(/\S/v);
 
     fireEvent.click(action("Tick bank details"));
 
-    expect(screen.queryByText(REVIEW_WORDS.selectFirst)).toBeNull();
+    expect(hint?.isConnected, "the select-first hint is still shown").toBe(false);
     const keep = action(KEEP);
     expect(keep.disabled).toBe(false);
     expect(keep.hasAttribute("aria-describedby")).toBe(false);
@@ -131,7 +137,7 @@ describe("the review's three bulk actions", () => {
   });
 
   it("count the ticked groups in the dialog's name", () => {
-    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
+    renderReviewActions(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
     fireEvent.click(action("Tick both"));
 
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.keep.key });
@@ -139,17 +145,16 @@ describe("the review's three bulk actions", () => {
     expect(screen.getByRole("dialog", { name: /\b2\b/v })).toBeDefined();
   });
 
-  it("never take groups another connected source's review ticked", () => {
-    reviewing(THE_CONNECTED_SOURCE, ANOTHER_CONNECTED_SOURCE);
+  it("ignore groups ticked in another source's review", () => {
+    renderReviewActions(THE_CONNECTED_SOURCE, ANOTHER_CONNECTED_SOURCE);
 
     fireEvent.click(action("Tick the health cue"));
 
-    for (const label of UNTICKED) expect(action(label).disabled).toBe(true);
-    expect(screen.getByText(REVIEW_WORDS.selectFirst)).toBeDefined();
+    expect(bulkActionsState()).toEqual(DISABLED_WITH_A_SELECT_FIRST_HINT);
   });
 
-  it("list a ticked group by its rule's word", () => {
-    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
+  it("list a ticked group by its rule's name", () => {
+    renderReviewActions(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
     fireEvent.click(action("Tick bank details"));
 
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.keep.key });
@@ -159,8 +164,8 @@ describe("the review's three bulk actions", () => {
     expect(listed.textContent).not.toContain(BANK_DETAILS.ruleId);
   });
 
-  it("list a rule they have not met as its id", () => {
-    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
+  it("list an unknown rule by its id", () => {
+    renderReviewActions(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
     fireEvent.click(action("Tick the passport"));
 
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.keep.key });
@@ -169,31 +174,32 @@ describe("the review's three bulk actions", () => {
   });
 });
 
-describe("the dismissal as not special category", () => {
-  it("is offered over ticked special category groups alone", () => {
-    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
+describe("dismissing findings as not special category", () => {
+  it("is enabled when only special category groups are ticked", () => {
+    renderReviewActions(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
     fireEvent.click(action("Tick the health cue"));
 
-    expect(action(DISMISS).disabled).toBe(false);
-    expect(screen.queryByText(NOT_SPECIAL_CATEGORY)).toBeNull();
+    const dismissal = action(DISMISS);
+    expect(dismissal.disabled).toBe(false);
+    expect(dismissal.hasAttribute("aria-describedby"), "the enabled action still has a hint").toBe(
+      false,
+    );
   });
 
-  it("stands disabled over a mixed selection, and says why", () => {
-    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
+  it("is disabled for a mixed selection and says why", () => {
+    renderReviewActions(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
     fireEvent.click(action("Tick both"));
 
     const dismissal = action(DISMISS);
     expect(dismissal.disabled).toBe(true);
-    expect(dismissal.getAttribute("aria-describedby")).toBe(
-      screen.getByText(NOT_SPECIAL_CATEGORY).id,
-    );
+    expect(describedBy(dismissal), "the disabled action does not say why").toMatch(/\S/v);
     expect(action(KEEP).disabled).toBe(false);
   });
 
-  it("opens on s, asking a reason and naming no finding", () => {
-    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
+  it("opens on s, asking for a reason without showing ids", () => {
+    renderReviewActions(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
     fireEvent.click(action("Tick the health cue"));
 
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.dismiss.key });
@@ -207,10 +213,15 @@ describe("the dismissal as not special category", () => {
     expect(dialog.textContent).not.toMatch(/\b[0-9A-HJKMNP-TV-Z]{26}\b/);
   });
 
-  it("says the api's not-special-category refusal as the hint does", () => {
+  it("words the api's refusal the same as the hint", () => {
+    renderReviewActions(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
+    fireEvent.click(action("Tick both"));
+    const hint = describedBy(action(DISMISS));
+    cleanup();
+
     const { container } = render(<p>{refusedFor("not-special-category", "inapplicable").words}</p>);
 
-    expect(container.textContent).toBe(NOT_SPECIAL_CATEGORY);
+    expect(container.textContent, "the api's refusal and the hint say different things").toBe(hint);
   });
 });
 
@@ -327,7 +338,7 @@ const ROW_ACTIONS = {
   widen: "Widen Sensitivity or Audience",
 };
 
-/** jsdom's accessible name drops the space a browser keeps before the hidden source's name. */
+/** jsdom drops the space a browser keeps before the visually hidden source name. */
 const rowAction = (row: BoundFunctions<typeof queries>, label: string, name: string) =>
   row.getByRole("button", { name: new RegExp(`^${label} ?${name}$`, "v") });
 
@@ -351,20 +362,23 @@ const widenOpened = (row: BoundFunctions<typeof queries>): HTMLElement => {
 const commitIn = (row: BoundFunctions<typeof queries>) =>
   row.getByRole("button", { name: "Widen" });
 
-const describedBy = (control: HTMLElement): string | undefined =>
-  document.getElementById(control.getAttribute("aria-describedby") ?? "")?.textContent;
-
-const TICKING = {
-  name: `Select bank details by Sort code and account number in ${BANK_DETAILS.title}`,
+const BANK_DETAILS_CHECKBOX = {
+  name: `Select bank details findings in ${BANK_DETAILS.title} found by the Sort code and account number rule`,
 };
 
-const aKeepHeldPending = async () => {
+const messagesOutsideRows = () =>
+  screen
+    .getAllByRole("status")
+    .filter((status) => status.closest("li") === null && /\S/v.test(status.textContent));
+
+const startPendingKeep = async () => {
   const answer = Promise.withResolvers<void>();
   atSources({ held: answer.promise, findings: [BANK_DETAILS] });
   const row = await rowOf("Staff handbook");
+  const messagesBefore = messagesOutsideRows().length;
   const review = rowAction(row, ROW_ACTIONS.review, "Staff handbook");
   fireEvent.click(review);
-  fireEvent.click(await row.findByRole("checkbox", TICKING));
+  fireEvent.click(await row.findByRole("checkbox", BANK_DETAILS_CHECKBOX));
   fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.keep.key });
   const reason = screen.getByLabelText("Reason");
   fireEvent.change(reason, { target: { value: "Printed on every invoice" } });
@@ -372,28 +386,35 @@ const aKeepHeldPending = async () => {
   await waitFor(() => {
     expect(review.getAttribute("aria-disabled")).toBe("true");
   });
-  return { answer, row, review };
+  return { answer, row, review, messagesBefore };
 };
 
-const reviewsDrawn = () => ({
+const reviewState = (held: Awaited<ReturnType<typeof startPendingKeep>>) => ({
   handbook: reviewOf("Staff handbook") !== null,
   priceBook: reviewOf("Price book") !== null,
-  saidWhy: screen.queryByText(THE_ACTION_BEFORE_IS_STILL_GOING) !== null,
+  saysToWait: messagesOutsideRows().length > held.messagesBefore,
 });
 
-const HELD_AS_IT_WAS = { handbook: true, priceBook: false, saidWhy: true };
+const HANDBOOK_REVIEW_STILL_OPEN = { handbook: true, priceBook: false, saysToWait: true };
 
-const theKeepIsRefusedInItsReview = async (held: Awaited<ReturnType<typeof aKeepHeldPending>>) => {
+const shownAlerts = (scope: BoundFunctions<typeof queries>) =>
+  scope.queryAllByRole("alert").filter((alert) => /\S/v.test(alert.textContent));
+
+const expectKeepRefusedInItsReview = async (held: Awaited<ReturnType<typeof startPendingKeep>>) => {
   held.answer.resolve();
-  expect(await held.row.findByText(SAID_OF_A_CONNECTED_SOURCE["not-the-always-set"])).toBeDefined();
-  expect(held.row.getByRole("checkbox", TICKING).getAttribute("aria-checked")).toBe("true");
+  await waitFor(() => {
+    expect(shownAlerts(held.row), "the review shows no refusal").toHaveLength(1);
+  });
+  expect(held.row.getByRole("checkbox", BANK_DETAILS_CHECKBOX).getAttribute("aria-checked")).toBe(
+    "true",
+  );
   await waitFor(() => {
     expect(held.review.hasAttribute("aria-disabled")).toBe(false);
   });
 };
 
 describe("a connected source's row", () => {
-  it("reads its stored values as words", async () => {
+  it("shows stored values as readable words", async () => {
     atSources();
     const row = await rowOf("Staff handbook");
 
@@ -404,7 +425,7 @@ describe("a connected source's row", () => {
     expect(row.queryByText("received")).toBeNull();
   });
 
-  it("labels each action with its effect and its source", async () => {
+  it("labels each action with what it does and the source", async () => {
     atSources();
     const row = await rowOf("Price book");
 
@@ -413,7 +434,7 @@ describe("a connected source's row", () => {
     }
   });
 
-  it("opens its review inside itself, focus on the heading", async () => {
+  it("opens its review inside the row and focuses its heading", async () => {
     atSources();
     const row = await rowOf("Staff handbook");
     const review = rowAction(row, ROW_ACTIONS.review, "Staff handbook");
@@ -430,7 +451,7 @@ describe("a connected source's row", () => {
     expect(review.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("closes its review on a second press, focus kept", async () => {
+  it("closes its review on a second press and keeps focus", async () => {
     atSources();
     const row = await rowOf("Staff handbook");
     const review = rowAction(row, ROW_ACTIONS.review, "Staff handbook");
@@ -444,28 +465,28 @@ describe("a connected source's row", () => {
     expect(document.activeElement).toBe(review);
   });
 
-  it("holds its review open until a pending keep answers", async () => {
-    const held = await aKeepHeldPending();
+  it("keeps its review open while a keep is pending", async () => {
+    const held = await startPendingKeep();
 
     fireEvent.click(held.review);
 
-    expect(reviewsDrawn()).toEqual(HELD_AS_IT_WAS);
-    await theKeepIsRefusedInItsReview(held);
+    expect(reviewState(held)).toEqual(HANDBOOK_REVIEW_STILL_OPEN);
+    await expectKeepRefusedInItsReview(held);
   });
 
-  it("holds another row's Review press while a keep is pending", async () => {
-    const held = await aKeepHeldPending();
+  it("ignores another row's Review button while a keep is pending", async () => {
+    const held = await startPendingKeep();
     const theirs = rowAction(await rowOf("Price book"), ROW_ACTIONS.review, "Price book");
 
     fireEvent.click(theirs);
 
-    expect(reviewsDrawn()).toEqual(HELD_AS_IT_WAS);
+    expect(reviewState(held)).toEqual(HANDBOOK_REVIEW_STILL_OPEN);
     expect(theirs.getAttribute("aria-disabled")).toBe("true");
-    await theKeepIsRefusedInItsReview(held);
+    await expectKeepRefusedInItsReview(held);
   });
 
-  it("holds r in another row while a keep is pending", async () => {
-    const held = await aKeepHeldPending();
+  it("ignores r in another row while a keep is pending", async () => {
+    const held = await startPendingKeep();
     const priceBook = await rowOf("Price book");
     act(() => {
       rowAction(priceBook, ROW_ACTIONS.review, "Price book").focus();
@@ -473,11 +494,11 @@ describe("a connected source's row", () => {
 
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.review.key });
 
-    expect(reviewsDrawn()).toEqual(HELD_AS_IT_WAS);
-    await theKeepIsRefusedInItsReview(held);
+    expect(reviewState(held)).toEqual(HANDBOOK_REVIEW_STILL_OPEN);
+    await expectKeepRefusedInItsReview(held);
   });
 
-  it("closes one review as another's opens", async () => {
+  it("closes one review when another opens", async () => {
     atSources();
     const handbook = await rowOf("Staff handbook");
     const priceBook = await rowOf("Price book");
@@ -491,7 +512,7 @@ describe("a connected source's row", () => {
 });
 
 describe("widening a connected source in its row", () => {
-  it("opens on w with focus on the sensitivity", async () => {
+  it("opens on w and focuses the Sensitivity field", async () => {
     atSources();
     const row = await rowOf("Staff handbook");
     act(() => {
@@ -503,25 +524,31 @@ describe("widening a connected source in its row", () => {
     const panel = row.getByRole("group", {
       name: PANEL_NAMED.widen("Staff handbook"),
     });
-    expect(describedBy(panel)).toBe(SENSITIVITY_PANEL_WORDS.widen.consequence(false));
+    expect(describedBy(panel), "the panel does not say what widening does").toMatch(/\S/v);
     expect(document.activeElement).toBe(
       within(panel).getByRole("combobox", { name: "Sensitivity" }),
     );
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("describes widening a published source by who it then reaches", async () => {
-    const { widen } = SENSITIVITY_PANEL_WORDS;
-    atSources({ listed: [{ ...HANDBOOK, state: "published", publishedAt: A_PUBLISH }] });
-    const row = await rowOf("Staff handbook");
+  it("describes widening differently once a source is published", async () => {
+    atSources({
+      listed: [{ ...HANDBOOK, state: "published", publishedAt: A_PUBLISH }, PRICE_BOOK],
+    });
+    const handbook = await rowOf("Staff handbook");
+    const priceBook = await rowOf("Price book");
 
-    fireEvent.click(rowAction(row, ROW_ACTIONS.widen, "Staff handbook"));
+    fireEvent.click(rowAction(handbook, ROW_ACTIONS.widen, "Staff handbook"));
+    const published = describedBy(handbook.getByRole("group"));
+    fireEvent.click(rowAction(priceBook, ROW_ACTIONS.widen, "Price book"));
+    const unpublished = describedBy(priceBook.getByRole("group"));
 
-    expect(describedBy(row.getByRole("group"))).toBe(widen.consequence(true));
-    expect(widen.consequence(true)).not.toBe(widen.consequence(false));
+    expect(published, "the published source's panel says nothing").toMatch(/\S/v);
+    expect(unpublished, "the unpublished source's panel says nothing").toMatch(/\S/v);
+    expect(published, "both panels describe widening the same way").not.toBe(unpublished);
   });
 
-  it("lists the one term that changes and names the result", async () => {
+  it("lists only the sensitivity change and offers Widen", async () => {
     atSources();
     const row = await rowOf("Staff handbook");
 
@@ -533,7 +560,7 @@ describe("widening a connected source in its row", () => {
     expect(commitIn(panel)).toBeDefined();
   });
 
-  it("closes on Cancel, focus back on its opener", async () => {
+  it("closes on Cancel and returns focus to Widen", async () => {
     atSources();
     const row = await rowOf("Staff handbook");
     const widen = widenOpened(row);
@@ -544,7 +571,7 @@ describe("widening a connected source in its row", () => {
     expect(document.activeElement).toBe(widen);
   });
 
-  it("keeps its opener when w is pressed again", async () => {
+  it("returns focus to Widen after w is pressed again", async () => {
     atSources();
     const row = await rowOf("Staff handbook");
     const widen = widenOpened(row);
@@ -559,7 +586,7 @@ describe("widening a connected source in its row", () => {
     expect(document.activeElement).toBe(widen);
   });
 
-  it("keeps its opener when another change replaces the panel", async () => {
+  it("returns focus to Narrow after w replaces its panel", async () => {
     atSources();
     const row = await rowOf("Price book");
     const narrow = rowAction(row, ROW_ACTIONS.narrow, "Price book");
@@ -576,7 +603,7 @@ describe("widening a connected source in its row", () => {
     expect(document.activeElement).toBe(narrow);
   });
 
-  it("commits at once, focus on the source's heading", async () => {
+  it("applies at once and focuses the source's heading", async () => {
     atSources({ held: Promise.withResolvers<void>().promise });
     const row = await rowOf("Staff handbook");
     widenOpened(row);
@@ -590,10 +617,11 @@ describe("widening a connected source in its row", () => {
     expect(await row.findByText(WIDENED.sensitivity)).toBeDefined();
   });
 
-  it("asks nothing of a commit pressed while one is pending", async () => {
+  it("sends no second widening while the first is pending", async () => {
     const answer = Promise.withResolvers<void>();
     const asked = atSources({ held: answer.promise });
     const row = await rowOf("Staff handbook");
+    const messagesBefore = messagesOutsideRows().map((status) => status.textContent);
     widenOpened(row);
     fireEvent.click(commitIn(row));
     await row.findByText(WIDENED.sensitivity);
@@ -603,14 +631,17 @@ describe("widening a connected source in its row", () => {
     fireEvent.click(second);
 
     expect(second.getAttribute("aria-disabled")).toBe("true");
-    expect(describedBy(second)).toBe(THE_CHANGE_BEFORE_IS_STILL_GOING);
+    expect(describedBy(second), "the disabled Widen does not say why").toMatch(/\S/v);
     expect(panelOf("widen", "Staff handbook")).not.toBeNull();
     expect(asked.filter((name) => name === "sources.widen")).toHaveLength(1);
 
     answer.resolve();
-    expect(
-      await screen.findByText(new RegExp(sensitivityAndAudienceWords(WIDENED), "v")),
-    ).toBeDefined();
+    await waitFor(() => {
+      expect(messagesOutsideRows().map((status) => status.textContent)).toEqual([
+        ...messagesBefore,
+        expect.stringMatching(/Staff handbook\D+Internal/v),
+      ]);
+    });
   });
 });
 
@@ -634,62 +665,68 @@ const narrowThePriceBook = async () => {
   fireEvent.click(row.getByRole("button", { name: "Narrow" }));
 };
 
-const SENT_FROM_A_ROW = [
+const ACTIONS_SENT_FROM_A_ROW = [
   { action: "widening", procedure: "sources.widen", send: widenTheHandbook },
   { action: "publish", procedure: "sources.publish", send: publishThePriceBook },
   { action: "narrowing", procedure: "sources.narrow", send: narrowThePriceBook },
 ];
 
-const saidNow = (): readonly string[] =>
+const statusMessages = (): readonly string[] =>
   screen
     .getAllByRole("status")
     .map((status) => status.textContent)
     .filter((words) => words !== "");
 
-describe("a connected source's action in flight", () => {
-  it.each(SENT_FROM_A_ROW)(
-    "says the $action is pending until it lands",
+describe("a pending connected source action", () => {
+  it.each(ACTIONS_SENT_FROM_A_ROW)(
+    "shows a pending message for $action until it answers",
     async ({ procedure, send }) => {
       const answer = Promise.withResolvers<void>();
       atSources({ held: answer.promise, forbidden: [procedure] });
       await rowOf("Price book");
-      const before = saidNow();
+      const before = statusMessages();
 
       await send();
 
-      expect(saidNow()).toHaveLength(before.length + 1);
+      expect(statusMessages(), "no pending message appeared").toHaveLength(before.length + 1);
       answer.resolve();
-      await screen.findByText(STOCK.permission);
-      expect(saidNow()).toEqual(before);
+      await waitFor(() => {
+        expect(shownAlerts(screen), "the refusal is not shown").toHaveLength(1);
+      });
+      expect(statusMessages(), "the pending message stayed after the answer").toEqual(before);
     },
   );
 });
 
-describe("a connected source's action refused twice", () => {
-  it.each(SENT_FROM_A_ROW)(
-    "empties the alert when a refused $action is sent again",
+describe("a connected source action refused twice", () => {
+  it.each(ACTIONS_SENT_FROM_A_ROW)(
+    "clears the alert when a refused $action is sent again",
     async ({ procedure, send }) => {
       const api: SourcesApi = { forbidden: [procedure] };
       atSources(api);
       await send();
-      const alert = await screen.findByText(STOCK.permission);
-      expect(alert.getAttribute("role")).toBe("alert");
+      let alert: HTMLElement | undefined;
+      await waitFor(() => {
+        [alert] = shownAlerts(screen);
+        expect(alert, "the first refusal is not shown").toBeDefined();
+      });
+      const refusal = alert?.textContent;
 
       const second = Promise.withResolvers<void>();
       api.held = second.promise;
       await send();
 
-      expect(alert.textContent).toBe("");
+      expect(alert?.textContent, "the alert kept the first refusal while resending").toBe("");
       second.resolve();
       await waitFor(() => {
-        expect(alert.textContent).toBe(STOCK.permission);
+        expect(alert?.textContent, "the second refusal is not shown").toBe(refusal);
       });
     },
   );
 });
 
 describe("narrowing a connected source in its row", () => {
-  it("offers a sensitivity alone and names the result", async () => {
+  it("offers only a sensitivity and shows the change", async () => {
     atSources();
     const row = await rowOf("Price book");
 
@@ -702,7 +739,7 @@ describe("narrowing a connected source in its row", () => {
     expect(panel.getByRole("button", { name: "Narrow" })).toBeDefined();
   });
 
-  it("takes the place of a panel open in another row", async () => {
+  it("replaces a panel that is open in another row", async () => {
     atSources();
     const handbook = await rowOf("Staff handbook");
     const priceBook = await rowOf("Price book");

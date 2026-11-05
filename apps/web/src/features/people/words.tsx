@@ -13,11 +13,11 @@ export function Day(properties: { readonly instant: string }) {
 export function CredentialsHere(properties: { readonly revokedAt: string | null }) {
   const { revokedAt } = properties;
   if (revokedAt === null) {
-    return <span className="text-muted-foreground">Never ended</span>;
+    return <span className="text-muted-foreground">Never</span>;
   }
   return (
     <span className="flex flex-wrap items-center gap-2">
-      <Pill>Ended</Pill>
+      <Pill>Signed out</Pill>
       <span className="tabular-nums">{instantWords(revokedAt)}</span>
     </span>
   );

@@ -119,7 +119,8 @@ const SENTENCES = {
   "knowledge.suggestion.accepted": ({ by, named }) =>
     `${by} accepted a suggestion, saved as ${conceptNamed(namedIn(named, "iri"))}`,
   "knowledge.suggestion.declined": ({ by }) => `${by} declined a suggestion`,
-  "knowledge.suggestion.returned": ({ by }) => `${by} sent a suggestion back to whoever made it`,
+  "knowledge.suggestion.returned": ({ by }) =>
+    `${by} sent a suggestion back to the person who made it`,
   "people.client.consented": ({ by }) => `${by} gave an assistant access`,
   "people.erasure.completed": ({ by }) => `${by} carried out an erasure request`,
   "people.group.created": ({ by, subject }) => `${by} created ${group(subject)}`,
@@ -196,7 +197,7 @@ const SENTENCES = {
   "platform.job.followed": ({ by }) => `${by} updated who can see concepts after a sync`,
   "platform.reconciler.replayed": ({ by }) => `${by} re-applied a change to the knowledge base`,
   "platform.workspace.marked": ({ by }) =>
-    `${by} kept the workspace’s invitations to its testing domain`,
+    `${by} limited the workspace’s invitations to its testing domain`,
   "platform.workspace.model_key_set": ({ by }) => `${by} set a model provider’s API key`,
   "platform.workspace.model_choice_set": ({ by }) => `${by} chose the AI model for a task`,
   "platform.model.priced": ({ by }) => `${by} set an AI model’s price`,

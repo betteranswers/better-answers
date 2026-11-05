@@ -16,14 +16,14 @@ import {
   keyShown,
   person,
   provision,
-  saysARefusal,
+  alertHasText,
   signedInAtHome,
   signedInWithNoWorkspace,
   tabUntilFocused,
-  theActionLandedWithinItsBudget,
+  actionWithinBudget,
   tokenColour,
 } from "../harness.ts";
-import { accountFromTheBand, codesListed, regionOf } from "../second-factor-steps.ts";
+import { openAccountFromPersonMenu, codesListed, regionOf } from "../second-factor-steps.ts";
 
 const authenticatorPart = (page: Page) => regionOf(page, "Authenticator");
 
@@ -43,7 +43,7 @@ const removeButton = (page: Page) =>
 
 const setupOpened = async (page: Page): Promise<string> => {
   await setUpButton(page).click();
-  await expect(page.getByRole("img", { name: "QR code for your authenticator" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "QR code for your authenticator app" })).toBeVisible();
   return keyShown(page);
 };
 
@@ -68,7 +68,7 @@ const anEditorOnAccount = async (page: Page, api: Parameters<typeof person>[0]) 
   const workspace = await provision(api, { name: "Calder Joinery" });
   await addMember(api, { role: "Editor", userId: editor.id, workspaceId: workspace.workspaceId });
   await signedInAtHome(page, api, email, "Editor");
-  await accountFromTheBand(page, editor.name);
+  await openAccountFromPersonMenu(page, editor.name);
   await expect(setUpButton(page)).toBeVisible();
 };
 
@@ -86,8 +86,8 @@ test("Done needs the checkbox ticked and reload hides the codes", async ({
     reads: "Save Your Recovery Codes",
   });
   await page.keyboard.press("Enter");
-  await theActionLandedWithinItsBudget(page, "unticked done");
-  await saysARefusal(codesBlock(page).getByRole("alert"));
+  await actionWithinBudget(page, "unticked done");
+  await alertHasText(codesBlock(page).getByRole("alert"));
   await expect(savedBox(page)).toBeFocused();
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
   await passesTheAccessibilityGate();
@@ -124,7 +124,7 @@ test("draws the QR code dark on light in dark mode", async ({ page, request }) =
   await signedInWithNoWorkspace(page, request, "theme-code");
   await page.goto("/account");
   await page.getByRole("button", { name: "Set Up an Authenticator" }).click();
-  const code = page.getByRole("img", { name: "QR code for your authenticator" });
+  const code = page.getByRole("img", { name: "QR code for your authenticator app" });
   await expect(code).toBeVisible();
 
   const [stroke, fill] = await Promise.all([

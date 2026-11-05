@@ -22,16 +22,16 @@ export const REASON_WORDS = {
   wrong: "Wrong",
   "out-of-date": "Out of date",
   incomplete: "Incomplete",
-  "should-not-have-shown": "Should not have shown",
+  "should-not-have-shown": "Shouldn't have been shown",
 } as const satisfies Readonly<Record<FlagReason, string>>;
 
 export const flaggedWords = (reason: FlagReason | null): string =>
   reason === null ? "Flagged" : `Flagged · ${REASON_WORDS[reason]}`;
 
 export const RECORD_WORDS = {
-  questionGone: "Question no longer kept",
+  questionGone: "Question no longer available",
   markedHelpful: "Marked helpful",
-  terms: { given: "Given", note: "Note", disputed: "Sentence Disputed" },
+  terms: { given: "Given", note: "Note", disputed: "Disputed Sentence" },
 } as const;
 
 export const questionWords = (record: { readonly question: string | null }): string =>

@@ -83,80 +83,77 @@ function SearchedWithoutPages() {
 const openList = (entry: string) =>
   openPages({ "/list": Searched, "/a-row": () => null }, ["/elsewhere", entry]);
 
-const box = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Search the list" });
+const searchBox = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Search the list" });
 
 const pageShown = () => screen.getByRole("status", { name: "Page shown" }).textContent;
 
 const typeIn = (typed: string) => {
   act(() => {
-    fireEvent.change(box(), { target: { value: typed } });
+    fireEvent.change(searchBox(), { target: { value: typed } });
   });
 };
 
-const pastTheSettle = () =>
+const waitPastDebounce = () =>
   new Promise((resolve) => {
     setTimeout(resolve, 450);
   });
 
-describe("a searched list, its search settled into the address", () => {
-  it("keeps every key while the address waits for the burst", async () => {
+describe("a searched list with a debounced URL search", () => {
+  it("keeps every keystroke while the URL update is debounced", async () => {
     const { router, at } = await openList("/list");
 
     for (const typed of ["p", "pr", "pri"]) typeIn(typed);
 
-    expect(box().value).toBe("pri");
-    expect(router.state.location.searchStr, "a key mid-burst reached the address").toBe("");
+    expect(searchBox().value).toBe("pri");
+    expect(router.state.location.searchStr, "the URL updated before typing paused").toBe("");
     await at("/list?list.search=pri");
-    expect(box().value).toBe("pri");
+    expect(searchBox().value).toBe("pri");
   });
 
-  it.each(["1.5", "true", "null", "42"])(
-    "takes %s written into the address by hand",
-    async (typed) => {
-      await openList(`/list?list.search=${typed}`);
+  it.each(["1.5", "true", "null", "42"])("reads %s typed into the URL by hand", async (typed) => {
+    await openList(`/list?list.search=${typed}`);
 
-      expect(box().value).toBe(typed);
-    },
-  );
+    expect(searchBox().value).toBe(typed);
+  });
 
-  it("takes a search field only as the text written", () => {
+  it("accepts only a SearchText field for search", () => {
     type Fields = Parameters<typeof useSearchedList>[1];
     expectTypeOf<{ search: SearchText }>().toExtend<Fields>();
-    // @ts-expect-error — a bare string field empties a search the router read as JSON.
+    // @ts-expect-error — a plain string field would lose searches the router parsed as JSON.
     expectTypeOf<{ search: z.ZodCatch<z.ZodString> }>().toExtend<Fields>();
   });
 
-  it("takes a search the address gained from outside the box", async () => {
+  it("updates the box when the URL search changes", async () => {
     const { router, at } = await openList("/list?list.search=priya");
-    expect(box().value).toBe("priya");
+    expect(searchBox().value).toBe("priya");
 
     await act(() => router.navigate({ href: "/list?list.search=sam" }));
 
     await at("/list?list.search=sam");
-    expect(box().value).toBe("sam");
+    expect(searchBox().value).toBe("sam");
   });
 
-  it("takes back a settled search Back returns to", async () => {
+  it("restores a search when the user goes back", async () => {
     const { router, at } = await openList("/list");
 
     typeIn("ab");
     await at("/list?list.search=ab");
     await act(() => router.navigate({ href: "/list" }));
     await at("/list");
-    expect(box().value).toBe("");
+    expect(searchBox().value).toBe("");
     act(() => {
       router.history.back();
     });
 
     await at("/list?list.search=ab");
-    expect(box().value, "the box lost the search Back restored").toBe("ab");
-    await act(pastTheSettle);
-    expect(router.state.location.href, "the box wrote over the entry Back restored").toBe(
+    expect(searchBox().value, "the box did not show the search restored by Back").toBe("ab");
+    await act(waitPastDebounce);
+    expect(router.state.location.href, "the box overwrote the history entry restored by Back").toBe(
       "/list?list.search=ab",
     );
   });
 
-  it("sends a search still settling before the reader leaves", async () => {
+  it("saves a pending search before navigating away", async () => {
     const { router, at } = await openList("/list");
 
     typeIn("sam");
@@ -167,36 +164,37 @@ describe("a searched list, its search settled into the address", () => {
     });
 
     await at("/list?list.search=sam");
-    expect(box().value).toBe("sam");
+    expect(searchBox().value).toBe("sam");
   });
 
-  it("shows the first page while a typed search settles", async () => {
+  it("shows the first page while a search is pending", async () => {
     await openList("/list?list.page=2");
     expect(pageShown()).toBe("2");
 
     typeIn("ada");
 
-    expect(pageShown(), "a search still settling showed the old page").toBe("1");
+    expect(pageShown(), "a pending search showed the old page").toBe("1");
   });
 
-  it("starts the page again once a search settles", async () => {
+  it("resets the page after a search is saved", async () => {
     const { router, at } = await openList("/list?list.page=3");
 
     typeIn("ada");
 
     await at("/list?list.search=ada");
-    expect(router.state.location.searchStr, "the old page outlived the search").not.toContain(
-      "list.page",
-    );
+    expect(
+      router.state.location.searchStr,
+      "the URL kept the old page after the search",
+    ).not.toContain("list.page");
   });
 
-  it("keeps the page within the last page", async () => {
+  it("limits the page to the last page", async () => {
     await openList("/list?list.page=9");
 
     expect(pageShown()).toBe("3");
   });
 
-  it("clears the search and every filter, keeping a kept field", async () => {
+  it("clears the search and filters but keeps the sort", async () => {
     const { at } = await openList(
       "/list?list.search=ada&list.role=Admin&list.sort=-name&list.page=2",
     );
@@ -204,10 +202,10 @@ describe("a searched list, its search settled into the address", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear Filters" }));
 
     await at("/list?list.sort=-name");
-    expect(box().value).toBe("");
+    expect(searchBox().value).toBe("");
   });
 
-  it("settles a list with no pages without writing a page", async () => {
+  it("saves an unpaged list's search without a page", async () => {
     const { router, at } = await openPages({ "/older": SearchedWithoutPages }, ["/older"]);
 
     typeIn("export");
@@ -216,7 +214,7 @@ describe("a searched list, its search settled into the address", () => {
     expect(router.state.location.searchStr).not.toContain("page");
   });
 
-  it("clears a list with no pages to a bare address", async () => {
+  it("clears an unpaged list to a URL with no query", async () => {
     const { at } = await openPages({ "/older": SearchedWithoutPages }, [
       "/older?older.search=export&older.family=people",
     ]);
@@ -224,6 +222,6 @@ describe("a searched list, its search settled into the address", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear Filters" }));
 
     await at("/older");
-    expect(box().value).toBe("");
+    expect(searchBox().value).toBe("");
   });
 });

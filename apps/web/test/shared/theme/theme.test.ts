@@ -8,7 +8,7 @@ import { FIRST_PAINT, THEME_KEPT_UNDER, themeShown } from "@/shared/theme/theme-
 import type * as ThemeStore from "@/shared/theme/theme.ts";
 import { sourceFiles } from "@test/source-files.ts";
 
-const aDevice = (dark: boolean) => {
+const stubDeviceScheme = (dark: boolean) => {
   const listeners = new Set<() => void>();
   const media = {
     matches: dark,
@@ -17,7 +17,7 @@ const aDevice = (dark: boolean) => {
   };
   vi.stubGlobal("matchMedia", () => media);
   return {
-    turns: (next: boolean) => {
+    setDark: (next: boolean) => {
       media.matches = next;
       for (const listener of listeners) listener();
     },
@@ -26,16 +26,16 @@ const aDevice = (dark: boolean) => {
 
 const theme = () => document.documentElement.dataset["theme"];
 
-const keep = (kept: string | null) => {
-  if (kept === null) localStorage.removeItem(THEME_KEPT_UNDER);
-  else localStorage.setItem(THEME_KEPT_UNDER, kept);
+const storeTheme = (stored: string | null) => {
+  if (stored === null) localStorage.removeItem(THEME_KEPT_UNDER);
+  else localStorage.setItem(THEME_KEPT_UNDER, stored);
 };
 
-const KEPT_ON_EACH_DEVICE = ["light", "dark", "anything else", null].flatMap((kept) =>
-  [true, false].map((deviceDark) => ({ kept, deviceDark })),
+const STORED_AND_DEVICE_CASES = ["light", "dark", "anything else", null].flatMap((stored) =>
+  [true, false].map((deviceDark) => ({ stored, deviceDark })),
 );
 
-const firstPaint = () => {
+const runHeadScript = () => {
   // oxlint-disable-next-line typescript/no-implied-eval, typescript/no-unsafe-call -- the head script is a string by design, run as the page runs it; lib types `new Function` as the bare Function
   new Function(FIRST_PAINT)();
 };
@@ -56,57 +56,57 @@ afterEach(() => {
 });
 
 describe("the head script", () => {
-  it("paints the kept theme over the device's", () => {
-    aDevice(false);
+  it("applies the stored theme over the device's", () => {
+    stubDeviceScheme(false);
     localStorage.setItem(THEME_KEPT_UNDER, "dark");
-    firstPaint();
+    runHeadScript();
     expect(theme()).toBe("dark");
 
-    aDevice(true);
+    stubDeviceScheme(true);
     localStorage.setItem(THEME_KEPT_UNDER, "light");
-    firstPaint();
+    runHeadScript();
     expect(theme()).toBe("light");
   });
 
-  it("follows the device when nothing is kept", () => {
-    aDevice(true);
-    firstPaint();
+  it("follows the device when no theme is stored", () => {
+    stubDeviceScheme(true);
+    runHeadScript();
     expect(theme()).toBe("dark");
 
-    aDevice(false);
-    firstPaint();
+    stubDeviceScheme(false);
+    runHeadScript();
     expect(theme()).toBe("light");
   });
 
-  it("follows the device when the store refuses to be read", () => {
-    aDevice(true);
+  it("follows the device when storage cannot be read", () => {
+    stubDeviceScheme(true);
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new DOMException("refused", "SecurityError");
     });
-    firstPaint();
+    runHeadScript();
     expect(theme()).toBe("dark");
   });
 
-  it.each(KEPT_ON_EACH_DEVICE)(
-    "matches the page with kept $kept, dark device $deviceDark",
-    ({ kept, deviceDark }) => {
-      aDevice(deviceDark);
-      keep(kept);
-      firstPaint();
-      expect(theme()).toBe(themeShown(kept, deviceDark));
+  it.each(STORED_AND_DEVICE_CASES)(
+    "matches the app with stored $stored, dark device $deviceDark",
+    ({ stored, deviceDark }) => {
+      stubDeviceScheme(deviceDark);
+      storeTheme(stored);
+      runHeadScript();
+      expect(theme()).toBe(themeShown(stored, deviceDark));
     },
   );
 });
 
-describe("the key a theme is kept under", () => {
-  it("keeps the name readers' browsers already hold", () => {
+describe("the theme storage key", () => {
+  it("keeps the name existing browsers already use", () => {
     expect(THEME_KEPT_UNDER).toBe("better-answers.theme");
   });
 });
 
 describe("choosing a theme", () => {
   it("follows the device until a theme is chosen", () => {
-    const device = aDevice(false);
+    const device = stubDeviceScheme(false);
     const { result } = renderHook(() => {
       store.useThemeFollowed();
       return store.useThemeChoice();
@@ -115,7 +115,7 @@ describe("choosing a theme", () => {
     expect(theme()).toBe("light");
 
     act(() => {
-      device.turns(true);
+      device.setDark(true);
     });
     expect(theme()).toBe("dark");
 
@@ -127,14 +127,14 @@ describe("choosing a theme", () => {
     expect(localStorage.getItem(THEME_KEPT_UNDER)).toBe("light");
 
     act(() => {
-      device.turns(false);
-      device.turns(true);
+      device.setDark(false);
+      device.setDark(true);
     });
     expect(theme()).toBe("light");
   });
 
-  it("forgets the kept theme when the device is chosen again", () => {
-    aDevice(true);
+  it("clears the stored theme when the device is chosen", () => {
+    stubDeviceScheme(true);
     localStorage.setItem(THEME_KEPT_UNDER, "light");
     const { result } = renderHook(() => {
       store.useThemeFollowed();
@@ -150,8 +150,8 @@ describe("choosing a theme", () => {
     expect(theme()).toBe("dark");
   });
 
-  it("holds a picked theme the browser refuses to keep", () => {
-    aDevice(false);
+  it("applies a chosen theme even when storage fails", () => {
+    stubDeviceScheme(false);
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new DOMException("full", "QuotaExceededError");
     });
@@ -167,8 +167,8 @@ describe("choosing a theme", () => {
     expect(theme()).toBe("dark");
   });
 
-  it("takes a theme chosen in another tab", () => {
-    aDevice(false);
+  it("applies a theme chosen in another tab", () => {
+    stubDeviceScheme(false);
     const { result } = renderHook(() => {
       store.useThemeFollowed();
       return store.useThemeChoice();
@@ -192,8 +192,8 @@ const bridge = readFileSync(
   "utf8",
 );
 
-describe("the one switch", () => {
-  it("is written by the switch alone", () => {
+describe("the theme switch module", () => {
+  it("is the only code that sets data-theme", () => {
     expect(files.length).toBeGreaterThan(0);
     const writers = files
       .filter(({ text }) =>
@@ -203,10 +203,11 @@ describe("the one switch", () => {
     expect(writers).toEqual(["shared/theme/theme-switch.ts"]);
   });
 
-  it("answers to no `.dark` class", () => {
+  it("is not paired with a `.dark` class", () => {
     const darkClass = /(?:^|[\s,(])\.dark\b/m;
-    const selecting = (text: string) => darkClass.test(text.replaceAll(/\/\*[\s\S]*?\*\//g, ""));
-    expect(files.filter(({ text }) => selecting(text)).map(({ file }) => file)).toEqual([]);
-    expect(selecting(bridge), "the bridge honours `.dark`").toBe(false);
+    const selectsDarkClass = (text: string) =>
+      darkClass.test(text.replaceAll(/\/\*[\s\S]*?\*\//g, ""));
+    expect(files.filter(({ text }) => selectsDarkClass(text)).map(({ file }) => file)).toEqual([]);
+    expect(selectsDarkClass(bridge), "the Tailwind bridge selects a `.dark` class").toBe(false);
   });
 });

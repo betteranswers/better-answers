@@ -33,7 +33,7 @@ const TWO_WORKSPACES = [
   { workspace: { id: "x", name: "Southern Castings" }, role: "Viewer" },
 ];
 
-let asked: string[] = [];
+let requested: string[] = [];
 
 const answerTo = (name: string, refusal: string | undefined, role: Role) => {
   if (name === WORKSPACES_READ) return { result: { data: TWO_WORKSPACES } };
@@ -59,7 +59,7 @@ const answering =
     if (!pathname.startsWith("/trpc/")) return answered(A_SESSION);
 
     const names = pathname.replace("/trpc/", "").split(",");
-    asked.push(...names);
+    requested.push(...names);
     return answered(names.map((name) => answerTo(name, refusal, role)));
   };
 
@@ -70,7 +70,7 @@ const SIGNED_IN_WITH_NONE_OPEN = {
 
 const EMPTY_READS = new Set(["person.workspaces", "person.invitations", "console.workspaces.list"]);
 
-const inNoWorkspace =
+const apiWithNoWorkspace =
   (operator: boolean) =>
   (input: string | URL | Request): Promise<Response> => {
     const { pathname } = addressOf(input);
@@ -84,31 +84,31 @@ const inNoWorkspace =
     return answered(pathname.replace("/trpc/", "").split(",").map(answerToNoWorkspace));
   };
 
-const losingTheShellsRead = (role: Role) => {
+const droppingFirstMemberRead = (role: Role) => {
   const answer = answeringAs(role);
-  let lost = false;
+  let dropped = false;
   return (input: string | URL | Request): Promise<Response> => {
-    if (lost || !addressOf(input).pathname.includes("session.member")) return answer(input);
-    lost = true;
+    if (dropped || !addressOf(input).pathname.includes("session.member")) return answer(input);
+    dropped = true;
     return Promise.reject(new TypeError("the request was dropped"));
   };
 };
 
-const TAKEN = { hidden: false, unread: false };
+const ACCESS_ALLOWED = { hidden: false, unread: false };
 
 const INVITE = "Invite a Person";
 
-const memberAsks = () => asked.filter((name) => name === "session.member").length;
+const memberRequestCount = () => requested.filter((name) => name === "session.member").length;
 
 const openAt = async (path: string, clients?: AppClients) => (await openApp(path, clients)).router;
 
 const heading = () => screen.getByRole("heading", { level: 1 }).textContent;
 
-const roleBeside = (button: HTMLElement) =>
+const roleDescriptionOf = (button: HTMLElement) =>
   document.getElementById(button.getAttribute("aria-describedby") ?? "")?.textContent;
 
 beforeEach(() => {
-  asked = [];
+  requested = [];
 });
 
 afterEach(() => {
@@ -116,8 +116,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("a person the api will not answer about", () => {
-  it("meets sign-in, which is told the address they asked for", async () => {
+describe("a person whose member read fails", () => {
+  it("is sent to sign-in with the address they requested", async () => {
     vi.stubGlobal("fetch", answering(NO_SESSION));
 
     const router = await openAt("/people/groups");
@@ -126,7 +126,7 @@ describe("a person the api will not answer about", () => {
     expect(router.state.location.href).toBe("/sign-in?redirect=%2Fpeople%2Fgroups");
   });
 
-  it("meets the picker instead when the session names no workspace", async () => {
+  it("is sent to the workspace picker when none is active", async () => {
     vi.stubGlobal("fetch", answering(NEEDS_A_PICK));
 
     const router = await openAt("/people/groups");
@@ -135,17 +135,19 @@ describe("a person the api will not answer about", () => {
     expect(router.state.location.href).toBe("/choose-workspace");
   });
 
-  it("reads their role beside each workspace on the picker", async () => {
+  it("sees their role beside each workspace on the picker", async () => {
     vi.stubGlobal("fetch", answering(NEEDS_A_PICK));
 
     await openAt("/choose-workspace");
     const northern = await screen.findByRole("button", { name: "Northern Tooling" });
 
-    expect(roleBeside(northern)).toBe("Admin");
-    expect(roleBeside(screen.getByRole("button", { name: "Southern Castings" }))).toBe("Viewer");
+    expect(roleDescriptionOf(northern)).toBe("Admin");
+    expect(roleDescriptionOf(screen.getByRole("button", { name: "Southern Castings" }))).toBe(
+      "Viewer",
+    );
   });
 
-  it("stays on the sign-in page when they went there", async () => {
+  it("stays on the sign-in page when they open it", async () => {
     vi.stubGlobal("fetch", answering(NO_SESSION));
 
     const router = await openAt("/sign-in");
@@ -154,7 +156,7 @@ describe("a person the api will not answer about", () => {
     expect(router.state.location.href).toBe("/sign-in");
   });
 
-  it("reaches the shell and the page's state when unread", async () => {
+  it("sees the shell and requested page with the api down", async () => {
     const clients = withTheApiDown();
 
     const router = await openAt("/people/members", clients);
@@ -166,8 +168,8 @@ describe("a person the api will not answer about", () => {
     expect(router.state.location.pathname).toBe("/people/members");
   });
 
-  it("hides a page from a role read only after arriving", async () => {
-    vi.stubGlobal("fetch", losingTheShellsRead("Viewer"));
+  it("hides a forbidden page once a late role read arrives", async () => {
+    vi.stubGlobal("fetch", droppingFirstMemberRead("Viewer"));
 
     await openAt("/people/members");
     await within(screen.getByRole("navigation", { name: "Areas" })).findByRole("link", {
@@ -180,12 +182,14 @@ describe("a person the api will not answer about", () => {
     expect(screen.queryByRole("button", { name: INVITE })).toBeNull();
   });
 
-  it("holds the verdict taken when the role arrives", async () => {
-    vi.stubGlobal("fetch", losingTheShellsRead("Admin"));
+  it("keeps the page access decided when the role first arrives", async () => {
+    vi.stubGlobal("fetch", droppingFirstMemberRead("Admin"));
     const { router, clients } = await openApp("/people/members");
     const rail = () => within(screen.getByRole("navigation", { name: "Areas" }));
     await rail().findByRole("link", { name: "Control Centre" });
-    await vi.waitFor(() => expect(router.state.matches.at(-1)?.context).toMatchObject(TAKEN));
+    await vi.waitFor(() =>
+      expect(router.state.matches.at(-1)?.context).toMatchObject(ACCESS_ALLOWED),
+    );
     expect(await screen.findByRole("button", { name: INVITE })).toBeDefined();
 
     vi.stubGlobal("fetch", answeringAs("Viewer"));
@@ -197,17 +201,17 @@ describe("a person the api will not answer about", () => {
   });
 });
 
-describe("the member the shell and its redirect both read", () => {
-  it("is read once across drawing the shell and changing pages", async () => {
+describe("the member read shared by the shell and redirects", () => {
+  it("is fetched once across rendering the shell and navigating", async () => {
     vi.stubGlobal("fetch", answering());
     const router = await openAt("/people/members");
     await screen.findByText("Northern Tooling", { exact: false });
-    expect(memberAsks()).toBe(1);
+    expect(memberRequestCount()).toBe(1);
 
     await router.navigate({ href: "/people/groups" });
 
     expect(router.state.location.pathname).toBe("/people/groups");
-    expect(memberAsks()).toBe(1);
+    expect(memberRequestCount()).toBe(1);
   });
 });
 
@@ -215,7 +219,7 @@ describe("the index route", () => {
   for (const role of ROLES) {
     const home = HOMES[role];
 
-    it(`lands a member at ${role} on ${home.name}`, async () => {
+    it(`sends a member with role ${role} to ${home.name}`, async () => {
       vi.stubGlobal("fetch", answering(undefined, role));
 
       const { router } = await appAt("/");
@@ -224,7 +228,7 @@ describe("the index route", () => {
     });
   }
 
-  it("shows the failed read, not Ask, holding no role", async () => {
+  it("shows the load failure, not Ask, without a role", async () => {
     const clients = withTheApiDown();
 
     const router = await openAt("/", clients);
@@ -234,7 +238,7 @@ describe("the index route", () => {
     expect(router.state.location.pathname).toBe("/");
   });
 
-  it("sends the person home once asking again reads their role", async () => {
+  it("sends the person home once Try Again reads their role", async () => {
     const clients = withTheApiDown();
     const router = await openAt("/", clients);
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
@@ -254,16 +258,16 @@ const consoleLanding = async (router: Router) => {
     at: router.state.location.pathname,
     inTheConsole:
       within(screen.getByRole("banner")).queryByRole("button", { name: "Console" }) !== null,
-    toldNoWorkspace:
+    showsNoWorkspace:
       screen.queryByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING }) !== null,
   };
 };
 
-const ON_THE_CONSOLE = { at: HOMES.operator.path, inTheConsole: true, toldNoWorkspace: false };
+const ON_THE_CONSOLE = { at: HOMES.operator.path, inTheConsole: true, showsNoWorkspace: false };
 
 describe("a person in no workspace", () => {
   it("sends a no-workspace operator to the console after setup", async () => {
-    vi.stubGlobal("fetch", inNoWorkspace(true));
+    vi.stubGlobal("fetch", apiWithNoWorkspace(true));
 
     const { router } = await openApp(stepAfterTheCodes(""));
 
@@ -271,7 +275,7 @@ describe("a person in no workspace", () => {
   });
 
   it("sends no-workspace operators to the console at sign-in and /", async () => {
-    vi.stubGlobal("fetch", inNoWorkspace(true));
+    vi.stubGlobal("fetch", apiWithNoWorkspace(true));
     expect(nextAfterSignIn("")).toBe("/");
 
     const { router } = await openApp("/");
@@ -279,8 +283,8 @@ describe("a person in no workspace", () => {
     expect(await consoleLanding(router)).toEqual(ON_THE_CONSOLE);
   });
 
-  it("shows a non-operator with no workspace No Workspace Yet", async () => {
-    vi.stubGlobal("fetch", inNoWorkspace(false));
+  it("shows a non-operator the no-workspace page", async () => {
+    vi.stubGlobal("fetch", apiWithNoWorkspace(false));
 
     const { router } = await openApp("/");
 
@@ -290,8 +294,8 @@ describe("a person in no workspace", () => {
     expect(router.state.location.pathname).toBe("/no-workspace");
   });
 
-  it("draws an unknown address outside the shell without a workspace", async () => {
-    vi.stubGlobal("fetch", inNoWorkspace(false));
+  it("renders an unknown address outside the shell", async () => {
+    vi.stubGlobal("fetch", apiWithNoWorkspace(false));
 
     await openApp("/nothing-here");
 

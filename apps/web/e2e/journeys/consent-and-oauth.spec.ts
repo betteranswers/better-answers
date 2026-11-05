@@ -12,17 +12,15 @@ import {
   signIn,
 } from "../harness.ts";
 
-const landedAt = (page: Page): URL => new URL(page.url());
-
 const consentHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Connect Claude" });
 
 const displayNameHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Your Name" });
 
-const connectedAt = async (page: Page): Promise<URL> => {
+const connectAndGetCallback = async (page: Page): Promise<URL> => {
   await page.getByRole("button", { name: "Connect" }).click();
-  const callback = landedAt(page);
+  const callback = new URL(page.url());
   expect(`${callback.origin}${callback.pathname}`).toBe(CLAUDES_REDIRECT_URI);
   expect(callback.searchParams.get("code")).not.toBeNull();
   return callback;
@@ -34,7 +32,7 @@ test("a member with a display name goes straight to consent", async ({
   baseURL,
   passesTheAccessibilityGate,
 }) => {
-  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite no baseURL");
+  assert.ok(baseURL !== undefined, "playwright.config.ts sets no baseURL");
   const email = anAddress("named-connecting");
   await provision(request, { name: "Named Connecting Ltd", adminEmail: email });
   await catchClaudesRedirect(page);
@@ -45,5 +43,5 @@ test("a member with a display name goes straight to consent", async ({
   await expect(consentHeading(page)).toBeVisible();
   await expect(displayNameHeading(page)).toHaveCount(0);
   await passesTheAccessibilityGate();
-  await connectedAt(page);
+  await connectAndGetCallback(page);
 });

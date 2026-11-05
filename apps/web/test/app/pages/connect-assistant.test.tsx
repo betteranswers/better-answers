@@ -16,7 +16,7 @@ afterEach(() => {
 
 const CONNECT_CLAUDE = pageNamed(menuGroupIn(ASK, "ask"), "Connect Claude");
 
-const connectOpened = async () => {
+const openConnectClaude = async () => {
   vi.stubGlobal("fetch", answeringAs("Viewer"));
   await openApp(CONNECT_CLAUDE.path);
   return within(await screen.findByRole("main"));
@@ -25,8 +25,8 @@ const connectOpened = async () => {
 const steps = (main: BoundFunctions<typeof queries>) => within(main.getByRole("list"));
 
 describe("Ask › Connect Claude", () => {
-  it("names the steps, Always allow among them, and the address", async () => {
-    const main = await connectOpened();
+  it("lists the steps, including Always allow, and the MCP address", async () => {
+    const main = await openConnectClaude();
 
     expect(
       main.getByRole("heading", { level: 2, name: "Connect Claude as Your Assistant" }),
@@ -41,9 +41,9 @@ describe("Ask › Connect Claude", () => {
     expect(main.getByText(CONNECT_ASSISTANT.asYou)).toBeDefined();
   });
 
-  it("copies the address and says it was copied", async () => {
-    const written = clipboardAnswering(() => Promise.resolve());
-    const main = await connectOpened();
+  it("copies the address and confirms it in a status", async () => {
+    const clipboardWrites = clipboardAnswering(() => Promise.resolve());
+    const main = await openConnectClaude();
 
     fireEvent.click(main.getByRole("button", { name: "Copy Address" }));
 
@@ -51,12 +51,12 @@ describe("Ask › Connect Claude", () => {
       expect(steps(main).getByRole("status").textContent).toBe(CONNECT_ASSISTANT.copied);
     });
     expect(steps(main).getByRole("alert").textContent).toBe("");
-    expect(written).toEqual([`${window.location.origin}/mcp`]);
+    expect(clipboardWrites).toEqual([`${window.location.origin}/mcp`]);
   });
 
-  it("says what to do when the browser refuses the copy", async () => {
+  it("shows an alert when the browser blocks the copy", async () => {
     clipboardAnswering(() => Promise.reject(new Error("refused")));
-    const main = await connectOpened();
+    const main = await openConnectClaude();
 
     fireEvent.click(main.getByRole("button", { name: "Copy Address" }));
 

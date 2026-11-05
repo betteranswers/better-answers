@@ -21,7 +21,7 @@ const wrapperOf = (clients: AppClients) =>
   };
 
 describe("finishing the authenticator's setup", () => {
-  it("hands over the codes after the code field has gone", async () => {
+  it("returns the codes even after the code field unmounts", async () => {
     const answer = Promise.withResolvers<void>();
     const asked = vi.fn<() => Promise<Response>>(async () => {
       await answer.promise;

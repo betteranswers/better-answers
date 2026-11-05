@@ -12,16 +12,16 @@ const REGION = "[aria-live]";
 
 const DOWN = new Error("the network is down");
 
-const failedSaid = (failure: Error): string => `No rows: ${failure.message}`;
+const failureText = (failure: Error): string => `No rows: ${failure.message}`;
 
 type Read = { readonly error: Error | null; readonly isPending: boolean };
 
 function Region(properties: { readonly read: Read }) {
-  const said = useReadSaid(properties.read);
+  const state = useReadSaid(properties.read);
   return (
     <div aria-live="polite">
-      {said.isPending ? LOADING : null}
-      {said.error === null ? null : failedSaid(said.error)}
+      {state.isPending ? LOADING : null}
+      {state.error === null ? null : failureText(state.error)}
     </div>
   );
 }
@@ -32,8 +32,8 @@ const FAILED: Read = { error: DOWN, isPending: false };
 
 const SETTLED: Read = { error: null, isPending: false };
 
-describe("a read's lines, said after their region mounts", () => {
-  it("mounts the region empty, then says the loading line", () => {
+describe("a read's live region messages", () => {
+  it("mounts empty, then shows the loading message", () => {
     const { seen, Seen } = regionsSeen(REGION);
 
     render(
@@ -46,7 +46,7 @@ describe("a read's lines, said after their region mounts", () => {
     expect(seen.at(-1)).toBe(LOADING);
   });
 
-  it("mounts the region empty, then says the failure", () => {
+  it("mounts empty, then shows the failure message", () => {
     const { seen, Seen } = regionsSeen(REGION);
 
     render(
@@ -56,13 +56,13 @@ describe("a read's lines, said after their region mounts", () => {
     );
 
     expect(seen[0]).toBe("");
-    expect(seen.at(-1)).toBe(failedSaid(DOWN));
+    expect(seen.at(-1)).toBe(failureText(DOWN));
   });
 
   it.each([
-    ["loading line", PENDING],
-    ["failure", FAILED],
-  ])("clears the %s on the commit the read settles", (_, before) => {
+    ["loading message", PENDING],
+    ["failure message", FAILED],
+  ])("clears the %s on the settling render", (_, before) => {
     const { seen, Seen } = regionsSeen(REGION);
     const { rerender } = render(
       <Seen>

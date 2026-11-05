@@ -151,11 +151,11 @@ describe("better-auth is named in the auth seam and nowhere else", () => {
     ["a sibling feature", probe("@/features/model-choices/api.ts")],
     ["the app layer", probe("@/app/router.tsx")],
     ["the api", typeProbe("@better-answers/api/trpc")],
-  ])("refuses the hooks reaching %s", (_reached, source) => {
+  ])("refuses the hooks importing %s", (_target, source) => {
     expect(flagged({ [HOOKS]: source })).toEqual([HOOKS]);
   });
 
-  it("lets the hooks reach shared", () => {
+  it("allows the hooks to import shared", () => {
     expect(flagged({ [HOOKS]: probe("@/shared/ui/button.tsx") })).toEqual([]);
   });
 });
@@ -199,7 +199,7 @@ describe("AppRouter as a type, in one file only", () => {
     ]);
   });
 
-  it("lets a second api type into the client-instance file", () => {
+  it("allows a second api type in the client-instance file", () => {
     const refused = flagged({
       "apps/web/src/shared/api/trpc.ts": `import type { TrpcContext } from "@better-answers/api/trpc";\nexport type Kept = TrpcContext;\n`,
     });

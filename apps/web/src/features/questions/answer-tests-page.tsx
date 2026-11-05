@@ -11,7 +11,7 @@ const ANSWER_TESTS = pageNamed(questions, "Answer Tests");
 
 const ANSWER_TESTS_WORDS = {
   empty: "No answer tests yet",
-  why: "Each correction recorded becomes an answer test. Recording corrections is coming soon.",
+  why: "An answer test is made from a correction to an answer. You can’t record corrections yet.",
 } as const;
 
 export function AnswerTestsPage() {

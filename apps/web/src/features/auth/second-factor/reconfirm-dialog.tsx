@@ -184,8 +184,8 @@ export function ReconfirmDialog() {
         <DialogHeader>
           <DialogTitle>{CONFIRM_WORDS.heading}</DialogTitle>
           <DialogDescription>
-            You confirmed your second factor over an hour ago. Confirm it again and your change goes
-            ahead.
+            You confirmed your second factor more than an hour ago. Confirm it again to save your
+            change.
           </DialogDescription>
         </DialogHeader>
         {ways.length === 0 && held.data === undefined ? null : (
@@ -196,7 +196,7 @@ export function ReconfirmDialog() {
             ) : null}
             {ways.length === 0 ? (
               <p className="text-muted-foreground">
-                You no longer hold a second factor. Add one from your Account page.
+                You no longer have a second factor. Add one from your Account page.
               </p>
             ) : null}
           </div>

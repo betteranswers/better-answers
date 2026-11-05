@@ -3,7 +3,7 @@ import type { APIRequestContext, Page } from "@playwright/test";
 import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor";
 
 import { expect, test } from "../browser.ts";
-import { landedAtHome, saysSomethingNew, saysTheWait } from "../harness.ts";
+import { landedAtHome, regionShowsNewText, alertShowsWait } from "../harness.ts";
 import { authAnswering } from "../refused-read.ts";
 import {
   anAdminWithAnAuthenticator,
@@ -91,8 +91,8 @@ test("locks the code field after wrong codes, but passkeys work", async ({
 
   const { waitSeconds, saidOfAWrongCode } = await wrongCodesUntilTheWait(page, key);
 
-  await saysTheWait(theRefusal(page), waitSeconds);
-  await saysSomethingNew(theRefusal(page), saidOfAWrongCode);
+  await alertShowsWait(theRefusal(page), waitSeconds);
+  await regionShowsNewText(theRefusal(page), saidOfAWrongCode);
   await expect(codeField(page)).not.toBeEditable();
   await passesTheAccessibilityGate();
 

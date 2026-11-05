@@ -9,13 +9,13 @@ import {
 
 afterEach(cleanup);
 
-/** Radix hands focus back a task after the sheet goes, so the test lets that task run. */
-const aTaskLater = () =>
+/** Radix restores focus one task after the sheet closes. */
+const nextTask = () =>
   new Promise((resolve) => {
     setTimeout(resolve, 0);
   });
 
-function AtNoPage(properties: { readonly wide: boolean }) {
+function NavigationWithoutAreas(properties: { readonly wide: boolean }) {
   const sheet = useNavigationSheet();
 
   return (
@@ -35,13 +35,13 @@ function AtNoPage(properties: { readonly wide: boolean }) {
 }
 
 describe("the navigation sheet", () => {
-  it("hands focus to the page when widening leaves no control", async () => {
-    const { rerender } = render(<AtNoPage wide={false} />);
+  it("moves focus to the page when widening removes its button", async () => {
+    const { rerender } = render(<NavigationWithoutAreas wide={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Menu" }));
     expect(screen.getByRole("dialog", { name: "Menu" })).toBeDefined();
 
-    rerender(<AtNoPage wide />);
-    await aTaskLater();
+    rerender(<NavigationWithoutAreas wide />);
+    await nextTask();
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("main"));

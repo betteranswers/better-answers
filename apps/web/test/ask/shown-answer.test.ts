@@ -42,8 +42,8 @@ const citing = (sentence: string, concepts: readonly Concept[]) => ({
   concepts: concepts.map(({ iri }): ConceptIri => iri),
 });
 
-describe("a kept record shown as an answer", () => {
-  it("shows the judge's passed concepts as answers, the rest related", () => {
+describe("showing a saved question as an answer", () => {
+  it("shows judged fits as answers and other concepts as related", () => {
     const passed = aConcept("audits", "yes");
     const failed = aConcept("audits", "no");
     const unjudged = aConcept(null);
@@ -54,7 +54,7 @@ describe("a kept record shown as an answer", () => {
     expect(shown?.related).toEqual([failed, unjudged]);
   });
 
-  it("groups kept sentences under their first cited concept's collection", () => {
+  it("groups drafted sentences by their first cited concept's collection", () => {
     const [audits, board, loose] = [aConcept("audits"), aConcept("board"), aConcept(null)];
     const kept = citing("Logs are kept a year.", [audits]);
     const boards = citing("The board meets monthly.", [board, audits]);
@@ -72,7 +72,7 @@ describe("a kept record shown as an answer", () => {
     ]);
   });
 
-  it("gives an unfinished record no result", () => {
+  it("returns nothing for an unfinished question", () => {
     expect(shownAnswerOf(aRecord({ verdict: null, judgeState: null }))).toBeUndefined();
   });
 });

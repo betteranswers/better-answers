@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import type { ReadAuditEvent } from "@/shared/audit/audit-event.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 import { adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -64,7 +64,7 @@ const lines = () => log().queryAllByRole("listitem");
 
 const lineBy = (name: RegExp): HTMLElement => {
   const line = lines().find((each) => name.test(each.textContent));
-  if (line === undefined) throw new Error("the audit log drew one line fewer");
+  if (line === undefined) throw new Error("the audit log has no line for this person");
   return line;
 };
 
@@ -73,14 +73,14 @@ const detailsOf = (line: HTMLElement) =>
   within(line).getByRole("button", { name: /^Details ?of / });
 
 describe("the System group's Audit log page", () => {
-  it("keeps open the detail opened before a typed search settles", async () => {
+  it("keeps details open while a typed search finishes", async () => {
     const api = adaAnAdmin();
     api.set("members.auditLog", () => pageOf(EVERYONES));
     await openAt(AUDIT_LOG, api);
     await waitFor(() => {
       expect(lines()).toHaveLength(EVERYONES.length);
     });
-    const typed = heldBack(api, "members.auditLog", pageOf([PRIYAS]));
+    const typed = holdProcedure(api, "members.auditLog", pageOf([PRIYAS]));
 
     fireEvent.change(log().getByRole("searchbox", { name: "Search by person, group or action" }), {
       target: { value: "Priya" },
@@ -95,7 +95,7 @@ describe("the System group's Audit log page", () => {
     const priyas = lineBy(BY_PRIYA);
     expect(
       detailsOf(priyas).getAttribute("aria-expanded"),
-      "the detail opened closed as the typed search settled",
+      "the details closed when the search finished",
     ).toBe("true");
     expect(within(priyas).getAllByRole("definition")[0]?.textContent).toBe(
       `Priya Shah${PRIYA_ADDRESS}`,

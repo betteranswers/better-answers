@@ -1,4 +1,4 @@
-/** Better Auth keeps the `fetch` it found when made, so this gives it one that asks the stub standing now. */
+/** Better Auth captures `fetch` at creation, so this gives it one that forwards to the current stub. */
 const original = globalThis.fetch;
 
 const forwarding: typeof fetch = (input, init) =>

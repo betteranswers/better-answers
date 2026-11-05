@@ -103,7 +103,7 @@ test.describe("the console's Everyone page", () => {
     await expect(listed).toHaveText([
       "Search Everyone by Name or Address",
       "Open the Person in Focus",
-      "End Every Sign-In and Token of the Person in Focus",
+      "Sign Out the Person in Focus Everywhere",
       "Correct the Display Name of the Person in Focus",
       "Show the Previous Page of People",
       "Show the Next Page of People",

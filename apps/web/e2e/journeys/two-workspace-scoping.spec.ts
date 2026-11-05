@@ -7,10 +7,10 @@ import {
   addMember,
   anAddress,
   inTwoWorkspaces,
-  keepsItsWordOffThePage,
+  pageHidesRefusalWord,
   landedAtHome,
   person,
-  saysARefusal,
+  alertHasText,
   switched,
   switcherOf,
 } from "../harness.ts";
@@ -75,8 +75,8 @@ const backIn = async (elsewhere: Page, { first, second }: Two): Promise<void> =>
 };
 
 const landedHomeSayingWhy = async (page: Page, now: Workspace): Promise<void> => {
-  await saysARefusal(page.getByRole("banner").getByRole("alert"));
-  await keepsItsWordOffThePage(page, SWITCHED.word);
+  await alertHasText(page.getByRole("banner").getByRole("alert"));
+  await pageHidesRefusalWord(page, SWITCHED.word);
   await landedAtHome(page, "Admin");
   await expect(
     switcherOf(page, now.name),

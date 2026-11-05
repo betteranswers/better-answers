@@ -14,11 +14,11 @@ const BUILT = pagesOf(AREAS).filter((page) => page.built);
 
 describe("the menu's current page", () => {
   it.each(BUILT.map((page) => [page.path, page] as const))(
-    "names only %s as current on it",
+    "marks only %s as current when it is open",
     async (_path, page) => {
       vi.stubGlobal("fetch", answeringAs("Admin"));
       const area = placeAt(visibleTo(readerOf("Admin"), AREAS).areas, page.path)?.area;
-      assert(area !== undefined, "the page sits in an area the Admin sees");
+      assert(area !== undefined, "the page is in no area an Admin can see");
 
       await openApp(page.path);
 

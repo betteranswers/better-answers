@@ -296,7 +296,7 @@ type Listed = {
   readonly onChoose: (jump: Jump) => void;
 };
 
-/** Its own lines, not the band's: an open dialog hides the band from assistive technology. */
+/** Announces its own status lines, because an open dialog hides the band from assistive technology. */
 function JumpList(
   properties: Listed & {
     readonly read: MembersRead;

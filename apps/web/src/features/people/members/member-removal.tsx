@@ -60,8 +60,8 @@ export function MemberRemoval(properties: {
               </legend>
               <p id={recordId} className="text-sm text-muted-foreground">
                 {yourself
-                  ? "Are you sure you want to remove yourself from this workspace? You will lose access on every session and assistant you hold."
-                  : "Are you sure you want to remove this member from the workspace? They will lose access on every session and assistant they hold."}
+                  ? "Are you sure you want to remove yourself from this workspace? You will be signed out, and any assistant you connected will lose access."
+                  : "Are you sure you want to remove this member from this workspace? They will be signed out, and any assistant they connected will lose access."}
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button

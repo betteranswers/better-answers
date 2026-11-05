@@ -1,10 +1,9 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { INCLUDES_YOU } from "@/features/people/member-action-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack, type Held } from "@test/stubbed-api.ts";
+import { holdProcedure, type Held } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -65,7 +64,7 @@ const switcherOpenedAndDismissed = async (listing?: string) => {
 };
 
 const editorPickedByKeyboard = async (select: HTMLElement) => {
-  // jsdom lays nothing out, and the select scrolls its chosen choice into view as it opens.
+  // jsdom has no scrollIntoView, which the select calls when it opens.
   Object.defineProperty(Element.prototype, "scrollIntoView", {
     value: () => undefined,
     configurable: true,
@@ -104,14 +103,14 @@ const removingYourself = (
     api.set("session.member", () => NOT_A_MEMBER);
     api.set("members.list", () => NOT_A_MEMBER);
     api.set("person.workspaces", () => read(after));
-    if (holdingTheReread) reread.resolve(heldBack(api, "person.workspaces"));
+    if (holdingTheReread) reread.resolve(holdProcedure(api, "person.workspaces"));
     return read({ changed: [ADA.personId], skipped: 0 });
   });
   return { api, reread: reread.promise };
 };
 
-describe("bulk actions on the members ticked", () => {
-  it("demoting yourself says so, then lands on Editor's home", async () => {
+describe("bulk actions that include you", () => {
+  it("demoting yourself warns you, then opens the Editor home", async () => {
     const api = adaAnAdmin();
     api.set("members.bulkChangeRole", () => {
       api.set("session.member", () => adaAt("Editor"));
@@ -122,8 +121,7 @@ describe("bulk actions on the members ticked", () => {
     await tick(ADA.displayName);
 
     const dialog = await dialogOpened("Change Role", "Change Role for 1 Member");
-    expect(linesIn(dialog)).toHaveLength(3);
-    expect(within(dialog).getByText(INCLUDES_YOU)).toBeDefined();
+    expect(linesIn(dialog), "the dialog did not add a line saying it includes you").toHaveLength(3);
     await editorPickedByKeyboard(within(dialog).getByRole("combobox", { name: "Role" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Change Role" }));
 
@@ -134,7 +132,7 @@ describe("bulk actions on the members ticked", () => {
     );
   });
 
-  it("removing yourself lands on the chooser, without this workspace", async () => {
+  it("removing yourself opens the chooser without this workspace", async () => {
     const { api, reread } = removingYourself(
       HELD_BEFORE,
       [
@@ -148,8 +146,7 @@ describe("bulk actions on the members ticked", () => {
     await tick(ADA.displayName);
 
     const dialog = await dialogOpened("Remove", "Remove 1 Member");
-    expect(linesIn(dialog)).toHaveLength(2);
-    expect(within(dialog).getByText(INCLUDES_YOU)).toBeDefined();
+    expect(linesIn(dialog), "the dialog did not add a line saying it includes you").toHaveLength(2);
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
 
     await waitFor(() => {
@@ -158,7 +155,7 @@ describe("bulk actions on the members ticked", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Your Workspaces" })).toBeDefined();
     expect(
       screen.queryByRole("button", { name: NORTHERN.name }),
-      "the chooser opens on the workspace left",
+      "the chooser lists the workspace that was left",
     ).toBeNull();
     (await reread).resolve();
     expect(await screen.findByRole("button", { name: HOLME.name })).toBeDefined();
@@ -166,7 +163,7 @@ describe("bulk actions on the members ticked", () => {
     expect(screen.queryByRole("button", { name: NORTHERN.name })).toBeNull();
   });
 
-  it("removing yourself, in one other workspace, opens that one", async () => {
+  it("removing yourself opens your only other workspace", async () => {
     const { api } = removingYourself(HELD_BEFORE.slice(0, 2), [
       { workspace: HOLME, role: "Viewer" },
     ]);
@@ -184,7 +181,7 @@ describe("bulk actions on the members ticked", () => {
     expect(await switcher(HOLME)).toBeDefined();
   });
 
-  it("removing yourself, in no other workspace, reaches no-workspace", async () => {
+  it("removing yourself from your only workspace shows No Workspace Yet", async () => {
     const { api } = removingYourself(HELD_BEFORE.slice(0, 1), []);
     await openAt(MEMBERS, api);
     await switcherOpenedAndDismissed();

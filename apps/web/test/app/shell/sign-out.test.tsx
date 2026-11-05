@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import { HOMES } from "@/shared/navigation.ts";
 import {
-  aCeilingMet,
+  rateLimitedResponse,
   ADA,
   adaAnAdmin,
   band,
@@ -19,17 +19,22 @@ afterEach(cleanup);
 
 const WAIT_SECONDS = 120;
 
-it("a refused sign-out keeps the page and says the wait", async () => {
+it("shows the wait and keeps the page on refused sign-out", async () => {
   const api = adaAnAdmin();
-  api.set("/sign-out", () => aCeilingMet(WAIT_SECONDS));
+  api.set("/sign-out", () => rateLimitedResponse(WAIT_SECONDS));
   const router = await openAt(HOMES.Admin.path, api);
   const alert = band().getByRole("alert");
-  expect(alert.textContent, "the band says nothing before a sign-out").toBe("");
+  expect(alert.textContent, "the band alert had text before sign-out").toBe("");
 
   await userEvent.click(band().getByRole("button", { name: ADA.displayName }));
   await userEvent.click(await screen.findByRole("menuitem", { name: "Sign Out" }));
 
   await vi.waitFor(() => expect(alert.textContent).toMatch(/\b2 minutes\b/));
-  expect(router.state.location.pathname, "a refused sign-out left the page").toBe(HOMES.Admin.path);
-  expect(switcherDrawn(NORTHERN), "a refused sign-out dropped the workspace").not.toBeNull();
+  expect(router.state.location.pathname, "the refused sign-out navigated away").toBe(
+    HOMES.Admin.path,
+  );
+  expect(
+    switcherDrawn(NORTHERN),
+    "the refused sign-out removed the workspace switcher",
+  ).not.toBeNull();
 });

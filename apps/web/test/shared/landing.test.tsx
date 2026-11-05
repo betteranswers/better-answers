@@ -53,7 +53,7 @@ function Lines() {
           ]);
         }}
       >
-        The page lands
+        Add Lines
       </button>
     </>
   );
@@ -61,64 +61,64 @@ function Lines() {
 
 const searchBox = (): HTMLElement => screen.getByRole("searchbox", { name: "Search" });
 
-const askedForMore = (): void => {
+const clickLoadMore = (): void => {
   const more = screen.getByRole("button", { name: "Load More" });
   more.focus();
   fireEvent.click(more);
 };
 
-const thePageLands = (): void => {
-  fireEvent.click(screen.getByRole("button", { name: "The page lands" }));
+const addNextPage = (): void => {
+  fireEvent.click(screen.getByRole("button", { name: "Add Lines" }));
 };
 
-describe("where focus goes when Load More's page lands", () => {
-  it("lands on the first new line", () => {
+describe("focus after Load More adds rows", () => {
+  it("moves to the first new line", () => {
     render(<Lines />);
 
-    askedForMore();
-    thePageLands();
+    clickLoadMore();
+    addNextPage();
 
     expect(document.activeElement?.textContent).toBe("line 3");
   });
 
-  it("lands there when focus has fallen to the page", () => {
+  it("moves to the first new line after focus is lost", () => {
     render(<Lines />);
 
-    askedForMore();
+    clickLoadMore();
     screen.getByRole("button", { name: "Load More" }).blur();
-    thePageLands();
+    addNextPage();
 
     expect(document.activeElement?.textContent).toBe("line 3");
   });
 
-  it("leaves focus where the reader has since moved it", () => {
+  it("stays where the user moved it while loading", () => {
     render(<Lines />);
 
-    askedForMore();
+    clickLoadMore();
     searchBox().focus();
-    thePageLands();
+    addNextPage();
 
     expect(document.activeElement).toBe(searchBox());
   });
 
-  it("lands when the window comes back to the same control", () => {
+  it("moves to the new line after the window regains focus", () => {
     render(<Lines />);
 
-    askedForMore();
+    clickLoadMore();
     fireEvent.focusIn(screen.getByRole("button", { name: "Load More" }));
-    thePageLands();
+    addNextPage();
 
     expect(document.activeElement?.textContent).toBe("line 3");
   });
 
-  it("lands again on the next page asked for", () => {
+  it("moves to the first line of the next page too", () => {
     render(<Lines />);
 
-    askedForMore();
+    clickLoadMore();
     searchBox().focus();
-    thePageLands();
-    askedForMore();
-    thePageLands();
+    addNextPage();
+    clickLoadMore();
+    addNextPage();
 
     expect(document.activeElement?.textContent).toBe("line 5");
   });

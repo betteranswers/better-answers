@@ -13,7 +13,7 @@ import {
   linkSentTo,
   person,
   provision,
-  theActionLandedWithinItsBudget,
+  actionWithinBudget,
 } from "../harness.ts";
 
 const CLIENT_IP_HEADER = "cf-connecting-ip";
@@ -91,7 +91,7 @@ test("another browser shows the link's code, and c copies it", async ({
   );
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading "Enter This Code Where You Started" [level=1]
+      - heading "Enter This Code to Finish Signing In" [level=1]
       - status
       - paragraph: ${JSON.stringify(codeSpelled(code))}
       - paragraph: /${untilTime}/
@@ -107,10 +107,10 @@ test("another browser shows the link's code, and c copies it", async ({
 
   await clockTheNextKey(page, {
     at: "//main[(.//*[@role='status'])[last()][normalize-space(.)]]",
-    reads: "Enter This Code Where You Started",
+    reads: "Enter This Code to Finish Signing In",
   });
   await page.keyboard.press("c");
-  await theActionLandedWithinItsBudget(page, "copy");
+  await actionWithinBudget(page, "copy");
 
   await page.keyboard.press("Tab");
   await expect(

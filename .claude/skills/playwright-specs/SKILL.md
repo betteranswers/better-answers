@@ -10,7 +10,7 @@ The browser suite drives `apps/web`'s **served build in a browser**. A spec here
 only the served build shows: a page, with its latency budget, the accessibility gate and
 keyboard reach, or a journey that crosses pages through the real api. A page's single-screen
 behaviour is a component test through Testing Library, not a spec (the root `AGENTS.md`, *Testing*).
-A component test holds a request with `heldBack` in `apps/web/test/support/stubbed-api.ts`, which resolves or
+A component test holds a request with `holdProcedure` in `apps/web/test/support/stubbed-api.ts`, which resolves or
 rejects it when the test chooses, where a spec holds one with `page.route`.
 Everything below is what the suite already is; `apps/web/e2e/model-choices/models-and-spend.spec.ts` is the fullest worked example.
 
@@ -82,7 +82,7 @@ signs in by email while the device holds a passkey.
 - **One page case per page, and a second case only for a distinct claim.** A page's spec has one case
   that asserts its latency budget, the accessibility gate on its end state and keyboard reach by
   native Tab. Each further claim of that page is a named `test.step` inside that case, so a failure
-  names it. A second case stays only where a fix or a `docs/solutions/` doc names a claim the page case cannot carry.
+  names it. A second case stays only where a fix names a claim the page case cannot carry.
 - **Locate by role and accessible name, and write the name in the spec.** `getByRole`,
   `getByLabel`, `getByText`. A control, a heading, a region, a dialog and a field are each found by
   the name the page gives them, written as a literal where the spec uses it. A name built from
@@ -137,22 +137,22 @@ signs in by email while the device holds a passkey.
   through `JSON.stringify`, which quotes it as the snapshot takes it.
 - **Tell which refusal happened from where it was decided.** Where the api answered, read its
   answer with `refusalAnswering` or `authAnswering` from `../refused-read.ts`
-  (`references/helpers.md` says what each answers), then check the alert with `saysARefusal`.
+  (`references/helpers.md` says what each answers), then check the alert with `alertHasText`.
   Ask for the answer before the action that calls and await it afterwards, because an answer can
   land before anything waits for it. A streamed answer is the exception, `ask.question`'s today
   (`STREAMED_PATH` in `apps/web/src/shared/api/link.ts`). Chromium keeps no body for it, so read
   it through `page.route` and `route.fetch()`, as
-  `docs/solutions/integration-issues/chromium-keeps-no-body-for-a-streamed-trpc-answer.md` shows.
+  `apps/web/e2e/ask/new-question.spec.ts` does.
   Holding words shows a refusal only in an alert that said
   nothing before it. In one that already says a refusal, read what it says first, then check with
-  `saysSomethingNew` that it says something else. A ceiling's answer carries no word, so the spec
-  hands the wait it names to `saysTheWait`. The api's word is for the logs and the wire, and
-  `keepsItsWordOffThePage` asserts the page shows none of it. A refusal the page draws outside an
+  `regionShowsNewText` that it says something else. A ceiling's answer carries no word, so the spec
+  hands the wait it names to `alertShowsWait`. The api's word is for the logs and the wire, and
+  `pageHidesRefusalWord` asserts the page shows none of it. A refusal the page draws outside an
   alert, as a console list's refused read and the concept page's not found are, is told by the
   answer and by the state the page is left in. Where that state is something gone from a region,
-  the spec also checks the region says something in its place, as `saysOfItsRead` does for a list.
+  the spec also checks the region says something in its place, as `listStatusHasText` does for a list.
   Where the page decided (a request dropped, a refusal the page raises before it calls, the tries
-  left for a code), no answer says which refusal it was, so `saysARefusal` is the whole check and
+  left for a code), no answer says which refusal it was, so `alertHasText` is the whole check and
   a number the alert shows is matched by pattern. No spec imports a refusal's sentence, and the
   page gains no marker for a test's sake. `apps/web/e2e/people/members.spec.ts` reads a batched answer,
   `apps/web/e2e/sources/connected-sources.spec.ts` one sent alone,
@@ -171,9 +171,9 @@ signs in by email while the device holds a passkey.
   100 ms is only recorded, because there the shared runner's processor sets the number. A timed
   draw that does wait on the server, such as jump-to's list, uses `clockTheNextDraw`, which holds
   nothing. `apps/web/e2e/sources/connected-sources.spec.ts` times both, with `clockTheNextKey` and
-  `theActionLandedWithinItsBudget`. Most specs time one sample;
+  `actionWithinBudget`. Most specs time one sample;
   `apps/web/e2e/people/members.spec.ts` and `apps/web/e2e/inbox/waiting-on-you.spec.ts` take the median of
-  `ACTION_SAMPLES` through `theActionsLandedWithinTheirBudget`.
+  `ACTION_SAMPLES` through `medianActionWithinBudget`.
 - **A shared part no page draws yet is bundled with Vite, not imported.** Playwright compiles
   every `.tsx` it loads with its own JSX runtime, so React cannot render a component a spec imports.
   `apps/web/e2e/drawn-parts.ts` builds a unit-suite harness through Vite from a virtual entry

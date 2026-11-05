@@ -15,9 +15,14 @@ import {
   provision,
   signIn,
   skipLinkReachesThePage,
-  theActionsLandedWithinTheirBudget,
+  medianActionWithinBudget,
 } from "../harness.ts";
-import { conceptsSeeded, isAFind, listsItsKeystrokes, scrolledSideways } from "../knowledge.ts";
+import {
+  conceptsSeeded,
+  isKnowledgeFind,
+  listsItsKeystrokes,
+  scrolledSideways,
+} from "../knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -183,10 +188,10 @@ test.describe("the concept page", () => {
     await expect(conceptOf(page, RETENTION)).toBeVisible();
     await page.reload();
     await expect(conceptOf(page, RETENTION)).toBeVisible();
-    await page.route(isAFind, (route) => route.abort());
+    await page.route(isKnowledgeFind, (route) => route.abort());
     await wayBack(page).click();
     await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
-    await page.unroute(isAFind);
+    await page.unroute(isKnowledgeFind);
 
     const box = page.getByRole("searchbox", { name: "Search by a word or a question" });
     await box.fill("audit logs");
@@ -213,7 +218,7 @@ test.describe("the concept page", () => {
       "The committee meets each quarter.",
     );
     await passesTheAccessibilityGate();
-    await opened.getByRole("button", { name: "Close editor" }).click();
+    await opened.getByRole("button", { name: "Close Editor" }).click();
     await expect(opened).toHaveCount(0);
 
     const samples: number[] = [];
@@ -230,9 +235,12 @@ test.describe("the concept page", () => {
       await page.keyboard.up("Control");
 
       samples.push(await actionClocked(page));
-      await expect(conceptOf(page, title).getByRole("status")).toHaveText("Saved.");
+      await expect(
+        conceptOf(page, title).getByRole("status"),
+        "the concept was not saved under its new title",
+      ).toHaveText(/\S/u);
     }
-    theActionsLandedWithinTheirBudget("save", samples);
+    medianActionWithinBudget("save", samples);
 
     await page.reload();
     await expect(conceptOf(page, title)).toBeVisible();

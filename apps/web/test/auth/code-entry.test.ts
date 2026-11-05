@@ -15,7 +15,7 @@ describe("the code a person enters", () => {
     expect(digitsOf(entered)).toBe(digits);
   });
 
-  it("sends six digits nobody refused", () => {
+  it("sends six digits that were not refused", () => {
     expect(worthSending("123456", [])).toBe(true);
   });
 
@@ -23,7 +23,7 @@ describe("the code a person enters", () => {
     ["five digits", "12345", []],
     ["nothing", "", []],
     ["a refused value", "123456", ["000000", "123456"]],
-  ])("holds back %s", (_, code, refused) => {
+  ])("does not send %s", (_, code, refused) => {
     expect(worthSending(code, refused)).toBe(false);
   });
 
@@ -42,16 +42,16 @@ describe("the code a person enters", () => {
   });
 
   it.each([
-    ["its tries are spent", 403, "TOO_MANY_ATTEMPTS"],
+    ["no tries are left", 403, "TOO_MANY_ATTEMPTS"],
     ["it has expired", 400, "OTP_EXPIRED"],
-  ])("reads a code as spent once %s", (_, status, libraryCode) => {
+  ])("rejects a code for good once %s", (_, status, libraryCode) => {
     expect(codeSpent({ status, libraryCode })).toBe(true);
   });
 
   it.each([
     ["says wrong", "INVALID_OTP"],
     ["names no reason", undefined],
-  ])("keeps a code's tries when its refusal %s", (_, libraryCode) => {
+  ])("keeps the code's tries when the refusal %s", (_, libraryCode) => {
     expect(codeSpent({ status: 400, libraryCode })).toBe(false);
   });
 });

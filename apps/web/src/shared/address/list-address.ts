@@ -6,14 +6,14 @@ import { asWritten } from "@/shared/address/address-query.ts";
 
 type Held = string | number | undefined;
 
-/** An editor that writes its own fields to the address is not the person leaving the page. */
+/** `ignoreBlocker` lets an editor update the address without triggering the unsaved-changes prompt. */
 export type WriteOptions = { readonly ignoreBlocker?: boolean };
 
 export type ListFields = Readonly<Record<string, z.ZodCatch<z.ZodType<Held>>>>;
 
 type AddressState<Fields extends ListFields> = z.output<z.ZodObject<Fields>>;
 
-/** The router reads a whole number as one, so a page held as a quoted word is malformed too. */
+/** The router parses a whole number as a number, so a quoted page number is also malformed. */
 export const PAGE_NUMBER = z.number().int().min(1).catch(1);
 
 export const searchText = (max = Number.POSITIVE_INFINITY) =>

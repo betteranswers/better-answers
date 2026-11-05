@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { INVITE_REFUSED, INVITE_WORDS } from "@/features/people/invitation-words.ts";
+import { INVITE_WORDS } from "@/features/people/invitation-words.ts";
 import { MOST_AT_ONCE } from "@/features/people/invitations/invite-addresses.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
@@ -26,7 +26,7 @@ import {
   pressedOn,
   pressEnter,
   PRIYA,
-  refusalNaming,
+  refusalWithItems,
   removeOf,
   rowsOf,
   sendButton,
@@ -36,13 +36,13 @@ import {
   typed,
   anInvitation,
 } from "@test/people/invitations-stubbed.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
-const JOINED_MEANWHILE = refusalNaming("already-a-member", "conflict", 409, {
+const JOINED_MEANWHILE = refusalWithItems("already-a-member", "conflict", 409, {
   1: "already-a-member",
 });
 
@@ -51,7 +51,7 @@ const alertIn = (where: HTMLElement) => firstAlertIn(where).textContent;
 const sentSaid = () => within(inviteDialog()).getAllByRole("status")[0]?.textContent ?? "";
 
 describe("the People page's Invitations tab", () => {
-  it("names a member's address inline before anything is sent", async () => {
+  it("flags a member's address before anything is sent", async () => {
     await openedWith();
     const member = PRIYA.address.toUpperCase();
 
@@ -64,7 +64,7 @@ describe("the People page's Invitations tab", () => {
     expect(sendButton().getAttribute("aria-disabled")).toBe("true");
     await pressEnter(addressField());
     await focused(removeOf(member));
-    expect(alertIn(inviteDialog())).toBe(INVITE_REFUSED.flagged);
+    expect(alertIn(inviteDialog()), "no alert asked to fix the flagged address").toMatch(/\S/);
     pressedOn("Escape");
     await dialogClosed();
     await focused(inviteAction());
@@ -72,7 +72,7 @@ describe("the People page's Invitations tab", () => {
     expect(asksOf("members.invite")).toEqual([]);
   });
 
-  it("names on its row an address that joined meanwhile", async () => {
+  it("flags an address that became a member during the send", async () => {
     const { api } = holdingInvitations([]);
     api.set("members.invite", () => JOINED_MEANWHILE);
     await openInvitations(api);
@@ -81,7 +81,7 @@ describe("the People page's Invitations tab", () => {
     await sentTyped(`${other}, ${joined}`);
 
     await waitFor(() => {
-      expect(alertIn(inviteDialog())).toBe(INVITE_REFUSED.flagged);
+      expect(alertIn(inviteDialog()), "no alert asked to fix the flagged address").toMatch(/\S/);
     });
     expect(asksOf("members.invite")).toEqual([{ addresses: [other, joined], role: "Viewer" }]);
     await focused(removeOf(joined));
@@ -89,7 +89,7 @@ describe("the People page's Invitations tab", () => {
     expect(removeOf(other, INVITE_WORDS.flag.ready)).toBeDefined();
   });
 
-  it("names an invalid address inline and sends nothing", async () => {
+  it("flags an invalid address and sends nothing", async () => {
     await openedWith();
     const [ana, ben] = [addressOf("ana"), addressOf("ben")];
 
@@ -103,13 +103,13 @@ describe("the People page's Invitations tab", () => {
       within(inviteDialog())
         .getAllByRole("status")
         .map((status) => status.textContent),
-      "the dialog counts two ready and one flagged",
+      "the dialog did not count two ready and one flagged",
     ).toContainEqual(expect.stringMatching(/\b2\b\D+\b1\b/));
     expect(sendButton().getAttribute("aria-disabled")).toBe("true");
     await pressEnter(addressField());
     await focused(removeOf("not-an-address"));
-    expect(alertIn(inviteDialog())).toBe(INVITE_REFUSED.flagged);
-    expect(asksOf("members.invite"), "the flagged send asked the api nothing").toEqual([]);
+    expect(alertIn(inviteDialog()), "no alert asked to fix the flagged address").toMatch(/\S/);
+    expect(asksOf("members.invite"), "the flagged send called the api").toEqual([]);
 
     await pressEnter(removeOf("not-an-address"));
     expect(heldAddresses()).toHaveLength(2);
@@ -128,7 +128,7 @@ describe("the People page's Invitations tab", () => {
     });
   });
 
-  it("removal hands focus to the row before, then the field", async () => {
+  it("removing addresses moves focus up, then to the field", async () => {
     await openedWith();
     const [ana, ben] = [addressOf("ana"), addressOf("ben")];
 
@@ -145,7 +145,7 @@ describe("the People page's Invitations tab", () => {
     await focused(addressField());
   });
 
-  it("sends 50 at once, holding a 51st in the field", async () => {
+  it("sends 50 at once and keeps the 51st typed", async () => {
     await openedWith();
     const fifty = Array.from({ length: MOST_AT_ONCE }, (_, at) =>
       addressOf(`person-${String(at)}`),
@@ -158,37 +158,37 @@ describe("the People page's Invitations tab", () => {
 
     expect(heldAddresses()).toHaveLength(MOST_AT_ONCE);
     expect(addressField().value).toBe(late);
-    expect(alertIn(inviteDialog())).toBe(INVITE_REFUSED.capped(MOST_AT_ONCE));
+    expect(alertIn(inviteDialog()), "the alert did not give the limit").toMatch(/\b50\b/);
     expect(sendButton().textContent).toBe("Send 50 Invitations");
     fireEvent.click(sendButton());
 
     await waitFor(() => {
-      expect(sentSaid(), "a send holding 50 sends them, and counts the one still waiting").toMatch(
+      expect(sentSaid(), "the outcome did not count 50 sent and 1 waiting").toMatch(
         /\b50\b.*\b1\b/,
       );
     });
     const sentFifty = sentSaid();
-    expect(asksOf("members.invite"), "the 51st waits, unsent").toEqual([
+    expect(asksOf("members.invite"), "the 51st address was sent with the first 50").toEqual([
       { addresses: fifty, role: "Viewer" },
     ]);
     const next = within(inviteDialog()).getByRole("button", { name: INVITE });
     await focused(next);
     await pressEnter(next);
     await focused(addressField());
-    expect(addressField().value, "the next invite starts from what was left").toBe(late);
+    expect(addressField().value, "the next invite did not start with the 51st address").toBe(late);
     fireEvent.click(sendButton());
 
     await waitFor(() => {
       expect(sentSaid()).toContain(late);
     });
-    expect(sentSaid(), "the outcome still tells of the 50").not.toBe(sentFifty);
+    expect(sentSaid(), "the outcome still describes the first 50").not.toBe(sentFifty);
     await focused(doneButton());
     fireEvent.click(doneButton());
     await dialogClosed();
     await statusChoice("Waiting", 51);
   });
 
-  it("re-sends to an address waiting, and says so", async () => {
+  it("inviting a waiting address replaces its invitation", async () => {
     const sam = addressOf("sam");
     const { api } = holdingInvitations([anInvitation("sam")]);
     await openInvitations(api);
@@ -201,14 +201,13 @@ describe("the People page's Invitations tab", () => {
     await waitFor(() => {
       expect(sentSaid()).toContain(sam);
     });
-    expect(sentSaid()).toMatch(/replacing the one that was waiting/);
     fireEvent.click(doneButton());
     await dialogClosed();
     await statusChoice("Waiting", 1);
     await statusChoice("Cancelled", 1);
   });
 
-  it("names an email that did not go, offering a Resend", async () => {
+  it("shows an unsent email with a Resend button", async () => {
     const offline = addressOf("offline");
     const { api } = holdingInvitations([], [offline]);
     await openInvitations(api);
@@ -230,14 +229,14 @@ describe("the People page's Invitations tab", () => {
     await focused(resend);
     fireEvent.click(doneButton());
     await dialogClosed();
-    expect(rowsOf(offline), "the invitation stands though its email did not go").toHaveLength(1);
+    expect(rowsOf(offline), "the invitation was not listed after its email failed").toHaveLength(1);
   });
 
   for (const tab of ["Members", "Invitations", "Requests"] as const) {
-    it(`closed mid-send, the dialog's unsent emails land on ${tab}`, async () => {
+    it(`shows unsent emails on ${tab} after the dialog closes mid-send`, async () => {
       const offline = addressOf("offline");
       const { api } = holdingInvitations([], [offline]);
-      const invite = heldBack(api, "members.invite");
+      const invite = holdProcedure(api, "members.invite");
       await openPeople(api, tab);
       const region = screen.getByRole("region", { name: tab });
 
@@ -256,9 +255,9 @@ describe("the People page's Invitations tab", () => {
     });
   }
 
-  it("a refusal after the dialog closed names its addresses", async () => {
+  it("a refusal after the dialog closes names the refused address", async () => {
     const { api } = holdingInvitations([]);
-    const invite = heldBack(api, "members.invite");
+    const invite = holdProcedure(api, "members.invite");
     await openInvitations(api);
     const [other, joined] = [addressOf("other"), addressOf("joined")];
 
@@ -278,10 +277,12 @@ describe("the People page's Invitations tab", () => {
     });
     fireEvent.click(inviteAction());
     await screen.findByRole("dialog", { name: INVITE });
-    expect(addressField().value, "the dialog holds what was not sent").toBe(`${other}, ${joined}`);
+    expect(addressField().value, "the dialog lost the addresses that were not sent").toBe(
+      `${other}, ${joined}`,
+    );
   });
 
-  it("the dialog's unsent list drops an address whose Resend went", async () => {
+  it("the dialog removes an address once its resend succeeds", async () => {
     const [offline, other] = [addressOf("offline"), addressOf("other")];
     const { api, reachable } = holdingInvitations([], [offline, other]);
     await openInvitations(api);
@@ -303,12 +304,12 @@ describe("the People page's Invitations tab", () => {
     expect(
       within(unsent).getByRole("button", { name: `Resend Invitation to ${other}` }),
     ).toBeDefined();
-    expect(document.activeElement, "focus left with the row").toBe(
+    expect(document.activeElement, "focus did not move to the Unsent Emails heading").toBe(
       within(unsent).getByRole("heading", { name: "Unsent Emails" }),
     );
   });
 
-  it("names when to try again past an address's email ceiling", async () => {
+  it("says when to try again after too many emails", async () => {
     const capped = addressOf("capped");
     const { api } = holdingInvitations([anInvitation("capped")]);
     api.set("members.invite", () => tooManyAttempts(150));

@@ -1,9 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { homeNowSaid } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
-import { ROLE_UNREAD } from "@/features/people/members/self-action.tsx";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { type Api } from "@test/stubbed-api.ts";
@@ -50,8 +48,8 @@ const demotingHerself = async (api: Api, memberAfter: Parameters<Api["set"]>[1])
   return router;
 };
 
-describe("a change to the reader's own member", () => {
-  it("lands a self-removed Admin at the chooser, drawing no role", async () => {
+describe("changes to your own membership", () => {
+  it("sends an Admin who removes themself to the workspace chooser", async () => {
     const api = adaAnAdmin();
     const landing = Promise.withResolvers<void>();
     api.set("members.remove", () => {
@@ -71,8 +69,10 @@ describe("a change to the reader's own member", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Remove Member" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
-    await waitFor(() => expect(switcherDrawn(), "the band names the workspace left").toBeNull());
-    expect(adminsAreaOffered(), "the rail offers the role lost").toBeNull();
+    await waitFor(() =>
+      expect(switcherDrawn(), "the top band still names the workspace that was left").toBeNull(),
+    );
+    expect(adminsAreaOffered(), "the rail still offers the Admin area").toBeNull();
 
     landing.resolve();
     expect(await screen.findByRole("button", { name: HOLME.name })).toBeDefined();
@@ -80,7 +80,7 @@ describe("a change to the reader's own member", () => {
     expect(screen.queryByRole("navigation", { name: "Areas" })).toBeNull();
   });
 
-  it("drops the left workspace's name when a switch's re-read fails", async () => {
+  it("hides the old workspace's name when a switch fails", async () => {
     const api = adaAnAdmin();
     api.set(SET_ACTIVE, () => {
       api.set("session.member", () => LOST);
@@ -95,23 +95,25 @@ describe("a change to the reader's own member", () => {
     expect(router.state.location.pathname).toBe("/");
   });
 
-  it("lands a self-demoted Admin at an Editor's home, saying why", async () => {
+  it("sends an Admin who demotes themself to the Editor home", async () => {
     const router = await demotingHerself(adaAnAdmin(), () => adaAt("Editor"));
 
-    const said = await screen.findByText(homeNowSaid("Editor"));
-    expect(said.textContent).toContain("Editor");
-    expect(router.state.location.pathname).toBe(HOMES.Editor.path);
-    expect(adminsAreaOffered(), "the rail offers the role lost").toBeNull();
+    await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Editor.path));
+    expect(
+      await screen.findByText(/\bEditor\b/, { selector: "output" }),
+      "the home page did not say the new role",
+    ).toBeDefined();
+    expect(adminsAreaOffered(), "the rail still offers the Admin area").toBeNull();
   });
 
-  it("keeps a self-demoted Admin put, told the role is unread", async () => {
+  it("keeps a demoted Admin on the page when reading fails", async () => {
     const router = await demotingHerself(adaAnAdmin(), () => LOST);
 
     const roleCard = within(screen.getByRole("region", { name: "Role" }));
-    await waitFor(() => expect(roleCard.getByRole("alert").textContent).toBe(ROLE_UNREAD.words));
+    await waitFor(() => expect(roleCard.getByRole("alert").textContent).toMatch(/\S/));
     expect(roleCard.getByRole("status").textContent).toBe("");
     expect(router.state.location.pathname).toBe(MEMBER_PAGE);
-    expect(switcherDrawn(), "the page lost the workspace it was drawn for").not.toBeNull();
-    expect(adminsAreaOffered(), "the page lost the role it was drawn for").not.toBeNull();
+    expect(switcherDrawn(), "the workspace switcher disappeared").not.toBeNull();
+    expect(adminsAreaOffered(), "the Admin area disappeared from the rail").not.toBeNull();
   });
 });

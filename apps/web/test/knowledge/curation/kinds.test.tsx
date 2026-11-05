@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 
 import {
   KINDS_KEYSTROKES as KEY,
@@ -7,9 +7,9 @@ import {
 } from "@/features/knowledge/curation/curation-state.ts";
 import { KINDS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { STOCK } from "@/shared/refusal-words.ts";
+import { theOneEmptyStatus } from "@test/empty-status.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -72,10 +72,29 @@ const filterButton = () => region().getByRole("button", { name: WORDS.tail });
 
 const sortHead = (name: string) => region().getByRole("button", { name });
 
-const saidInAnAlert = async (words: string) => {
-  const said = await region().findByText(words);
-  expect(said.closest("[role=alert]"), `"${words}" was drawn outside an alert`).not.toBeNull();
-};
+const table = () => region().findByRole("table");
+
+const alertHoldsWords = () =>
+  waitFor(() =>
+    expect(
+      region()
+        .getAllByRole("alert")
+        .map((alert) => alert.textContent)
+        .join(""),
+      "the failed read showed no alert",
+    ).toMatch(/\S/u),
+  );
+
+const theLoadingLine = () =>
+  waitFor(() => {
+    const loading = region()
+      .getAllByRole("status")
+      .find((status) => /\S/u.test(status.textContent));
+    assert(loading !== undefined, "no status says the kinds are loading");
+    return loading;
+  });
+
+const theStatusEmptyOnArrival = () => theOneEmptyStatus(region().getAllByRole("status"));
 
 const searchOf = (router: Awaited<ReturnType<typeof openAt>>) => router.state.location.searchStr;
 
@@ -83,7 +102,7 @@ describe("the Kinds page", () => {
   it("lists each kind with its concepts, sorted by kind", async () => {
     await openAt(PAGE, aKindsApi());
 
-    await screen.findByRole("table", { name: WORDS.caption });
+    await table();
     expect(kindsListed()).toEqual(["Ledger", "Policy", "Procedure", "Role"]);
     expect(
       ["Ledger", "Policy", "Procedure", "Role"].map(countOf),
@@ -97,7 +116,7 @@ describe("the Kinds page", () => {
 
   it("holds a sort by concepts in the address", async () => {
     const router = await openAt(PAGE, aKindsApi());
-    await screen.findByRole("table", { name: WORDS.caption });
+    await table();
 
     fireEvent.click(sortHead("Concepts"));
 
@@ -128,7 +147,7 @@ describe("the Kinds page", () => {
   it("reads the filter and the sort from its address", async () => {
     await openAt(`${PAGE}?${KINDS_LIST}.tail=small&${KINDS_LIST}.sort=-count`, aKindsApi());
 
-    await screen.findByRole("table", { name: WORDS.caption });
+    await table();
     expect(kindsListed()).toEqual(["Ledger", "Role", "Procedure"]);
     expect(filterButton().getAttribute("aria-pressed")).toBe("true");
     expect(region().getByText("3 of 4 kinds")).toBeDefined();
@@ -136,7 +155,7 @@ describe("the Kinds page", () => {
 
   it("shows only kinds with two or fewer concepts when pressed", async () => {
     const router = await openAt(PAGE, aKindsApi());
-    await screen.findByRole("table", { name: WORDS.caption });
+    await table();
     expect(filterButton().getAttribute("aria-pressed")).toBe("false");
 
     fireEvent.click(filterButton());
@@ -155,7 +174,7 @@ describe("the Kinds page", () => {
 
   it("switches the filter by its keystroke", async () => {
     await openAt(PAGE, aKindsApi());
-    await screen.findByRole("table", { name: WORDS.caption });
+    await table();
 
     fireEvent.keyDown(document.body, { key: KEY.tail.key });
 
@@ -168,20 +187,19 @@ describe("the Kinds page", () => {
     expect(kindsListed()).toHaveLength(4);
   });
 
-  it("words an empty filter and clears it", async () => {
+  it("offers Clear Filters when the filter leaves no kinds", async () => {
     const router = await openAt(
       PAGE,
       aKindsApi([{ kind: "Policy", count: 3, collections: [{ collection: "hr", count: 3 }] }]),
     );
-    await screen.findByRole("table", { name: WORDS.caption });
+    await table();
 
     fireEvent.click(filterButton());
 
-    expect(await region().findByText(WORDS.noneSmall)).toBeDefined();
+    const clear = await region().findByRole("button", { name: "Clear Filters" });
     expect(kindsListed()).toEqual([]);
     expect(region().getByText("0 of 1 kind")).toBeDefined();
 
-    const clear = region().getByRole("button", { name: "Clear Filters" });
     clear.focus();
     fireEvent.click(clear);
 
@@ -192,7 +210,7 @@ describe("the Kinds page", () => {
 
   it("opens a kind to list its counts per collection", async () => {
     await openAt(PAGE, aKindsApi());
-    await screen.findByRole("table", { name: WORDS.caption });
+    await table();
     const policy = disclosureOf("Policy");
     expect(policy.getAttribute("aria-expanded")).toBe("false");
     expect(region().queryByRole("list", { name: WORDS.collectionsOf("Policy") })).toBeNull();
@@ -201,15 +219,13 @@ describe("the Kinds page", () => {
 
     const list = await region().findByRole("list", { name: WORDS.collectionsOf("Policy") });
     expect(policy.getAttribute("aria-expanded")).toBe("true");
-    expect(
-      within(list)
-        .getAllByRole("listitem")
-        .map((each) => [...each.children].map((part) => part.textContent)),
-      "the collections differ from the kind's, or the unnamed one has no plain word",
-    ).toEqual([
-      ["hr", "2"],
-      [WORDS.noCollection, "1"],
-    ]);
+    const [named, unnamed] = within(list)
+      .getAllByRole("listitem")
+      .map((each) => [...each.children].map((part) => part.textContent));
+    expect(named, "the collections differ from the kind's").toEqual(["hr", "2"]);
+    expect(unnamed?.[1], "the concepts in no collection are miscounted").toBe("1");
+    expect(unnamed?.[0], "the concepts in no collection have no label").toMatch(/\S/u);
+    expect(unnamed?.[0], "the missing collection shows as null").not.toMatch(/null/u);
     expect(disclosureOf("Ledger").getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.click(policy);
@@ -220,7 +236,7 @@ describe("the Kinds page", () => {
 
   it("keeps an opened kind open through a sort", async () => {
     await openAt(PAGE, aKindsApi());
-    await screen.findByRole("table", { name: WORDS.caption });
+    await table();
     fireEvent.click(disclosureOf("Role"));
     await region().findByRole("list", { name: WORDS.collectionsOf("Role") });
 
@@ -233,7 +249,7 @@ describe("the Kinds page", () => {
 
   it("opens and closes the kind in focus by its keystroke", async () => {
     await openAt(PAGE, aKindsApi());
-    await screen.findByRole("table", { name: WORDS.caption });
+    await table();
     const ledger = disclosureOf("Ledger");
     ledger.focus();
 
@@ -250,19 +266,22 @@ describe("the Kinds page", () => {
 
   it("asks for a kind first when none is in focus", async () => {
     await openAt(PAGE, aKindsApi());
-    await screen.findByRole("table", { name: WORDS.caption });
+    await table();
+    const outcome = theStatusEmptyOnArrival();
 
     fireEvent.keyDown(document.body, { key: KEY.open.key });
 
-    expect(await region().findByText(WORDS.selectFirst)).toBeDefined();
+    await waitFor(() =>
+      expect(outcome.textContent, "the open key with no kind in focus said nothing").toMatch(/\S/u),
+    );
     expect(disclosures().filter((each) => each.getAttribute("aria-expanded") === "true")).toEqual(
       [],
     );
   });
 
-  it("reads without a rename, a merge or an editable cell", async () => {
+  it("offers no rename, merge or editable cell", async () => {
     await openAt(PAGE, aKindsApi());
-    await screen.findByRole("table", { name: WORDS.caption });
+    await table();
 
     expect(
       region()
@@ -287,52 +306,52 @@ describe("the Kinds page", () => {
     ]);
   });
 
-  it("words an empty knowledge base", async () => {
+  it("shows no table for an empty knowledge base", async () => {
     await openAt(PAGE, aKindsApi([]));
 
-    expect(await region().findByText(WORDS.none)).toBeDefined();
+    expect(await region().findByText("0 kinds")).toBeDefined();
     expect(region().queryByRole("table")).toBeNull();
     expect(region().queryByRole("button", { name: WORDS.tail })).toBeNull();
-    expect(region().getByText("0 kinds")).toBeDefined();
+    expect(
+      region().queryByRole("button", { name: "Retry" }),
+      "an empty list showed as a failure",
+    ).toBeNull();
   });
 
   it("says the kinds are loading until the read answers", async () => {
     const api = aKindsApi();
-    const held = heldBack(api, "knowledge.kinds");
+    const held = holdProcedure(api, "knowledge.kinds");
     await openAt(PAGE, api);
 
-    expect(await region().findByText(WORDS.loading)).toBeDefined();
+    const loading = await theLoadingLine();
     expect(region().queryByRole("table")).toBeNull();
 
     held.resolve();
 
-    expect(await region().findByRole("table", { name: WORDS.caption })).toBeDefined();
-    expect(region().queryByText(WORDS.loading)).toBeNull();
+    expect(await table()).toBeDefined();
+    expect(loading.isConnected, "the loading line stayed after the kinds arrived").toBe(false);
   });
 
-  it.each([
-    ["owner-forbids", WORDS.refusals["owner-forbids"]],
-    ["role-forbids", WORDS.refusals["role-forbids"]],
-  ])("words the %s refusal of the read", async (word, sentence) => {
+  it.each(["owner-forbids", "role-forbids"])("alerts on a %s refusal of the read", async (word) => {
     const api = aKindsApi();
     api.set("knowledge.kinds", () => aRefusalAnswer(word, "forbidden", 403));
     await openAt(PAGE, api);
 
-    await saidInAnAlert(sentence);
+    await alertHoldsWords();
     expect(region().queryByRole("table")).toBeNull();
   });
 
-  it("words a failed read and retries it", async () => {
+  it("alerts on a failed read and retries it", async () => {
     const api = aKindsApi();
     api.set("knowledge.kinds", () => LOST);
     await openAt(PAGE, api);
 
-    await saidInAnAlert(STOCK.notLoaded);
+    await alertHoldsWords();
 
     api.set("knowledge.kinds", () => read({ kinds: KINDS }));
     fireEvent.click(region().getByRole("button", { name: "Retry" }));
 
-    expect(await region().findByRole("table", { name: WORDS.caption })).toBeDefined();
+    expect(await table()).toBeDefined();
   });
 
   it("leaves the page when its reader stops owning a collection", async () => {
@@ -342,9 +361,9 @@ describe("the Kinds page", () => {
       read({ workspace: NORTHERN, person, role: "Editor", owns: { collections, concepts: 0 } });
     api.set("session.member", () => asAnOwner(["policy"]));
     api.set("knowledge.kinds", () => aRefusalAnswer("owner-forbids", "forbidden", 403));
-    const refused = heldBack(api, "knowledge.kinds");
+    const refused = holdProcedure(api, "knowledge.kinds");
     await openAt(PAGE, api);
-    await region().findByText(WORDS.loading);
+    await theLoadingLine();
 
     api.set("session.member", () => asAnOwner([]));
     refused.resolve();

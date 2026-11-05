@@ -6,12 +6,12 @@ export const server: {
   answer: (asked: Asked, init?: RequestInit) => Promise<Response>;
   asks: Ask[];
 } = {
-  answer: () => Promise.reject(new TypeError("unanswered")),
+  answer: () => Promise.reject(new TypeError("no stub answer is set")),
   asks: [],
 };
 
 /**
- * Better Auth's client keeps the `fetch` it finds when made, so a test file loads this through
- * `vi.hoisted`, ahead of its imports.
+ * Better Auth's client captures `fetch` at creation, so a test file loads this through
+ * `vi.hoisted`, before its imports.
  */
 globalThis.fetch = (asked: Asked, init?: RequestInit) => server.answer(asked, init);

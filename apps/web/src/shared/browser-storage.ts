@@ -1,6 +1,6 @@
 /**
- * A browser told to block storage throws on the getter rather than answering it; this answers
- * undefined, and the choice is then not kept.
+ * A browser that blocks storage throws when the storage is read. This returns undefined
+ * instead, and the choice is not saved.
  */
 const reached = (store: (browser: Window) => Storage): Storage | undefined => {
   if (typeof window === "undefined") return undefined;
@@ -15,7 +15,7 @@ const kept = (store: Storage | undefined, key: string, value: string): void => {
   try {
     store?.setItem(key, value);
   } catch {
-    // Losing a kept choice costs the reader one click next time; failing the action would cost more.
+    // A lost choice costs the user one click later. Failing the action would cost more.
   }
 };
 
@@ -35,6 +35,6 @@ export const forgetOnThisBrowser = (key: string): void => {
   try {
     onThisBrowser()?.removeItem(key);
   } catch {
-    // A refusing store keeps what it held; the choice shown is still the one made.
+    // If the store refuses, it keeps the old value. The page still shows the new choice.
   }
 };

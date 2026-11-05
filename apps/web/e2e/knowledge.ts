@@ -11,12 +11,12 @@ import {
 } from "./harness.ts";
 
 /** Matches the procedure name anywhere in the path, because the tRPC client can batch several reads into one URL. */
-export const isAFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
+export const isKnowledgeFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
 
-export const heldBack = async (page: Page, named: (url: URL) => boolean) => {
+export const holdRequests = async (page: Page, matches: (url: URL) => boolean) => {
   const held = Promise.withResolvers<void>();
   const reached = Promise.withResolvers<void>();
-  await page.route(named, async (route) => {
+  await page.route(matches, async (route) => {
     reached.resolve();
     await held.promise;
     await route.continue();

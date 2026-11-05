@@ -13,10 +13,7 @@ export const PEOPLE_KEYSTROKES = {
   searchRequests: { key: "/", action: "Search the Requests by Name or Address" },
   open: { key: "o", action: "Open the Member in Focus" },
   changeRole: { key: "c", action: "Change the Role of the Member in Focus" },
-  endEverySignInAndToken: {
-    key: "v",
-    action: "End Every Sign-In and Token Here of the Member in Focus",
-  },
+  signOut: { key: "v", action: "Sign the Member in Focus Out of This Workspace" },
   changeGroups: { key: "g", action: "Change the Groups of the Member in Focus" },
   remove: { key: "d", action: "Remove the Member in Focus" },
   flagName: { key: "f", action: "Flag the Display Name of the Member in Focus" },
@@ -46,10 +43,7 @@ export const MEMBER_PAGE_KEYSTROKES = {
   changeRole: { key: "c", action: "Change This Member’s Role" },
   changeGroups: { key: "g", action: "Change This Member’s Groups" },
   flagName: { key: "f", action: "Flag This Member’s Display Name" },
-  endEverySignInAndToken: {
-    key: "v",
-    action: "End Every Sign-In and Token This Member Holds Here",
-  },
+  signOut: { key: "v", action: "Sign This Member Out of This Workspace" },
   remove: { key: "d", action: "Remove This Member" },
   olderActivity: { key: "o", action: "Show This Member’s Older Activity" },
 } as const satisfies Readonly<Record<string, Keystroke>>;

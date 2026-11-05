@@ -12,8 +12,8 @@ export function PersonName(properties: { readonly person: ListedPerson }) {
   return displayName === "" ? <Address address={email} /> : displayName;
 }
 
-export const grantStateOf = (grant: HeldGrant, nowMs: number): "Expired" | "Live" =>
-  Date.parse(grant.expiresAt) <= nowMs ? "Expired" : "Live";
+export const grantStateOf = (grant: HeldGrant, nowMs: number): "Expired" | "Active" =>
+  Date.parse(grant.expiresAt) <= nowMs ? "Expired" : "Active";
 
 export function WorkspacesAndRoles(properties: { readonly person: ListedPerson }) {
   const { workspaces } = properties.person;

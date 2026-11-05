@@ -10,5 +10,5 @@ export const correctingConsequence = (name: string): string =>
 
 export const correctedWords = (was: string, now: string): string =>
   was === now
-    ? `The display name ${now} has been kept, and its flags have been cleared successfully.`
+    ? `The flags on ${now} have been cleared successfully. The display name is unchanged.`
     : `The display name ${was === "" ? "" : `${was} `}has been changed to ${now} successfully.`;

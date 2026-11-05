@@ -34,7 +34,7 @@ import {
   groupsCounted,
   REVIEW_WORDS,
   ruleWordOf,
-  sentenceCased,
+  spokenWord,
   SYNC_OF_A_DISMISSAL,
 } from "./words.ts";
 
@@ -158,8 +158,12 @@ function TickedList(properties: { readonly groups: readonly GroupOfFindings[] })
     <ul className="grid gap-1">
       {properties.groups.map((group) => (
         <li key={groupKeyText(group)}>
-          {sentenceCased(group.category)} by <RuleWord ruleId={group.ruleId} /> in {group.title}:{" "}
-          {group.found} found
+          {counted(
+            group.found,
+            `${spokenWord(group.category)} finding`,
+            `${spokenWord(group.category)} findings`,
+          )}{" "}
+          in {group.title}, found by the <RuleWord ruleId={group.ruleId} /> rule
         </li>
       ))}
     </ul>
@@ -251,7 +255,7 @@ function NarrowDocumentsAction(properties: ActionProperties) {
     action.command<DocumentsNarrowed>({
       pending: "Narrowing.",
       done: (narrowed) =>
-        `${counted(narrowed.documentIds.length, "document", "documents")} narrowed to ${NARROWEST} successfully. ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.writeUps.length, "write-up", "write-ups")} were updated with them.`,
+        `${counted(narrowed.documentIds.length, "document", "documents")} narrowed to ${NARROWEST} successfully. ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.writeUps.length, "write-up", "write-ups")} that cite them were also updated.`,
       run: (ready, settled) => {
         narrow.mutate(askOf(ready), settled);
       },
@@ -284,7 +288,7 @@ function NarrowDocumentsAction(properties: ActionProperties) {
   );
 }
 
-/** A ulid sorts by when it was minted, so a sync at or past the action's own is one that reads it. */
+/** Job ids are ulids, which sort by creation time, so a sync whose id is at or after this job's includes the dismissal. */
 function SyncStatus(properties: { readonly connectedSourceId: string; readonly jobId: string }) {
   const connectedSources = useConnectedSources();
   const sync = connectedSources.data?.find(
@@ -310,7 +314,7 @@ function DismissAsNotSpecialCategoryAction(properties: ActionProperties) {
       done: (answer) => (
         <>
           {named} dismissed in {counted(answer.documentIds.length, "document", "documents")}{" "}
-          successfully. The sync{" "}
+          successfully. The sync that applies the change{" "}
           <SyncStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />.
         </>
       ),

@@ -20,7 +20,7 @@ import {
   placedForSearch,
   pressed,
   rowAt,
-  saidNow,
+  searchStatusText,
   searchBox,
   searched,
   typed,
@@ -56,13 +56,13 @@ describe("the Knowledge Search page", () => {
     await searched(router, "pallet");
     expect(matchRows()).toHaveLength(A_PAGE);
     expect(loadMore()).not.toBeNull();
-    const whileMoreFollow = saidNow();
+    const whileMoreFollow = searchStatusText();
     pressed(loadMoreButton());
 
     await waitFor(() => expect(matchRows()).toHaveLength(PALLET_PASSAGES.length));
     focusIsOn(rowAt(A_PAGE), "focus did not land on the first new match");
     expect(loadMore()).toBeNull();
-    expect(saidNow(), "the status still says more follow").not.toBe(whileMoreFollow);
+    expect(searchStatusText(), "the status still says more follow").not.toBe(whileMoreFollow);
     expect(findsAsked()).toEqual([
       { query: "pallet", limit: A_PAGE },
       { query: "pallet", limit: A_PAGE, cursor: String(A_PAGE) },
@@ -97,7 +97,7 @@ describe("the Knowledge Search page", () => {
     const keptInOrder = PALLET_PASSAGES.map((_, index) => index).filter(
       (index) => index !== A_PAGE,
     );
-    expect(textOfRows(), "the repeat did not drop and the first appearance did not stay").toEqual(
+    expect(textOfRows(), "the repeated match was not dropped, or the first was lost").toEqual(
       keptInOrder.map((index): unknown => expect.stringContaining(palletPassage(index))),
     );
     focusIsOn(rowAt(A_PAGE), "focus did not land on the first match the page added");

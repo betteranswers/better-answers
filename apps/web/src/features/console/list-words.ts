@@ -18,8 +18,8 @@ export const EVERYONE_WORDS = {
   caption: "Every person on the platform.",
   loading: "The people are still loading.",
   readingAgain: "Updating the list.",
-  onTheFirstPage: "This is the first page of people.",
-  onTheLastPage: "This is the last page of people.",
+  onTheFirstPage: "You’re already on the first page.",
+  onTheLastPage: "You’re already on the last page.",
   counted: (total: number): string => `${counted(total, ...PEOPLE)} on the platform.`,
   matching: (total: number, search: string): string => matching(total, PEOPLE, search),
   noneYet: "No people yet",
@@ -34,11 +34,11 @@ const namesCounted = (count: number): string => {
 };
 
 export const NAMES_WAITING_WORDS = {
-  heading: "Names Waiting",
+  heading: "Flagged Names",
   description: "Review display names flagged by Admins.",
   search: "Search by name or workspace",
   caption: "Display names waiting to be corrected.",
-  loading: "The names waiting are still loading.",
+  loading: "The names are still loading.",
   counted: namesCounted,
   matching: (count: number, search: string): string => matching(count, NAMES, search),
   noneWaiting: "No names waiting",
@@ -48,13 +48,13 @@ export const NAMES_WAITING_WORDS = {
 
 export const WORKSPACES_WORDS = {
   heading: "Every Workspace",
-  description: "Listed in name order.",
+  description: "Sorted by name.",
   search: "Search by name or short name",
   columns: {
     workspace: "Workspace",
     shortName: "Short Name",
     memberCount: "Members",
-    createdAt: "Provisioned",
+    createdAt: "Created",
   },
   caption: "Every workspace on the platform.",
   loading: "The workspaces are still loading.",

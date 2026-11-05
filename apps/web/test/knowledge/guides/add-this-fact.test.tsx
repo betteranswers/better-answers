@@ -82,17 +82,20 @@ describe("adding a missing fact from a guide", () => {
     expect(router.state.location.search).not.toHaveProperty("knowledge.subject");
   });
 
-  it("says nothing is missing when none is", async () => {
+  it("stays on the guide when no fact is missing", async () => {
     const recorded = aGuide({
       sections: [aSection({ coverage: { met: 1, of: 1, facts: [aFact({ state: "met" })] } })],
     });
-    await openedFromTheGuide(recorded);
+    const router = await openedFromTheGuide(recorded);
 
     const button = screen.getByRole("button", { name: "Show Detail" });
     button.focus();
     fireEvent.keyDown(button, { key: "a" });
 
-    const article = within(screen.getByRole("article"));
-    expect(await article.findByText(/nothing to add/u)).toBeDefined();
+    const status = within(screen.getByRole("article")).getByRole("status");
+    await waitFor(() => {
+      expect(status.textContent, "a with nothing missing said nothing").toMatch(/\S/u);
+    });
+    expect(router.state.location.pathname).toBe(A_GUIDE_PAGE);
   });
 });

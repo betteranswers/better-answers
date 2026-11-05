@@ -27,12 +27,7 @@ import { MEMBER_PAGE_KEYSTROKES as KEY } from "../people-state.ts";
 import { outcomeOfFailure } from "../refusal.tsx";
 import { nameOf } from "../words.tsx";
 import { MemberActivity } from "./member-activity.tsx";
-import {
-  Access,
-  RemoveAndEndEverySignIn,
-  type Landings,
-  type Removal,
-} from "./member-sections.tsx";
+import { Access, RemoveAndSignOut, type Landings, type Removal } from "./member-sections.tsx";
 import {
   MEMBERS_PAGE,
   membersAt,
@@ -65,8 +60,8 @@ const SECTIONS: readonly Section[] = [
   { id: "activity", title: WORDS.activity, draw: MemberActivity },
   {
     id: "remove-and-end-every-sign-in",
-    title: WORDS.removeAndEndEverySignIn,
-    draw: RemoveAndEndEverySignIn,
+    title: WORDS.removeAndSignOut,
+    draw: RemoveAndSignOut,
     apart: true,
   },
 ];
@@ -255,7 +250,7 @@ function MemberShown(properties: {
   useKeystroke(KEY.flagName, () => {
     landOn("flag");
   });
-  useKeystroke(KEY.endEverySignInAndToken, () => {
+  useKeystroke(KEY.signOut, () => {
     landOn("credentials");
   });
   useKeystroke(KEY.remove, () => {

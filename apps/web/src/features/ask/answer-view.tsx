@@ -55,7 +55,7 @@ const PanelContext = createContext<Panel | undefined>(undefined);
 
 const usePanel = (): Panel => {
   const panel = useContext(PanelContext);
-  if (panel === undefined) throw new Error("a part of the answer is drawn outside its view");
+  if (panel === undefined) throw new Error("usePanel was called outside AnswerView");
   return panel;
 };
 

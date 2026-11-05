@@ -2,9 +2,9 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest";
 
 import { memberPageOf } from "@/features/people/members/members-address.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { MEMBERS_PAGE } from "@test/people/member-pages.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -21,8 +21,6 @@ import {
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
-
-const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
 
 const SET_ACTIVE = "/organization/set-active";
 
@@ -47,7 +45,7 @@ const activityOf = () => within(activityRegion());
 
 const linesOf = () => activityOf().queryAllByRole("listitem");
 
-const alertsSaid = (region: HTMLElement): number =>
+const alertsWithText = (region: HTMLElement): number =>
   within(region)
     .queryAllByRole("alert")
     .filter((alert) => alert.textContent !== "").length;
@@ -68,7 +66,7 @@ const openedByName = async (name: string) => {
 };
 
 describe("a member's Activity", () => {
-  it("draws nothing of the workspace left after a switch", async () => {
+  it("shows no activity from the previous workspace after a switch", async () => {
     const api = adaAnAdmin();
     api.set("person.workspaces", () =>
       read([
@@ -92,38 +90,39 @@ describe("a member's Activity", () => {
     await switcher(HOLME);
     await waitFor(() => expect(router.state.location.pathname).toBe(MEMBERS_PAGE));
     expect(screen.getByRole("heading", { level: 1, name: "People" })).toBeDefined();
-    const activity = heldBack(api, "members.activity", readOf());
+    const activity = holdProcedure(api, "members.activity", readOf());
     await openedByName(ADA.displayName);
 
     await activity.asked;
-    expect(activityOf().getByRole("status").textContent, "the held read says nothing").toMatch(
-      /\S/,
-    );
+    expect(
+      activityOf().getByRole("status").textContent,
+      "the loading region was empty while the read was pending",
+    ).toMatch(/\S/);
     expect(
       thePage().queryByText("Northern leads", { exact: false }),
-      "drew the left workspace's Activity",
+      "the page showed activity from the previous workspace",
     ).toBeNull();
 
     activity.resolve();
     await waitFor(() => expect(activityOf().queryAllByRole("status")).toHaveLength(0));
     expect(activityOf().getByText(ADA.displayName, { exact: false })).toBeDefined();
-    expect(alertsSaid(activityRegion())).toBe(0);
+    expect(alertsWithText(activityRegion())).toBe(0);
     expect(linesOf()).toHaveLength(0);
     expect(thePage().queryByText("Northern leads", { exact: false })).toBeNull();
   });
 
-  it("says a failed read in Activity alone, then retries it", async () => {
+  it("shows a failed read only in Activity, then retries it", async () => {
     const api = adaAnAdmin();
     api.set("members.list", () => read([ADA, GRACE]));
     api.set("members.groups", () => read([]));
     api.set("members.activity", () => LOST);
     await openAt(memberPageOf(ADA.personId), api);
 
-    await waitFor(() => expect(alertsSaid(activityRegion())).toBe(1));
+    await waitFor(() => expect(alertsWithText(activityRegion())).toBe(1));
     expect(thePage().getByRole("region", { name: "Access" })).toBeDefined();
     expect(
-      thePage().getByRole("region", { name: "Remove and End Every Sign-In" }),
-      "a failed Activity took Remove and end every sign-in with it",
+      thePage().getByRole("region", { name: "Remove and Sign Out" }),
+      "a failed Activity read hid the Remove and Sign Out section",
     ).toBeDefined();
 
     api.set("members.activity", () => readOf(aLineAbout("Northern leads")));

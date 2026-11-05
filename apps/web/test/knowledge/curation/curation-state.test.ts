@@ -10,7 +10,7 @@ import {
   YOUR_COLLECTIONS,
 } from "@/features/knowledge/curation/curation-state.ts";
 
-describe("the collection filter's address words", () => {
+describe("the collection filter held in the address", () => {
   it("leaves every marker clear of a collection's name", () => {
     const markers = [
       YOUR_COLLECTIONS,

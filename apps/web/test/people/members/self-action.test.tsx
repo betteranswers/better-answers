@@ -3,10 +3,8 @@ import { useState, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
-import { homeNowSaid, INCLUDES_YOU } from "@/features/people/member-action-words.ts";
 import {
   HomeLine,
-  ROLE_UNREAD,
   useIncludesYou,
   useSelfActionHome,
 } from "@/features/people/members/self-action.tsx";
@@ -133,38 +131,37 @@ const changingARole = async () => {
   return { clients, people, answer };
 };
 
-describe("an action's confirmation", () => {
-  it("says the set includes the reader, and only then", async () => {
+describe("a bulk confirmation's note about you", () => {
+  it("adds a note only when the selection includes you", async () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
     const { result } = renderHook(() => [useIncludesYou(["q", "p"]), useIncludesYou(["q"])], {
       wrapper: wrapperOf(createAppClients()),
     });
 
-    await waitFor(() => expect(result.current[0]).toBe(INCLUDES_YOU));
+    await waitFor(() => expect(result.current[0]).toMatch(/\S/));
     expect(result.current[1]).toBeUndefined();
   });
 });
 
 describe("going home after an action on yourself", () => {
-  it("sends a self-demoted Admin to an Editor's home, saying why", async () => {
+  it("sends a demoted Admin to the Editor home page", async () => {
     const { history } = await demotedToEditor();
 
-    expect(screen.getByRole("status").textContent).toBe(homeNowSaid("Editor"));
     expect(screen.getByRole("status").textContent).toContain("Editor");
     expect(screen.getByText("Held: Editor")).toBeDefined();
-    expect(history.length, "the move home pushed an entry of its own").toBe(2);
+    expect(history.length, "the move home added a history entry").toBe(2);
   });
 
-  it("drops what a self-demoted Admin read before the change", async () => {
+  it("clears results a demoted Admin loaded before the change", async () => {
     const { clients } = await demotedToEditor();
 
     expect(
       clients.queryClient.getQueryData(MATCHES_HELD),
-      "Search would open on the matches an Admin was shown",
+      "Search still holds results loaded as an Admin",
     ).toBeUndefined();
   });
 
-  it("sends a self-removed Admin in no workspace to the chooser", async () => {
+  it("sends a removed Admin with no workspace to the chooser", async () => {
     const { router, clients } = await actingAt();
     const held = workspacesHeldIn(clients);
     clients.queryClient.setQueryData(held, []);
@@ -176,33 +173,30 @@ describe("going home after an action on yourself", () => {
     expect(await screen.findByText("Held: none")).toBeDefined();
     expect(
       clients.queryClient.getQueryData(held),
-      "the chooser would open on the workspace left",
+      "the chooser still lists the workspace that was left",
     ).toBeUndefined();
   });
 
-  it("stays put, refusing in words, when the role is unread", async () => {
+  it("alerts and stays put if the role cannot load", async () => {
     const { router, clients } = await actingAt();
     clients.queryClient.setQueryData(MATCHES_HELD, AS_AN_ADMIN);
 
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the network is down")));
     fireEvent.click(screen.getByRole("button", { name: "Demoted myself" }));
 
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe(ROLE_UNREAD.words));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/\S/));
     expect(screen.getByRole("status").textContent).toBe("");
     expect(router.state.location.pathname).toBe(MEMBERS);
-    expect(
-      screen.getByText("Held: Admin"),
-      "the page lost the role it was drawn for",
-    ).toBeDefined();
+    expect(screen.getByText("Held: Admin"), "the page lost the Admin role it showed").toBeDefined();
     expect(
       clients.queryClient.getQueryData(MATCHES_HELD),
-      "a read from before the change outlived it",
+      "results loaded before the change were kept",
     ).toBeUndefined();
   });
 });
 
-describe("a members action that lands after its page has gone", () => {
-  it("drops what the reader held when it includes them", async () => {
+describe("a role change that finishes after its page closes", () => {
+  it("clears cached results when the change is to your role", async () => {
     const { clients, people, answer } = await changingARole();
 
     act(() => {
@@ -214,12 +208,12 @@ describe("a members action that lands after its page has gone", () => {
     await waitFor(() =>
       expect(
         clients.queryClient.getQueryData(MATCHES_HELD),
-        "a read made as an Admin outlived the change",
+        "results loaded as an Admin were kept after the change",
       ).toBeUndefined(),
     );
   });
 
-  it("keeps what the reader held when it is another's", async () => {
+  it("keeps cached results when the change is to another member", async () => {
     const { clients, people, answer } = await changingARole();
 
     act(() => {

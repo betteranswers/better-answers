@@ -15,7 +15,12 @@ import {
   signIn,
   skipLinkReachesThePage,
 } from "../harness.ts";
-import { heldBack, isAFind, listsItsKeystrokes, scrolledSideways } from "../knowledge.ts";
+import {
+  holdRequests,
+  isKnowledgeFind,
+  listsItsKeystrokes,
+  scrolledSideways,
+} from "../knowledge.ts";
 import { aVirtualAuthenticator } from "../virtual-authenticator.ts";
 
 const LIST_BUDGET_MS = 1000;
@@ -36,7 +41,7 @@ const jumpToDialog = (page: Page) => page.getByRole("dialog", { name: "Jump To" 
 
 const jumpToInput = (page: Page) => jumpToDialog(page).getByRole("combobox", { name: "Jump To" });
 
-const said = (page: Page) => searchRegion(page).getByRole("status").first();
+const statusOf = (page: Page) => searchRegion(page).getByRole("status").first();
 
 const passagePanel = (page: Page, title: string) => page.getByRole("dialog", { name: title });
 
@@ -92,7 +97,7 @@ const forkliftGuideSeeded = async (api: APIRequestContext, workspace: Seeded): P
 const isAFindFor =
   (query: string) =>
   (url: URL): boolean =>
-    isAFind(url) && (url.searchParams.get("input") ?? "").includes(`"query":"${query}"`);
+    isKnowledgeFind(url) && (url.searchParams.get("input") ?? "").includes(`"query":"${query}"`);
 
 type Seeding = (api: APIRequestContext, workspace: Seeded) => Promise<void>;
 
@@ -114,12 +119,13 @@ const anAdminAtSearch = async (
   return workspace;
 };
 
-const saidNow = async (page: Page): Promise<string> => (await said(page).textContent()) ?? "";
+const statusText = async (page: Page): Promise<string> =>
+  (await statusOf(page).textContent()) ?? "";
 
 const aPassageClickedWhileTheListLoads = async (page: Page): Promise<() => void> => {
   await searched(page, "pallet");
   await expect(matchesOf(page)).toHaveCount(2);
-  const typed = await heldBack(page, isAFindFor("forklift"));
+  const typed = await holdRequests(page, isAFindFor("forklift"));
   await searchBox(page).fill("forklift");
   await matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
   await typed.reached;
@@ -147,7 +153,7 @@ const searched = async (page: Page, query: string): Promise<void> => {
   await expect(page, "the URL does not hold the typed search").toHaveURL(
     (url) => url.searchParams.get("knowledge.search") === query,
   );
-  await expect(said(page)).toContainText(query);
+  await expect(statusOf(page)).toContainText(query);
   await expect(matchesOf(page).first()).toBeVisible();
 };
 
@@ -156,16 +162,16 @@ const foundNothing = async (
   query: string,
   ask: () => Promise<unknown> = () => searchBox(page).fill(query),
 ): Promise<void> => {
-  const find = await heldBack(page, isAFind);
+  const find = await holdRequests(page, isKnowledgeFind);
   await ask();
   await find.reached;
-  await expect(said(page)).toContainText(query);
-  const whileAsking = await saidNow(page);
+  await expect(statusOf(page)).toContainText(query);
+  const whileAsking = await statusText(page);
   find.release();
-  await expect(said(page), "the status still says the search is running").not.toHaveText(
+  await expect(statusOf(page), "the status still says the search is running").not.toHaveText(
     whileAsking,
   );
-  await expect(said(page)).toContainText(query);
+  await expect(statusOf(page)).toContainText(query);
   await expect(matchesOf(page)).toHaveCount(0);
 };
 
@@ -230,7 +236,7 @@ test.describe("the Knowledge Search page", () => {
   }) => {
     await anAdminAtSearch(page, request, "Swale Stores", [handbookSeeded]);
     await foundNothing(page, "forklift");
-    const withNoPassageOpened = await saidNow(page);
+    const withNoPassageOpened = await statusText(page);
     await searched(page, "pallet");
     const opener = handbookMatches(page).first().getByRole("button", { name: HANDBOOK });
     await opener.click();
@@ -254,7 +260,7 @@ test.describe("the Knowledge Search page", () => {
     await expect(panel, "a new search left the previous search's passage open").toHaveCount(0);
     await expect(searchBox(page)).toBeFocused();
     await expect(
-      said(page),
+      statusOf(page),
       "the status does not read as it did before any passage opened",
     ).toHaveText(withNoPassageOpened);
   });

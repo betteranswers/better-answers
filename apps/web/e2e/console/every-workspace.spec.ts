@@ -107,7 +107,7 @@ test.describe("the console's Workspaces page", () => {
 
     await skipLinkReachesThePage(page);
 
-    await page.getByRole("link", { name: "Skip to the Page" }).focus();
+    await page.getByRole("link", { name: "Skip to Main Content" }).focus();
     for (const stop of [
       page.getByRole("banner").getByRole("link", { name: "better-answers" }),
       switcherOf(page, "Console"),
@@ -122,7 +122,7 @@ test.describe("the console's Workspaces page", () => {
       await page.keyboard.press("Tab");
       await expect(stop).toBeFocused();
     }
-    for (const name of ["Everyone", "Names Waiting", "Every Workspace"]) {
+    for (const name of ["Everyone", "Flagged Names", "Every Workspace"]) {
       await page.keyboard.press("Tab");
       await expect(navOf(page, "Console").getByRole("link", { name })).toBeFocused();
     }
@@ -151,11 +151,11 @@ test.describe("the console's Workspaces page", () => {
           - table:
             - caption
             - rowgroup:
-              - row "Workspace Short Name Members Provisioned":
+              - row "Workspace Short Name Members Created":
                 - columnheader "Workspace"
                 - columnheader "Short Name"
                 - columnheader "Members"
-                - columnheader "Provisioned"
+                - columnheader "Created"
             - rowgroup:
               - row /${workspace.name}/:
                 - cell /${workspace.name}/:

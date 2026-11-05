@@ -5,7 +5,7 @@ import {
   aForkliftGuide,
   aRackingPlan,
   aSearchApi,
-  alerted,
+  searchAlert,
   answeringFinds,
   atWidth,
   finding,
@@ -23,8 +23,8 @@ import {
   refusing,
   retryButton,
   rowNamed,
-  said,
-  saidNow,
+  searchStatus,
+  searchStatusText,
   searchBox,
   searchHeading,
   searched,
@@ -89,13 +89,13 @@ const passageOpenedWhileTheListLoads = async () => {
     () => within(panel).getByRole("heading", { name: FORKLIFT_GUIDE }),
     "the opened passage's heading did not take focus",
   );
-  expect(matchRows(), "the opener is still on the page while the list loads").toHaveLength(0);
+  expect(matchRows(), "the opener stayed on the page while the list loaded").toHaveLength(0);
   return { panel, release: forklift.release };
 };
 
 describe("the Knowledge Search page", () => {
   for (const width of [320, 1280]) {
-    it(`keeps open a passage clicked before settling, at ${String(width)} px`, async () => {
+    it(`keeps a passage clicked mid-search open, at ${String(width)} px`, async () => {
       atWidth(width);
       const forklift = forkliftListHeld();
       const router = await openedSearch(forklift.api);
@@ -106,7 +106,7 @@ describe("the Knowledge Search page", () => {
       await waitFor(() => expect(textOfRows()).toEqual([expect.stringContaining(FORKLIFT_GUIDE)]));
       await focusLandsOn(
         () => screen.getByRole("heading", { name: FORKLIFT_GUIDE }),
-        "the passage clicked closed as the typed search settled",
+        "the clicked passage closed when the search finished",
       );
     });
   }
@@ -143,7 +143,7 @@ describe("the Knowledge Search page", () => {
     [320, "Search"],
     [1280, FORKLIFT_GUIDE],
   ] as const) {
-    it(`keeps the passage through a failed list, at ${String(width)} px`, async () => {
+    it(`keeps the passage when the list fails, at ${String(width)} px`, async () => {
       atWidth(width);
       const api = aSearchApi();
       api.set("knowledge.find", finding(TABLE));
@@ -156,10 +156,12 @@ describe("the Knowledge Search page", () => {
       typed("forklift");
       pressed(openerIn(rowNamed(FORKLIFT_GUIDE), FORKLIFT_GUIDE));
 
-      await waitFor(() => expect(alerted()?.textContent, "the alert says nothing").toMatch(/\S/));
+      await waitFor(() =>
+        expect(searchAlert()?.textContent, "the alert says nothing").toMatch(/\S/),
+      );
       await focusLandsOn(
         () => screen.getByRole("heading", { name: landsOn }),
-        "a failed list left focus on the page",
+        "focus fell to the page body when the list failed",
       );
       api.set("knowledge.find", finding(TABLE));
       pressed(retryButton());
@@ -167,18 +169,18 @@ describe("the Knowledge Search page", () => {
       await listsOnly(FORKLIFT_GUIDE);
       expect(
         screen.getByRole("heading", { name: FORKLIFT_GUIDE }),
-        "a failed list closed the passage it never dropped",
+        "the failed list closed the open passage",
       ).toBeDefined();
     });
   }
 
-  it("closes a passage opened as the search empties", async () => {
+  it("closes a passage opened as the search is cleared", async () => {
     const api = aSearchApi();
     api.set("knowledge.find", finding(TABLE));
     api.set("knowledge.open", theForkliftGuide);
     const router = await openedSearch(api);
-    await waitFor(() => expect(said().textContent).toMatch(/\S/));
-    const nothingAsked = saidNow();
+    await waitFor(() => expect(searchStatus().textContent).toMatch(/\S/));
+    const nothingAsked = searchStatusText();
     await searched(router, "forklift");
 
     typed("");
@@ -190,10 +192,9 @@ describe("the Knowledge Search page", () => {
         "a passage stayed open beside an empty search",
       ).toBeNull(),
     );
-    expect(saidNow(), "emptying the search said more than nothing asked").toBe(nothingAsked);
-    await focusLandsOn(
-      searchHeading,
-      "the passage closed under an emptied search left focus on the page",
+    expect(searchStatusText(), "clearing the search changed the empty-search status").toBe(
+      nothingAsked,
     );
+    await focusLandsOn(searchHeading, "focus fell to the page body when the passage closed");
   });
 });

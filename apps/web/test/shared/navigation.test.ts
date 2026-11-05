@@ -39,7 +39,7 @@ const outline = (areas: readonly Area[]) =>
     area.menuGroups.map((group) => [group.name ?? null, group.pages.map((each) => each.name)]),
   ]);
 
-const builtThroughout = (area: Area): Area => ({
+const withAllPagesBuilt = (area: Area): Area => ({
   id: area.id,
   name: area.name,
   icon: area.icon,
@@ -50,7 +50,7 @@ const builtThroughout = (area: Area): Area => ({
 });
 
 const groupsFor = (role: Role, owns: Owns) =>
-  visibleTo(readerOf(role, owns), AREAS.map(builtThroughout)).areas.map((area) => [
+  visibleTo(readerOf(role, owns), AREAS.map(withAllPagesBuilt)).areas.map((area) => [
     area.name,
     area.menuGroups.map((group) => group.name ?? null),
   ]);
@@ -64,7 +64,7 @@ const aPage = (name: string, built: boolean, owners?: Page["owners"]): Page => (
   ...(owners === undefined ? {} : { owners }),
 });
 
-describe("the one navigation list", () => {
+describe("the navigation declaration", () => {
   it("declares the navigation list's areas, groups and pages in order", () => {
     expect(outline(AREAS)).toEqual([
       ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]],
@@ -112,12 +112,12 @@ describe("the one navigation list", () => {
     ]);
   });
 
-  it("declares the console apart, for the operator alone", () => {
+  it("declares the console separately, for the operator only", () => {
     expect(outline([CONSOLE])).toEqual([
       [
         "Console",
         [
-          ["People", ["Everyone", "Names Waiting"]],
+          ["People", ["Everyone", "Flagged Names"]],
           ["Workspaces", ["Every Workspace"]],
         ],
       ],
@@ -130,7 +130,7 @@ describe("the one navigation list", () => {
     ]);
   });
 
-  it("calls only today's twenty-one pages built", () => {
+  it("marks exactly the twenty-one current pages as built", () => {
     expect(
       pagesOf([...AREAS, CONSOLE])
         .filter((each) => each.built)
@@ -160,18 +160,18 @@ describe("the one navigation list", () => {
     ]);
   });
 
-  it("keeps group addresses at the root, the console's under /console", () => {
+  it("puts group paths at the root, console paths under /console", () => {
     const controlCentre = AREAS.find((area) => area.name === "Control Centre");
-    assert(controlCentre !== undefined, "the navigation lists Control Centre");
-    const strays = controlCentre.menuGroups.flatMap((group) =>
+    assert(controlCentre !== undefined, "the navigation has no Control Centre area");
+    const misplacedPaths = controlCentre.menuGroups.flatMap((group) =>
       group.pages.filter((each) => !each.path.startsWith(`/${group.id}`)).map((each) => each.path),
     );
 
-    expect(strays).toEqual([]);
+    expect(misplacedPaths).toEqual([]);
     expect(pagesOf([CONSOLE]).filter((each) => !each.path.startsWith("/console/"))).toEqual([]);
   });
 
-  it("homes Admins on Members, Editors and Viewers on New question", () => {
+  it("sets the home to Members for Admins, else New Question", () => {
     expect(ROLES.map((role) => [role, HOMES[role].path])).toEqual([
       ["Admin", "/people/members"],
       ["Editor", "/ask/new-question"],
@@ -180,7 +180,7 @@ describe("the one navigation list", () => {
     expect(HOMES.operator.path).toBe("/console/workspaces/every-workspace");
   });
 
-  it("gives each area a glyph of its own", () => {
+  it("gives each area a different icon", () => {
     const glyphs = [...AREAS, CONSOLE].map((area) => area.icon);
 
     expect(new Set(glyphs).size).toBe(glyphs.length);
@@ -209,9 +209,9 @@ const KNOWLEDGE_WITH_ADMIN_CURATION = [
 
 const INBOX_OUTLINE = ["Inbox", [[null, ["Waiting on You"]]]];
 
-describe("what each person is shown", () => {
+describe("the navigation each person sees", () => {
   for (const role of ["Editor", "Viewer"] as const) {
-    it(`shows ${aRole(role)} Ask, at their home, and Search`, () => {
+    it(`shows ${aRole(role)} Ask as home, and Knowledge`, () => {
       const shown = visibleTo(readerOf(role), AREAS);
 
       expect(outline(shown.areas)).toEqual([
@@ -223,7 +223,7 @@ describe("what each person is shown", () => {
     });
   }
 
-  it("shows an Admin Ask, Knowledge and Control Centre's built pages", () => {
+  it("shows an Admin Ask, Knowledge and built Control Centre pages", () => {
     const shown = visibleTo(readerOf("Admin"), AREAS);
 
     expect(outline(shown.areas)).toEqual([
@@ -245,14 +245,14 @@ describe("what each person is shown", () => {
     expect(shown.areas[3]?.opensAt).toBe(HOMES.Admin);
   });
 
-  it("shows nothing and no home while the role is unknown", () => {
+  it("shows nothing and no home before the role loads", () => {
     expect(visibleTo(readerOf(undefined), AREAS)).toEqual({
       areas: [],
       home: undefined,
     });
   });
 
-  it("shows the operator the console, opening on Every workspace", () => {
+  it("shows the operator the console, opening on Every Workspace", () => {
     const shown = visibleTo(readerOf("operator"), [CONSOLE]);
 
     expect(outline(shown.areas)).toEqual(outline([CONSOLE]));
@@ -260,7 +260,7 @@ describe("what each person is shown", () => {
     expect(visibleTo(readerOf("operator"), AREAS).areas).toEqual([]);
   });
 
-  it("hides unbuilt groups, and areas left with no group", () => {
+  it("hides unbuilt groups and areas with no built groups", () => {
     const anArea: Area = {
       id: "a",
       name: "A",
@@ -278,7 +278,7 @@ describe("what each person is shown", () => {
     expect(shown.areas[0]?.opensAt.name).toBe("Shown");
   });
 
-  it("shows a page to its roles, and owners where marked", () => {
+  it("shows a page to its roles and to marked owners", () => {
     const anArea: Area = {
       id: "a",
       name: "A",
@@ -319,7 +319,7 @@ describe("what each person is shown", () => {
     ]);
   });
 
-  it("shows an owning Editor Curation without Exports", () => {
+  it("shows an Editor who owns a collection Curation without Exports", () => {
     const owner = readerOf("Editor", { collections: ["policy"], concepts: 0 });
     const exports = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Exports");
     const shown = visibleTo(owner, AREAS);
@@ -329,7 +329,7 @@ describe("what each person is shown", () => {
     expect(hides(visibleTo(readerOf("Admin"), AREAS), exports.path)).toBe(false);
   });
 
-  it("shows Waiting on you to an owner and Admins", () => {
+  it("shows Waiting on You to owners and Admins", () => {
     const waiting = pageNamed(menuGroupIn(INBOX, "inbox"), "Waiting on You");
     const { path } = waiting;
     const item = detailAt(waiting, "01JBZ6Q2V7Y9K3M5N8P0R2T4W7");
@@ -359,17 +359,17 @@ describe("what each person is shown", () => {
     ]);
   });
 
-  it("opens Waiting on you, not Curation, to a concept's owner", () => {
+  it("shows a concept owner Waiting on You but not Curation", () => {
     const owner = readerOf("Editor", { collections: [], concepts: 1 });
 
-    expect(outline(visibleTo(owner, AREAS.map(builtThroughout)).areas)).toEqual([
+    expect(outline(visibleTo(owner, AREAS.map(withAllPagesBuilt)).areas)).toEqual([
       ASK_OUTLINE,
       ["Knowledge", [["Browse", ["Search", "Guides", "Knowledge Base"]]]],
       ["Inbox", [[null, ["Waiting on You"]]]],
     ]);
   });
 
-  it("shows the not-found page at Curation to the unowned", () => {
+  it("hides Curation from people who own no collection", () => {
     const path = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Collections and Owners").path;
     const owns = { collections: ["policy"], concepts: 0 };
 
@@ -383,7 +383,7 @@ describe("what each person is shown", () => {
     }
   });
 
-  it("declares who sees each group once its pages are built", () => {
+  it("declares who sees each group when all pages are built", () => {
     const controlCentre = [
       "Overview",
       "Suggestions",
@@ -419,8 +419,8 @@ const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
 
 const A_PERSON = "01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
 
-describe("a member page, declared beneath Members", () => {
-  it("places a person's address at Members, holding the person", () => {
+describe("a member detail page under Members", () => {
+  it("resolves a person's path to Members with the person id", () => {
     const place = placeAt(AREAS, `${MEMBERS.path}/${A_PERSON}`);
 
     expect(place?.page).toBe(MEMBERS);
@@ -429,24 +429,24 @@ describe("a member page, declared beneath Members", () => {
     expect(placeAt(AREAS, MEMBERS.path)?.detail).toBeUndefined();
   });
 
-  it("places nothing deeper, nor beneath a page declaring no detail", () => {
-    const placed = [
+  it("resolves no deeper path or detail under other pages", () => {
+    const resolved = [
       `${MEMBERS.path}/${A_PERSON}/x`,
       `${MEMBERS.path}/`,
       `/people/groups/${A_PERSON}`,
       `/system/audit-log/${A_PERSON}`,
     ].filter((path) => placeAt(AREAS, path) !== undefined);
 
-    expect(placed).toEqual([]);
+    expect(resolved).toEqual([]);
   });
 
-  it("lists the page nowhere, so no page list grows", () => {
+  it("is not listed as a page in the navigation", () => {
     const paths = pagesOf([...AREAS, CONSOLE]).map((each) => each.path);
 
     expect(paths.filter((path) => path.startsWith(`${MEMBERS.path}/`))).toEqual([]);
   });
 
-  it("hides it exactly where Members is hidden", () => {
+  it("is hidden exactly where Members is hidden", () => {
     const path = detailAt(MEMBERS, A_PERSON);
 
     expect(path).toBe(`${MEMBERS.path}/${A_PERSON}`);
@@ -456,12 +456,12 @@ describe("a member page, declared beneath Members", () => {
     }
   });
 
-  it("refuses an address beneath a page that declares none", () => {
+  it("throws for a detail path under a page without details", () => {
     expect(() => detailAt(HOMES.Editor, A_PERSON)).toThrow(/declares no detail address/);
   });
 });
 
-const heading = () => screen.getByRole("heading", { level: 1 }).textContent;
+const pageHeading = () => screen.getByRole("heading", { level: 1 }).textContent;
 
 const NOT_FOUND = "Page Not Found";
 
@@ -475,9 +475,9 @@ const MOVED = [
   ["/system", "/system/audit-log"],
 ] as const;
 
-describe("an address that moved", () => {
+describe("a moved path", () => {
   for (const [from, to] of MOVED) {
-    it(`leads an Admin from ${from} to ${to}`, async () => {
+    it(`redirects an Admin from ${from} to ${to}`, async () => {
       vi.stubGlobal("fetch", answeringAs("Admin"));
 
       const { router } = await appAt(from);
@@ -486,29 +486,29 @@ describe("an address that moved", () => {
     });
 
     for (const role of ["Editor", "Viewer"] as const) {
-      it(`shows ${aRole(role)} at ${from} the not-found page`, async () => {
+      it(`shows ${aRole(role)} not found at ${from}`, async () => {
         vi.stubGlobal("fetch", answeringAs(role));
 
         const { router } = await openApp(from);
 
-        expect(heading()).toBe(NOT_FOUND);
+        expect(pageHeading()).toBe(NOT_FOUND);
         expect(router.state.location.pathname).toBe(from);
       });
     }
 
-    it(`shows the failed read at ${from}, no role held`, async () => {
+    it(`shows the failed page at ${from} with the api down`, async () => {
       const clients = withTheApiDown();
 
       const { router } = await openApp(from, clients);
       await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
-      expect(heading()).toBe("This Page Didn’t Load");
+      expect(pageHeading()).toBe("This Page Didn’t Load");
       expect(router.state.location.pathname).toBe(from);
     });
   }
 
   for (const role of ROLES) {
-    it(`leads ${aRole(role)} from Ask's old home to New question`, async () => {
+    it(`redirects ${aRole(role)} from /ask to New Question`, async () => {
       vi.stubGlobal("fetch", answeringAs(role));
 
       const { router } = await appAt("/ask");
@@ -521,7 +521,7 @@ describe("an address that moved", () => {
     ["/console/people", "/console/people/everyone"],
     ["/console/workspaces", "/console/workspaces/every-workspace"],
   ] as const) {
-    it(`leads the operator from ${from} to ${to}`, async () => {
+    it(`redirects the operator from ${from} to ${to}`, async () => {
       vi.stubGlobal("fetch", answeringAs("Viewer", true));
 
       const { router } = await appAt(from);
@@ -530,7 +530,7 @@ describe("an address that moved", () => {
     });
   }
 
-  it("leads every older address of a page or group", () => {
+  it("redirects every old path of a page or group", () => {
     const moved = { ...aPage("Moved", true), movedFrom: ["/first", "/second"] };
     const anArea: Area = {
       id: "a",
@@ -548,62 +548,62 @@ describe("an address that moved", () => {
   });
 });
 
-describe("an address the person may not see", () => {
-  it("shows a Viewer Members as not found, offering New question", async () => {
+describe("a path the person cannot access", () => {
+  it("shows a Viewer not found at Members, linking New Question", async () => {
     vi.stubGlobal("fetch", answeringAs("Viewer"));
 
     const hidden = await openApp("/people/members");
     const main = screen.getByRole("main");
     await within(main).findByRole("link", { name: "Go to New Question" });
-    const drawn = { main: main.innerHTML, banner: screen.getByRole("banner").textContent };
+    const hiddenPage = { main: main.innerHTML, banner: screen.getByRole("banner").textContent };
     hidden.rendered.unmount();
 
     await openApp("/people/not-a-page");
     await within(screen.getByRole("main")).findByRole("link", { name: "Go to New Question" });
 
-    expect(heading()).toBe(NOT_FOUND);
-    expect(screen.getByRole("main").innerHTML).toBe(drawn.main);
-    expect(screen.getByRole("banner").textContent).toBe(drawn.banner);
+    expect(pageHeading()).toBe(NOT_FOUND);
+    expect(screen.getByRole("main").innerHTML).toBe(hiddenPage.main);
+    expect(screen.getByRole("banner").textContent).toBe(hiddenPage.banner);
     expect(screen.queryByRole("tablist")).toBeNull();
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    it(`shows ${aRole(role)} a member page as not found`, async () => {
+    it(`shows ${aRole(role)} not found at a member page`, async () => {
       vi.stubGlobal("fetch", answeringAs(role));
 
       await openApp(`${MEMBERS.path}/${A_PERSON}`);
       await within(screen.getByRole("main")).findByRole("link", { name: "Go to New Question" });
 
-      expect(heading()).toBe(NOT_FOUND);
+      expect(pageHeading()).toBe(NOT_FOUND);
     });
   }
 
-  it("shows an Admin a deeper address as not found", async () => {
+  it("shows an Admin not found below a member page", async () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
 
     await openApp(`${MEMBERS.path}/${A_PERSON}/x`);
 
-    expect(heading()).toBe(NOT_FOUND);
+    expect(pageHeading()).toBe(NOT_FOUND);
   });
 
-  it("names no one at a malformed member address, asking nothing", async () => {
-    const asked: string[] = [];
-    const answering = answeringAs("Admin");
+  it("fetches no member for a malformed member id", async () => {
+    const requested: string[] = [];
+    const adminApi = answeringAs("Admin");
     vi.stubGlobal("fetch", (input: string | URL | Request) => {
-      asked.push(addressOf(input).pathname);
-      return answering(input);
+      requested.push(addressOf(input).pathname);
+      return adminApi(input);
     });
 
     await openApp(`${MEMBERS.path}/not-a-person`);
     await screen.findByText(MEMBER_PAGE_WORDS.noSuchMember);
 
-    expect(heading()).toBe("People");
+    expect(pageHeading()).toBe("People");
     expect(screen.getByRole("link", { name: "Go to Members" })).toBeDefined();
-    expect(asked.filter((path) => path.includes("members."))).toEqual([]);
+    expect(requested.filter((path) => path.includes("members."))).toEqual([]);
   });
 
   for (const path of ["/people/thresholds", "/suggestions/to-decide", "/knowledge/conflicts"]) {
-    it(`shows an Admin the unbuilt ${path} as not found`, async () => {
+    it(`shows an Admin not found at unbuilt ${path}`, async () => {
       vi.stubGlobal("fetch", answeringAs("Admin"));
 
       const { router } = await openApp(path);
@@ -614,18 +614,18 @@ describe("an address the person may not see", () => {
   }
 });
 
-describe("a role changed while the person is on a page", () => {
-  it("keeps the page until the next move, then hides it", async () => {
+describe("a role change while a page is open", () => {
+  it("keeps the page until the next navigation, then hides it", async () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
     const { router, clients } = await openApp("/people/groups");
-    expect(heading()).toBe("People");
+    expect(pageHeading()).toBe("People");
 
     vi.stubGlobal("fetch", answeringAs("Editor"));
     await clients.queryClient.invalidateQueries();
     const rail = screen.getByRole("navigation", { name: "Areas" });
     await within(rail).findByRole("link", { name: "Ask" });
 
-    expect(heading()).toBe("People");
+    expect(pageHeading()).toBe("People");
     expect(screen.getByRole("main").textContent).not.toContain(NOT_FOUND);
 
     await router.navigate({ href: HOMES.Editor.path });

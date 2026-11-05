@@ -20,7 +20,7 @@ export const recoveryField = (page: Page) => page.getByRole("textbox", { name: "
 export const codesListed = (page: Page) =>
   page.getByRole("list", { name: "Recovery Codes" }).getByRole("listitem");
 
-export const saidOfTheSet = (page: Page) =>
+export const recoveryCodesParagraphs = (page: Page) =>
   page.getByRole("region", { name: "Save Your Recovery Codes" }).getByRole("paragraph");
 
 export const codesTicked = async (page: Page, finish: string): Promise<void> => {
@@ -34,22 +34,27 @@ const accountHeading = (page: Page) => page.getByRole("heading", { level: 1, nam
 export const regionOf = (page: Page, name: string) =>
   page.getByRole("region", { name, exact: true });
 
-export const accountFromTheBand = async (page: Page, who: string): Promise<void> => {
+export const openAccountFromPersonMenu = async (page: Page, who: string): Promise<void> => {
   const menu = await personMenuOpened(page, who);
   await menu.getByRole("menuitem", { name: "Account" }).click();
   await expect(accountHeading(page)).toBeVisible();
   await expect(page).toHaveURL(/\/account$/);
 };
 
-const signedInWaiting = async (page: Page, api: APIRequestContext, email: string, on: string) => {
+const signInToHeading = async (
+  page: Page,
+  api: APIRequestContext,
+  email: string,
+  headingName: string,
+) => {
   await page.goto("/sign-in");
   await signInByEmail(page, api, email);
-  await expect(heading(page, on)).toBeVisible();
+  await expect(heading(page, headingName)).toBeVisible();
 };
 
 export const signedInAgain = async (page: Page, api: APIRequestContext, email: string) => {
   await page.context().clearCookies();
-  await signedInWaiting(page, api, email, CONFIRM_HEADING);
+  await signInToHeading(page, api, email, CONFIRM_HEADING);
 };
 
 export const anAdminWithAnAuthenticator = async (
@@ -59,6 +64,6 @@ export const anAdminWithAnAuthenticator = async (
 ) => {
   const { admin } = await provision(api, { name: "Calder Confirmations" });
   const { key, recoveryCodes } = await enrolledWith(api, admin.email, codes);
-  await signedInWaiting(page, api, admin.email, CONFIRM_HEADING);
+  await signInToHeading(page, api, admin.email, CONFIRM_HEADING);
   return { email: admin.email, key, codes: recoveryCodes };
 };

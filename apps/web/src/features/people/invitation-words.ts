@@ -172,5 +172,5 @@ export const INVITE_REFUSED = {
   none: "Please enter at least one email address.",
   capped: (most: number): string => `You can send up to ${String(most)} addresses at a time.`,
   heldBack: (count: number): string =>
-    `No invitations were sent, and Invite a Person still holds the addresses. There was a problem with ${counted(count, "address", "addresses")}:`,
+    `No invitations were sent. There was a problem with ${counted(count, "address", "addresses")}:`,
 } as const;

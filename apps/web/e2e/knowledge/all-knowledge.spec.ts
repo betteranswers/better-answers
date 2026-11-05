@@ -89,29 +89,29 @@ const signedInAt = async (page: Page, api: APIRequestContext, email: string): Pr
   await signIn(page, api, email);
 };
 
-const reviewed = (page: Page): Locator => page.getByRole("region", { name: "All Knowledge" });
+const allKnowledge = (page: Page): Locator => page.getByRole("region", { name: "All Knowledge" });
 
 const rowsOf = (page: Page): Locator =>
-  reviewed(page)
+  allKnowledge(page)
     .getByRole("row")
     .filter({ has: page.getByRole("link") });
 
 const rowOf = (page: Page, title: string): Locator =>
-  reviewed(page)
+  allKnowledge(page)
     .getByRole("row")
     .filter({ has: page.getByRole("link", { name: title, exact: true }) });
 
 const titleOf = (page: Page, title: string): Locator =>
-  reviewed(page).getByRole("link", { name: title, exact: true });
+  allKnowledge(page).getByRole("link", { name: title, exact: true });
 
 const tickOf = (page: Page, title: string): Locator =>
-  reviewed(page).getByRole("checkbox", { name: `Select ${title}`, exact: true });
+  allKnowledge(page).getByRole("checkbox", { name: `Select ${title}`, exact: true });
 
 const selectedBar = (page: Page): Locator =>
-  reviewed(page).getByRole("toolbar", { name: "Selected concepts" });
+  allKnowledge(page).getByRole("toolbar", { name: "Selected concepts" });
 
 const filterOf = (page: Page, name: "Collection" | "Kind"): Locator =>
-  reviewed(page).getByRole("combobox", { name: `Filter by ${name}` });
+  allKnowledge(page).getByRole("combobox", { name: `Filter by ${name}` });
 
 test.describe("All Knowledge", () => {
   test("shows each role only the concepts they can curate", async ({
@@ -134,7 +134,7 @@ test.describe("All Knowledge", () => {
     await expect(rowsOf(page)).toHaveCount(FIRST_PAGE);
     await expect(page.getByRole("main")).not.toContainText(/bundle/i);
 
-    await expect(reviewed(page)).toMatchAriaSnapshot(`
+    await expect(allKnowledge(page)).toMatchAriaSnapshot(`
       - region "All Knowledge":
         - heading "All Knowledge" [level=2]
         - status: /\\b64\\b/
@@ -152,7 +152,7 @@ test.describe("All Knowledge", () => {
               - columnheader "Collection"
               - columnheader "Trust"
               - columnheader "Owner"
-              - columnheader "Last Checked"
+              - columnheader "Last Verified"
         - navigation "Pages of Concepts"
     `);
     await expect(rowOf(page, "Annual leave")).toContainText(/\d{1,2} \w+ \d{4}/);
@@ -188,8 +188,10 @@ test.describe("All Knowledge", () => {
         await expect(tickOf(page, title)).not.toBeChecked();
       }
       await expect(selectedBar(page)).toBeHidden();
-      await expect(reviewed(page).getByRole("status").nth(1)).toHaveText(/\S/);
-      await expect(reviewed(page).getByRole("heading", { name: "All Knowledge" })).toBeFocused();
+      await expect(allKnowledge(page).getByRole("status").nth(1)).toHaveText(/\S/);
+      await expect(
+        allKnowledge(page).getByRole("heading", { name: "All Knowledge" }),
+      ).toBeFocused();
 
       await page.reload();
       await expect(rowOf(page, "Annual leave")).toContainText(NEW_OWNER);
@@ -205,7 +207,7 @@ test.describe("All Knowledge", () => {
       await expect(filterOf(page, "Collection")).toContainText("policy");
       await expect(rowsOf(page)).toHaveCount(3);
       await expect(titleOf(page, "Fire drills")).toHaveCount(0);
-      await expect(reviewed(page).getByRole("checkbox")).toHaveCount(0);
+      await expect(allKnowledge(page).getByRole("checkbox")).toHaveCount(0);
       await expect(selectedBar(page)).toHaveCount(0);
       await expect(rowOf(page, "Annual leave")).toContainText(NEW_OWNER);
       await passesTheAccessibilityGate();
@@ -213,7 +215,7 @@ test.describe("All Knowledge", () => {
       await filterOf(page, "Collection").click();
       await page.getByRole("option", { name: "Any Collection" }).click();
       await expect(titleOf(page, "Fire drills")).toBeVisible();
-      await reviewed(page).getByRole("button", { name: "Owner", exact: true }).click();
+      await allKnowledge(page).getByRole("button", { name: "Owner", exact: true }).click();
       await expect(page).toHaveURL(/all\.sort/);
       const held = page.url();
 
@@ -233,7 +235,7 @@ test.describe("All Knowledge", () => {
       await page.goto(ALL_KNOWLEDGE);
 
       await notFoundOfferingHome(page, "Editor");
-      await expect(reviewed(page)).toHaveCount(0);
+      await expect(allKnowledge(page)).toHaveCount(0);
     });
   });
 });

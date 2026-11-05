@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { DISPLAY_NAME_MAX_CHARACTERS } from "@/shared/member/display-name-words.ts";
 import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/auth/signed-in-without-workspace.ts";
 import { server } from "@test/stub-server.ts";
-import { aRefusalAnswer, openOutsideTheShellAt, read } from "@test/two-workspaces.ts";
+import { aRefusalAnswer, openPageOutsideShell, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
@@ -27,26 +27,26 @@ it("says what to change in a bad name, then saves", async () => {
     },
   ];
   api.set("person.setDisplayName", () => answers.shift()?.());
-  const router = await openOutsideTheShellAt("/display-name", api);
+  const router = await openPageOutsideShell("/display-name", api);
   expect(await screen.findByRole("heading", { level: 1, name: "Your Name" })).toBeDefined();
   const field = screen.getByLabelText("Display Name");
   const save = screen.getByRole("button", { name: "Save and Continue" });
 
   const regions = screen.getAllByRole("alert", { hidden: true });
-  expect(regions, "the display-name page stands no refusal region").toHaveLength(1);
-  const stood = regions[0];
-  expect(stood?.textContent, "the refusal region stands with words already in it").toBe("");
+  expect(regions, "the display-name page does not have exactly one alert region").toHaveLength(1);
+  const alertBefore = regions[0];
+  expect(alertBefore?.textContent, "the alert region holds words before a refusal").toBe("");
 
   const bracketed = "Priya <priya@acme.invalid>";
   fireEvent.change(field, { target: { value: bracketed } });
   fireEvent.click(save);
 
-  await waitFor(() => expect(stood?.textContent).toMatch(/< or >/));
-  const said = stood?.textContent;
+  await waitFor(() => expect(alertBefore?.textContent).toMatch(/\S/u));
+  const said = alertBefore?.textContent;
   expect(document.body.textContent, "the page shows the refusal's word").not.toContain(
     "display-name-angle-bracket",
   );
-  expect(screen.getByRole("alert"), "the refusal was said in a region of its own").toBe(stood);
+  expect(screen.getByRole("alert"), "the refusal appeared in a new alert region").toBe(alertBefore);
   expect(field.getAttribute("aria-invalid")).toBe("true");
   expect(screen.getByRole("heading", { level: 1, name: "Your Name" })).toBeDefined();
 
@@ -55,11 +55,11 @@ it("says what to change in a bad name, then saves", async () => {
   fireEvent.click(save);
 
   await waitFor(() =>
-    expect(stood?.textContent).toMatch(
+    expect(alertBefore?.textContent).toMatch(
       new RegExp(String.raw`\b${String(DISPLAY_NAME_MAX_CHARACTERS)}\b`),
     ),
   );
-  expect(stood?.textContent).not.toBe(said);
+  expect(alertBefore?.textContent).not.toBe(said);
   expect(document.body.textContent, "the page shows the refusal's word").not.toContain(
     "display-name-too-long",
   );

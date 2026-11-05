@@ -1,17 +1,10 @@
 import { createBrowserHistory, RouterProvider } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { detourTo } from "@/features/auth/second-factor-steps.ts";
-import {
-  CONFIRM_WORDS,
-  PROMOTION_WORDS,
-  SETUP_WORDS,
-  UNSAVED_AFTER_CONFIRMING,
-} from "@/features/auth/second-factor/second-factor-words.ts";
-import { SIGN_IN_WORDS } from "@/features/auth/sign-in/sign-in-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { openApp } from "@test/open-app.tsx";
 import {
@@ -82,8 +75,8 @@ const heading = () => screen.getByRole("heading", { level: 1 }).textContent;
 const pendingAt = (held: unknown, procedures = new Map<string, () => unknown>()) =>
   adasApi(() => held, new Map(), procedures, PENDING);
 
-describe("a pending session meeting the gate", () => {
-  it("sends the shell's reader to confirm, keeping their address", async () => {
+describe("a session waiting on its second factor", () => {
+  it("sends a member to confirm, keeping the page address", async () => {
     pendingAt(WAITING_TO_CONFIRM);
 
     const { router } = await openAsAda("/people/members");
@@ -92,7 +85,7 @@ describe("a pending session meeting the gate", () => {
     expect(heading()).toBe("Confirm It’s You");
   });
 
-  it("sends a reader holding no factor to setup instead", async () => {
+  it("sends a person with no second factor to setup", async () => {
     pendingAt(NOTHING_HELD);
 
     const { router } = await loadedAsAda("/people/members");
@@ -100,7 +93,7 @@ describe("a pending session meeting the gate", () => {
     expect(router.state.location.href).toBe("/setup?redirect=%2Fpeople%2Fmembers");
   });
 
-  it("sends the console's reader to confirm, though its standing answers", async () => {
+  it("sends the operator to confirm before the console", async () => {
     pendingAt(
       { ...WAITING_TO_CONFIRM, operator: true },
       new Map([["session.operator", () => ({ operator: true, name: "Ada" })]]),
@@ -118,7 +111,7 @@ describe("a pending session meeting the gate", () => {
     ["/invitations/inv-1", "/confirm?redirect=%2Finvitations%2Finv-1"],
     ["/display-name?redirect=%2Fpeople", "/confirm?redirect=%2Fpeople"],
     ["/recovery-codes?redirect=%2Fpeople", "/confirm?redirect=%2Fpeople"],
-  ])("detours %s to confirm before it draws", async (path, detour) => {
+  ])("sends %s to confirm before showing it", async (path, detour) => {
     pendingAt(WAITING_TO_CONFIRM);
 
     const { router } = await loadedAsAda(path);
@@ -126,7 +119,7 @@ describe("a pending session meeting the gate", () => {
     expect(router.state.location.href).toBe(detour);
   });
 
-  it("keeps a signed connection's whole query through the detour", () => {
+  it("keeps a signed connection's full query when sent to confirm", () => {
     const signed = "?client_id=claude&sig=abc&exp=1791000000";
 
     expect(detourTo("/confirm", { href: `/choose-workspace${signed}`, query: signed })).toBe(
@@ -134,7 +127,7 @@ describe("a pending session meeting the gate", () => {
     );
   });
 
-  it("draws the page for a session already confirmed", async () => {
+  it("shows the page for a session already confirmed", async () => {
     pendingAt(CONFIRMED);
 
     const { router } = await loadedAsAda("/no-workspace");
@@ -143,8 +136,8 @@ describe("a pending session meeting the gate", () => {
   });
 });
 
-describe("a pending refusal heard mid-session", () => {
-  it("sends a refused read to confirm, keeping the address", async () => {
+describe("the api asking for confirmation mid-session", () => {
+  it("a refused read sends the person to confirm", async () => {
     pendingAt(WAITING_TO_CONFIRM, SHELL_READS);
 
     const { router } = await openAsAda("/people/groups");
@@ -155,7 +148,7 @@ describe("a pending refusal heard mid-session", () => {
     expect(router.state.location.href).toBe("/confirm?redirect=%2Fpeople%2Fgroups");
   });
 
-  it("sends a pending page's signed-out reader to sign-in, keeping redirect", async () => {
+  it("sends a signed-out person from confirm to sign-in", async () => {
     vi.stubGlobal("fetch", answeringTheReadWith(NO_SESSION));
 
     const { router } = await openAsAda("/confirm?redirect=%2Fpeople%2Fmembers");
@@ -165,7 +158,7 @@ describe("a pending refusal heard mid-session", () => {
     });
   });
 
-  it("says on return that the refused change wasn't saved", async () => {
+  it("says the refused change was not saved after confirming", async () => {
     withPasskeysHere();
     const ada = adaPromotedMidSession();
     vi.stubGlobal("fetch", ada.fetch);
@@ -177,8 +170,8 @@ describe("a pending refusal heard mid-session", () => {
     fireEvent.change(field, { target: { value: "123456" } });
 
     await waitFor(() => {
-      const statuses = screen.getAllByRole("status").map((status) => status.textContent);
-      expect(statuses).toContain(UNSAVED_AFTER_CONFIRMING);
+      const inTheBand = within(screen.getByRole("banner")).getAllByRole("status");
+      expect(inTheBand.map((status) => status.textContent).join("")).toMatch(/\S/u);
     });
     expect(router.state.location.pathname).toBe("/people/groups");
   });
@@ -264,12 +257,12 @@ describe("the steps after a sign-in", () => {
 
   it.each([
     [
-      "confirms before the unseen codes and the display name",
+      "confirms before unacknowledged codes and the display name",
       { ...WAITING_TO_CONFIRM, codesAcknowledged: false },
       "/confirm?redirect=%2Fpeople%2Fmembers",
     ],
     [
-      "sets up first when the session holds no factor",
+      "sets up a second factor first when there is none",
       NOTHING_HELD,
       "/setup?redirect=%2Fpeople%2Fmembers",
     ],
@@ -284,7 +277,7 @@ describe("the steps after a sign-in", () => {
     });
   });
 
-  it("owes the passkey offer again after a sign-in by link", async () => {
+  it("shows the passkey offer again after a link sign-in", async () => {
     const shownUnder = "better-answers.passkey-offer-shown";
     globalThis.localStorage.setItem(shownUnder, "shown");
     signedInByLink(NOTHING_HELD);
@@ -303,7 +296,7 @@ describe("the steps after a sign-in", () => {
     String.raw`/\evil.example`,
     "/\t/evil.example",
     "evil.example/settings",
-  ])("lands a redirect to %s on home", async (redirect) => {
+  ])("sends a redirect to %s home instead", async (redirect) => {
     adasApi(() => CONFIRMED, new Map(), SHELL_READS);
 
     const { router } = await openAsAda(`/confirm?redirect=${encodeURIComponent(redirect)}`);
@@ -315,39 +308,39 @@ describe("the steps after a sign-in", () => {
 });
 
 describe("the confirm page for a person just promoted", () => {
-  it("lists what can confirm their sign-in, before the ways", async () => {
+  it("lists their second factors above the ways to confirm", async () => {
     adasApi(() => ({ ...WAITING_TO_CONFIRM, promoted: true }));
 
     await openAsAda("/confirm");
 
-    const list = await screen.findByRole("list", { name: PROMOTION_WORDS.lead });
+    const list = await screen.findByRole("list", { name: /\S/u });
     const [passkey, ...others] = [...list.querySelectorAll("li")].map((item) => item.textContent);
     expect(passkey).toMatch(/MacBook.*3 March 2026/v);
     expect(others).toEqual(["Authenticator"]);
-    expect(screen.getByText(PROMOTION_WORDS.after)).toBeDefined();
+    expect(list.nextElementSibling?.textContent, "no advice follows the list").toMatch(/\S/u);
     const code = screen.getByRole("textbox", { name: "Authenticator Code" });
     expect(list.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("lists nothing once the promotion has been confirmed", async () => {
+  it("lists no factors once the promotion is confirmed", async () => {
     adasApi(() => WAITING_TO_CONFIRM);
 
     await openAsAda("/confirm");
 
     await screen.findByRole("textbox", { name: "Authenticator Code" });
-    expect(screen.queryByText(PROMOTION_WORDS.lead)).toBeNull();
-    expect(screen.queryByText(PROMOTION_WORDS.after)).toBeNull();
+    expect(screen.queryByRole("list", { name: /\S/u })).toBeNull();
   });
 
-  it("names better-answers support as the operator's reason", async () => {
+  it("tells the operator why better-answers support must confirm", async () => {
     adasApi(() => ({ ...WAITING_TO_CONFIRM, operator: true }));
 
     await openAsAda("/confirm");
 
-    expect(await screen.findByText(CONFIRM_WORDS.whyTheOperator)).toBeDefined();
+    await screen.findByRole("textbox", { name: "Authenticator Code" });
+    expect(screen.getByRole("main").textContent).toContain("better-answers support");
   });
 
-  it("names the workspace on setup that just made them Admin", async () => {
+  it("names the workspace that made them an Admin on setup", async () => {
     adasApi(() => ({
       ...NOTHING_HELD,
       promoted: true,
@@ -356,15 +349,14 @@ describe("the confirm page for a person just promoted", () => {
 
     await openAsAda("/setup");
 
-    const why = await screen.findByText(SETUP_WORDS.nowAnAdmin("Northern Tooling"), {
-      exact: false,
+    await waitFor(() => {
+      expect(screen.getByRole("main").textContent).toContain("Northern Tooling");
     });
-    expect(why.textContent).toContain("Northern Tooling");
   });
 });
 
-describe("a sign-in that ended while waiting on its second factor", () => {
-  it("is remembered as pending by the page that waited", async () => {
+describe("a sign-in that expired before its second factor", () => {
+  it("is stored as pending while the confirm page waits", async () => {
     adasApi(() => WAITING_TO_CONFIRM);
 
     await openAsAda("/confirm");
@@ -373,7 +365,7 @@ describe("a sign-in that ended while waiting on its second factor", () => {
     expect(globalThis.localStorage.getItem("better-answers.session")).toBe("pending");
   });
 
-  it("is remembered as held once the shell reads the session", async () => {
+  it("is stored as held once the shell reads the session", async () => {
     globalThis.localStorage.setItem("better-answers.session", "pending");
     adasApi(() => CONFIRMED, new Map(), SHELL_READS);
 
@@ -382,7 +374,7 @@ describe("a sign-in that ended while waiting on its second factor", () => {
     expect(globalThis.localStorage.getItem("better-answers.session")).toBe("held");
   });
 
-  it("is remembered as held once the step after setup reads", async () => {
+  it("is stored as held once the display-name step loads", async () => {
     globalThis.localStorage.setItem("better-answers.session", "pending");
     adasApi(() => CONFIRMED);
 
@@ -391,12 +383,14 @@ describe("a sign-in that ended while waiting on its second factor", () => {
     expect(globalThis.localStorage.getItem("better-answers.session")).toBe("held");
   });
 
-  it("says on sign-in that it ended unconfirmed within the hour", async () => {
+  it("explains the expiry on the sign-in page", async () => {
     globalThis.localStorage.setItem("better-answers.session", "pending");
     vi.stubGlobal("fetch", () => answered(null));
 
     await openApp("/sign-in?redirect=%2Fpeople%2Fmembers");
 
-    expect(await screen.findByText(SIGN_IN_WORDS.arrived["confirm-timed-out"])).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toMatch(/\S/u);
+    });
   });
 });

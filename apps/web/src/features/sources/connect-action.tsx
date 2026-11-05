@@ -40,10 +40,7 @@ const ACCEPTED = [
   ...MEDIA_TYPES,
 ].join(",");
 
-/**
- * A browser names a markdown file's type inconsistently, so the extension decides where it is
- * silent.
- */
+/** Browsers give a Markdown file different types, or none, so the extension decides when the type is not one listed. */
 const mediaTypeOf = (file: File): string | undefined => {
   if (MEDIA_TYPES.has(file.type)) return file.type;
   return MEDIA_TYPE_OF_EXTENSION.get(file.name.split(".").at(-1)?.toLowerCase() ?? "");
@@ -210,7 +207,7 @@ export function ConnectAction() {
             <div className="grid gap-2">
               <Progress
                 value={percentOf(uploading)}
-                aria-label={`Upload of ${uploading.fileName}`}
+                aria-label={`Uploading ${uploading.fileName}`}
                 aria-valuetext={`${uploading.sentBytes} of ${uploading.totalBytes} bytes sent`}
               />
               <p className="text-sm text-muted-foreground">

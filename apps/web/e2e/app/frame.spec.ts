@@ -21,7 +21,7 @@ import {
   railOf,
   signIn,
   signInHeading,
-  signInSaysWhy,
+  signInStatusText,
   signOutFromTheShell,
   signedInAtHome,
   skipLinkReachesThePage,
@@ -52,15 +52,15 @@ const PAGE_NAMES = [
 
 const AREA_NAMES = ["Ask", "Knowledge", "Inbox", "Control Centre"];
 
-const ITS_HEADING = "Models";
+const MODELS_HEADING = "Models";
 
 const NARROW = { width: 320, height: 720 };
 
-const NOWHERE = "/nothing-here";
+const UNKNOWN_PATH = "/nothing-here";
 
 const FAILED_HEADING = "This Page Didn’t Load";
 
-const NOT_A_LIST = { why: "the api answered a shape the model choices card cannot render" };
+const MALFORMED_LIST = { why: "a response the Model Choices card cannot render" };
 
 const MODEL_CHOICES_LIST = "modelChoices.list";
 
@@ -74,26 +74,27 @@ const NON_TEXT_CONTRAST = 3;
 
 const STOPS = 60;
 
-const bandOf = (page: Page) => page.getByRole("banner");
+const headerOf = (page: Page) => page.getByRole("banner");
 
-const logoOf = (page: Page) => bandOf(page).getByRole("link", { name: "better-answers" });
+const logoOf = (page: Page) => headerOf(page).getByRole("link", { name: "better-answers" });
 
-const closerOf = (page: Page) => page.getByRole("button", { name: "Hide Menu" });
+const hideMenuButton = (page: Page) => page.getByRole("button", { name: "Hide Menu" });
 
-const sheetButtonOf = (page: Page) => page.getByRole("button", { name: "Menu", exact: true });
+const menuButton = (page: Page) => page.getByRole("button", { name: "Menu", exact: true });
 
-const sheetOf = (page: Page) => page.getByRole("dialog", { name: "Menu", exact: true });
+const menuDialog = (page: Page) => page.getByRole("dialog", { name: "Menu", exact: true });
 
-const jumpToOf = (page: Page) => bandOf(page).getByRole("button", { name: "Jump To" });
+const jumpToOf = (page: Page) => headerOf(page).getByRole("button", { name: "Jump To" });
 
 const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Models and Spend" });
 
 const modelChoicesCardOf = (page: Page) => page.getByRole("region", { name: "Model Choices" });
 
-const theModelChoicesHaveLanded = (page: Page) =>
+const modelChoicesLoaded = (page: Page) =>
   expect(modelChoicesCardOf(page).getByRole("paragraph")).toHaveCount(3);
 
-const unknownPage = (page: Page) => page.getByRole("heading", { level: 1, name: "Page Not Found" });
+const notFoundHeading = (page: Page) =>
+  page.getByRole("heading", { level: 1, name: "Page Not Found" });
 
 const jumpToDialogOf = (page: Page) => page.getByRole("dialog", { name: "Jump To" });
 
@@ -102,42 +103,44 @@ const jumpToOptionOf = (page: Page, name: string | RegExp) =>
 
 const boxOf = async (region: Locator) => {
   const box = await region.boundingBox();
-  if (box === null) throw new Error("the region is not drawn");
+  if (box === null) throw new Error("the region is not rendered");
   return box;
 };
 
 const topOf = async (region: Locator): Promise<number> => (await boxOf(region)).y;
 
-const sidewaysRoom = (page: Page) =>
+const pageWidths = (page: Page) =>
   page.evaluate(() => ({
-    scrolls: document.documentElement.scrollWidth,
-    holds: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
   }));
 
-const scrollsNothingSideways = async (page: Page, when: string) => {
-  const room = await sidewaysRoom(page);
-  expect(room.scrolls, `the page scrolls sideways ${when}`).toBeLessThanOrEqual(room.holds);
+const expectNoSidewaysScroll = async (page: Page, when: string) => {
+  const widths = await pageWidths(page);
+  expect(widths.scrollWidth, `the page scrolls sideways ${when}`).toBeLessThanOrEqual(
+    widths.clientWidth,
+  );
 };
 
-const contentIsLastWithNoJumps = () => {
-  const bar = document.querySelector("header");
+const mainFollowsHeaderWithNoPositiveTabindex = () => {
+  const header = document.querySelector("header");
   const content = document.querySelector("main");
-  if (bar === null || content === null) return false;
-  const following = bar.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING;
-  const jumped = [...document.querySelectorAll("[tabindex]")].some(
+  if (header === null || content === null) return false;
+  const following = header.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING;
+  const positiveTabindex = [...document.querySelectorAll("[tabindex]")].some(
     (element) => Number(element.getAttribute("tabindex")) > 0,
   );
-  return following !== 0 && !jumped;
+  return following !== 0 && !positiveTabindex;
 };
 
 const inDocumentOrder = async (page: Page, regions: readonly Locator[]): Promise<boolean> => {
   const nodes = await Promise.all(regions.map((region) => region.elementHandle()));
   return page.evaluate(
-    (drawn) =>
-      drawn.every(
+    (elements) =>
+      elements.every(
         (node, at) =>
           at === 0 ||
-          ((drawn[at - 1]?.compareDocumentPosition(node) ?? 0) &
+          ((elements[at - 1]?.compareDocumentPosition(node) ?? 0) &
             Node.DOCUMENT_POSITION_FOLLOWING) !==
             0,
       ),
@@ -145,7 +148,11 @@ const inDocumentOrder = async (page: Page, regions: readonly Locator[]): Promise
   );
 };
 
-const signedIn = async (page: Page, api: Parameters<typeof provision>[0], name: string) => {
+const signInToNewWorkspace = async (
+  page: Page,
+  api: Parameters<typeof provision>[0],
+  name: string,
+) => {
   const email = anAddress("shell");
   const workspace = await provision(api, { name, adminEmail: email });
   await page.goto("/sign-in");
@@ -153,18 +160,22 @@ const signedIn = async (page: Page, api: Parameters<typeof provision>[0], name: 
   return workspace;
 };
 
-const narrowAtModelsAndSpend = async (
+const openModelsAndSpendAtNarrowWidth = async (
   page: Page,
   api: Parameters<typeof provision>[0],
   name: string,
 ) => {
-  await signedIn(page, api, name);
+  await signInToNewWorkspace(page, api, name);
   await page.setViewportSize(NARROW);
   await page.goto(MODELS_AND_SPEND.path);
-  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: MODELS_HEADING })).toBeVisible();
 };
 
-const provisionedWithATeam = async (api: APIRequestContext, name: string, adminEmail: string) => {
+const provisionWithTwoMembers = async (
+  api: APIRequestContext,
+  name: string,
+  adminEmail: string,
+) => {
   const workspace = await provision(api, { name, adminEmail });
   for (const [address, displayName, role] of [
     [anAddress("priya"), PRIYA, "Editor"],
@@ -176,7 +187,7 @@ const provisionedWithATeam = async (api: APIRequestContext, name: string, adminE
   return workspace;
 };
 
-const modelChoicesBroken = async (route: Route) => {
+const breakModelChoicesList = async (route: Route) => {
   const answered = await route.fetch();
   const procedures = decodeURIComponent(new URL(route.request().url()).pathname)
     .replace("/trpc/", "")
@@ -190,9 +201,9 @@ const modelChoicesBroken = async (route: Route) => {
   const batch = z.array(z.unknown()).safeParse(answers);
   const broken = batch.success
     ? batch.data.map((answer, index) =>
-        procedures[index] === MODEL_CHOICES_LIST ? { result: { data: NOT_A_LIST } } : answer,
+        procedures[index] === MODEL_CHOICES_LIST ? { result: { data: MALFORMED_LIST } } : answer,
       )
-    : { result: { data: NOT_A_LIST } };
+    : { result: { data: MALFORMED_LIST } };
   await route.fulfill({ json: broken });
 };
 
@@ -202,15 +213,15 @@ test("the shell's header, rail, and menu work by keyboard", async ({
   passesTheAccessibilityGate,
 }) => {
   const email = anAddress("shell");
-  const workspace = await provisionedWithATeam(request, "Wharfedale Castings", email);
+  const workspace = await provisionWithTwoMembers(request, "Wharfedale Castings", email);
 
-  await test.step("shows a signed-out visitor the logo and Sign In on an unknown page", async () => {
-    await page.goto(NOWHERE);
+  await test.step("an unknown page shows a signed-out visitor only Sign In", async () => {
+    await page.goto(UNKNOWN_PATH);
 
-    await expect(unknownPage(page)).toBeVisible();
-    await expect(bandOf(page)).toHaveText("better-answers", { useInnerText: true });
+    await expect(notFoundHeading(page)).toBeVisible();
+    await expect(headerOf(page)).toHaveText("better-answers", { useInnerText: true });
     await expect(page.getByRole("main").getByRole("link")).toHaveText(["Sign In"]);
-    await expect(page).toHaveURL(NOWHERE);
+    await expect(page).toHaveURL(UNKNOWN_PATH);
     await passesTheAccessibilityGate();
 
     await page.getByRole("link", { name: "Sign In" }).click();
@@ -221,18 +232,18 @@ test("the shell's header, rail, and menu work by keyboard", async ({
   await signIn(page, request, email);
   await expect(page).toHaveURL(new RegExp(`${MODELS_AND_SPEND.path}$`));
 
-  await test.step("Tab visits the skip link, header, rail, menu, tabs, and panel in order", async () => {
+  await test.step("Tab reaches each shell control in document order", async () => {
     const rail = railOf(page);
     await expect(rail.getByRole("link", { name: "Control Centre" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    await theModelChoicesHaveLanded(page);
+    await modelChoicesLoaded(page);
 
-    const band = [
+    const headerControls = [
       logoOf(page),
       switcherOf(page, workspace.name),
-      closerOf(page),
+      hideMenuButton(page),
       crumbOf(page, "Control Centre"),
       crumbOf(page, "Models"),
       crumbOf(page, "Models and Spend"),
@@ -240,14 +251,14 @@ test("the shell's header, rail, and menu work by keyboard", async ({
       avatarOf(page, workspace.admin.name),
     ];
     expect(
-      await inDocumentOrder(page, band),
+      await inDocumentOrder(page, headerControls),
       "the header's controls are out of document order",
     ).toBe(true);
 
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
+    await expect(page.getByRole("link", { name: "Skip to Main Content" })).toBeFocused();
 
-    for (const stop of band) {
+    for (const stop of headerControls) {
       await page.keyboard.press("Tab");
       await expect(stop).toBeFocused();
     }
@@ -279,8 +290,10 @@ test("the shell's header, rail, and menu work by keyboard", async ({
     await expect(panel).toBeFocused();
     await expect(panel.getByRole("region", { name: "Model Choices" })).toBeVisible();
 
-    const contentIsLast = await page.evaluate(contentIsLastWithNoJumps);
-    expect(contentIsLast).toBe(true);
+    expect(
+      await page.evaluate(mainFollowsHeaderWithNoPositiveTabindex),
+      "the main content precedes the header or a control has a positive tabindex",
+    ).toBe(true);
   });
 
   await test.step("passes the accessibility gate with the workspace switcher menu open", async () => {
@@ -292,15 +305,15 @@ test("the shell's header, rail, and menu work by keyboard", async ({
     await expect(switcherMenuOf(page, workspace.name)).toHaveCount(0);
   });
 
-  await test.step("opens the Jump To list within one second, timed in the browser", async () => {
+  await test.step("opens the Jump To list within one second", async () => {
     await page.reload();
-    await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: MODELS_HEADING })).toBeVisible();
 
     await clockTheNextDraw(page, { at: "//*[@role='dialog']", reads: TOM });
     await page.keyboard.press("Meta+k");
     const elapsed = await actionClocked(page);
     test.info().annotations.push({ type: "jump-to list", description: `${elapsed} ms` });
-    expect(elapsed, "the Jump To list took longer than one second to draw").toBeLessThan(
+    expect(elapsed, "the Jump To list took longer than one second to render").toBeLessThan(
       LIST_BUDGET_MS,
     );
 
@@ -309,23 +322,23 @@ test("the shell's header, rail, and menu work by keyboard", async ({
     await expect(jumpToOptionOf(page, INVITE_A_PERSON)).toBeVisible();
   });
 
-  await page.route("**/trpc/**", modelChoicesBroken);
+  await page.route("**/trpc/**", breakModelChoicesList);
   await page.goto(MODELS_AND_SPEND.path);
   const failed = page.getByRole("heading", { level: 1, name: FAILED_HEADING });
   const navigation = page.getByRole("navigation", { name: "Control Centre" });
 
-  await test.step("shows an error with a way out, and the shell still works by keyboard", async () => {
+  await test.step("a load error leaves the shell usable by keyboard", async () => {
     await expect(page.getByRole("alert").filter({ has: failed })).toBeVisible();
     await expect(page.getByRole("alert").getByRole("paragraph")).toHaveText(/\S/);
     await expect(page.getByRole("link", { name: "Go to Members" })).toHaveAttribute(
       "href",
       HOMES.Admin.path,
     );
-    const everything = page.locator("body");
-    await expect(everything).not.toContainText("TypeError");
-    await expect(everything).not.toContainText("is not a function");
+    const body = page.locator("body");
+    await expect(body).not.toContainText("TypeError");
+    await expect(body).not.toContainText("is not a function");
 
-    await expect(bandOf(page).getByText(workspace.name)).toBeVisible();
+    await expect(headerOf(page).getByText(workspace.name)).toBeVisible();
     await expect(railOf(page).getByRole("link")).toHaveText(AREA_NAMES);
     await expect(navigation.getByRole("link", { name: "Audit Log" })).toBeVisible();
 
@@ -358,18 +371,18 @@ test("the shell's header, rail, and menu work by keyboard", async ({
 });
 
 test("never scrolls sideways at 320 px, menu open or closed", async ({ page, request }) => {
-  await narrowAtModelsAndSpend(page, request, "Acme Joinery");
+  await openModelsAndSpendAtNarrowWidth(page, request, "Acme Joinery");
 
-  await scrollsNothingSideways(page, "with the sheet closed");
+  await expectNoSidewaysScroll(page, "with the menu closed");
 
-  const bar = await topOf(bandOf(page));
-  const content = await topOf(page.getByRole("main"));
-  expect(bar).toBeLessThan(content);
+  const headerTop = await topOf(headerOf(page));
+  const mainTop = await topOf(page.getByRole("main"));
+  expect(headerTop, "the header is not above the main content").toBeLessThan(mainTop);
 
-  await sheetButtonOf(page).click();
-  await expect(sheetOf(page)).toBeVisible();
+  await menuButton(page).click();
+  await expect(menuDialog(page)).toBeVisible();
 
-  await scrollsNothingSideways(page, "with the sheet open");
+  await expectNoSidewaysScroll(page, "with the menu open");
 });
 
 test("sends an Admin from an unknown page to their home", async ({
@@ -402,7 +415,7 @@ test("sends an Admin from an unknown page to their home", async ({
   await landedAtHome(page, "Admin");
 });
 
-type Drawn = {
+type FocusStyle = {
   readonly again: boolean;
   readonly rings: number;
   readonly name: string;
@@ -423,8 +436,8 @@ const focusSettled = (page: Page): Promise<void> =>
     );
   });
 
-const drawnFocus = (page: Page, edge: string): Promise<Drawn | undefined> =>
-  page.evaluate((inked) => {
+const focusStyleOf = (page: Page, edge: string): Promise<FocusStyle | undefined> =>
+  page.evaluate((ringColour) => {
     const focused = document.activeElement;
     if (!(focused instanceof HTMLElement) || focused === document.body) return undefined;
     // A browser reports an opaque colour as `rgb()`, and anything see-through as `rgba()`.
@@ -437,63 +450,63 @@ const drawnFocus = (page: Page, edge: string): Promise<Drawn | undefined> =>
       return parent === null ? "rgb(255, 255, 255)" : getComputedStyle(parent).backgroundColor;
     };
     // The ring is the element whose box-shadow contains the focus colour. Utility classes add
-    // transparent shadow layers, which the filter below drops.
-    const ringed = [focused, ...focused.querySelectorAll<HTMLElement>("*")].filter((element) =>
-      getComputedStyle(element).boxShadow.includes(inked),
+    // transparent shadow colourLayers, which the filter below drops.
+    const ringElements = [focused, ...focused.querySelectorAll<HTMLElement>("*")].filter(
+      (element) => getComputedStyle(element).boxShadow.includes(ringColour),
     );
-    const drawing = ringed[0] ?? focused;
-    const shadow = getComputedStyle(drawing)
+    const ringElement = ringElements[0] ?? focused;
+    const shadow = getComputedStyle(ringElement)
       .boxShadow.split(/,(?![^(]*\))\s*/)
       .filter((layer) => !layer.startsWith("rgba(0, 0, 0, 0)"))
       .join(", ");
-    const layers = (painted: string) => {
+    const colourLayers = (painted: string) => {
       const colours = painted.match(/rgba?\([^)]+\)/g) ?? [];
       return { ring: colours[0] ?? "", edge: colours.at(-1) ?? "" };
     };
-    const behind = surfaceBehind(drawing);
-    const own = getComputedStyle(drawing).backgroundColor;
+    const behind = surfaceBehind(ringElement);
+    const own = getComputedStyle(ringElement).backgroundColor;
     const fill = [own, behind].find(opaque);
-    const again = focused.dataset["focusWalked"] === "";
-    focused.dataset["focusWalked"] = "";
+    const again = focused.dataset["focusVisited"] === "";
+    focused.dataset["focusVisited"] = "";
     const label = focused.getAttribute("aria-label") ?? focused.textContent;
     return {
       again,
-      rings: ringed.length,
+      rings: ringElements.length,
       name: `${focused.tagName.toLowerCase()} "${label.trim().slice(0, 40)}"`,
       shadow,
-      ...layers(shadow),
+      ...colourLayers(shadow),
       fill: fill ?? behind,
       behind,
     };
   }, edge);
 
-const inkOf = async (page: Page): Promise<string> =>
+const focusRingColour = async (page: Page): Promise<string> =>
   (await tokenPainted(page, "--focus-ring", "box-shadow")).match(/rgba?\([^)]+\)/g)?.at(-1) ?? "";
 
-const walked = async (page: Page): Promise<readonly Drawn[]> => {
-  const edge = await inkOf(page);
-  const seen: Drawn[] = [];
+const focusStylesByTab = async (page: Page): Promise<readonly FocusStyle[]> => {
+  const edge = await focusRingColour(page);
+  const styles: FocusStyle[] = [];
   for (let stop = 0; stop < STOPS; stop += 1) {
     await page.keyboard.press("Tab");
     await focusSettled(page);
-    const drawn = await drawnFocus(page, edge);
-    if (drawn?.again === true) return seen;
-    if (drawn !== undefined) seen.push(drawn);
+    const style = await focusStyleOf(page, edge);
+    if (style?.again === true) return styles;
+    if (style !== undefined) styles.push(style);
   }
   throw new Error(
-    `focus never came back round in ${String(STOPS)} stops, so the controls past them were never measured`,
+    `focus did not return to a visited control within ${String(STOPS)} Tab presses, so later controls went unchecked`,
   );
 };
 
-const holdsTheRing = async (page: Page, stops: readonly Drawn[]): Promise<void> => {
+const expectStandardFocusRings = async (
+  page: Page,
+  stops: readonly FocusStyle[],
+): Promise<void> => {
   const token = await tokenPainted(page, "--focus-ring", "box-shadow");
   expect(stops.length, "Tab reached fewer than three controls").toBeGreaterThan(2);
   for (const stop of stops) {
-    expect(stop.rings, `${stop.name} draws ${String(stop.rings)} focus rings, not one`).toBe(1);
-    expect(
-      stop.shadow,
-      `${stop.name} draws its focus ring in a colour other than --focus-ring`,
-    ).toBe(token);
+    expect(stop.rings, `${stop.name} shows ${String(stop.rings)} focus rings, not one`).toBe(1);
+    expect(stop.shadow, `${stop.name} has a focus ring colour other than --focus-ring`).toBe(token);
     const edge = contrastBetween(stop.edge, stop.behind);
     test
       .info()
@@ -505,7 +518,7 @@ const holdsTheRing = async (page: Page, stops: readonly Drawn[]): Promise<void> 
   }
 };
 
-test("draws the standard focus ring on every Members page control", async ({ page, request }) => {
+test("shows the standard focus ring on every Members page control", async ({ page, request }) => {
   const email = anAddress("focus");
   await provision(request, { name: "Calder Joinery", adminEmail: email });
   await signedInAtHome(page, request, email);
@@ -513,7 +526,7 @@ test("draws the standard focus ring on every Members page control", async ({ pag
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await skipLinkReachesThePage(page);
 
-  await holdsTheRing(page, await walked(page));
+  await expectStandardFocusRings(page, await focusStylesByTab(page));
 });
 
 test("sign-out from the shell ends the session", async ({ page, request }) => {
@@ -525,12 +538,12 @@ test("sign-out from the shell ends the session", async ({ page, request }) => {
 
   await signOutFromTheShell(page, workspace.admin.name);
 
-  const signedOut = await signInSaysWhy(page);
+  const signedOut = await signInStatusText(page);
 
   await page.goto("/people");
   await expect(signInHeading(page)).toBeVisible();
   await expect(
     page.getByRole("status"),
-    "the sign-in page does not say the person signed out",
+    "the sign-in status after visiting /people differs from the sign-out status",
   ).toHaveText(signedOut);
 });

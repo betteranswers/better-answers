@@ -13,10 +13,7 @@ export const SOURCES_KEYSTROKES = {
   widen: { key: "w", action: "Widen the Connected Source in Focus" },
   select: { key: "x", action: "Select or Clear the Group of Findings in Focus" },
   keep: { key: "k", action: "Keep the Selected Groups of Findings in Text" },
-  narrowDocuments: {
-    key: "d",
-    action: "Narrow the Documents the Selected Groups of Findings Sit In",
-  },
+  narrowDocuments: { key: "d", action: "Narrow the Documents That Hold the Selected Findings" },
   dismiss: { key: "s", action: "Dismiss the Selected Groups of Findings as Not Special Category" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 

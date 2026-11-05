@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 describe("removing a member from their page", () => {
-  it("waits on the reader's member read, then finds its outcome", async () => {
+  it("offers removal only after your membership loads", async () => {
     const clients = createAppClients();
     clients.queryClient.setDefaultOptions({ queries: { retry: false } });
     const read = Promise.withResolvers<void>();
@@ -52,7 +52,7 @@ describe("removing a member from their page", () => {
 
     expect(
       result.current.removal,
-      "offered before the reader's workspace was read",
+      "removal was offered before your membership loaded",
     ).toBeUndefined();
 
     read.resolve();
@@ -120,10 +120,10 @@ const removedOnTheirPage = async (): Promise<void> => {
   fireEvent.click(removal.getByRole("button", { name: "Remove" }));
 };
 
-describe("a removal and jump-to", () => {
+describe("removing a member opened from Jump To", () => {
   placedWithoutMeasuring();
 
-  it("removing a member opened from jump-to keeps Members' search", async () => {
+  it("returns to Members with its search kept", async () => {
     const router = await openAt(SEARCHED, aTeamPriyaCanBeRemovedFrom());
     await waitFor(() => expect(namesShown()).toEqual([TOM.displayName]));
 
@@ -136,7 +136,7 @@ describe("a removal and jump-to", () => {
     expect(namesShown()).toEqual([TOM.displayName]);
   });
 
-  it("jumping after a removal focuses the page, not Remove", async () => {
+  it("Jump To after a removal focuses the page", async () => {
     await openAt(MEMBERS, aTeamPriyaCanBeRemovedFrom());
     const menu = await rowMenuOpened(PRIYA.displayName);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Remove" }));
@@ -153,12 +153,12 @@ describe("a removal and jump-to", () => {
     }
 
     expect(focus.stops).toContain("main");
-    expect(focus.stops, "focus never stops on Remove Member").not.toContain("Remove Member");
+    expect(focus.stops, "focus passed through Remove Member").not.toContain("Remove Member");
   });
 });
 
-describe("a stale confirmation before removing a member", () => {
-  it("asks again before removing a member, and not after", async () => {
+describe("removing a member after the confirmation expires", () => {
+  it("asks to confirm again once, then removes without asking", async () => {
     const api = anAdminOver([ADA, PRIYA, SAM]);
     const removals = [
       () => aRefusalAnswer(STALE_CONFIRMATION, "precondition", 412),
@@ -204,6 +204,9 @@ describe("a stale confirmation before removing a member", () => {
     );
     await waitFor(() => expect(router.state.location.pathname).toBe("/people/members"));
     expect(screen.queryByRole("link", { name: "Sam Okoro" })).toBeNull();
-    expect(screen.queryByRole("dialog"), "no confirmation asked for the second removal").toBeNull();
+    expect(
+      screen.queryByRole("dialog"),
+      "the second removal asked for confirmation again",
+    ).toBeNull();
   });
 });

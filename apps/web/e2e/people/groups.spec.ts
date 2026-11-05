@@ -48,7 +48,7 @@ const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", 
 const emptyStatusIn = (scope: Locator): Locator =>
   scope.getByRole("status").filter({ hasNotText: /\S/ });
 
-const standsWithoutRoom = async (status: Locator) => {
+const expectTakesNoSpace = async (status: Locator) => {
   await expect(status).not.toHaveCSS("display", "none");
   const box = await status.boundingBox();
   expect(box?.height, "the empty status region takes up space on the page").toBeLessThanOrEqual(1);
@@ -167,7 +167,7 @@ test.describe("the People group's Groups page", () => {
         inTheBand,
         "the top bar's status region is not in the accessibility tree",
       ).toHaveCount(1);
-      await standsWithoutRoom(inTheBand);
+      await expectTakesNoSpace(inTheBand);
 
       const onThePage = emptyStatusIn(groupsRegion(page));
       await expect(
@@ -175,7 +175,7 @@ test.describe("the People group's Groups page", () => {
         "the page's status region is not in the accessibility tree",
       ).toHaveCount(1);
       for (const status of await onThePage.all()) {
-        await standsWithoutRoom(status);
+        await expectTakesNoSpace(status);
       }
       const standing = await onThePage.elementHandles();
 
@@ -186,7 +186,7 @@ test.describe("the People group's Groups page", () => {
         "the dialog's status region is not in the accessibility tree",
       ).toHaveCount(1);
       for (const status of await inTheDialog.all()) {
-        await standsWithoutRoom(status);
+        await expectTakesNoSpace(status);
       }
       await nameField(page).fill("Estimators");
       await createDialog(page).getByRole("button", { name: "Create Group" }).click();

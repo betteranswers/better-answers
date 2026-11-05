@@ -18,7 +18,7 @@ import {
   provision,
   signIn,
   signInHeading,
-  theActionLandedWithinItsBudget,
+  actionWithinBudget,
 } from "../harness.ts";
 import {
   addressField,
@@ -38,24 +38,24 @@ import {
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
-const rowOf = (page: Page, address: string): Locator =>
+const invitationRow = (page: Page, address: string): Locator =>
   invitationRows(page).filter({ hasText: address });
 
-const theOneCell = (page: Page): Locator => invitationsRegion(page).getByRole("cell");
+const emptyStateCell = (page: Page): Locator => invitationsRegion(page).getByRole("cell");
 
 const openInvitations = async (page: Page): Promise<void> => {
   await page.getByRole("tab", { name: "Invitations" }).click();
   await expect(invitationsRegion(page).getByRole("heading", { name: "Invitations" })).toBeVisible();
 };
 
-const dialogOpened = async (page: Page): Promise<void> => {
+const openInviteDialog = async (page: Page): Promise<void> => {
   await inviteAction(page).click();
   await expect(addressField(page)).toBeFocused();
 };
 
 const activityOf = (page: Page): Locator => thePage(page).getByRole("region", { name: "Activity" });
 
-const linesOf = (page: Page): Locator => activityOf(page).getByRole("listitem");
+const activityItems = (page: Page): Locator => activityOf(page).getByRole("listitem");
 
 test("invited people join, and their Activity shows only the join", async ({
   page,
@@ -65,21 +65,21 @@ test("invited people join, and their Activity shows only the join", async ({
   const adminEmail = anAddress("admin");
   const workspace = await provision(request, { name: "Calder Joinery", adminEmail });
 
-  await test.step("an Admin invites a person by email address, and the invitation shows as Waiting", async () => {
+  await test.step("an Admin invites a person and the invitation is Waiting", async () => {
     await page.goto(MEMBERS_PAGE);
     await signIn(page, request, adminEmail);
     await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
     await openInvitations(page);
     await expect(invitationRows(page)).toHaveCount(0);
-    await expect(theOneCell(page)).toHaveText(/\S/);
+    await expect(emptyStateCell(page)).toHaveText(/\S/);
     const address = anAddress("sam");
 
-    await dialogOpened(page);
+    await openInviteDialog(page);
     await addressField(page).fill(address);
     const role = inviteDialog(page).getByRole("combobox", { name: "Role" });
     const describedBy = await role.getAttribute("aria-describedby");
-    assert.ok(describedBy !== null, "the Role field has no description of its meaning");
-    const meant = await inviteDialog(page).locator(`[id="${describedBy}"]`).innerText();
+    assert.ok(describedBy !== null, "the Role field has no aria-describedby");
+    const firstDescription = await inviteDialog(page).locator(`[id="${describedBy}"]`).innerText();
     await role.click();
     await page.getByRole("option", { name: "Editor" }).click();
     await expect(role).toHaveText("Editor");
@@ -87,7 +87,7 @@ test("invited people join, and their Activity shows only the join", async ({
     await expect(
       role,
       "the Role description did not change when the Admin picked Editor",
-    ).not.toHaveAccessibleDescription(meant);
+    ).not.toHaveAccessibleDescription(firstDescription);
     await inviteDialog(page).getByRole("button", { name: "Send Invitation" }).click();
 
     await expect(inviteDialog(page).getByRole("status").first()).toContainText(address);
@@ -97,7 +97,7 @@ test("invited people join, and their Activity shows only the join", async ({
     await expect(inviteAction(page)).toBeFocused();
 
     await expect(invitationRows(page)).toHaveCount(1);
-    const cells = rowOf(page, address).getByRole("cell");
+    const cells = invitationRow(page, address).getByRole("cell");
     await expect(cells.nth(1)).toHaveText(address);
     await expect(cells.nth(2)).toHaveText("Editor");
     await expect(cells.nth(3)).toHaveText(LONG_UK_DATE);
@@ -106,7 +106,7 @@ test("invited people join, and their Activity shows only the join", async ({
     await expect(countOf(invitationsRegion(page))).toHaveText(/\b1\b/);
     await expect(
       page.getByRole("main").getByRole("status").filter({ hasText: /\d/ }),
-      "the Invitations tab does not show only its own count",
+      "the page does not show exactly one count",
     ).toHaveCount(1);
     await expect(
       invitationsRegion(page).getByRole("radio", { name: /^Waiting\b/ }),
@@ -118,7 +118,7 @@ test("invited people join, and their Activity shows only the join", async ({
     await passesTheAccessibilityGate();
   });
 
-  await test.step("a new person opens an invitation link, enters their display name, and joins", async () => {
+  await test.step("a new person enters a display name and joins", async () => {
     const { address, link } = await anInvitation(request, workspace.workspaceId, "Editor");
 
     await page.context().clearCookies();
@@ -150,15 +150,15 @@ test("invited people join, and their Activity shows only the join", async ({
     await expect(joinButton(page)).toBeFocused();
     await clockTheNextKey(page, { at: "//main//button[@type='submit']", reads: "Joining" });
     await page.keyboard.press("j");
-    await theActionLandedWithinItsBudget(page, "name and accept");
+    await actionWithinBudget(page, "name and accept");
 
-    const bar = page.getByRole("banner");
-    await expect(bar.getByText("Calder Joinery")).toBeVisible();
+    const header = page.getByRole("banner");
+    await expect(header.getByText("Calder Joinery")).toBeVisible();
     await expect(await personMenuOpened(page, "Priya Shah")).toContainText("Editor");
     await passesTheAccessibilityGate();
   });
 
-  await test.step("a new member's Activity shows one line for their joining and no Load More button", async () => {
+  await test.step("a new member's Activity shows only their join", async () => {
     const address = anAddress("ola");
     await person(request, address, { displayName: "Ola Brennan" });
     const invited = await invite(request, {
@@ -177,8 +177,8 @@ test("invited people join, and their Activity shows only the join", async ({
 
     await openedByName(page, "Ola Brennan");
 
-    await expect(linesOf(page)).toHaveCount(1);
-    await expect(linesOf(page)).toContainText(/Ola Brennan.*Admin/);
+    await expect(activityItems(page)).toHaveCount(1);
+    await expect(activityItems(page)).toContainText(/Ola Brennan.*Admin/);
     await expect(activityOf(page).getByRole("button", { name: "Load More" })).toHaveCount(0);
   });
 });

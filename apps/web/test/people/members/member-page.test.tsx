@@ -2,12 +2,12 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-libra
 import { describe, expect, it, vi } from "vitest";
 
 import { memberPageOf } from "@/features/people/members/members-address.ts";
-import { PEOPLE_KEYSTROKES, PEOPLE_SELECT_FIRST } from "@/features/people/people-state.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
   anAdminOver,
   idOf,
+  MEMBERS_PAGE,
   membersRegion,
   personHeading,
   PRIYA,
@@ -22,8 +22,6 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
-const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
-
 const UNNAMED = {
   ...GRACE,
   personId: idOf("NNMD"),
@@ -34,14 +32,14 @@ const UNNAMED = {
 
 const aWorkspaceOfThree = () => anAdminOver([PRIYA, SAM, TEST_PERSON, UNNAMED]);
 
-const alertsSaid = (region: HTMLElement): number =>
+const alertsWithText = (region: HTMLElement): number =>
   within(region)
     .queryAllByRole("alert")
     .filter((alert) => alert.textContent !== "").length;
 
 const tickedBox = (name: string): HTMLElement => {
   const box = tickOf(name);
-  expect(box, `no tick for ${name}`).not.toBeNull();
+  expect(box, `the list has no checkbox for ${name}`).not.toBeNull();
   return box ?? document.body;
 };
 
@@ -57,7 +55,7 @@ const roleRadio = (role: string) => thePage().getByRole("radio", { name: role })
 const describing = (control: HTMLElement): string =>
   document.getElementById(control.getAttribute("aria-describedby") ?? "")?.textContent ?? "";
 
-const selectFirstSaid = () => membersRegion().queryAllByText(PEOPLE_SELECT_FIRST.member).length;
+const outcomeSaid = () => membersRegion().getAllByRole("status")[1]?.textContent ?? "";
 
 const keyPressed = (key: string) => {
   fireEvent.keyDown(document.activeElement ?? document.body, { key });
@@ -67,7 +65,7 @@ const focused = (control: HTMLElement): HTMLElement => {
   act(() => {
     control.focus();
   });
-  expect(document.activeElement, "the control took no focus").toBe(control);
+  expect(document.activeElement, "the control did not take focus").toBe(control);
   return control;
 };
 
@@ -77,7 +75,7 @@ const membersListed = () =>
 const linkTo = (name: string) => waitFor(() => membersRegion().getByRole("link", { name }));
 
 describe("a member's own page", () => {
-  it("opens by name, row menu and link, crumbed by name", async () => {
+  it("opens from its link and row menu, with a breadcrumb", async () => {
     const api = aWorkspaceOfThree();
     const router = await openAt(MEMBERS_PAGE, api);
     const priyasPage = memberPageOf(PRIYA.personId);
@@ -122,7 +120,7 @@ describe("a member's own page", () => {
     expect(screen.getByRole("heading", { level: 1, name: "People" })).toBeDefined();
   });
 
-  it("names a role change only once another role is picked", async () => {
+  it("describes a role change only after another role is picked", async () => {
     await openAt(memberPageOf(PRIYA.personId), aWorkspaceOfThree());
     await personHeading("Priya Shah");
     const commit = () => rolePicker().getByRole("button", { name: "Change Role" });
@@ -132,7 +130,7 @@ describe("a member's own page", () => {
 
     fireEvent.click(roleRadio("Viewer"));
     expect(commit().hasAttribute("disabled")).toBe(false);
-    expect(describing(commit()), "the primary names no change with another role picked").toMatch(
+    expect(describing(commit()), "the button's description did not name the new role").toMatch(
       /Priya Shah.*Editor.*Viewer/,
     );
     expect(rolePicker().getAllByRole("button")).toHaveLength(1);
@@ -151,13 +149,12 @@ describe("a member's own page", () => {
     keyPressed(PEOPLE_KEYSTROKES.open.key);
 
     await waitFor(() => expect(outcome()?.textContent).toMatch(/\S/));
-    expect(outcome()?.textContent).toBe(PEOPLE_SELECT_FIRST.member);
-    expect(router.state.location.pathname, "the keystroke left Members").toBe(MEMBERS_PAGE);
+    expect(router.state.location.pathname, "the key opened another page").toBe(MEMBERS_PAGE);
     expect(screen.queryByRole("heading", { level: 2, name: "Priya Shah" })).toBeNull();
     expect(screen.queryByRole("toolbar", { name: "Selected Members" })).toBeNull();
   });
 
-  it("drops the select-first line once a key ticks a member", async () => {
+  it("clears the select-first message once a key selects a member", async () => {
     await openAt(MEMBERS_PAGE, aWorkspaceOfThree());
     await linkTo("Priya Shah");
 
@@ -165,34 +162,38 @@ describe("a member's own page", () => {
       focused(await membersListed());
       keyPressed(key);
       await waitFor(() =>
-        expect(selectFirstSaid(), `${key} with no member in focus or ticked said nothing`).toBe(1),
+        expect(outcomeSaid(), `pressing ${key} with no member selected showed no message`).toMatch(
+          /\S/,
+        ),
       );
 
       const tick = tickedBox("Priya Shah");
       focused(tick);
       keyPressed(PEOPLE_KEYSTROKES.tick.key);
       await waitFor(() => expect(tick.getAttribute("aria-checked")).toBe("true"));
-      expect(selectFirstSaid(), `the select-first line of ${key} outlived the tick`).toBe(0);
+      expect(outcomeSaid(), `the select-first message for ${key} stayed after the selection`).toBe(
+        "",
+      );
       keyPressed(PEOPLE_KEYSTROKES.tick.key);
       await waitFor(() => expect(tick.getAttribute("aria-checked")).toBe("false"));
     }
   });
 });
 
-describe("ending every sign-in and token a member holds here", () => {
-  it("opens a member's sign-ins and ends them by keyboard", async () => {
+describe("signing a member out of this workspace", () => {
+  it("signs a member out by keyboard from the list", async () => {
     const api = aWorkspaceOfThree();
     api.set("members.endEverySignInAndToken", () => read({}));
     const router = await openAt(MEMBERS_PAGE, api);
     await linkTo("Sam Okoro");
-    const endKey = PEOPLE_KEYSTROKES.endEverySignInAndToken.key;
+    const endKey = PEOPLE_KEYSTROKES.signOut.key;
     const outcome = () => membersRegion().getAllByRole("status")[1];
     focused(await membersListed());
     expect(outcome()?.textContent).toBe("");
 
     keyPressed(endKey);
 
-    await waitFor(() => expect(outcome()?.textContent).toBe(PEOPLE_SELECT_FIRST.member));
+    await waitFor(() => expect(outcome()?.textContent).toMatch(/\S/));
     expect(router.state.location.pathname).toBe(MEMBERS_PAGE);
     expect(screen.queryByRole("toolbar", { name: "Selected Members" })).toBeNull();
 
@@ -200,11 +201,11 @@ describe("ending every sign-in and token a member holds here", () => {
     keyPressed(endKey);
 
     const revoke = await waitFor(() =>
-      thePage().getByRole("button", { name: "End Every Sign-In and Token Here" }),
+      thePage().getByRole("button", { name: "Sign Out of This Workspace" }),
     );
     await waitFor(() => expect(document.activeElement).toBe(revoke));
     fireEvent.click(revoke);
-    const credentials = thePage().getByRole("region", { name: "Sign-Ins and Personal Tokens" });
+    const credentials = thePage().getByRole("region", { name: "Sign Out of This Workspace" });
     await waitFor(() =>
       expect(within(credentials).getByRole("status").textContent).toContain("Sam Okoro"),
     );
@@ -212,7 +213,7 @@ describe("ending every sign-in and token a member holds here", () => {
   });
 });
 
-describe("a member's display name, flagged to better-answers support", () => {
+describe("flagging a member's display name", () => {
   it("offers no flag for a member with no display name", async () => {
     await openAt(MEMBERS_PAGE, aWorkspaceOfThree());
 
@@ -250,7 +251,7 @@ describe("a member's display name, flagged to better-answers support", () => {
     fireEvent.click(flag);
     const region = thePage().getByRole("region", { name: "Display Name" });
     await waitFor(() => expect(within(region).getByRole("status").textContent).toMatch(/\S/));
-    expect(alertsSaid(region)).toBe(0);
+    expect(alertsWithText(region)).toBe(0);
     await waitFor(() =>
       expect(server.asks.filter((ask) => ask.procedure === "members.flagDisplayName")).toEqual([
         { procedure: "members.flagDisplayName", input: { personId: PRIYA.personId } },

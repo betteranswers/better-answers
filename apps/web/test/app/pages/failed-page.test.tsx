@@ -20,7 +20,7 @@ const A_MEMBER = {
   role: "Admin",
 };
 
-const NOT_A_LIST = { why: "the api answered a shape the model choices card cannot render" };
+const NOT_A_LIST = { why: "not a list of model choices" };
 
 const answerTrpc = (input: string | URL | Request): Promise<Response> => {
   const url = new URL(
@@ -43,24 +43,25 @@ const answerTrpc = (input: string | URL | Request): Promise<Response> => {
 
 const MODELS_AND_SPEND = "/models/models-and-spend";
 
-/** jsdom applies no stylesheet, so the band's empty alert counts as an alert here too. */
-const saying = () => screen.getAllByRole("alert").filter((alert) => alert.textContent !== "");
+/** jsdom applies no styles, so the band's empty alert is also found and must be skipped. */
+const nonEmptyAlerts = () =>
+  screen.getAllByRole("alert").filter((alert) => alert.textContent !== "");
 
 const openModelChoicesWithABrokenRead = async () => {
   vi.stubGlobal("fetch", answerTrpc);
   const { rendered } = await openApp(MODELS_AND_SPEND);
   await waitFor(() => {
-    expect(saying()).toHaveLength(1);
+    expect(nonEmptyAlerts()).toHaveLength(1);
   });
   return rendered;
 };
 
-const aPageBrokenUntilFixed = () => {
+const pageThatThrowsUntilFixed = () => {
   let broken = true;
   return {
-    Draws: () => {
-      if (broken) throw new Error("the page's own bug");
-      return <p>The page drew.</p>;
+    Content: () => {
+      if (broken) throw new Error("page render failed");
+      return <p>Page content</p>;
     },
     fix: () => {
       broken = false;
@@ -69,7 +70,7 @@ const aPageBrokenUntilFixed = () => {
 };
 
 describe("a page that throws", () => {
-  it("leaves the rail, menu, band and content standing", async () => {
+  it("keeps the rail, menu, band and main region rendered", async () => {
     await openModelChoicesWithABrokenRead();
 
     const band = screen.getByRole("banner");
@@ -82,20 +83,22 @@ describe("a page that throws", () => {
     const nav = screen.getByRole("navigation", { name: "Control Centre" });
     expect(within(nav).getByRole("link", { name: "Models and Spend" })).toBeDefined();
 
-    expect(saying().map((alert) => screen.getByRole("main").contains(alert))).toEqual([true]);
+    expect(nonEmptyAlerts().map((alert) => screen.getByRole("main").contains(alert))).toEqual([
+      true,
+    ]);
   });
 
-  it("says the page did not load, as an alert", async () => {
+  it("shows a load-failure alert with a heading", async () => {
     await openModelChoicesWithABrokenRead();
 
-    const [alert = document.body] = saying();
+    const [alert = document.body] = nonEmptyAlerts();
     expect(
       within(alert).getByRole("heading", { level: 1, name: "This Page Didn’t Load" }),
     ).toBeDefined();
     expect(alert.textContent).toContain(FAILED_PAGE.said);
   });
 
-  it("shows no message, name or stack from what threw", async () => {
+  it("hides the error's message, name and stack", async () => {
     const { container } = await openModelChoicesWithABrokenRead();
 
     const shown = container.textContent;
@@ -109,22 +112,22 @@ describe("a page that throws", () => {
     );
   });
 
-  it("offers the two ways out as controls a keyboard reaches", async () => {
+  it("offers Try Again and a home link, both keyboard-reachable", async () => {
     await openModelChoicesWithABrokenRead();
 
-    const again = screen.getByRole("button", { name: "Try Again" });
+    const tryAgain = screen.getByRole("button", { name: "Try Again" });
 
-    expect(again.tagName).toBe("BUTTON");
-    expect(again.getAttribute("tabindex")).toBeNull();
-    expect(again.hasAttribute("disabled")).toBe(false);
-    again.focus();
-    expect(document.activeElement).toBe(again);
+    expect(tryAgain.tagName).toBe("BUTTON");
+    expect(tryAgain.getAttribute("tabindex")).toBeNull();
+    expect(tryAgain.hasAttribute("disabled")).toBe(false);
+    tryAgain.focus();
+    expect(document.activeElement).toBe(tryAgain);
 
-    const away = await screen.findByRole("link", { name: "Go to Members" });
-    expect(away.getAttribute("href")).toBe(HOMES.Admin.path);
+    const homeLink = await screen.findByRole("link", { name: "Go to Members" });
+    expect(homeLink.getAttribute("href")).toBe(HOMES.Admin.path);
   });
 
-  it("offers no way home to a reader whose home failed", async () => {
+  it("offers no home link when the home page itself failed", async () => {
     vi.stubGlobal("fetch", answerTrpc);
     await openApp(HOMES.Admin.path);
 
@@ -132,8 +135,8 @@ describe("a page that throws", () => {
     expect(within(screen.getByRole("main")).queryAllByRole("link")).toEqual([]);
   });
 
-  it("draws the page again when the reader asks for it", () => {
-    const page = aPageBrokenUntilFixed();
+  it("renders the page again after Try Again", () => {
+    const page = pageThatThrowsUntilFixed();
 
     const clients = createAppClients();
     const router = createAppRouter(
@@ -143,8 +146,8 @@ describe("a page that throws", () => {
     render(
       <Providers clients={clients}>
         <RouterContextProvider router={router}>
-          <CatchBoundary getResetKey={() => "the reader's own retry"} errorComponent={FailedPage}>
-            <page.Draws />
+          <CatchBoundary getResetKey={() => "retry"} errorComponent={FailedPage}>
+            <page.Content />
           </CatchBoundary>
         </RouterContextProvider>
       </Providers>,
@@ -153,15 +156,15 @@ describe("a page that throws", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("This Page Didn’t Load");
 
     page.fix();
-    expect(screen.queryByText("The page drew.")).toBeNull();
+    expect(screen.queryByText("Page content")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
 
-    expect(screen.getByText("The page drew.")).toBeDefined();
+    expect(screen.getByText("Page content")).toBeDefined();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("leaves an unknown address to the not-found page", async () => {
+  it("shows Page Not Found for an unknown address", async () => {
     vi.stubGlobal("fetch", answerTrpc);
 
     await openApp("/not-a-page");

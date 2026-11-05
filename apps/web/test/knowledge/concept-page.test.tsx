@@ -13,7 +13,7 @@ placedWithoutMeasuring();
 const A_CONCEPT = detailAt(SEARCH_PAGE, "01JRETENTN000000000000000A");
 
 describe("the concept page", () => {
-  it("draws not found when the api calls the id malformed", async () => {
+  it("shows not found when the api rejects the id", async () => {
     const api = adaAnAdmin();
     api.set("knowledge.open", () => aRefusalAnswer("malformed", "invalid", 400));
     await openAt(A_CONCEPT, api);

@@ -7,28 +7,28 @@ import { openPages } from "@test/address-router.tsx";
 
 afterEach(cleanup);
 
-/** Keeps each search in its own state, the one place `take` may write during render. */
+/** Records each received search in state; the callback may set state during render. */
 const Members = () => {
-  const [taken, setTaken] = useState<readonly string[]>([]);
-  useAsked("search", (value) => setTaken((before) => [...before, value]));
-  return <output>{taken.join(" ")}</output>;
+  const [received, setReceived] = useState<readonly string[]>([]);
+  useAsked("search", (value) => setReceived((before) => [...before, value]));
+  return <output>{received.join(" ")}</output>;
 };
 
-const takenSoFar = () => screen.getByRole("status").textContent;
+const receivedSoFar = () => screen.getByRole("status").textContent;
 
 const openAt = (...entries: readonly string[]) =>
   openPages({ "/members": Members, "/elsewhere": () => null }, entries);
 
-describe("a search another place asks of a page", () => {
-  it("is taken once, then cleared from the address in place", async () => {
+describe("a search passed to a page in the URL", () => {
+  it("is received once, then removed from the URL", async () => {
     const { history, at } = await openAt("/elsewhere", "/members?search=priya");
 
     await at("/members");
-    expect(takenSoFar()).toBe("priya");
-    expect(history.length, "the clear pushed an entry of its own").toBe(2);
+    expect(receivedSoFar()).toBe("priya");
+    expect(history.length, "removing the search added a history entry").toBe(2);
   });
 
-  it("is never asked again by a step back and forward", async () => {
+  it("is not received again after going back and forward", async () => {
     const { history, at } = await openAt("/elsewhere", "/members?search=priya");
     await at("/members");
 
@@ -37,31 +37,31 @@ describe("a search another place asks of a page", () => {
     act(() => history.forward());
     await at("/members");
 
-    expect(takenSoFar(), "the page took an ask on its way back").toBe("");
+    expect(receivedSoFar(), "the page received the search again after back and forward").toBe("");
   });
 
-  it("is taken by a page already open", async () => {
+  it("is received by a page that is already open", async () => {
     const { router, at } = await openAt("/members?search=priya");
     await at("/members");
 
     await act(() => router.navigate({ href: "/members?search=tom" }));
     await at("/members");
 
-    expect(takenSoFar()).toBe("priya tom");
+    expect(receivedSoFar()).toBe("priya tom");
   });
 
-  it("clears its own key and leaves a list's in place", async () => {
+  it("removes only its own key, keeping list keys", async () => {
     const { history, at } = await openAt("/elsewhere", "/members?members.role=Editor&search=priya");
 
     await at("/members?members.role=Editor");
-    expect(takenSoFar()).toBe("priya");
-    expect(history.length, "the clear pushed an entry of its own").toBe(2);
+    expect(receivedSoFar()).toBe("priya");
+    expect(history.length, "removing the search added a history entry").toBe(2);
   });
 });
 
-describe("a search that reads as JSON", () => {
+describe("a search that looks like JSON", () => {
   it.each(["1e3", "1.50", "true", "null", '"audit logs"', '{"a": 1}', "[1, 2]", '"1e3"', " 7 "])(
-    "is taken as typed: %s",
+    "is received as typed: %s",
     async (typed) => {
       const { router, at } = await openAt("/elsewhere");
 
@@ -72,93 +72,93 @@ describe("a search that reads as JSON", () => {
       );
       await at("/members");
 
-      expect(takenSoFar()).toBe(typed);
+      expect(receivedSoFar()).toBe(typed);
     },
   );
 });
 
 const ActionAndSearch = () => {
-  const [taken, setTaken] = useState<readonly string[]>([]);
-  useAsked("action", (value) => setTaken((before) => [...before, `action ${value}`]));
-  useAsked("search", (value) => setTaken((before) => [...before, `search ${value}`]));
-  return <output>{taken.join(", ")}</output>;
+  const [received, setReceived] = useState<readonly string[]>([]);
+  useAsked("action", (value) => setReceived((before) => [...before, `action ${value}`]));
+  useAsked("search", (value) => setReceived((before) => [...before, `search ${value}`]));
+  return <output>{received.join(", ")}</output>;
 };
 
-const openActionAndSearchAt = (asked: string) =>
-  openPages({ "/members": ActionAndSearch, "/elsewhere": () => null }, ["/elsewhere", asked]);
+const openActionAndSearchAt = (address: string) =>
+  openPages({ "/members": ActionAndSearch, "/elsewhere": () => null }, ["/elsewhere", address]);
 
-describe("an ask as the address holds it", () => {
+describe("encoding a URL parameter", () => {
   const here = { pathname: "/elsewhere", searchStr: "" };
 
-  const WHOLE = [
+  const JSON_ENCODED = [
     ["1.50", "%221.50%22"],
     ["1e3", "%221e3%22"],
     ['"audit logs"', "%22%5C%22audit+logs%5C%22%22"],
   ] as const;
 
-  it.each(WHOLE)("asks %s as its JSON string", (typed, held) => {
-    expect(askingHere(here, "/members", "search", typed)).toBe(`/members?search=${held}`);
+  it.each(JSON_ENCODED)("encodes %s as a JSON string", (typed, encoded) => {
+    expect(askingHere(here, "/members", "search", typed)).toBe(`/members?search=${encoded}`);
   });
 
-  it.each(WHOLE)("reads %s back from its JSON string", (typed, held) => {
-    expect(askedIn(new URLSearchParams(`?search=${held}`), "search")).toBe(typed);
+  it.each(JSON_ENCODED)("decodes %s from its JSON string", (typed, encoded) => {
+    expect(askedIn(new URLSearchParams(`?search=${encoded}`), "search")).toBe(typed);
   });
 
-  it("asks plain words as they are", () => {
+  it("leaves plain words unquoted", () => {
     expect(askingHere(here, "/members", "search", "audit logs")).toBe("/members?search=audit+logs");
     expect(askingHere(here, "/members", "action", "invite")).toBe("/members?action=invite");
   });
 
-  it("is read as written where it was never quoted", () => {
+  it("decodes an unquoted value as written", () => {
     expect(askedIn(new URLSearchParams("?search=1.5"), "search")).toBe("1.5");
     expect(askedIn(new URLSearchParams("?search=audit+logs"), "search")).toBe("audit logs");
     expect(askedIn(new URLSearchParams("?action=invite"), "action")).toBe("invite");
   });
 });
 
-describe("a search written into the address by hand", () => {
-  it.each(["audit", "1.5", "1.50", "1e3"])("is taken as written: %s", async (written) => {
+describe("a search typed into the URL by hand", () => {
+  it.each(["audit", "1.5", "1.50", "1e3"])("is received as written: %s", async (written) => {
     const { at } = await openAt("/elsewhere", `/members?search=${written}`);
 
     await at("/members");
-    expect(takenSoFar()).toBe(written);
+    expect(receivedSoFar()).toBe(written);
   });
 });
 
-describe("two asks in one address", () => {
-  it("takes each once and clears both from the address", async () => {
+describe("two parameters in one URL", () => {
+  it("receives each once and removes both from the URL", async () => {
     const { history, at } = await openActionAndSearchAt("/members?action=invite&search=priya");
 
     await at("/members");
-    expect(takenSoFar()).toBe("action invite, search priya");
-    expect(history.length, "a clear pushed an entry of its own").toBe(2);
+    expect(receivedSoFar()).toBe("action invite, search priya");
+    expect(history.length, "removing the parameters added a history entry").toBe(2);
   });
 
-  it("takes an action under its older key, then clears it", async () => {
+  it("receives an action under its legacy key, then removes it", async () => {
     const { history, at } = await openActionAndSearchAt("/members?act=invite&search=priya");
 
     await at("/members");
-    expect(takenSoFar()).toBe("action invite, search priya");
-    expect(history.length, "a clear pushed an entry of its own").toBe(2);
+    expect(receivedSoFar()).toBe("action invite, search priya");
+    expect(history.length, "removing the parameters added a history entry").toBe(2);
   });
 });
 
-describe("asking a page for an action", () => {
+describe("building a URL that requests an action", () => {
   const HERE = { pathname: "/members", searchStr: "?members.role=Editor&members.page=2" };
 
-  it("adds to the query of the page already open", () => {
+  it("keeps the current page's query on the same page", () => {
     expect(askingHere(HERE, "/members", "action", "invite")).toBe(
       "/members?members.role=Editor&members.page=2&action=invite",
     );
   });
 
-  it("carries no other page's query", () => {
+  it("drops the query when going to another page", () => {
     expect(askingHere(HERE, "/groups", "action", "invite")).toBe("/groups?action=invite");
     const onGroups = { pathname: "/groups", searchStr: "?groups.search=ops" };
     expect(askingHere(onGroups, "/members", "action", "invite")).toBe("/members?action=invite");
   });
 
-  it("reads a return address's action under its older key", () => {
+  it("reads a return URL's action under its legacy key", () => {
     const signedInAgain = new URLSearchParams("?search=priya%40acme.invalid&person=p1&act=correct");
 
     expect(askedIn(signedInAgain, "action")).toBe("correct");

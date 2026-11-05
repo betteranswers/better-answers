@@ -5,8 +5,8 @@ import { invitedAs } from "./invitation-words.ts";
 export const PICKER_WORDS = {
   heading: "Your Workspaces",
   lead: "Choose a workspace to open.",
-  reading: "Reading your workspaces.",
-  opening: "Taking you to your workspace.",
+  reading: "Loading your workspaces.",
+  opening: "Opening your workspace.",
   tryAgain: "Try Again",
 } as const;
 
@@ -21,12 +21,12 @@ export const NO_WORKSPACE_WORDS = {
   invitations: "Your Invitations",
   invitedAs,
   tryAgain: "Try Again",
-  readingAgain: "Reading",
+  readingAgain: "Loading",
 } as const;
 
 export const NO_WORKSPACE_ACTIONS = {
   toInvitations: "Go to Your Invitations",
-  readAgain: "Read Your Invitations Again",
+  readAgain: "Reload Your Invitations",
 } as const;
 
 export const NOT_CONNECTED = {

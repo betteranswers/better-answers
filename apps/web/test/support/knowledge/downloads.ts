@@ -7,7 +7,7 @@ export type SavedFile = {
   readonly text: () => Promise<string>;
 };
 
-/** jsdom saves no file, so the page's anchor click is heard instead, with the blob it carried. */
+/** jsdom cannot save files, so this records each anchor click with the blob it links to. */
 export const downloadsWatched = (): readonly SavedFile[] => {
   const saved: SavedFile[] = [];
   const blobs = new Map<string, Blob>();
@@ -27,7 +27,7 @@ export const downloadsWatched = (): readonly SavedFile[] => {
       this: HTMLAnchorElement,
     ) {
       const blob = blobs.get(this.href);
-      assert(blob !== undefined, "the page saved a file it never made");
+      assert(blob !== undefined, "the anchor links to a blob the page never created");
       saved.push({
         name: this.download,
         type: blob.type,

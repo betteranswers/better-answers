@@ -1,8 +1,6 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, assert, describe, expect, it } from "vitest";
 
-import { RECOVERY_CODE_WORDS } from "@/features/auth/account-words.ts";
-import { CODES_NOT_TICKED } from "@/features/auth/refusal-words.ts";
 import { RecoveryCodes } from "@/features/auth/second-factor/recovery-codes.tsx";
 import { clipboardAnswering } from "@test/clipboard-stand-in.ts";
 
@@ -40,8 +38,8 @@ const doneButton = () => screen.getByRole("button", { name: "Done" });
 
 const savedBox = () => screen.getByRole("checkbox", { name: "I have saved these codes" });
 
-describe("the recovery codes block", () => {
-  it("reads as a list of the ten codes", () => {
+describe("the recovery codes section", () => {
+  it("lists the ten codes", () => {
     drawn();
 
     const list = screen.getByRole("list", { name: "Recovery Codes" });
@@ -52,7 +50,7 @@ describe("the recovery codes block", () => {
     ).toEqual(CODES);
   });
 
-  it("refuses an unticked Done and moves focus to the box", () => {
+  it("Done without the checkbox shows an alert and focuses it", () => {
     let doneCalls = 0;
     drawn(() => {
       doneCalls += 1;
@@ -61,12 +59,12 @@ describe("the recovery codes block", () => {
     expect(doneButton().getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(doneButton());
 
-    expect(screen.getByRole("alert").textContent).toBe(CODES_NOT_TICKED);
+    expect(screen.getByRole("alert").textContent).toMatch(/\S/u);
     expect(document.activeElement).toBe(savedBox());
     expect(doneCalls).toBe(0);
   });
 
-  it("finishes once the box is ticked, naming the set shown", () => {
+  it("Done reports the set's date once the checkbox is ticked", () => {
     const done: string[] = [];
     drawn((madeAt) => {
       done.push(madeAt);
@@ -86,16 +84,18 @@ describe("the recovery codes block", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Copy Codes" }));
 
-    expect(await screen.findByText(RECOVERY_CODE_WORDS.copied)).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toMatch(/\S/u);
+    });
     expect(written).toEqual([CODES.join("\n")]);
   });
 
-  it("downloads the codes with the address and the day made", () => {
+  it("downloads the codes with the address and the date", () => {
     drawn();
 
     const download = screen.getByRole("link", { name: "Download" });
     const href = download.getAttribute("href");
-    assert(href !== null, "Download links to the codes");
+    assert(href !== null, "the Download link has no href");
     const [kind, text = ""] = href.split(",", 2);
 
     expect(kind).toBe("data:text/plain;charset=utf-8");

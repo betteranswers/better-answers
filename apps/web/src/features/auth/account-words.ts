@@ -8,15 +8,15 @@ export const ACCOUNT_WORDS = {
   signIn: "Sign-In",
   goOn: `Go to ${PRODUCT_NAME}`,
   tryAgain: "Try Again",
-  readingAgain: "Reading",
+  readingAgain: "Loading",
 } as const;
 
 export const THEME_WORDS = {
   heading: "Theme",
-  device: "Match this device",
+  device: "System",
   light: "Light",
   dark: "Dark",
-  kept: "Saved on this browser.",
+  kept: "Your choice is saved in this browser only.",
 } as const;
 
 const SET_UP = "Set Up an Authenticator";
@@ -24,7 +24,7 @@ const SET_UP = "Set Up an Authenticator";
 const ADD_A_PASSKEY = "Add a Passkey";
 
 export const ACCOUNT_ACTIONS = {
-  readAgain: "Read Your Sign-In Again",
+  readAgain: "Reload Your Sign-In Methods",
   addPasskey: ADD_A_PASSKEY,
   setUp: SET_UP,
   copyKey: "Copy the Key",
@@ -90,19 +90,19 @@ export const passkeyNameFor = (userAgent: string): string => {
 
 export const AUTHENTICATOR_WORDS = {
   heading: "Authenticator",
-  none: "No authenticator set up.",
+  none: "You haven’t set up an authenticator app.",
   setUp: SET_UP,
-  held: "Authenticator set up.",
+  held: "Your authenticator app is set up.",
   remove: "Remove",
-  making: "Making a key.",
-  scan: "Scan this QR code with your authenticator.",
-  qrCode: "QR code for your authenticator",
-  orEnterKey: "Or enter this key:",
+  making: "Preparing your QR code.",
+  scan: "Scan this QR code with your authenticator app.",
+  qrCode: "QR code for your authenticator app",
+  orEnterKey: "Or enter this setup key:",
   copyKey: "Copy Key",
   keyCopied: "Key copied successfully.",
   codeField: "Authenticator Code",
   codeHint:
-    "Authenticator code must be 6 digits. If it doesn’t work, please check that your phone sets its time automatically.",
+    "Enter the 6-digit code from your authenticator app. If the code doesn’t work, check that your phone sets its date and time automatically.",
   finish: "Finish Setup",
   finishing: "Finishing Setup",
   startAgain: "Try Again",
@@ -114,18 +114,18 @@ export const AUTHENTICATOR_WORDS = {
 
 export const RECOVERY_CODE_WORDS = {
   heading: "Recovery Codes",
-  none: "No recovery codes yet",
-  make: "Make Recovery Codes",
+  none: "You don’t have any recovery codes yet.",
+  make: "Generate Recovery Codes",
   replace: "Replace Recovery Codes",
-  making: "Making Codes",
-  makingLine: "Making codes.",
+  making: "Generating Codes",
+  makingLine: "Generating your recovery codes.",
   replaceTitle: "Replace Recovery Codes",
   replaceConsequence:
     "Are you sure you want to replace your recovery codes? Your current codes will stop working immediately.",
   replaceCommit: "Replace",
   saveHeading: "Save Your Recovery Codes",
   saveLine:
-    "Each code signs you in once if you lose your second factor. They won’t be shown again.",
+    "If you lose access to your passkey or authenticator app, you can sign in with one of these codes. Each code works once, and you won’t see these codes again.",
   replacedLine: "Your previous codes no longer work.",
   list: "Recovery Codes",
   copy: "Copy Codes",
@@ -138,7 +138,7 @@ export const RECOVERY_CODE_WORDS = {
 } as const;
 
 export const codesLeft = (unused: number, madeAt: string): string =>
-  `${String(unused)} of ${String(RECOVERY_CODES_IN_A_SET)} unused · made ${dayWords(madeAt)}`;
+  `${String(unused)} of ${String(RECOVERY_CODES_IN_A_SET)} codes left · Generated ${dayWords(madeAt)}`;
 
 const noticeTo = (address: string): string => `A confirmation email is on its way to ${address}.`;
 
@@ -153,7 +153,7 @@ export const ACTION_LANDED = {
   removed: (address: string) =>
     `Your authenticator has been removed successfully. ${noticeTo(address)}`,
   made: (address: string) =>
-    `Your recovery codes have been made successfully. ${noticeTo(address)}`,
+    `Your recovery codes have been generated successfully. ${noticeTo(address)}`,
   replaced: (address: string) =>
     `Your recovery codes have been replaced successfully. ${noticeTo(address)}`,
 } as const;
@@ -167,10 +167,10 @@ export const recoveryCodesText = (
 ): string =>
   [
     `${PRODUCT_NAME} recovery codes for ${address}`,
-    `Made ${dayWords(madeAt)}`,
+    `Generated ${dayWords(madeAt)}`,
     "",
     ...codes,
     "",
-    "Each code signs you in once.",
+    "You can use each code once to sign in.",
     "",
   ].join("\n");

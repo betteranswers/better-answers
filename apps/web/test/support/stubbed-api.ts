@@ -66,7 +66,7 @@ export type Held = {
   readonly reject: (refusal: unknown) => void;
 };
 
-export const heldBack = (api: Api, procedure: string, answer?: unknown): Held => {
+export const holdProcedure = (api: Api, procedure: string, answer?: unknown): Held => {
   const asked = Promise.withResolvers<void>();
   const gate = Promise.withResolvers<() => unknown>();
   const before = api.get(procedure);
@@ -107,7 +107,7 @@ export const withTheApiDown = () => {
 
 const SETTLES_WITHIN_MS = 1000;
 
-/** Drains the app's and the stub's timers in virtual time, so a check that nothing happened waits for the app. */
+/** Runs pending app and stub timers in fake time, so a check that nothing happened sees their effects. */
 export const settlingAfter = async (happens: () => void): Promise<void> => {
   vi.useFakeTimers();
   try {

@@ -82,7 +82,7 @@ const exportsRegion = (page: Page): Locator => page.getByRole("region", { name: 
 const downloadOf = (page: Page, name: string): Locator =>
   page.getByRole("button", { name: `Download the ${name}` });
 
-const said = (page: Page): Locator => exportsRegion(page).getByRole("status").nth(1);
+const statusOf = (page: Page): Locator => exportsRegion(page).getByRole("status").nth(1);
 
 const downloadedBy = async (page: Page, act: () => Promise<void>): Promise<Download> => {
   const [download] = await Promise.all([page.waitForEvent("download"), act()]);
@@ -188,7 +188,7 @@ test.describe("Exports", () => {
       const knowledgeBase = downloadOf(page, KNOWLEDGE_BASE);
       await tabUntilFocused(page, knowledgeBase);
       const snapshot = await downloadedBy(page, () => page.keyboard.press("Enter"));
-      await expect(said(page)).toContainText(snapshot.suggestedFilename());
+      await expect(statusOf(page)).toContainText(snapshot.suggestedFilename());
       await expect(knowledgeBase, "focus left the button of the download that ran").toBeFocused();
       expect(snapshot.suggestedFilename()).toMatch(/^knowledge-base-\d{4}-\d{2}-\d{2}\.zip$/u);
       const snapshotZip = await savedTo(snapshot, testInfo);
@@ -205,7 +205,7 @@ test.describe("Exports", () => {
       await page.keyboard.press("Tab");
       await expect(downloadOf(page, RECORDS)).toBeFocused();
       const records = await downloadedBy(page, () => page.keyboard.press("Enter"));
-      await expect(said(page)).toContainText(records.suggestedFilename());
+      await expect(statusOf(page)).toContainText(records.suggestedFilename());
       expect(entriesOf(await savedTo(records, testInfo)).toSorted()).toEqual([
         "owners.csv",
         "usage.csv",
@@ -217,7 +217,7 @@ test.describe("Exports", () => {
       await page.keyboard.press("Tab");
       await expect(downloadOf(page, GUIDE)).toBeFocused();
       const guide = await downloadedBy(page, () => page.keyboard.press("Enter"));
-      await expect(said(page)).toContainText(guide.suggestedFilename());
+      await expect(statusOf(page)).toContainText(guide.suggestedFilename());
       expect(guide.suggestedFilename()).toMatch(/^guide-.+-\d{4}-\d{2}-\d{2}\.md$/u);
       const markdown = await savedTo(guide, testInfo);
       expect(readFileSync(markdown, "utf8")).toContain("Not maintained");

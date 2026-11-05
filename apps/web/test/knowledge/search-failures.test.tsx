@@ -5,7 +5,7 @@ import { MATCHES_A_PAGE as A_PAGE } from "@/features/knowledge/knowledge-state.t
 import {
   aProcedureCeilingMet,
   aSearchApi,
-  alerted,
+  searchAlert,
   answeringFinds,
   answeringPassages,
   finding,
@@ -24,17 +24,17 @@ import {
   passagePanel,
   placedForSearch,
   pressed,
-  refocused,
+  fireVisibilityChange,
   refusing,
   retryButton,
   rowAt,
-  saidNow,
+  searchStatusText,
   searchBox,
   typed,
   type FindAsked,
-  palletsFound,
+  searchedForPallets,
 } from "@test/knowledge/search-answers.ts";
-import { heldBack, settlingAfter } from "@test/stubbed-api.ts";
+import { holdProcedure, settlingAfter } from "@test/stubbed-api.ts";
 import { FORBIDDEN, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -53,22 +53,22 @@ const saysSomething = (alert: HTMLElement | null) =>
   expect(alert?.textContent, "the alert says nothing").toMatch(/\S/);
 
 describe("the Knowledge Search page", () => {
-  it("says the reads' ceiling and asks no more", async () => {
-    const { api } = await palletsFound();
+  it("says how long to wait and stops searching", async () => {
+    const { api } = await searchedForPallets();
     api.set("knowledge.find", answeringFinds(refusing(aProcedureCeilingMet(180))));
 
     typed("forklift");
 
-    await waitFor(() => saysTheWait(alerted(), 3));
-    await settlingAfter(refocused);
+    await waitFor(() => saysTheWait(searchAlert(), 3));
+    await settlingAfter(fireVisibilityChange);
     expect(
       findsAsked().filter((asked) => asked.query === "forklift"),
       "the page asked again past the ceiling",
     ).toHaveLength(1);
   });
 
-  it("asks a passage at its ceiling again only when pressed", async () => {
-    const { api } = await palletsFound();
+  it("asks for a passage past its limit only when pressed", async () => {
+    const { api } = await searchedForPallets();
     const unread = openerIn(rowAt(0), HANDBOOK);
     const wasRead = openerIn(rowAt(1), HANDBOOK);
     const closed = async () => {
@@ -95,7 +95,7 @@ describe("the Knowledge Search page", () => {
     }
     pressed(wasRead);
     await waits();
-    await settlingAfter(refocused);
+    await settlingAfter(fireVisibilityChange);
 
     expect(opensAsked() - before, "a passage was asked for again while its wait ran").toBe(2);
   });
@@ -107,37 +107,37 @@ describe("the Knowledge Search page", () => {
 
     typed("pallet");
 
-    await waitFor(() => saysSomething(alerted()));
-    expect(saidNow(), "a failed read says something beside its alert").toBe("");
+    await waitFor(() => saysSomething(searchAlert()));
+    expect(searchStatusText(), "the status spoke as well as the failed read's alert").toBe("");
     api.set("knowledge.find", finding({ pallet: PALLET_PASSAGES }));
     pressed(retryButton());
 
     await waitFor(() => expect(matchRows()).toHaveLength(A_PAGE));
-    expect(alerted()).toBeNull();
+    expect(searchAlert()).toBeNull();
     focusIsOn(searchBox(), "Retry left focus on the page");
   });
 
   it("keeps the shown rows when More fails, and retries it", async () => {
-    const { api } = await palletsFound();
+    const { api } = await searchedForPallets();
     api.set("knowledge.find", answeringFinds(moreRefused));
     expect(matchRows()).toHaveLength(A_PAGE);
 
     pressed(loadMoreButton());
-    await waitFor(() => saysSomething(alerted()));
+    await waitFor(() => saysSomething(searchAlert()));
     expect(matchRows()).toHaveLength(A_PAGE);
 
-    const retrying = heldBack(api, "knowledge.find");
+    const retrying = holdProcedure(api, "knowledge.find");
     pressed(retryButton());
     await retrying.asked;
-    await waitFor(() => expect(alerted()).toBeNull());
+    await waitFor(() => expect(searchAlert()).toBeNull());
     retrying.reject(FORBIDDEN);
-    await waitFor(() => saysSomething(alerted()));
-    focusIsOn(retryButton(), "a failed Retry took focus from the button");
+    await waitFor(() => saysSomething(searchAlert()));
+    focusIsOn(retryButton(), "focus left Retry when the retry failed");
 
     api.set("knowledge.find", finding({ pallet: PALLET_PASSAGES }));
     pressed(retryButton());
     await waitFor(() => expect(matchRows()).toHaveLength(PALLET_PASSAGES.length));
-    expect(alerted()).toBeNull();
+    expect(searchAlert()).toBeNull();
     await focusLandsOn(
       () => rowAt(A_PAGE),
       "the retried page did not land focus on its first match",

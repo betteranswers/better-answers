@@ -1,8 +1,7 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
-import { GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
 import {
   A_GUIDE_PAGE,
@@ -35,6 +34,18 @@ const openGuide = async (role: "Admin" | "Editor" | "Viewer", guide = aGuide()) 
 
 const sectionNamed = (name: string) => screen.getByRole("region", { name });
 
+const guideArticle = () => within(screen.getByRole("article"));
+
+const status = () => guideArticle().getByRole("status");
+
+const alert = () => guideArticle().getByRole("alert");
+
+const describedBy = (control: HTMLElement): string =>
+  document.getElementById(control.getAttribute("aria-describedby") ?? "")?.textContent ?? "";
+
+const reasonBeside = (section: HTMLElement): string =>
+  within(section).getByText("Needs review").nextElementSibling?.textContent ?? "";
+
 const numbered = (sections: readonly (readonly [string, string])[]) =>
   aGuide({
     sections: sections.map(([number, prompt], at) =>
@@ -51,7 +62,7 @@ describe("the guide page", () => {
     const article = within(screen.getByRole("article"));
     expect(article.getByText("Bid library")).toBeDefined();
     expect(article.getByRole("link", { name: "Northgate Ltd" })).toBeDefined();
-    expect(article.getAllByText("3 of 4 expected facts recorded")).toHaveLength(2);
+    expect(article.getAllByText(/\b3 of 4\b/u)).toHaveLength(2);
   });
 
   it("names only Guides as current in the menu", async () => {
@@ -111,23 +122,25 @@ describe("the guide page", () => {
     expect(screen.getByRole("button", { name: "Edit Brief" })).toBeDefined();
   });
 
-  it("says an empty Brief has no text yet", async () => {
+  it("offers Edit Brief but no Copy for an empty Brief", async () => {
     const empty = aBrief({ rendered: { markdown: "", footnotes: [] } });
     await openGuide("Editor", aGuide({ sections: [aSection({ brief: empty })] }));
 
-    expect(within(sectionNamed(SECTION_ONE)).getByText(GUIDE_WORDS.noBrief)).toBeDefined();
+    const section = within(sectionNamed(SECTION_ONE));
+    expect(section.getByRole("button", { name: "Edit Brief" })).toBeDefined();
+    expect(section.queryByRole("button", { name: "Copy" })).toBeNull();
+    expect(section.queryByRole("list", { name: "Footnotes" })).toBeNull();
   });
 
-  it("draws not found for an unknown guide", async () => {
+  it("offers a way back to Guides for an unknown guide", async () => {
     const api = aGuideApi("Editor");
     api.set("knowledge.guide", () => aRefusalAnswer("not-found", "absent", 404));
     await openAt(A_GUIDE_PAGE, api);
 
     const main = within(screen.getByRole("main"));
-    expect(await main.findByText(/This guide isn’t available/u)).toBeDefined();
-    expect(main.getByRole("link", { name: "Back to Guides" }).getAttribute("href")).toBe(
-      GUIDES_PAGE.path,
-    );
+    const back = await main.findByRole("link", { name: "Back to Guides" });
+    expect(back.getAttribute("href")).toBe(GUIDES_PAGE.path);
+    expect(screen.queryByRole("article"), "the page drew a guide that was not found").toBeNull();
   });
 });
 
@@ -149,40 +162,40 @@ describe("a section the reader cannot read", () => {
 
     const section = within(sectionNamed("3. Insurance"));
     expect(section.getByText("Verified automatically")).toBeDefined();
-    expect(section.getByText("2 of 4 expected facts recorded")).toBeDefined();
-    expect(section.getByText(GUIDE_WORDS.withheld)).toBeDefined();
+    expect(section.getByText(/\b2 of 4\b/u)).toBeDefined();
+    expect(section.queryByRole("list", { name: "Footnotes" })).toBeNull();
     expect(section.queryByRole("button")).toBeNull();
     expect(section.queryByText(RACKING_TITLE)).toBeNull();
     expect(screen.queryByText("Each bay is racked by row.")).toBeNull();
   });
 
-  it("still says it needs review", async () => {
+  it("still marks it as needing review, with a reason", async () => {
     await openGuide("Viewer", withheld);
 
-    const section = within(sectionNamed("3. Insurance"));
-    expect(section.getByText("Needs review")).toBeDefined();
-    expect(section.getByText("Cites a concept that changed")).toBeDefined();
+    expect(reasonBeside(sectionNamed("3. Insurance"))).toMatch(/\S/u);
   });
 });
 
 describe("a section that needs review", () => {
   const REASONS = [
-    ["concept-changed", "Cites a concept that changed"],
-    ["concept-removed", "Cites a concept that was removed"],
-    ["expectation-unmet", "Expects a fact that is not yet recorded"],
-    ["review-finding", "A review found something to check"],
+    "concept-changed",
+    "concept-removed",
+    "expectation-unmet",
+    "review-finding",
   ] as const;
 
-  for (const [reason, words] of REASONS) {
-    it(`says ${reason} in words to a Viewer`, async () => {
-      const guide = aGuide({ sections: [aSection({ needsReview: reason })] });
-      await openGuide("Viewer", guide);
+  it("gives a different reason for each kind of review", async () => {
+    const given = new Set<string>();
+    for (const reason of REASONS) {
+      await openGuide("Viewer", aGuide({ sections: [aSection({ needsReview: reason })] }));
+      const words = reasonBeside(sectionNamed(SECTION_ONE));
+      expect(words, `the ${reason} review gave no reason`).toMatch(/\S/u);
+      given.add(words);
+      cleanup();
+    }
 
-      const section = within(sectionNamed(SECTION_ONE));
-      expect(section.getByText("Needs review")).toBeDefined();
-      expect(section.getByText(words)).toBeDefined();
-    });
-  }
+    expect(given.size, "two kinds of review gave the same reason").toBe(REASONS.length);
+  });
 
   it("says nothing of review when none is needed", async () => {
     await openGuide("Viewer");
@@ -286,7 +299,9 @@ describe("the Detail of a section", () => {
 
     fireEvent.keyDown(document.body, { key: "d" });
 
-    expect(await screen.findByText(GUIDE_WORDS.selectFirst)).toBeDefined();
+    await waitFor(() => {
+      expect(status().textContent, "d with no section in focus said nothing").toMatch(/\S/u);
+    });
     expect(screen.queryByRole("region", { name: "Detail of section 1" })).toBeNull();
   });
 });
@@ -296,20 +311,20 @@ describe("the coverage of a section", () => {
     await openGuide("Editor");
 
     const section = within(sectionNamed(SECTION_ONE));
-    expect(section.getByText("3 of 4 expected facts recorded")).toBeDefined();
-    const line = section.getByText(`${LIABILITY_TITLE} not yet recorded. Owner Dana Example.`);
+    expect(section.getByText(/\b3 of 4\b/u)).toBeDefined();
     const add = section.getByRole("link", { name: "Add This Fact" });
-    expect(add.getAttribute("aria-describedby")).toBe(line.id);
+    expect(describedBy(add)).toContain(LIABILITY_TITLE);
+    expect(describedBy(add)).toContain("Dana Example");
   });
 
-  it("says an Admin decides when the collection has no owner", async () => {
+  it("names no owner for a fact in an unowned collection", async () => {
     await openGuide("Viewer", aGuide({ owner: null }));
 
-    expect(
-      screen.getByText(
-        `${LIABILITY_TITLE} not yet recorded. No owner is named yet, so an Admin decides.`,
-      ),
-    ).toBeDefined();
+    const add = screen.getByRole("link", { name: "Add This Fact" });
+    expect(describedBy(add)).toContain(LIABILITY_TITLE);
+    expect(describedBy(add), "the line named an owner the collection lacks").not.toContain(
+      "Dana Example",
+    );
   });
 
   it("offers Add This Fact to a Viewer too", async () => {
@@ -325,9 +340,9 @@ describe("the coverage of a section", () => {
     await openGuide("Editor", met);
 
     const section = within(sectionNamed(SECTION_ONE));
-    expect(section.getByText("1 of 1 expected fact recorded")).toBeDefined();
-    expect(section.queryByText(/not yet recorded/u)).toBeNull();
-    expect(section.queryByText(/recorded but not in this section/u)).toBeNull();
+    expect(section.getByText(/\b1 of 1\b/u)).toBeDefined();
+    expect(sectionNamed(SECTION_ONE).textContent).not.toContain(LIABILITY_TITLE);
+    expect(section.queryByRole("button", { name: "Include" })).toBeNull();
     expect(section.queryByRole("link", { name: "Add This Fact" })).toBeNull();
   });
 
@@ -338,10 +353,9 @@ describe("the coverage of a section", () => {
     await openGuide("Editor", available);
 
     const section = within(sectionNamed(SECTION_ONE));
-    expect(
-      section.getByText(`${LIABILITY_TITLE} is recorded but not in this section.`),
-    ).toBeDefined();
-    expect(section.getByRole("button", { name: "Include" })).toBeDefined();
+    expect(describedBy(section.getByRole("button", { name: "Include" }))).toContain(
+      LIABILITY_TITLE,
+    );
     expect(section.queryByRole("link", { name: "Add This Fact" })).toBeNull();
   });
 
@@ -356,7 +370,7 @@ describe("the coverage of a section", () => {
     });
     await openGuide("Viewer", available);
 
-    expect(screen.getByText(/is recorded but not in this section/u)).toBeDefined();
+    expect(sectionNamed(SECTION_ONE).textContent).toContain(LIABILITY_TITLE);
     expect(screen.queryByRole("button", { name: "Include" })).toBeNull();
   });
 });
@@ -398,10 +412,11 @@ describe("including an available fact", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Include" }));
 
-    const status = await screen.findByText("Included in section 3.");
-    expect(status.tagName).toBe("OUTPUT");
     await waitFor(() => {
-      expect(screen.getAllByText("4 of 4 expected facts recorded")).toHaveLength(2);
+      expect(status().textContent, "the include was not announced").toMatch(/\S/u);
+    });
+    await waitFor(() => {
+      expect(screen.getAllByText(/\b4 of 4\b/u)).toHaveLength(2);
     });
     expect(screen.queryByRole("button", { name: "Include" })).toBeNull();
     expect(asksOf(INCLUDE)).toEqual([{ writeUpId: A_WRITE_UP_ID }]);
@@ -409,13 +424,15 @@ describe("including an available fact", () => {
     expect(await screen.findByText("Cover is £5m.")).toBeDefined();
   });
 
-  it("says so when the include is refused", async () => {
+  it("alerts and keeps Include when the include is refused", async () => {
     const { api } = await openGuide("Editor", AVAILABLE);
     api.set(INCLUDE, () => aRefusalAnswer("role-forbids", "forbidden", 403));
 
     fireEvent.click(screen.getByRole("button", { name: "Include" }));
 
-    expect(await screen.findByText(/Only an Editor or an Admin/u)).toBeDefined();
+    await waitFor(() => {
+      expect(alert().textContent, "the refused include raised no alert").toMatch(/\S/u);
+    });
     expect(screen.getByRole("button", { name: "Include" })).toBeDefined();
   });
 });

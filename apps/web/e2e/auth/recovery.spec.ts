@@ -5,7 +5,7 @@ import type { Locator } from "@playwright/test";
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 
 import { expect, test } from "../browser.ts";
-import { keepsItsWordOffThePage, landedAtHome, signIn } from "../harness.ts";
+import { pageHidesRefusalWord, landedAtHome, signIn } from "../harness.ts";
 import { authAnswering } from "../refused-read.ts";
 import {
   anAdminWithAnAuthenticator,
@@ -15,7 +15,7 @@ import {
   codesTicked,
   heading,
   recoveryField,
-  saidOfTheSet,
+  recoveryCodesParagraphs,
   signedInAgain,
   theRefusal,
 } from "../second-factor-steps.ts";
@@ -42,7 +42,10 @@ test("replaces recovery codes never confirmed as saved at sign-in", async ({
   await codeField(page).fill(codeOf(key));
   await expect(heading(page, "Save Your Recovery Codes")).toBeVisible();
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
-  await expect(saidOfTheSet(page), "the first set says it replaces an earlier set").toHaveCount(1);
+  await expect(
+    recoveryCodesParagraphs(page),
+    "the first set says it replaces an earlier set",
+  ).toHaveCount(1);
   const first = await codesListed(page).allInnerTexts();
 
   await page.context().clearCookies();
@@ -57,7 +60,10 @@ test("replaces recovery codes never confirmed as saved at sign-in", async ({
     second.filter((code) => first.includes(code)),
     "the new set shares a code with the first set",
   ).toEqual([]);
-  await expect(saidOfTheSet(page), "the new set does not say it replaces the first").toHaveCount(2);
+  await expect(
+    recoveryCodesParagraphs(page),
+    "the new set does not say it replaces the first",
+  ).toHaveCount(2);
   await passesTheAccessibilityGate();
   await codesTicked(page, "Finish Setup");
   await landedAtHome(page, "Admin");
@@ -78,7 +84,7 @@ test("replaces recovery codes never confirmed as saved at sign-in", async ({
   await codeUsedByKeyboard(recoveryField(page), replaced);
   expect(await refused).toMatchObject({ status: 400, word: "recovery-code-wrong" });
   await expect(theRefusal(page)).toBeVisible();
-  await keepsItsWordOffThePage(page, "recovery-code-wrong");
+  await pageHidesRefusalWord(page, "recovery-code-wrong");
   await passesTheAccessibilityGate();
   const [current] = second;
   assert.ok(current !== undefined, "the second set lists no code");

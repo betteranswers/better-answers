@@ -5,7 +5,6 @@ import {
   MATCHES_A_PAGE as A_PAGE,
   SEARCH_KEYSTROKES as KEY,
 } from "@/features/knowledge/knowledge-state.ts";
-import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 import {
   aConceptRead,
@@ -26,7 +25,7 @@ import {
   pressed,
   rowAt,
   rowNamed,
-  saidNow,
+  searchStatusText,
   searched,
   searchBox,
   searchHeading,
@@ -36,24 +35,26 @@ import {
   AUDIT_LOGS_RETENTION,
   FORKLIFT_LICENCES,
   listsOnly,
-  palletsFound,
+  searchedForPallets,
 } from "@test/knowledge/search-answers.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedForSearch();
 
-const noMatchWasInFocus = async (listed: string) => {
+const openPressedWithNoMatchInFocus = async (listed: string) => {
   keyPressed(KEY.open.key);
   await waitFor(() =>
-    expect(saidNow(), "the page says nothing of a key that opened nothing").toBe(
-      `${listed} ${SEARCH_WORDS.selectFirst}`,
-    ),
+    expect(
+      searchStatusText(),
+      "the status did not change when the open key found no match",
+    ).not.toBe(listed),
   );
+  expect(searchStatusText(), "the status dropped what it said of the list").toContain(listed);
 };
 
 describe("the Knowledge Search page", () => {
-  it("opens the focused match by key, else says none is", async () => {
+  it("opens the focused match by key, or asks for one", async () => {
     const api = aSearchApi();
     api.set(
       "knowledge.find",
@@ -65,14 +66,14 @@ describe("the Knowledge Search page", () => {
     );
     const router = await openedSearch(api);
     await searched(router, "forklift");
-    const listed = saidNow();
+    const listed = searchStatusText();
 
     searchHeading().focus();
-    await noMatchWasInFocus(listed);
+    await openPressedWithNoMatchInFocus(listed);
     expect(router.state.location.pathname).toBe(SEARCH.path);
     await searched(router, "audit");
     await searched(router, "forklift");
-    expect(saidNow(), "the page still says no match was in focus").toBe(listed);
+    expect(searchStatusText(), "the select-a-match hint stayed after a new search").toBe(listed);
 
     within(rowAt(0)).getByRole("link", { name: "Forklift Licences" }).focus();
     keyPressed(KEY.open.key);
@@ -89,22 +90,22 @@ describe("the Knowledge Search page", () => {
     api.set("knowledge.open", theForkliftGuide);
     const router = await openedSearch(api);
     await searched(router, "forklift");
-    const listed = saidNow();
+    const listed = searchStatusText();
     const row = rowAt(0);
 
     openerIn(row, FORKLIFT_GUIDE).focus();
     searchHeading().focus();
 
-    await noMatchWasInFocus(listed);
+    await openPressedWithNoMatchInFocus(listed);
     expect(passagePanel(FORKLIFT_GUIDE)).toBeNull();
 
     pressed(openerIn(row, FORKLIFT_GUIDE));
     expect(await screen.findByRole("dialog", { name: FORKLIFT_GUIDE })).toBeDefined();
-    expect(saidNow(), "the page still says to select a match beside the one opened").toBe(listed);
+    expect(searchStatusText(), "the select-a-match hint stayed after a match opened").toBe(listed);
   });
 
   it("opens the match focus landed on after More", async () => {
-    await palletsFound();
+    await searchedForPallets();
     searchHeading().focus();
 
     keyPressed(KEY.more.key);

@@ -19,13 +19,13 @@ const aHarness = z.object({
 
 const REFUSAL = '{"field":"unreadableReason","rule":"must have no space for a text layer"}';
 
-const harnessRefusing = async () => {
+const startRefusingServer = async () => {
   const server = createServer((_, response) => {
     response.writeHead(400, { "content-type": "application/json" }).end(REFUSAL);
   });
   await new Promise<void>((listening) => server.listen(0, "127.0.0.1", listening));
   const address = server.address();
-  assert(address !== null && typeof address === "object", "the server listens on a port");
+  assert(address !== null && typeof address === "object", "the stub server has no port");
   const { port } = address;
   const api = await request.newContext({ baseURL: `http://127.0.0.1:${port}` });
   return {
@@ -37,19 +37,19 @@ const harnessRefusing = async () => {
   };
 };
 
-describe("the browser suite's seed call", () => {
-  it("names the status, field and rule of a refusal", async () => {
+describe("the browser suite's seeding helper", () => {
+  it("reports the status, field and rule when the api refuses", async () => {
     const harness = aHarness.parse(
       await import(pathToFileURL(path.join(workspaceRoot, "e2e/harness.ts")).href),
     );
-    const refusing = await harnessRefusing();
+    const stub = await startRefusingServer();
 
     try {
       await expect(
-        harness.seedConnectedSources(refusing.api, { workspaceId: "w", connectedSources: [] }),
+        harness.seedConnectedSources(stub.api, { workspaceId: "w", connectedSources: [] }),
       ).rejects.toThrow(/answered 400.*unreadableReason.*must have no space/s);
     } finally {
-      await refusing.close();
+      await stub.close();
     }
   });
 });

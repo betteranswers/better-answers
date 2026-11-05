@@ -73,7 +73,7 @@ function PersonCell(properties: { readonly member: ListedMember; readonly refuse
         <Address address={address} className="text-xs text-muted-foreground" />
         {refused ? (
           <span className="mt-1 flex text-xs">
-            <Pill>Refused</Pill>
+            <Pill>Not changed</Pill>
           </span>
         ) : null}
       </span>

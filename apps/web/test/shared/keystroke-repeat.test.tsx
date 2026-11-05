@@ -19,7 +19,7 @@ describe("a single-key keystroke", () => {
     expect(action).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps a held key from the browser", () => {
+  it("prevents the browser default for repeated key events", () => {
     renderHook(() => {
       useKeystroke({ key: "o", action: "Open the Member in Focus" }, vi.fn<() => void>());
     });

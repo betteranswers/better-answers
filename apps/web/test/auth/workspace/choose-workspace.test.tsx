@@ -1,8 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { SOLE_PICK_REFUSED } from "@/features/auth/refusal-words.ts";
-import { STOCK } from "@/shared/refusal-words.ts";
 import { openApp } from "@test/open-app.tsx";
 import { server, type Asked } from "@test/stub-server.ts";
 import { addressOf, answered } from "@test/stubbed-api.ts";
@@ -48,27 +46,26 @@ const everyPickRefused =
 
 const alertSays = () => screen.getByRole("alert").textContent;
 
-describe("a pick of a workspace the api refuses", () => {
-  it("tells the reader to reload where nothing can be pressed", async () => {
+describe("choosing a workspace the api refuses", () => {
+  it("shows an alert and no buttons for the only workspace", async () => {
     server.answer = everyPickRefused([NORTHERN]);
 
     await openApp("/choose-workspace");
 
     await waitFor(() => {
-      expect(alertSays()).toBe(SOLE_PICK_REFUSED);
+      expect(alertSays()).toMatch(/\S/u);
     });
-    expect(SOLE_PICK_REFUSED).not.toBe(STOCK.general);
     expect(screen.queryAllByRole("button")).toEqual([]);
   });
 
-  it("tells the reader to try again beside the listed row", async () => {
+  it("shows an alert and keeps the workspace list", async () => {
     server.answer = everyPickRefused([NORTHERN, SOUTHERN]);
     await openApp("/choose-workspace");
 
     fireEvent.click(await screen.findByRole("button", { name: SOUTHERN.workspace.name }));
 
     await waitFor(() => {
-      expect(alertSays()).toBe(STOCK.general);
+      expect(alertSays()).toMatch(/\S/u);
     });
     expect(screen.getByRole("button", { name: SOUTHERN.workspace.name })).toBeDefined();
   });

@@ -3,7 +3,7 @@ import { assert, describe, expect, it, vi } from "vitest";
 
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -27,19 +27,19 @@ const settled = () =>
     setTimeout(resolve, 50);
   });
 
-describe("a bulk role change while the list is read again", () => {
-  it("keeps its rows through the read it overtook", async () => {
+describe("a bulk role change while the list reloads", () => {
+  it("keeps the new role when an older reload finishes", async () => {
     const api = adaAnAdmin();
     await openAt(HOMES.Admin.path, api);
     await waitFor(() => expect(tickOf(GRACE.displayName)).not.toBeNull());
-    const list = heldBack(api, "members.list", read([ADA, GRACE]));
-    heldBack(api, "members.bulkChangeRole", read({ changed: [GRACE.personId], skipped: [] }));
+    const list = holdProcedure(api, "members.list", read([ADA, GRACE]));
+    holdProcedure(api, "members.bulkChangeRole", read({ changed: [GRACE.personId], skipped: [] }));
     openTab("Invitations");
     openTab("Members");
     await list.asked;
 
     const tick = tickOf(GRACE.displayName);
-    assert(tick !== null, "Grace's row keeps its tick box while the list is read again");
+    assert(tick !== null, "Grace's row lost its checkbox while the list reloaded");
     fireEvent.click(tick);
     await changeTheTickedToViewer();
     await waitFor(() => expect(gracesRole()).toContain("Viewer"));
@@ -47,6 +47,6 @@ describe("a bulk role change while the list is read again", () => {
     list.resolve();
     await settled();
 
-    expect(gracesRole(), "the read in flight wrote over the change").toContain("Viewer");
+    expect(gracesRole(), "the older reload overwrote the role change").toContain("Viewer");
   });
 });

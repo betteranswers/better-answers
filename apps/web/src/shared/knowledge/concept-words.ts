@@ -19,7 +19,7 @@ export const CONCEPT_WORDS = {
   verifiedOn: (day: string, byAPerson: boolean): string =>
     byAPerson ? `${day} · by a person` : `${day} · automatically`,
   place: (at: string): string => `· ${at}`,
-  noLinks: "No links you can read",
+  noLinks: "No links you have access to",
   ownPage: "Open This Concept’s Page",
   noCollection: "No collection",
   notCompanyKnowledge: "Not company knowledge",

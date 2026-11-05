@@ -17,23 +17,23 @@ import {
   outcomeIn,
   pressedOn,
   pressEnter,
-  refusalNaming,
+  refusalWithItems,
   rowsOf,
   selectionAction,
-  selectionSaid,
+  selectionStatusText,
   shownUnder,
   statusChoice,
   tickOf,
   ticked,
 } from "@test/people/invitations-stubbed.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
 const NO_LONGER_WAITING = (invitationId: string) =>
-  refusalNaming("no-such-invitation", "absent", 404, { [invitationId]: "no-such-invitation" });
+  refusalWithItems("no-such-invitation", "absent", 404, { [invitationId]: "no-such-invitation" });
 
 const saidInTheTab = (said: string | RegExp) =>
   within(invitationsRegion())
@@ -46,7 +46,7 @@ const theHeading = () =>
   within(invitationsRegion()).getByRole("heading", { level: 2, name: "Invitations" });
 
 describe("the People page's Invitations tab", () => {
-  it("the tab's unsent list drops an address whose Resend went", async () => {
+  it("removes an address from Unsent Emails once its resend succeeds", async () => {
     const offline = addressOf("offline");
     const { api, reachable } = holdingInvitations([anInvitation("offline")], [offline]);
     await openInvitations(api);
@@ -65,12 +65,12 @@ describe("the People page's Invitations tab", () => {
       expect(within(unsent).queryByRole("button", { name: resendName })).toBeNull();
     });
     expect(within(unsent).getByRole("status").textContent).toContain(offline);
-    expect(document.activeElement, "focus left with the row").toBe(
+    expect(document.activeElement, "focus did not move to the Unsent Emails heading").toBe(
       within(unsent).getByRole("heading", { name: "Unsent Emails" }),
     );
   });
 
-  it("an expired invitation resent from its menu waits again", async () => {
+  it("the row menu's Resend moves an expired invitation to Waiting", async () => {
     const old = addressOf("old");
     const { api } = holdingInvitations([anInvitation("old", "expired")]);
     await openInvitations(api);
@@ -93,7 +93,7 @@ describe("the People page's Invitations tab", () => {
     });
   });
 
-  it("cancelling from a row's menu hands focus to the list", async () => {
+  it("cancelling from a row's menu moves focus to the heading", async () => {
     const [ana, ben] = [addressOf("ana"), addressOf("ben")];
     await openedWith([anInvitation("ana"), anInvitation("ben")]);
 
@@ -120,21 +120,18 @@ describe("the People page's Invitations tab", () => {
     await waitFor(() => {
       expect(invitationRows()).toHaveLength(0);
     });
-    await waitFor(() => {
-      expect(outcomeIn()?.textContent).toMatch(/cancelled successfully/);
-    });
+    await statusChoice("Cancelled", 2);
     expect(
       outcomeIn()?.textContent,
-      "the bulk cancel's outcome counts two, and none skipped",
+      "the outcome did not count two cancelled and none skipped",
     ).toMatch(/^\D*2\D*$/);
     expect(asksOf("members.bulkCancelInvitations")).toEqual([
       { invitationIds: [anInvitation("ana").invitationId, anInvitation("ben").invitationId] },
     ]);
-    await statusChoice("Cancelled", 2);
     await statusChoice("Waiting", 0);
   });
 
-  it("bulk Cancel counts a row cancelled meanwhile as skipped", async () => {
+  it("bulk Cancel counts an already cancelled invitation as skipped", async () => {
     const [ana, ben] = [addressOf("ana"), addressOf("ben")];
     const { api, moveTo } = holdingInvitations([anInvitation("ana"), anInvitation("ben")]);
     await openInvitations(api);
@@ -145,15 +142,15 @@ describe("the People page's Invitations tab", () => {
     pressedOn(PEOPLE_KEYSTROKES.cancelSelected.key, true);
 
     await waitFor(() => {
-      expect(outcomeIn()?.textContent).toMatch(/already cancelled/);
+      expect(
+        outcomeIn()?.textContent,
+        "the outcome did not count one cancelled and one skipped",
+      ).toMatch(/\b1\b\D+\b1\b/);
     });
-    expect(outcomeIn()?.textContent, "the outcome counts one cancelled and one skipped").toMatch(
-      /\b1\b\D+\b1\b/,
-    );
     await statusChoice("Cancelled", 2);
   });
 
-  it("an expired invitation resent from the bar waits again", async () => {
+  it("the bar's Resend moves an expired invitation to Waiting", async () => {
     const old = addressOf("old");
     const { api } = holdingInvitations([anInvitation("old", "expired")]);
     await openInvitations(api);
@@ -163,9 +160,11 @@ describe("the People page's Invitations tab", () => {
     fireEvent.click(selectionAction("Resend"));
 
     await waitFor(() => {
-      expect(outcomeIn()?.textContent).toMatch(/resent successfully/);
+      expect(
+        outcomeIn()?.textContent,
+        "the outcome did not count one resent with its expiry",
+      ).toMatch(/\b1\b.*\d{4}/);
     });
-    expect(outcomeIn()?.textContent).toMatch(/\b1\b.*\d{4}/);
     await waitFor(() => {
       expect(rowsOf(old)).toHaveLength(0);
     });
@@ -173,7 +172,7 @@ describe("the People page's Invitations tab", () => {
     await statusChoice("Expired", 0);
   });
 
-  it("a refused bulk Resend names a row not shown", async () => {
+  it("a refused bulk Resend names a hidden invitation", async () => {
     const [gone, kept] = [addressOf("gone"), addressOf("kept")];
     const TWO_TICKED_NEITHER_SHOWN = /\b2\b\D+\b2\b/;
     const { api } = holdingInvitations([anInvitation("gone"), anInvitation("kept")]);
@@ -186,7 +185,7 @@ describe("the People page's Invitations tab", () => {
     await ticked(kept);
     await shownUnder("Expired");
     await waitFor(() => {
-      expect(selectionSaid()).toMatch(TWO_TICKED_NEITHER_SHOWN);
+      expect(selectionStatusText()).toMatch(TWO_TICKED_NEITHER_SHOWN);
     });
     fireEvent.click(selectionAction("Resend"));
 
@@ -199,7 +198,7 @@ describe("the People page's Invitations tab", () => {
     const refusal = within(invitationsRegion()).getByRole("alert");
     expect(
       within(refusal).getByRole("paragraph").textContent,
-      "the refusal counts one refused",
+      "the refusal did not count one invitation",
     ).toMatch(/\b1\b/);
     expect(
       within(refusal)
@@ -207,21 +206,21 @@ describe("the People page's Invitations tab", () => {
         .map((item) => item.textContent),
     ).toEqual([expect.stringContaining(gone)]);
     await waitFor(() => {
-      expect(selectionSaid()).toMatch(TWO_TICKED_NEITHER_SHOWN);
+      expect(selectionStatusText()).toMatch(TWO_TICKED_NEITHER_SHOWN);
     });
   });
 
-  it("a second action waits on the first, whose answer lands", async () => {
+  it("a second action waits until the first one finishes", async () => {
     const [ana, ben] = [addressOf("ana"), addressOf("ben")];
     const { api } = holdingInvitations([anInvitation("ana"), anInvitation("ben")]);
-    const cancelling = heldBack(api, "members.bulkCancelInvitations");
+    const cancelling = holdProcedure(api, "members.bulkCancelInvitations");
     await openInvitations(api);
 
     await ticked(ana);
     fireEvent.click(selectionAction("Cancel"));
     await cancelling.asked;
     const saidPending = outcomeIn()?.textContent;
-    expect(saidPending, "the pending cancel counts its one invitation").toMatch(/\b1\b/);
+    expect(saidPending, "the pending message did not count one invitation").toMatch(/\b1\b/);
     expect(cancelling.pending).toBe(true);
     await ticked(ben);
     const action = selectionAction("Cancel");
@@ -230,33 +229,34 @@ describe("the People page's Invitations tab", () => {
     await pressEnter(action);
     const saidWaiting = outcomeIn()?.textContent;
     expect(saidWaiting).toMatch(/\S/);
-    expect(saidWaiting, "the second press said nothing of its own").not.toBe(saidPending);
+    expect(saidWaiting, "the second press did not say that it is waiting").not.toBe(saidPending);
 
     cancelling.resolve();
     await waitFor(() => {
-      expect(outcomeIn()?.textContent, "the first action's outcome never landed").not.toBe(
+      expect(outcomeIn()?.textContent, "the first action's outcome never appeared").not.toBe(
         saidWaiting,
       );
     });
     expect(outcomeIn()?.textContent).not.toBe(saidPending);
-    expect(outcomeIn()?.textContent, "the outcome counts one cancelled, and none skipped").toMatch(
-      /^\D*1\D*$/,
-    );
+    expect(
+      outcomeIn()?.textContent,
+      "the outcome did not count one cancelled and none skipped",
+    ).toMatch(/^\D*1\D*$/);
     await waitFor(() => {
       expect(rowsOf(ana)).toHaveLength(0);
     });
     expect(
       asksOf("members.bulkCancelInvitations"),
-      "the second press asked the api to cancel, once the list was read again",
+      "the second press sent a second cancel request",
     ).toHaveLength(1);
     expect(tickOf(ben)?.getAttribute("aria-checked")).toBe("true");
     expect(selectionAction("Cancel").getAttribute("aria-disabled")).not.toBe("true");
   });
 
-  it("a tick made mid-act survives the bulk refusal", async () => {
+  it("a selection made during an action stays after a refusal", async () => {
     const [ana, ben] = [addressOf("ana"), addressOf("ben")];
     const { api } = holdingInvitations([anInvitation("ana"), anInvitation("ben")]);
-    const resending = heldBack(api, "members.bulkResendInvitations");
+    const resending = holdProcedure(api, "members.bulkResendInvitations");
     await openInvitations(api);
 
     await ticked(ana);
@@ -271,7 +271,12 @@ describe("the People page's Invitations tab", () => {
     await waitFor(() => {
       expect(within(invitationsRegion()).getByRole("alert").textContent).not.toBe("");
     });
-    expect(tickOf(ben)?.getAttribute("aria-checked"), "the tick made meanwhile stays").toBe("true");
-    expect(selectionSaid(), "the pressed tick comes back too").toMatch(/\b2\b/);
+    expect(
+      tickOf(ben)?.getAttribute("aria-checked"),
+      "the selection made during the action was cleared",
+    ).toBe("true");
+    expect(selectionStatusText(), "the first selection was not restored after the refusal").toMatch(
+      /\b2\b/,
+    );
   });
 });

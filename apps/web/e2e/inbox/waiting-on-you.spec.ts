@@ -18,7 +18,7 @@ import {
   signIn,
   skipLinkReachesThePage,
   tabUntilFocused,
-  theActionsLandedWithinTheirBudget,
+  medianActionWithinBudget,
 } from "../harness.ts";
 import { conceptsSeeded, listsItsKeystrokes, scrolledSideways } from "../knowledge.ts";
 
@@ -138,11 +138,15 @@ const rowLink = (page: Page, title: string): Locator =>
 const tickOf = (page: Page, title: string): Locator =>
   waiting(page).getByRole("checkbox", { name: `Select ${title}` });
 
-const said = (page: Page): Locator => waiting(page).getByRole("status").nth(1);
+const outcomeLine = (page: Page): Locator => waiting(page).getByRole("status").nth(1);
 
-const SAID_AT = "(//section[.//h2[.='Waiting on You']]//output)[2]";
+const OUTCOME_LINE_XPATH = "(//section[.//h2[.='Waiting on You']]//output)[2]";
 
-const answered = async (page: Page, procedure: "accept" | "decline", act: () => Promise<void>) => {
+const afterTheApiSucceeds = async (
+  page: Page,
+  procedure: "accept" | "decline",
+  act: () => Promise<void>,
+) => {
   const [answer] = await Promise.all([
     page.waitForResponse((each) => each.url().includes(`inbox.${procedure}`)),
     act(),
@@ -193,10 +197,12 @@ test.describe("Waiting on You", () => {
       await tabUntilFocused(page, rowLink(page, CLAIMS));
       await page.keyboard.press(KEY.tick.key);
       await expect(tickOf(page, CLAIMS)).toBeChecked();
-      await answered(page, "accept", () => page.keyboard.press(`Shift+${KEY.acceptSelected.key}`));
+      await afterTheApiSucceeds(page, "accept", () =>
+        page.keyboard.press(`Shift+${KEY.acceptSelected.key}`),
+      );
 
-      await expect(said(page)).toContainText(LEAVE);
-      await expect(said(page)).toContainText(CLAIMS);
+      await expect(outcomeLine(page)).toContainText(LEAVE);
+      await expect(outcomeLine(page)).toContainText(CLAIMS);
       await expect(rowTitles(page)).toHaveCount(BULK_CONCEPTS.length * DRAFTS.length);
       expect(await scrolledSideways(page), "the list scrolls sideways at 320px").toBe(0);
       await passesTheAccessibilityGate();
@@ -227,14 +233,14 @@ test.describe("Waiting on You", () => {
       const clocked: number[] = [];
       for (const { title } of BULK_CONCEPTS.slice(0, ACTION_SAMPLES)) {
         await tickOf(page, title).first().check();
-        await clockTheNextKey(page, { at: SAID_AT, reads: title });
-        await answered(page, "accept", async () => {
+        await clockTheNextKey(page, { at: OUTCOME_LINE_XPATH, reads: title });
+        await afterTheApiSucceeds(page, "accept", async () => {
           await page.keyboard.press(`Shift+${KEY.acceptSelected.key}`);
           clocked.push(await actionClocked(page));
         });
-        await expect(said(page)).toContainText(PROPOSER);
+        await expect(outcomeLine(page)).toContainText(PROPOSER);
       }
-      theActionsLandedWithinTheirBudget("accepting a suggestion", clocked);
+      medianActionWithinBudget("accepting a suggestion", clocked);
     });
 
     await test.step("opens a suggestion within the list time budget and starts to decline it by keyboard alone", async () => {

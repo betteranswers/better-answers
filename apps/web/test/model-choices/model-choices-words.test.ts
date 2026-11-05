@@ -4,22 +4,22 @@ import { describe, expect, it } from "vitest";
 
 import { providerWordOf } from "@/features/model-choices/words.ts";
 
-describe("a model choice's provider, in a reader's word", () => {
+describe("the provider name shown for a model choice", () => {
   it.each([
     ["anthropic", "Anthropic"],
     ["mistral", "Mistral AI"],
     ["voyage", "Voyage AI"],
     ["openai", "OpenAI"],
     ["google", "Google"],
-  ])("names %s %s", (provider, word) => {
+  ])("shows %s as %s", (provider, word) => {
     expect(providerWordOf(provider)).toBe(word);
   });
 
-  it("gives a local model's provider a word of its own", () => {
+  it("gives the local provider a readable name", () => {
     expect(providerWordOf("local")).not.toBe("local");
   });
 
-  it("shows a provider it has no word for as itself", () => {
+  it("shows an unknown provider as its id", () => {
     expect(providerWordOf("acme-inference")).toBe("acme-inference");
   });
 });

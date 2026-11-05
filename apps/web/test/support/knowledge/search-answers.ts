@@ -8,7 +8,7 @@ import { MATCHES_A_PAGE, SEARCH_LIST } from "@/features/knowledge/knowledge-stat
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { server } from "@test/stub-server.ts";
-import { heldBack, type Api } from "@test/stubbed-api.ts";
+import { holdProcedure, type Api } from "@test/stubbed-api.ts";
 import { adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
 
 export type Match = Readonly<Record<string, unknown>>;
@@ -208,20 +208,20 @@ export const matchRows = (): readonly HTMLElement[] => {
   return list === null ? [] : within(list).getAllByRole("listitem");
 };
 
-export const said = (): HTMLElement => {
+export const searchStatus = (): HTMLElement => {
   const [first] = within(searchRegion()).getAllByRole("status");
   if (first === undefined) throw new Error("the Search region has no status");
   return first;
 };
 
-export const saidNow = (): string => said().textContent;
+export const searchStatusText = (): string => searchStatus().textContent;
 
 export const textOfRows = () => matchRows().map((row) => row.textContent);
 
 export const listsOnly = (title: string) =>
   waitFor(() => expect(textOfRows()).toEqual([expect.stringContaining(title)]));
 
-export const alerted = (): HTMLElement | null => within(searchRegion()).queryByRole("alert");
+export const searchAlert = (): HTMLElement | null => within(searchRegion()).queryByRole("alert");
 
 export const loadMore = (): HTMLElement | null =>
   within(searchRegion()).queryByRole("button", { name: "Load More" });
@@ -257,17 +257,19 @@ export const typed = (query: string): void => {
 const addressSearch = (router: Router): string | null =>
   new URLSearchParams(router.state.location.searchStr).get(`${SEARCH_LIST}.search`);
 
-const addressHolds = (router: Router, query: string) =>
+const waitForAddressSearch = (router: Router, query: string) =>
   waitFor(() => {
-    if (addressSearch(router) !== query) throw new Error("the typed search has not settled");
+    if (addressSearch(router) !== query)
+      throw new Error("the URL does not hold the typed query yet");
   });
 
 export const searched = async (router: Router, query: string): Promise<void> => {
   typed(query);
-  await addressHolds(router, query);
+  await waitForAddressSearch(router, query);
   await waitFor(() => {
-    if (!saidNow().includes(query)) throw new Error("the status does not name the search");
-    if (matchRows().length === 0) throw new Error("no match is drawn");
+    if (!searchStatusText().includes(query))
+      throw new Error("the status does not mention the query");
+    if (matchRows().length === 0) throw new Error("no search results are shown");
   });
 };
 
@@ -277,7 +279,7 @@ export const openedSearch = async (api: Api, address: string = SEARCH_PAGE.path)
   return router;
 };
 
-export const palletsFound = async () => {
+export const searchedForPallets = async () => {
   const api = aSearchApi();
   api.set(FIND, finding({ pallet: PALLET_PASSAGES }));
   api.set(OPEN, thePalletPassages);
@@ -301,25 +303,27 @@ export const foundNothing = async (
     typed(query);
   },
 ): Promise<void> => {
-  const find = heldBack(api, FIND, read({ query, matches: [] }));
+  const find = holdProcedure(api, FIND, read({ query, matches: [] }));
   ask();
   await find.asked;
-  await waitFor(() => expect(saidNow()).toContain(query));
-  const whileAsking = saidNow();
+  await waitFor(() => expect(searchStatusText()).toContain(query));
+  const whileAsking = searchStatusText();
   find.resolve();
   await waitFor(() =>
-    expect(saidNow(), "the status still says the search is asking").not.toBe(whileAsking),
+    expect(searchStatusText(), "the status still shows the loading text").not.toBe(whileAsking),
   );
-  expect(saidNow()).toContain(query);
+  expect(searchStatusText()).toContain(query);
   expect(matchRows()).toHaveLength(0);
 };
 
-const named = (node: Element | null): string =>
+const describeNode = (node: Element | null): string =>
   node === null ? "nothing" : `<${node.tagName.toLowerCase()}> ${node.textContent.slice(0, 40)}`;
 
 export const focusIsOn = (element: Element, why: string): void => {
   if (document.activeElement !== element) {
-    throw new Error(`${why}: focus is on ${named(document.activeElement)}, not ${named(element)}`);
+    throw new Error(
+      `${why}: focus is on ${describeNode(document.activeElement)}, not ${describeNode(element)}`,
+    );
   }
 };
 
@@ -338,7 +342,7 @@ export const keyPressed = (key: string): void => {
   fireEvent.keyDown(document.activeElement ?? document.body, { key });
 };
 
-export const refocused = (): void => {
+export const fireVisibilityChange = (): void => {
   globalThis.dispatchEvent(new Event("visibilitychange"));
 };
 

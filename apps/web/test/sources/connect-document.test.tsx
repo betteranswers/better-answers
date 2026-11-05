@@ -9,7 +9,7 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 placedWithoutMeasuring();
 
 describe("connecting a document on the Sources page", () => {
-  it("refuses an Admin's unconvertible file, keeping the dialog open", async () => {
+  it("refuses an unsupported file and keeps the dialog open", async () => {
     await openSources(anAdminWith());
     press("b");
     const dialog = await screen.findByRole("dialog", { name: "Connect a Document" });

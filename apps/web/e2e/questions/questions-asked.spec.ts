@@ -74,7 +74,7 @@ const signedInAtTheQuestions = async (page: Page, api: APIRequestContext, at: At
   await expect(page).toHaveURL(new RegExp(`${QUESTIONS_ASKED}$`));
 };
 
-const leadingLineOf = async (page: Page, name: string, path: string) => {
+const lineUnderHeading = async (page: Page, name: string, path: string) => {
   await page.goto(path);
   await expect(page.getByRole("heading", { level: 1, name: "Questions" })).toBeVisible();
   const lead = page.getByRole("main").locator("h1 + p");
@@ -82,7 +82,7 @@ const leadingLineOf = async (page: Page, name: string, path: string) => {
   return lead.innerText();
 };
 
-const aPageAndOneMoreOpened = async (page: Page, api: APIRequestContext, name: string) => {
+const fiftyOneQuestionsOpened = async (page: Page, api: APIRequestContext, name: string) => {
   const at = await aWorkspaceWithConcepts(api, name);
   const records = Array.from({ length: 51 }, (_, nth): SeedRecord => ({
     question: `Question number ${nth + 1}`,
@@ -98,12 +98,12 @@ test.describe("the Questions Asked page", () => {
     request,
     passesTheAccessibilityGate,
   }) => {
-    await aPageAndOneMoreOpened(page, request, "Wharfe Pages");
+    await fiftyOneQuestionsOpened(page, request, "Wharfe Pages");
 
     await test.step("each Questions page shows the same line under its heading and passes the accessibility checks", async () => {
       const lines = new Set<string>();
       for (const [name, path] of QUESTIONS_PAGES) {
-        lines.add(await leadingLineOf(page, name, path));
+        lines.add(await lineUnderHeading(page, name, path));
         expect(
           lines.size,
           `${name} shows a different line under its heading from the other Questions pages`,

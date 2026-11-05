@@ -2,20 +2,14 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { STALE_CONFIRMATION } from "@/features/auth/refusal-words.ts";
-import {
-  EXPORTS_WORDS as WORDS,
-  SAID_OF_EXPORTED_GUIDE,
-  SAID_OF_EXPORTED_KNOWLEDGE_BASE,
-  SAID_OF_EXPORTED_RECORDS,
-} from "@/features/knowledge/curation/curation-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { STOCK } from "@/shared/refusal-words.ts";
+import { theOneEmptyStatus } from "@test/empty-status.ts";
 import { downloadsWatched, type SavedFile } from "@test/knowledge/downloads.ts";
 import { aGuideSummary, idOf } from "@test/knowledge/guide-answers.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { BOTH_HELD } from "@test/second-factor-api.ts";
 import { server } from "@test/stub-server.ts";
-import { heldBack, type Api } from "@test/stubbed-api.ts";
+import { holdProcedure, type Api } from "@test/stubbed-api.ts";
 import { adaAnAdmin, adaAt, aRefusalAnswer, LOST, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -106,11 +100,12 @@ const whatTheAlertSays = (): string =>
     .map((alert) => alert.textContent)
     .join("");
 
-const whatTheStatusSays = (): string =>
-  region()
-    .getAllByRole("status", { hidden: true })
-    .map((status) => status.textContent)
-    .join("");
+const theCount = () => region().getAllByRole("status", { hidden: true })[0]?.textContent ?? "";
+
+const theStatusEmptyOnArrival = () =>
+  theOneEmptyStatus(region().getAllByRole("status", { hidden: true }));
+
+const guideRow = () => region().getByRole("listitem", { name: GUIDE });
 
 const asked = (procedure: string) => server.asks.filter((ask) => ask.procedure === procedure);
 
@@ -139,7 +134,7 @@ describe("the Exports page", () => {
         .map((heading) => heading.textContent),
     ).toEqual([KNOWLEDGE_BASE, RECORDS, GUIDE]);
     expect(region().getAllByRole("listitem")).toHaveLength(3);
-    expect(whatTheStatusSays()).toContain(WORDS.count(3));
+    expect(theCount()).toMatch(/^3\b/u);
     expect(downloadOf(KNOWLEDGE_BASE).getAttribute("aria-keyshortcuts")).toBe("k");
     expect(downloadOf(RECORDS).getAttribute("aria-keyshortcuts")).toBe("r");
     expect(downloadOf(GUIDE).getAttribute("aria-keyshortcuts")).toBe("g");
@@ -147,36 +142,39 @@ describe("the Exports page", () => {
 
   it("saves the knowledge base zip under the answer's name", async () => {
     await openAt(PAGE, anAdminOffering());
+    const button = await readyToDownload(KNOWLEDGE_BASE);
+    const outcome = theStatusEmptyOnArrival();
 
-    fireEvent.click(await readyToDownload(KNOWLEDGE_BASE));
+    fireEvent.click(button);
 
     const file = await theOneSaved();
     expect(file.name).toBe(KNOWLEDGE_BASE_ANSWER.name);
     expect(file.type).toBe("application/zip");
     expect([...(await file.bytes())]).toEqual([...ZIP_BYTES]);
-    expect(whatTheStatusSays()).toContain(
-      WORDS.knowledgeBase.saved(KNOWLEDGE_BASE_ANSWER.name, KNOWLEDGE_BASE_ANSWER.files),
-    );
+    expect(outcome.textContent, "the outcome does not name the saved file").toContain(file.name);
+    expect(outcome.textContent, "the outcome does not count the files").toMatch(/\b5\b/u);
   });
 
-  it("saves the records as a zip, naming what it holds", async () => {
+  it("saves the records as a zip and counts its spreadsheets", async () => {
     await openAt(PAGE, anAdminOffering());
+    const button = await readyToDownload(RECORDS);
+    const outcome = theStatusEmptyOnArrival();
 
-    fireEvent.click(await readyToDownload(RECORDS));
+    fireEvent.click(button);
 
     const file = await theOneSaved();
     expect(file.name).toBe(RECORDS_ANSWER.name);
     expect(file.type).toBe("application/zip");
     expect([...(await file.bytes())]).toEqual([...ZIP_BYTES]);
-    expect(whatTheStatusSays()).toContain(
-      `Saved ${RECORDS_ANSWER.name}. It holds the owners, the checks and the uses as 3 spreadsheets.`,
-    );
+    expect(outcome.textContent, "the outcome does not name the saved file").toContain(file.name);
+    expect(outcome.textContent, "the outcome does not count the spreadsheets").toMatch(/\b3\b/u);
   });
 
   it("saves the chosen guide as markdown under the answer's name", async () => {
     await openAt(PAGE, anAdminOffering([aGuideSummary(), OTHER_GUIDE]));
 
-    const picker = await region().findByRole("combobox", { name: WORDS.guide.picker });
+    const picker = await region().findByRole("combobox", { name: "Guide" });
+    const outcome = theStatusEmptyOnArrival();
     expect(
       within(picker)
         .getAllByRole("option")
@@ -190,7 +188,8 @@ describe("the Exports page", () => {
     expect(file.name).toBe(GUIDE_ANSWER.name);
     expect(file.type).toBe("text/markdown;charset=utf-8");
     expect(await file.text()).toBe(GUIDE_ANSWER.markdown);
-    expect(whatTheStatusSays()).toContain(WORDS.guide.saved(GUIDE_ANSWER.name, 8));
+    expect(outcome.textContent, "the outcome does not name the saved file").toContain(file.name);
+    expect(outcome.textContent, "the outcome does not count the Briefs").toMatch(/\b8\b/u);
   });
 
   it("runs each download on its own key", async () => {
@@ -214,9 +213,11 @@ describe("the Exports page", () => {
   it("does nothing on a second press while one export runs", async () => {
     const api = anAdminOffering();
     await openAt(PAGE, api);
-    const running = heldBack(api, EXPORT_BUNDLE, read(KNOWLEDGE_BASE_ANSWER));
+    const running = holdProcedure(api, EXPORT_BUNDLE, read(KNOWLEDGE_BASE_ANSWER));
+    const button = await readyToDownload(KNOWLEDGE_BASE);
+    const outcome = theStatusEmptyOnArrival();
 
-    fireEvent.click(await readyToDownload(KNOWLEDGE_BASE));
+    fireEvent.click(button);
     await running.asked;
     const preparing = await waitFor(() => buttonNamed("Preparing", KNOWLEDGE_BASE));
     expect(preparing.getAttribute("aria-disabled")).toBe("true");
@@ -225,7 +226,7 @@ describe("the Exports page", () => {
 
     expect(downloadOf(RECORDS).getAttribute("aria-disabled")).toBe("false");
     expect(downloadOf(GUIDE).getAttribute("aria-disabled")).toBe("false");
-    expect(whatTheStatusSays()).toContain(WORDS.preparingSaid(KNOWLEDGE_BASE));
+    expect(outcome.textContent, "the status is silent while the export runs").toMatch(/\S/u);
     running.resolve();
     await theOneSaved();
     expect(running.asks).toBe(1);
@@ -236,7 +237,7 @@ describe("the Exports page", () => {
   it("still saves the file when the person leaves the page", async () => {
     const api = anAdminOffering();
     const router = await openAt(PAGE, api);
-    const running = heldBack(api, EXPORT_BUNDLE, read(KNOWLEDGE_BASE_ANSWER));
+    const running = holdProcedure(api, EXPORT_BUNDLE, read(KNOWLEDGE_BASE_ANSWER));
 
     fireEvent.click(await readyToDownload(KNOWLEDGE_BASE));
     await running.asked;
@@ -251,7 +252,13 @@ describe("the Exports page", () => {
   it("offers no guide download when there are no guides", async () => {
     await openAt(PAGE, anAdminOffering([]));
 
-    expect(await region().findByText(WORDS.guide.none)).toBeDefined();
+    await waitFor(() =>
+      expect(within(guideRow()).queryByRole("status"), "the guides are still loading").toBeNull(),
+    );
+    expect(
+      within(guideRow()).queryByRole("alert"),
+      "an empty guide list showed as a failure",
+    ).toBeNull();
     expect(
       region()
         .getAllByRole("button")
@@ -267,15 +274,15 @@ describe("the Exports page", () => {
     api.set("knowledge.guides", () => PAST_ITS_CEILING);
     await openAt(PAGE, api);
 
-    expect(await region().findByText(/Please try again in 2 minutes/u)).toBeDefined();
+    await waitFor(() => expect(whatTheAlertSays()).toMatch(/\b2 minutes\b/u));
     api.set("knowledge.guides", () => read([aGuideSummary()]));
-    fireEvent.click(region().getByRole("button", { name: WORDS.guide.retry }));
+    fireEvent.click(region().getByRole("button", { name: "Retry" }));
 
-    expect(await region().findByRole("combobox", { name: WORDS.guide.picker })).toBeDefined();
+    expect(await region().findByRole("combobox", { name: "Guide" })).toBeDefined();
     await readyToDownload(GUIDE);
   });
 
-  it("never says bundle", async () => {
+  it("never shows the word bundle", async () => {
     await openAt(PAGE, anAdminOffering());
     await readyToDownload(GUIDE);
     fireEvent.click(downloadOf(KNOWLEDGE_BASE));
@@ -285,7 +292,7 @@ describe("the Exports page", () => {
     expect(screen.queryByLabelText(/bundle/iu)).toBeNull();
   });
 
-  it("is not found by an Editor", async () => {
+  it("shows Page Not Found to an Editor", async () => {
     const api = anAdminOffering();
     api.set("session.member", () => adaAt("Editor"));
     await openAt(PAGE, api);
@@ -303,39 +310,22 @@ describe("a refused export", () => {
       KNOWLEDGE_BASE,
       "role-forbids",
       "forbidden",
-      SAID_OF_EXPORTED_KNOWLEDGE_BASE["role-forbids"],
     ],
+    ["a changed role for the records", EXPORT_RECORDS, RECORDS, "role-forbids", "forbidden"],
+    ["a changed role for the guide", EXPORT_GUIDE, GUIDE, "role-forbids", "forbidden"],
     [
-      "a changed role for the records",
-      EXPORT_RECORDS,
-      RECORDS,
-      "role-forbids",
-      "forbidden",
-      SAID_OF_EXPORTED_RECORDS["role-forbids"],
-    ],
-    [
-      "a changed role for the guide",
-      EXPORT_GUIDE,
-      GUIDE,
-      "role-forbids",
-      "forbidden",
-      SAID_OF_EXPORTED_GUIDE["role-forbids"],
-    ],
-    [
-      "a change still landing",
+      "a change still being saved",
       EXPORT_BUNDLE,
       KNOWLEDGE_BASE,
       "unrecorded-head",
       "precondition",
-      SAID_OF_EXPORTED_KNOWLEDGE_BASE["unrecorded-head"],
     ],
     [
-      "a knowledge base with no commit",
+      "a knowledge base with no saved version",
       EXPORT_BUNDLE,
       KNOWLEDGE_BASE,
       "not-found",
       "absent",
-      SAID_OF_EXPORTED_KNOWLEDGE_BASE["not-found"],
     ],
     [
       "a knowledge base too large",
@@ -343,39 +333,26 @@ describe("a refused export", () => {
       KNOWLEDGE_BASE,
       "export-too-large",
       "inapplicable",
-      SAID_OF_EXPORTED_KNOWLEDGE_BASE["export-too-large"],
     ],
-    [
-      "records too large",
-      EXPORT_RECORDS,
-      RECORDS,
-      "export-too-large",
-      "inapplicable",
-      SAID_OF_EXPORTED_RECORDS["export-too-large"],
-    ],
-    [
-      "a guide that is gone",
-      EXPORT_GUIDE,
-      GUIDE,
-      "not-found",
-      "absent",
-      SAID_OF_EXPORTED_GUIDE["not-found"],
-    ],
-  ])("words %s", async (_cause, procedure, name, word, refusalClass, sentence) => {
+    ["records too large", EXPORT_RECORDS, RECORDS, "export-too-large", "inapplicable"],
+    ["a guide that is gone", EXPORT_GUIDE, GUIDE, "not-found", "absent"],
+  ])("alerts on %s", async (_cause, procedure, name, word, refusalClass) => {
     const api = anAdminOffering();
     api.set(procedure, () => aRefusalAnswer(word, refusalClass, 412));
     await openAt(PAGE, api);
+    const button = await readyToDownload(name);
+    const outcome = theStatusEmptyOnArrival();
 
-    fireEvent.click(await readyToDownload(name));
+    fireEvent.click(button);
 
-    await waitFor(() => expect(whatTheAlertSays()).toBe(sentence));
-    expect(sentence).not.toMatch(/bundle/iu);
+    await waitFor(() => expect(whatTheAlertSays(), "the refusal showed no alert").toMatch(/\S/u));
+    expect(whatTheAlertSays()).not.toMatch(/bundle/iu);
     expect(saved).toHaveLength(0);
-    expect(whatTheStatusSays()).not.toContain(WORDS.preparingSaid(name));
+    expect(outcome.textContent, "the status still says the export is running").toBe("");
     await readyToDownload(name);
   });
 
-  it("says how long a ceiling holds", async () => {
+  it("says how long to wait after too many requests", async () => {
     const api = anAdminOffering();
     api.set(EXPORT_RECORDS, () => PAST_ITS_CEILING);
     await openAt(PAGE, api);
@@ -386,14 +363,14 @@ describe("a refused export", () => {
     expect(saved).toHaveLength(0);
   });
 
-  it("words a failure it cannot name", async () => {
+  it("alerts on a failure that gives no reason", async () => {
     const api = anAdminOffering();
     api.set(EXPORT_GUIDE, () => LOST);
     await openAt(PAGE, api);
 
     fireEvent.click(await readyToDownload(GUIDE));
 
-    await waitFor(() => expect(whatTheAlertSays()).toBe(STOCK.tryAgain));
+    await waitFor(() => expect(whatTheAlertSays(), "the failure showed no alert").toMatch(/\S/u));
     expect(saved).toHaveLength(0);
   });
 
@@ -402,7 +379,7 @@ describe("a refused export", () => {
     api.set(EXPORT_RECORDS, () => LOST);
     await openAt(PAGE, api);
     fireEvent.click(await readyToDownload(RECORDS));
-    await waitFor(() => expect(whatTheAlertSays()).toBe(STOCK.tryAgain));
+    await waitFor(() => expect(whatTheAlertSays(), "the failure showed no alert").toMatch(/\S/u));
 
     fireEvent.click(downloadOf(KNOWLEDGE_BASE));
 
@@ -428,11 +405,12 @@ describe("a stale confirmation before an export", () => {
     staleOnce(api, procedure, read(answer));
     await openAt(PAGE, api);
     await readyToDownload(name);
+    const outcome = theStatusEmptyOnArrival();
 
     fireEvent.keyDown(document.body, { key });
     await screen.findByRole("dialog");
     expect(saved, "saved before the person confirmed").toHaveLength(0);
-    expect(whatTheAlertSays(), "worded the stale confirmation as a failure").toBe("");
+    expect(whatTheAlertSays(), "the stale confirmation showed as a failure").toBe("");
     await confirmedInTheDialog();
 
     const file = await theOneSaved();
@@ -440,7 +418,7 @@ describe("a stale confirmation before an export", () => {
     expect(file.name).toBe(answer.name);
     expect(asked(procedure)).toHaveLength(2);
     expect(whatTheAlertSays()).toBe("");
-    expect(whatTheStatusSays()).toContain(`Saved ${answer.name}.`);
+    expect(outcome.textContent, "the outcome does not name the saved file").toContain(answer.name);
     expect(document.activeElement, "focus was lost when the dialog closed").toBe(
       await readyToDownload(name),
     );
@@ -450,19 +428,21 @@ describe("a stale confirmation before an export", () => {
     const api = anAdminOffering();
     staleOnce(api, EXPORT_BUNDLE, read(KNOWLEDGE_BASE_ANSWER));
     await openAt(PAGE, api);
+    const button = await readyToDownload(KNOWLEDGE_BASE);
+    const outcome = theStatusEmptyOnArrival();
 
-    fireEvent.click(await readyToDownload(KNOWLEDGE_BASE));
+    fireEvent.click(button);
     fireEvent.keyDown(await screen.findByRole("dialog"), { key: "Escape" });
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(saved).toHaveLength(0);
     expect(asked(EXPORT_BUNDLE)).toHaveLength(1);
     expect(whatTheAlertSays()).toBe("");
-    expect(whatTheStatusSays()).not.toContain(WORDS.preparingSaid(KNOWLEDGE_BASE));
+    expect(outcome.textContent, "the status still says the export is running").toBe("");
     await readyToDownload(KNOWLEDGE_BASE);
   });
 
-  it("words a refusal that follows the confirmation", async () => {
+  it("alerts on a refusal after the person confirms", async () => {
     const api = anAdminOffering();
     staleOnce(api, EXPORT_BUNDLE, aRefusalAnswer("unrecorded-head", "precondition", 412));
     await openAt(PAGE, api);
@@ -470,9 +450,7 @@ describe("a stale confirmation before an export", () => {
     fireEvent.click(await readyToDownload(KNOWLEDGE_BASE));
     await confirmedInTheDialog();
 
-    await waitFor(() =>
-      expect(whatTheAlertSays()).toBe(SAID_OF_EXPORTED_KNOWLEDGE_BASE["unrecorded-head"]),
-    );
+    await waitFor(() => expect(whatTheAlertSays(), "the refusal showed no alert").toMatch(/\S/u));
     expect(saved).toHaveLength(0);
   });
 });

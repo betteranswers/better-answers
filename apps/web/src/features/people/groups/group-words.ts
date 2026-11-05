@@ -7,7 +7,7 @@ export const membersWord = (group: Pick<ListedGroup, "memberCount">): string =>
 
 export const GROUP_WORDS = {
   create: {
-    consequence: "A group only changes what its members may see, never what they may do.",
+    consequence: "A group controls what its members can see. It doesn't change their role.",
   },
   rename: {
     consequence: "This will change the group’s name. Members stay in the group.",

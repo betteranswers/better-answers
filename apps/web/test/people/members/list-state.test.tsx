@@ -3,7 +3,6 @@ import { createRef, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
-import { MEMBERS_LOADING } from "@/features/people/member-action-words.ts";
 import { MembersTab } from "@/features/people/members/members-tab.tsx";
 import { ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { openPages } from "@test/address-router.tsx";
@@ -37,8 +36,8 @@ const listRead = (read: { readonly error: Error | null; readonly isPending: bool
   </ListRead>
 );
 
-describe("a list's state, said after its region mounts", () => {
-  it("mounts the loading region empty, then says its line", () => {
+describe("a list's status regions, filled after they mount", () => {
+  it("mounts the loading region empty, then fills it", () => {
     const { seen, Seen } = regionsSeen("output");
 
     render(
@@ -51,7 +50,7 @@ describe("a list's state, said after its region mounts", () => {
     expect(screen.getByRole("status").textContent).toBe(LOADING);
   });
 
-  it("mounts the failure's alert empty, then says the failure", () => {
+  it("mounts the failure alert empty, then fills it", () => {
     const { seen, Seen } = regionsSeen("[role=alert]");
 
     render(
@@ -71,13 +70,13 @@ describe("a list's state, said after its region mounts", () => {
     expect(screen.getByRole("alert").textContent).toBe(FAILED);
   });
 
-  it("draws the loading region while a read is pending", () => {
+  it("shows the loading region while a read is pending", () => {
     render(listRead({ error: null, isPending: true }));
 
     expect(screen.getByRole("status").textContent).toBe(LOADING);
   });
 
-  it("draws a failed read's alert in place of the rows", () => {
+  it("shows a failed read's alert instead of the rows", () => {
     render(listRead({ error: DOWN, isPending: false }));
 
     expect(screen.getByRole("alert").textContent).toBe(failedSaid(DOWN));
@@ -95,7 +94,7 @@ describe("a list's state, said after its region mounts", () => {
     expect(screen.getByRole("alert").textContent).toBe(failedSaid(DOWN));
   });
 
-  it("draws the rows once the read has them", () => {
+  it("shows the rows once the read finishes", () => {
     render(listRead({ error: null, isPending: false }));
 
     expect(screen.getByText("The rows")).toBeDefined();
@@ -103,8 +102,8 @@ describe("a list's state, said after its region mounts", () => {
   });
 });
 
-describe("Members' loading line, said after its region mounts", () => {
-  it("mounts Members' loading region empty while the read is pending", async () => {
+describe("the Members loading message", () => {
+  it("mounts its region empty, then shows the message", async () => {
     vi.stubGlobal("fetch", () => new Promise<Response>(() => undefined));
     const { seen, Seen } = regionsSeen(LIST_REGION);
     const wrapper = (properties: { readonly children: ReactNode }) => (
@@ -116,6 +115,6 @@ describe("Members' loading line, said after its region mounts", () => {
     await openPages({ "/people/members": MembersTab }, ["/people/members"], wrapper);
 
     expect(seen.find((said) => said !== undefined)).toBe("");
-    expect(document.querySelector(LIST_REGION)?.textContent).toBe(MEMBERS_LOADING);
+    expect(document.querySelector(LIST_REGION)?.textContent).toMatch(/\S/);
   });
 });

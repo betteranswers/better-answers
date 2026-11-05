@@ -11,8 +11,8 @@ placedWithoutMeasuring();
 
 const A_SUGGESTION = detailAt(WAITING_ON_YOU, "01JXSGGST0000000000000000A");
 
-describe("a suggestion of Waiting on You", () => {
-  it("draws not found when the api names no such suggestion", async () => {
+describe("a suggestion on Waiting on You", () => {
+  it("shows Page Not Found when the suggestion does not exist", async () => {
     const drawn = await openedWhereTheApiNamesNone(A_SUGGESTION, "inbox.item");
 
     expect(drawn.notFound).toBeDefined();

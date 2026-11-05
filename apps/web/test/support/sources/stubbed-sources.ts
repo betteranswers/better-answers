@@ -107,7 +107,7 @@ export const aGroupOfFindings = (overrides: Partial<AGroupOfFindings> = {}): AGr
 });
 
 export const BANK_ACCOUNT_BOX =
-  "Select bank details by Sort code and account number in Supplier form";
+  "Select bank details findings in Supplier form found by the Sort code and account number rule";
 
 export const supplierFormsFindings = (): readonly AGroupOfFindings[] => {
   const form = anId();
@@ -158,7 +158,7 @@ const ROW_ACTIONS = {
   widen: "Widen Sensitivity or Audience",
 } as const;
 
-/** jsdom's accessible name drops the space a browser keeps before the hidden source's name. */
+/** jsdom's accessible name omits the space a browser keeps before the hidden source name. */
 export const rowAction = (row: HTMLElement, action: keyof typeof ROW_ACTIONS): HTMLElement =>
   within(row).getByRole("button", { name: new RegExp(`^${ROW_ACTIONS[action]} ?`, "v") });
 
@@ -182,7 +182,7 @@ export const thePanelOf = (change: "narrow" | "widen", name: string): HTMLElemen
   return panel;
 };
 
-/** What a browser does when a pointer presses a button: the button takes focus, then it acts. */
+/** Focuses then clicks, as a browser does when a pointer presses a button. */
 export const pressed = (button: HTMLElement): void => {
   button.focus();
   fireEvent.click(button);
@@ -192,13 +192,13 @@ export const press = (key: string): void => {
   fireEvent.keyDown(document.activeElement ?? document.body, { key });
 };
 
-const describerOf = (control: HTMLElement): HTMLElement | null => {
+const descriptionElementOf = (control: HTMLElement): HTMLElement | null => {
   const id = control.getAttribute("aria-describedby");
   return id === null ? null : document.getElementById(id);
 };
 
 export const describedBy = (control: HTMLElement): string =>
-  describerOf(control)?.textContent ?? "";
+  descriptionElementOf(control)?.textContent ?? "";
 
 const definitionOf = (terms: readonly HTMLElement[], word: string): HTMLElement => {
   const definition = terms.find((each) => each.textContent === word)?.nextElementSibling;
@@ -206,7 +206,7 @@ const definitionOf = (terms: readonly HTMLElement[], word: string): HTMLElement 
   return definition;
 };
 
-export const leadOf = (row: HTMLElement, word: string): HTMLElement =>
+export const firstDefinitionOf = (row: HTMLElement, word: string): HTMLElement =>
   definitionOf(within(row).getAllByRole("term"), word);
 
 export const detailOf = (row: HTMLElement, word: string): HTMLElement =>

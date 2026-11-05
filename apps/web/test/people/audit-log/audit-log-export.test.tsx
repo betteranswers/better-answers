@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { assert, describe, expect, it, vi } from "vitest";
 
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 import { adaAnAdmin, openAt } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -17,19 +17,19 @@ const PAST_ITS_CEILING = {
   },
 };
 
-describe("an audit log export refused twice in one sentence", () => {
-  it("empties its alert at the second press", async () => {
+describe("an audit log export refused twice in a row", () => {
+  it("clears the alert when Export is pressed again", async () => {
     const api = adaAnAdmin();
     api.set("members.exportAuditLog", () => PAST_ITS_CEILING);
     await openAt("/system/audit-log", api);
     const log = within(await screen.findByRole("region", { name: "Audit Log" }));
     const [alert] = log.getAllByRole("alert");
-    assert(alert !== undefined, "the audit log draws an alert");
+    assert(alert !== undefined, "the audit log has no alert region");
 
     fireEvent.click(log.getByRole("button", { name: "Export Events" }));
     await waitFor(() => expect(alert.textContent).toMatch(/\b2\b/));
 
-    const second = heldBack(api, "members.exportAuditLog", PAST_ITS_CEILING);
+    const second = holdProcedure(api, "members.exportAuditLog", PAST_ITS_CEILING);
     fireEvent.click(log.getByRole("button", { name: "Export Events" }));
     await second.asked;
 

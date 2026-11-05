@@ -4,12 +4,12 @@ import { describe, expectTypeOf, it } from "vitest";
 import type { Menu } from "@/app/shell/menu.tsx";
 import type { CONTROL_CENTRE, VisibleArea } from "@/shared/navigation.ts";
 
-type Listed = ComponentProps<typeof Menu>["area"];
+type MenuArea = ComponentProps<typeof Menu>["area"];
 
 describe("the menu", () => {
-  it("takes an area only as the reader may see it", () => {
-    expectTypeOf<VisibleArea>().toExtend<Listed>();
-    // @ts-expect-error — an area as declared holds pages the reader may not see.
-    expectTypeOf<typeof CONTROL_CENTRE>().toExtend<Listed>();
+  it("accepts only an area filtered to what the reader sees", () => {
+    expectTypeOf<VisibleArea>().toExtend<MenuArea>();
+    // @ts-expect-error — an unfiltered area includes pages the reader may not see.
+    expectTypeOf<typeof CONTROL_CENTRE>().toExtend<MenuArea>();
   });
 });

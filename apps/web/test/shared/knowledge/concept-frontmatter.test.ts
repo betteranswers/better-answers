@@ -10,14 +10,14 @@ import {
 } from "@/shared/knowledge/concept-frontmatter.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 
-describe("what a concept page reads from a file's frontmatter", () => {
-  it("names a file with no title as untitled", () => {
+describe("concept frontmatter parsing", () => {
+  it("uses the untitled label when the title is missing", () => {
     expect(titleOf({ type: "Answer" })).toBe(CONCEPT_WORDS.untitled);
     expect(titleOf({ type: "Answer", title: "  " })).toBe(CONCEPT_WORDS.untitled);
     expect(titleOf({ type: "Answer", title: "Audit Logs Retention" })).toBe("Audit Logs Retention");
   });
 
-  it("reads the kind and tags as the file wrote them", () => {
+  it("returns the kind and tags unchanged", () => {
     expect(kindOf({ type: "Answer" })).toBe("Answer");
     expect(tagsOf({ type: "Answer", tags: ["audit", "retention"] })).toEqual([
       "audit",
@@ -26,7 +26,7 @@ describe("what a concept page reads from a file's frontmatter", () => {
     expect(tagsOf({ type: "Answer", tags: "audit" })).toEqual([]);
   });
 
-  it("says a verifier is a person or not, never who", () => {
+  it("records whether a person verified, without their identity", () => {
     const events = verifiedEventsOf({
       type: "Answer",
       verified: [
@@ -41,21 +41,21 @@ describe("what a concept page reads from a file's frontmatter", () => {
     ]);
   });
 
-  it("says an event's day in the UK long form", () => {
+  it("formats an event's date in UK long form", () => {
     expect(dayOf({ at: "2026-03-03T09:41:00Z", byAPerson: true })).toBe("3 March 2026");
   });
 
-  it("shows an unreadable date as the file wrote it", () => {
+  it("returns an unparseable date unchanged", () => {
     expect(dayOf({ at: "last Tuesday", byAPerson: false })).toBe("last Tuesday");
   });
 
-  it("reads a malformed verified list as no events", () => {
+  it("returns no events for a malformed verified list", () => {
     expect(verifiedEventsOf({ type: "Answer", verified: "yesterday" })).toEqual([]);
     expect(verifiedEventsOf({ type: "Answer", verified: [{ by: "human:x" }] })).toEqual([]);
   });
 
-  it("lists the keys no part of the page already draws", () => {
-    const further = furtherKeysOf({
+  it("lists only the keys the page does not already show", () => {
+    const extraKeys = furtherKeysOf({
       type: "Answer",
       title: "Audit Logs Retention",
       description: "How long audit logs are kept.",
@@ -70,7 +70,7 @@ describe("what a concept page reads from a file's frontmatter", () => {
       generated: [{ by: "extractor/1", at: "2026-01-01T00:00:00Z" }],
     });
 
-    expect(further).toEqual([
+    expect(extraKeys).toEqual([
       ["status", "stable"],
       ["stale_after", "2027-03-03"],
       ["owners", "Compliance, Security"],

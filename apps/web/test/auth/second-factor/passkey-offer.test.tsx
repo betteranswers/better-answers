@@ -72,7 +72,7 @@ const DISMISSAL = { name: "Dismiss Passkey Offer" };
 
 const offer = () => screen.queryByRole("button", DISMISSAL);
 
-const offerDrawn = () => screen.findByRole("button", DISMISSAL);
+const offerShown = () => screen.findByRole("button", DISMISSAL);
 
 const adaHoldingNoPasskey = (reads: ReadonlyMap<string, () => unknown> = SHELL_READS): void => {
   withPasskeysHere();
@@ -82,7 +82,7 @@ const adaHoldingNoPasskey = (reads: ReadonlyMap<string, () => unknown> = SHELL_R
 const loadedOnTheOffer = async () => {
   adaHoldingNoPasskey();
   const loaded = await openAsAda(FIRST_PAGE);
-  await offerDrawn();
+  await offerShown();
   return loaded;
 };
 
@@ -90,7 +90,7 @@ const switchedOnTheOffer = async () => {
   let workspace = NORTHERN_TOOLING;
   adaHoldingNoPasskey(new Map([...SHELL_READS, ["session.member", () => adaIn(workspace)]]));
   const loaded = await openAsAda(HOME);
-  await offerDrawn();
+  await offerShown();
   const { queryClient } = loaded.clients;
 
   workspace = HOLME_PRESSINGS;
@@ -126,29 +126,29 @@ const refuseStorage = (): void => {
 };
 
 describe("the passkey offer", () => {
-  it("draws on the first page, and on no page after", async () => {
+  it("shows on the first page and on no later page", async () => {
     const { router } = await loadedOnTheOffer();
 
     expect(await movedTo(router, NEXT_PAGE)).toStrictEqual({ at: NEXT_PAGE, offer: null });
     expect(await movedTo(router, FIRST_PAGE)).toStrictEqual({ at: FIRST_PAGE, offer: null });
   });
 
-  it("stays drawn when a switch draws its page afresh", async () => {
+  it("stays visible when a workspace switch reloads the page", async () => {
     const { router } = await switchedOnTheOffer();
 
     expect(router.state.location.pathname).toBe(HOME);
-    expect(await offerDrawn()).toBeDefined();
+    expect(await offerShown()).toBeDefined();
   });
 
-  it("ends on the next page after a switch, for good", async () => {
+  it("disappears for good on the next page after a switch", async () => {
     const { router } = await switchedOnTheOffer();
-    await offerDrawn();
+    await offerShown();
 
     expect(await movedTo(router, FIRST_PAGE)).toStrictEqual({ at: FIRST_PAGE, offer: null });
     expect(await movedTo(router, HOME)).toStrictEqual({ at: HOME, offer: null });
   });
 
-  it("stays quiet on a page load after another showed it", async () => {
+  it("stays hidden after another page load showed it", async () => {
     adaHoldingNoPasskey();
     const { clients, rendered } = await openAsAda("/account");
     await screen.findByRole("button", { name: "Add a Passkey" });
@@ -161,7 +161,7 @@ describe("the passkey offer", () => {
     expect(offer()).toBeNull();
   });
 
-  it("is marked shown as it draws, not on mount", async () => {
+  it("is marked shown when it appears, not on mount", async () => {
     adaHoldingNoPasskey();
     const { router } = await openAsAda("/account");
     expect(await screen.findByRole("heading", { level: 1, name: "Account" })).toBeDefined();
@@ -170,11 +170,11 @@ describe("the passkey offer", () => {
 
     await act(() => router.navigate({ href: FIRST_PAGE }));
 
-    expect(await offerDrawn()).toBeDefined();
+    expect(await offerShown()).toBeDefined();
     expect(globalThis.localStorage.getItem(SHOWN_UNDER)).not.toBeNull();
   });
 
-  it("draws once on each page load where storage is refused", async () => {
+  it("shows once per page load when storage is blocked", async () => {
     refuseStorage();
     const { router, rendered } = await loadedOnTheOffer();
 
@@ -187,10 +187,10 @@ describe("the passkey offer", () => {
 
     await nextLoad.openAsAda(FIRST_PAGE);
 
-    expect(await offerDrawn()).toBeDefined();
+    expect(await offerShown()).toBeDefined();
   });
 
-  it("is owed again after a sign-in by passkey", async () => {
+  it("shows again after a passkey sign-in", async () => {
     const { clients, rendered } = await loadedOnTheOffer();
     rendered.unmount();
     const signedIn = vi.fn<() => void>();
@@ -208,7 +208,7 @@ describe("the passkey offer", () => {
     signingIn.unmount();
     await openApp(FIRST_PAGE, clients);
 
-    expect(await offerDrawn()).toBeDefined();
+    expect(await offerShown()).toBeDefined();
   });
 
   it("a Viewer is offered a passkey once per sign-in", async () => {
@@ -228,6 +228,6 @@ describe("the passkey offer", () => {
     signingIn.unmount();
     await openApp(FIRST_PAGE, clients);
 
-    expect(await offerDrawn()).toBeDefined();
+    expect(await offerShown()).toBeDefined();
   });
 });

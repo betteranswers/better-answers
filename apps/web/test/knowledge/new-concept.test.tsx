@@ -31,9 +31,21 @@ const TO_EDIT = "knowledge.conceptToEdit";
 
 const SAVE = "knowledge.saveConcept";
 
-const ASKS_NOTHING_TO_KEEP = "You have changes that are not saved.";
+const NEW_CONCEPT_OFFER = "New Concept";
 
-const NEW_CONCEPT_OFFER = "Type it as a new concept";
+const leaveAsked = () => screen.queryByRole("button", { name: "Leave" });
+
+const quietStatuses = () =>
+  screen.getAllByRole("status").filter((each) => each.textContent.trim() === "");
+
+const warnings = () =>
+  screen.queryAllByText("Warning").map((label) => label.parentElement?.textContent ?? "");
+
+const warnsOf = async (collection: string) => {
+  await waitFor(() => {
+    expect(warnings().some((warning) => warning.includes(collection))).toBe(true);
+  });
+};
 
 const collectionsIn = (...names: readonly string[]) =>
   read({
@@ -73,6 +85,11 @@ const pressed = (name: string): void => {
 
 const newConceptHeading = () => screen.findByRole("heading", { level: 3, name: "New Concept" });
 
+const newConceptClosed = () =>
+  waitFor(() => {
+    expect(screen.queryByRole("heading", { level: 3, name: "New Concept" })).toBeNull();
+  });
+
 const openedForANewConcept = async (fields: Readonly<Record<string, string>> = {}, api?: Api) => {
   const asked = api ?? aNewConceptApi();
   const router = await openedSearch(
@@ -98,8 +115,8 @@ describe("typing a new concept from Search", () => {
     typedInto(kindField(), "Policy");
     chose("policies");
 
-    await screen.findByText("Saving adds this concept for everyone who can read policies.");
-    expect(screen.queryByText(ASKS_NOTHING_TO_KEEP)).toBeNull();
+    await warnsOf("policies");
+    expect(leaveAsked()).toBeNull();
     expect(kindField().value).toBe("Policy");
     expect(router.state.location.searchStr).toContain("knowledge.collection=policies");
     expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
@@ -117,12 +134,10 @@ describe("typing a new concept from Search", () => {
     const router = await openedForANewConcept({ collection: "policies" });
 
     typedInto(kindField(), "Policy");
-    pressed("Close editor");
+    pressed("Close Editor");
 
-    await waitFor(() => {
-      expect(screen.queryByRole("heading", { level: 3, name: "New Concept" })).toBeNull();
-    });
-    expect(screen.queryByText(ASKS_NOTHING_TO_KEEP)).toBeNull();
+    await newConceptClosed();
+    expect(leaveAsked()).toBeNull();
     await waitFor(() => {
       expect(router.state.location.searchStr).not.toContain("knowledge.new");
     });
@@ -135,10 +150,8 @@ describe("typing a new concept from Search", () => {
     typedInto(kindField(), "Certification");
     typedInto(titleField(), "Cyber Essentials Plus");
 
-    pressed("Close editor");
-    await waitFor(() => {
-      expect(screen.queryByRole("heading", { level: 3, name: "New Concept" })).toBeNull();
-    });
+    pressed("Close Editor");
+    await newConceptClosed();
     fireEvent.click(await screen.findByRole("button", { name: NEW_CONCEPT_OFFER }));
 
     await newConceptHeading();
@@ -164,7 +177,7 @@ describe("typing a new concept from Search", () => {
     await newConceptHeading();
     typedInto(titleField(), "Cyber Essentials Plus");
     pressed("Save");
-    await screen.findByText(/Your suggestion is waiting/u);
+    await newConceptClosed();
 
     fireEvent.click(await screen.findByRole("button", { name: NEW_CONCEPT_OFFER }));
 
@@ -194,35 +207,32 @@ describe("typing a new concept from Search", () => {
       expect(asksOf(TO_EDIT)).toHaveLength(1);
     });
     chose("finance");
-    await screen.findByText("Saving adds this concept for everyone who can read finance.");
+    await warnsOf("finance");
+    const [beforeTheLateRead] = warnings();
     await settlingAfter(() => {
       lateRead.resolve(aConceptToEdit({ ...BLANK_TO_EDIT, standing: "suggests" }));
     });
 
     expect(asksOf(TO_EDIT)).toHaveLength(2);
-    expect(
-      screen.getByText("Saving adds this concept for everyone who can read finance."),
-    ).toBeDefined();
-    expect(screen.queryByText(/Saving sends your new concept/u)).toBeNull();
+    expect(warnings(), "the late read changed the save's standing").toEqual([beforeTheLateRead]);
   });
 
-  it("words a suggestion for the collection's owner, not a concept's", async () => {
+  it("reports a new concept's suggestion after its form closes", async () => {
     const api = aNewConceptApi("suggests");
     api.set(SAVE, suggested);
     await openedForANewConcept({ collection: "policies", kind: "Policy" }, api);
 
-    expect(
-      await screen.findByText(
-        "Saving sends your new concept to the collection's owner or an Admin. Nothing is added until they decide.",
-      ),
-    ).toBeDefined();
+    await waitFor(() => {
+      expect(warnings()[0], "the editor showed no warning before saving").toMatch(/\S/);
+    });
+    const quiet = quietStatuses();
     pressed("Save");
 
+    await newConceptClosed();
+    expect(savesAsked()).toHaveLength(1);
     expect(
-      await screen.findByText(
-        "Your suggestion is waiting for the collection's owner or an Admin to decide.",
-      ),
-    ).toBeDefined();
-    expect(screen.queryByText(/the concept's owner/u)).toBeNull();
+      quiet.some((status) => /\S/u.test(status.textContent)),
+      "no status reported the suggestion",
+    ).toBe(true);
   });
 });

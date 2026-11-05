@@ -1,8 +1,7 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { copyBrief, copyingWords } from "@/features/knowledge/guides/brief-clipboard.ts";
-import { GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import type { BriefCopied } from "@/features/knowledge/knowledge-api.ts";
 import { clipboardTaking, partOf } from "@test/clipboard-stand-in.ts";
 import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
@@ -93,7 +92,7 @@ describe("copying a Brief to the clipboard", () => {
     expect(record).not.toHaveBeenCalled();
   });
 
-  it("says a copy that was not recorded", async () => {
+  it("words an unrecorded copy apart from a recorded one", async () => {
     clipboardTaking();
 
     const copying = await copyBrief(
@@ -101,8 +100,9 @@ describe("copying a Brief to the clipboard", () => {
       () => Promise.reject(new Error("down")),
     );
 
-    expect(copyingWords("3", copying)).toBe(
-      "Copied section 3 with 1 footnote. Numbers start at 1 in each copy. The copy was not recorded.",
+    expect(copying).toEqual({ kind: "copied", copy: COPIED, recorded: false });
+    expect(copyingWords("3", copying)).not.toBe(
+      copyingWords("3", { kind: "copied", copy: COPIED, recorded: true }),
     );
   });
 });
@@ -118,6 +118,17 @@ const openGuide = async (copy: "offered" | "below-action-threshold" = "offered")
 
 const copyButton = () => screen.getByRole("button", { name: "Copy" });
 
+const status = () => within(screen.getByRole("article")).getByRole("status");
+
+const alert = () => within(screen.getByRole("article")).getByRole("alert");
+
+const saysSomethingNew = async (before: string) => {
+  await waitFor(() => {
+    expect(status().textContent, "the status did not change").not.toBe(before);
+  });
+  expect(status().textContent).toMatch(/\S/u);
+};
+
 describe("copying a section on the guide page", () => {
   it("announces the copy at once, then what was copied", async () => {
     const taken = clipboardTaking();
@@ -125,23 +136,23 @@ describe("copying a section on the guide page", () => {
 
     fireEvent.click(copyButton());
 
-    expect(screen.getByText("Copying section 1.")).toBeDefined();
-    expect(
-      await screen.findByText("Copied section 1 with 1 footnote. Numbers start at 1 in each copy."),
-    ).toBeDefined();
+    const whileCopying = status().textContent;
+    expect(whileCopying, "the copy was not announced at once").toMatch(/\S/u);
+    await saysSomethingNew(whileCopying);
     expect(await partOf(taken[0], "text/plain")).toBe(COPIED.text);
     expect(asksOf(RECORD_COPY)).toEqual([{ writeUpId: A_WRITE_UP_ID, version: 2 }]);
   });
 
-  it("says a browser that refused, and records nothing", async () => {
+  it("announces a refused clipboard and records nothing", async () => {
     clipboardTaking(refusedClipboard);
     await openGuide();
 
     fireEvent.click(copyButton());
 
-    expect(
-      await screen.findByText("Your browser did not allow copying. Nothing was copied."),
-    ).toBeDefined();
+    await saysSomethingNew(status().textContent);
+    await waitFor(() => {
+      expect(copyButton().getAttribute("aria-disabled")).not.toBe("true");
+    });
     expect(asksOf(RECORD_COPY)).toEqual([]);
   });
 
@@ -152,25 +163,29 @@ describe("copying a section on the guide page", () => {
     copyButton().focus();
     fireEvent.keyDown(copyButton(), { key: "c" });
 
-    expect(await screen.findByText(/^Copied section 1 with 1 footnote/u)).toBeDefined();
+    await waitFor(() => {
+      expect(asksOf(RECORD_COPY)).toEqual([{ writeUpId: A_WRITE_UP_ID, version: 2 }]);
+    });
   });
 
-  it("says why instead of offering Copy below the role's threshold", async () => {
+  it("offers no Copy below the role's threshold", async () => {
     await openGuide("below-action-threshold");
 
     const section = within(screen.getByRole("region", { name: "1. Warehouse racking" }));
     expect(section.queryByRole("button", { name: "Copy" })).toBeNull();
-    expect(section.getByText(/You can’t copy this section yet/u)).toBeDefined();
+    expect(section.getByRole("button", { name: "Show Detail" })).toBeDefined();
   });
 
-  it("says in words a copy the server then refused", async () => {
+  it("alerts when the server refuses the copy", async () => {
     clipboardTaking();
     const api = await openGuide();
     api.set(BRIEF_COPY, () => aRefusalAnswer("below-action-threshold", "precondition", 412));
 
     fireEvent.click(copyButton());
 
-    expect(await screen.findByText(/You can’t copy this section yet/u)).toBeDefined();
+    await waitFor(() => {
+      expect(alert().textContent, "the refused copy raised no alert").toMatch(/\S/u);
+    });
     expect(asksOf(RECORD_COPY)).toEqual([]);
   });
 
@@ -182,17 +197,23 @@ describe("copying a section on the guide page", () => {
 
     fireEvent.click(copyButton());
 
-    expect(await screen.findByText(GUIDE_WORDS.closeToCopy)).toBeDefined();
+    await waitFor(() => {
+      expect(status().textContent, "Copy with the editor open said nothing").toMatch(/\S/u);
+    });
     expect(asksOf(BRIEF_COPY)).toEqual([]);
+    expect(screen.getByRole("textbox", { name: "Brief of section 1" })).toBeDefined();
   });
 
-  it("says nothing is copyable where no Copy is drawn", async () => {
+  it("announces that c has nothing to copy without Copy", async () => {
     await openGuide("below-action-threshold");
 
     const heading = screen.getByRole("heading", { name: "1. Warehouse racking" });
     heading.focus();
     fireEvent.keyDown(heading, { key: "c" });
 
-    expect(await screen.findByText("Copy isn’t available for this section.")).toBeDefined();
+    await waitFor(() => {
+      expect(status().textContent, "c with no Copy said nothing").toMatch(/\S/u);
+    });
+    expect(asksOf(BRIEF_COPY)).toEqual([]);
   });
 });

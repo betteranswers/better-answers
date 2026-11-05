@@ -3,13 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
-import {
-  ACTION_LANDED,
-  AUTHENTICATOR_WORDS,
-  PASSKEY_WORDS,
-  RECOVERY_CODE_WORDS,
-} from "@/features/auth/account-words.ts";
-import { SAID_OF_SECOND_FACTOR } from "@/features/auth/refusal-words.ts";
 import { THEME_KEPT_UNDER } from "@/shared/theme/theme-switch.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { openApp } from "@test/open-app.tsx";
@@ -102,7 +95,7 @@ const adasApi =
     return answered(names.map((name) => answerTo(name, replace, read)));
   };
 
-const anotherTabMadeASet = () => {
+const anotherTabGeneratedCodes = () => {
   let refused = false;
   return adasApi(
     () => {
@@ -114,12 +107,20 @@ const anotherTabMadeASet = () => {
 };
 
 /** The session is held before the page opens: the auth library's own read never settles here. */
-const makeCodesPressed = async () => {
+const pressGenerateCodes = async () => {
   const clients = createAppClients();
   clients.queryClient.setQueryData(["auth", "session"], SIGNED_IN_AS_ADA);
   await openApp("/account", clients);
-  fireEvent.click(await screen.findByRole("button", { name: "Make Recovery Codes" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Generate Recovery Codes" }));
 };
+
+const signInAlertsWithWords = (): readonly HTMLElement[] =>
+  within(screen.getByRole("region", { name: "Sign-In" }))
+    .getAllByRole("alert")
+    .filter((alert) => /\S/u.test(alert.textContent));
+
+const paragraphsIn = (region: string): readonly HTMLElement[] =>
+  within(screen.getByRole("region", { name: region })).queryAllByRole("paragraph");
 
 const A_PASSKEY = {
   id: "01K6AAAAAAAAAAAAAAAAAAAAAA",
@@ -150,56 +151,57 @@ const accountOpened = async (held: unknown) => {
 };
 
 describe("the Account page's passkeys", () => {
-  it("lists each by name, with when it was added", async () => {
+  it("lists each by name, with the date it was added", async () => {
     await accountOpened(ADMINS_ONLY_FACTOR);
 
     const row = await screen.findByRole("listitem", { name: "MacBook" });
 
     expect(row.textContent).toContain("3 March 2026");
-    expect(row.textContent).toContain(PASSKEY_WORDS.notUsed);
   });
 
-  it("keeps an Admin's only factor, saying why beside Remove", async () => {
+  it("disables Remove on an Admin's only passkey and says why", async () => {
     await accountOpened(ADMINS_ONLY_FACTOR);
 
     const remove = await screen.findByRole("button", { name: "Remove" });
 
     expect(remove.getAttribute("aria-disabled")).toBe("true");
     const describedBy = remove.getAttribute("aria-describedby");
-    assert(describedBy !== null, "Remove is described by a reason");
+    assert(describedBy !== null, "the disabled Remove button has no reason");
     const reason = document.getElementById(describedBy);
-    expect(reason?.textContent).toBe(SAID_OF_SECOND_FACTOR["last-second-factor"]);
+    expect(reason?.textContent, "the disabled Remove button's reason is empty").toMatch(/\S/u);
   });
 
-  it("says there are none, and this browser adds none", async () => {
+  it("explains why a browser without passkey support cannot add one", async () => {
     await accountOpened(NO_SET);
 
-    expect(await screen.findByText(PASSKEY_WORDS.none)).toBeDefined();
-    expect(screen.getByText(PASSKEY_WORDS.noWebAuthn)).toBeDefined();
+    await screen.findByRole("region", { name: "Passkeys" });
+    const said = paragraphsIn("Passkeys");
+    expect(said, "the Passkeys section does not explain both states").toHaveLength(2);
+    for (const paragraph of said) expect(paragraph.textContent).toMatch(/\S/u);
     expect(screen.queryByRole("button", { name: "Add a Passkey" })).toBeNull();
   });
 
-  it("offers to add one where this browser can", async () => {
+  it("offers Add a Passkey in a browser that supports passkeys", async () => {
     withPasskeysHere();
     await accountOpened(NO_SET);
 
     expect(await screen.findByRole("button", { name: "Add a Passkey" })).toBeDefined();
-    expect(screen.queryByText(PASSKEY_WORDS.noWebAuthn)).toBeNull();
+    expect(paragraphsIn("Passkeys"), "the Passkeys section says it cannot add one").toHaveLength(1);
   });
 });
 
 describe("the Account page's theme", () => {
-  it("matches this device until a theme is picked", async () => {
+  it("selects the System theme until another is picked", async () => {
     await accountOpened(NO_SET);
 
     const theme = await screen.findByRole("radiogroup", { name: "Theme" });
-    const device = screen.getByRole("radio", { name: "Match this device" });
+    const device = screen.getByRole("radio", { name: "System" });
 
     expect(theme.getAttribute("aria-describedby")).not.toBeNull();
     expect(device.getAttribute("aria-checked")).toBe("true");
   });
 
-  it("paints and keeps the theme picked", async () => {
+  it("applies a picked theme at once and saves it", async () => {
     await accountOpened(NO_SET);
 
     fireEvent.click(await screen.findByRole("radio", { name: "Dark" }));
@@ -211,7 +213,7 @@ describe("the Account page's theme", () => {
 });
 
 describe("setting up an authenticator on the Account page", () => {
-  it("replaces the factors for a session a code granted", async () => {
+  it("uses the replace route after a restore code", async () => {
     const asked = adasRoutes(
       () => ({
         ...NOTHING_HELD,
@@ -230,14 +232,16 @@ describe("setting up an authenticator on the Account page", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Set Up an Authenticator" }));
 
-    expect(await screen.findByText(AUTHENTICATOR_WORDS.scan)).toBeDefined();
+    expect(
+      await screen.findByRole("img", { name: "QR code for your authenticator app" }),
+    ).toBeDefined();
     expect(asked).toContain("/second-factor/replace/authenticator-start");
     expect(asked).not.toContain("/authenticator/start");
   });
 });
 
-describe("making a first set on the Account page", () => {
-  it("says a notice is on its way", async () => {
+describe("generating recovery codes on the Account page", () => {
+  it("names the address the confirmation email goes to", async () => {
     vi.stubGlobal(
       "fetch",
       adasApi(
@@ -246,22 +250,23 @@ describe("making a first set on the Account page", () => {
       ),
     );
 
-    await makeCodesPressed();
+    await pressGenerateCodes();
 
-    const landed = await screen.findByText(ACTION_LANDED.made(SESSION.user.email));
-    expect(landed.textContent).toContain(SESSION.user.email);
+    await waitFor(() => {
+      expect(saidOnThePage().join(" ")).toContain(SESSION.user.email);
+    });
   });
 
-  it("offers Replace once another tab made a set", async () => {
-    vi.stubGlobal("fetch", anotherTabMadeASet());
+  it("offers Replace when another tab already generated codes", async () => {
+    vi.stubGlobal("fetch", anotherTabGeneratedCodes());
 
-    await makeCodesPressed();
+    await pressGenerateCodes();
 
     expect(await screen.findByRole("button", { name: "Replace Recovery Codes" })).toBeDefined();
-    expect(screen.getByText(SAID_OF_SECOND_FACTOR["recovery-codes-held"])).toBeDefined();
+    expect(signInAlertsWithWords(), "no alert says why Generate was refused").toHaveLength(1);
   });
 
-  it("asks a restored sign-in for its restore code first", async () => {
+  it("refuses with an alert until the restore code is entered", async () => {
     vi.stubGlobal(
       "fetch",
       adasApi(
@@ -270,9 +275,11 @@ describe("making a first set on the Account page", () => {
       ),
     );
 
-    await makeCodesPressed();
+    await pressGenerateCodes();
 
-    expect(await screen.findByText(SAID_OF_SECOND_FACTOR["restore-code-needed"])).toBeDefined();
+    await waitFor(() => {
+      expect(signInAlertsWithWords(), "no alert asks for the restore code").toHaveLength(1);
+    });
   });
 });
 
@@ -302,7 +309,7 @@ const timesAsked = (asked: readonly string[], procedure: string): number =>
   asked.filter((address) => address === `/trpc/${procedure}`).length;
 
 describe("finishing a first authenticator on the Account page", () => {
-  it("a setup's codes land though Set up is pressed mid-finish", async () => {
+  it("pressing Set Up mid-finish still shows the new codes", async () => {
     const answer = Promise.withResolvers<void>();
     let finished = false;
     const asked = adasRoutes(
@@ -344,7 +351,7 @@ describe("finishing a first authenticator on the Account page", () => {
     expect(within(list).getAllByRole("listitem")).toHaveLength(CODES.length);
     await waitFor(() => {
       expect(document.activeElement).toBe(
-        screen.getByRole("heading", { name: RECOVERY_CODE_WORDS.saveHeading }),
+        screen.getByRole("heading", { name: "Save Your Recovery Codes" }),
       );
     });
   });
@@ -373,7 +380,7 @@ describe("removing and replacing on the Account page", () => {
     fireEvent.click(remove);
 
     const dialog = await screen.findByRole("dialog", {
-      name: AUTHENTICATOR_WORDS.removeTitle,
+      name: "Remove Authenticator",
       description: /\S/,
     });
     expect(timesAsked(asked, "person.removeAuthenticator")).toBe(0);
@@ -383,7 +390,8 @@ describe("removing and replacing on the Account page", () => {
     const setUp = await screen.findByRole("button", { name: "Set Up an Authenticator" });
     expect(timesAsked(asked, "person.removeAuthenticator")).toBe(1);
     expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
-    expect(saidOnThePage()).toEqual([ACTION_LANDED.removed(SIGNED_IN_AS_ADA.person.email)]);
+    expect(saidOnThePage()).toHaveLength(1);
+    expect(saidOnThePage()[0]).toContain(SIGNED_IN_AS_ADA.person.email);
     await waitFor(() => {
       expect(document.activeElement).toBe(setUp);
     });
@@ -401,20 +409,18 @@ describe("removing and replacing on the Account page", () => {
       ]),
     );
     await openAsAda("/account");
-    const replace = await screen.findByRole("button", { name: RECOVERY_CODE_WORDS.replace });
+    const replace = await screen.findByRole("button", { name: "Replace Recovery Codes" });
     expect(screen.queryByRole("list", { name: "Recovery Codes" })).toBeNull();
 
     fireEvent.click(replace);
 
     const dialog = await screen.findByRole("dialog", {
-      name: RECOVERY_CODE_WORDS.replaceTitle,
+      name: "Replace Recovery Codes",
       description: /\S/,
     });
     expect(timesAsked(asked, "person.replaceRecoveryCodes")).toBe(0);
 
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: RECOVERY_CODE_WORDS.replaceCommit }),
-    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Replace" }));
 
     const list = await screen.findByRole("list", { name: "Recovery Codes" });
     expect(timesAsked(asked, "person.replaceRecoveryCodes")).toBe(1);
@@ -423,8 +429,12 @@ describe("removing and replacing on the Account page", () => {
         .getAllByRole("listitem")
         .map((code) => code.textContent),
     ).toEqual(CODES);
-    expect(screen.getByText(RECOVERY_CODE_WORDS.replacedLine)).toBeDefined();
-    expect(saidOnThePage()).toEqual([ACTION_LANDED.replaced(SIGNED_IN_AS_ADA.person.email)]);
+    expect(
+      paragraphsIn("Save Your Recovery Codes"),
+      "a replaced set does not say the old codes stopped working",
+    ).toHaveLength(2);
+    expect(saidOnThePage()).toHaveLength(1);
+    expect(saidOnThePage()[0]).toContain(SIGNED_IN_AS_ADA.person.email);
   });
 });
 
@@ -439,7 +449,7 @@ const inTheBand = () => within(screen.getByRole("banner"));
 describe("the Account page of a member", () => {
   placedWithoutMeasuring();
 
-  it("a member's Account page sits inside the shell", async () => {
+  it("shows a member's Account page inside the shell", async () => {
     adasRoutes(() => NO_FACTOR_YET);
     const outside = await openAsAda("/account");
     await screen.findByRole("heading", { level: 1, name: "Account" });

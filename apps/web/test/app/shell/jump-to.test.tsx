@@ -27,7 +27,7 @@ import {
   SAM,
 } from "@test/people/member-pages.ts";
 import { server } from "@test/stub-server.ts";
-import { answeringAs, heldBack } from "@test/stubbed-api.ts";
+import { answeringAs, holdProcedure } from "@test/stubbed-api.ts";
 import { ADA, adaAnAdmin, adaAt, openAt } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -95,7 +95,7 @@ const STUB: readonly Area[] = [
 const INVITE = "Invite a Person";
 
 describe("what jump-to lists", () => {
-  it("lists a stub tree's built pages and their actions alone", () => {
+  it("lists only a stub tree's built pages and their actions", () => {
     expect(outline(jumpsIn(treeOf("Admin", STUB), undefined, AT_ROOT))).toEqual([
       ["Areas", ["Yard"]],
       ["Pages", ["Timber", "Deliveries"]],
@@ -103,7 +103,7 @@ describe("what jump-to lists", () => {
     ]);
   });
 
-  it("drops an action with the page hidden from the role", () => {
+  it("leaves out actions on pages hidden from the role", () => {
     const editors = jumpsIn(treeOf("Editor", STUB), undefined, AT_ROOT);
 
     expect(outline(editors)).toEqual([
@@ -114,7 +114,7 @@ describe("what jump-to lists", () => {
     expect(jumpsIn(treeOf("Viewer", STUB), undefined, AT_ROOT)).toEqual([]);
   });
 
-  it("lists a Viewer's areas and pages, no members or actions", () => {
+  it("lists a Viewer's areas and pages without members or actions", () => {
     expect(outline(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT))).toEqual([
       ["Areas", ["Ask", "Knowledge"]],
       [
@@ -155,13 +155,13 @@ describe("what jump-to lists", () => {
     ]);
   });
 
-  it("gives every item its own value, namesakes included", () => {
+  it("gives every item a unique value, even with duplicate names", () => {
     const values = valuesOf(jumpsIn(treeOf("Admin"), [PRIYA, ANOTHER_PRIYA, NAMELESS], AT_ROOT));
 
     expect(new Set(values).size).toBe(values.length);
   });
 
-  it("leads each item to its place, asking Members for actions", () => {
+  it("links each item to its page and actions to Members", () => {
     const groups = jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT);
     const to = Object.fromEntries(
       groups.flatMap((group) => group.jumps.map((jump) => [jump.name, jump.to])),
@@ -172,7 +172,7 @@ describe("what jump-to lists", () => {
     expect(to[INVITE]).toBe("/people/members?action=invite");
   });
 
-  it("leads a member to their page from anywhere", () => {
+  it("links a member to their page from any address", () => {
     const narrowed = {
       pathname: "/people/members",
       searchStr: "?members.role=Viewer&members.page=3&invitations.search=ops",
@@ -186,7 +186,7 @@ describe("what jump-to lists", () => {
     expect(toOf(narrowed)).toBe("/people/members/p1");
   });
 
-  it("keeps Members' list filters when asking Members for an action", () => {
+  it("keeps Members' list filters in an action's link", () => {
     const filtered = { pathname: "/people/members", searchStr: "?members.role=Editor" };
     const elsewhere = { pathname: "/people/groups", searchStr: "?groups.search=ops" };
     const toOf = (here: typeof filtered) =>
@@ -199,15 +199,15 @@ describe("what jump-to lists", () => {
   });
 });
 
-/** jsdom has none, and the dialog's list watches its own size with one. */
-class Unmeasured {
+/** jsdom has no ResizeObserver, and the dialog's list needs one. */
+class StubResizeObserver {
   observe = vi.fn<() => void>();
   unobserve = vi.fn<() => void>();
   disconnect = vi.fn<() => void>();
 }
 
 describe("choosing Invite a person in the app", () => {
-  // jsdom lays nothing out, and the list scrolls the chosen item into view.
+  // jsdom lacks scrollIntoView, which the list calls on the chosen item.
   beforeEach(() => {
     Object.defineProperty(Element.prototype, "scrollIntoView", {
       value: vi.fn<() => void>(),
@@ -221,7 +221,7 @@ describe("choosing Invite a person in the app", () => {
 
   it("keeps Members' list filters in the address", async () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
-    vi.stubGlobal("ResizeObserver", Unmeasured);
+    vi.stubGlobal("ResizeObserver", StubResizeObserver);
     const { router } = await openApp("/people/members?members.role=Editor");
     await screen.findByRole("button", { name: "Jump To" });
 
@@ -237,7 +237,7 @@ describe("choosing Invite a person in the app", () => {
 
 const MODELS_AND_SPEND = pageNamed(menuGroupIn(CONTROL_CENTRE, "models"), "Models and Spend");
 
-const jumpToOpened = async (): Promise<HTMLElement> => {
+const openJumpTo = async (): Promise<HTMLElement> => {
   fireEvent.keyDown(document, { key: "k", ctrlKey: true });
   return screen.findByRole("combobox", { name: JUMP_TO.name });
 };
@@ -245,18 +245,18 @@ const jumpToOpened = async (): Promise<HTMLElement> => {
 const optionNamed = (name: string | RegExp): Promise<HTMLElement> =>
   screen.findByRole("option", { name });
 
-const selection = (option: HTMLElement): string | null => option.getAttribute("aria-selected");
+const ariaSelected = (option: HTMLElement): string | null => option.getAttribute("aria-selected");
 
-describe("what jump-to reads in the app", () => {
+describe("jump-to in the app", () => {
   placedWithoutMeasuring();
 
-  it("hides People from a Viewer, reading no members", async () => {
+  it("hides People from a Viewer without fetching members", async () => {
     const api = adaAnAdmin();
     api.set("session.member", () => adaAt("Viewer"));
     await openAt(HOMES.Viewer.path, api);
     const user = userEvent.setup();
 
-    const input = await jumpToOpened();
+    const input = await openJumpTo();
     await optionNamed(/^Ask$/);
     await user.type(input, "people");
 
@@ -272,24 +272,24 @@ describe("what jump-to reads in the app", () => {
     expect(input.getAttribute("placeholder")).not.toMatch(/member|action/i);
     expect(
       server.asks.map((ask) => ask.procedure),
-      "a Viewer's jump-to asked for the members",
+      "jump-to fetched members for a Viewer",
     ).not.toContain("members.list");
   });
 
-  it("opens a member who loads after the search row", async () => {
+  it("opens a member whose result arrives after the search option", async () => {
     const api = anAdminOver([ADA, PRIYA_LISTED, SAM]);
     const router = await openAt(MODELS_AND_SPEND.path, api);
-    const members = heldBack(api, "members.list");
+    const members = holdProcedure(api, "members.list");
     const user = userEvent.setup();
 
-    const input = await jumpToOpened();
+    const input = await openJumpTo();
     await user.type(input, "priya");
     await members.asked;
-    expect(selection(await optionNamed(searchFor("priya")))).toBe("true");
+    expect(ariaSelected(await optionNamed(searchFor("priya")))).toBe("true");
 
     members.resolve();
     const priya = await optionNamed(new RegExp(PRIYA_LISTED.displayName));
-    await waitFor(() => expect(selection(priya)).toBe("true"));
+    await waitFor(() => expect(ariaSelected(priya)).toBe("true"));
     await user.keyboard("{Enter}");
 
     await waitFor(() =>
@@ -299,7 +299,7 @@ describe("what jump-to reads in the app", () => {
   });
 });
 
-describe("what typing leaves", () => {
+describe("filtering jump-to by typed text", () => {
   it("finds no People page for a Viewer typing people", () => {
     expect(matching(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT), "people")).toEqual([]);
   });
@@ -316,7 +316,7 @@ describe("what typing leaves", () => {
     ]);
   });
 
-  it("finds a member by name or address, every word counting", () => {
+  it("finds a member by name or address, matching every word", () => {
     const groups = jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS], AT_ROOT);
 
     expect(outline(matching(groups, "shah priya"))).toEqual([["Members", ["Priya Shah"]]]);
@@ -328,38 +328,38 @@ describe("what typing leaves", () => {
   });
 });
 
-describe("what jump-to offers to search", () => {
+describe("jump-to's search option", () => {
   const offered = (group: JumpGroup | undefined) =>
     group === undefined
       ? undefined
       : [group.heading, group.jumps.map((jump) => [jump.name, jump.to])];
 
-  it("asks Search for what was typed", () => {
+  it("links to Search with the typed text", () => {
     expect(offered(searchGroup(treeOf("Viewer"), "audit logs", AT_ROOT))).toEqual([
       "Knowledge",
-      [["Search for “audit logs”", "/knowledge/search?search=audit+logs"]],
+      [[searchFor("audit logs"), "/knowledge/search?search=audit+logs"]],
     ]);
   });
 
-  it("offers no search with nothing typed", () => {
+  it("is absent when nothing is typed", () => {
     expect(searchGroup(treeOf("Viewer"), "", AT_ROOT)).toBeUndefined();
   });
 
-  it("offers no search for spaces alone", () => {
+  it("is absent when only spaces are typed", () => {
     expect(searchGroup(treeOf("Viewer"), "  \t ", AT_ROOT)).toBeUndefined();
   });
 
-  it("offers no search to a reader with no Search", () => {
+  it("is absent for a reader without the Search page", () => {
     const operators = visibleTo(readerOf("operator"), [CONSOLE]);
 
     expect(searchGroup(treeOf("Admin", STUB), "audit logs", AT_ROOT)).toBeUndefined();
     expect(searchGroup(operators, "audit logs", AT_ROOT)).toBeUndefined();
   });
 
-  it("drops the spaces around what was typed", () => {
+  it("trims spaces around the typed text", () => {
     expect(offered(searchGroup(treeOf("Admin"), "  audit logs ", AT_ROOT))).toEqual([
       "Knowledge",
-      [["Search for “audit logs”", "/knowledge/search?search=audit+logs"]],
+      [[searchFor("audit logs"), "/knowledge/search?search=audit+logs"]],
     ]);
   });
 
@@ -367,45 +367,45 @@ describe("what jump-to offers to search", () => {
     ["1.50", "%221.50%22"],
     ["1e3", "%221e3%22"],
     ['"audit logs"', "%22%5C%22audit+logs%5C%22%22"],
-  ])("asks for %s whole, though it reads as JSON", (typed, held) => {
-    const asked = searchGroup(treeOf("Viewer"), typed, AT_ROOT)?.jumps.map((jump) => jump.to);
+  ])("searches for %s as text, not as JSON", (typed, encoded) => {
+    const links = searchGroup(treeOf("Viewer"), typed, AT_ROOT)?.jumps.map((jump) => jump.to);
 
-    expect(asked).toEqual([`/knowledge/search?search=${held}`]);
+    expect(links).toEqual([`/knowledge/search?search=${encoded}`]);
   });
 
-  it("asks for no more than Search takes", () => {
-    const asked = offered(searchGroup(treeOf("Viewer"), `${"a".repeat(500)}bcd`, AT_ROOT));
+  it("truncates the typed text to Search's length limit", () => {
+    const option = offered(searchGroup(treeOf("Viewer"), `${"a".repeat(500)}bcd`, AT_ROOT));
 
-    expect(asked?.[1]).toEqual([
-      [`Search for “${"a".repeat(500)}”`, `/knowledge/search?search=${"a".repeat(500)}`],
+    expect(option?.[1]).toEqual([
+      [searchFor("a".repeat(500)), `/knowledge/search?search=${"a".repeat(500)}`],
     ]);
   });
 
-  it("keeps Search's own query when asked from Search", () => {
+  it("keeps Search's own query when opened on Search", () => {
     const onSearch = { pathname: "/knowledge/search", searchStr: "?knowledge.search=forklift" };
 
     expect(offered(searchGroup(treeOf("Editor"), "audit", onSearch))?.[1]).toEqual([
-      ["Search for “audit”", "/knowledge/search?knowledge.search=forklift&search=audit"],
+      [searchFor("audit"), "/knowledge/search?knowledge.search=forklift&search=audit"],
     ]);
   });
 });
 
-describe("what the dialog's outcome line says", () => {
-  it("says the members are loading, never that nothing matches", () => {
+describe("jump-to's status lines", () => {
+  it("shows members loading instead of no matches", () => {
     expect(linesOf("pending", 0, "zzz")).toEqual({ said: JUMP_TO.membersLoading });
   });
 
-  it("says nothing matches once every group has loaded", () => {
+  it("shows no matches once every group has loaded", () => {
     expect(linesOf("read", 0, " zzz ")).toEqual({ said: nothingMatches("zzz") });
     expect(linesOf("unasked", 0, "zzz")).toEqual({ said: nothingMatches("zzz") });
   });
 
-  it("says nothing while something matches", () => {
+  it("is empty while something matches", () => {
     expect(linesOf("read", 3, "pri")).toEqual({});
     expect(linesOf("read", 9, "")).toEqual({});
   });
 
-  it("refuses a failed read beside what still matches", () => {
+  it("shows a failed members read alongside remaining matches", () => {
     expect(linesOf("failed", 2, "inv")).toEqual({ refused: JUMP_TO.membersUnread });
     expect(linesOf("failed", 0, "zzz")).toEqual({
       said: nothingMatches("zzz"),
@@ -413,16 +413,16 @@ describe("what the dialog's outcome line says", () => {
     });
   });
 
-  it("promises a Viewer pages, an Admin members and actions too", () => {
+  it("mentions pages to Viewers, plus members and actions to Admins", () => {
     const { page, member, action } = JUMP_TO.kinds;
-    const forAViewer = findWhat([page]);
-    const forAnAdmin = findWhat([page, member, action]);
-    const placed = [page, member, action].map((kind) => forAnAdmin.indexOf(kind));
+    const viewerPrompt = findWhat([page]);
+    const adminPrompt = findWhat([page, member, action]);
+    const positions = [page, member, action].map((kind) => adminPrompt.indexOf(kind));
 
-    expect(forAViewer).toContain(page);
-    expect(forAViewer).not.toContain(member);
-    expect(forAViewer).not.toContain(action);
-    expect(placed).not.toContain(-1);
-    expect(placed).toEqual(placed.toSorted((one, next) => one - next));
+    expect(viewerPrompt).toContain(page);
+    expect(viewerPrompt).not.toContain(member);
+    expect(viewerPrompt).not.toContain(action);
+    expect(positions).not.toContain(-1);
+    expect(positions).toEqual(positions.toSorted((one, next) => one - next));
   });
 });

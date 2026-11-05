@@ -41,8 +41,8 @@ const playwrightIn = (tree: string, env: Readonly<Record<string, string>>): Prom
   });
 
 /**
- * In a throwaway tree that is the run's workspace. A spec's import of Playwright resolves through
- * the link, to the instance running it.
+ * Runs Playwright in a throwaway tree used as the run's workspace. Specs import Playwright through a
+ * link to the running instance.
  */
 export const playwrightOver = async (
   files: Readonly<Record<string, string>>,

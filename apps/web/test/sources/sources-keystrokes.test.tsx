@@ -1,7 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { SELECT_A_CONNECTED_SOURCE_FIRST } from "@/features/sources/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
   aConnectedSource,
@@ -20,39 +19,44 @@ placedWithoutMeasuring();
 
 const keystrokesButton = () => screen.getByRole("button", { name: "Keyboard Shortcuts" });
 
+const messagesShown = () =>
+  within(connectedSourcesRegion())
+    .getAllByRole("status")
+    .filter((status) => /\S/v.test(status.textContent));
+
 describe("the Sources page's keystrokes", () => {
-  it("drops the select-first line once a key acts", async () => {
+  it("clears the select-a-source message once a key acts", async () => {
     await openSources(anAdminWith(aConnectedSource("Supplier forms")));
     const row = await rowOf("Supplier forms");
-    const said = () =>
-      within(connectedSourcesRegion()).queryAllByText(SELECT_A_CONNECTED_SOURCE_FIRST);
+    const atRest = messagesShown().length;
     keystrokesButton().focus();
 
     press("n");
-    expect(said(), "n with no connected source in focus said nothing").toHaveLength(1);
+    expect(messagesShown(), "n with no source in focus showed no message").toHaveLength(atRest + 1);
 
     rowAction(row, "narrow").focus();
     press("n");
     expect(rowAction(row, "narrow").getAttribute("aria-expanded")).toBe("true");
-    expect(said(), "the select-first line outlived the narrow").toHaveLength(0);
+    expect(messagesShown(), "the message stayed after n opened the Narrow panel").toHaveLength(
+      atRest,
+    );
   });
 
-  it("acts on no source by key once focus leaves", async () => {
+  it("ignores action keys when no source has focus", async () => {
     await openSources(anAdminWith(aConnectedSource("Supplier forms")));
     const row = await rowOf("Supplier forms");
-    const saying = () =>
-      within(connectedSourcesRegion())
-        .getAllByRole("status")
-        .filter((status) => /\S/v.test(status.textContent));
-    const atRest = saying().length;
+    const atRest = messagesShown().length;
     rowAction(row, "review").focus();
     keystrokesButton().focus();
 
     for (const key of ["r", "p", "n", "w"]) press(key);
 
-    expect(screen.queryByRole("dialog"), "a key published a source not in focus").toBeNull();
+    expect(
+      screen.queryByRole("dialog"),
+      "p opened the Publish dialog with no source in focus",
+    ).toBeNull();
     expect(reviewOf("Supplier forms")).toBeNull();
-    expect(saying(), "a key with no connected source in focus said nothing").toHaveLength(
+    expect(messagesShown(), "the keys showed no message, or more than one").toHaveLength(
       atRest + 1,
     );
     for (const action of ["narrow", "widen"] as const) {

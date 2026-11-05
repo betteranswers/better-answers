@@ -5,27 +5,27 @@ import {
   addMember,
   anAddress,
   avatarOf,
-  memberUnreadUntil,
+  failMemberReadUntil,
   person,
   provision,
   signIn,
 } from "../harness.ts";
 import { MEMBERS_PAGE, memberRows, outcomeOf, selectionAction, tickOf } from "../people-pages.ts";
 
-const removedThroughTheBar = async (page: Page, titled: string): Promise<void> => {
+const removeSelectedMembers = async (page: Page, dialogName: string): Promise<void> => {
   await selectionAction(page, "Remove").click();
   await page
-    .getByRole("dialog", { name: titled })
+    .getByRole("dialog", { name: dialogName })
     .getByRole("button", { name: "Remove", exact: true })
     .click();
 };
 
-const removedThemselfThroughTheBar = async (page: Page): Promise<void> => {
+const removeSelf = async (page: Page): Promise<void> => {
   await tickOf(page, "Test person").check();
-  await removedThroughTheBar(page, "Remove 1 Member");
+  await removeSelectedMembers(page, "Remove 1 Member");
 };
 
-const anAdminBesideAnotherAtPeople = async (
+const signInAsOneOfTwoAdmins = async (
   page: Page,
   api: APIRequestContext,
   workspaceName: string,
@@ -40,12 +40,12 @@ const anAdminBesideAnotherAtPeople = async (
   return workspace;
 };
 
-test.describe("bulk actions on the members ticked", () => {
+test.describe("bulk actions on selected members", () => {
   test("self-removal waits for the Admin's role, then opens Your Workspaces", async ({
     page,
     request,
   }) => {
-    const workspace = await anAdminBesideAnotherAtPeople(page, request, "Esk Cordage");
+    const workspace = await signInAsOneOfTwoAdmins(page, request, "Esk Cordage");
     for (const name of ["Ure Cordage", "Nidd Cordage"]) {
       const other = await provision(request, { name });
       await addMember(request, {
@@ -54,8 +54,8 @@ test.describe("bulk actions on the members ticked", () => {
         role: "Viewer",
       });
     }
-    const read = Promise.withResolvers<void>();
-    await memberUnreadUntil(page, read.promise);
+    const memberLoad = Promise.withResolvers<void>();
+    await failMemberReadUntil(page, memberLoad.promise);
     await page.reload();
     await expect(memberRows(page)).toHaveCount(2);
 
@@ -64,16 +64,16 @@ test.describe("bulk actions on the members ticked", () => {
     await selectionAction(page, "Remove").click();
     await expect(
       outcomeOf(page),
-      "Remove showed no message while the Admin's role loaded",
+      "clicking Remove showed no status while the Admin's role loaded",
     ).toHaveText(/\S/);
     await expect(
       page.getByRole("dialog"),
       "a confirmation opened before the Admin's role loaded",
     ).toHaveCount(0);
-    read.resolve();
+    memberLoad.resolve();
     await expect(avatarOf(page, "Test person")).toBeVisible();
 
-    await removedThemselfThroughTheBar(page);
+    await removeSelf(page);
 
     await expect(page).toHaveURL(/\/choose-workspace$/);
   });

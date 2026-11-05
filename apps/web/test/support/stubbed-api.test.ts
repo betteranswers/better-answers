@@ -1,32 +1,32 @@
 import { describe, expect, it } from "vitest";
 
-import { heldBack, type Api } from "./stubbed-api.ts";
+import { holdProcedure, type Api } from "./stubbed-api.ts";
 
 const LIST = "members.list";
 
-const THE_LIST = { result: { data: ["Ada"] } };
+const LIST_RESPONSE = { result: { data: ["Ada"] } };
 
-const REFUSED = { error: { message: "forbidden" } };
+const ERROR_RESPONSE = { error: { message: "forbidden" } };
 
-const api = (): Api => new Map([[LIST, () => THE_LIST]]);
+const api = (): Api => new Map([[LIST, () => LIST_RESPONSE]]);
 
-const asked = (table: Api): Promise<unknown> => Promise.resolve(table.get(LIST)?.());
+const request = (table: Api): Promise<unknown> => Promise.resolve(table.get(LIST)?.());
 
-const aTurnLater = () =>
+const nextTask = () =>
   new Promise<void>((resolve) => {
     setTimeout(resolve);
   });
 
 const settled = async (answer: Promise<unknown>): Promise<boolean> =>
-  Promise.race([answer.then(() => true), aTurnLater().then(() => false)]);
+  Promise.race([answer.then(() => true), nextTask().then(() => false)]);
 
 describe("a held procedure", () => {
-  it("stays unanswered and pending until the test answers it", async () => {
+  it("stays pending until the test resolves it", async () => {
     const table = api();
-    const held = heldBack(table, LIST);
-    expect(held.pending, "pending before anything asked").toBe(false);
+    const held = holdProcedure(table, LIST);
+    expect(held.pending, "the procedure was pending before any request").toBe(false);
 
-    const answer = asked(table);
+    const answer = request(table);
     await held.asked;
 
     expect(held.pending).toBe(true);
@@ -34,15 +34,15 @@ describe("a held procedure", () => {
 
     held.resolve();
 
-    expect(await answer).toBe(THE_LIST);
+    expect(await answer).toBe(LIST_RESPONSE);
     expect(held.pending).toBe(false);
   });
 
-  it("answers every waiting ask with the answer it is given", async () => {
+  it("resolves every waiting request with the given response", async () => {
     const table = api();
-    const held = heldBack(table, LIST);
-    const first = asked(table);
-    const second = asked(table);
+    const held = holdProcedure(table, LIST);
+    const first = request(table);
+    const second = request(table);
 
     held.resolve({ result: { data: ["Grace"] } });
 
@@ -51,33 +51,33 @@ describe("a held procedure", () => {
     expect(held.asks).toBe(2);
   });
 
-  it("answers its own answer when it was given one", async () => {
+  it("resolves with the response passed to holdProcedure", async () => {
     const table = api();
-    const held = heldBack(table, LIST, { result: { data: [] } });
-    const answer = asked(table);
+    const held = holdProcedure(table, LIST, { result: { data: [] } });
+    const answer = request(table);
 
     held.resolve();
 
     expect(await answer).toEqual({ result: { data: [] } });
   });
 
-  it("answers a refusal when the test rejects it", async () => {
+  it("returns the error response when the test rejects it", async () => {
     const table = api();
-    const held = heldBack(table, LIST);
-    const answer = asked(table);
+    const held = holdProcedure(table, LIST);
+    const answer = request(table);
     await held.asked;
 
-    held.reject(REFUSED);
+    held.reject(ERROR_RESPONSE);
 
-    expect(await answer).toBe(REFUSED);
+    expect(await answer).toBe(ERROR_RESPONSE);
     expect(held.pending).toBe(false);
   });
 
-  it("leaves a procedure it does not hold answering at once", async () => {
+  it("lets other procedures respond immediately", async () => {
     const table = api();
-    table.set("members.invitations", () => THE_LIST);
-    heldBack(table, LIST);
+    table.set("members.invitations", () => LIST_RESPONSE);
+    holdProcedure(table, LIST);
 
-    expect(await Promise.resolve(table.get("members.invitations")?.())).toBe(THE_LIST);
+    expect(await Promise.resolve(table.get("members.invitations")?.())).toBe(LIST_RESPONSE);
   });
 });

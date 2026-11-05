@@ -5,7 +5,8 @@ type Json = string | number | boolean | null | readonly Json[] | { readonly [key
 
 const asJsonWritesIt = (value: string): Json => {
   const read: Json = z.json().parse(JSON.parse(value));
-  if (JSON.stringify(read) !== value) throw new SyntaxError(`${value} is not as JSON writes it`);
+  if (JSON.stringify(read) !== value)
+    throw new SyntaxError(`${value} is not in the form JSON.stringify writes`);
   return read;
 };
 

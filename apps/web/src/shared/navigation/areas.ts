@@ -427,7 +427,7 @@ export const CONSOLE = {
           seenBy: THE_OPERATOR,
         },
         {
-          name: "Names Waiting",
+          name: "Flagged Names",
           path: "/console/people/names-waiting",
           icon: "names",
           built: true,

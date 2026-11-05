@@ -42,7 +42,7 @@ const evidenceOf = (sources: z.output<typeof linksCase>["sources"]): Evidence =>
 
 const NOTHING_OPEN = { openerId: undefined, onOpen: () => undefined, inline: undefined };
 
-const drawn = async (
+const renderBody = async (
   body: string,
   evidence: Evidence,
   opening: Parameters<typeof ConceptBody>[0]["opening"] = NOTHING_OPEN,
@@ -105,11 +105,11 @@ const HANDBOOK = [
 const PRODUCT = "01J6NNNNNNNNNNNNNNNNNNNNNN";
 
 describe("a concept's body", () => {
-  it("resolves every links case's marks as the fixture says", async () => {
+  it("resolves the marks of every shared links fixture case", async () => {
     const resolved = [];
     for (const each of fixture.cases) {
       const evidence = evidenceOf(each.sources);
-      resolved.push({ case: each.case, marks: marksIn(await drawn(each.body, evidence)) });
+      resolved.push({ case: each.case, marks: marksIn(await renderBody(each.body, evidence)) });
       cleanup();
     }
 
@@ -126,7 +126,7 @@ describe("a concept's body", () => {
 
   it("names a mark by its source and opens it", async () => {
     const onOpen = vi.fn<(chosen: { openerId: string; source: number }) => void>();
-    const article = await drawn("Claims close within 30 days.[^a]", HANDBOOK, {
+    const article = await renderBody("Claims close within 30 days.[^a]", HANDBOOK, {
       ...NOTHING_OPEN,
       onOpen,
     });
@@ -138,8 +138,8 @@ describe("a concept's body", () => {
     expect(onOpen).toHaveBeenCalledWith({ openerId: mark.id, source: 0 });
   });
 
-  it("draws a mark whose source opens nothing as text", async () => {
-    const article = await drawn("Claims close within 30 days.[^a]", [
+  it("renders a mark without a locator as plain text", async () => {
+    const article = await renderBody("Claims close within 30 days.[^a]", [
       { id: "a", source: "Staff handbook" },
     ]);
 
@@ -147,7 +147,7 @@ describe("a concept's body", () => {
     expect(article.textContent).toBe("Claims close within 30 days.[1]");
   });
 
-  it("draws every mark as text where nothing opens them", async () => {
+  it("renders every mark as text without an opening handler", async () => {
     await openPages(
       {
         "/": () => (
@@ -164,7 +164,7 @@ describe("a concept's body", () => {
     expect(article.textContent).toBe("Claims close within 30 days.[1]");
   });
 
-  it("keeps the open mark drawn as its panel opens", async () => {
+  it("keeps focus on the mark when its panel opens", async () => {
     await openPages(
       {
         "/": () => (
@@ -179,7 +179,9 @@ describe("a concept's body", () => {
     fireEvent.click(mark);
 
     expect(mark.getAttribute("aria-expanded")).toBe("true");
-    expect(document.activeElement, "opening its panel drew the mark afresh").toBe(mark);
+    expect(document.activeElement, "opening the panel remounted the mark and lost focus").toBe(
+      mark,
+    );
   });
 
   it.each([
@@ -203,14 +205,14 @@ describe("a concept's body", () => {
       "> Kept seven years.[^a]\n\nMileage is paid at cost.",
       "<blockquote><p>Kept seven years.[1]</p><section>Clause 4.2</section></blockquote><p>Mileage is paid at cost.</p>",
     ],
-  ])("puts the panel under %s", async (_, body, drawnAs) => {
+  ])("places the panel after %s", async (_, body, expected) => {
     await openPages({ "/": () => <Opening body={body} /> }, ["/"]);
     fireEvent.click(screen.getByRole("button", { name: "Source 1: Staff handbook" }));
 
-    expect(blocksOf(screen.getByRole("article"))).toBe(drawnAs);
+    expect(blocksOf(screen.getByRole("article"))).toBe(expected);
   });
 
-  it("draws a table cell's panel under its whole table", async () => {
+  it("places a table cell's panel after the whole table", async () => {
     await openPages(
       {
         "/": () => (
@@ -224,7 +226,7 @@ describe("a concept's body", () => {
     fireEvent.click(screen.getByRole("button", { name: "Source 1: Staff handbook" }));
 
     const prose = screen.getByRole("article").firstElementChild;
-    assert(prose !== null, "the article holds its prose");
+    assert(prose !== null, "the article has no prose element");
     expect([...prose.children].map((block) => block.tagName)).toEqual(["DIV", "SECTION", "P"]);
     expect(prose.querySelector("table section")).toBeNull();
   });
@@ -235,8 +237,8 @@ describe("a concept's body", () => {
     ["quoted emphasis", '*"As agreed."*[^a]', "em", '"As agreed."'],
     ["struck words", "~~The old rule.~~[^a]", "del", "The old rule."],
     ["emphasis after it", "Kept.[^a]*(see the note)*", "em", "(see the note)"],
-  ])("keeps %s beside a mark", async (_, body, tag, words) => {
-    const article = await drawn(body, HANDBOOK);
+  ])("keeps %s next to a mark", async (_, body, tag, words) => {
+    const article = await renderBody(body, HANDBOOK);
 
     expect(article.querySelector(tag)?.textContent).toBe(words);
     expect(marksIn(article)).toEqual(["Source 1: Staff handbook"]);
@@ -254,15 +256,15 @@ describe("a concept's body", () => {
       `See https://better-answers.com/c/${PRODUCT}[^a] for tiers.`,
       `/knowledge/search/${PRODUCT}`,
     ],
-  ])("ends %s at the mark after it", async (_, body, address) => {
-    const article = await drawn(body, HANDBOOK);
+  ])("ends %s before the mark that follows", async (_, body, address) => {
+    const article = await renderBody(body, HANDBOOK);
 
     expect(within(article).getByRole("link").getAttribute("href")).toBe(address);
     expect(marksIn(article)).toEqual(["Source 1: Staff handbook"]);
   });
 
-  it("keeps a link definition's address when a mark ends it", async () => {
-    const article = await drawn(
+  it("keeps a link definition's URL when a mark follows it", async () => {
+    const article = await renderBody(
       "See [the rules][rules].\n\n[rules]: https://example.test/rules[^a]",
       HANDBOOK,
     );
@@ -276,8 +278,8 @@ describe("a concept's body", () => {
     ["written out", `<${OPENS}0${CLOSES}>`],
     ["as hexadecimal references", "&lt;&#xE000;0&#xe001;&gt;"],
     ["as decimal references", "<&#57344;0&#0057345;>"],
-  ])("draws no mark for a forged carrier, %s", async (_, forged) => {
-    const article = await drawn(
+  ])("renders no mark for forged marker characters %s", async (_, forged) => {
+    const article = await renderBody(
       `Claims close within 30 days.[^a] Forged here: ${forged}.`,
       HANDBOOK,
     );
@@ -286,14 +288,14 @@ describe("a concept's body", () => {
     expect(article.textContent).toBe("Claims close within 30 days.[1] Forged here: <0>.");
   });
 
-  it("reads a label as written, carrier characters included", async () => {
-    const article = await drawn(`Claims close within 30 days.[^a${OPENS}]`, HANDBOOK);
+  it("shows a footnote label containing marker characters as text", async () => {
+    const article = await renderBody(`Claims close within 30 days.[^a${OPENS}]`, HANDBOOK);
 
     expect(marksIn(article)).toEqual([]);
     expect(article.textContent).toBe("Claims close within 30 days.[^a]");
   });
 
-  it("moves between a footnote and its claim, address unchanged", async () => {
+  it("moves focus between footnote and claim without changing URL", async () => {
     const { router } = await openPages(
       {
         "/": () => (
@@ -320,7 +322,7 @@ describe("a concept's body", () => {
   });
 
   it("sends a concept IRI link to that concept's page", async () => {
-    const article = await drawn(
+    const article = await renderBody(
       `See [the product](https://better-answers.com/c/${PRODUCT}) for tiers.`,
       [],
     );
@@ -330,16 +332,16 @@ describe("a concept's body", () => {
     );
   });
 
-  it("keeps a mail address the file wrote", async () => {
-    const article = await drawn("Ask [the records team](mailto:records@example.test).", []);
+  it("keeps a mailto link", async () => {
+    const article = await renderBody("Ask [the records team](mailto:records@example.test).", []);
 
     expect(
       within(article).getByRole("link", { name: "the records team" }).getAttribute("href"),
     ).toBe("mailto:records@example.test");
   });
 
-  it("keeps a web link the file wrote, and no referrer", async () => {
-    const article = await drawn("See [the regulator](https://example.test/regulator).", []);
+  it("keeps a web link and sends no referrer", async () => {
+    const article = await renderBody("See [the regulator](https://example.test/regulator).", []);
     const link = within(article).getByRole("link", { name: "the regulator" });
 
     expect(link.getAttribute("href")).toBe("https://example.test/regulator");
@@ -348,18 +350,18 @@ describe("a concept's body", () => {
 
   it.each([
     ["a script link", "[the rates](javascript:alert(1))"],
-    ["a file beside it", "[the rates](rates.md)"],
-    ["a place on this site", "[the rates](/people/members)"],
-    ["another site without its scheme", "[the rates](//example.test/rates)"],
-  ])("draws %s as its words alone", async (_, link) => {
-    const article = await drawn(`See ${link}.`, []);
+    ["a relative file link", "[the rates](rates.md)"],
+    ["a link to an app path", "[the rates](/people/members)"],
+    ["a protocol-relative link", "[the rates](//example.test/rates)"],
+  ])("renders %s as plain text", async (_, link) => {
+    const article = await renderBody(`See ${link}.`, []);
 
     expect(within(article).queryAllByRole("link")).toEqual([]);
     expect(article.textContent).toBe("See the rates.");
   });
 
-  it("draws raw HTML as the text the file wrote", async () => {
-    const article = await drawn(
+  it("renders raw HTML as escaped text", async () => {
+    const article = await renderBody(
       'Before <script>alert(1)</script> and <a href="https://example.test/x">a link</a>.\n\n<iframe src="https://example.test/frame"></iframe>',
       [],
     );
@@ -369,15 +371,15 @@ describe("a concept's body", () => {
     expect(article.textContent).toContain('<iframe src="https://example.test/frame"></iframe>');
   });
 
-  it("draws an image as its alt text, fetching nothing", async () => {
-    const article = await drawn("![The approval flow](https://example.test/flow.png)", []);
+  it("renders an image as its alt text without fetching", async () => {
+    const article = await renderBody("![The approval flow](https://example.test/flow.png)", []);
 
     expect(article.querySelectorAll("img, picture, source, [src], [srcset]")).toHaveLength(0);
     expect(article.textContent).toBe("The approval flow");
   });
 
-  it("keeps a footnote naming no source under a Footnotes heading", async () => {
-    const article = await drawn(
+  it("lists a footnote without a source under Footnotes", async () => {
+    const article = await renderBody(
       "Mileage follows the rates policy.[^b]\n\n[^b]: Reviewed each April.",
       HANDBOOK,
     );
@@ -396,10 +398,10 @@ const TO_THE_COMMITTEE = "../roles/audit-committee.md";
 
 type BodyLinks = NonNullable<Parameters<typeof ConceptBody>[0]["bodyLinks"]>;
 
-const answering = (...addresses: readonly string[]): BodyLinks =>
+const resolvedToCommittee = (...addresses: readonly string[]): BodyLinks =>
   addresses.map((address) => ({ address, target: `https://better-answers.com/c/${COMMITTEE}` }));
 
-const drawnLinking = async (body: string, bodyLinks: BodyLinks) => {
+const renderBodyWithLinks = async (body: string, bodyLinks: BodyLinks) => {
   await openPages(
     {
       "/": () => (
@@ -418,11 +420,11 @@ const addressesIn = (article: HTMLElement): readonly (string | null)[] =>
     .queryAllByRole("link")
     .map((link) => link.getAttribute("href"));
 
-describe("a body's links to other concepts", () => {
-  it("draws an answered relative link to its concept's page", async () => {
-    const article = await drawnLinking(
+describe("a concept body's links to other concepts", () => {
+  it("links a resolved relative link to its concept page", async () => {
+    const article = await renderBodyWithLinks(
       `See the [Audit Committee](${TO_THE_COMMITTEE}).`,
-      answering(TO_THE_COMMITTEE),
+      resolvedToCommittee(TO_THE_COMMITTEE),
     );
 
     expect(
@@ -430,20 +432,20 @@ describe("a body's links to other concepts", () => {
     ).toBe("/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR");
   });
 
-  it("draws an unanswered link beside it as its words", async () => {
-    const article = await drawnLinking(
+  it("renders an unresolved link as plain text", async () => {
+    const article = await renderBodyWithLinks(
       `See the [Audit Committee](${TO_THE_COMMITTEE}) and [the rates](rates.md).`,
-      answering(TO_THE_COMMITTEE),
+      resolvedToCommittee(TO_THE_COMMITTEE),
     );
 
     expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
     expect(article.textContent).toBe("See the Audit Committee and the rates.");
   });
 
-  it("draws both links of an address written twice", async () => {
-    const article = await drawnLinking(
+  it("links both occurrences of a repeated link", async () => {
+    const article = await renderBodyWithLinks(
       `See [the committee](${TO_THE_COMMITTEE}), [again](${TO_THE_COMMITTEE}).`,
-      answering(TO_THE_COMMITTEE, TO_THE_COMMITTEE),
+      resolvedToCommittee(TO_THE_COMMITTEE, TO_THE_COMMITTEE),
     );
 
     expect(addressesIn(article)).toEqual([
@@ -452,35 +454,38 @@ describe("a body's links to other concepts", () => {
     ]);
   });
 
-  it("leaves an address's fragment off the page's address", async () => {
-    const article = await drawnLinking(
+  it("drops the fragment from the concept page URL", async () => {
+    const article = await renderBodyWithLinks(
       `See [its duties](${TO_THE_COMMITTEE}#duties).`,
-      answering(`${TO_THE_COMMITTEE}#duties`),
+      resolvedToCommittee(`${TO_THE_COMMITTEE}#duties`),
     );
 
     expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
   });
 
-  it("matches an address holding a letter beyond ASCII", async () => {
-    const article = await drawnLinking("See [the team](équipe.md).", answering("équipe.md"));
+  it("resolves a link with non-ASCII letters", async () => {
+    const article = await renderBodyWithLinks(
+      "See [the team](équipe.md).",
+      resolvedToCommittee("équipe.md"),
+    );
 
     expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
   });
 
-  it("keeps an encoded slash apart from a written one", async () => {
-    const article = await drawnLinking(
+  it("distinguishes an encoded slash from a literal slash", async () => {
+    const article = await renderBodyWithLinks(
       "See [the first](roles%2Fboard.md) and [the second](roles/board.md).",
-      answering("roles/board.md"),
+      resolvedToCommittee("roles/board.md"),
     );
 
     expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
     expect(within(article).getByRole("link", { name: "the second" })).toBeDefined();
   });
 
-  it("draws a reference link to the file its definition names", async () => {
-    const article = await drawnLinking(
+  it("resolves a reference link through its definition", async () => {
+    const article = await renderBodyWithLinks(
       "See [the board][b] and [its rates][r].\n\n[b]: ./board.md\n[r]: ./rates.md",
-      answering("./board.md"),
+      resolvedToCommittee("./board.md"),
     );
 
     expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
@@ -488,10 +493,10 @@ describe("a body's links to other concepts", () => {
     expect(article.textContent.trim()).toBe("See the board and its rates.");
   });
 
-  it("draws the body when an address does not decode", async () => {
-    const article = await drawnLinking(
+  it("renders the body when a link cannot be decoded", async () => {
+    const article = await renderBodyWithLinks(
       "See [the café](caf%E9.md), [the odd one](x%zz.md) and [the rates](100%.md).",
-      answering("100%.md"),
+      resolvedToCommittee("100%.md"),
     );
 
     expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
@@ -499,8 +504,8 @@ describe("a body's links to other concepts", () => {
     expect(article.textContent).toBe("See the café, the odd one and the rates.");
   });
 
-  it("ignores an entry whose target is no concept", async () => {
-    const article = await drawnLinking(
+  it("ignores a resolved link whose target is not a concept", async () => {
+    const article = await renderBodyWithLinks(
       "See [the rates](rates.md) and [the regulator](https://example.test/regulator).",
       [
         { address: "rates.md", target: "https://example.test/rates" },
@@ -512,27 +517,27 @@ describe("a body's links to other concepts", () => {
     expect(article.textContent).toBe("See the rates and the regulator.");
   });
 
-  it("keeps an answered image as its alt text", async () => {
-    const article = await drawnLinking(
+  it("renders a resolved image as its alt text", async () => {
+    const article = await renderBodyWithLinks(
       `![The committee's chart](${TO_THE_COMMITTEE})`,
-      answering(TO_THE_COMMITTEE),
+      resolvedToCommittee(TO_THE_COMMITTEE),
     );
 
     expect(article.querySelectorAll("a, img, [src]")).toHaveLength(0);
     expect(article.textContent).toBe("The committee's chart");
   });
 
-  it("keeps a footnote defined as an answered path a jump", async () => {
-    const article = await drawnLinking(
+  it("keeps a footnote with a resolved path as an anchor", async () => {
+    const article = await renderBodyWithLinks(
       `Mileage follows the rates policy.[^b]\n\n[^b]: ${TO_THE_COMMITTEE}`,
-      answering(TO_THE_COMMITTEE),
+      resolvedToCommittee(TO_THE_COMMITTEE),
     );
 
     const jump = within(article).getByRole("link", { name: "1" }).getAttribute("href");
-    assert(jump !== null, "the footnote mark is a jump");
-    const landing = article.querySelector(`[id="${jump.slice(1)}"]`);
+    assert(jump !== null, "the footnote mark has no href");
+    const footnote = article.querySelector(`[id="${jump.slice(1)}"]`);
 
     expect(addressesIn(article).filter((address) => !address?.startsWith("#"))).toEqual([]);
-    expect(landing?.textContent).toContain(TO_THE_COMMITTEE);
+    expect(footnote?.textContent).toContain(TO_THE_COMMITTEE);
   });
 });

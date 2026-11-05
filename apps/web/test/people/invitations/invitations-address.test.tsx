@@ -21,7 +21,7 @@ const statusAt = async (query: string) => {
 };
 
 describe("the Invitations tab's address", () => {
-  it("reads a status it was given", async () => {
+  it("reads the status from the address", async () => {
     expect(await statusAt("?invitations.status=expired")).toBe("expired");
   });
 

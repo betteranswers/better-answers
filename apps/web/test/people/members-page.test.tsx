@@ -35,7 +35,7 @@ const memberRows = () =>
 
 const rowOf = (name: string) => {
   const row = memberRows().find((each) => each.textContent.includes(name));
-  expect(row, `no row for ${name}`).toBeDefined();
+  expect(row, `the list has no row for ${name}`).toBeDefined();
   return row ?? document.body;
 };
 
@@ -85,7 +85,7 @@ describe("the People group's Members page", () => {
     expect(cellOf(SAM.displayName, "Joined")).toBe("17 April 2026");
   });
 
-  it("shows an Editor Members as not found, listing no one", async () => {
+  it("shows an Editor Page Not Found for Members", async () => {
     const api = theThree();
     api.set("session.member", () => adaAt("Editor"));
     api.set("members.list", () => read([PRIYA, SAM, TEST_PERSON, A_STRANGER]));

@@ -64,7 +64,7 @@ const markedInTheMenu = () =>
 
 const inTheBreadcrumb = () => within(screen.getByRole("navigation", { name: "Breadcrumb" }));
 
-describe("the concept page's way back", () => {
+describe("the concept page's back link", () => {
   it("goes back to Knowledge Base with its kind open", async () => {
     const router = await openAt(OPEN_KIND, aKnowledgeBaseApi());
 
@@ -118,7 +118,7 @@ describe("the concept page's way back", () => {
     expect(main.queryByRole("link", { name: "Back to Search" })).toBeNull();
     expect(
       main.getByRole("heading", { level: 1 }).textContent,
-      "the page titles itself for the group it was opened from",
+      "the heading names a different group from the one it opened from",
     ).toBe("Curation");
 
     fireEvent.click(main.getByRole("link", { name: "Back to All Knowledge" }));
@@ -146,7 +146,7 @@ describe("the concept page's way back", () => {
     );
   });
 
-  it("keeps naming Search for a concept opened by its address", async () => {
+  it("links back to Search for a concept opened by address", async () => {
     await openAt(`${SEARCH_PAGE.path}/${A_LEASE}`, aKnowledgeBaseApi());
 
     expect(await screen.findByRole("link", { name: "Back to Search" })).toBeDefined();

@@ -23,11 +23,11 @@ describe("the sign-in link's token", () => {
   });
 
   it.each([
-    ["missing", ""],
-    ["empty", "#"],
-    ["past what the api accepts", `#${"a".repeat(129)}`],
-    ["not letters and digits", `#${TOKEN.slice(1)}-`],
-  ])("reads none from a fragment %s", (_, fragment) => {
+    ["that is missing", ""],
+    ["that is empty", "#"],
+    ["over 128 characters", `#${"a".repeat(129)}`],
+    ["with other characters", `#${TOKEN.slice(1)}-`],
+  ])("finds no token in a fragment %s", (_, fragment) => {
     at(`/sign-in/link${fragment}`);
     expect(linkTokenOnThisPage()).toBeUndefined();
   });
@@ -43,12 +43,12 @@ describe("the sign-in link's token", () => {
   });
 });
 
-describe("the code typed where the person started", () => {
+describe("the code shown for another browser", () => {
   it("shows in two groups of three", () => {
     expect(codeShown("123456")).toBe("123 456");
   });
 
-  it("spells each digit apart for a screen reader", () => {
+  it("reads each digit separately to a screen reader", () => {
     expect(codeSpelled("123456")).toBe("1 2 3 4 5 6");
   });
 });

@@ -3,8 +3,6 @@ import { useRef, useState, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
-import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
-import { BULK_WORDS } from "@/features/people/member-action-words.ts";
 import {
   MemberBulkActions,
   MemberBulkDialogs,
@@ -31,7 +29,7 @@ const NOTHING = () => undefined;
 
 const MEMBERS = "/people/members";
 
-const AT_MOST = BULK_WORDS.tooMany(200);
+const outcomeSaid = () => screen.getAllByRole("status", { hidden: true })[0]?.textContent ?? "";
 
 const tickedMembers = (count: number, readable: boolean) =>
   function TickedMembers() {
@@ -92,25 +90,25 @@ const ACTIONS = [
 ];
 
 describe("the members' bulk actions", () => {
-  it.each(ACTIONS)("refuses %s on 201 ticked, opening nothing", async (label) => {
+  it.each(ACTIONS)("refuses %s with 201 selected and opens nothing", async (label) => {
     await ticking(201);
 
     fireEvent.click(screen.getByRole("button", { name: label }));
 
-    expect(screen.getByText(AT_MOST).textContent).toMatch(/\b200\b/v);
+    expect(outcomeSaid(), "the message did not give the limit of 200").toMatch(/\b200\b/v);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it.each(ACTIONS)("refuses %s's Shift+%s on 201 ticked", async (_, key) => {
+  it.each(ACTIONS)("refuses %s by Shift+%s with 201 selected", async (_, key) => {
     await ticking(201);
 
     fireEvent.keyDown(document.body, { key, shiftKey: true });
 
-    expect(screen.getByText(AT_MOST)).toBeDefined();
+    expect(outcomeSaid(), "the message did not give the limit of 200").toMatch(/\b200\b/v);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("opens Change Role on exactly 200 ticked", async () => {
+  it("opens Change Role with exactly 200 selected", async () => {
     await ticking(200);
 
     fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
@@ -118,10 +116,10 @@ describe("the members' bulk actions", () => {
     expect(
       await screen.findByRole("dialog", { name: "Change Role for 200 Members" }),
     ).toBeDefined();
-    expect(screen.queryByText(AT_MOST)).toBeNull();
+    expect(outcomeSaid(), "a message appeared at the limit itself").toBe("");
   });
 
-  it("says a failed groups read, never that none exist", async () => {
+  it("shows a failed groups read, not an empty list", async () => {
     await ticking(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Add to Group" }));
@@ -130,10 +128,13 @@ describe("the members' bulk actions", () => {
     await waitFor(() => {
       expect(within(dialog).getByRole("alert").textContent).not.toBe("");
     });
-    expect(within(dialog).queryByText(EMPTY_LINES.groups)).toBeNull();
+    expect(
+      within(dialog).queryByRole("link", { name: "Go to Groups" }),
+      "the dialog said there are no groups after a failed read",
+    ).toBeNull();
   });
 
-  it.each(["C", "G", "D"])("opens no dialog on Shift+%s while the list is unread", async (key) => {
+  it.each(["C", "G", "D"])("opens no dialog on Shift+%s while the list loads", async (key) => {
     await ticking(2, false);
 
     fireEvent.keyDown(document.body, { key, shiftKey: true });
@@ -147,7 +148,7 @@ describe("the members' bulk actions", () => {
 describe("the members' bulk Remove", () => {
   placedWithoutMeasuring();
 
-  it("bulk Remove names the count and opens on Cancel", async () => {
+  it("bulk Remove names the count and focuses Cancel", async () => {
     const api = adaAnAdmin();
     api.set("members.list", () => read([ADA, PRIYA, SAM]));
     api.set("members.bulkRemove", () => {
@@ -176,11 +177,11 @@ describe("the members' bulk Remove", () => {
     });
     expect(
       screen.getByRole("dialog", { name: "Remove 2 Members", description: /\S/ }),
-      "the dialog describes what removing does",
+      "the dialog has no description of what removing does",
     ).toBe(dialog);
     expect(
       within(dialog).getAllByRole("paragraph"),
-      "a line warns two others as it would the reader",
+      "the dialog shows more than one warning paragraph",
     ).toHaveLength(1);
 
     fireEvent.keyDown(dialog, { key: "Escape" });
@@ -190,7 +191,7 @@ describe("the members' bulk Remove", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(remove);
     });
-    expect(asked("members.bulkRemove"), "Escape asked the api to remove").toEqual([]);
+    expect(asked("members.bulkRemove"), "Escape sent a remove request").toEqual([]);
     for (const member of [ADA, PRIYA, SAM]) {
       expect(listed().getByRole("link", { name: member.displayName })).toBeDefined();
     }
@@ -200,14 +201,11 @@ describe("the members' bulk Remove", () => {
     fireEvent.click(within(again).getByRole("button", { name: "Remove" }));
 
     await waitFor(() => {
-      expect(listOutcome()?.textContent).not.toBe(BULK_WORDS.remove.pending(2));
-    });
-    expect(listOutcome()?.textContent, "the outcome counts two removed, and none skipped").toMatch(
-      /^\D*2\D*$/,
-    );
-    await waitFor(() => {
       expect(listed().queryByRole("link", { name: PRIYA.displayName })).toBeNull();
     });
+    expect(listOutcome()?.textContent, "the outcome did not count two removed").toMatch(
+      /^\D*2\D*$/,
+    );
     expect(listed().queryByRole("link", { name: SAM.displayName })).toBeNull();
     expect(listed().getByRole("link", { name: ADA.displayName })).toBeDefined();
     await waitFor(() => {

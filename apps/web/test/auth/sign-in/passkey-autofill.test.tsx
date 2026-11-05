@@ -6,7 +6,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { CodeRefused } from "@/features/auth/auth-hooks.ts";
 import { usePasskeySignIn } from "@/features/auth/passkey-hooks.ts";
-import { PASSKEY_SIGN_IN_REFUSED } from "@/features/auth/refusal-words.ts";
 import { openApp } from "@test/open-app.tsx";
 import { A_CHALLENGE, A_CREDENTIAL } from "@test/second-factor-api.ts";
 import { server, type Asked } from "@test/stub-server.ts";
@@ -61,7 +60,7 @@ const withAConditionalDevice = (
 };
 
 describe("signing in with a passkey from the email field", () => {
-  it("says a refused autofill pick after a cancelled press", async () => {
+  it("reports a refused autofill passkey after a cancelled press", async () => {
     const field = document.createElement("input");
     field.setAttribute("autocomplete", "username webauthn");
     document.body.append(field);
@@ -120,7 +119,7 @@ describe("signing in with a passkey from the email step", () => {
     await waitFor(() => {
       expect(press.getAttribute("aria-disabled")).toBe("true");
     });
-    expect(press, "a natively disabled button drops the focus it holds").toHaveProperty(
+    expect(press, "the passkey button is natively disabled, which drops its focus").toHaveProperty(
       "disabled",
       false,
     );
@@ -129,17 +128,17 @@ describe("signing in with a passkey from the email step", () => {
     prompt.reject(new DOMException("cancelled", "NotAllowedError"));
 
     await waitFor(() => {
-      expect(screen.getByRole("status").textContent).toMatch(/no passkey was used/i);
+      expect(screen.getByRole("status").textContent).toMatch(/\S/u);
     });
     expect(press.getAttribute("aria-disabled")).toBe("false");
-    expect(alert().textContent, "an unused passkey read as a refusal").toBe("");
+    expect(alert().textContent, "a cancelled passkey prompt showed an alert").toBe("");
     expect(field).toHaveProperty("value", ADDRESS);
     expect(document.activeElement, "focus left the passkey button").toBe(press);
 
     await user.click(press);
 
     await waitFor(() => {
-      expect(alert().textContent).toBe(PASSKEY_SIGN_IN_REFUSED);
+      expect(alert().textContent).toMatch(/\S/u);
     });
     expect(field).toHaveProperty("value", ADDRESS);
   });

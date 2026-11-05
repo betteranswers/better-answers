@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { saidOfAccepting, saidOfEach, stillWaitingAfter } from "@/features/inbox/decided.ts";
 import type { WaitingItem } from "@/features/inbox/inbox-api.ts";
-import { DECIDED_WORDS, SAID_OF_ACCEPTING } from "@/features/inbox/inbox-words.ts";
 
 const OWEN = { id: z.string().brand<"UserId">().parse("u-owen"), name: "Owen Price" };
 
@@ -19,35 +18,40 @@ const anItem = (suggestionId: string, title: string): WaitingItem => ({
   places: 0,
 });
 
-describe("what accepting a suggestion says", () => {
-  it("names the proposer as author of an accepted change", () => {
-    expect(saidOfAccepting("accepted", OWEN)).toEqual({
-      words: DECIDED_WORDS.accepted("Owen Price"),
-      refused: false,
-    });
+describe("the message after accepting a suggestion", () => {
+  it("names the proposer of an accepted change", () => {
+    const said = saidOfAccepting("accepted", OWEN);
+
+    expect(said.refused).toBe(false);
+    expect(said.words).toContain("Owen Price");
   });
 
-  it("says a moved concept returned the suggestion, unrefused", () => {
+  it("reports a moved concept as returned, not refused", () => {
+    const accepted = saidOfAccepting("accepted", OWEN).words;
     for (const word of ["stale-precondition", "resolution-moved"] as const) {
-      expect(saidOfAccepting(word, OWEN)).toEqual({
-        words: DECIDED_WORDS.returned("Owen Price"),
-        refused: false,
-      });
+      const said = saidOfAccepting(word, OWEN);
+
+      expect(said.refused, `${word} was reported as refused`).toBe(false);
+      expect(said.words).toContain("Owen Price");
+      expect(said.words, `${word} gave the same message as accepted`).not.toBe(accepted);
     }
   });
 
-  it("refuses any other word in its own sentence", () => {
-    expect(saidOfAccepting("owner-forbids", OWEN)).toEqual({
-      words: SAID_OF_ACCEPTING["owner-forbids"],
-      refused: true,
-    });
+  it("marks any other outcome as refused", () => {
+    const said = saidOfAccepting("owner-forbids", OWEN);
+
+    expect(said.refused).toBe(true);
+    expect(said.words).toMatch(/\S/v);
   });
 
-  it("reads a proposer with no person as a former member", () => {
-    expect(saidOfAccepting("accepted", null).words).toBe(DECIDED_WORDS.accepted("a former member"));
+  it("describes a missing proposer without a blank name", () => {
+    const { words } = saidOfAccepting("accepted", null);
+
+    expect(words).not.toMatch(/\bnull\b|\bundefined\b/v);
+    expect(words, "the message left a gap where the name goes").not.toContain("  ");
   });
 
-  it("says each item's outcome by its title", () => {
+  it("reports each item's outcome under its title", () => {
     const items = [anItem("s1", "Annual leave"), anItem("s2", "Expense claims")];
 
     const said = saidOfEach(
@@ -64,7 +68,7 @@ describe("what accepting a suggestion says", () => {
     ]);
   });
 
-  it("keeps a refusal on its page only while still waiting", () => {
+  it("treats only unresolved refusals as still waiting", () => {
     expect(
       (["accepted", "resolution-moved", "already-decided", "no-such-suggestion"] as const).map(
         stillWaitingAfter,

@@ -45,34 +45,34 @@ const modelChoicesSeeded = z.object({ seeded: z.number() });
 const codeSent = z.object({ code: z.string() });
 const linkSent = z.object({ token: z.string() });
 
-const ask = async <T>(
+const postToHarness = async <T>(
   api: APIRequestContext,
   path: string,
   body: unknown,
-  answer: z.ZodType<T>,
+  schema: z.ZodType<T>,
 ): Promise<T> => {
   const answered = await api.post(`${HARNESS}${path}`, { data: body });
   const why = answered.ok() ? "" : `: ${await answered.text()}`;
   expect(answered.ok(), `${path} answered ${answered.status()}${why}`).toBe(true);
-  return answer.parse(await answered.json());
+  return schema.parse(await answered.json());
 };
 
 export const provision = (api: APIRequestContext, input: { name: string; adminEmail?: string }) =>
-  ask(api, "/workspaces", input, aProvisionedWorkspace);
+  postToHarness(api, "/workspaces", input, aProvisionedWorkspace);
 
 export const person = (
   api: APIRequestContext,
   email: string,
   input: { displayName?: string } = {},
-) => ask(api, "/people", { email, ...input }, aPerson);
+) => postToHarness(api, "/people", { email, ...input }, aPerson);
 
 export const addMember = (
   api: APIRequestContext,
   input: { workspaceId: string; userId: string; role: "Admin" | "Editor" | "Viewer" },
-) => ask(api, "/members", input, memberAdded);
+) => postToHarness(api, "/members", input, memberAdded);
 
 export const endEverySignInAndToken = (api: APIRequestContext, userId: string) =>
-  ask(api, "/revocations", { userId }, credentialsRevoked);
+  postToHarness(api, "/revocations", { userId }, credentialsRevoked);
 
 const operatorMarked = z.object({ marked: z.boolean() });
 
@@ -80,7 +80,7 @@ export const markTheOperator = (
   api: APIRequestContext,
   email: string,
   change: "grant" | "revoke" = "grant",
-) => ask(api, "/operators", { email, change }, operatorMarked);
+) => postToHarness(api, "/operators", { email, change }, operatorMarked);
 const invitationWritten = z.object({ id: z.string() });
 
 /** The database stores Better Auth's spelling, "canceled". Specs use the glossary's spelling, "cancelled". */
@@ -98,7 +98,7 @@ export const invite = (
   },
 ) => {
   const { status, expiresAt, ...invited } = input;
-  return ask(
+  return postToHarness(
     api,
     "/invitations",
     {
@@ -116,7 +116,7 @@ export const enrolledWith = (
   api: APIRequestContext,
   email: string,
   codes: "saved" | "none" = "saved",
-) => ask(api, "/authenticators", { email, codes }, enrolled);
+) => postToHarness(api, "/authenticators", { email, codes }, enrolled);
 
 export const withAnAuthenticator = async (api: APIRequestContext, email: string) =>
   (await enrolledWith(api, email)).key;
@@ -159,7 +159,7 @@ export const catchClaudesRedirect = (page: Page) =>
     route.fulfill({
       status: 200,
       contentType: "text/html",
-      body: "<!doctype html><title>Claude</title><p>The assistant received the redirect.</p>",
+      body: "<!doctype html><title>Claude</title><p>Redirect received.</p>",
     }),
   );
 
@@ -193,7 +193,7 @@ export type SeedModelChoice = {
 export const seedModelChoices = (
   api: APIRequestContext,
   input: { workspaceId: string; modelChoices: readonly SeedModelChoice[] },
-) => ask(api, "/model-choices", input, modelChoicesSeeded);
+) => postToHarness(api, "/model-choices", input, modelChoicesSeeded);
 
 type Sensitivity = (typeof SENSITIVITIES)[number];
 
@@ -254,7 +254,7 @@ const seededConnectedSources = z.object({
 export const seedConnectedSources = (
   api: APIRequestContext,
   input: { workspaceId: string; connectedSources: readonly SeedConnectedSource[] },
-) => ask(api, "/connected-sources", input, seededConnectedSources);
+) => postToHarness(api, "/connected-sources", input, seededConnectedSources);
 
 type SeedCitedDocument = {
   readonly title: string;
@@ -303,7 +303,7 @@ const seededConcepts = z.object({
 export const seedConcepts = (
   api: APIRequestContext,
   input: { workspaceId: string; userId: string; concepts: readonly SeedConcept[] },
-) => ask(api, "/concepts", input, seededConcepts);
+) => postToHarness(api, "/concepts", input, seededConcepts);
 
 type SeedOwner = (
   | { readonly collection: string; readonly iri?: never }
@@ -315,14 +315,14 @@ const ownersNamed = z.object({ named: z.number() });
 export const nameOwners = (
   api: APIRequestContext,
   input: { workspaceId: string; userId: string; owners: readonly SeedOwner[] },
-) => ask(api, "/owners", input, ownersNamed);
+) => postToHarness(api, "/owners", input, ownersNamed);
 
 const manifestSeeded = z.object({ written: z.boolean() });
 
 export const seedManifest = (
   api: APIRequestContext,
   input: { workspaceId: string; userId: string },
-) => ask(api, "/manifest", input, manifestSeeded);
+) => postToHarness(api, "/manifest", input, manifestSeeded);
 
 const guideSeeded = z.object({
   guideId: z.string(),
@@ -342,7 +342,7 @@ const guideSeeded = z.object({
 export const seedGuide = (
   api: APIRequestContext,
   input: { workspaceId: string; userId: string; financeUserIds: readonly string[] },
-) => ask(api, "/guides", input, guideSeeded);
+) => postToHarness(api, "/guides", input, guideSeeded);
 
 const usageRead = z.object({
   usage: z.array(
@@ -361,7 +361,7 @@ const usageRead = z.object({
 export const usageOf = (
   api: APIRequestContext,
   input: { workspaceId: string; writeUpId: string },
-) => ask(api, "/usage", input, usageRead);
+) => postToHarness(api, "/usage", input, usageRead);
 
 type SeedIndexBatch = {
   readonly collection: string | null;
@@ -377,14 +377,14 @@ const indexSeeded = z.object({ seeded: z.number() });
 export const seedConceptIndex = (
   api: APIRequestContext,
   input: { workspaceId: string; batches: readonly SeedIndexBatch[] },
-) => ask(api, "/concept-index", input, indexSeeded);
+) => postToHarness(api, "/concept-index", input, indexSeeded);
 
 const editSuggested = z.object({ suggestionId: z.string(), setId: z.string() });
 
 export const seedEditSuggestion = (
   api: APIRequestContext,
   input: { workspaceId: string; userId: string; iri: string; title?: string; body?: string },
-) => ask(api, "/suggestions", input, editSuggested);
+) => postToHarness(api, "/suggestions", input, editSuggested);
 
 type SeedFlag = {
   readonly reason: (typeof FEEDBACK_REASONS)[number];
@@ -417,7 +417,7 @@ const seededQuestions = z.object({
 export const seedQuestions = (
   api: APIRequestContext,
   input: { workspaceId: string; records: readonly SeedRecord[] },
-) => ask(api, "/questions", input, seededQuestions);
+) => postToHarness(api, "/questions", input, seededQuestions);
 
 type ScriptedSentence = { readonly citing: string; readonly sentence: string };
 
@@ -430,10 +430,10 @@ export type AskingScript = {
 };
 
 export const scriptAsking = (api: APIRequestContext, script: AskingScript) =>
-  ask(api, "/asking", script, z.object({ scripted: z.literal(true) }));
+  postToHarness(api, "/asking", script, z.object({ scripted: z.literal(true) }));
 
 export const releaseTheModel = (api: APIRequestContext, workspaceId: string) =>
-  ask(api, "/asking/releases", { workspaceId }, z.object({ released: z.literal(true) }));
+  postToHarness(api, "/asking/releases", { workspaceId }, z.object({ released: z.literal(true) }));
 
 const modelCalls = z.object({ judge: z.number(), draft: z.number() });
 
@@ -451,7 +451,7 @@ const syncMoved = z.object({ jobId: z.string() });
 export const moveTheSync = (
   api: APIRequestContext,
   input: { workspaceId: string; to: "claimed" | "done" },
-) => ask(api, "/syncs", input, syncMoved);
+) => postToHarness(api, "/syncs", input, syncMoved);
 
 const groupsMade = z.object({ made: z.number() });
 
@@ -463,33 +463,33 @@ export const makeGroups = (
     names: readonly string[];
     memberIds?: readonly string[];
   },
-) => ask(api, "/groups", input, groupsMade);
+) => postToHarness(api, "/groups", input, groupsMade);
 
 const nameFlagged = z.object({ flagged: z.literal(true) });
 
 export const flagTheName = (
   api: APIRequestContext,
   input: { workspaceId: string; adminId: string; personId: string },
-) => ask(api, "/name-flags", input, nameFlagged);
+) => postToHarness(api, "/name-flags", input, nameFlagged);
 
-const capturedFor = async <T>(
+const capturedByHarness = async <T>(
   api: APIRequestContext,
   path: string,
   email: string,
-  answer: z.ZodType<T>,
+  schema: z.ZodType<T>,
 ): Promise<T> => {
   const sent = await api.get(`${HARNESS}${path}?email=${encodeURIComponent(email)}`);
   expect(sent.ok(), `the test harness captured nothing at ${path} for this email address`).toBe(
     true,
   );
-  return answer.parse(await sent.json());
+  return schema.parse(await sent.json());
 };
 
 export const codeSentTo = async (api: APIRequestContext, email: string): Promise<string> =>
-  (await capturedFor(api, "/codes", email, codeSent)).code;
+  (await capturedByHarness(api, "/codes", email, codeSent)).code;
 
 export const linkSentTo = async (api: APIRequestContext, email: string): Promise<string> =>
-  (await capturedFor(api, "/links", email, linkSent)).token;
+  (await capturedByHarness(api, "/links", email, linkSent)).token;
 
 const emailsCounted = z.object({ sent: z.number() });
 
@@ -520,19 +520,19 @@ export const signInByEmail = async (
   await expect(code).toHaveCount(0);
 };
 
-const factorsRead = (page: Page) =>
+const expectSecondFactorChoices = (page: Page) =>
   expect(
     page
       .getByRole("link", { name: "Use a Recovery Code" })
       .or(page.getByRole("button", { name: "Set Up an Authenticator Instead" })),
   ).toBeVisible();
 
-const confirmedWithTheHarness = async (
+const confirmWithANewAuthenticator = async (
   page: Page,
   api: APIRequestContext,
   email: string,
 ): Promise<void> => {
-  await factorsRead(page);
+  await expectSecondFactorChoices(page);
   const key = await withAnAuthenticator(api, email);
   await page.goto(`/confirm${new URL(page.url()).search}`);
   await authenticatorCodeField(page).fill(authenticatorCodeAt(key, new Date()));
@@ -541,7 +541,7 @@ const confirmedWithTheHarness = async (
 
 const PENDING_PAGE = /^\/(?:confirm|setup)$/;
 
-const firstPageDrawn = async (page: Page): Promise<boolean> => {
+const needsSecondFactor = async (page: Page): Promise<boolean> => {
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   return PENDING_PAGE.test(new URL(page.url()).pathname);
 };
@@ -552,14 +552,14 @@ export const confirmedWhenAsked = async (
   email: string,
 ): Promise<void> => {
   await expect(page).toHaveURL(/\/(?:confirm|setup)(?:\?|$)/);
-  await firstPageDrawn(page);
-  await confirmedWithTheHarness(page, api, email);
+  await needsSecondFactor(page);
+  await confirmWithANewAuthenticator(page, api, email);
 };
 
 export const signIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
   await signInByEmail(page, api, email);
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/);
-  if (await firstPageDrawn(page)) await confirmedWithTheHarness(page, api, email);
+  if (await needsSecondFactor(page)) await confirmWithANewAuthenticator(page, api, email);
 };
 
 export const signedInAtHome = async (
@@ -620,9 +620,9 @@ export const signedInWithNoWorkspace = async (page: Page, api: APIRequestContext
   return signedIn;
 };
 
-const MEMBER_READ = "session.member";
+const MEMBER_PROCEDURE = "session.member";
 
-const A_FAILED_READ = {
+const SERVER_ERROR_RESPONSE = {
   error: {
     message: "INTERNAL_SERVER_ERROR",
     code: -32_603,
@@ -630,19 +630,19 @@ const A_FAILED_READ = {
   },
 };
 
-export const memberUnreadUntil = async (page: Page, landed: Promise<void>): Promise<void> => {
-  let theShellsReadToDrop = true;
+export const failMemberReadUntil = async (page: Page, landed: Promise<void>): Promise<void> => {
+  let isFirstMemberRead = true;
   await page.route(
-    (url) => askedAt(url.href).includes(MEMBER_READ),
+    (url) => askedAt(url.href).includes(MEMBER_PROCEDURE),
     async (route) => {
       const asked = askedAt(route.request().url());
-      if (theShellsReadToDrop) {
-        theShellsReadToDrop = false;
+      if (isFirstMemberRead) {
+        isFirstMemberRead = false;
         await route.abort();
         return;
       }
-      const theLoneRetryToHold = asked.length === 1;
-      if (theLoneRetryToHold) {
+      const isMemberRetry = asked.length === 1;
+      if (isMemberRetry) {
         await landed;
         await route.continue();
         return;
@@ -651,7 +651,9 @@ export const memberUnreadUntil = async (page: Page, landed: Promise<void>): Prom
       const answers = z.array(z.unknown()).parse(await answered.json());
       await route.fulfill({
         response: answered,
-        json: answers.map((answer, at) => (asked[at] === MEMBER_READ ? A_FAILED_READ : answer)),
+        json: answers.map((answer, at) =>
+          asked[at] === MEMBER_PROCEDURE ? SERVER_ERROR_RESPONSE : answer,
+        ),
       });
     },
   );

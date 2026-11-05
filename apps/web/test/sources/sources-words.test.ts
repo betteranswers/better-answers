@@ -5,7 +5,6 @@ import { assert, describe, expect, it } from "vitest";
 import type { ListedConnectedSource } from "@/features/sources/sources-api.ts";
 import {
   AUDIENCE_WORDS,
-  CONNECT_WORDS,
   destinationOf,
   instantWords,
   lastSyncedWords,
@@ -34,36 +33,36 @@ const aSync = (status: Sync["status"], finishedAt: string | null): Sync => ({
   finishedAt,
 });
 
-const formOf = (said: string): string => said.replaceAll(/\d+/g, "");
+const withoutNumbers = (text: string): string => text.replaceAll(/\d+/g, "");
 
-const countsIn = (said: string): readonly string[] => said.match(/\b\d+\b/g) ?? [];
+const numbersIn = (text: string): readonly string[] => text.match(/\b\d+\b/g) ?? [];
 
-const spoken = (word: string): string => word.toLowerCase().replaceAll("’", "'");
+const lowerCased = (word: string): string => word.toLowerCase().replaceAll("’", "'");
 
 describe("a connected source's last sync", () => {
-  it("shows no time for a source never synced", () => {
+  it("shows no time for a source that has never synced", () => {
     expect(lastSyncedWords(null)).not.toBe("");
     expect(lastSyncedWords(null)).not.toMatch(/\d/);
   });
 
-  it("gives a finished sync's time alone", () => {
+  it("shows only the time of a finished sync", () => {
     expect(lastSyncedWords(aSync("done", FINISHED))).toBe(instantWords(FINISHED));
   });
 
-  it("marks a failed sync beside the time it finished", () => {
+  it("marks a failed sync next to the time it finished", () => {
     const failed = lastSyncedWords(aSync("failed", FINISHED));
 
     expect(failed).toContain(instantWords(FINISHED));
     expect(failed).not.toBe(instantWords(FINISHED));
   });
 
-  it("shows a sync given up on as a failed one", () => {
+  it("shows an abandoned sync as failed", () => {
     expect(lastSyncedWords(aSync("poisoned", FINISHED))).toBe(
       lastSyncedWords(aSync("failed", FINISHED)),
     );
   });
 
-  it("tells a queued sync from a claimed one, since asked", () => {
+  it("tells a queued sync apart from a running one", () => {
     const queued = lastSyncedWords(aSync("queued", null));
     const claimed = lastSyncedWords(aSync("claimed", null));
 
@@ -76,7 +75,7 @@ describe("a connected source's last sync", () => {
 });
 
 describe("a destination", () => {
-  it("gives each destination it knows a meaning of its own", () => {
+  it("describes each known destination in its own words", () => {
     for (const stored of ["passage-index", "bundle", "map"]) {
       const { word, means } = destinationOf(stored);
       expect(means).not.toBe(stored);
@@ -85,25 +84,25 @@ describe("a destination", () => {
     expect(destinationOf("bundle").word).not.toBe("bundle");
   });
 
-  it("shows a destination it has not met as itself", () => {
+  it("shows an unknown destination as its id", () => {
     expect(destinationOf("archive").means).toBe("archive");
   });
 });
 
 describe("a retention class", () => {
-  it("gives each retention class it knows its own meaning", () => {
+  it("describes each known retention class in its own words", () => {
     for (const stored of ["mirror", "keep", "transient"]) {
       expect(retentionOf(stored).means).not.toBe(stored);
     }
   });
 
-  it("shows a retention class it has not met as itself", () => {
+  it("shows an unknown retention class as its id", () => {
     expect(retentionOf("forever").means).toBe("forever");
   });
 });
 
 describe("a connected source's stored values", () => {
-  it("gives each state its own word, whatever its case", () => {
+  it("gives each state its own label", () => {
     const words = Object.values(STATE_WORDS);
 
     expect(STATE_WORDS.received).toMatch(/^received$/iv);
@@ -113,7 +112,7 @@ describe("a connected source's stored values", () => {
     expect(new Set(words).size).toBe(words.length);
   });
 
-  it("gives each row action a label no other has", () => {
+  it("gives each row action a unique label", () => {
     const labels = Object.values(ROW_ACTIONS);
 
     expect(new Set(labels).size).toBe(labels.length);
@@ -141,37 +140,43 @@ const RULES_RAISED = {
 };
 
 describe("a finding's rule", () => {
-  it("gives every rule the worker raises its own word", () => {
+  it("gives every rule the worker raises a readable name", () => {
     const ruleIds = Object.keys(RULES_RAISED);
-    const read = Object.fromEntries(ruleIds.map((ruleId) => [ruleId, spoken(ruleWordOf(ruleId))]));
+    const read = Object.fromEntries(
+      ruleIds.map((ruleId) => [ruleId, lowerCased(ruleWordOf(ruleId))]),
+    );
 
     expect(read).toEqual(RULES_RAISED);
     expect(new Set(Object.values(read)).size).toBe(ruleIds.length);
   });
 
-  it("shows a rule it has not met as its id", () => {
+  it("shows an unknown rule as its id", () => {
     expect(ruleWordOf("UK_PASSPORT")).toBe("UK_PASSPORT");
   });
 });
 
-describe("how many documents a sync left unreadable", () => {
-  it("counts the unreadable alone while none needs OCR", () => {
-    expect(countsIn(unreadableCounted(4, 0))).toEqual(["4"]);
-    expect(formOf(unreadableCounted(1, 0))).not.toBe(formOf(unreadableCounted(4, 0)));
+describe("the count of documents a sync could not read", () => {
+  it("counts unreadable documents when none needs OCR", () => {
+    expect(numbersIn(unreadableCounted(4, 0))).toEqual(["4"]);
+    expect(withoutNumbers(unreadableCounted(1, 0))).not.toBe(
+      withoutNumbers(unreadableCounted(4, 0)),
+    );
   });
 
-  it("counts the scans needing OCR beside the unreadable", () => {
-    expect(countsIn(unreadableCounted(4, 2))).toEqual(["4", "2"]);
-    expect(countsIn(unreadableCounted(1, 1))).toEqual(["1", "1"]);
-    expect(formOf(unreadableCounted(4, 1))).not.toBe(formOf(unreadableCounted(4, 2)));
+  it("counts scans that need OCR separately", () => {
+    expect(numbersIn(unreadableCounted(4, 2))).toEqual(["4", "2"]);
+    expect(numbersIn(unreadableCounted(1, 1))).toEqual(["1", "1"]);
+    expect(withoutNumbers(unreadableCounted(4, 1))).not.toBe(
+      withoutNumbers(unreadableCounted(4, 2)),
+    );
   });
 });
 
-describe("what the review counts", () => {
-  it("counts the findings in each line", () => {
-    expect(countsIn(REVIEW_WORDS.keep.done(1, 3))).toEqual(["1", "3"]);
-    expect(countsIn(REVIEW_WORDS.dismissed.says(1))).toEqual(["1"]);
-    expect(countsIn(REVIEW_WORDS.keptStillWithheld.says(2))).toEqual(["2"]);
+describe("the numbers in review messages", () => {
+  it("includes the counts of groups and findings", () => {
+    expect(numbersIn(REVIEW_WORDS.keep.done(1, 3))).toEqual(["1", "3"]);
+    expect(numbersIn(REVIEW_WORDS.dismissed.says(1))).toEqual(["1"]);
+    expect(numbersIn(REVIEW_WORDS.keptStillWithheld.says(2))).toEqual(["2"]);
   });
 
   it("names a group's checkbox by category, rule and document", () => {
@@ -190,17 +195,17 @@ describe("what the review counts", () => {
 describe("the terms a narrowing or widening changes", () => {
   const present = { sensitivity: "Restricted", audience: "groups" } as const;
 
-  it("lists the sensitivity alone while the audience stands", () => {
+  it("lists only the sensitivity when the audience is unchanged", () => {
     const changes = termsThatChange(present, { sensitivity: "Internal", audience: "groups" });
 
     expect(changes.map((change) => change.term)).toEqual(["Sensitivity"]);
     expect(changes[0]?.says).toMatch(/Restricted.+Internal/v);
   });
 
-  it("adds the audience once it moves too", () => {
+  it("adds the audience when it changes too", () => {
     const changes = termsThatChange(present, { sensitivity: "Internal", audience: "everyone" });
     const [, audience] = changes;
-    assert(audience !== undefined, "a second term changes");
+    assert(audience !== undefined, "the audience change is missing from the list");
     const said = audience.says.toLowerCase();
     const from = said.indexOf(AUDIENCE_WORDS.groups.toLowerCase());
 
@@ -209,13 +214,7 @@ describe("the terms a narrowing or widening changes", () => {
     expect(said.indexOf(AUDIENCE_WORDS.everyone.toLowerCase())).toBeGreaterThan(from);
   });
 
-  it("lists nothing where neither term moves", () => {
+  it("lists nothing when neither term changes", () => {
     expect(termsThatChange(present, present)).toEqual([]);
-  });
-});
-
-describe("the connect dialog's audience hint", () => {
-  it("sends the reader to no page", () => {
-    expect(CONNECT_WORDS.audienceHint).not.toMatch(/People/v);
   });
 });

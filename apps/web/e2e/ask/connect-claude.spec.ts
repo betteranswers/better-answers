@@ -42,8 +42,8 @@ test("shows only app-wide shortcuts on Connect Claude and unknown pages", async 
   await landedAtHome(page, "Viewer");
   await page.getByRole("main").getByRole("link", { name: "connect Claude" }).click();
   await expect(page).toHaveURL(new RegExp(`${CONNECT_CLAUDE.path}$`));
-  const theShells = ["Show This List", "Jump To"];
-  const addsNoLine = "Keyboard Shortcuts added a line for a page with no shortcuts";
+  const appWideShortcuts = ["Show This List", "Jump To"];
+  const extraLineMessage = "Keyboard Shortcuts added a line for a page with no shortcuts";
 
   await test.step("renders Connect Claude within one second", async () => {
     const started = Date.now();
@@ -68,8 +68,8 @@ test("shows only app-wide shortcuts on Connect Claude and unknown pages", async 
       .getByRole("button", { name: "Keyboard Shortcuts" })
       .click();
     const onConnect = page.getByRole("dialog", { name: "Keyboard Shortcuts on Connect Claude" });
-    await expect(onConnect.getByRole("paragraph"), addsNoLine).toHaveCount(2);
-    await expect(onConnect.getByRole("definition")).toHaveText(theShells);
+    await expect(onConnect.getByRole("paragraph"), extraLineMessage).toHaveCount(2);
+    await expect(onConnect.getByRole("definition")).toHaveText(appWideShortcuts);
     await passesTheAccessibilityGate();
     await keystrokesDismissed(page, onConnect);
   });
@@ -78,8 +78,8 @@ test("shows only app-wide shortcuts on Connect Claude and unknown pages", async 
     await page.goto(HOMES.Admin.path);
     await expect(unknownPage(page)).toBeVisible();
     const onUnknown = await keystrokesListed(page, "This Page");
-    await expect(onUnknown.getByRole("paragraph"), addsNoLine).toHaveCount(2);
-    await expect(onUnknown.getByRole("definition")).toHaveText(theShells);
+    await expect(onUnknown.getByRole("paragraph"), extraLineMessage).toHaveCount(2);
+    await expect(onUnknown.getByRole("definition")).toHaveText(appWideShortcuts);
     await keystrokesDismissed(page, onUnknown);
   });
 });

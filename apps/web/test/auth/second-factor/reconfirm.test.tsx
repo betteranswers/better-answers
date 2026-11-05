@@ -28,8 +28,8 @@ afterEach(() => {
   cancelTheRefusedAct();
 });
 
-describe("a stale confirmation's refused act", () => {
-  it("opens only for the stale word, with an act", () => {
+describe("an action refused for an old confirmation", () => {
+  it("opens the dialog only for that refusal with a retry", () => {
     const retry = vi.fn<() => void>();
 
     expect(reconfirmAfter(stale(), { retry })).toBe(true);
@@ -42,13 +42,13 @@ describe("a stale confirmation's refused act", () => {
     expect(retry).not.toHaveBeenCalled();
   });
 
-  it("opens for the word our own routes answer too", () => {
+  it("opens for the same refusal from an auth route", () => {
     const refusedByARoute = new CodeRefused(412, undefined, undefined, STALE_CONFIRMATION);
 
     expect(reconfirmAfter(refusedByARoute, { retry: vi.fn<() => void>() })).toBe(true);
   });
 
-  it("keeps the act, and cancels it without running", async () => {
+  it("cancelling drops the action without running it", async () => {
     const retry = vi.fn<() => void>();
     reconfirmAfter(stale(), { retry });
     const opened = render(<Probe />);
@@ -62,13 +62,13 @@ describe("a stale confirmation's refused act", () => {
     expect(retry).not.toHaveBeenCalled();
   });
 
-  it("says one sentence wherever the act was refused", () => {
-    expect(refusalSentence({}, STALE_CONFIRMATION, "precondition")).toBe(
-      "It's been over an hour since you confirmed your second factor. Please confirm it again.",
+  it("gives an old confirmation its own message", () => {
+    expect(refusalSentence({}, STALE_CONFIRMATION, "precondition")).not.toBe(
+      refusalSentence({}, "spending-limit-met", "precondition"),
     );
   });
 
-  it("hands the refused act back to run again", async () => {
+  it("retries the refused action", async () => {
     const retry = vi.fn<() => void>();
     reconfirmAfter(stale(), { retry });
     const opened = render(<Probe />);

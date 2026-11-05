@@ -462,7 +462,7 @@ function useInFocusKeystrokes(properties: {
 
   useKeystroke(KEY.open, opening("member"));
   useKeystroke(KEY.changeRole, opening("role"));
-  useKeystroke(KEY.endEverySignInAndToken, opening("credentials"));
+  useKeystroke(KEY.signOut, opening("credentials"));
   useKeystroke(KEY.changeGroups, opening("groups"));
   useKeystroke(KEY.remove, opening("removal"));
   useKeystroke(KEY.flagName, opening("flag"));

@@ -7,7 +7,7 @@ import { carrying } from "@test/stubbed-api.ts";
 
 const retryPolicy = () => {
   const policy = createQueryClient().getDefaultOptions().queries?.retry;
-  if (typeof policy !== "function") throw new Error("the query client carries no retry policy");
+  if (typeof policy !== "function") throw new Error("the query client has no retry function");
   return policy;
 };
 
@@ -15,37 +15,37 @@ const ATTEMPTS_ALREADY_MADE = 0;
 
 const NOT_ANSWERED = new Error("the network went away");
 
-const hearing = () => {
-  const heard: FailedDuring[] = [];
+const clientRecordingFailures = () => {
+  const failures: FailedDuring[] = [];
   const client = createQueryClient((_, during) => {
-    heard.push(during);
+    failures.push(during);
   });
-  return { heard, client };
+  return { failures, client };
 };
 
-describe("the refusal the api sends the web", () => {
-  it("reads the word and its class off a refused read", () => {
-    const read = refusalOf(carrying({ refusal: { word: "no-such-binding", class: "absent" } }));
+describe("parsing an api refusal", () => {
+  it("returns the refusal word and its class", () => {
+    const refusal = refusalOf(carrying({ refusal: { word: "no-such-binding", class: "absent" } }));
 
-    expect(read).toEqual({ word: "no-such-binding", class: "absent" });
+    expect(refusal).toEqual({ word: "no-such-binding", class: "absent" });
   });
 
-  it("reads which fields a malformed input names", () => {
-    const read = refusalOf(
+  it("returns the invalid fields of a malformed input", () => {
+    const refusal = refusalOf(
       carrying({
         refusal: { word: "malformed", class: "malformed", fields: { sensitivity: "not-a-word" } },
       }),
     );
 
-    expect(read?.fields).toEqual({ sensitivity: "not-a-word" });
+    expect(refusal?.fields).toEqual({ sensitivity: "not-a-word" });
   });
 
-  it("reads nothing off a failure carrying no refusal", () => {
+  it("returns nothing for a failure without a refusal", () => {
     expect(refusalOf(carrying({ code: "INTERNAL_SERVER_ERROR" }))).toBeUndefined();
     expect(refusalOf(new Error("the network went away"))).toBeUndefined();
   });
 
-  it("infers every word the api registered from the router", () => {
+  it("infers every registered refusal word from the router", () => {
     expectTypeOf<"no-session">().toExtend<RefusalWord>();
     expectTypeOf<"no-active-workspace">().toExtend<RefusalWord>();
     expectTypeOf<"workspace-switched">().toExtend<RefusalWord>();
@@ -55,11 +55,11 @@ describe("the refusal the api sends the web", () => {
     expectTypeOf<"role-forbids">().toExtend<RefusalWord>();
     expectTypeOf<"widening-refused">().toExtend<RefusalWord>();
     expectTypeOf<"no-such-group">().toExtend<RefusalWord>();
-    // @ts-expect-error — a word no slice declared never crosses to the web.
+    // @ts-expect-error — an undeclared word is not a RefusalWord.
     expectTypeOf<"no-such-thing">().toExtend<RefusalWord>();
   });
 
-  it("knows the seven classes a word is sorted into", () => {
+  it("has exactly seven refusal classes", () => {
     expectTypeOf<RefusalClass>().toEqualTypeOf<
       | "unauthenticated"
       | "forbidden"
@@ -73,8 +73,8 @@ describe("the refusal the api sends the web", () => {
   });
 });
 
-describe("an action refused because the workspace was switched", () => {
-  it("shows its own sentence on a feature listing none", () => {
+describe("a workspace-switched refusal", () => {
+  it("has its own message when the feature lists none", () => {
     const sentence = refusalSentence({}, "workspace-switched", "conflict");
 
     expect(sentence).not.toBe(STOCK.changed);
@@ -82,30 +82,30 @@ describe("an action refused because the workspace was switched", () => {
   });
 });
 
-describe("what the web asks again", () => {
+describe("the retry policy", () => {
   it.each([
     ["unauthenticated", "no-session"],
     ["absent", "no-such-binding"],
     ["precondition", "not-indexed"],
-  ])("never asks again after a refusal in the %s class", (refusalClass, word) => {
-    const asked = retryPolicy()(
+  ])("does not retry a refusal in the %s class", (refusalClass, word) => {
+    const retries = retryPolicy()(
       ATTEMPTS_ALREADY_MADE,
       carrying({ refusal: { word, class: refusalClass } }),
     );
 
-    expect(asked).toBe(false);
+    expect(retries).toBe(false);
   });
 
-  it("asks again after a failure that is nobody's to fix", () => {
-    const asked = retryPolicy()(ATTEMPTS_ALREADY_MADE, new Error("the network went away"));
+  it("retries a failure that is not a refusal", () => {
+    const retries = retryPolicy()(ATTEMPTS_ALREADY_MADE, new Error("the network went away"));
 
-    expect(asked).toBe(true);
+    expect(retries).toBe(true);
   });
 });
 
-describe("what the web hears of a failure", () => {
-  it("hears a failed read as a read", async () => {
-    const { heard, client } = hearing();
+describe("the failure callback", () => {
+  it("reports a failed query as a read", async () => {
+    const { failures, client } = clientRecordingFailures();
 
     await client
       .query({
@@ -115,11 +115,11 @@ describe("what the web hears of a failure", () => {
       })
       .catch(() => undefined);
 
-    expect(heard).toEqual(["read"]);
+    expect(failures).toEqual(["read"]);
   });
 
-  it("hears a failed action as an action", async () => {
-    const { heard, client } = hearing();
+  it("reports a failed mutation as an action", async () => {
+    const { failures, client } = clientRecordingFailures();
 
     await client
       .getMutationCache()
@@ -127,6 +127,6 @@ describe("what the web hears of a failure", () => {
       .execute(undefined)
       .catch(() => undefined);
 
-    expect(heard).toEqual(["action"]);
+    expect(failures).toEqual(["action"]);
   });
 });

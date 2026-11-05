@@ -16,9 +16,9 @@ import {
 } from "../connected-sources.ts";
 import {
   clockTheNextKey,
-  saysARefusal,
+  alertHasText,
   type SeedConnectedSource,
-  theActionLandedWithinItsBudget,
+  actionWithinBudget,
 } from "../harness.ts";
 import { refusalAnswering } from "../refused-read.ts";
 
@@ -73,7 +73,7 @@ test.describe("connecting a document on the Sources page", () => {
     await dialog.getByRole("button", { name: "Connect", exact: true }).click();
 
     expect(await refused).toMatchObject({ word: "media-type-refused", class: "inapplicable" });
-    await saysARefusal(dialog.getByRole("alert"));
+    await alertHasText(dialog.getByRole("alert"));
     await expect(dialog).toBeVisible();
   });
 });
@@ -97,10 +97,10 @@ const SUPPLIER_FORMS: SeedConnectedSource = indexed("Supplier forms", {
 
 const HEALTH_CUE_RULE = "Health wording";
 
-const healthCueBoxIn = (title: string): string =>
-  `Select special category by ${HEALTH_CUE_RULE} in ${title}`;
+const healthCueCheckboxIn = (title: string): string =>
+  `Select special category findings in ${title} found by the ${HEALTH_CUE_RULE} rule`;
 
-const HEALTH_CUE_BOX = healthCueBoxIn("Staff survey");
+const HEALTH_CUE_CHECKBOX = healthCueCheckboxIn("Staff survey");
 
 const reviewOf = (page: Page, name: string) =>
   connectedSourceNamed(page, name).getByRole("region", { name: `Review of ${name}` });
@@ -222,7 +222,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
         reads: "Internal",
       });
       await page.keyboard.press("Enter");
-      await theActionLandedWithinItsBudget(page, "widen");
+      await actionWithinBudget(page, "widen");
 
       await expect(saidIn(page)).toHaveText(/Tender answers\D+Internal\D+\b1\b\D+\b1\b/);
       await expect(page.getByText(citedBy.iri)).toBeVisible();
@@ -238,7 +238,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       await rowAction(page, "Supplier forms", "review").click();
       await expect(reviewOf(page, "Supplier forms").getByRole("checkbox")).toHaveCount(3);
       await reviewOf(page, "Supplier forms")
-        .getByRole("checkbox", { name: HEALTH_CUE_BOX })
+        .getByRole("checkbox", { name: HEALTH_CUE_CHECKBOX })
         .click();
       await expect(
         reviewOf(page, "Supplier forms").getByRole("button", {

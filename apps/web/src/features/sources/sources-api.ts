@@ -67,10 +67,7 @@ export const usePreview = (connectedSourceId: string, enabled: boolean) => {
   return useQuery({ ...api.sources.preview.queryOptions({ connectedSourceId }), enabled });
 };
 
-/**
- * The one action whose input is bytes: its descriptor rides beside them, so it goes through the
- * tRPC client, not an options factory built once.
- */
+/** Connect uploads a file and sends its descriptor in headers, so it calls the tRPC client directly. */
 export const useConnect = () => {
   const api = useTRPC();
   const client = useTRPCClient();

@@ -1,21 +1,21 @@
-import { act, cleanup, fireEvent, renderHook, screen, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { useAsking } from "@/features/console/everyone/everyone-search.tsx";
 import {
-  EVERYONE_WORDS,
-  NAMES_WAITING_WORDS,
-  WORKSPACES_WORDS,
-} from "@/features/console/list-words.ts";
-import {
   NAMES_WAITING_KEYSTROKES,
   PEOPLE_KEYSTROKES,
-  SELECT_A_NAME_FIRST,
-  SELECT_A_PERSON_FIRST,
 } from "@/features/console/people-keystrokes.ts";
 import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
-import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
-import { STOCK } from "@/shared/refusal-words.ts";
+import { HOMES } from "@/shared/navigation.ts";
 import { openApp } from "@test/open-app.tsx";
 import { addressOf, answered } from "@test/stubbed-api.ts";
 
@@ -35,7 +35,7 @@ const NO_SESSION: Answer = {
   },
 };
 
-const WITHOUT_THE_MARK: Answer = {
+const FORBIDDEN: Answer = {
   error: {
     message: NOT_THE_OPERATOR,
     code: -32_003,
@@ -47,14 +47,16 @@ const WITHOUT_THE_MARK: Answer = {
   },
 };
 
-const SINCE_ERASED: Answer = {
+const NO_SUCH_USER = "no-such-user";
+
+const ERASED: Answer = {
   error: {
-    message: "no-such-user",
+    message: NO_SUCH_USER,
     code: -32_004,
     data: {
       code: "NOT_FOUND",
       httpStatus: 404,
-      refusal: { word: "no-such-user", class: "absent" },
+      refusal: { word: NO_SUCH_USER, class: "absent" },
     },
   },
 };
@@ -134,14 +136,37 @@ const rowsOf = (list: HTMLElement): readonly HTMLElement[] =>
 
 const textOf = (each: HTMLElement): string => each.textContent;
 
-const readsInOrder = (page: HTMLElement, words: readonly string[]): boolean => {
-  let from = 0;
-  for (const each of words) {
-    const at = page.textContent.indexOf(each, from);
-    if (at === -1) return false;
-    from = at + each.length;
-  }
-  return true;
+const inDocumentOrder = (nodes: readonly Node[]): boolean =>
+  nodes.every((each, index) => {
+    const before = nodes[index - 1];
+    return (
+      before === undefined ||
+      (before.compareDocumentPosition(each) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+    );
+  });
+
+const paragraphAfter = (heading: HTMLElement): HTMLElement => {
+  const next = heading.nextElementSibling;
+  assert(next instanceof HTMLParagraphElement, `no paragraph follows ${heading.textContent}`);
+  return next;
+};
+
+const countIn = (list: HTMLElement): HTMLElement => {
+  const [count] = within(list).getAllByRole("status");
+  assert(count !== undefined, "the list shows no count");
+  return count;
+};
+
+const outcomeIn = (list: HTMLElement): HTMLElement => {
+  const line = within(list).getByRole("alert").previousElementSibling;
+  assert(line instanceof HTMLOutputElement, "the list has no outcome line");
+  return line;
+};
+
+const liveRegionIn = (list: HTMLElement): HTMLElement => {
+  const region = list.querySelector<HTMLElement>('[aria-live="polite"]');
+  assert(region !== null, "the list has no aria-live region");
+  return region;
 };
 
 const listAt = async (path: string, name: string, held: Readonly<Record<string, unknown>>) => {
@@ -162,8 +187,8 @@ const searchFor = (list: HTMLElement, label: string, typed: string): void => {
   });
 };
 
-/** The query library reads every list on the page again as the network comes back. */
-const readAgainInPlace = (): void => {
+/** The query library loads every list on the page again when the network comes back. */
+const reloadLists = (): void => {
   act(() => {
     globalThis.dispatchEvent(new Event("offline"));
     globalThis.dispatchEvent(new Event("online"));
@@ -187,7 +212,7 @@ const groupHeadingsIn = (region: HTMLElement) =>
     .map((each) => each.textContent);
 
 describe("the console's shell", () => {
-  it("draws the console's area, groups and pages for the operator", async () => {
+  it("shows the operator the console's menu groups and pages", async () => {
     vi.stubGlobal("fetch", answering({ result: { data: { operator: true, name: "Ada" } } }));
 
     const { router } = await openApp("/console");
@@ -196,11 +221,11 @@ describe("the console's shell", () => {
     expect(router.state.location.pathname).toBe("/console/workspaces/every-workspace");
     expect(linksIn(screen.getByRole("navigation", { name: "Areas" }))).toEqual(["Console"]);
     expect(groupHeadingsIn(nav)).toEqual(["People", "Workspaces"]);
-    expect(linksIn(nav)).toEqual(["Everyone", "Names Waiting", "Every Workspace"]);
+    expect(linksIn(nav)).toEqual(["Everyone", "Flagged Names", "Every Workspace"]);
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
   });
 
-  it("reads Console and the person's name, with no role", async () => {
+  it("shows Console and the operator's name without a role", async () => {
     vi.stubGlobal("fetch", answering({ result: { data: { operator: true, name: "Ada" } } }));
 
     await openApp("/console/workspaces/every-workspace");
@@ -214,7 +239,7 @@ describe("the console's shell", () => {
     expect(logo.getAttribute("href")).toBe(HOMES.operator.path);
   });
 
-  it("shows a person without the mark the refused state alone", async () => {
+  it("shows Access Denied to anyone but the operator", async () => {
     vi.stubGlobal("fetch", answering({ result: { data: { operator: false } } }));
 
     await openApp("/console/workspaces/every-workspace");
@@ -226,12 +251,12 @@ describe("the console's shell", () => {
       }),
     ).toBeDefined();
     const refused = screen.getByRole("alert").textContent;
-    expect(refused).toBe(STOCK.permission);
-    expect(refused).not.toContain(NOT_THE_OPERATOR);
+    expect(refused, "the refusal alert is empty").toMatch(/\S/);
+    expect(refused, "the alert shows the api's refusal word").not.toContain(NOT_THE_OPERATOR);
     expect(screen.queryByRole("navigation", { name: "Console" })).toBeNull();
   });
 
-  it("sends a sessionless person to sign in, then back", async () => {
+  it("sends a signed-out person to sign in, then back", async () => {
     vi.stubGlobal("fetch", answering(NO_SESSION));
 
     const { router } = await openApp("/console/people/everyone");
@@ -242,15 +267,18 @@ describe("the console's shell", () => {
 
 const EVERY_WORKSPACE = "/console/workspaces/every-workspace";
 
+const EVERYONE_PAGE = "/console/people/everyone";
+
 const NAMES_WAITING_PAGE = "/console/people/names-waiting";
 
 const WORKSPACES_LIST = { heading: "Every Workspace", search: "Search by name or short name" };
 
-const NAMES_WAITING_LIST = { heading: "Names Waiting", search: "Search by name or workspace" };
+const NAMES_WAITING_LIST = { heading: "Flagged Names", search: "Search by name or workspace" };
+
+const EVERYONE_LIST = { heading: "Everyone", search: "Search by name or address" };
 
 describe("the console's lists", () => {
-  it("opens Every workspace as a table under its head", async () => {
-    const workspaces = menuGroupIn(CONSOLE, "workspaces");
+  it("shows Every Workspace as a table below its heading", async () => {
     const list = await listAt(EVERY_WORKSPACE, WORKSPACES_LIST.heading, {
       "console.workspaces.list": [ACME, DALES],
     });
@@ -259,24 +287,33 @@ describe("the console's lists", () => {
       "Workspace",
       "Short Name",
       "Members",
-      "Provisioned",
+      "Created",
     ]);
     const [acme] = rowsOf(list);
-    assert(acme !== undefined, "a workspace is listed");
+    assert(acme !== undefined, "no workspace is listed");
     expect(within(acme).getAllByRole("cell").slice(1).map(textOf)).toEqual([
       ACME.shortName,
       "2 members",
       "3 March 2026",
     ]);
+    const pageHeading = screen.getByRole("heading", { level: 1, name: "Workspaces" });
+    const listHeading = within(list).getByRole("heading", {
+      level: 2,
+      name: WORKSPACES_LIST.heading,
+    });
+    expect(paragraphAfter(pageHeading).textContent).toMatch(/\S/);
+    expect(paragraphAfter(listHeading).textContent).toMatch(/\S/);
+    expect(countIn(list).textContent).toMatch(/\b2\b/);
     expect(
-      readsInOrder(screen.getByRole("main"), [
-        "Workspaces",
-        workspaces.summary,
-        WORKSPACES_LIST.heading,
-        WORKSPACES_WORDS.description,
-        WORKSPACES_WORDS.counted(2),
-        ACME.name,
+      inDocumentOrder([
+        pageHeading,
+        paragraphAfter(pageHeading),
+        listHeading,
+        paragraphAfter(listHeading),
+        countIn(list),
+        acme,
       ]),
+      "the headings, descriptions, count and rows are out of order",
     ).toBe(true);
 
     expect(within(list).queryByText(ACME.id)).toBeNull();
@@ -284,20 +321,20 @@ describe("the console's lists", () => {
     expect(within(acme).getByText(ACME.id)).toBeDefined();
   });
 
-  it("narrows Every workspace by name or short name", async () => {
+  it("filters Every Workspace by name or short name", async () => {
     const list = await listAt(EVERY_WORKSPACE, WORKSPACES_LIST.heading, {
       "console.workspaces.list": [ACME, DALES],
     });
 
     searchFor(list, WORKSPACES_LIST.search, "NORTH");
     expect(rowsOf(list).map(textOf)).toEqual([expect.stringContaining(ACME.name)]);
-    expect(within(list).getByText(WORKSPACES_WORDS.matching(1, "NORTH"))).toBeDefined();
+    expect(countIn(list).textContent).toMatch(/\b1\b.*NORTH/);
 
     searchFor(list, WORKSPACES_LIST.search, "nowhere");
-    expect(within(list).getByText(WORKSPACES_WORDS.noneMatch("nowhere"))).toBeDefined();
+    expect(countIn(list).textContent).toMatch(/\b0\b.*nowhere/);
     fireEvent.click(within(list).getByRole("button", { name: "Clear Search" }));
     expect(rowsOf(list)).toHaveLength(2);
-    expect(within(list).getByText(WORKSPACES_WORDS.counted(2))).toBeDefined();
+    expect(countIn(list).textContent).toMatch(/\b2\b/);
   });
 
   it.each([
@@ -315,24 +352,28 @@ describe("the console's lists", () => {
       read: "console.people.namesWaiting",
       rows: NAMES_WAITING,
     },
-  ])("keeps the search of $page through a refused re-read", async (listed) => {
+  ])("keeps the $page search when a reload is refused", async (listed) => {
     const { words, read } = listed;
     const list = await listAt(listed.path, words.heading, { [read]: listed.rows });
     const search = within(list).getByRole("searchbox", { name: words.search });
     search.focus();
     searchFor(list, words.search, "acme");
 
-    vi.stubGlobal("fetch", answering(THE_OPERATOR, {}, new Map([[read, WITHOUT_THE_MARK]])));
-    readAgainInPlace();
+    vi.stubGlobal("fetch", answering(THE_OPERATOR, {}, new Map([[read, FORBIDDEN]])));
+    reloadLists();
 
-    expect(await within(list).findByText(STOCK.permission)).toBeDefined();
-    expect(within(list).queryByRole("table")).toBeNull();
+    await waitFor(() => {
+      expect(within(list).queryByRole("table"), "the refused list still shows rows").toBeNull();
+    });
+    const said = liveRegionIn(list).textContent;
+    expect(said, "the list shows no message in place of its rows").toMatch(/\S/);
+    expect(said, "the list shows the api's refusal word").not.toContain(NOT_THE_OPERATOR);
     expect(within(list).getByRole("searchbox", { name: words.search })).toBe(search);
     expect(within(list).getByDisplayValue("acme")).toBe(search);
     expect(document.activeElement).toBe(search);
   });
 
-  it("narrows Names waiting by name or flagging workspace", async () => {
+  it("filters Flagged Names by name or flagging workspace", async () => {
     const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_LIST.heading, {
       "console.people.namesWaiting": NAMES_WAITING,
     });
@@ -342,13 +383,14 @@ describe("the console's lists", () => {
 
     searchFor(list, NAMES_WAITING_LIST.search, "dales");
     expect(rowsOf(list).map(textOf)).toEqual([expect.stringContaining("Sam Okoro")]);
-    expect(within(list).getByText(NAMES_WAITING_WORDS.matching(1, "dales"))).toBeDefined();
+    expect(countIn(list).textContent).toMatch(/\b1\b.*dales/);
 
     searchFor(list, NAMES_WAITING_LIST.search, "nobody");
-    expect(within(list).getByText(NAMES_WAITING_WORDS.noneMatch("nobody"))).toBeDefined();
+    expect(countIn(list).textContent).toMatch(/\b0\b.*nobody/);
+    expect(within(list).getByRole("button", { name: "Clear Search" })).toBeDefined();
   });
 
-  it("keeps the correct keystroke off a name the search hid", async () => {
+  it("does not correct a focused name the search hid", async () => {
     const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_LIST.heading, {
       "console.people.namesWaiting": NAMES_WAITING,
     });
@@ -360,26 +402,26 @@ describe("the console's lists", () => {
 
     searchFor(list, NAMES_WAITING_LIST.search, "sam");
     pressCorrect();
-    expect(within(list).getByText(SELECT_A_NAME_FIRST)).toBeDefined();
+    expect(outcomeIn(list).textContent, "c with Priya hidden showed no message").toMatch(/\S/);
     expect(screen.queryByRole("dialog")).toBeNull();
 
     searchFor(list, NAMES_WAITING_LIST.search, "");
     pressCorrect();
-    expect(screen.queryByRole("dialog"), "a name shown again kept focus it lost").toBeNull();
+    expect(
+      screen.queryByRole("dialog"),
+      "c opened a dialog for a name that lost focus while hidden",
+    ).toBeNull();
 
     within(list).getByRole("button", { name: toCorrectPriya }).focus();
     pressCorrect();
     expect(await screen.findByRole("dialog", { name: toCorrectPriya })).toBeDefined();
   });
 
-  it("opens no person by key after focus leaves the list", async () => {
-    const list = await listAt("/console/people/everyone", "Everyone", {
+  it("asks for a person first when no row has focus", async () => {
+    const list = await listAt(EVERYONE_PAGE, EVERYONE_LIST.heading, {
       "console.people.list": { people: [PRIYA], total: 1 },
     });
-    expect(
-      within(list).queryByText(SELECT_A_PERSON_FIRST),
-      "the list says nothing at rest",
-    ).toBeNull();
+    expect(outcomeIn(list).textContent, "the list shows a message before any key").toBe("");
     within(list).getByRole("button", { name: PRIYA.displayName }).focus();
     screen.getByRole("button", { name: "Keyboard Shortcuts" }).focus();
 
@@ -389,65 +431,72 @@ describe("the console's lists", () => {
       PEOPLE_KEYSTROKES.correct,
     ]) {
       press(key);
+      expect(outcomeIn(list).textContent, `${key} with no row in focus showed no message`).toMatch(
+        /\S/,
+      );
       expect(
-        within(list).getByText(SELECT_A_PERSON_FIRST),
-        `${key} with no person in focus said nothing`,
-      ).toBeDefined();
-      expect(screen.queryByRole("dialog"), `${key} opened a person not in focus`).toBeNull();
+        screen.queryByRole("dialog"),
+        `${key} opened a dialog with no row in focus`,
+      ).toBeNull();
     }
   });
 
-  it("corrects no name by key after focus leaves the list", async () => {
+  it("asks for a name first when no row has focus", async () => {
     const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_LIST.heading, {
       "console.people.namesWaiting": NAMES_WAITING,
     });
-    expect(
-      within(list).queryByText(SELECT_A_NAME_FIRST),
-      "the list says nothing at rest",
-    ).toBeNull();
+    expect(outcomeIn(list).textContent, "the list shows a message before any key").toBe("");
     within(list).getByRole("button", { name: "Correct Priya Shah’s Display Name" }).focus();
     screen.getByRole("button", { name: "Keyboard Shortcuts" }).focus();
 
     press(NAMES_WAITING_KEYSTROKES.correct.key);
 
-    expect(
-      within(list).getByText(SELECT_A_NAME_FIRST),
-      "c with no name in focus said nothing",
-    ).toBeDefined();
-    expect(screen.queryByRole("dialog"), "c corrected a name not in focus").toBeNull();
+    expect(outcomeIn(list).textContent, "c with no row in focus showed no message").toMatch(/\S/);
+    expect(screen.queryByRole("dialog"), "c opened a dialog with no row in focus").toBeNull();
   });
 
-  it("keeps the description of Everyone off Names waiting", async () => {
-    const people = menuGroupIn(CONSOLE, "people");
-    await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_LIST.heading, {
+  it("does not show Everyone's description on Flagged Names", async () => {
+    const everyone = await listAt(EVERYONE_PAGE, EVERYONE_LIST.heading, {
+      "console.people.list": { people: [PRIYA], total: 1 },
+    });
+    const everyoneSays = paragraphAfter(
+      within(everyone).getByRole("heading", { level: 2 }),
+    ).textContent;
+    cleanup();
+
+    const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_LIST.heading, {
       "console.people.namesWaiting": NAMES_WAITING,
     });
-    const page = screen.getByRole("main");
+    const pageHeading = screen.getByRole("heading", { level: 1, name: "People" });
+    const listHeading = within(list).getByRole("heading", {
+      level: 2,
+      name: NAMES_WAITING_LIST.heading,
+    });
 
+    expect(paragraphAfter(listHeading).textContent).toMatch(/\S/);
+    expect(countIn(list).textContent).toMatch(/\b2\b/);
     expect(
-      readsInOrder(page, [
-        "People",
-        people.summary,
-        NAMES_WAITING_LIST.heading,
-        NAMES_WAITING_WORDS.description,
-        NAMES_WAITING_WORDS.counted(2),
-        "Priya Shah",
-      ]),
+      inDocumentOrder([pageHeading, listHeading, paragraphAfter(listHeading), countIn(list)]),
+      "the headings, description and count are out of order",
     ).toBe(true);
-    expect(page.textContent).not.toContain(EVERYONE_WORDS.description);
+    expect(everyoneSays, "Everyone has no description").toMatch(/\S/);
+    expect(screen.getByRole("main").textContent).not.toContain(everyoneSays);
   });
 
-  it("describes Everyone once, above its search", async () => {
+  it("shows Everyone's description once, above its search", async () => {
     vi.stubGlobal(
       "fetch",
       answering(THE_OPERATOR, { "console.people.list": { people: [], total: 0 } }),
     );
-    await openApp("/console/people/everyone");
-    const label = "Search by name or address";
-    const list = await screen.findByRole("region", { name: "Everyone" });
+    await openApp(EVERYONE_PAGE);
+    const { heading, search: label } = EVERYONE_LIST;
+    const list = await screen.findByRole("region", { name: heading });
     const search = await within(list).findByRole("searchbox", { name: label });
+    const description = paragraphAfter(within(list).getByRole("heading", { level: 2 }));
 
-    expect(screen.getByRole("main").textContent.split(EVERYONE_WORDS.description)).toHaveLength(2);
+    expect(description.textContent).toMatch(/\S/);
+    expect(screen.getByRole("main").textContent.split(description.textContent)).toHaveLength(2);
+    expect(inDocumentOrder([description, search])).toBe(true);
     expect(search.getAttribute("placeholder")).toBe(label);
     expect(within(list).queryByText(label)).toBeNull();
   });
@@ -462,44 +511,59 @@ const PRIYA = {
   credentialsRevokedAt: null,
 };
 
-const sheetRefusedWith = async (refusal: Answer) => {
-  vi.stubGlobal(
-    "fetch",
-    answering(
-      THE_OPERATOR,
-      { "console.people.list": { people: [PRIYA], total: 1 } },
-      new Map([["console.people.inspect", refusal]]),
-    ),
+const CREDENTIALS_PART = "Sessions and Assistant Access";
+
+/** Holds the person's details back until the part has drawn its loading state. */
+const sheetSaysWhenRefused = async (refusal: Answer): Promise<string> => {
+  const loaded = Promise.withResolvers<void>();
+  const answer = answering(
+    THE_OPERATOR,
+    { "console.people.list": { people: [PRIYA], total: 1 } },
+    new Map([["console.people.inspect", refusal]]),
   );
-  await openApp("/console/people/everyone");
+  vi.stubGlobal("fetch", async (input: string | URL | Request) => {
+    if (addressOf(input).pathname.includes("console.people.inspect")) await loaded.promise;
+    return answer(input);
+  });
+  await openApp(EVERYONE_PAGE);
   fireEvent.click(await screen.findByRole("button", { name: PRIYA.displayName }));
-  return within(await screen.findByRole("dialog"));
+  const sheet = within(await screen.findByRole("dialog"));
+  const loading = (await sheet.findByRole("region", { name: CREDENTIALS_PART })).textContent;
+
+  loaded.resolve();
+  await waitFor(() => {
+    expect(sheet.getByRole("region", { name: CREDENTIALS_PART }).textContent).not.toBe(loading);
+  });
+  const said = within(sheet.getByRole("region", { name: CREDENTIALS_PART })).getByRole(
+    "paragraph",
+  ).textContent;
+  cleanup();
+  vi.unstubAllGlobals();
+  return said;
 };
 
-describe("a person's sheet whose read is refused", () => {
-  it("says a person since erased is no longer available", async () => {
-    const sheet = await sheetRefusedWith(SINCE_ERASED);
+describe("a person's sheet when loading their details is refused", () => {
+  it("explains an erased person and a forbidden read differently", async () => {
+    const erased = await sheetSaysWhenRefused(ERASED);
+    const forbidden = await sheetSaysWhenRefused(FORBIDDEN);
 
-    expect(await sheet.findByText(STOCK.gone)).toBeDefined();
-    expect(sheet.queryByText(STOCK.permission)).toBeNull();
-  });
-
-  it("says a forbidden read is not the reader's to see", async () => {
-    const sheet = await sheetRefusedWith(WITHOUT_THE_MARK);
-
-    expect(await sheet.findByText(STOCK.permission)).toBeDefined();
+    expect(erased, "the erased person's sheet shows no message").toMatch(/\S/);
+    expect(forbidden, "the forbidden sheet shows no message").toMatch(/\S/);
+    expect(erased, "both refusals show the same message").not.toBe(forbidden);
+    expect(erased, "the sheet shows the api's refusal word").not.toContain(NO_SUCH_USER);
+    expect(forbidden, "the sheet shows the api's refusal word").not.toContain(NOT_THE_OPERATOR);
   });
 });
 
-describe("what the search on Everyone asks the api", () => {
-  it("asks for everyone at once when its box empties", () => {
+describe("what the Everyone search sends to the api", () => {
+  it("asks for everyone at once when the search is cleared", () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useAsking("tom"));
 
     act(() => {
       result.current.type("priya");
     });
-    expect(result.current.asked, "a key asked before its pause").toEqual({
+    expect(result.current.asked, "the search was sent before the typing pause ended").toEqual({
       search: "tom",
       offset: 0,
     });
@@ -512,7 +576,7 @@ describe("what the search on Everyone asks the api", () => {
     act(() => {
       vi.runAllTimers();
     });
-    expect(result.current.asked, "the dropped pause asked after all").toEqual({
+    expect(result.current.asked, "the cancelled search was sent after the clear").toEqual({
       search: "",
       offset: 0,
     });

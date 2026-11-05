@@ -3,7 +3,7 @@ import type { Keystroke } from "@/shared/keystrokes.tsx";
 export const PEOPLE_KEYSTROKES = {
   search: { key: "/", action: "Search Everyone by Name or Address" },
   open: { key: "o", action: "Open the Person in Focus" },
-  revoke: { key: "r", action: "End Every Sign-In and Token of the Person in Focus" },
+  revoke: { key: "r", action: "Sign Out the Person in Focus Everywhere" },
   correct: { key: "c", action: "Correct the Display Name of the Person in Focus" },
   previous: { key: "p", action: "Show the Previous Page of People" },
   next: { key: "n", action: "Show the Next Page of People" },
@@ -12,7 +12,7 @@ export const PEOPLE_KEYSTROKES = {
 export const SELECT_A_PERSON_FIRST = "Please select a person first.";
 
 export const NAMES_WAITING_KEYSTROKES = {
-  search: { key: "/", action: "Search the Names Waiting by Name or Workspace" },
+  search: { key: "/", action: "Search Flagged Names by Name or Workspace" },
   correct: { key: "c", action: "Correct the Display Name in Focus" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
