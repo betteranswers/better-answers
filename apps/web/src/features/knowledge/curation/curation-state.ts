@@ -167,4 +167,8 @@ export const kindsSortedOf = (sort: KindsSort): KindsSorted => ({
 export const kindsSortOf = (sorted: KindsSorted): KindsSort | undefined =>
   KINDS_SORTS.find((sort) => sort === `${sorted.desc ? "-" : ""}${sorted.id}`);
 
-export const EXPORTS_KEYSTROKES = {} as const satisfies Readonly<Record<string, Keystroke>>;
+export const EXPORTS_KEYSTROKES = {
+  knowledgeBase: { key: "k", action: "Download the Knowledge Base Snapshot" },
+  records: { key: "r", action: "Download the Records" },
+  guide: { key: "g", action: "Download the Guide Snapshot" },
+} as const satisfies Readonly<Record<string, Keystroke>>;

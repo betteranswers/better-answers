@@ -2,6 +2,8 @@ import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { counted } from "@/shared/words.ts";
 
+import type { GuideSummary, RecordsExported } from "../knowledge-api.ts";
+
 const conceptsCounted = (count: number): string => counted(count, "concept", "concepts");
 
 export const ALL_KNOWLEDGE_WORDS = {
@@ -87,4 +89,72 @@ export const KINDS_WORDS = {
   } satisfies OwnSentences,
 } as const;
 
-export const EXPORTS_WORDS = {} as const;
+type Family = RecordsExported["families"][number];
+
+const FAMILY_WORDS = {
+  owners: "the owners",
+  verifications: "the checks",
+  usage: "the uses",
+} as const satisfies Readonly<Record<Family, string>>;
+
+const listed = (items: readonly string[]): string => {
+  const last = items.at(-1);
+  if (items.length < 2 || last === undefined) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${last}`;
+};
+
+export const EXPORTS_WORDS = {
+  about:
+    "Download a copy of what your company knows. A copy is a moment in time, so it does not change when your knowledge does.",
+  count: (count: number): string => counted(count, "export", "exports"),
+  download: "Download",
+  preparing: "Preparing",
+  ofThe: (name: string): string => ` the ${name}`,
+  preparingSaid: (name: string): string => `Preparing the ${name}. This can take a moment.`,
+  knowledgeBase: {
+    name: "Knowledge Base Snapshot",
+    holds:
+      "Every concept file you can read at this moment, in one zip file. The guides are not in it.",
+    saved: (file: string, files: number): string =>
+      `Saved ${file}. It holds ${counted(files, "file", "files")} from your knowledge base.`,
+  },
+  records: {
+    name: "Records",
+    holds:
+      "The owners, the checks and the uses of your knowledge, as three spreadsheets in one zip file.",
+    saved: (file: string, families: readonly Family[]): string =>
+      `Saved ${file}. It holds ${listed(families.map((family) => FAMILY_WORDS[family]))} as ${counted(families.length, "spreadsheet", "spreadsheets")}.`,
+  },
+  guide: {
+    name: "Guide Snapshot",
+    holds:
+      "One guide’s Briefs as a single document. It is dated and marked not maintained, so it does not change when the guide does. Downloading it counts as a use of each Brief it holds.",
+    picker: "Guide",
+    option: (guide: GuideSummary): string =>
+      `${guide.subject?.title ?? guide.collection} (${guide.kind})`,
+    loading: "The guides are still loading.",
+    none: "No guides to show yet. A guide appears here once one is set up for a collection you can read.",
+    retry: "Retry",
+    saved: (file: string, briefs: number): string =>
+      `Saved ${file}. It holds ${counted(briefs, "Brief", "Briefs")}, marked not maintained. Each one now counts as used.`,
+  },
+} as const;
+
+export const SAID_OF_EXPORTED_KNOWLEDGE_BASE = {
+  "role-forbids": "Only an Admin can download the knowledge base.",
+  "not-found": "Your knowledge base has no saved version yet, so there is nothing to download.",
+  "unrecorded-head":
+    "A change to your knowledge base is still being saved. Nothing was downloaded. Please try again in a minute.",
+  "export-too-large":
+    "Your knowledge base is too large to take in one file. Nothing was downloaded.",
+} satisfies OwnSentences;
+
+export const SAID_OF_EXPORTED_RECORDS = {
+  "role-forbids": "Only an Admin can download the records.",
+  "export-too-large": "Your records are too large to take in one file. Nothing was downloaded.",
+} satisfies OwnSentences;
+
+export const SAID_OF_EXPORTED_GUIDE = {
+  "role-forbids": "Only an Admin can download a guide.",
+  "not-found": "This guide is no longer available. Please choose another guide.",
+} satisfies OwnSentences;
