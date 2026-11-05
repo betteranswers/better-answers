@@ -131,6 +131,7 @@ const unquoted = (body: string): string =>
 const CUBIC_LOGIN = "cubic-dev-ai";
 
 type Facts = {
+  readonly running: boolean;
   readonly pending: boolean;
   readonly reviewed: boolean;
   readonly cubicReviewed: boolean;
@@ -153,6 +154,7 @@ const factsOf = (judged: readonly Judged[], pullRequest: PullRequest, now: numbe
     );
   const reviewed = judged.some(({ bot, state }) => bot.ai && state.kind === "reviewed");
   return {
+    running: judged.some(({ state }) => state.kind === "pending"),
     pending: judged.some(({ bot, state }) => state.kind === "pending" && (bot.ai || !reviewed)),
     reviewed,
     cubicReviewed: pullRequest.reviews.some((review) => review.author?.login === CUBIC_LOGIN),
@@ -232,9 +234,7 @@ export const assess = (
     `head ${pullRequest.headRefOid}`,
     ...judged.map(({ bot, state }) => `${bot.name}\t${describeState(state)}`),
     `ai reviewers on this head: ${String(reviewers.length)} of ${String(BOTS.filter((bot) => bot.ai).length)}`,
-    ...(judged.some(({ state }) => state.kind === "pending")
-      ? ["a bot is still running, so this is not final"]
-      : []),
+    ...(facts.running ? ["a bot is still running, so this is not final"] : []),
     `pull request: ${String(pullRequest.changedFiles)} files, label ${REVIEW_LABEL} ${facts.labelled ? "set" : "not set"}, Cubic reviewed it: ${yesNo(facts.cubicReviewed)}, Cubic hit its limit: ${yesNo(facts.limited)}, Cubic asked: ${yesNo(facts.asked)}`,
     `next: ${rule.next(pr)}`,
   ];
