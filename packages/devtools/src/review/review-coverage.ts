@@ -10,7 +10,7 @@ const CODERABBIT_FILE_LIMIT = 100;
 /** A run still going after this long did not run, so the verdict rule decides. */
 const RUNNING_LIMIT_MINUTES = 20;
 
-/** Cubic, asked by comment, shows a check run within this long or did not start. Only that wait is timed. */
+/** Cubic, asked by comment, shows a check run within this long or did not start. Only that wait is timed. The label's wait is advice. */
 const START_WAIT_MINUTES = 10;
 
 const minutes = (count: number): number => count * 60 * 1000;
@@ -132,7 +132,7 @@ const CUBIC_LOGIN = "cubic-dev-ai";
 
 type Facts = {
   readonly running: boolean;
-  readonly pending: boolean;
+  readonly blocking: boolean;
   readonly reviewed: boolean;
   readonly cubicReviewed: boolean;
   readonly limited: boolean;
@@ -155,7 +155,7 @@ const factsOf = (judged: readonly Judged[], pullRequest: PullRequest, now: numbe
   const reviewed = judged.some(({ bot, state }) => bot.ai && state.kind === "reviewed");
   return {
     running: judged.some(({ state }) => state.kind === "pending"),
-    pending: judged.some(({ bot, state }) => state.kind === "pending" && (bot.ai || !reviewed)),
+    blocking: judged.some(({ bot, state }) => state.kind === "pending" && (bot.ai || !reviewed)),
     reviewed,
     cubicReviewed: pullRequest.reviews.some((review) => review.author?.login === CUBIC_LOGIN),
     limited,
@@ -183,7 +183,7 @@ const addLabel = (pr: string): string => `gh pr edit ${pr} --add-label ${REVIEW_
 
 const RULES: readonly Rule[] = [
   {
-    when: (facts) => facts.pending,
+    when: (facts) => facts.blocking,
     exit: 3,
     next: (pr) =>
       `wait for the running bot, then run pnpm run review-coverage ${pr} again. After ${String(RUNNING_LIMIT_MINUTES)} minutes this treats a bot still running as one that did not run`,
