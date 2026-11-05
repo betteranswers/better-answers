@@ -173,5 +173,21 @@ describe.each<Migrator>(["the bound owner", "a superuser"])(
         expect(await rebuildsWaitingIn(client, SUPERSEDING)).toHaveLength(1);
       });
     });
+
+    it("queues a fresh rebuild beside a retry already tried", async () => {
+      await withFourMaps(async (client) => {
+        await testData(client).job({
+          workspaceId: DERIVED,
+          kind: FULL_REBUILD_KIND,
+          reason: "first-build",
+          attempts: 1,
+        });
+
+        await queuingTheUpgradeRebuilds(client, migrator, 1, THE_LINEAGE_UPGRADE);
+
+        const reasons = (await rebuildsWaitingIn(client, DERIVED)).map(({ reason }) => reason);
+        expect(reasons.toSorted()).toEqual(["first-build", "upgrade"]);
+      });
+    });
   },
 );
