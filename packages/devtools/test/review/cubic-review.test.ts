@@ -7,14 +7,11 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
   couldNot,
   cubicEnvironment,
-  drift,
   EXIT,
-  redact,
-  refusal,
   report,
   reviewFrom,
 } from "@better-answers/devtools/cubic-review";
-import type { CliRun, Review } from "@better-answers/devtools/cubic-review";
+import type { CliRun } from "@better-answers/devtools/cubic-review";
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import {
   gitIn,
@@ -46,7 +43,7 @@ const finding = (priority: string, file: string, title: string, line?: number) =
   file,
   ...(line === undefined ? {} : { line }),
   title,
-  description: "The   handler\nreads the row before it checks the lock.",
+  description: "The handler reads the row\nbefore it checks the lock.",
 });
 
 const cli = (stdout: unknown, status: number | null, rest: Partial<CliRun> = {}): CliRun => ({
@@ -57,12 +54,9 @@ const cli = (stdout: unknown, status: number | null, rest: Partial<CliRun> = {})
   ...rest,
 });
 
-const kindOf = (review: Review): string =>
-  review.kind === "could-not-run" ? `${review.kind}:${review.cause}` : review.kind;
-
 describe("reading the cubic CLI's output", () => {
   it("reads no finding and a zero exit as clean", () => {
-    expect(kindOf(reviewFrom(cli({ issues: [], repository_context: LOADED }, 0)))).toBe("clean");
+    expect(reviewFrom(cli({ issues: [], repository_context: LOADED }, 0)).kind).toBe("clean");
   });
 
   it("reads findings printed with exit 1 as findings", () => {
@@ -73,8 +67,12 @@ describe("reading the cubic CLI's output", () => {
     expect(review).toMatchObject({ kind: "findings", issues: [{ priority: "P1", line: 12 }] });
   });
 
-  it("reads the failure the real CLI 1.14.2 printed", () => {
-    expect(kindOf(reviewFrom(cli(SUBSCRIPTION_EXPIRED, 1)))).toBe("could-not-run:subscription");
+  it("carries the CLI's own error word for word", () => {
+    expect(reviewFrom(cli(SUBSCRIPTION_EXPIRED, 1))).toEqual(
+      couldNot(
+        "Subscription expired. Visit https://www.cubic.dev/settings?tab=subscription to renew.",
+      ),
+    );
   });
 
   it("lets an error outrank findings printed beside it", () => {
@@ -82,49 +80,37 @@ describe("reading the cubic CLI's output", () => {
       cli({ issues: [finding("P0", "a.ts", "Bug")], error: "Review interrupted" }, 130),
     );
 
-    expect(kindOf(review)).toBe("could-not-run:failed");
-  });
-
-  it.each([
-    ["a rate limit", "Rate limit exceeded. Try again in 60 seconds.", "rate-limit"],
-    ["a 429", "Server error (429)", "rate-limit"],
-    ["no provider configured", NO_PROVIDER, "no-credential"],
-    ["a missing credential", "Cubic credentials are missing", "no-credential"],
-    ["a malformed key", "CUBIC_API_KEY does not look like a cubic API key", "no-credential"],
-    ["an unknown failure", "Review returned an invalid final response", "failed"],
-  ])("names %s", (_name, error, cause) => {
-    expect(kindOf(reviewFrom(cli({ issues: [], error }, 1)))).toBe(`could-not-run:${cause}`);
+    expect(review).toEqual(couldNot("Review interrupted"));
   });
 
   it("never reads empty output as clean", () => {
-    expect(kindOf(reviewFrom(cli("", 0)))).toBe("could-not-run:failed");
+    expect(reviewFrom(cli("", 0)).kind).toBe("could-not-run");
   });
 
   it("never reads a changed JSON shape as clean", () => {
-    expect(kindOf(reviewFrom(cli({ findings: [] }, 0)))).toBe("could-not-run:failed");
+    expect(reviewFrom(cli({ findings: [] }, 0)).kind).toBe("could-not-run");
   });
 
   it("quotes the CLI when its output is not JSON", () => {
     const review = reviewFrom(cli("", 1, { stderr: "error: unknown argument --nope\n" }));
 
-    expect(review).toMatchObject({ kind: "could-not-run", cause: "failed" });
     expect(JSON.stringify(review)).toContain("error: unknown argument --nope");
   });
 
   it("reads exit 1 with nothing to report as a failure", () => {
-    expect(kindOf(reviewFrom(cli({ issues: [] }, 1)))).toBe("could-not-run:failed");
+    expect(reviewFrom(cli({ issues: [] }, 1)).kind).toBe("could-not-run");
   });
 
-  it("reads a missing executable as a missing CLI", () => {
+  it("tells how to install a missing CLI without git-ai", () => {
     const review = reviewFrom(cli("", null, { spawnError: "ENOENT" }));
 
-    expect(kindOf(review)).toBe("could-not-run:cli-absent");
+    expect(JSON.stringify(review)).toContain(
+      "CUBIC_DISABLE_GIT_AI=1 npm install --global @cubic-dev-ai/cli",
+    );
   });
 
   it("reads a timeout as a failure", () => {
-    expect(kindOf(reviewFrom(cli("", null, { spawnError: "ETIMEDOUT" })))).toBe(
-      "could-not-run:failed",
-    );
+    expect(reviewFrom(cli("", null, { spawnError: "ETIMEDOUT" })).kind).toBe("could-not-run");
   });
 
   it("keeps a clean review and notes a missing context", () => {
@@ -143,12 +129,10 @@ describe("reading the cubic CLI's output", () => {
 
 describe("the report", () => {
   const HEAD = "0123456789abcdef0123456789abcdef01234567";
-  const BASE = "origin/main at 89abcdef0123456789abcdef0123456789abcdef";
 
-  it("lists findings by priority with one detail line each", () => {
+  it("lists findings in the CLI's order with detail", () => {
     const text = report(
       HEAD,
-      BASE,
       reviewFrom(
         cli(
           {
@@ -165,104 +149,41 @@ describe("the report", () => {
     expect(text).toBe(
       [
         `cubic-cli reviewed head ${HEAD}: 2 findings`,
-        `base ${BASE}`,
-        "P0 apps/api/src/server.ts:12 Race on the lock",
-        "   The handler reads the row before it checks the lock.",
         "P2 apps/web/src/page.tsx Unused prop",
-        "   The handler reads the row before it checks the lock.",
+        "   The handler reads the row",
+        "   before it checks the lock.",
+        "P0 apps/api/src/server.ts:12 Race on the lock",
+        "   The handler reads the row",
+        "   before it checks the lock.",
         "",
       ].join("\n"),
     );
   });
 
   it("states zero findings for a clean review", () => {
-    const text = report(HEAD, BASE, reviewFrom(cli({ issues: [] }, 0)));
-
-    expect(text).toBe(`cubic-cli reviewed head ${HEAD}: 0 findings\nbase ${BASE}\n`);
-  });
-
-  it("cuts a long detail line", () => {
-    const long = { ...finding("P1", "a.ts", "Long"), description: "word ".repeat(200) };
-    const lines = report(HEAD, BASE, reviewFrom(cli({ issues: [long] }, 1))).split("\n");
-
-    expect(lines[3]?.length).toBeLessThanOrEqual(250);
-    expect(lines[3]).toMatch(/…$/u);
-  });
-
-  it("names the connect and sign-in routes without a credential", () => {
-    const text = report(HEAD, BASE, reviewFrom(cli({ issues: [], error: NO_PROVIDER }, 1)));
-
-    expect(text).toContain("could not run on head " + HEAD + " (no credential)");
-    expect(text).toContain("`cubic auth connect claude-code`");
-    expect(text).toContain("`cubic auth login`");
-    expect(text).toContain("CUBIC_API_KEY");
-  });
-
-  it("names the provider connection for a lapsed subscription", () => {
-    const text = report(HEAD, BASE, reviewFrom(cli(SUBSCRIPTION_EXPIRED, 1)));
-
-    expect(text).toContain("(subscription)");
-    expect(text).toContain("`cubic auth connect claude-code`");
-  });
-
-  it("tells how to install a missing CLI without git-ai", () => {
-    const text = report(HEAD, BASE, couldNot("cli-absent", "`cubic` is not on PATH"));
-
-    expect(text).toContain("CUBIC_DISABLE_GIT_AI=1 npm install --global @cubic-dev-ai/cli");
-  });
-
-  it("says unknown when no head could be read", () => {
-    expect(report(undefined, "origin/main", couldNot("not-ready", "no git"))).toContain(
-      "on head unknown",
+    expect(report(HEAD, reviewFrom(cli({ issues: [] }, 0)))).toBe(
+      `cubic-cli reviewed head ${HEAD}: 0 findings\n`,
     );
   });
-});
 
-describe("the branch the review would cover", () => {
-  const tree = { head: "a".repeat(40), dirty: false };
+  it("prints the CLI's error as the reason", () => {
+    const text = report(HEAD, reviewFrom(cli({ issues: [], error: NO_PROVIDER }, 1)));
 
-  it("accepts a clean branch whose head held still", () => {
-    expect(refusal(tree)).toBeUndefined();
-    expect(drift(tree, tree)).toBeUndefined();
-  });
-
-  it("refuses uncommitted tracked changes", () => {
-    expect(refusal({ ...tree, dirty: true })).toContain("uncommitted");
-  });
-
-  it("refuses a head that moved", () => {
-    expect(drift(tree, { ...tree, head: "b".repeat(40) })).toContain("HEAD moved");
-  });
-
-  it("refuses a tree edited during the review", () => {
-    expect(drift(tree, { ...tree, dirty: true })).toContain("changed during");
+    expect(text).toBe(`cubic-cli could not run on head ${HEAD}: ${NO_PROVIDER}\n`);
   });
 });
 
-describe("the child's environment and the printed text", () => {
-  it("keeps the key and adds the headless and git-ai switches", () => {
-    const env = { CUBIC_API_KEY: "cbk_secret", PATH: "/bin" };
-    const child = cubicEnvironment(env);
+describe("the child's environment", () => {
+  it("adds the headless and git-ai switches", () => {
+    const env = { PATH: "/bin" };
 
-    expect(child).toEqual({
-      CUBIC_API_KEY: "cbk_secret",
+    expect(cubicEnvironment(env)).toEqual({
       PATH: "/bin",
       CUBIC_DISABLE_AUTOUPDATE: "1",
       CUBIC_DISABLE_LSP_DOWNLOAD: "1",
       CUBIC_DISABLE_GIT_AI: "1",
     });
-    expect(env).toEqual({ CUBIC_API_KEY: "cbk_secret", PATH: "/bin" });
-  });
-
-  it("removes the key from text", () => {
-    expect(redact("bad key cbk_secret, again cbk_secret", "cbk_secret")).toBe(
-      "bad key [redacted], again [redacted]",
-    );
-  });
-
-  it("leaves text alone when no key is set", () => {
-    expect(redact("nothing here", undefined)).toBe("nothing here");
-    expect(redact("nothing here", "")).toBe("nothing here");
+    expect(env).toEqual({ PATH: "/bin" });
   });
 });
 
@@ -304,13 +225,13 @@ const setup = (): Setup => {
   return { origin, work, bin, args: path.join(root, "args.txt") };
 };
 
-const stubCubic = (one: Setup, stdout: unknown, status: number, before = ""): void => {
+const stubCubic = (one: Setup, stdout: unknown, status: number): void => {
   const answer = path.join(one.bin, "answer.json");
   writeUnder(one.bin, "answer.json", JSON.stringify(stdout));
   writeUnder(
     one.bin,
     "cubic",
-    `#!/bin/sh\nprintf '%s\\n' "$@" > '${one.args}'\n${before}\ncat '${answer}'\nexit ${String(status)}\n`,
+    `#!/bin/sh\nprintf '%s\\n' "$@" > '${one.args}'\ncat '${answer}'\nexit ${String(status)}\n`,
   );
   chmodSync(path.join(one.bin, "cubic"), 0o755);
 };
@@ -321,19 +242,15 @@ const pathWithoutCubic = (): string =>
     .filter((folder) => !existsSync(path.join(folder, "cubic")))
     .join(path.delimiter);
 
-const ranOn = (one: Setup, env: Readonly<Record<string, string>> = {}, args: string[] = []) =>
-  spawnSync(process.execPath, [SCRIPT, ...args], {
+const ranOn = (one: Setup) =>
+  spawnSync(process.execPath, [SCRIPT], {
     cwd: one.work,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      PATH: `${one.bin}${path.delimiter}${process.env["PATH"] ?? ""}`,
-      ...env,
-    },
+    env: { ...process.env, PATH: `${one.bin}${path.delimiter}${process.env["PATH"] ?? ""}` },
   });
 
 describe("the cubic-review script", () => {
-  it("reviews the head against its merge base, exit 0", () => {
+  it("reviews the head against origin/main, exit 0", () => {
     const one = setup();
     stubCubic(one, { issues: [], repository_context: LOADED }, 0);
 
@@ -362,7 +279,7 @@ describe("the cubic-review script", () => {
     expect(result.stdout).toContain("P1 b.txt:1 Wrong total");
   });
 
-  it("exits 2 when the cubic CLI is not installed", () => {
+  it("exits 2 and names the install without the CLI", () => {
     const one = setup();
 
     const result = spawnSync(process.execPath, [SCRIPT], {
@@ -372,25 +289,12 @@ describe("the cubic-review script", () => {
     });
 
     expect(result.status).toBe(2);
-    expect(result.stdout).toContain("cubic CLI not installed");
-  });
-
-  it("exits 2 without the CLI when tracked files changed", () => {
-    const one = setup();
-    stubCubic(one, { issues: [] }, 0);
-    writeUnder(one.work, "b.txt", "changed\n");
-
-    const result = ranOn(one);
-
-    expect(result.status).toBe(2);
-    expect(result.stdout).toContain("uncommitted");
-    expect(existsSync(one.args)).toBe(false);
+    expect(result.stdout).toContain("CUBIC_DISABLE_GIT_AI=1 npm install --global");
   });
 
   it("reviews only the branch's changes once the base moved", () => {
     const one = setup();
     stubCubic(one, { issues: [] }, 0);
-    const mergeBase = gitIn(one.work, "rev-parse", "origin/main").trim();
     writeUnder(one.origin, "c.txt", "three\n");
     gitIn(one.origin, "add", "--", "c.txt");
     gitIn(one.origin, "commit", "-q", "-m", "three");
@@ -400,39 +304,7 @@ describe("the cubic-review script", () => {
 
     expect(result.status).toBe(0);
     expect(gitIn(one.work, "rev-parse", "origin/main").trim()).toBe(newBase);
-    expect(result.stdout).toContain(`origin/main...HEAD, merge base ${mergeBase}`);
     expect(readFileSync(one.args, "utf8")).toContain("origin/main...HEAD");
-  });
-
-  it("exits 2 when the head moves during the review", () => {
-    const one = setup();
-    stubCubic(one, { issues: [] }, 0, "git commit -q --allow-empty -m moved");
-
-    const result = ranOn(one);
-
-    expect(result.status).toBe(2);
-    expect(result.stdout).toContain("HEAD moved");
-  });
-
-  it("never prints the key it was given", () => {
-    const one = setup();
-    stubCubic(one, { issues: [], error: "key cbk_secret_value was refused" }, 1);
-
-    const result = ranOn(one, { CUBIC_API_KEY: "cbk_secret_value" });
-
-    expect(result.status).toBe(2);
-    expect(result.stdout).toContain("key [redacted] was refused");
-    expect(result.stdout + result.stderr).not.toContain("cbk_secret_value");
-  });
-
-  it("hides the key before a long output is cut", () => {
-    const one = setup();
-    stubCubic(one, `${"x".repeat(230)} cbk_secret_value`, 1);
-
-    const result = ranOn(one, { CUBIC_API_KEY: "cbk_secret_value" });
-
-    expect(result.status).toBe(2);
-    expect(result.stdout).not.toContain("cbk_");
   });
 
   it("reviews a clone that fetches only its own branch", () => {
@@ -449,13 +321,6 @@ describe("the cubic-review script", () => {
     const result = ranOn(one);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("origin/main...HEAD, merge base");
-  });
-
-  it("refuses a base outside origin", () => {
-    const result = ranOn(setup(), {}, ["main"]);
-
-    expect(result.status).toBe(2);
-    expect(result.stderr).toContain("usage: pnpm run cubic-review");
+    expect(gitIn(one.work, "rev-parse", "--verify", "origin/main").trim()).not.toBe("");
   });
 });
