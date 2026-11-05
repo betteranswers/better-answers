@@ -14,6 +14,13 @@ export const CONCEPT_KEYSTROKES = {
   links: { key: "l", action: "Go to the Concept’s Links" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
+export const EDITOR_KEYSTROKES = {
+  edit: { key: "e", action: "Edit This Concept, or Suggest an Edit" },
+  mode: { key: "m", action: "Switch Between Visual and Markdown Editing" },
+  save: { key: "Control+Enter", action: "Save the Concept You Are Editing" },
+  leave: { key: "Escape", action: "Leave a Text Field to Reach the Editor’s Buttons" },
+} as const satisfies Readonly<Record<string, Keystroke>>;
+
 export const COLLECTIONS_KEYSTROKES = {
   changeOwner: { key: "c", action: "Change the Owner of the Collection in Focus" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
@@ -30,8 +37,15 @@ export const QUERY_MAX = 500;
 
 export const MATCHES_A_PAGE = 20;
 
+const NEW_CONCEPT_MAX = 500;
+
 export const SEARCH_FIELDS = {
   search: searchText(QUERY_MAX),
+  new: searchText(NEW_CONCEPT_MAX),
+  collection: searchText(NEW_CONCEPT_MAX),
+  kind: searchText(NEW_CONCEPT_MAX),
+  tags: searchText(NEW_CONCEPT_MAX),
+  subject: searchText(NEW_CONCEPT_MAX),
 };
 
 export const KNOWLEDGE_BASE_LIST = "base";
