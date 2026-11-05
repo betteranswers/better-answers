@@ -10,6 +10,7 @@ import {
   DERIVED_FROM_LABEL,
   IRI,
   LINKS_TO_LABEL,
+  quotedPassageOf,
   resolvedResource,
   SUPERSEDES_LABEL,
   type UNRESOLVED_RELATIONS,
@@ -95,6 +96,7 @@ const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
   });
 
   const lineage = concept.sources.flatMap((cited, ordinal) => {
+    if (quotedPassageOf(cited) !== undefined) return [];
     const target = targetOf(cited.resource, concept.path);
     if (target === undefined) return [];
     return [{ relation: "lineage" as const, ordinal, target, section: null, sentence: null }];

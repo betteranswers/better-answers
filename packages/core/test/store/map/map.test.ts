@@ -12,7 +12,14 @@ import {
   type ConceptDelta,
   type WalkStep,
 } from "@better-answers/core/store/map";
-import { citedSourcesOf, conceptIriOf, ids, ulid, WELL_FORMED_ULID } from "@better-answers/schema";
+import {
+  citedSourcesOf,
+  conceptIriOf,
+  ids,
+  passageLocatorOf,
+  ulid,
+  WELL_FORMED_ULID,
+} from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 
 import { readConcept } from "../../../src/concepts/index.ts";
@@ -1137,6 +1144,31 @@ describe("a path reference no concept holds yet", () => {
       { label: "SUPERSEDES", to_uid: retired.iri, to_kind: null },
     ]);
     expect(await unresolvedFrom(scenario, successor.iri)).toEqual([]);
+  });
+
+  it("takes a connected source's passage as evidence, never lineage", async () => {
+    const scenario = await arrange();
+    await landedAt(scenario, "knowledge/pricing.md", { kind: "Policy" });
+    const document = ulid();
+    const citer = await conceptIn(scenario, {
+      path: "knowledge/expenses.md",
+      kind: "Policy",
+      frontmatter: {
+        title: "Expenses",
+        type: "Policy",
+        sources: [
+          { resource: "The handbook", locator: passageLocatorOf(document, 0, 12) },
+          { resource: "pricing.md", locator: passageLocatorOf(document, 12, 40) },
+        ],
+      },
+    });
+
+    await land(scenario, deltaOf(citer));
+
+    expect({
+      unresolved: await unresolvedFrom(scenario, citer.iri),
+      edges: await edgesFrom(scenario, citer.iri),
+    }).toEqual({ unresolved: [], edges: [] });
   });
 
   it("drops a rewritten link's unresolved row", async () => {

@@ -15,6 +15,7 @@ IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM"
 OTHER_IRI = "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
 UNLANDED_IRI = "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP"
 PATH = "knowledge/expenses.md"
+DOCUMENT = "01J6QQQQQQQQQQQQQQQQQQQQQQ"
 
 
 def edges(
@@ -198,6 +199,39 @@ def test_lineage_to_one_concept_is_one_edge_however_often_cited() -> None:
     )
 
     assert [edge.uid for edge in derived] == [f"lineage:{IRI}:0"]
+
+
+def test_a_connected_sources_passage_is_evidence_never_lineage() -> None:
+    frontmatter: Frontmatter = {
+        "sources": [
+            {"resource": "The handbook", "locator": f"{DOCUMENT}/chars:0-12"},
+            {"resource": "pricing.md", "locator": f"{DOCUMENT}/chars:12-40"},
+        ]
+    }
+    held = {"knowledge/pricing.md": ResolvedTarget(OTHER_IRI, "Policy", "stable")}
+
+    references = references_of("A body.", frontmatter, PATH)
+
+    assert (
+        unresolved_references(references, {}),
+        edges("A body.", frontmatter, by_path=held),
+    ) == ([], [])
+
+
+def test_a_concept_cited_with_a_passage_locator_stays_lineage() -> None:
+    frontmatter: Frontmatter = {
+        "sources": [{"resource": OTHER_IRI, "locator": f"{DOCUMENT}/chars:0-12"}]
+    }
+
+    derived = edges(
+        "A body.",
+        frontmatter,
+        by_iri={OTHER_IRI: ResolvedTarget(OTHER_IRI, "Policy", "stable")},
+    )
+
+    assert [(edge.uid, edge.label, edge.to_uid) for edge in derived] == [
+        (f"lineage:{IRI}:0", DERIVED_FROM_LABEL, OTHER_IRI)
+    ]
 
 
 def test_a_fence_closes_only_on_its_own_character_no_shorter() -> None:

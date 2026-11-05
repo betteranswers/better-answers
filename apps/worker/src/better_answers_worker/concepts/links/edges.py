@@ -14,7 +14,7 @@ from .definitions import (
 from .fences import prose_of
 from .scan import _Found, _link_matches
 from .sentences import _section_at, _sentence_at
-from .targets import _target_of, _TargetShape
+from .targets import _quotes_passage, _target_of, _TargetShape
 
 CONCEPT_NODE_LABEL = "Concept"
 
@@ -153,7 +153,9 @@ def references_of(
             if not isinstance(entry, Mapping | str):
                 continue
             cited = cited_source(entry)
-            target = None if cited is None else _target_of(cited[0], path)
+            if cited is None or _quotes_passage(*cited):
+                continue
+            target = _target_of(cited[0], path)
             if target is None:
                 continue
             lineage.append(OutgoingReference("lineage", ordinal, target, None, None))

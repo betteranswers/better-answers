@@ -255,6 +255,14 @@ If 0069, 0072 or 0073 fails on `lock_timeout`, it rolls back whole and can run a
 
 The new worker runs each rebuild, and the daily sweep removes the old generation. A worker left running across the migration may take a rebuild and write no rows (`docs/operations/CI.md`, *The pull runs before the stop*). Rolling back across the migration is the migration case. An older api never reads the table, but an older worker's deploy stamp no longer matches, so it claims nothing. Rolling forward again queues the rebuilds anew.
 
+**The migration that rebuilds maps holding lineage**, `0099_the-lineage-rebuilds` (05/11/2026, BA-249). Before it, both tiers read the label of a connected source in a concept's `sources` as a path. A map can therefore hold a `lineage` row at `knowledge/<label>`, or a false DERIVED_FROM or SUPERSEDES edge to a concept at that path. No scheduled job rebuilds a map, and the nightly audit only compares `concept_index` with git. The migration queues one `full-rebuild` job with the reason `upgrade` for each workspace whose map holds a `lineage` row or a DERIVED_FROM or SUPERSEDES edge. It skips a workspace where a full rebuild not yet tried already waits. It runs once per database. Nothing is run by hand.
+
+1. To watch, count `SELECT workspace_id, status FROM job WHERE kind = 'full-rebuild' AND reason = 'upgrade'` as `postgres`. Every row reaches `done` once the new worker is up.
+2. If a row ends `failed` or `poisoned`, read the job's outcome and fix its cause.
+3. Run `pnpm ops map-rebuild --workspace <id> --reason upgrade --wait` for that workspace.
+
+The rebuild runs the fixed reader, so the new live generation holds none of those rows. The old generation keeps them until the daily sweep removes it, and the api reads only the live generation. A workspace with only real lineage gets one rebuild that keeps that lineage. Rolling back across the migration is the migration case. An older api reads nothing the migration changed, but an older worker's deploy stamp no longer matches, so it claims nothing.
+
 ### The tag ruleset
 
 A tag ruleset (Settings, Rules, Rulesets) targets `release/*` and is Active, with **Restrict updates** and **Restrict deletions** on and **Restrict creations** off. Nothing can move or delete a release tag, and the record job can still push one. To delete a tag by hand, turn the ruleset off for the deletion and on again after. The `production` environment admits only `main` (Settings, Environments, `production`, Deployment branches and tags), so no workflow on another branch reads its secrets. Both were set on 03/10/2026.
