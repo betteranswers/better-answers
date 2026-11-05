@@ -71,7 +71,7 @@ Four of the six tests in the describe block "the skills this repository tracks" 
 - KTD1. **`check:docs:api` is removed outright, not left pointing at nothing.** The words test was its only suite, and `packages/devtools/test/ci/check-scripts.test.ts` refuses a test step that passes with no tests. The docs lane keeps its core, devtools and web steps.
 - KTD2. **`packages/devtools/test/root-config/lefthook-config.test.ts` takes `check:docs:core` as its stand-in failing gate.** It still shows a prose-suite step failing beside a `check:gates` step (`knip`), which is what those four sites were written to show.
 - KTD3. **`provision-skills.test.ts` stays in the docs lane.** The design-skill link test still reads `packages/design-system/SKILL.md` through its symlink, so the file keeps its `PROSE_SUITES` row and its place in `check:docs:devtools`. The row's `reads` text is corrected to what the file reads now.
-- KTD4. **One learning is deleted and two are edited.** `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md` describes only the deleted list and is removed. `docs/solutions/best-practices/what-a-rename-prose-pass-gets-wrong-and-the-checks-that-catch-it.md` is about rename passes in general: its passages on the words test and its carve-outs go, its grep-based checks stay, and its link to the deleted learning goes. `docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md` loses its link to the deleted learning and any sentence that relies on the words test.
+- KTD4. **The learnings that name the words test are cut.** The learning that describes only the deleted list is removed. The others lose each passage, carve-out and link that relies on the words test, and keep their grep-based checks.
 - KTD5. **The decision doc gets a dated amendment, and its earlier amendments stay.** `docs/solutions/architecture-patterns/adr-0047.md` says an old word leaves the glossary for `old-words.ts`. Its 08/10/2026 amendment says the old word's row refuses it in reader text until a block's rename lands. A new amendment line dated 12/10/2026 says an old word now leaves the glossary, no list of old words is kept in the tree, and no gate refuses an old word: review holds a staged rename. The pull request body says this decision doc was edited.
 - KTD6. **`.claude/skills/ce-skill-work/references/evaluate.md` and `references/new-skill.md` are edited through the `ce-skill-work` skill**, as `AGENTS.md` requires for a tracked skill.
 
@@ -149,9 +149,6 @@ Four of the six tests in the describe block "the skills this repository tracks" 
   - `.claude/skills/ce-skill-work/references/evaluate.md`
   - `.claude/skills/ce-skill-work/references/new-skill.md`
   - `docs/solutions/architecture-patterns/adr-0047.md`
-  - delete `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md`
-  - `docs/solutions/best-practices/what-a-rename-prose-pass-gets-wrong-and-the-checks-that-catch-it.md`
-  - `docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md`
 - **Approach:**
   1. `CONCEPTS.md` preamble: keep the rule that the file carries no lines of words to avoid and names no replaced word, and drop the clause saying the words test holds them.
   2. `docs/operations/local-gates.md`: the hook runs three prose suites; drop the sentence naming `check:docs:api` as the slowest command; correct which suites start Postgres; use another step in the `LEFTHOOK_EXCLUDE` example. Re-measure the hook's duration with every gate passing, or remove the stale figure.
@@ -174,7 +171,7 @@ Four of the six tests in the describe block "the skills this repository tracks" 
 
 ## Definition of Done
 
-- A search of the tree for `avoid-words`, `old-words`, `words-scan` and `check:docs:api` finds them only in dated plans, dogfood reports, `docs/archive/` and passages that record a past event: the 03/10/2026 and 08/10/2026 amendments in the decision doc and the incident file list in `docs/solutions/integration-issues/lefthook-reverts-unstaged-only-files-when-a-pre-commit-formatter-conflicts.md`.
+- A search of the tree for `avoid-words`, `old-words`, `words-scan` and `check:docs:api` finds them only in dated plans, dogfood reports, `docs/archive/` and passages that record a past event: the 03/10/2026 and 08/10/2026 amendments in the decision doc.
 - No live doc calls the words test or the tracked-skill list pins a current gate.
 - Every command in the Verification Contract passes.
 - The diff holds no product code and no change to a test outside the files this plan names.

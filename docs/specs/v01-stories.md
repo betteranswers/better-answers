@@ -13,7 +13,7 @@ This file holds the stories a finished v0.1 satisfies, numbered as plans cite th
 7. [S5, S7] Every suggestion of every kind waits on one page, *To decide*: suggested concepts from a sync, an Editor's edit, a promotion, an alias merge and an update to a platform bundle. A set's summary names the kinds it introduces, and nothing the platform prepared reaches the knowledge base without an Admin's decision.
 8. [S5] A bulk acceptance writes one commit per suggestion and shows each item's outcome. The platform returns a set it refuses partway to its proposer with the reason, so partial success is always visible.
 9. [S5] An Admin reverses a poisoned sync's suggestion set by sync, in one action. A bad extraction stays out of a history that is permanent.
-10. [S3, S7] Knowledge › Kinds lists the kinds with counts per kind and per collection, and an Admin renames or merges a kind by one bulk commit. The company language is read off its concepts and corrected by an Admin, never declared in a file.
+10. [S3, S7] Knowledge › Kinds lists the kinds with counts per kind and per collection, and offers no rename or merge. The company language is read off its concepts, never declared in a file.
 11. [S3, V1] Knowledge › All knowledge lists every concept and write-up, with Knowledge › Conflicts and Knowledge › Due for verification beside it. An Admin reads the state of the map in one area.
 12. [P1] An Admin invites a person by email, changes their role, removes them, and ends every sign-in and token they hold in this workspace. Access follows the people the company has today.
 13. [P1] Groups are flat, aligned to Entra, and the one thing an audience names. Who may see a connected source's content is one group lookup.

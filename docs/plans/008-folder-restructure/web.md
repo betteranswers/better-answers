@@ -508,14 +508,6 @@ Each row says what must change. "None" rows are listed because they name a path 
 
 Prose with no gate behind it (update so the next agent is not misled; nothing fails if skipped):
 
-- `docs/solutions/logic-errors/a-second-mutate-drops-the-first-actions-callbacks.md:66,67,69`
-- `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md:44,174` (line 93 already names a file that no longer exists, `features/auth/member.ts`)
-- `docs/solutions/logic-errors/a-stale-tab-acted-in-the-workspace-the-session-had-moved-to.md:87,94,97`
-- `docs/solutions/logic-errors/better-auth-lookup-deleted-another-persons-expired-sign-in-code.md:15,46,167`
-- `docs/solutions/logic-errors/a-non-modal-radix-sheet-still-loops-tab-inside-itself.md:82,84`
-- `docs/solutions/logic-errors/a-held-read-in-a-spec-stalls-the-actions-settle-and-its-refusal-line.md:39`
-- `docs/solutions/integration-issues/chromium-keeps-no-body-for-a-streamed-trpc-answer.md:43`
-- `docs/solutions/best-practices/what-a-rename-prose-pass-gets-wrong-and-the-checks-that-catch-it.md:99` (`apps/web/test/navigation.test.ts`)
 - `docs/specs/route/p1.md:15` (`apps/web/src/features/auth/account-page.tsx`, which stays; no change)
 - `docs/plans/007-s3-concepts-and-guides.md`, an active plan: 37 full-path mentions (lines 302-1423) plus short `e2e/<name>.spec.ts` mentions at 541, 555, 640, 654, 1102, 1146, 1147, 1306. It also plans new specs at `apps/web/e2e/guides.spec.ts` (1102) and `apps/web/e2e/all-knowledge.spec.ts` (1306); under this layout those belong in `e2e/knowledge/`.
 - `.claude/skills/survey-architecture/SKILL.md:17` treats each `apps/web/src/features/<f>/` as one unit; still true, no change.

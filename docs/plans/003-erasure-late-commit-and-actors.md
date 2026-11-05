@@ -79,7 +79,6 @@ ADR 0020 says every actor id the platform wrote becomes the pseudonym, `bundle_c
 - `packages/core/src/concepts/writes/reconciler.ts` (`trailerFactsOf`, `replayCommit`): a replay takes its actor from the trailer.
 - `packages/core/src/store/git/index.ts` (`rewriteHistory`, `replacementsFor`): text and message replacements are `human:<address>` alone.
 - `packages/schema/src/knowledge/question-tables.ts` (`question_feedback_flag_check`).
-- `docs/solutions/best-practices/a-race-test-held-late-or-released-in-turn-cannot-prove-a-lock-order.md`: hold at the first contended statement.
 
 ---
 

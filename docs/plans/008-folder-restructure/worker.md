@@ -185,8 +185,6 @@ Bare names that keep working unchanged, because `tests/` stays on `sys.path`:
 
 - `contracts/links/cases.json:2` (`links.py`, `apps/worker/tests/test_links_contract.py`), `contracts/document-passage/cases.json:2`, `contracts/erasure-match/cases.json:2`, `contracts/redaction/cases.json:2`, `contracts/upload-media-types/cases.json:2` (moved test paths in `description`). Neither tier's contract test parses `description`. **Do not edit these in the move commit; see Risks.**
 - `docs/operations/CI.md:109` (`apps/worker/tests/test_redaction_descriptors.py`).
-- `docs/solutions/logic-errors/python-unquote-is-not-javascript-decodeuri.md:11` (`applies_when` cites `apps/worker/src/better_answers_worker/links.py`), `docs/solutions/logic-errors/two-tiers-regex-engines-split-lines-and-whitespace-differently.md:55` (same path).
-- `docs/solutions/integration-issues/a-store-reopened-in-one-process-races-the-engines-teardown-of-its-last-handle.md:15,45,75` (`test_pipeline_landed.py`, `test_pipeline_host.py`).
 - `docs/plans/007-s3-concepts-and-guides.md:687-758` (`links.py`, `rebuild.py`, `test_links*.py`). Plan record; update only if plans are kept live.
 - `apps/worker/tests/fixtures/conversion/README.md:10` (`tests/test_pipeline_landed.py`). `fixtures/redaction/README.md:9,19` name `planted_page.py` and `test_redaction_windows.py` by basename; still true.
 - `docs/archive/plans/*` and `.planning/` mention old paths; archive, leave.

@@ -425,7 +425,7 @@ A refusal whose sweep is `sessions`, `verifications` or `ingress` names no works
 
 The test workspace stands in production, marked, and no run signs in to it. Its three test people (the test Admin, Editor and Viewer) and its 51 invented members have addresses on its testing domain. The mark names that domain in a row the api cannot delete (migrations 0062 and 0063). While it stands, an invitation to an address off that domain is refused `off-testing-domain`, so an Admin of the workspace cannot invite a real person into it.
 
-**The journeys and the test inbox are retired until go-live.** The owner retired them on 19/10/2026 (ADR 0022). The go-live rebuild starts from this page as `a3c19ec8` holds it, and from `docs/solutions/best-practices/a-cloudflare-email-worker-test-inbox-needs-its-own-zone-and-its-deploy-token-reaches-every-zone.md`.
+**The journeys and the test inbox are retired until go-live.** The owner retired them on 19/10/2026. The go-live rebuild starts from this page as `a3c19ec8` holds it.
 
 **Fires.** Nothing. `off-testing-domain` is the mark doing its job.
 
@@ -513,7 +513,7 @@ The worker ends a job that hangs past `JOB_DEADLINE_SECONDS`, 36 hours (`apps/wo
 
 VPC 1 has a 4 GB swap file on the NVMe, so a first index that outgrows the worker's 1.5 GB cap slows down rather than fails. `deploy/host-setup.sh vpc1` creates it with `fallocate`, `mkswap`, `swapon`, the `fstab` line, and `vm.swappiness=10`. `memswap_limit` in `platform.compose.yaml` caps the worker's spill at 1.5 GB of swap.
 
-During the first index, watch the worker heartbeat's `pswpin` figure. Above 4 MB/s for five minutes is the signal for the WireGuard split (ADR 0025). The page-cache floor in `BACKUPS.md` § Signals is the second trigger.
+During the first index, watch the worker heartbeat's `pswpin` figure. Above 4 MB/s for five minutes is the signal for the WireGuard split, growth step A in `coolify.md` § Boxes. The page-cache floor in `BACKUPS.md` § Signals is the second trigger.
 
 ## The daily sweeps
 

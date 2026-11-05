@@ -403,8 +403,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   },
   {
     file: "packages/devtools/test/gates/solutions-docs.test.ts",
-    reads:
-      "every doc under docs/solutions, for its applies_when and for a line-number reference, and each architecture decision for the ADR format",
+    reads: "every doc under docs/solutions, for the ADR format and for a line-number reference",
     inTheLane: "check:docs:devtools",
   },
   {

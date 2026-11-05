@@ -195,9 +195,9 @@ Update skills only with `pnpm run skills-update`. The command runs `npx skills u
 
 The backlog is in Linear. Use the `linear-server` MCP server to reach it. `docs/agents/issue-tracker.md` gives the details.
 
-### Lessons learned
+### Architecture decisions
 
-`docs/solutions/` records the problems that this repository has solved. The docs are in folders by category and have YAML frontmatter. Before you work in an area, read the docs whose `applies_when` matches that area.
+Before you start a task, read the decisions in `docs/solutions/architecture-patterns/` whose `applies_when` lines match it.
 
 ### Mutation triage
 

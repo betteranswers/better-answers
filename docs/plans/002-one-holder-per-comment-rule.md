@@ -87,7 +87,6 @@ The density gate measures workspaces, four directories and one named set of root
 - KTD3. **Density loses the directory kind, not just its arguments.** `packages/devtools/src/comments/comment-density.ts` drops the `directory` kind, the config-language set and a unit's `holds` list, and `scripts/comment-density.mjs` drops the two options. A workspace still measures TypeScript and Python only, in a source arm and a test arm.
 - KTD4. **A `comment-lint.test.ts` case goes only when a rule suite holds the same case.** Before deleting a case, find its twin in `comment-only-the-why.test.ts` or `string-cites-nothing.test.ts`. A case with no twin stays.
 - KTD5. **The decision doc on rule form is amended, not rewritten.** `docs/solutions/architecture-patterns/adr-0045.md` says the density ceiling is "the only gate on a config file's comments". A dated amendment says density is now a workspace backstop, a config file's comments have no mechanical gate, and the edit hook is gone. The pull request body says this decision doc was edited.
-- KTD6. **The cloc learning is retired unless its trap still bites a workspace.** `docs/solutions/integration-issues/cloc-counts-a-glob-in-a-config-string-as-a-block-comment.md` describes the named root-config unit, which goes. Run the learning's own check on a TypeScript file inside a workspace: if cloc still counts the lines between two glob strings as comments, keep the learning and move its example to that case; otherwise delete it.
 
 ### Assumptions
 
@@ -193,19 +192,17 @@ The density gate measures workspaces, four directories and one named set of root
 ### U5. Correct the docs
 
 - **Goal:** Live docs describe four holders: the lint config, the Python gate, the workspace density ceiling and review.
-- **Requirements:** R7. Carries KTD5 and KTD6.
+- **Requirements:** R7. Carries KTD5.
 - **Dependencies:** U1, U2, U3.
 - **Files:**
   - `docs/operations/local-gates.md`
   - `packages/devtools/README.md`
   - `docs/solutions/architecture-patterns/adr-0045.md`
-  - `docs/solutions/integration-issues/cloc-counts-a-glob-in-a-config-string-as-a-block-comment.md`
 - **Approach:**
   1. `local-gates.md`: remove the section on the write-time comment gate and correct the count of scripts the settings wire; add the Python gate and the wider glob to the pre-commit section.
   2. `packages/devtools/README.md`: remove the edit hook's lines and its test's row; say density holds each workspace; replace the sentence that a comment in YAML, shell, TOML or SQL is the density ceiling's alone.
   3. The decision doc: add the amendment under KTD5.
-  4. The cloc learning: keep or delete under KTD6.
-  5. Search `AGENTS.md`, each `CODING_STANDARDS.md` and `docs/agents/` for the hook and the directory ceilings, and correct what the search finds.
+  4. Search `AGENTS.md`, each `CODING_STANDARDS.md` and `docs/agents/` for the hook and the directory ceilings, and correct what the search finds.
 - **Test scenarios:** Test expectation: none, docs only.
 - **Verification:** `check:docs` passes, and a search for `comment-gate-hook`, `--directory .github` and `the-root-tool-configuration` finds them only in dated plans, `docs/archive/` and passages that record a past event.
 
