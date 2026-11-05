@@ -579,7 +579,7 @@ Use this procedure to land a company's reviewed OKF bundle in its workspace. Run
 2. Copy the bundle's own tree to the box.
 3. Run the command with `--dry-run`. It checks the whole tree, writes nothing, and says what a run would do.
 4. Run the command without `--dry-run`.
-5. If the run says `stopped at <file> (<reason>)`, it kept what landed. Put the reason right and run it again. For a taken merge key, apply page 10's `merge-key-taken` remedy and rewrite the holder onto a free key. `stopped at <file> (stale-precondition)` means another writer changed the file between the passes, and the rerun handles it.
+5. If the run says `stopped at <file> (<reason>)`, it kept what landed. Put the reason right and run it again. For a taken merge key, apply page 10's `merge-key-taken` remedy and rewrite the holder onto a free key. `stopped at <file> (stale-precondition)` means another writer changed the file between the passes, and the rerun handles it. A refusal `unrecorded-head` means the bundle's head is a commit whose rows were lost. Run again in a minute, and if it repeats, go to page 10.
 6. Put the numbers from the closing line in the estate-size record.
 
 **The tree.** `manifest.yaml` sits at its root, with the five keys ADR 0002 names: `id` (a ULID minted once for the bundle), `origin`, `ref`, `owner`, and `content_version`. Concept files sit beneath it in any folders. `index.md` and `log.md` are skipped at any level.
@@ -621,6 +621,7 @@ The command replaces the body and nothing else. The frontmatter's bytes, the sta
 | Refusal | Exit | Meaning and what to do |
 | --- | --- | --- |
 | `stale-precondition` | 8 | The concept moved off the `--expect` hash, or its file is ahead of its row while another write lands. Run the dry run again. If it repeats a minute later, the rows are behind the bundle, so go to page 10. |
+| `unrecorded-head` | 9 | The bundle's head is a commit whose rows were lost, and the reconciler has not replayed it yet. Run again in a minute. If it repeats, the replay stopped, so go to page 10. |
 | `no-such-concept` | 6 | The IRI names no concept the `--as` member can read. |
 | `unchanged` | 7 | The body renders as the one held, as after a done line. |
 | `widening-refused` | 7 | The concept is held narrower than its sources' documents, and the update would widen it. Escalate to the technical contact. |
