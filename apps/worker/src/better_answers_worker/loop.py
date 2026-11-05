@@ -1,7 +1,8 @@
 import argparse
+import os
+import select
 import signal
 import sys
-import threading
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from types import FrameType
@@ -33,9 +34,13 @@ DIFFERS = "differs"
 class StopRequested(SystemExit): ...
 
 
+# The signal handler takes no lock: the main thread may hold it, as in
+# threading.Event.wait, and the handler would then wait forever.
 class _Stop:
     def __init__(self) -> None:
-        self.requested = threading.Event()
+        self.requested = False
+        self.wakeup, self._wake = os.pipe()
+        os.set_blocking(self._wake, False)
         self._job_running = False
         self._finish_within_seconds: float = FINISH_WITHIN_SECONDS
 
@@ -46,8 +51,9 @@ class _Stop:
         signal.signal(signal.SIGALRM, self._interrupt)
 
     def _request(self, _signal: int, _frame: FrameType | None) -> None:
-        if not self.requested.is_set():
-            self.requested.set()
+        if not self.requested:
+            self.requested = True
+            os.write(self._wake, b"\0")
             signal.setitimer(signal.ITIMER_REAL, self._finish_within_seconds)
 
     def _interrupt(self, _signal: int, _frame: FrameType | None) -> None:
@@ -70,7 +76,7 @@ type Sleep = Callable[[float], object]
 
 
 def sleep_until_stopped(seconds: float) -> None:
-    STOP.requested.wait(seconds)
+    select.select([STOP.wakeup], [], [], seconds)
 
 
 def schema_stamp_matches(connection: psycopg.Connection) -> bool:
@@ -238,7 +244,7 @@ def tick(
 ) -> bool:
     worked = False
     for workspace_id in queue.workspace_ids(connection):
-        if STOP.requested.is_set():
+        if STOP.requested:
             break
         served = _serve_workspace(
             connection,
@@ -266,7 +272,7 @@ def warm_the_detectors_stack(worker_id: str) -> None:
 def run(bootstrap: Bootstrap, *, once: bool, sleep: Sleep = sleep_until_stopped) -> int:
     with queue.connected(bootstrap.database_url) as connection:
         said: dict[str, str] | None = None
-        while not STOP.requested.is_set():
+        while not STOP.requested:
             stamps = deploy_stamps(connection)
             if DIFFERS in stamps.values():
                 if stamps != said:
