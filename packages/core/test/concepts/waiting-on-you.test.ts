@@ -376,6 +376,9 @@ describe("Waiting on you", () => {
       ownerOpens: await openedBy(scenario.editor, sibling.suggestionId),
       adminDeclines: await declinedBy(scenario, scenario.admin, sibling.suggestionId),
       ownerDeclines: await declinedBy(scenario, scenario.editor, sibling.suggestionId),
+      adminAccepts: await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+        decisions: [{ suggestionId: sibling.suggestionId, expectedTarget: null }],
+      }),
     };
 
     expect(orphaned).toEqual([
@@ -388,7 +391,17 @@ describe("Waiting on you", () => {
       ownerOpens: { ok: false, error: "not-found" },
       adminDeclines: { ok: false, error: "no-such-suggestion" },
       ownerDeclines: { ok: false, error: "no-such-suggestion" },
+      adminAccepts: {
+        ok: true,
+        value: [
+          {
+            suggestionId: sibling.suggestionId,
+            outcome: { ok: false, error: "no-such-suggestion" },
+          },
+        ],
+      },
     });
+    expect(await waitingStatusOf([sibling.suggestionId])).toEqual([true]);
     expect(JSON.stringify(seen)).not.toContain(withheld);
   });
 

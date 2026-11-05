@@ -10,7 +10,11 @@ import {
   SUGGESTION_WAITING_STATUS,
 } from "@better-answers/schema";
 
-import { readableClause, readableParameters } from "../../access/index.ts";
+import {
+  readableClause,
+  readableParameters,
+  sensitivityAndAudienceClause,
+} from "../../access/index.ts";
 import { action, declareActions, record, type AuditAction } from "../../audit/index.ts";
 import {
   actorIdOf,
@@ -284,14 +288,25 @@ export const conceptOfSuggestion = async (
     : standingConcept(principal, tx, target, payload.path);
 };
 
+const HIDDEN_AT = `SELECT 1 FROM concept_index c
+   WHERE c.workspace_id = $1 AND c.path = $4
+     AND NOT (${sensitivityAndAudienceClause("c", 2)})`;
+
 const decidersRefusal = async (
   decider: UserPrincipal,
   tx: Tx,
   suggestionId: string,
-): Promise<DeciderRefusal | undefined> => {
+): Promise<DeciderRefusal | "no-such-suggestion" | undefined> => {
   const payload = await payloadFor(decider, tx, suggestionId);
   if (payload === undefined) throw new Error("a suggestion has no write request to decide");
-  return deciderAdmits(decider, tx, await conceptOfSuggestion(decider, tx, payload), payload.kind);
+  const concept = await conceptOfSuggestion(decider, tx, payload);
+  const hidden = await tx.query(HIDDEN_AT, [
+    decider.workspaceId,
+    ...readableParameters(decider),
+    concept.path,
+  ]);
+  if (hidden.rows.length > 0) return "no-such-suggestion";
+  return deciderAdmits(decider, tx, concept, payload.kind);
 };
 
 const decide = async (
