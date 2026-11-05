@@ -668,6 +668,8 @@ const FINANCE = "finance";
 
 const FINANCE_ONLY = "Professional indemnity policy";
 
+export const NORTHGATE_RECORDS = "Northgate company records";
+
 const BID_LIBRARY = {
   templateId: "bid-library",
   collection: NORTHGATE.collection,
@@ -680,6 +682,7 @@ const northgateConcept = (concept: Concept, trust: AskedConcept["trust"]) => ({
   kind: concept.kind,
   body: concept.body,
   trust,
+  sources: [{ title: NORTHGATE_RECORDS, at: "register entry" }],
   frontmatter: { tags: [...concept.tags] },
 });
 
@@ -951,6 +954,33 @@ export const seedEditSuggestion = async (
   const [suggestionId] = submitted.value.suggestionIds;
   if (suggestionId === undefined) throw new Error("the set holds no suggestion");
   return { suggestionId, setId: submitted.value.setId };
+};
+
+export const usageAsking = z.strictObject({
+  workspaceId: z.string().min(1),
+  writeUpId: z.string().min(1),
+});
+
+type UsageRow = {
+  readonly id: string;
+  readonly actor: string;
+  readonly at: Date;
+  readonly act: string;
+  readonly writeUpId: string | null;
+  readonly version: number | null;
+  readonly iri: string | null;
+};
+
+export const usageOf = async (
+  app: TestApp,
+  asked: z.output<typeof usageAsking>,
+): Promise<{ readonly usage: readonly UsageRow[] }> => {
+  const found = await app.database.superuser.query<UsageRow>(
+    `SELECT id, actor, at, act, write_up_id AS "writeUpId", write_up_version AS version, iri
+       FROM usage WHERE workspace_id = $1 AND write_up_id = $2 ORDER BY at, id`,
+    [asked.workspaceId, asked.writeUpId],
+  );
+  return { usage: found.rows };
 };
 
 const commitAuthorsAsking = z.strictObject({

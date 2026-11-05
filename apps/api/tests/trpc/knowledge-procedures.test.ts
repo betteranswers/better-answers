@@ -17,10 +17,12 @@ import {
   conceptsSeeding,
   guideSeeding,
   nameOwners,
+  NORTHGATE_RECORDS,
   ownersNaming,
   seedConceptIndex,
   seedConcepts,
   seedGuide,
+  usageOf,
 } from "../support/harness/harness-knowledge.ts";
 import { actingIn, openTestGit } from "../support/harness/harness.ts";
 import {
@@ -814,6 +816,41 @@ describe("a guide over tRPC", () => {
     expect(unchanged).toEqual({ saved: false, version: 2 });
     expect(changed).toEqual({ saved: true, version: 3 });
     expect(again).toEqual({ saved: false, version: 3 });
+  });
+
+  it("copies a Brief, then records its usage", async () => {
+    const { workspace, outsider, editor, seeded } = await aGuideHeldByAnEditorInFinance();
+    const { writeUpId } = sectionOf(seeded.sections, INSURANCE);
+    const { workspaceId } = workspace;
+    const usage = async () => (await usageOf(app(), { workspaceId, writeUpId })).usage;
+    const { api } = await webSignedIn(app(), editor.email);
+    const outsiders = (await webSignedIn(app(), outsider.email)).api;
+
+    const copy = await api.knowledge.briefCopy.query({ writeUpId });
+    const readOnly = await usage();
+    const recorded = await api.knowledge.recordCopy.mutate({ writeUpId, version: copy.version });
+    const withheld = rpcOf(await refusalOfCall(outsiders.knowledge.briefCopy.query({ writeUpId })));
+    const editorsGuide = await api.knowledge.guide.query({ guideId: seeded.guideId });
+    const outsidersGuide = await outsiders.knowledge.guide.query({ guideId: seeded.guideId });
+
+    expect(copy).toMatchObject({ version: 2, footnotes: 4 });
+    expect(copy.text).toMatch(
+      /\n\nSources\n\[1\] [^\n]+\n\[2\] [^\n]+\n\[3\] [^\n]+\n\[4\] [^\n]+$/u,
+    );
+    expect(copy.text).toContain(`Source: ${NORTHGATE_RECORDS}, register entry.`);
+    expect(readOnly).toEqual([]);
+    expect(recorded).toEqual({ id: matching.any(String) });
+    expect(await usage()).toMatchObject([
+      { act: "copied", version: 2, actor: `human:${editor.id}`, iri: null },
+    ]);
+    expect(withheld).toMatchObject({
+      message: "not-found",
+      data: { refusal: { word: "not-found" } },
+    });
+    expect(sectionOf(editorsGuide.sections, INSURANCE).copy).toBe("offered");
+    expect(sectionOf(outsidersGuide.sections, "Company overview").copy).toBe(
+      "below-action-threshold",
+    );
   });
 
   it("includes an available concept through the knowledge router", async () => {

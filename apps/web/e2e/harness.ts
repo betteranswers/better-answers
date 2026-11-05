@@ -334,6 +334,25 @@ export const seedGuide = (
   input: { workspaceId: string; userId: string; financeUserIds: readonly string[] },
 ) => ask(api, "/guides", input, guideSeeded);
 
+const usageRead = z.object({
+  usage: z.array(
+    z.object({
+      id: z.string(),
+      actor: z.string(),
+      at: z.string(),
+      act: z.string(),
+      writeUpId: z.string().nullable(),
+      version: z.number().nullable(),
+      iri: z.string().nullable(),
+    }),
+  ),
+});
+
+export const usageOf = (
+  api: APIRequestContext,
+  input: { workspaceId: string; writeUpId: string },
+) => ask(api, "/usage", input, usageRead);
+
 type SeedIndexBatch = {
   readonly collection: string | null;
   readonly kind: string;
