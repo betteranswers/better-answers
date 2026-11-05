@@ -31,17 +31,13 @@ A living company knowledge map for UK SMBs, built on the Open Knowledge Format (
 ### Source files
 
 - Group source by capability, in `src/<capability>/`. Name each capability with the glossary's words.
-- When a capability has more than 15 files, give it subfolders by sub-capability.
 - Leave a file where it is if something other than an import names it by path.
 
 ### Test files
 
 Test folders mirror source folders. Put a test in the folder that mirrors the folder of the slice whose entry or module the test drives.
 
-- `test/a/b/` mirrors `src/a/b/`.
-- In `apps/api` and `apps/worker`, the test root is `tests/`, so `tests/a/b/` mirrors `src/a/b/`.
-- In `apps/worker`, the source root is `src/better_answers_worker/`, and the test root mirrors it.
-- In `apps/web`, `test/<feature>/` or `e2e/<feature>/` mirrors `src/features/<feature>/`.
+`test/a/b/` mirrors `src/a/b/`. `TREES` in `packages/devtools/src/scans/test-folders.ts` lists each workspace's test root and source root.
 
 An import that only sets a test up, such as a store door or `kernel`, does not decide where the test goes.
 
@@ -51,43 +47,21 @@ To find the tests of a source file, open its mirror folder. Then search for the 
 
 ### Test folders that mirror no source folder
 
-A test folder that mirrors no source folder is one of four kinds:
-
-- `support/` and `fixtures/` hold helpers.
-- `gates/` at the test root holds the checks of the repository itself, such as a config, a lint rule, a workflow, a skill, or the tree.
-- A run folder holds the tests that a job other than `check` selects. `readings/`, `budgets/`, and `images/` are run folders.
-- A pinned folder mirrors a tree outside `src/`. A pinned folder can also hold the tests of one source file when those tests fill a folder.
-
-`pnpm run test-folders` enforces these kinds. The table in `packages/devtools/src/scans/test-folders.ts` lists every run folder and every pinned folder, with the reason for each.
+Such a folder is `support/` or `fixtures/` for helpers, `gates/` at the test root for checks of the repository itself, or a row in `PINS` in `packages/devtools/src/scans/test-folders.ts`. `pnpm run test-folders` names the fix for any other folder.
 
 ### Test helpers
 
 - Put a helper that one folder uses beside that folder's tests.
 - Put a helper that two folders share in `support/`.
-- In `apps/web`, put every helper of `test/` in `test/support/`.
 - Put a helper's own test beside the helper.
 
 ### Paths to repository files
 
-A test or a script reaches repository files through the roots helper of its workspace:
-
-| Workspace | Helper file | Names |
-| --- | --- | --- |
-| `apps/api` | `apps/api/tests/support/roots/roots.ts` | `repositoryRoot`, `workspaceRoot` |
-| `apps/web` | `apps/web/test/support/roots.ts` | `repositoryRoot`, `workspaceRoot` |
-| `packages/core` | `packages/core/test/support/roots/roots.ts` | `repositoryRoot`, `workspaceRoot` |
-| `packages/schema` | `packages/schema/test/support/roots/roots.ts` | `repositoryRoot`, `workspaceRoot` |
-| `apps/worker` | `apps/worker/tests/support/roots.py` | `REPOSITORY_ROOT`, `WORKER_ROOT` |
-| `packages/devtools` (TypeScript) | `packages/devtools/src/paths.ts` | `repositoryRoot` |
-| `packages/devtools` (Python) | `packages/devtools/python/roots.py` | `REPOSITORY_ROOT` |
-
-- Outside `packages/devtools`, only the roots helpers import `repositoryRoot` from `@better-answers/devtools/paths`.
-- `pnpm run lint` and `pnpm run climb-scan` refuse the common ways to climb out of a workspace. Each error message names the file of the helper to use.
-- Production source under `src/` is exempt from these checks. Code at the repository root, such as `scripts/`, is also exempt.
+A test or a script reaches repository files through its workspace's roots helper, never by climbing with `..`. `pnpm run lint` and `pnpm run climb-scan` name the helper in each error. Production source under `src/` and code at the repository root, such as `scripts/`, are exempt.
 
 ### Folder size
 
-A folder in a `src`, `test`, `tests`, or `e2e` tree holds at most 15 tracked files directly. `pnpm run loose-files` enforces the limit. The table in `packages/devtools/src/scans/loose-files.ts` lists the folders that a tool pins above the limit, with the reason for each.
+A folder in a `src`, `test`, `tests`, or `e2e` tree holds at most 15 tracked files directly. Split a full folder by sub-capability. `pnpm run loose-files` enforces the limit.
 
 ### Move files
 
@@ -110,8 +84,7 @@ A move changes no test file's name and no test's title.
 ### Test at the lowest layer that can see the claim
 
 - Test a pure function in-process, and import its module by path.
-- In `packages/core`, a test under `test/<x>/` imports the modules of `src/<x>/` by path. For a store door, the test folder is `test/store/<door>/` and the source folder is `src/store/<door>/`.
-- In `packages/core`, a test reaches every other directory through an entry in the package's `exports` map.
+- In `packages/core`, a test imports any module of the folder it mirrors, and any other folder only through that folder's `index.ts`. The `import-direction` lint enforces this.
 - Test a transport through its interface. In `apps/api`, call `server.request(...)`. In `apps/worker`, call the job or the module entry point.
 - Test the behaviour of a page on a single screen with a component test that uses Testing Library.
 
@@ -136,16 +109,13 @@ Never mock this repository's own code. Never add an in-memory stand-in for a sto
 
 ### Browser specs
 
-- The browser suite has one spec for each page.
-- A page's spec covers its latency budget, the accessibility gate, and keyboard reach.
-- The browser suite also holds the journeys that cross pages through the real api.
+The browser suite has one spec for each page, and its cross-page journeys are in `apps/web/e2e/journeys/`. The `playwright-specs` skill gives the rest.
 
 ### Jobs outside `check`
 
-- The image job, `pnpm run check:images`, runs the tests of the images, the compose scripts, and the api's stop. `check` does not run them.
+- Put an image, compose-script or api-stop test in `apps/api/tests/images/`, or mark a worker test `image`. `pnpm run check:images` runs them; `check` does not.
+- Put a test that records figures in `packages/core/test/readings/`, and a performance-budget test in `packages/core/test/budgets/`. The schedule runs them.
 - A test that spawns the worker stays in its package's `check`.
-- A test that records figures runs on the schedule, not in `check`.
-- A performance-budget test runs on the schedule, not in `check`.
 
 ### Failures in Postgres
 
