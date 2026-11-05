@@ -217,6 +217,21 @@ describe("the Detail of a section", () => {
     expect(screen.queryByRole("region", { name: "Detail of section 1" })).toBeNull();
   });
 
+  it("returns focus to Show Detail when d closes it", async () => {
+    await openGuide("Viewer");
+    const button = screen.getByRole("button", { name: "Show Detail" });
+
+    fireEvent.click(button);
+    const detail = await screen.findByRole("region", { name: "Detail of section 1" });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(detail);
+    });
+    fireEvent.keyDown(detail, { key: "d" });
+
+    expect(screen.queryByRole("region", { name: "Detail of section 1" })).toBeNull();
+    expect(document.activeElement).toBe(button);
+  });
+
   it("opens by default where no assembled layer shows", async () => {
     const quoted = aGuide({ sections: [aSection({ layers: ["quoted"] })] });
     await openGuide("Viewer", quoted);

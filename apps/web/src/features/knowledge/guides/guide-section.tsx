@@ -137,7 +137,7 @@ function Detail(properties: {
   );
 }
 
-const useDetail = (section: GuideSection) => {
+const useDetail = (section: GuideSection, button: RefObject<HTMLButtonElement | null>) => {
   const [open, setOpen] = useState(!section.layers.includes("assembled"));
   const region = useRef<HTMLElement>(null);
   const pressed = useRef(false);
@@ -152,6 +152,7 @@ const useDetail = (section: GuideSection) => {
     toggle: () => {
       pressed.current = !open;
       setOpen(!open);
+      if (open) button.current?.focus();
     },
   };
 };
@@ -221,7 +222,8 @@ export function GuideSectionView(properties: SectionProps) {
   const detailId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   const navigate = useNavigate();
-  const detail = useDetail(section);
+  const showDetail = useRef<HTMLButtonElement>(null);
+  const detail = useDetail(section, showDetail);
   const including = useIncluding(section, say, heading);
   const editing = useBriefEditing({
     sectionId: section.sectionId,
@@ -265,6 +267,7 @@ export function GuideSectionView(properties: SectionProps) {
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {editing.actions}
               <Button
+                ref={showDetail}
                 type="button"
                 variant="outline"
                 {...actionNamed(SECTION_ACTIONS.showDetail)}
