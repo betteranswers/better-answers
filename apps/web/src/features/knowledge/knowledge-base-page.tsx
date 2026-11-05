@@ -8,6 +8,7 @@ import {
   BROWSE,
   conceptMatchKey,
   conceptPageOf,
+  KNOWLEDGE_BASE_PAGE,
   RETURNED_TO,
 } from "@/shared/knowledge/concept-address.ts";
 import { useOpenMatch } from "@/shared/knowledge/open-match.ts";
@@ -15,7 +16,6 @@ import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { useLanding, useLandingLine } from "@/shared/landing.ts";
 import { GridTable, RowLink } from "@/shared/list/grid-table.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list/list-pages.tsx";
-import { pageNamed } from "@/shared/navigation.ts";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
 import { Card } from "@/shared/ui/card.tsx";
@@ -38,8 +38,6 @@ import {
 } from "./knowledge-state.ts";
 import { KnowledgeTree } from "./knowledge-tree.tsx";
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "./knowledge-words.ts";
-
-const KNOWLEDGE_BASE = pageNamed(BROWSE, "Knowledge Base");
 
 const LISTED = Object.values(KEY);
 
@@ -280,7 +278,7 @@ function KnowledgeBaseRegion() {
   return (
     <section aria-labelledby={headingId} className="mt-6">
       <ListHead
-        heading={KNOWLEDGE_BASE.name}
+        heading={KNOWLEDGE_BASE_PAGE.name}
         headingId={headingId}
         headingRef={heading}
         description={WORDS.about}

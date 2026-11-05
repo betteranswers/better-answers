@@ -108,7 +108,7 @@ export const KNOWLEDGE = {
     {
       id: "browse",
       name: "Browse",
-      summary: "Search this workspace.",
+      summary: "Search or browse this workspace.",
       pages: [
         {
           name: "Search",

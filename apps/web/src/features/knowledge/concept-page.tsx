@@ -1,5 +1,5 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
@@ -7,8 +7,7 @@ import {
   BROWSE,
   conceptMatchKey,
   conceptPageOf,
-  OPENED_FROM,
-  searchAt,
+  wayBackOf,
 } from "@/shared/knowledge/concept-address.ts";
 import { ConceptBody, LINK, type MarkOpening } from "@/shared/knowledge/concept-body.tsx";
 import {
@@ -33,6 +32,7 @@ import {
   type Concept,
   type Evidence,
 } from "@/shared/knowledge/knowledge-reads.ts";
+import { useOpenedFrom } from "@/shared/knowledge/open-match.ts";
 import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { cn } from "@/shared/lib/utils.ts";
@@ -49,33 +49,40 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { useConceptEditing } from "./editing/concept-actions.tsx";
-import { CONCEPT_KEYSTROKES as KEY, EDITOR_KEYSTROKES } from "./knowledge-state.ts";
+import {
+  CONCEPT_KEYSTROKES as KEY,
+  EDITOR_KEYSTROKES,
+  wayBackKeystroke,
+} from "./knowledge-state.ts";
 import { RELATION_WORDS } from "./knowledge-words.ts";
 
-const LISTED = [...Object.values(KEY), ...Object.values(EDITOR_KEYSTROKES)];
+const listedWithWayBackTo = (page: string) => [
+  wayBackKeystroke(page),
+  KEY.sources,
+  KEY.links,
+  ...Object.values(EDITOR_KEYSTROKES),
+];
 
 const useWayBack = (iri: string | undefined) => {
   const navigate = useNavigate();
-  const searchQuery = useRouterState({
-    select: (state) => OPENED_FROM.safeParse(state.location.state).data?.searchQuery,
-  });
-  const href = searchAt(searchQuery);
+  const openedFrom = useOpenedFrom();
+  const { page, href } = wayBackOf(openedFrom);
   const openedMatch =
-    iri === undefined || searchQuery === undefined ? undefined : conceptMatchKey(iri);
+    iri === undefined || openedFrom === undefined ? undefined : conceptMatchKey(iri);
   const go = () => {
     void navigate({
       href,
-      state: (held) => ({ ...held, searchQuery: undefined, openedMatch }),
+      state: (held) => ({ ...held, openedFrom: undefined, openedMatch }),
     });
   };
-  return { href, go };
+  return { name: page.name, href, go };
 };
 
 function WayBack(properties: { readonly iri: string | undefined }) {
   const wayBack = useWayBack(properties.iri);
   return (
     <RowLink href={wayBack.href} className={LINK} onOpen={wayBack.go}>
-      {WORDS.toSearch}
+      {WORDS.backTo(wayBack.name)}
     </RowLink>
   );
 }
@@ -309,8 +316,9 @@ function ConceptShown(properties: {
     standing: properties.standing,
   });
 
-  usePageKeystrokes(LISTED);
-  useKeystroke(KEY.back, wayBack.go);
+  const listed = useMemo(() => listedWithWayBackTo(wayBack.name), [wayBack.name]);
+  usePageKeystrokes(listed);
+  useKeystroke(wayBackKeystroke(wayBack.name), wayBack.go);
   useKeystroke(KEY.sources, () => {
     sources.current?.focus();
   });

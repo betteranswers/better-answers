@@ -1,4 +1,4 @@
-import { useRouter, useRouterState } from "@tanstack/react-router";
+import { useRouterState } from "@tanstack/react-router";
 import {
   useCallback,
   useEffect,
@@ -327,7 +327,6 @@ function Results(properties: {
 }
 
 const useReading = (query: string): Reading => {
-  const router = useRouter();
   const openMatch = useOpenMatch();
   const returned = useRouterState({
     select: (state) => RETURNED_TO.safeParse(state.location.state).data?.openedMatch,
@@ -345,7 +344,7 @@ const useReading = (query: string): Reading => {
       },
     },
     onRead: (match, page) => {
-      openMatch({ key: keyOf(match), page, searchQuery: router.latestLocation.searchStr });
+      openMatch({ key: keyOf(match), page });
     },
   };
 };

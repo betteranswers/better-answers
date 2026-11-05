@@ -16,6 +16,8 @@ import { useOperatorStanding } from "@/features/console/operator.ts";
 import { HomeLine } from "@/features/people/members/self-action.tsx";
 import { GridPattern } from "@/shared/blueprint.tsx";
 import { ShellKeystrokes, ShellKeystrokesAction, type Keystroke } from "@/shared/keystrokes.tsx";
+import { placeOpenedFrom } from "@/shared/knowledge/concept-address.ts";
+import { useOpenedFrom } from "@/shared/knowledge/open-match.ts";
 import { leftFor, useMember } from "@/shared/member/member.ts";
 import {
   EVERY_AREA,
@@ -163,7 +165,8 @@ export function Frame(properties: {
   const offersJumpTo = visible.home !== undefined;
   const jumping = useJumping(offersJumpTo);
 
-  const open = placeAt(visible.areas, pathname);
+  const openedFrom = useOpenedFrom();
+  const open = placeOpenedFrom(visible.areas, pathname, openedFrom);
   const region = useRegion(visible, pathname);
   const outcome = useBandOutcome(switching, leaving, here, pathname);
   const switches = useSwitchesSeen(here?.workspaceId);

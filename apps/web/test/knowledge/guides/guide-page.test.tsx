@@ -54,6 +54,17 @@ describe("the guide page", () => {
     expect(article.getAllByText("3 of 4 expected facts recorded")).toHaveLength(2);
   });
 
+  it("names only Guides as current in the menu", async () => {
+    await openGuide("Editor");
+
+    const menu = screen.getByRole("navigation", { name: "Knowledge" });
+    expect(
+      within(menu)
+        .getAllByRole("link", { current: "page" })
+        .map((link) => link.textContent),
+    ).toEqual([GUIDES_PAGE.name]);
+  });
+
   it("draws each section in order with its number", async () => {
     await openGuide(
       "Editor",
