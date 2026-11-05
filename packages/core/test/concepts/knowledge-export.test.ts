@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -12,12 +13,14 @@ import { matching } from "@better-answers/schema/testing/matching";
 import { zipOf, type ZipEntry } from "../../src/concepts/export-zip.ts";
 import {
   exportBundleSnapshot,
+  exportGuideInput,
   exportGuideSnapshot,
   exportRecords,
 } from "../../src/concepts/index.ts";
 import { readGuide, saveBrief, seedGuide } from "../../src/guides/index.ts";
 import type { Role, UserPrincipal } from "../../src/kernel/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit, treeCommitted } from "../fixtures/bundle.ts";
+import { shelveOne } from "../fixtures/concept-shelf.ts";
 import { bundleIndexed, type BundleIndexed } from "../fixtures/indexed-bundle.ts";
 import { IMPORTED, NORTHGATE, TYPED } from "../fixtures/northgate-concepts.ts";
 import { northgate, type Northgate } from "../fixtures/northgate.ts";
@@ -114,29 +117,38 @@ type GuideWorld = {
   readonly insurance: Briefed;
 };
 
-const briefWith = async (
-  ng: Northgate,
+const briefSaved = async (
+  writer: UserPrincipal,
+  scenario: Scenario,
   guideId: string,
   prompt: string,
-  sentence: string,
+  markdownOf: (labels: readonly string[]) => string,
 ): Promise<Briefed> => {
   const guide = answered(
-    await readingAs(db().runtimePool, ng.editor, (editor, tx) =>
-      readGuide(editor, tx, { guideId }),
-    ),
+    await readingAs(db().runtimePool, writer, (editor, tx) => readGuide(editor, tx, { guideId })),
   );
   const section = guide?.sections.find((each) => each.prompt === prompt);
   const labels = section?.brief?.editable?.footnotes.map(({ label }) => label) ?? [];
   if (section?.brief === undefined) throw new Error(`no Brief to write at ${prompt}`);
   const saved = answered(
-    await saveBrief(ng.editor, doorsOf(ng.scenario), {
+    await saveBrief(writer, doorsOf(scenario), {
       writeUpId: section.writeUpId,
-      markdown: labels.map((label) => `${sentence}[^${label}]`).join("\n\n"),
+      markdown: markdownOf(labels),
       base: section.brief.version,
     }),
   );
   return { writeUpId: section.writeUpId, version: saved.version };
 };
+
+const briefWith = (
+  ng: Northgate,
+  guideId: string,
+  prompt: string,
+  sentence: string,
+): Promise<Briefed> =>
+  briefSaved(ng.editor, ng.scenario, guideId, prompt, (labels) =>
+    labels.map((label) => `${sentence}[^${label}]`).join("\n\n"),
+  );
 
 const guideWorld = once(async (): Promise<GuideWorld> => {
   const scenario = await arrange();
@@ -214,6 +226,23 @@ describe("who may export", () => {
 
     expect(refused).toEqual(
       Array.from({ length: 3 }, () => ({ ok: false, error: "confirmation-too-old" })),
+    );
+    expect(await exportEventsBy(world.scenario, admin)).toEqual([]);
+    expect(await usageBy(world.scenario, admin)).toEqual([]);
+  });
+
+  it("an Admin removed from the workspace is refused every export", async () => {
+    const world = await guideWorld();
+    const admin = await memberAs(world.scenario, "Admin", world.ng.finance);
+    await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+      world.scenario.workspaceId,
+      admin.userId,
+    ]);
+
+    const refused = await everyExportOf(admin, world);
+
+    expect(refused).toEqual(
+      Array.from({ length: 3 }, () => ({ ok: false, error: "not-a-member" })),
     );
     expect(await exportEventsBy(world.scenario, admin)).toEqual([]);
     expect(await usageBy(world.scenario, admin)).toEqual([]);
@@ -320,6 +349,55 @@ describe("a guide snapshot", () => {
 
     expect(await guideOf(admin, world, ulid())).toEqual({ ok: false, error: "not-found" });
     expect(await exportEventsBy(world.scenario, admin)).toEqual([]);
+  });
+
+  it("takes a guide id and nothing else", () => {
+    expect(exportGuideInput.safeParse({ guideId: ulid() }).success).toBe(true);
+    expect(exportGuideInput.safeParse({}).success).toBe(false);
+    expect(exportGuideInput.safeParse({ guideId: ulid(), colour: "red" }).success).toBe(false);
+  });
+});
+
+/** A guide about a concept, with a sub-section's Brief written and a section's left blank. */
+const subjectWorld = once(async () => {
+  const scenario = await arrange();
+  const subjectIri = await shelveOne(db().pool, scenario.workspaceId, {
+    path: "knowledge/company/smith-and-jones.md",
+    title: "“Smith & Jones” bids (2026)!",
+  });
+  const { guideId } = answered(
+    await seedGuide(scenario.admin, doorsOf(scenario), {
+      templateId: "bid-library",
+      collection: "company",
+      subjectIri,
+    }),
+  );
+  const writer = await principalFor(db(), scenario.workspaceId, scenario.editor.userId);
+  await briefSaved(writer, scenario, guideId, "Security testing", () => "We test every quarter.");
+  await briefSaved(writer, scenario, guideId, "What we offer", () => " \n");
+  const admin = await memberAs(scenario, "Admin");
+  return answered(await exportGuideSnapshot(admin, scenario.postgres, { guideId, at: AT }));
+});
+
+describe("a guide snapshot about a concept", () => {
+  it("names the file after the concept, in plain words", async () => {
+    const guide = await subjectWorld();
+
+    expect(guide.name).toBe("guide-smith-jones-bids-2026-2026-06-02.md");
+    expect(guide.markdown).toMatch(/^# “Smith & Jones” bids \(2026\)!\n/u);
+  });
+
+  it("heads a sub-section one level below its section", async () => {
+    const guide = await subjectWorld();
+
+    expect(guide.markdown).toContain("\n### 6.1 Security testing\n\n");
+  });
+
+  it("leaves out a section whose Brief is blank", async () => {
+    const guide = await subjectWorld();
+
+    expect(guide.sections).toBe(1);
+    expect(guide.markdown).not.toContain("What we offer");
   });
 });
 
@@ -558,6 +636,39 @@ describe("a knowledge base whose head cannot be exported", () => {
   });
 });
 
+describe("records past their row cap", () => {
+  it("keeps a family's newest 50,000 rows and says so", async () => {
+    const scenario = await arrange();
+    const iri = await shelveOne(db().pool, scenario.workspaceId, {
+      path: "knowledge/policies/expenses.md",
+    });
+    const admin = await memberAs(scenario, "Admin");
+    const usedOlder = (from: number, to: number) =>
+      db().pool.query(
+        `INSERT INTO usage (workspace_id, id, actor, at, act, iri)
+         SELECT $1, lpad(n::text, 26, '0'), $2, $3::timestamptz - n * interval '1 second',
+                'copied', $4
+           FROM generate_series($5::int, $6::int) AS n`,
+        [scenario.workspaceId, `human:${admin.userId}`, AT.toISOString(), iri, from, to],
+      );
+    const usageLines = async () =>
+      csvLinesOf(answered(await recordsOf(admin, scenario)).zip, "usage.csv");
+
+    await usedOlder(1, 50_000);
+    const atTheCap = await usageLines();
+    await usedOlder(50_001, 50_001);
+    const pastTheCap = await usageLines();
+
+    expect(atTheCap).toHaveLength(50_001);
+    expect(atTheCap.at(-1)).toMatch(/^"","","[^"]+","copied",/u);
+    expect(pastTheCap).toHaveLength(50_002);
+    expect(pastTheCap.at(-2)).toBe(atTheCap.at(-1));
+    expect(pastTheCap.at(-1)).toBe(
+      `"The export stopped at 50,000 rows. The rest are not in this file."`,
+    );
+  });
+});
+
 const NOT_UTF8 = Uint8Array.of(0xff, 0xfe, 0x00, 0x80, 0x0a, 0xc3);
 
 const ENTRIES: readonly ZipEntry[] = [
@@ -570,11 +681,19 @@ const ENTRIES: readonly ZipEntry[] = [
   { path: "knowledge/manifest.yaml", bytes: Buffer.from("owner: Acme\n") },
 ];
 
-const unzipped = async (zip: Uint8Array) => {
+const onDisk = async <T>(zip: Uint8Array, read: (file: string) => Promise<T>): Promise<T> => {
   const scratch = await mkdtemp(path.join(tmpdir(), "better-answers-zip-"));
   const file = path.join(scratch, "export.zip");
   try {
     await writeFile(file, zip);
+    return await read(file);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+};
+
+const unzipped = (zip: Uint8Array) =>
+  onDisk(zip, async (file) => {
     const tested = await run("unzip", ["-tq", file]);
     const names = (await run("unzip", ["-Z1", file])).stdout.split("\n").filter(Boolean);
     const contents = await Promise.all(
@@ -583,10 +702,31 @@ const unzipped = async (zip: Uint8Array) => {
       ),
     );
     return { tested: tested.stdout.trim(), files: names.map((name, at) => [name, contents[at]]) };
-  } finally {
-    await rm(scratch, { recursive: true, force: true });
-  }
-};
+  });
+
+const DESCRIBED = new Map([
+  ["compression method", "method"],
+  ["version of encoding software", "madeBy"],
+  ["minimum software version required to extract", "needs"],
+  ["file last modified on (DOS date/time)", "modified"],
+]);
+
+/** What `zipinfo -v` reports of each entry's central directory record. */
+const describedBy = (zip: Uint8Array): Promise<readonly Record<string, string>[]> =>
+  onDisk(zip, async (file) =>
+    (await run("unzip", ["-Zv", file])).stdout
+      .split(/Central directory entry #\d+:\n-+\n/u)
+      .slice(1)
+      .map((entry) => {
+        const [name = "", ...lines] = entry.trim().split("\n");
+        const fields = lines.flatMap((line): (readonly [string, string])[] => {
+          const [, label = "", value = ""] = /^\s*([^:]+):\s{2,}(.+)$/u.exec(line) ?? [];
+          const key = DESCRIBED.get(label);
+          return key === undefined ? [] : [[key, value]];
+        });
+        return { name, ...Object.fromEntries(fields) };
+      }),
+  );
 
 describe("the export's zip", () => {
   it("the zip round trips through unzip", async () => {
@@ -628,6 +768,55 @@ describe("the export's zip", () => {
     expect(zipOf([{ path: "binary.bin", bytes: NOT_UTF8 }], AT, zip.length)).toEqual({
       ok: true,
       value: zip,
+    });
+  });
+
+  it("dates each entry and compresses only what shrinks", async () => {
+    const zip = answered(zipOf(ENTRIES, AT));
+
+    const dated = { madeBy: "2.0", needs: "2.0", modified: "2026 Jun 1 23:30:00" };
+    expect(await describedBy(zip)).toEqual([
+      { name: "knowledge/manifest.yaml", method: "none (stored)", ...dated },
+      { name: "knowledge/policies/binary.bin", method: "none (stored)", ...dated },
+      { name: "knowledge/policies/empty.md", method: "none (stored)", ...dated },
+      { name: "knowledge/policies/repeated.md", method: "deflated", ...dated },
+    ]);
+  });
+
+  it("marks names UTF-8 and counts entries where strict readers look", () => {
+    const zip = Buffer.from(answered(zipOf(ENTRIES.slice(0, 2), AT)));
+    const central = zip.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+    const end = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+
+    expect({
+      localNeeds: zip.readUInt16LE(4),
+      localFlags: zip.readUInt16LE(6),
+      centralFlags: zip.readUInt16LE(central + 8),
+      entriesOnThisDisk: zip.readUInt16LE(end + 8),
+      entries: zip.readUInt16LE(end + 10),
+    }).toEqual({
+      localNeeds: 20,
+      localFlags: 0x08_00,
+      centralFlags: 0x08_00,
+      entriesOnThisDisk: 2,
+      entries: 2,
+    });
+  });
+
+  it("refuses a file over its cap before compressing it", () => {
+    const text = (length: number) => [{ path: "long.md", bytes: Buffer.from("a".repeat(length)) }];
+
+    expect(zipOf(text(1_001), AT, 1_000)).toEqual({ ok: false, error: "export-too-large" });
+    expect(zipOf(text(1_000), AT, 1_000)).toMatchObject({ ok: true });
+  });
+
+  it("refuses once its files together pass the cap", () => {
+    const noise = (name: string) => ({ path: name, bytes: randomBytes(400) });
+
+    expect(zipOf([noise("one.bin")], AT, 600)).toMatchObject({ ok: true });
+    expect(zipOf([noise("one.bin"), noise("two.bin")], AT, 600)).toEqual({
+      ok: false,
+      error: "export-too-large",
     });
   });
 });
