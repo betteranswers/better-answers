@@ -15,7 +15,8 @@ def _quotes_passage(resource: str, locator: str | None) -> bool:
     if locator is None or _IRI.fullmatch(resource):
         return False
     span = _PASSAGE_LOCATOR.fullmatch(locator)
-    return span is not None and int(span[1]) < int(span[2])
+    # The api reads each offset as a JavaScript Number, which rounds past 2**53.
+    return span is not None and float(span[1]) < float(span[2])
 
 
 _URI_RESERVED = frozenset(";/?:@&=+$,#")
