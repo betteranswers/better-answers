@@ -94,7 +94,14 @@ export type {
   OverrideConceptSensitivityRefusal,
 } from "./visibility.ts";
 export { conceptPageOf } from "./reading/read.ts";
-export { briefCopy, briefCopyInput, recordCopy, recordCopyInput } from "./brief-copy.ts";
+export {
+  briefCopy,
+  briefCopyInput,
+  copyOfferOf,
+  recordCopy,
+  recordCopyInput,
+  type CopyOffer,
+} from "./brief-copy.ts";
 export {
   MAP_MAINTENANCE,
   mapCounts,
@@ -108,7 +115,6 @@ export {
   TRUST_STATUSES,
   TRUST_TIERS,
   UNREVIEWED_TIERS,
-  standsOn,
   trustOf,
   trustWords,
   ukLongDate,

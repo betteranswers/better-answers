@@ -3,6 +3,7 @@ import {
   briefCopy,
   briefCopyInput,
   collectionOwnerNamed,
+  copyOfferOf,
   collectionsAndOwners,
   conceptToEdit,
   conceptToEditInput,
@@ -17,8 +18,8 @@ import {
   saveConcept,
   saveConceptInput,
   standingOnConcept,
-  standsOn,
   trustWords,
+  type CopyOffer,
 } from "@better-answers/core/concepts";
 import {
   includeAvailable,
@@ -86,8 +87,6 @@ const passages = (principal: UserPrincipal, tx: Tx) => (locator: string) =>
 
 type GuideAsked = Parameters<typeof readGuide>[2];
 
-type CopyOffer = "offered" | "below-action-threshold";
-
 type GuideAnswered = Omit<GuideRead, "sections"> & {
   readonly owner: { readonly id: string; readonly name: string } | null;
   readonly sections: readonly (Omit<SectionRead, "citedIris"> & {
@@ -123,8 +122,11 @@ const guideAnswered = async (
     sections: guide.sections.map(({ citedIris: _cited, ...section }, at) => {
       const held = trust.value[at];
       if (held === undefined) throw new Error(`section ${section.sectionId} has no trust`);
-      const copy = standsOn(held, threshold.value) ? "offered" : "below-action-threshold";
-      return { ...section, trustWords: trustWords(held), copy };
+      return {
+        ...section,
+        trustWords: trustWords(held),
+        copy: copyOfferOf(held, threshold.value),
+      };
     }),
   });
 };

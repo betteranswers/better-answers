@@ -30,6 +30,10 @@ const SUPPORT = "Support and service levels";
 
 const OFFER = "What we offer";
 
+const SECURITY = "Information security";
+
+const TESTING = "Security testing";
+
 type Section = {
   readonly guide: SeededGuide;
   readonly writeUpId: string;
@@ -201,6 +205,21 @@ describe("copying a section's Brief", () => {
     const copying = await copyingAs(section.guide.ng.viewer, section.writeUpId);
 
     expect(copying).toEqual({ ok: false, error: "not-found" });
+  });
+
+  it("a section under a hidden one cannot be copied", async () => {
+    const section = await briefedSection(TESTING);
+    const { editor, admin } = section.guide.ng;
+    const hide = (hidden: boolean) =>
+      db().pool.query("UPDATE guide_section SET hidden = $1 WHERE prompt = $2", [hidden, SECURITY]);
+    await hide(true);
+
+    const hiddenFromEditor = await copyingAs(editor, section.writeUpId);
+    const shownToAdmin = await copyingAs(admin, section.writeUpId);
+    await hide(false);
+
+    expect(hiddenFromEditor).toEqual({ ok: false, error: "not-found" });
+    expect(shownToAdmin.ok).toBe(true);
   });
 
   it("a Brief with no text is not found to copy", async () => {

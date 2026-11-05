@@ -1,9 +1,10 @@
 import { z } from "zod";
 
-import { boundarySchemas } from "@better-answers/schema";
+import { boundarySchemas, type TRUST_TIERS } from "@better-answers/schema";
 
 import {
   briefToCopy,
+  readActionThreshold,
   renderBrief,
   type BriefToCopy,
   type ClipboardBrief,
@@ -22,7 +23,7 @@ import {
 import type { Tx } from "../store/postgres/index.ts";
 import { recordUsage } from "../usage/index.ts";
 import { readSectionTrusts } from "./reading/browse.ts";
-import { standsOn } from "./trust.ts";
+import { standsOn, type Trust } from "./trust.ts";
 
 export const briefCopyInput = z.strictObject({
   writeUpId: boundarySchemas.writeUp.select.shape.id,
@@ -55,6 +56,11 @@ export type RecordCopyRefusal = RefusalOf<typeof recordCopyAction> | Error;
 
 export type CopiedBrief = ClipboardBrief & { readonly version: number };
 
+export type CopyOffer = "offered" | "below-action-threshold";
+
+export const copyOfferOf = (section: Trust, threshold: (typeof TRUST_TIERS)[number]): CopyOffer =>
+  standsOn(section, threshold) ? "offered" : "below-action-threshold";
+
 type Copiable = Result<BriefToCopy, BriefCopyRefusal>;
 
 const copiable = async (
@@ -72,7 +78,11 @@ const copiable = async (
   if (!trusts.ok) return trusts;
   const weakest = trusts.value[0];
   if (weakest === undefined) return err(new Error("the section's trust was not read"));
-  return standsOn(weakest, held.threshold) ? ok(held) : err("below-action-threshold");
+  const threshold = await readActionThreshold(reader, tx, held.guideId);
+  if (!threshold.ok) return threshold;
+  return copyOfferOf(weakest, threshold.value) === "offered"
+    ? ok(held)
+    : err("below-action-threshold");
 };
 
 export const briefCopy = async (
