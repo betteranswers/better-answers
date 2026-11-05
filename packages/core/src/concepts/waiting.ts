@@ -11,7 +11,7 @@ import {
   type ConceptIri,
 } from "@better-answers/schema";
 
-import { readableClause, readableParameters } from "../access/index.ts";
+import { readableParameters, sensitivityAndAudienceClause } from "../access/index.ts";
 import {
   admit,
   ANY_ROLE,
@@ -99,7 +99,9 @@ const waitingSelect = (narrowed: boolean): string => `WITH sets AS (
     FROM sets
    CROSS JOIN LATERAL suggestion_set_summary(sets.set_id) s
     JOIN suggestion p ON p.workspace_id = $1 AND p.id = s.suggestion_id
-    LEFT JOIN concept_index c ON c.workspace_id = $1 AND c.iri = s.resolved_iri
+    LEFT JOIN concept_index c
+           ON c.workspace_id = $1
+          AND (c.iri = s.resolved_iri OR (s.resolved_iri IS NULL AND c.path = s.path))
     LEFT JOIN LATERAL (
           SELECT person_id FROM concept_owner
            WHERE workspace_id = $1
@@ -112,7 +114,7 @@ const waitingSelect = (narrowed: boolean): string => `WITH sets AS (
           AND pu.id = substr(s.proposer, ${PERSON_PREFIX.length + 1})
    WHERE s.kind = '${SUGGESTION_EDIT_KIND}' AND s.status = '${SUGGESTION_WAITING_STATUS}'
      AND ($2 = 'Admin' OR o.person_id = $4)
-     AND (s.resolved_iri IS NULL OR (${readableClause("c", 2)}))${
+     AND (c.iri IS NULL AND s.resolved_iri IS NULL OR (${sensitivityAndAudienceClause("c", 2)}))${
        narrowed ? "\n     AND s.suggestion_id = $5" : ""
      }
    ORDER BY p.proposed_at, s.suggestion_id`;
@@ -179,7 +181,7 @@ type StandingRow = {
 };
 
 const STANDING = `SELECT c.title, c.body, c.frontmatter FROM concept_index c
-   WHERE c.workspace_id = $1 AND c.iri = $4 AND ${readableClause("c", 2)}`;
+   WHERE c.workspace_id = $1 AND c.iri = $4 AND ${sensitivityAndAudienceClause("c", 2)}`;
 
 type Projecting = WaitingReads & {
   readonly principal: UserPrincipal;

@@ -121,6 +121,22 @@ describe("the browser suite's knowledge harness", () => {
     });
   });
 
+  it("lands a draft concept that find leaves out", async () => {
+    const workspace = await app().provision();
+    const [draft, stable] = await conceptsSeeded({
+      ...seedingBy(workspace),
+      concepts: [
+        { title: "Quarry blast plan", body: "A synthetic blast plan.", status: "draft" },
+        { title: "Quarry blast window", body: "Synthetic blasts happen at noon." },
+      ],
+    });
+
+    const found = await foundBy(workspace.admin, "quarry blast");
+
+    expect(found).toContain(stable?.iri);
+    expect(found).not.toContain(draft?.iri);
+  });
+
   it("lands one file name in two collections", async () => {
     const workspace = await app().provision();
 

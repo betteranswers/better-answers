@@ -6,6 +6,8 @@ import { ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
 import {
+  acceptSuggestions,
+  declineSuggestion,
   submitSuggestionSet,
   waitingEdit,
   waitingOnYou,
@@ -15,10 +17,16 @@ import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { parseLocator, passageAt } from "../../src/sources/index.ts";
 import {
   connectedSourceHolding,
+  groupNamed,
   passageUnder,
   writeUpIncluding,
 } from "../fixtures/sourced-concept.ts";
-import { nameOwnerAs, suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
+import {
+  doorsOf,
+  nameOwnerAs,
+  suiteWithBundles,
+  type Scenario,
+} from "../fixtures/workspace-with-bundle.ts";
 import {
   conceptProposedBy,
   conceptWritten,
@@ -47,6 +55,17 @@ const openedBy = (reader: UserPrincipal, suggestionId: string) =>
       },
     ),
   );
+
+const declinedBy = (scenario: Scenario, decider: UserPrincipal, suggestionId: string) =>
+  declineSuggestion(decider, doorsOf(scenario), { suggestionId, reason: "Thirty days stands." });
+
+const waitingStatusOf = async (suggestionIds: readonly string[]) => {
+  const found = await db().pool.query<{ waiting: boolean }>(
+    "SELECT status = 'waiting' AS waiting FROM suggestion WHERE id = ANY($1) ORDER BY id",
+    [suggestionIds],
+  );
+  return found.rows.map((row) => row.waiting);
+};
 
 const named = async (principal: UserPrincipal, name: string) => {
   await db().pool.query('UPDATE "user" SET name = $2 WHERE id = $1', [principal.userId, name]);
@@ -284,36 +303,210 @@ describe("Waiting on you", () => {
 
   it("hides an edit whose concept the owner cannot read", async () => {
     const scenario = await arrange();
-    const { suggestionId } = await conceptProposedBy(scenario, scenario.viewer, {
-      sensitivity: "Restricted",
+    const restricted = { sensitivity: "Restricted" } as const;
+    const published = await conceptProposedBy(scenario, scenario.viewer, restricted);
+    const draft = await conceptProposedBy(scenario, scenario.viewer, {
+      ...restricted,
+      status: "draft",
     });
 
     expect({
       owner: await suggestionsWaitingFor(scenario.editor),
-      ownerOpens: await openedBy(scenario.editor, suggestionId),
+      ownerOpensPublished: await openedBy(scenario.editor, published.suggestionId),
+      ownerOpensDraft: await openedBy(scenario.editor, draft.suggestionId),
       admin: await suggestionsWaitingFor(scenario.admin),
     }).toEqual({
       owner: [],
-      ownerOpens: { ok: false, error: "not-found" },
-      admin: [suggestionId],
+      ownerOpensPublished: { ok: false, error: "not-found" },
+      ownerOpensDraft: { ok: false, error: "not-found" },
+      admin: [published.suggestionId, draft.suggestionId],
     });
   });
 
   it("hides an edit from an Admin outside its concept's audience", async () => {
     const scenario = await arrange();
-    const { written, suggestionId } = await conceptProposedBy(scenario, scenario.viewer);
+    const published = await conceptProposedBy(scenario, scenario.viewer);
+    const draft = await conceptProposedBy(scenario, scenario.viewer, { status: "draft" });
     await db().pool.query(
       `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
-        WHERE workspace_id = $1 AND iri = $2`,
-      [scenario.workspaceId, written.iri, ulid()],
+        WHERE workspace_id = $1 AND iri = ANY($2)`,
+      [scenario.workspaceId, [published.written.iri, draft.written.iri], ulid()],
     );
 
     expect({
       admin: await suggestionsWaitingFor(scenario.admin),
-      adminOpens: await openedBy(scenario.admin, suggestionId),
+      adminOpensPublished: await openedBy(scenario.admin, published.suggestionId),
+      adminOpensDraft: await openedBy(scenario.admin, draft.suggestionId),
+      adminDeclinesPublished: await declinedBy(scenario, scenario.admin, published.suggestionId),
+      adminDeclinesDraft: await declinedBy(scenario, scenario.admin, draft.suggestionId),
+      stillWaiting: await waitingStatusOf([published.suggestionId, draft.suggestionId]),
     }).toEqual({
       admin: [],
+      adminOpensPublished: { ok: false, error: "not-found" },
+      adminOpensDraft: { ok: false, error: "not-found" },
+      adminDeclinesPublished: { ok: false, error: "no-such-suggestion" },
+      adminDeclinesDraft: { ok: false, error: "no-such-suggestion" },
+      stillWaiting: [true, true],
+    });
+  });
+
+  it("hides a retitle's orphaned edit from deciders outside its audience", async () => {
+    const scenario = await arrange();
+    const standing = await conceptWritten(scenario);
+    const retitle = await proposedBy(scenario, scenario.viewer, standing, {
+      title: "Travel Expenses",
+      frontmatter: { title: "Travel Expenses", type: "Policy" },
+    });
+    const withheld = "The settlement figure is 4.2 million pounds.";
+    const sibling = await proposedBy(scenario, scenario.viewer, standing, { body: withheld });
+    await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+      decisions: [{ suggestionId: retitle.suggestionId, expectedTarget: standing.written.iri }],
+    });
+    const orphaned = await waitingFor(scenario.admin);
+    await db().pool.query(
+      `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
+        WHERE workspace_id = $1 AND iri = $2`,
+      [scenario.workspaceId, standing.written.iri, ulid()],
+    );
+
+    const seen = {
+      admin: await suggestionsWaitingFor(scenario.admin),
+      owner: await suggestionsWaitingFor(scenario.editor),
+      adminOpens: await openedBy(scenario.admin, sibling.suggestionId),
+      ownerOpens: await openedBy(scenario.editor, sibling.suggestionId),
+      adminDeclines: await declinedBy(scenario, scenario.admin, sibling.suggestionId),
+      ownerDeclines: await declinedBy(scenario, scenario.editor, sibling.suggestionId),
+      adminAccepts: await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+        decisions: [{ suggestionId: sibling.suggestionId, expectedTarget: null }],
+      }),
+    };
+
+    expect(orphaned).toEqual([
+      matching.objectContaining({ suggestionId: sibling.suggestionId, target: null }),
+    ]);
+    expect(seen).toEqual({
+      admin: [],
+      owner: [],
       adminOpens: { ok: false, error: "not-found" },
+      ownerOpens: { ok: false, error: "not-found" },
+      adminDeclines: { ok: false, error: "no-such-suggestion" },
+      ownerDeclines: { ok: false, error: "no-such-suggestion" },
+      adminAccepts: {
+        ok: true,
+        value: [
+          {
+            suggestionId: sibling.suggestionId,
+            outcome: { ok: false, error: "no-such-suggestion" },
+          },
+        ],
+      },
+    });
+    expect(await waitingStatusOf([sibling.suggestionId])).toEqual([true]);
+    expect(JSON.stringify(seen)).not.toContain(withheld);
+  });
+
+  describe("on a draft concept", () => {
+    const draftProposed = (scenario: Scenario) =>
+      conceptProposedBy(scenario, scenario.viewer, { status: "draft" });
+
+    const standingText = {
+      title: "Expenses",
+      body: "Expenses are claimed within thirty days.",
+      sources: undefined,
+    };
+
+    it("lists and opens its edit for the owner and Admins", async () => {
+      const scenario = await arrange();
+      const { written, suggestionId } = await draftProposed(scenario);
+      const opened = { ok: true, value: matching.objectContaining({ current: standingText }) };
+
+      expect({
+        owner: await suggestionsWaitingFor(scenario.editor),
+        ownerOpens: await openedBy(scenario.editor, suggestionId),
+        admin: await waitingFor(scenario.admin),
+        adminOpens: await openedBy(scenario.admin, suggestionId),
+      }).toEqual({
+        owner: [suggestionId],
+        ownerOpens: opened,
+        admin: [matching.objectContaining({ suggestionId, target: written.iri })],
+        adminOpens: opened,
+      });
+    });
+
+    it("lets an Admin in its audience group decide its edit", async () => {
+      const scenario = await arrange();
+      const { written, suggestionId } = await draftProposed(scenario);
+      const finance = await groupNamed(db(), scenario, "Finance", [scenario.admin]);
+      await db().pool.query(
+        `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
+          WHERE workspace_id = $1 AND iri = $2`,
+        [scenario.workspaceId, written.iri, finance],
+      );
+
+      expect({
+        admin: await suggestionsWaitingFor(scenario.admin),
+        adminOpens: await openedBy(scenario.admin, suggestionId),
+        adminDeclines: await declinedBy(scenario, scenario.admin, suggestionId),
+      }).toEqual({
+        admin: [suggestionId],
+        adminOpens: { ok: true, value: matching.objectContaining({ current: standingText }) },
+        adminDeclines: matching.objectContaining({ ok: true }),
+      });
+    });
+
+    it("hides its edit from people who may not decide it", async () => {
+      const scenario = await arrange();
+      const { suggestionId } = await draftProposed(scenario);
+
+      expect({
+        proposer: await suggestionsWaitingFor(scenario.viewer),
+        proposerOpens: await openedBy(scenario.viewer, suggestionId),
+        anotherEditor: await suggestionsWaitingFor(scenario.unowned),
+        anotherEditorOpens: await openedBy(scenario.unowned, suggestionId),
+      }).toEqual({
+        proposer: [],
+        proposerOpens: { ok: false, error: "not-found" },
+        anotherEditor: [],
+        anotherEditorOpens: { ok: false, error: "not-found" },
+      });
+    });
+
+    it("lets the owner accept and an Admin decline its edits", async () => {
+      const scenario = await arrange();
+      const accepted = await draftProposed(scenario);
+      const declined = await draftProposed(scenario);
+
+      const acceptance = await acceptSuggestions(scenario.editor, doorsOf(scenario), {
+        decisions: [{ suggestionId: accepted.suggestionId, expectedTarget: accepted.written.iri }],
+      });
+      const decline = await declineSuggestion(scenario.admin, doorsOf(scenario), {
+        suggestionId: declined.suggestionId,
+        reason: "Thirty days stands.",
+      });
+      const landed = await db().pool.query<{ status: string; body: string }>(
+        "SELECT status, body FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+        [scenario.workspaceId, accepted.written.iri],
+      );
+
+      expect({
+        acceptance,
+        decline,
+        landed: landed.rows,
+        waiting: await suggestionsWaitingFor(scenario.admin),
+      }).toEqual({
+        acceptance: {
+          ok: true,
+          value: [
+            {
+              suggestionId: accepted.suggestionId,
+              outcome: matching.objectContaining({ ok: true }),
+            },
+          ],
+        },
+        decline: matching.objectContaining({ ok: true }),
+        landed: [{ status: "draft", body: "Expenses are claimed within sixty days." }],
+        waiting: [],
+      });
     });
   });
 });
