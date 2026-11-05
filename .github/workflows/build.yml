@@ -171,9 +171,10 @@ jobs:
           # In the registry, not the Actions cache, which any run on main can write: these
           # layers ship, and only a job holding `packages: write` can write here. A failed
           # export warns rather than fails, so a refused cache never stops a built image
-          # from being probed and pushed.
+          # from being probed and pushed. Only a run on main writes the tag, because a branch run
+          # that did would decide which layers main's next build reads and ships; it still reads.
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/{0}/{1}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true', github.repository_owner, matrix.tier) || '' }}
       # With no id the probe would build an image of its own, and the leg would push
       # something nothing read.
       - name: the image is read before it ships
