@@ -9,9 +9,9 @@ Each package's assessment behind the code-scanning alerts `scan.yml` raises with
 - **What holds it today.** The SSH client speaks to that one host, whose host key `deploy/host-setup.sh` pins in the backup's `known_hosts`, so a re-exchange inside the session can come only from the mirror's own `sshd`.
 - **What removes it.** BA-15: a Debian 13 `openssh-client` that fixes the flaw, built into the image and deployed. No such package is due. Debian marks trixie `<no-dsa>` (a minor issue), so its security team will issue no update, and only a stable point release could carry one. On 30/09/2026 `trixie-proposed-updates` held no fix, and `trixie-backports` carried 10.3p1, while the flaw is fixed from OpenSSH 10.4, in forky and sid only. The removal has no date.
 
-**CVE-2026-95619 in `libstdc++6`, `image-api` alert #1667 and `image-worker` alert #1671, medium.** libstdc++'s aligned `operator new` rounds the requested size up to the alignment without checking for overflow, so a size within the alignment of `SIZE_MAX` wraps to an undersized allocation. The code is in `libstdc++.so` itself, and programs that take outside input import it: in `image-api`, `node`; in `image-worker`, `libtorch_cpu.so`, `libtorch_python.so`, `libonnxruntime.so`, onnxruntime's pybind module and `_sentencepiece` (`readelf`, checked on 04/11/2026). No real buffer length comes near `SIZE_MAX`, but an overflowed `new T[n]` count of an over-aligned `T` can, and no reading shows that none of these takes an outside `n`.
+**CVE-2026-95619 in `libstdc++6`, `image-api` alert #1667 and `image-worker` alert #1671, medium.** libstdc++'s aligned `operator new` rounds the requested size up to the alignment without checking for overflow. So a size within the alignment of 2^64 wraps to an undersized allocation. The code is in `libstdc++.so` itself, and programs that take outside input import it. In `image-api` that is `node`. In `image-worker` it is `libtorch_cpu.so`, `libtorch_python.so`, `libonnxruntime.so`, onnxruntime's pybind module and `_sentencepiece` (`readelf`, checked on 04/11/2026). No real buffer length comes near 2^64, but an overflowed `new T[n]` count of an over-aligned `T` can. No reading shows that none of these takes an outside `n`.
 
-- **What holds it today.** The size has to come within the alignment, 64 bytes or less, of 2^64. Node and V8 bound their buffer and array lengths far below that. Torch allocates tensor storage through its own `posix_memalign` path, not `operator new`, which is inferred and not read in the binaries.
+- **What holds it today.** The alignment is 64 bytes or less, so the size has to come within 64 bytes of 2^64. Node and V8 bound their buffer and array lengths far below that. Torch allocates tensor storage through its own `posix_memalign` path, not `operator new`, which is inferred and not read in the binaries.
 - **What removes it.** BA-283: a trixie `libstdc++6` that fixes the flaw, in the api's apt layer and the worker's `cc-debian13` digest. sid has it in `gcc-14 14.4.0-3`. Debian marks trixie `<no-dsa>`, so only a stable point release could carry it, and the removal has no date.
 
 **CVE-2026-111943 in Go's standard library in `rclone`, `image-backup`, alert #1837, high.** Go 1.26.10 and 1.27.3 add a denylist to `crypto/x509` that refuses intermediate certificates no longer trusted, for systems whose trust store keeps them. `rclone` v1.75.2 is built with go1.26.9 and links `(*Certificate).Verify` (`go version -m` and its function names, checked on 04/11/2026). The path is run: every nightly and hourly job uploads to the `dumps` remote, `BACKUP_S3_ENDPOINT`, over HTTPS.
@@ -21,11 +21,14 @@ Each package's assessment behind the code-scanning alerts `scan.yml` raises with
 
 ## Assessed 04/11/2026
 
-Every critical, high, medium and unrated alert open that day, except those a fix closes. The low ones have not been through the method. The images read are the ones the nightly scan of 04/11/2026 (run 41821287427) read, all three built for `08b9b21`: `api` `sha256:15f5d84d…`, `backup` `sha256:12d4ac22…`, `worker` `sha256:bff3d8fb…`. The versions installed in them match what the alerts report. Each image was exported with `docker export` and read there: dpkg's status file, a `readelf` sweep of every ELF file for its `DT_NEEDED` and its undefined and defined dynamic symbols, the file list, and `go version -m` and the function names of the Go binaries. Two reads ran the images themselves: importing `git_filter_repo` in the api image loads 82 modules, and none of them is `ssl`, `socket`, `tarfile`, `zipfile`, `pyexpat` or `sqlite3`; and `perl` with `POSIX` and `PgCommon`, as `pg_wrapper` loads them, in the backup image holds 16 modules and no `Pod::` one.
+Every critical, high, medium and unrated alert open that day, except those a fix closes. The low ones have not been through the method. The images read are the ones the nightly scan of 04/11/2026 (run 41821287427) read, all three built for `08b9b21`: `api` `sha256:15f5d84d…`, `backup` `sha256:12d4ac22…`, `worker` `sha256:bff3d8fb…`. The versions installed in them match what the alerts report. Each image's service is as on 24/09, below. Each image was exported with `docker export` and read there: dpkg's status file, a `readelf` sweep of every ELF file for its `DT_NEEDED` and its undefined and defined dynamic symbols, the file list, and `go version -m` and the function names of the Go binaries. Two reads ran the images themselves:
+
+- Importing `git_filter_repo` in the api image loads 82 modules, and none of them is `ssl`, `socket`, `tarfile`, `zipfile`, `pyexpat` or `sqlite3`.
+- `perl` with `POSIX` and `PgCommon`, as `pg_wrapper` loads them, in the backup image holds 16 modules and no `Pod::` one.
 
 178 alerts are dismissed, 64 in `image-api`, 85 in `image-backup` and 29 in `image-worker`:
 
-- 89 are the ones BA-279 assessed on 28/10/2026, on the images of `sha-e905815`. Every reason still holds on these digests, and each is dismissed as BA-279 wrote it. libexpat1's CVE-2026-113351 (#1843 and #1851) has since risen from medium to high; its reason does not depend on the rating.
+- 89 are the ones BA-279 assessed on 28/10/2026, on the images of `sha-e905815`. Every reason still holds on these digests, and each is dismissed as BA-279 wrote it. libexpat1's CVE-2026-113351 (#1843 and #1851) has since risen from medium to high. Its reason does not depend on the rating.
 - 5 are glibc's CVE-2026-84243, from BA-310, which read the repository only. The images confirm it. The `image-api` reason is reworded, because `initRepository` runs `git init` without `LC_ALL=C`. That call still runs in C, as nothing sets `LANG`.
 - 84 are new, under BA-323.
 
@@ -33,7 +36,7 @@ Held open: #1667 and #1671 (BA-283), #1837, and #446, above. Left to a fix, and 
 
 ### `image-api`
 
-The service is as on 24/09, below. It spawns `git` through `execFile`, and `git filter-repo` in the erasure routine. The image installs no locale but C.UTF-8 and sets no `LANG`, `LC_*` or `LANGUAGE`.
+The api spawns `git` through `execFile`, and `git filter-repo` in the erasure routine. The image installs no locale but C.UTF-8 and sets no `LANG`, `LC_*` or `LANGUAGE`.
 
 - **gcc-14**: `gcc-14-base`, `libgcc-s1`, `libstdc++6`. CVE-2026-95619 in `gcc-14-base` and `libgcc-s1` (#1665 and #1666), CVE-2026-102010 (#1647, #1648 and #1653), and CVE-2026-114690, CVE-2026-114691 and CVE-2026-115455 (#1891 to #1896 and #1909 to #1911), 14 alerts. `gcc-14-base` is docs only, and `libgcc_s` exports no C++ symbol. The new flaws and CVE-2026-102010 are in header-only templates: parallel-mode `std::search`, `vector<bool>`'s constructor, extracting a `bitset` from a wide stream, and `__gnu_pbds`. `libstdc++.so` exports none of them, and the image has no C++ headers. No ELF file imports `__gnu_parallel` or `basic_istream<wchar_t>`'s sentry, and no file holds `__gnu_pbds`. `libstdc++6`'s CVE-2026-95619 is held open, above.
 - **glibc**: `libc6`, `libc-bin`. CVE-2026-84243, 2 alerts. gettext reads `LANGUAGE` only outside the C locale, and the image has no other locale. `node` imports no gettext, and the environment is the operator's compose file.
@@ -47,7 +50,7 @@ The service is as on 24/09, below. It spawns `git` through `execFile`, and `git 
 
 ### `image-backup`
 
-The service is as on 24/09, below. The image's `backup.sh` and `backup-env` match the repository's. `backup-env` passes the jobs a fixed list of variables with no `LANG`, `LC_*` or `LANGUAGE`. Both `rclone` remotes are `s3`: `src` is the object store over plain HTTP, and `dumps` the provider over HTTPS.
+The image's `backup.sh` and `backup-env` match the repository's. `backup-env` passes the jobs a fixed list of variables with no `LANG`, `LC_*` or `LANGUAGE`. Both `rclone` remotes are `s3`: `src` is the object store over plain HTTP, and `dumps` the provider over HTTPS.
 
 - **`curl`, `libcurl4t64`, `libcurl3t64-gnutls`**: CVE-2026-92388, 3 alerts. The flaw needs a failed FTP wildcard `LIST` and a reused handle. The job's one `curl` call is an HTTPS POST to the ping URL, one handle per run, and git's HTTP transports never run.
 - **gcc-14**: `gcc-14-base`, `libgcc-s1`, `libstdc++6`. CVE-2026-95619 (#1662 to #1664), CVE-2026-102010 (#1644 to #1646), and CVE-2026-114690, CVE-2026-114691 and CVE-2026-115455 (#1872 to #1877 and #1888 to #1890), 15 alerts. `gcc-14-base` is docs only, and `libgcc_s` exports no C++ symbol. Only apt's binaries link `libstdc++`, and the jobs never run apt. cron, the jobs' tools, `rclone` and `age` are C or Go.
@@ -65,7 +68,7 @@ The service is as on 24/09, below. The image's `backup.sh` and `backup-env` matc
 
 ### `image-worker`
 
-The service is as on 24/09, below. The image carries no locale directory, and its Python imports no gettext.
+The image carries no locale directory, and its Python imports no gettext.
 
 - **gcc-14**: `gcc-14-base`, `libgcc-s1`, `libgomp1`, `libstdc++6`. CVE-2026-95619 in the first three (#1668 to #1670), CVE-2026-102010 (#1658 to #1661), and CVE-2026-114690, CVE-2026-114691 and CVE-2026-115455 (#1914 to #1922 and #1933 to #1935), 19 alerts. As in `image-api`: `libgcc_s` and `libgomp` export no C++ symbol, the flaws are header-only templates that `libstdc++.so` does not export, and no ELF file imports `__gnu_parallel` or `basic_istream<wchar_t>`'s sentry or holds `__gnu_pbds`. `libtorch_cpu.so` imports OpenMP, but not `__gnu_parallel`. `libstdc++6`'s CVE-2026-95619 is held open, above.
 - **glibc**: `libc6`. CVE-2026-84243, 1 alert. Distroless carries no locale, and Python's `gettext` module is pure Python.
@@ -73,7 +76,7 @@ The service is as on 24/09, below. The image carries no locale directory, and it
 
 ## Assessed 30/09/2026
 
-Every medium alert. The low and unrated ones have not been through the method. The images read are the ones `build.yml` pushed for `1279f9c`: `api` `sha256:0613fe1d…`, `backup` `sha256:23f1bd1d…`, `worker` `sha256:eb8e4ca0…`. The alerts come from the nightly scan on `83c2f68`, and the versions installed in these images match what the alerts report. Each image was exported with `docker export` and read there: dpkg's status file, and a `readelf` sweep of every ELF file for what imports each flawed entry point and what links each library.
+Every medium alert. The low and unrated ones have not been through the method. The images read are the ones `build.yml` pushed for `1279f9c`: `api` `sha256:0613fe1d…`, `backup` `sha256:23f1bd1d…`, `worker` `sha256:eb8e4ca0…`. The alerts come from the nightly scan on `83c2f68`, and the versions installed in these images match what the alerts report. Each image's service is as on 24/09, below. Each image was exported with `docker export` and read there: dpkg's status file, and a `readelf` sweep of every ELF file for what imports each flawed entry point and what links each library.
 
 Of the 285 critical, high and medium alerts open that day:
 
@@ -85,7 +88,7 @@ Of the 285 critical, high and medium alerts open that day:
 
 ### `image-api`
 
-The service is as on 24/09, below. It spawns only `git`, through `execFile`, with no shell. The image's `HEALTHCHECK` runs `wget` through `sh`, and `deploy/platform.compose.yaml` replaces it with the exec form.
+The api spawns only `git`, through `execFile`, with no shell. The image's `HEALTHCHECK` runs `wget` through `sh`, and `deploy/platform.compose.yaml` replaces it with the exec form.
 
 - **dash**: CVE-2026-102473 and CVE-2026-102474, 2 alerts. Debian's `/bin/sh`. The flaws are in dash's own glob matching, which this build uses because it imports no libc `fnmatch`, and in its `printf`. dash runs only the `HEALTHCHECK`'s fixed line, which compose replaces. Nothing globs a directory an attacker can write, and no outside data reaches dash's `printf`.
 - **glibc**: `libc6`, `libc-bin`. CVE-2026-18374, CVE-2026-19499, CVE-2026-19542, CVE-2026-5435, CVE-2026-6238, CVE-2026-6368, CVE-2026-6791, CVE-2026-77117, CVE-2026-80489, CVE-2026-86805, CVE-2026-89092 and CVE-2026-95818, 24 alerts. Debian's base system. No ELF file imports `ns_printrr`, `ns_printrrf`, `fp_nquery`, `wordexp` or `strfmon`. Only `libtinfo` and `libncursesw` import `tdelete`, whose flaw needs a tree of a million nodes. `git`, `wget`, `tar` and `bash` import `iconv`, and the api's git re-encodes nothing: it writes blobs by `hash-object --stdin` with no `--path`, and its commits are its own UTF-8. There is no `nscd`, and none of the 11 setuid or setgid files has an RPATH or RUNPATH. The `fopen` flaw needs a caller that passes an outside `ccs=` mode, and the advisory knows of none in a distribution.
@@ -108,7 +111,7 @@ The service is as on 24/09, below. It spawns only `git`, through `execFile`, wit
 
 ### `image-backup`
 
-The service is as on 24/09, below. cron runs its two fixed job lines through `sh`, and so does the healthcheck's `pgrep` and `find` line. `backup.sh` and `backup-env` are bash.
+cron runs its two fixed job lines through `sh`, and so does the healthcheck's `pgrep` and `find` line. `backup.sh` and `backup-env` are bash.
 
 - **`curl`, `libcurl4t64`**: CVE-2026-10536, CVE-2026-11856, CVE-2026-19931, CVE-2026-80229, CVE-2026-8924, CVE-2026-8926, CVE-2026-8932, CVE-2026-9079, CVE-2026-9080 and CVE-2026-9545, 20 alerts, beside the four below. For the ping. Only `/usr/bin/curl` links `libcurl4t64`. The job's one call is an HTTPS POST to the ping URL, `curl -fsS -m 10 --retry 3`, with one handle per run. The flaws need, in turn: HTTP/2 stream dependencies, Digest auth, Negotiate auth, TLS reuse across a multi handle with an OpenSSL provider config, the cookie engine, `--netrc`, a client certificate, a proxy, an application's `SOCKETFUNCTION` callback, and HTTP/3 with early data. The call uses none of them, and `backup-env` passes the job no proxy variable.
 - **dash**: CVE-2026-102473 and CVE-2026-102474, 2 alerts. Debian's `/bin/sh`. The flaws are as in `image-api`, above. dash runs only cron's two fixed job lines and the healthcheck's fixed line. Nothing globs a directory an attacker can write, and no outside data reaches dash's `printf`.
@@ -132,7 +135,7 @@ The service is as on 24/09, below. cron runs its two fixed job lines through `sh
 
 ### `image-worker`
 
-The service is as on 24/09, below. The image carries no binary in `/bin` or `/usr/bin`, no setuid file and no `nscd`. The venv holds 142 ELF files, and the sweep read them too.
+The image carries no binary in `/bin` or `/usr/bin`, no setuid file and no `nscd`. The venv holds 142 ELF files, and the sweep read them too.
 
 - **glibc**: `libc6`. The twelve CVEs in `image-api`, above, 12 alerts. No ELF file imports `ns_printrr`, `fp_nquery`, `wordexp`, `strfmon` or `tdelete`. Only `libstdc++` imports `iconv_open`, and Python's codecs do not use it. No caller passes an outside `fopen` mode.
 - **`libbz2-1.0`**: CVE-2026-42250, 1 alert. For Python's `bz2`. The flaw is in the `bzip2recover` tool, and the image carries no binary beyond Python. The library holds none of that code.
