@@ -20,7 +20,7 @@ import { withRLS } from "../with-rls.ts";
 import { IRI, type CitedSource } from "./concept-file.ts";
 import { FULL_TEXT_LANGUAGE, searchVector } from "./full-text-match.ts";
 import { AUDIENCE_CHECK, SENSITIVITIES, SENSITIVITY_DEFAULT } from "./readable-columns.ts";
-import { SCHEMED } from "./scan.ts";
+import { SCHEMED, trimmedWhitespace } from "./scan.ts";
 
 export const CONCEPT_STATUSES = ["draft", "stable", "deprecated", "removed"] as const;
 
@@ -65,20 +65,22 @@ type SourceEntry = Readonly<Record<string, string | number | boolean | null>>;
 
 const citedByText = (entry: string): CitedSource | undefined => {
   const hash = entry.lastIndexOf("#");
-  const resource = (hash === -1 ? entry : entry.slice(0, hash)).trim();
+  const resource = trimmedWhitespace(hash === -1 ? entry : entry.slice(0, hash));
   return resource === ""
     ? undefined
     : { resource, locator: hash === -1 ? null : entry.slice(hash + 1), id: null };
 };
 
 const citedByKeys = (entry: SourceEntry): CitedSource | undefined => {
-  const resource = entry["resource"];
-  if (typeof resource !== "string" || resource.trim() === "") return undefined;
+  const named = entry["resource"];
+  if (typeof named !== "string") return undefined;
+  const resource = trimmedWhitespace(named);
+  if (resource === "") return undefined;
   const locator = entry["locator"];
   const id = entry["id"];
 
   return {
-    resource: resource.trim(),
+    resource,
     locator: locator === undefined || locator === null ? null : String(locator),
     id: id === undefined || id === null ? null : String(id),
   };

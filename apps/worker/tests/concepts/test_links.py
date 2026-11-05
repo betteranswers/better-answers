@@ -1,3 +1,5 @@
+from typing import cast
+
 from better_answers_worker.concepts.concept_file import Frontmatter
 from better_answers_worker.concepts.links import (
     DERIVED_FROM_LABEL,
@@ -195,6 +197,21 @@ def test_citing_one_concept_twice_makes_one_lineage_edge() -> None:
             {"resource": OTHER_IRI, "locator": "p.2"},
         ]
     }
+
+    derived = edges(
+        "A body.",
+        frontmatter,
+        by_iri={OTHER_IRI: ResolvedTarget(OTHER_IRI, "Policy", "stable")},
+    )
+
+    assert [edge.uid for edge in derived] == [f"lineage:{IRI}:0"]
+
+
+def test_a_lineage_ordinal_counts_only_sources_naming_a_resource() -> None:
+    frontmatter = cast(
+        "Frontmatter",
+        {"sources": [{"id": "a"}, " \t", 7, None, ["x"], {"resource": OTHER_IRI}]},
+    )
 
     derived = edges(
         "A body.",

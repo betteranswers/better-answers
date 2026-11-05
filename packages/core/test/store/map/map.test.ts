@@ -986,6 +986,24 @@ describe("which markdown in a body makes an edge", () => {
     ).toEqual([cited.iri, unwritten].toSorted());
   });
 
+  it("counts a lineage ordinal over the sources naming a resource", async () => {
+    const scenario = await arrange();
+    const cited = await conceptIn(scenario, { path: "knowledge/expenses.md", kind: "Policy" });
+    const successor = await conceptIn(scenario, { path: "knowledge/expenses-v2.md" });
+    await land(scenario, deltaOf(cited));
+
+    await land(
+      scenario,
+      deltaOf(successor, {
+        sources: citedSourcesOf([{ id: "a" }, { resource: " \t" }, { resource: cited.iri }]),
+      }),
+    );
+
+    expect(await edgeRowsFrom<{ uid: string }>(scenario, successor.iri, "uid")).toEqual([
+      { uid: `lineage:${successor.iri}:0` },
+    ]);
+  });
+
   it("adds a link once its target lands, at any depth", async () => {
     const scenario = await arrange();
     const author = await authorOf(

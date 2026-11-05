@@ -19,6 +19,7 @@ import {
   GIT_SHA,
   VERIFICATION_ORIGINS,
 } from "../knowledge/concept-tables.ts";
+import { trimmedWhitespace } from "../knowledge/scan.ts";
 import {
   conceptWriteRequest,
   suggestion,
@@ -165,7 +166,7 @@ const evidenceRefinements = {
   workspaceId,
   sourceDocumentId: (schema: z.ZodString) => schema.trim().min(1),
   locator: (schema: z.ZodString) => schema.trim().min(1),
-  resource: (schema: z.ZodString) => schema.trim().min(1),
+  resource: (schema: z.ZodString) => schema.overwrite(trimmedWhitespace).min(1),
   contentVersion: (schema: z.ZodString) => schema.trim().min(1),
 };
 
