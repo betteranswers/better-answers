@@ -18,7 +18,7 @@ import {
 } from "@/shared/ui/table.tsx";
 
 import { outcomeOfFailure } from "./refusal.tsx";
-import { ReviewActions, RuleWord } from "./review-actions.tsx";
+import { ReviewActions } from "./review-actions.tsx";
 import {
   groupIsIn,
   groupKeyText,
@@ -34,7 +34,7 @@ import {
   SOURCES_KEYSTROKES,
   useTickedGroups,
 } from "./sources-state.ts";
-import { groupsCounted, REVIEW_WORDS, sentenceCased } from "./words.ts";
+import { groupsCounted, REVIEW_WORDS, ruleWordOf, sentenceCased } from "./words.ts";
 
 const NOTHING_FOUND = {
   received: "No findings yet",
@@ -181,11 +181,9 @@ function FindingsTable(properties: {
             </TableCell>
             <TableCell>
               {sentenceCased(group.category)}
-              <span className="block text-muted-foreground">{sentenceCased(group.tier)}</span>
+              <span className="block text-muted-foreground">{REVIEW_WORDS.tier(group.tier)}</span>
             </TableCell>
-            <TableCell className="whitespace-normal">
-              <RuleWord ruleId={group.ruleId} />
-            </TableCell>
+            <TableCell className="whitespace-normal">{ruleWordOf(group)}</TableCell>
             <TableCell className="whitespace-normal">{group.title}</TableCell>
             <TableCell className="text-right tabular-nums">{group.found}</TableCell>
             <TableCell className="whitespace-normal">

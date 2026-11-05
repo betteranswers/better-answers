@@ -81,4 +81,4 @@ export type AnswerResult<Iri extends string = ConceptIri> = PlannedAnswer<Iri> &
   readonly recordId: string;
 };
 
-export const NOT_ANSWERED = "Not answered from the company's knowledge.";
+export const NOT_ANSWERED = "We couldn't find an answer in your company's knowledge.";

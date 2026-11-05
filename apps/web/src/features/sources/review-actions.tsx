@@ -148,11 +148,6 @@ function BulkAction(properties: {
   );
 }
 
-export function RuleWord(properties: { readonly ruleId: string }) {
-  const word = ruleWordOf(properties.ruleId);
-  return word === properties.ruleId ? <span className="font-mono">{word}</span> : word;
-}
-
 function TickedList(properties: { readonly groups: readonly GroupOfFindings[] }) {
   return (
     <ul className="grid gap-1">
@@ -163,7 +158,7 @@ function TickedList(properties: { readonly groups: readonly GroupOfFindings[] })
             `${spokenWord(group.category)} finding`,
             `${spokenWord(group.category)} findings`,
           )}{" "}
-          in {group.title}, found by the <RuleWord ruleId={group.ruleId} /> rule
+          in {group.title}, found by the {ruleWordOf(group)} rule
         </li>
       ))}
     </ul>

@@ -7,7 +7,7 @@ import {
 } from "@/features/knowledge/curation/curation-state.ts";
 import { KINDS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { theOneEmptyStatus } from "@test/empty-status.ts";
+import { theOneEmptyStatus } from "@test/knowledge/empty-status.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure } from "@test/stubbed-api.ts";
 import {

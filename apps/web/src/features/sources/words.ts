@@ -6,8 +6,6 @@ export { instantWords };
 
 export const SELECT_A_CONNECTED_SOURCE_FIRST = "Please select a connected source first.";
 
-type Meaning = { readonly word: string; readonly means: string };
-
 export const STATE_WORDS = {
   received: "Received",
   indexing: "Indexing",
@@ -70,54 +68,17 @@ export const NOTHING_CONNECTED = "No connected sources yet";
 
 export const DESTINATIONS_TERM = "Destinations";
 
-const DESTINATIONS = new Map<string, Meaning>([
-  [
-    "passage-index",
-    {
-      word: "searchable",
-      means: "Its passages appear in search.",
-    },
-  ],
-  [
-    "bundle",
-    {
-      word: "knowledge base",
-      means: "Concepts from it are suggested to an Admin.",
-    },
-  ],
-  ["map", { word: "map", means: "Its people, meetings and tasks are added to the map." }],
-]);
+export const DESTINATION_MEANS = {
+  "passage-index": "Its passages appear in search.",
+  bundle: "Concepts from it are suggested to an Admin.",
+  map: "Its people, meetings and tasks are added to the map.",
+} satisfies Record<ListedConnectedSource["destination"][number], string>;
 
-const RETENTIONS = new Map<string, Meaning>([
-  [
-    "mirror",
-    {
-      word: "mirror",
-      means: "Documents removed at source are removed here after a grace period.",
-    },
-  ],
-  [
-    "keep",
-    {
-      word: "keep",
-      means: "Documents are kept until an Admin removes them.",
-    },
-  ],
-  [
-    "transient",
-    {
-      word: "transient",
-      means: "Originals are deleted once processed. The redacted text is kept.",
-    },
-  ],
-]);
-
-const meaningIn = (vocabulary: ReadonlyMap<string, Meaning>, word: string): Meaning =>
-  vocabulary.get(word) ?? { word, means: word };
-
-export const destinationOf = (word: string): Meaning => meaningIn(DESTINATIONS, word);
-
-export const retentionOf = (word: string): Meaning => meaningIn(RETENTIONS, word);
+export const RETENTION_MEANS = {
+  mirror: "Documents removed at source are removed here after a grace period.",
+  keep: "Documents are kept until an Admin removes them.",
+  transient: "Originals are deleted once processed. The redacted text is kept.",
+} satisfies Record<ListedConnectedSource["retentionClass"], string>;
 
 export const UPLOAD_CAP_MB = 64;
 
@@ -169,7 +130,10 @@ const RULE_WORDS = new Map([
   ["JOB_TITLE", "Job title"],
 ]);
 
-export const ruleWordOf = (ruleId: string): string => RULE_WORDS.get(ruleId) ?? ruleId;
+type RuleOfAGroup = { readonly category: string; readonly ruleId: string };
+
+export const ruleWordOf = (group: RuleOfAGroup): string =>
+  RULE_WORDS.get(group.ruleId) ?? sentenceCased(group.category);
 
 export type SensitivityAndAudience = {
   readonly sensitivity: Sensitivity;
@@ -241,18 +205,15 @@ const groupsCountedInATitle = (groups: number): string =>
 
 const findingsCounted = (findings: number): string => counted(findings, "finding", "findings");
 
-type NamedGroup = {
-  readonly category: string;
-  readonly ruleId: string;
-  readonly title: string;
-};
+type NamedGroup = RuleOfAGroup & { readonly title: string };
 
 export const REVIEW_WORDS = {
   heading: (name: string): string => `Review of ${name}`,
   lead: "These findings come from the last sync. The personal data itself is never shown.",
   selectFirst: "Select a group of findings first.",
   select: (group: NamedGroup): string =>
-    `Select ${spokenWord(group.category)} findings in ${group.title} found by the ${ruleWordOf(group.ruleId)} rule`,
+    `Select ${spokenWord(group.category)} findings in ${group.title} found by the ${ruleWordOf(group)} rule`,
+  tier: (tier: string): string => `Redaction: ${sentenceCased(tier)}`,
   noPassages: "No passages yet",
   alreadyNarrowed: {
     tag: "Already narrowed",

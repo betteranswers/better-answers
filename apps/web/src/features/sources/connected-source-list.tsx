@@ -14,12 +14,12 @@ import { SOURCES_KEYSTROKES } from "./sources-state.ts";
 import {
   AUDIENCE_WORDS,
   CONNECTOR_WORDS,
+  DESTINATION_MEANS,
   DESTINATIONS_TERM,
-  destinationOf,
   instantWords,
   lastSyncedWords,
   NEEDS_OCR,
-  retentionOf,
+  RETENTION_MEANS,
   ROW_ACTIONS,
   STATE_MEANS,
   STATE_WORDS,
@@ -68,10 +68,10 @@ function MoreAbout(properties: { readonly connectedSource: ListedConnectedSource
           <Row term="State">{STATE_MEANS[connectedSource.state]}</Row>
           <Row term={DESTINATIONS_TERM}>
             {connectedSource.destination.map((word) => (
-              <p key={word}>{destinationOf(word).means}</p>
+              <p key={word}>{DESTINATION_MEANS[word]}</p>
             ))}
           </Row>
-          <Row term="Retention">{retentionOf(connectedSource.retentionClass).means}</Row>
+          <Row term="Retention">{RETENTION_MEANS[connectedSource.retentionClass]}</Row>
           <Row term="Documents">{connectedSource.documentCount}</Row>
           <Row term="Passages">{connectedSource.passageCount}</Row>
           <Row term="Published">

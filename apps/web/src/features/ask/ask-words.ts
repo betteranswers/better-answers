@@ -32,7 +32,7 @@ export const ASK_WORDS = {
   verdictSaid: {
     ok: "Answered from this workspace’s knowledge.",
     warn: "Answered from this workspace’s knowledge, with a warning.",
-    refuse: "Not answered from the company's knowledge.",
+    refuse: "We couldn’t find an answer in your company’s knowledge.",
     related: "No Q&A pair answers your question, so here is related knowledge.",
   } satisfies Readonly<Record<QuestionVerdict, string>>,
   judge: JUDGE_WORDS satisfies Readonly<Record<JudgeState, string>>,

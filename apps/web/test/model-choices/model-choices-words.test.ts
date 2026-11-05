@@ -2,6 +2,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { MODEL_PROVIDERS } from "@better-answers/schema";
+
 import { providerWordOf } from "@/features/model-choices/words.ts";
 
 describe("the provider name shown for a model choice", () => {
@@ -15,8 +17,8 @@ describe("the provider name shown for a model choice", () => {
     expect(providerWordOf(provider)).toBe(word);
   });
 
-  it("gives the local provider a readable name", () => {
-    expect(providerWordOf("local")).not.toBe("local");
+  it.each([...MODEL_PROVIDERS, "local"])("gives the %s provider a readable name", (provider) => {
+    expect(providerWordOf(provider)).not.toBe(provider);
   });
 
   it("shows an unknown provider as its id", () => {

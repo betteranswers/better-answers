@@ -47,7 +47,7 @@ const openSupplierFormsReview = async () => {
 };
 
 describe("reviewing a connected source's findings", () => {
-  it("shows an unknown rule as its id", async () => {
+  it("never shows an unknown rule's id", async () => {
     const findings = [
       aGroupOfFindings({
         title: "Passport scan",
@@ -64,13 +64,11 @@ describe("reviewing a connected source's findings", () => {
     fireEvent.click(rowAction(visaFiles, "review"));
 
     await within(visaFiles).findByRole("table");
-    const finding = within(findingRow(visaFiles, "Passport scan", "UK_PASSPORT"));
-    expect(finding.getByRole("cell", { name: "UK_PASSPORT" })).toBeDefined();
-    expect(
-      finding.getByRole("checkbox", {
-        name: "Select government identifier findings in Passport scan found by the UK_PASSPORT rule",
-      }),
-    ).toBeDefined();
+    const finding = findingRow(visaFiles, "Passport scan", "Passport scan");
+    expect(finding.textContent).not.toContain("UK_PASSPORT");
+    expect(within(finding).getByRole("checkbox").getAttribute("aria-label")).not.toContain(
+      "UK_PASSPORT",
+    );
   });
 
   it("x selects nothing once focus leaves the table", async () => {

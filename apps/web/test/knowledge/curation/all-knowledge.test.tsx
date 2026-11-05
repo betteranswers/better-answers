@@ -2,7 +2,6 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { assert, describe, expect, it, vi } from "vitest";
 
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
-import { theOneEmptyStatus } from "@test/empty-status.ts";
 import {
   aConceptRow,
   ALL_KNOWLEDGE,
@@ -12,6 +11,7 @@ import {
   RHIAN,
   type ConceptRow,
 } from "@test/knowledge/all-knowledge-answers.ts";
+import { theOneEmptyStatus } from "@test/knowledge/empty-status.ts";
 import { choosing, placedWithoutMeasuring } from "@test/measuring.ts";
 import { server } from "@test/stub-server.ts";
 import { ADA, aRefusalAnswer, LOST, openAt, read } from "@test/two-workspaces.ts";

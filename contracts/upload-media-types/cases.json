@@ -9,11 +9,11 @@
   "outside": [
     {
       "media_type": "application/msword",
-      "why": "Word's older format, the nearest neighbour of an admitted type and the likeliest fifth: no converter was chosen for it (ADR 0013), so neither tier takes it on the strength of `.docx`"
+      "why": "Word's older format, the nearest neighbour of an admitted type and the likeliest fifth: no converter was chosen for it, so neither tier takes it on the strength of `.docx`"
     },
     {
       "media_type": "text/html",
-      "why": "text, and still outside: the two passed-through types are named, never matched by a `text/` prefix. HTML is no upload type — the website connector names its converter at S4 under ADR 0013's one-converter rule — so until then neither tier takes it"
+      "why": "text, and still outside: the two passed-through types are named, never matched by a `text/` prefix. HTML is no upload type, and under ADR 0013 each type an upload admits has one converter, so until one is chosen for HTML neither tier takes it"
     }
   ]
 }

@@ -31,7 +31,7 @@ This file holds the stories a finished v0.1 satisfies, numbered as plans cite th
 22. [S3] An Editor copies a section into a tender with footnotes that resolve, and the platform records the copy as a usage. What left the platform is known.
 23. [S2b] An Editor asks a question and gets an answer that asserts concepts only, cited passage by passage, with its verdict for the Editor's role first. The Editor can paste it knowing where every claim came from.
 24. [S2b] The platform reuses an existing `Answer` as it stands when it answers the question as asked, and shows it with the question it answered and its own trust words. The bid library's verified answers are found before anything is drafted.
-25. [S2b] When nothing on the map answers, the platform says "Not answered from the company's knowledge" and shows the closest unmapped passages, with one action to suggest a concept from a passage. A gap becomes knowledge, never fluent prose nobody owns.
+25. [S2b] When nothing on the map answers, the platform says "We couldn't find an answer in your company's knowledge" and shows the closest unmapped passages, with one action to suggest a concept from a passage. A gap becomes knowledge, never fluent prose nobody owns.
 26. [S5] An Editor saves an answer as an `Answer`, and the promotion gate decides it, one at a time, against the closest existing `Answer`. The bid library grows without duplicates.
 27. [S6] An Editor pastes a bid document and confirms its extracted question set in a table, and the platform answers every question in the background, streaming each response as it is drafted. The questions it could not answer sort to the top.
 28. [S6] The response-set document leaves through the one renderer, recorded as one usage per response. What the company submitted traces to the concepts it cited.
@@ -65,7 +65,7 @@ This file holds the stories a finished v0.1 satisfies, numbered as plans cite th
 ## The operator and the owner
 
 46. [P2] The operator provisions a workspace and its first member with one command under the platform principal. A customer exists before anyone signs in, and the product can be dogfooded.
-47. [P2] From the console, the operator ends every sign-in and token a person holds everywhere, lists people across workspaces and sees their sessions. Better Auth's admin plugin is refused (ADR 0009), and the identity-set audit log records every operator write, so the one cross-workspace area stays small and audited.
+47. [P2] From the console, the operator ends every sign-in and token a person holds everywhere, lists people across workspaces and sees their sessions. Better Auth's admin plugin is not used, because its endpoints write no audit event and its session revoke leaves OAuth tokens alive. The identity-set audit log records every operator write, so the one cross-workspace area stays small and audited.
 48. [S0, O1] `pnpm ops replay-erasures` and `pnpm ops erasure-rehearsal` answer *done*, and the monthly restore drill goes fully green with a `backup` row written to production. The drill proves what it exists to prove.
 
 <!-- The numbering skips story 49, as the note at the end says. -->

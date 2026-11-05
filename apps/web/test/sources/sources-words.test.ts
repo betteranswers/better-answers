@@ -2,13 +2,15 @@
 
 import { assert, describe, expect, it } from "vitest";
 
+import { DESTINATIONS, RETENTION_CLASSES } from "@better-answers/schema";
+
 import type { ListedConnectedSource } from "@/features/sources/sources-api.ts";
 import {
   AUDIENCE_WORDS,
-  destinationOf,
+  DESTINATION_MEANS,
   instantWords,
   lastSyncedWords,
-  retentionOf,
+  RETENTION_MEANS,
   REVIEW_WORDS,
   ROW_ACTIONS,
   ruleWordOf,
@@ -75,29 +77,14 @@ describe("a connected source's last sync", () => {
 });
 
 describe("a destination", () => {
-  it("describes each known destination in its own words", () => {
-    for (const stored of ["passage-index", "bundle", "map"]) {
-      const { word, means } = destinationOf(stored);
-      expect(means).not.toBe(stored);
-      expect(means).not.toBe(word);
-    }
-    expect(destinationOf("bundle").word).not.toBe("bundle");
-  });
-
-  it("shows an unknown destination as its id", () => {
-    expect(destinationOf("archive").means).toBe("archive");
+  it.each(DESTINATIONS)("describes %s in its own words", (stored) => {
+    expect(DESTINATION_MEANS[stored]).not.toBe(stored);
   });
 });
 
 describe("a retention class", () => {
-  it("describes each known retention class in its own words", () => {
-    for (const stored of ["mirror", "keep", "transient"]) {
-      expect(retentionOf(stored).means).not.toBe(stored);
-    }
-  });
-
-  it("shows an unknown retention class as its id", () => {
-    expect(retentionOf("forever").means).toBe("forever");
+  it.each(RETENTION_CLASSES)("describes %s in its own words", (stored) => {
+    expect(RETENTION_MEANS[stored]).not.toBe(stored);
   });
 });
 
@@ -143,15 +130,17 @@ describe("a finding's rule", () => {
   it("gives every rule the worker raises a readable name", () => {
     const ruleIds = Object.keys(RULES_RAISED);
     const read = Object.fromEntries(
-      ruleIds.map((ruleId) => [ruleId, lowerCased(ruleWordOf(ruleId))]),
+      ruleIds.map((ruleId) => [ruleId, lowerCased(ruleWordOf({ category: "any", ruleId }))]),
     );
 
     expect(read).toEqual(RULES_RAISED);
     expect(new Set(Object.values(read)).size).toBe(ruleIds.length);
   });
 
-  it("shows an unknown rule as its id", () => {
-    expect(ruleWordOf("UK_PASSPORT")).toBe("UK_PASSPORT");
+  it("names an unknown rule by the category it found", () => {
+    expect(ruleWordOf({ category: "government-identifier", ruleId: "UK_PASSPORT" })).toBe(
+      sentenceCased("government-identifier"),
+    );
   });
 });
 
@@ -187,7 +176,7 @@ describe("the numbers in review messages", () => {
     });
 
     expect(named).toMatch(/bank details/i);
-    expect(named).toContain(ruleWordOf("UK_BANK_ACCOUNT"));
+    expect(named).toContain(ruleWordOf({ category: "bank-details", ruleId: "UK_BANK_ACCOUNT" }));
     expect(named).toContain("Form");
   });
 });

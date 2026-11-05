@@ -164,13 +164,14 @@ describe("the review's three bulk actions", () => {
     expect(listed.textContent).not.toContain(BANK_DETAILS.ruleId);
   });
 
-  it("list an unknown rule by its id", () => {
+  it("never list an unknown rule by its id", () => {
     renderReviewActions(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
     fireEvent.click(action("Tick the passport"));
 
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.keep.key });
 
-    expect(within(screen.getByRole("dialog")).getByText(A_PASSPORT.ruleId)).toBeDefined();
+    const listed = within(screen.getByRole("dialog")).getByRole("listitem");
+    expect(listed.textContent).not.toContain(A_PASSPORT.ruleId);
   });
 });
 

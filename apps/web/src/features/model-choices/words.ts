@@ -14,6 +14,7 @@ export const MODEL_CHOICES_WORDS = {
 const PROVIDER_WORDS = new Map([
   ["anthropic", "Anthropic"],
   ["mistral", "Mistral AI"],
+  ["cloudflare", "Cloudflare"],
   ["voyage", "Voyage AI"],
   ["openai", "OpenAI"],
   ["google", "Google"],

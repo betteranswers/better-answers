@@ -3,8 +3,8 @@ import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { STALE_CONFIRMATION } from "@/features/auth/refusal-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { theOneEmptyStatus } from "@test/empty-status.ts";
 import { downloadsWatched, type SavedFile } from "@test/knowledge/downloads.ts";
+import { theOneEmptyStatus } from "@test/knowledge/empty-status.ts";
 import { aGuideSummary, idOf } from "@test/knowledge/guide-answers.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { BOTH_HELD } from "@test/second-factor-api.ts";
