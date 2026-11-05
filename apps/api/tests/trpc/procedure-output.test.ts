@@ -62,6 +62,9 @@ describe("what a procedure may answer the wire", () => {
       "knowledge.briefCopy",
       "knowledge.collections",
       "knowledge.conceptToEdit",
+      "knowledge.exportBundle",
+      "knowledge.exportGuide",
+      "knowledge.exportRecords",
       "knowledge.find",
       "knowledge.guide",
       "knowledge.guides",
@@ -194,6 +197,9 @@ describe("what a procedure may answer the wire", () => {
       | "knowledge.allKnowledge"
       | "knowledge.kinds"
       | "knowledge.setOwners"
+      | "knowledge.exportBundle"
+      | "knowledge.exportRecords"
+      | "knowledge.exportGuide"
       | "knowledge.tree"
       | "knowledge.kindConcepts"
       | "knowledge.conceptToEdit"

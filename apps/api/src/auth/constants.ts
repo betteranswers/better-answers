@@ -114,6 +114,8 @@ export const MCP_TOKEN_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
 export const AUDIT_EXPORT_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
+export const KNOWLEDGE_EXPORT_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
+
 export const ASK_TO_JOIN_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
 export const ASK_TO_JOIN_ANSWER_FLOOR_MS = 250;
