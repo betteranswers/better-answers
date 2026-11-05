@@ -1,6 +1,6 @@
 -- Custom migration (hand-written SQL; ADR 0032).
 -- Before BA-249 both tiers read a connected source's label as a path, so a map can hold a lineage
--- row or a DERIVED_FROM edge that a rebuild by the fixed reader leaves out.
+-- row, or a DERIVED_FROM or SUPERSEDES edge, that a rebuild by the fixed reader leaves out.
 -- OR REPLACE: a database migrating from before 0097 runs both in one session, and pg_temp keeps
 -- 0097's function.
 CREATE OR REPLACE FUNCTION pg_temp.new_ulid() RETURNS text LANGUAGE plpgsql AS $$
@@ -34,7 +34,7 @@ BEGIN
          )
          OR EXISTS (
            SELECT 1 FROM public.map_edge
-            WHERE workspace_id = scope AND label = 'DERIVED_FROM'
+            WHERE workspace_id = scope AND label IN ('DERIVED_FROM', 'SUPERSEDES')
          )
        )
        AND NOT EXISTS (
