@@ -47,6 +47,18 @@ const foundOrRefused = <Refused>(
   return opened.value.found ? ok(opened.value) : err(NOT_FOUND);
 };
 
+type Opened = Found & { readonly standing?: Awaited<ReturnType<typeof standingOnConcept>> };
+
+const openedWithStanding = async <Refused>(
+  ctx: { readonly principal: UserPrincipal; readonly tx: Tx },
+  found: Result<Found, Refused>,
+  iri: string | undefined,
+): Promise<Result<Opened, Refused | Error>> => {
+  if (!found.ok || iri === undefined) return found;
+  const standing = await attempt(() => standingOnConcept(ctx.principal, ctx.tx, iri));
+  return standing.ok ? ok({ ...found.value, standing: standing.value }) : standing;
+};
+
 const passages = (principal: UserPrincipal, tx: Tx) => (locator: string) =>
   passageAt(principal, tx, locator);
 
@@ -66,13 +78,13 @@ export const knowledgeRouter = router({
     crossing(
       ctx,
       open.name,
-      given(input, async (asked) => {
-        const found = foundOrRefused(await open(ctx.principal, ctx.tx, asked, ctx.clock.now()));
-        if (!found.ok || asked.iri === undefined) return found;
-        const { iri } = asked;
-        const standing = await attempt(() => standingOnConcept(ctx.principal, ctx.tx, iri));
-        return standing.ok ? ok({ ...found.value, standing: standing.value }) : standing;
-      }),
+      given(input, async (asked) =>
+        openedWithStanding(
+          ctx,
+          foundOrRefused(await open(ctx.principal, ctx.tx, asked, ctx.clock.now())),
+          asked.iri,
+        ),
+      ),
     ),
   ),
   tree: knowledgeReadProcedure.query(({ ctx }) =>
