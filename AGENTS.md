@@ -103,7 +103,7 @@ A move changes no test file's name and no test's title.
 
 - Read the environment in the tier's config module.
 - Pass the environment to a child process through one named function.
-- Add backward compatibility only when someone asks for it. Without that request, add no `omitempty` shims, no legacy fallbacks, and no second code path for the old behaviour.
+- Add backward compatibility only when someone asks for it.
 
 ## Testing
 
@@ -114,7 +114,6 @@ A move changes no test file's name and no test's title.
 - In `packages/core`, a test reaches every other directory through an entry in the package's `exports` map.
 - Test a transport through its interface. In `apps/api`, call `server.request(...)`. In `apps/worker`, call the job or the module entry point.
 - Test the behaviour of a page on a single screen with a component test that uses Testing Library.
-- Put the regression test for a bug at the lowest layer that reproduces the bug.
 
 ### Use a real store only where the store is the claim
 
@@ -165,25 +164,11 @@ Postgres aborts the transaction after a failed statement, even when the code cat
 
 Use the `pstack` skills. For day-to-day work, run `/poteto-mode <goal and definition of done>`. Name the goal and how to tell that it is done. Do not name the skills.
 
-The project playbooks in `.agents/playbooks/` add this repository's steps to the pstack playbooks.
-
-Cubic's PR bot reviews a pull request when it opens. CodeRabbit reviews only pull requests that have the `review:coderabbit` label. Run Cubic's CLI, `pnpm run cubic-review`, before you open a pull request and before each later push. `.agents/playbooks/review.md` gives the details.
+`.agents/playbooks/review.md` owns review and the verdict: Cubic, CodeRabbit, CodeQL, `pnpm run cubic-review` before each push, and the `verdict` commit status.
 
 Until v0.1, the session lands its own pull request when the verdict is `PASS` or `PASS+NOTES`. The session does not wait for the owner to approve.
 
-The verifier records its Shipping verdict as a commit status on the verified head, with the context `verdict`. The state is `success` for PASS or PASS+NOTES, and `failure` for FAIL. The description names the verdict and the verifier. For example:
-
-```sh
-gh api repos/{owner}/{repo}/statuses/<sha> -f state=success -f context=verdict -f description='PASS by <verifier>'
-```
-
-The `main` ruleset requires a successful `verdict` status and a successful `check` on the head.
-
-To land a pull request:
-
-1. Read the newest completed `build` run on `main` with `gh run list --workflow build.yml --branch main --status completed --limit 1`.
-2. If that run failed, land the fix for `main` first.
-3. Land the pull request with `gh pr merge <n> --squash --match-head-commit <verified-sha>`.
+The `main` ruleset requires a successful `verdict` status and a successful `check` on the head. Before you land, read the newest completed `build` run on `main` with `gh run list --workflow build.yml --branch main --status completed --limit 1`. If it failed, land the fix for `main` first.
 
 ### Skills
 
@@ -198,10 +183,6 @@ The backlog is in Linear. Use the `linear-server` MCP server to reach it. `docs/
 ### Architecture decisions
 
 Before you start a task, read the decisions in `docs/solutions/architecture-patterns/` whose `applies_when` lines match it.
-
-### Mutation triage
-
-Treat a surviving mutant as a hypothesis until a probe verifies it. `docs/agents/mutation-triage.md` gives the procedure.
 
 ### Cloud sessions
 
