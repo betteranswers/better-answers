@@ -337,13 +337,16 @@ const threeNotesAskingTheBoard = async () => {
   };
 };
 
+const aWorkspaceOfBirds = () =>
+  aWorkspaceHolding([
+    { ...FEEDING_WRITTEN, collection: "birds" },
+    { ...RINGING_WRITTEN, collection: "birds" },
+    { title: SURVEY, body: "Heron counts are taken each June.", kind: "Procedure" },
+  ]);
+
 describe("the knowledge tree over tRPC", () => {
   it("reads the knowledge tree through the knowledge router", async () => {
-    const { workspace, viewer } = await aWorkspaceHolding([
-      { ...FEEDING_WRITTEN, collection: "birds" },
-      { ...RINGING_WRITTEN, collection: "birds" },
-      { title: SURVEY, body: "Heron counts are taken each June.", kind: "Procedure" },
-    ]);
+    const { workspace, viewer } = await aWorkspaceOfBirds();
     await seedConceptIndex(
       app(),
       conceptIndexSeeding.parse({
@@ -391,11 +394,7 @@ describe("the knowledge tree over tRPC", () => {
 
 describe("the Curation reads over tRPC", () => {
   it("reads Kinds through the knowledge router", async () => {
-    const { workspace, viewer } = await aWorkspaceHolding([
-      { ...FEEDING_WRITTEN, collection: "birds" },
-      { ...RINGING_WRITTEN, collection: "birds" },
-      { title: SURVEY, body: "Heron counts are taken each June.", kind: "Procedure" },
-    ]);
+    const { workspace, viewer } = await aWorkspaceOfBirds();
     const owner = await app().person();
     await app().addMember(workspace.workspaceId, owner.id, "Editor");
     await nameOwners(
