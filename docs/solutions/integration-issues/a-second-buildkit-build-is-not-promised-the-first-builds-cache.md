@@ -35,11 +35,14 @@ Until 05/11/2026, each leg of `build.yml`'s image job built its image twice. The
 
 BuildKit does not promise that cache hit. On runs 41939005250 (#985) and 41939407450 (#986), the worker's second build ran steps again that the first build had run minutes earlier. Those were `build 9/9` in the first run and `build 5/9` to `9/9` in the second. The weights step and the suffix list step fetch from the network, so a step that runs again gives other bytes. The runtime stage copies those bytes, so the pushed manifest was not the probed one.
 
+The two builds can also differ when no step runs again. Each build imports `buildcache` when it starts, and another run can move the tag in between. On run 41946705666 (5feebe7f5, a web-test-only change), every step of both builds showed `CACHED`, and the digests still differed. Between the load's import at 01:21:31 and the push's import at 01:23:07, a diagnostic run that had rebuilt the worker's build stage wrote the tag. It put other layers under the same cache keys, and the push build took them.
+
 ## Symptoms
 
 - The `digest to the job summary` step fails with `the two exports have stopped being one manifest`.
 - The push build's log shows `CACHED` for every build step up to one that shows `DONE`. Every `runtime` copy after it shows `DONE` too.
 - The failure follows no input. #986 changed only docs, and the next docs-only run passed.
+- Every step of both builds shows `CACHED`, the digests still differ, and the package's version list shows a `buildcache` write between the two builds' `importing cache manifest` lines.
 
 ## What Didn't Work
 
@@ -58,7 +61,7 @@ A local check of the premise, with the same exporter options: the build's digest
 
 ## Why This Works
 
-Two builds can give two manifests whenever a step is not reproducible and BuildKit runs it again. One build gives one manifest, and a push from the containerd store does not rebuild or recompress it. So the digest the probe read and the digest the registry holds are the same by construction, and the comparison is now a guard on the push.
+Two builds can give two manifests whenever a step is not reproducible and BuildKit runs it again, or whenever the cache tag moves between their imports. One build imports the cache once and gives one manifest, and a push from the containerd store does not rebuild or recompress it. So the digest the probe read and the digest the registry holds are the same by construction, and the comparison is now a guard on the push.
 
 ## Prevention
 
