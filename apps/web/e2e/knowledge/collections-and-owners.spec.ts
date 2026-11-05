@@ -134,6 +134,10 @@ test.describe("Collections and Owners", () => {
         - heading "Curation" [level=3]
         - list:
           - listitem:
+            - link "All Knowledge"
+          - listitem:
+            - link "Kinds"
+          - listitem:
             - link "Collections and Owners"
     `);
 
