@@ -174,16 +174,18 @@ const stringIn = (frontmatter: Frontmatter, key: string): string | undefined => 
   return typeof value === "string" ? value : undefined;
 };
 
-const derivedMergeKey = async (
+const replayedMergeKey = async (
   platform: PlatformPrincipal,
   tx: Tx,
-  iri: string,
-  kind: string,
-  title: string,
+  row: IndexRow,
+  held: Held | undefined,
+  suggested: string | undefined,
 ): Promise<string> => {
-  const derived = mergeKeyOf(kind, title);
-  const holder = await targetOfMergeKey(platform, tx, derived);
-  return holder === undefined || holder === iri ? derived : iri;
+  if (suggested === undefined && held !== undefined) return held.mergeKey;
+  const wanted =
+    suggested === undefined ? mergeKeyOf(row.kind, row.title) : acceptedKeyOf(suggested, held, row);
+  const holder = await targetOfMergeKey(platform, tx, wanted);
+  return holder === undefined || holder === row.iri ? wanted : (held?.mergeKey ?? row.iri);
 };
 
 const catalogued = async (
@@ -310,11 +312,7 @@ const replayCommit = async (
         const suggested = await suggestedBy(platform, tx, facts.suggestionId);
         const row = replayableOf(workspaceId, facts, held, doors.clock);
         if (row === undefined) return err("unreadable-commit");
-        const mergeKey =
-          suggested.mergeKey === undefined
-            ? (held?.mergeKey ??
-              (await derivedMergeKey(platform, tx, row.iri, row.kind, row.title)))
-            : acceptedKeyOf(suggested.mergeKey, held, row);
+        const mergeKey = await replayedMergeKey(platform, tx, row, held, suggested.mergeKey);
         const evidence = await catalogued(
           platform,
           tx,
