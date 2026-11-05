@@ -28,9 +28,14 @@ export const GUIDE_ACTIONS = declareActions("knowledge", {
     included: "count",
     commitSha: "gitSha",
   }),
+  briefSaved: action("knowledge.guide.brief_saved", {
+    guideId: "id",
+    writeUpId: "id",
+    version: "count",
+  }),
 });
 
-const includeSnapshot = z.array(
+export const includeSnapshot = z.array(
   z.strictObject({
     id: z.string(),
     iri: z.string(),
@@ -46,7 +51,7 @@ type SnapshotEntry = z.output<typeof includeSnapshot>[number];
 
 export type IncludeRow = SnapshotEntry & { readonly writeUpId: string };
 
-const snapshotEntryOf = (include: IncludeRow): SnapshotEntry => ({
+export const snapshotEntryOf = (include: IncludeRow): SnapshotEntry => ({
   id: include.id,
   iri: include.iri,
   contentHash: include.contentHash,

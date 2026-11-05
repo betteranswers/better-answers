@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { head } from "@better-answers/core/store/git";
@@ -10,7 +10,7 @@ import { matching } from "@better-answers/schema/testing/matching";
 import { connectAsHost } from "../flow.ts";
 import { calledTool, rpcListOf, rpcOf, structured, type Rpc } from "../mcp-call.ts";
 import { appForSuite } from "../suite-app.ts";
-import { webSignedIn } from "../web-client.ts";
+import { refusalOfCall, webSignedIn } from "../web-client.ts";
 import { askedOfTheHarness } from "./harness-asked.ts";
 import { harnessControl } from "./harness-control.ts";
 import { actingIn, openTestGit } from "./harness.ts";
@@ -647,5 +647,265 @@ describe("a waiting edit suggestion the harness seeds", () => {
         }),
       ],
     });
+  });
+});
+
+const seededInclude = z.object({ id: z.string(), iri: z.string(), title: z.string() });
+
+const seededSection = z.object({
+  sectionId: z.string(),
+  writeUpId: z.string(),
+  prompt: z.string(),
+  includes: z.array(seededInclude),
+});
+
+const seededGuide = z.object({
+  guideId: z.string(),
+  groupId: z.string(),
+  concepts: z.record(z.string(), z.string()),
+  sections: z.array(seededSection),
+});
+
+const PROMPTS = [
+  "Company overview",
+  "What we offer",
+  "Insurance and financial standing",
+  "Certifications",
+  "Data protection",
+  "Information security",
+  "Security testing",
+  "Support and service levels",
+];
+
+const PROFESSIONAL_INDEMNITY = "Professional indemnity policy";
+
+const HUMAN_REVIEWED = [
+  "Public liability policy",
+  PROFESSIONAL_INDEMNITY,
+  "Filed accounts 2024",
+  "Filed accounts 2025",
+];
+
+type GuideSeeded = z.output<typeof seededGuide>;
+
+const sectionOf = (seeded: GuideSeeded, prompt: string) => {
+  const found = seeded.sections.find((section) => section.prompt === prompt);
+  assert(found !== undefined, `the guide holds no section ${prompt}`);
+  return found;
+};
+
+const iriOf = (seeded: GuideSeeded, title: string): string => {
+  const iri = seeded.concepts[title];
+  assert(iri !== undefined, `the guide seeded no concept ${title}`);
+  return iri;
+};
+
+const tiersOf = async (
+  api: Awaited<ReturnType<typeof webSignedIn>>["api"],
+  seeded: GuideSeeded,
+): Promise<readonly (readonly [title: string, tier: string])[]> => {
+  const tiers: [string, string][] = [];
+  for (const [title, iri] of Object.entries(seeded.concepts)) {
+    const opened = await api.knowledge.open.query({ iri });
+    assert(opened.concept !== undefined, `${title} did not open as a concept`);
+    tiers.push([title, opened.concept.trust.tier]);
+  }
+  return tiers;
+};
+
+const aGuideSeeded = async () => {
+  const { workspace, viewer } = await aWorkspaceWithAViewer();
+  const financier = await app().person();
+  await app().addMember(workspace.workspaceId, financier.id, "Editor");
+  const seeded = seededGuide.parse(
+    await harnessPosted("/__harness/guides", {
+      ...seedingBy(workspace),
+      financeUserIds: [financier.id],
+    }),
+  );
+  return { workspace, viewer, financier, seeded };
+};
+
+const guideRowsIn = async (workspaceId: string) => {
+  const counted = await app().database.superuser.query<{
+    guides: number;
+    versions: number;
+    concepts: number;
+    groups: number;
+  }>(
+    `SELECT (SELECT count(*) FROM guide_definition WHERE workspace_id = $1)::int AS guides,
+            (SELECT count(*) FROM write_up_version WHERE workspace_id = $1)::int AS versions,
+            (SELECT count(*) FROM concept_index WHERE workspace_id = $1)::int AS concepts,
+            (SELECT count(*) FROM "group" WHERE workspace_id = $1)::int AS groups`,
+    [workspaceId],
+  );
+  return counted.rows[0];
+};
+
+const askedToSeedAGuide = (body: unknown) => askedOfTheHarness(app(), "/__harness/guides", body);
+
+describe("the guide the harness seeds", () => {
+  it("seeds eight sections in tree order with 24 includes", async () => {
+    const { seeded } = await aGuideSeeded();
+
+    expect(seeded.sections.map(({ prompt }) => prompt)).toEqual(PROMPTS);
+    expect(seeded.sections.map(({ includes }) => includes.length)).toEqual([
+      4, 3, 4, 2, 3, 3, 2, 3,
+    ]);
+    expect(Object.keys(seeded.concepts)).toHaveLength(23);
+  });
+
+  it("leaves the employers' liability policy unseeded", async () => {
+    const { seeded } = await aGuideSeeded();
+    const insurance = sectionOf(seeded, "Insurance and financial standing");
+
+    expect(seeded.concepts).not.toHaveProperty("Employers' liability policy");
+    expect(insurance.includes.map(({ title }) => title)).toEqual([
+      "Public liability policy",
+      PROFESSIONAL_INDEMNITY,
+      "Filed accounts 2024",
+      "Filed accounts 2025",
+    ]);
+  });
+
+  it("cites the Cyber Essentials Plus certificate from two sections", async () => {
+    const { seeded } = await aGuideSeeded();
+    const certificate = iriOf(seeded, "Cyber Essentials Plus certificate");
+
+    const citing = seeded.sections.filter(({ includes }) =>
+      includes.some(({ iri }) => iri === certificate),
+    );
+
+    expect(citing.map(({ prompt }) => prompt)).toEqual(["Certifications", "Information security"]);
+  });
+
+  it("writes each Brief as version 2 over an empty one", async () => {
+    const { workspace, seeded } = await aGuideSeeded();
+    const stored = await app().database.superuser.query<{
+      write_up_id: string;
+      version: number;
+      markdown: string;
+    }>(
+      `SELECT write_up_id, version, markdown FROM write_up_version
+        WHERE workspace_id = $1 ORDER BY write_up_id, version`,
+      [workspace.workspaceId],
+    );
+
+    const versionsOf = (writeUpId: string) =>
+      stored.rows.filter((row) => row.write_up_id === writeUpId);
+
+    for (const { writeUpId, includes } of seeded.sections) {
+      const [empty, brief, ...later] = versionsOf(writeUpId);
+      expect([empty?.version, empty?.markdown, brief?.version, later]).toEqual([1, "", 2, []]);
+      expect(brief?.markdown.match(/\[\^[^\]]+\]/g)).toEqual(includes.map(({ id }) => `[^${id}]`));
+      expect(brief?.markdown.split("\n\n")).toHaveLength(includes.length);
+    }
+  });
+
+  it("writes a paragraph of each concept's body, then its marker", async () => {
+    const { workspace, seeded } = await aGuideSeeded();
+    const certifications = sectionOf(seeded, "Certifications");
+    const [iso, plus] = certifications.includes;
+
+    const brief = await app().database.superuser.query<{ markdown: string }>(
+      `SELECT markdown FROM write_up_version
+        WHERE workspace_id = $1 AND write_up_id = $2 AND version = 2`,
+      [workspace.workspaceId, certifications.writeUpId],
+    );
+
+    expect(brief.rows[0]?.markdown).toBe(
+      [
+        `Northgate is certified to ISO 27001 for its whole service.[^${iso?.id}]`,
+        `Northgate holds Cyber Essentials Plus, renewed each year.[^${plus?.id}]`,
+      ].join("\n\n"),
+    );
+  });
+
+  it("narrows the professional indemnity policy to finance", async () => {
+    const { workspace, viewer, financier, seeded } = await aGuideSeeded();
+    const iri = iriOf(seeded, PROFESSIONAL_INDEMNITY);
+    const group = await app().database.superuser.query<{ name: string; members: string[] }>(
+      `SELECT g.name, array_agg(m.user_id ORDER BY m.user_id) AS members
+         FROM "group" g JOIN group_member m ON m.group_id = g.id
+        WHERE g.workspace_id = $1 AND g.id = $2 GROUP BY g.name`,
+      [workspace.workspaceId, seeded.groupId],
+    );
+
+    const financiers = (await webSignedIn(app(), financier.email)).api;
+    const outsiders = (await webSignedIn(app(), viewer.email)).api;
+
+    expect(group.rows[0]).toEqual({
+      name: "finance",
+      members: [workspace.admin.id, financier.id].toSorted(),
+    });
+    expect(await financiers.knowledge.open.query({ iri })).toMatchObject({ found: true });
+    expect(await refusalOfCall(outsiders.knowledge.open.query({ iri }))).toMatchObject({
+      message: "not-found",
+      data: { httpStatus: 404 },
+    });
+  });
+
+  it("verifies four concepts by a person and leaves the rest", async () => {
+    const { workspace, seeded } = await aGuideSeeded();
+    const { api } = await webSignedIn(app(), workspace.admin.email);
+
+    const tiers = await tiersOf(api, seeded);
+
+    const titlesAt = (tier: string) =>
+      tiers.filter((each) => each[1] === tier).map(([title]) => title);
+    expect(titlesAt("human-reviewed")).toEqual(HUMAN_REVIEWED);
+    expect(titlesAt("unverified")).toHaveLength(19);
+  });
+});
+
+describe("a guide seed the harness refuses before it writes", () => {
+  it("refuses an Editor as the guide's writer", async () => {
+    const workspace = await app().provision();
+
+    const answered = await askedToSeedAGuide({
+      ...(await aMemberAt(workspace, "Editor")),
+      financeUserIds: [],
+    });
+
+    expect(answered).toEqual(refusedNaming(["userId", "seeded by an Admin"]));
+    expect(await guideRowsIn(workspace.workspaceId)).toEqual({
+      guides: 0,
+      versions: 0,
+      concepts: 0,
+      groups: 0,
+    });
+  });
+
+  it("refuses a second guide in one workspace", async () => {
+    const { workspace } = await aGuideSeeded();
+    const before = await guideRowsIn(workspace.workspaceId);
+
+    const answered = await askedToSeedAGuide({ ...seedingBy(workspace), financeUserIds: [] });
+
+    expect(answered).toEqual(refusedNaming(["workspaceId", "one guide"]));
+    expect(await guideRowsIn(workspace.workspaceId)).toEqual(before);
+  });
+
+  it("refuses a finance member who is no member", async () => {
+    const workspace = await app().provision();
+    const outsider = await app().person();
+
+    const answered = await askedToSeedAGuide({
+      ...seedingBy(workspace),
+      financeUserIds: [outsider.id],
+    });
+
+    expect(answered).toEqual(refusedNaming(["financeUserIds.0", "group_member_member_fk"]));
+    expect(await guideRowsIn(workspace.workspaceId)).toMatchObject({ concepts: 0, groups: 0 });
+  });
+
+  it("refuses a workspace that already holds a finance group", async () => {
+    const workspace = await app().provision();
+    await harnessPosted("/__harness/groups", { ...seedingBy(workspace), names: ["finance"] });
+
+    const answered = await askedToSeedAGuide({ ...seedingBy(workspace), financeUserIds: [] });
+
+    expect(answered).toEqual(refusedNaming(["workspaceId", "group named finance"]));
+    expect(await guideRowsIn(workspace.workspaceId)).toMatchObject({ concepts: 0, groups: 1 });
   });
 });

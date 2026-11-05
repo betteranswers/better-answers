@@ -119,7 +119,7 @@ describe("the Knowledge Search page", () => {
         within(screen.getByRole("navigation", { name: "Knowledge" }))
           .getAllByRole("link")
           .map((link) => link.textContent),
-      ).toEqual(["Search", "Knowledge Base"]);
+      ).toEqual(["Search", "Guides", "Knowledge Base"]);
       expect(saidNow()).toMatch(/\S/);
       expect(matchRows()).toHaveLength(0);
     });

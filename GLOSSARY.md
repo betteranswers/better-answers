@@ -285,6 +285,16 @@ quoted, in the concepts' own words.
 **Expectation**:
 A section's statement of which concepts should fill it.
 
+**Brief**:
+A section's assembled layer: the prose written over its included concepts, each claim footnoted to
+the concept it rests on.
+
+**Detail**:
+A section's quoted layer: its included concepts in their own words, opened under the Brief.
+
+**Coverage**:
+How many of a section's expected facts the concepts it includes meet, and which it lacks.
+
 **Write-up**:
 Prose the platform keeps as a record, written over the concepts it includes, such as a guide
 section's assembled layer or a response.

@@ -122,8 +122,9 @@ export const KNOWLEDGE = {
           name: "Guides",
           path: "/knowledge/guides",
           icon: "guides",
-          built: false,
+          built: true,
           seenBy: EVERY_ROLE,
+          detail: { param: "guide" },
         },
         {
           name: "Knowledge Base",

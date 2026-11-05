@@ -15,8 +15,8 @@ import {
 } from "../../src/guides/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit } from "../fixtures/bundle.ts";
+import { EMPLOYERS_LIABILITY } from "../fixtures/northgate-concepts.ts";
 import {
-  EMPLOYERS_LIABILITY,
   importedBy,
   northgate,
   northgateTree,

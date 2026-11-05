@@ -168,3 +168,55 @@ export const useNameOwner = () => {
     }),
   );
 };
+
+export type GuideSummary = inferOutput<Api["knowledge"]["guides"]>[number];
+
+export type Guide = inferOutput<Api["knowledge"]["guide"]>;
+
+export type GuideSection = Guide["sections"][number];
+
+export type SectionFact = GuideSection["coverage"]["facts"][number];
+
+export type SectionBrief = NonNullable<GuideSection["brief"]>;
+
+export type BriefAsked = inferInput<Api["knowledge"]["saveBrief"]>;
+
+export type BriefSaved = inferOutput<Api["knowledge"]["saveBrief"]>;
+
+export const useGuides = () => {
+  const api = useTRPC();
+  return useQuery(api.knowledge.guides.queryOptions(undefined, WHILE_A_CEILING_HOLDS));
+};
+
+export const useGuide = (guideId: string | undefined) => {
+  const api = useTRPC();
+  return useQuery(
+    api.knowledge.guide.queryOptions(
+      guideId === undefined ? skipToken : { guideId },
+      WHILE_A_CEILING_HOLDS,
+    ),
+  );
+};
+
+export const useSaveBrief = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  const saving = useMutation(
+    api.knowledge.saveBrief.mutationOptions({
+      onSettled: () => queryClient.invalidateQueries(api.knowledge.pathFilter()),
+    }),
+  );
+  return (asked: BriefAsked): Promise<BriefSaved> => saving.mutateAsync(asked);
+};
+
+export const useIncludeAvailable = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  const including = useMutation(
+    api.knowledge.includeAvailable.mutationOptions({
+      onSettled: () => queryClient.invalidateQueries(api.knowledge.pathFilter()),
+    }),
+  );
+  return (writeUpId: string): Promise<{ readonly included: number }> =>
+    including.mutateAsync({ writeUpId });
+};

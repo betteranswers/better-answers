@@ -128,6 +128,8 @@ test.describe("Collections and Owners", () => {
           - listitem:
             - link "Search"
           - listitem:
+            - link "Guides"
+          - listitem:
             - link "Knowledge Base"
         - heading "Curation" [level=3]
         - list:

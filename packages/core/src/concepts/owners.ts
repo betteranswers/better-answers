@@ -69,6 +69,25 @@ export const ownerOf = (
   concept: OwnedConcept,
 ): Promise<UserId | undefined> => readOwner(principal, tx, concept, false);
 
+const COLLECTION_OWNER = `SELECT o.person_id, u.name
+    FROM concept_owner o
+    JOIN "user" u ON u.id = o.person_id
+   WHERE o.workspace_id = ${scopeClause(1)} AND o.collection = $2`;
+
+/** Whom to ask about a collection's knowledge, which every reader of the collection may know. */
+export const collectionOwnerNamed = async (
+  principal: Principal,
+  tx: Tx,
+  collection: string,
+): Promise<{ readonly id: UserId; readonly name: string } | null> => {
+  const found = await tx.query<{ person_id: UserId; name: string }>(COLLECTION_OWNER, [
+    scopeParameter(principal),
+    collection,
+  ]);
+  const owner = found.rows[0];
+  return owner === undefined ? null : { id: owner.person_id, name: owner.name };
+};
+
 export const standingConcept = async (
   principal: UserPrincipal,
   tx: Tx,

@@ -104,6 +104,7 @@ const SENTENCES = {
     `${by} overrode the sensitivity of ${conceptNamed(subject)}`,
   "knowledge.concept.committed": ({ by, subject }) => `${by} saved ${conceptNamed(subject)}`,
   "knowledge.feedback.closed": ({ by }) => `${by} closed a flag on an answer`,
+  "knowledge.guide.brief_saved": ({ by }) => `${by} saved the Brief of a guide section`,
   "knowledge.guide.included": ({ by, detail }) =>
     `${by} included ${included(detail)} in a section of a guide`,
   "knowledge.guide.seeded": ({ by }) => `${by} seeded a guide from a template`,

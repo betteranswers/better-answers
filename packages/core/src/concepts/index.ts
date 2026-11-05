@@ -11,6 +11,7 @@ export {
   kindConceptsInput,
   readKindConcepts,
   readKnowledgeTree,
+  readSectionTrustWords,
   type KindConceptsInput,
 } from "./reading/browse.ts";
 export {
@@ -40,6 +41,7 @@ export {
 } from "./import/loader.ts";
 export { writeManifest, type ManifestWritten, type WriteManifestInput } from "./import/manifest.ts";
 export {
+  collectionOwnerNamed,
   collectionsAndOwners,
   nameOwner,
   nameOwnerInput,

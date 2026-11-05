@@ -117,7 +117,10 @@ describe("what jump-to lists", () => {
   it("lists a Viewer's areas and pages, no members or actions", () => {
     expect(outline(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT))).toEqual([
       ["Areas", ["Ask", "Knowledge"]],
-      ["Pages", ["New Question", "Your Questions", "Connect Claude", "Search", "Knowledge Base"]],
+      [
+        "Pages",
+        ["New Question", "Your Questions", "Connect Claude", "Search", "Guides", "Knowledge Base"],
+      ],
     ]);
   });
 
@@ -131,6 +134,7 @@ describe("what jump-to lists", () => {
           "Your Questions",
           "Connect Claude",
           "Search",
+          "Guides",
           "Knowledge Base",
           "Collections and Owners",
           "Waiting on You",

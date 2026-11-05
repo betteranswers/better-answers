@@ -1,5 +1,6 @@
 import { find, findInput, open, openInput, type OpenResult } from "@better-answers/core/answering";
 import {
+  collectionOwnerNamed,
   collectionsAndOwners,
   conceptToEdit,
   conceptToEditInput,
@@ -8,15 +9,29 @@ import {
   nameOwnerInput,
   readKindConcepts,
   readKnowledgeTree,
+  readSectionTrustWords,
   saveConcept,
   saveConceptInput,
   standingOnConcept,
 } from "@better-answers/core/concepts";
 import {
+  includeAvailable,
+  includeAvailableInput,
+  readGuide,
+  readGuideInput,
+  readGuides,
+  saveBrief,
+  saveBriefInput,
+  type GuideRead,
+  type GuideReadRefusal,
+  type SectionRead,
+} from "@better-answers/core/guides";
+import {
   attempt,
   err,
   NOT_FOUND,
   ok,
+  type Clock,
   type Result,
   type UserPrincipal,
 } from "@better-answers/core/kernel";
@@ -24,7 +39,7 @@ import { passageAt } from "@better-answers/core/sources";
 import type { Tx } from "@better-answers/core/store/postgres";
 
 import { MCP_TOKEN_RULE } from "../auth/constants.ts";
-import { doorTold } from "../doors.ts";
+import { doorTold, type Doors } from "../doors.ts";
 import {
   answeredBy,
   crossing,
@@ -62,6 +77,54 @@ const openedWithStanding = async <Refused>(
 const passages = (principal: UserPrincipal, tx: Tx) => (locator: string) =>
   passageAt(principal, tx, locator);
 
+type GuideAsked = Parameters<typeof readGuide>[2];
+
+type GuideAnswered = Omit<GuideRead, "sections"> & {
+  readonly owner: { readonly id: string; readonly name: string } | null;
+  readonly sections: readonly (Omit<SectionRead, "citedIris"> & { readonly trustWords: string })[];
+};
+
+const guideAnswered = async (
+  ctx: { readonly principal: UserPrincipal; readonly tx: Tx; readonly clock: Clock },
+  asked: GuideAsked,
+): Promise<Result<GuideAnswered, GuideReadRefusal | typeof NOT_FOUND>> => {
+  const read = await readGuide(ctx.principal, ctx.tx, asked);
+  if (!read.ok) return read;
+  const guide = read.value;
+  if (guide === undefined) return err(NOT_FOUND);
+
+  const trust = await readSectionTrustWords(
+    ctx.principal,
+    ctx.tx,
+    guide.sections.map((section) => section.citedIris),
+    ctx.clock.now(),
+  );
+  if (!trust.ok) return trust;
+  const owner = await attempt(() => collectionOwnerNamed(ctx.principal, ctx.tx, guide.collection));
+  if (!owner.ok) return owner;
+
+  return ok({
+    ...guide,
+    owner: owner.value,
+    sections: guide.sections.map(({ citedIris: _cited, ...section }, at) => {
+      const trustWords = trust.value[at];
+      if (trustWords === undefined) throw new Error(`section ${section.sectionId} has no trust`);
+      return { ...section, trustWords };
+    }),
+  });
+};
+
+type GuideDoors = Parameters<typeof includeAvailable>[1];
+
+const writingGuide = <Value, Refused>(
+  doors: Doors,
+  write: (guide: GuideDoors) => Promise<Result<Value, Refused | Error>>,
+): Promise<Result<Value, Refused | Error>> => {
+  const bundle = doorTold(doors.git, "no bundle store is configured");
+  if (!bundle.ok) return Promise.resolve(err(new Error(bundle.error)));
+  return write({ git: bundle.value, postgres: doors.postgres, clock: doors.clock });
+};
+
 export const KNOWLEDGE_CEILING: RoadCeiling = { budget: "knowledge", rule: MCP_TOKEN_RULE };
 
 export const knowledgeReadProcedure = queryCeiling(KNOWLEDGE_CEILING);
@@ -97,6 +160,36 @@ export const knowledgeRouter = router({
       given(input, (asked) => readKindConcepts(ctx.principal, ctx.tx, asked, ctx.clock.now())),
     ),
   ),
+  guides: knowledgeReadProcedure.query(({ ctx }) =>
+    crossing(ctx, readGuides.name, readGuides(ctx.principal, ctx.tx)),
+  ),
+  guide: knowledgeReadProcedure.input(parsedBy(readGuideInput)).query(({ ctx, input }) =>
+    crossing(
+      ctx,
+      readGuide.name,
+      given(input, (asked) => guideAnswered(ctx, asked)),
+    ),
+  ),
+  saveBrief: ownTransactionProcedure.input(parsedBy(saveBriefInput)).mutation(({ ctx, input }) =>
+    crossing(
+      ctx,
+      saveBrief.name,
+      given(input, (asked) =>
+        writingGuide(ctx.doors, (doors) => saveBrief(ctx.principal, doors, asked)),
+      ),
+    ),
+  ),
+  includeAvailable: ownTransactionProcedure
+    .input(parsedBy(includeAvailableInput))
+    .mutation(({ ctx, input }) =>
+      crossing(
+        ctx,
+        includeAvailable.name,
+        given(input, (asked) =>
+          writingGuide(ctx.doors, (doors) => includeAvailable(ctx.principal, doors, asked)),
+        ),
+      ),
+    ),
   collections: queryProcedure.query(({ ctx }) =>
     crossing(ctx, collectionsAndOwners.name, collectionsAndOwners(ctx.principal, ctx.tx)),
   ),

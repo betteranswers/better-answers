@@ -9,6 +9,8 @@
 | `POST /members` | `workspaceId`, `userId`, `role` of `Admin`, `Editor` or `Viewer` | `{"added":true}` |
 | `POST /invitations` | `workspaceId`, `email`, `inviterId`, `role` | `id` |
 | `POST /concepts` | `workspaceId`, `userId`, `concepts` of `title`, `body`, optional `collection`, `kind`, `trust`, `status` (`stable` unless named) | `concepts` with `iri`, `title`, `path`, `documents` |
+| `POST /owners` | `workspaceId`, `userId` of an Admin, `owners` of `collection` or `iri`, and `personId` or `null` | `{"named":<number of owners>}` |
+| `POST /guides` | `workspaceId`, `userId` of an Admin, `financeUserIds` of members to place in the group `finance` | `guideId`, `groupId`, `sections` with `sectionId`, `writeUpId`, `prompt`, `includes` of `id`, `iri`, `title`, and `concepts` mapping each title to its `iri` |
 | `POST /suggestions` | `workspaceId`, `userId`, `iri`, optional `title` and `body` | `suggestionId`, `setId` |
 | `POST /groups` | `workspaceId`, `userId`, `names`, optional `memberIds` | `{"made":<number of names>}` |
 | `POST /connected-sources` | `workspaceId`, `connectedSources` of `name`, optional `sensitivity`, `sync` (`none`, `queued`, `claimed` or `done`) and `documents` of `title` | `connectedSources` with `connectedSourceId`, `name`, `documents` |

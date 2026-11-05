@@ -35,6 +35,8 @@ const STEPS: Readonly<Record<string, string>> = {
   "bundle/landBundleCommit": "an admitted write and the reconciler land their commit's row",
   "bundle/withBundleWrite": "takes the lock for a write that admitted its person first",
   "concepts/cascadingVisibility": "runs its caller's write, and that write's own checks",
+  "concepts/collectionOwnerNamed":
+    "the guide read calls it with the reader it admitted, and it decides nothing",
   "concepts/conceptCountsOf": "find and ask call it with the reader they admitted",
   "concepts/evidenceOf": "ask calls it with the reader it admitted",
   "concepts/findConcepts": "find and ask call it with the reader they admitted",

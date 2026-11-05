@@ -9,7 +9,7 @@ const FOOTNOTE_REFERENCE = /^\[\^([\w-]+)\](?!:)/u;
 const labelOf = (attributes: { readonly label?: unknown } | undefined): string =>
   typeof attributes?.label === "string" ? attributes.label : "";
 
-const FootnoteReference = Node.create({
+export const FootnoteReference = Node.create({
   name: "footnoteReference",
   group: "inline",
   inline: true,

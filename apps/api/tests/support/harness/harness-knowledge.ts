@@ -14,8 +14,21 @@ import {
   submitSuggestionSet,
   writeConcept,
 } from "@better-answers/core/concepts";
+import {
+  coverageOf,
+  footnotesOf,
+  saveBrief,
+  seedGuide as seedGuideRows,
+} from "@better-answers/core/guides";
 import { actorIdOfPerson, type UserPrincipal } from "@better-answers/core/kernel";
 import { head, initRepository, type GitDoor } from "@better-answers/core/store/git";
+import {
+  IMPORTED,
+  NORTHGATE,
+  TYPED,
+  VERIFIED_AT_IMPORT,
+  type Concept,
+} from "@better-answers/core/testing/northgate";
 import {
   AUDIENCES,
   COLLECTION,
@@ -381,29 +394,48 @@ const conceptWritten = async (
   return { ...written.value, path, citations };
 };
 
+type Seeder = { readonly workspaceId: string; readonly userId: string };
+
+const groupMade = (app: TestApp, workspaceId: string, name: string, memberIds: readonly string[]) =>
+  inOneTransaction(app, async (client) => {
+    const seed = testData(client);
+    const made = await seed.group({ workspaceId, name });
+    for (const memberId of memberIds) {
+      await seed.groupMember({ workspaceId, groupId: made.id, userId: memberId });
+    }
+    return made;
+  });
+
+const narrowedTo = (
+  app: TestApp,
+  writer: Seeder,
+  concept: { readonly iri: string; readonly sensitivity: Sensitivity },
+  groupId: string,
+) => {
+  const { workspaceId, userId } = writer;
+  return actingIn(app, { workspaceId, userId }, (principal, tx) =>
+    overrideConceptSensitivity(principal, tx, {
+      iri: concept.iri,
+      sensitivity: concept.sensitivity,
+      audience: "groups",
+      audienceGroups: [groupId],
+    }),
+  );
+};
+
 const narrowedToAGroup = async (
   app: TestApp,
   writer: Writer,
   concept: AskedConcept,
   iri: string,
 ) => {
-  const { workspaceId, userId } = writer.principal;
-  const group = await inOneTransaction(app, async (client) => {
-    const seed = testData(client);
-    const made = await seed.group({ workspaceId, name: `${concept.title} readers` });
-    for (const memberId of concept.groupMemberIds) {
-      await seed.groupMember({ workspaceId, groupId: made.id, userId: memberId });
-    }
-    return made;
-  });
-  await actingIn(app, { workspaceId, userId }, (principal, tx) =>
-    overrideConceptSensitivity(principal, tx, {
-      iri,
-      sensitivity: concept.sensitivity,
-      audience: "groups",
-      audienceGroups: [group.id],
-    }),
+  const group = await groupMade(
+    app,
+    writer.principal.workspaceId,
+    `${concept.title} readers`,
+    concept.groupMemberIds,
   );
+  await narrowedTo(app, writer.principal, { iri, sensitivity: concept.sensitivity }, group.id);
 };
 
 const sharedPastItsEvidence = async (
@@ -487,20 +519,23 @@ type Role = UserPrincipal["role"];
 
 type Refusal = { readonly path: readonly (string | number)[]; readonly message: string };
 
-const heldAhead = async (app: TestApp, asked: Asked) => {
-  const { superuser } = app.database;
-  const { workspaceId, concepts } = asked;
-  const files = await superuser.query<{ held: string }>(
-    "SELECT path AS held FROM concept_index WHERE workspace_id = $1 AND path = ANY($2)",
-    [workspaceId, concepts.map(pathOf)],
-  );
-  const members = await superuser.query<{ held: string; role: Role }>(
+const membersOf = async (app: TestApp, workspaceId: string): Promise<ReadonlyMap<string, Role>> => {
+  const members = await app.database.superuser.query<{ held: string; role: Role }>(
     "SELECT user_id AS held, role FROM member WHERE workspace_id = $1",
     [workspaceId],
   );
+  return new Map(members.rows.map((row) => [row.held, row.role]));
+};
+
+const heldAhead = async (app: TestApp, asked: Asked) => {
+  const { workspaceId, concepts } = asked;
+  const files = await app.database.superuser.query<{ held: string }>(
+    "SELECT path AS held FROM concept_index WHERE workspace_id = $1 AND path = ANY($2)",
+    [workspaceId, concepts.map(pathOf)],
+  );
   return {
     files: new Set(files.rows.map((row) => row.held)),
-    members: new Map(members.rows.map((row) => [row.held, row.role])),
+    members: await membersOf(app, workspaceId),
   };
 };
 
@@ -512,22 +547,28 @@ const titlesHeld = (asked: Asked, held: ReadonlySet<string>): readonly Refusal[]
       : [];
   });
 
+const STRANGER_TO_A_GROUP =
+  "a group holds members of its workspace alone, which group_member_member_fk holds";
+
+const strangersAmong = (
+  memberIds: readonly string[],
+  members: ReadonlyMap<string, Role>,
+  path: readonly (string | number)[],
+): readonly Refusal[] =>
+  memberIds.flatMap((memberId, nth) =>
+    members.has(memberId) ? [] : [{ path: [...path, nth], message: STRANGER_TO_A_GROUP }],
+  );
+
 const strangersToTheWorkspace = (
   asked: Asked,
   members: ReadonlyMap<string, Role>,
 ): readonly Refusal[] =>
   asked.concepts.flatMap((concept, at) =>
-    (concept.audience === "groups" ? concept.groupMemberIds : []).flatMap((memberId, nth) =>
-      members.has(memberId)
-        ? []
-        : [
-            {
-              path: ["concepts", at, "groupMemberIds", nth],
-              message:
-                "a group holds members of its workspace alone, which group_member_member_fk holds",
-            },
-          ],
-    ),
+    strangersAmong(concept.audience === "groups" ? concept.groupMemberIds : [], members, [
+      "concepts",
+      at,
+      "groupMemberIds",
+    ]),
   );
 
 const writerRefused = (role: Role | undefined): readonly Refusal[] => {
@@ -595,6 +636,194 @@ export const nameOwners = async (
     }
   }
   return { named: asked.owners.length };
+};
+
+export const guideSeeding = z.strictObject({
+  workspaceId: z.string().min(1),
+  userId: z.string().min(1),
+  financeUserIds: z.array(z.string().min(1)),
+});
+
+type GuideAsked = z.output<typeof guideSeeding>;
+
+type SeededSection = {
+  readonly sectionId: string;
+  readonly writeUpId: string;
+  readonly prompt: string;
+  readonly includes: readonly {
+    readonly id: string;
+    readonly iri: string;
+    readonly title: string;
+  }[];
+};
+
+type GuideSeeded = {
+  readonly guideId: string;
+  readonly groupId: string;
+  readonly sections: readonly SeededSection[];
+  readonly concepts: Readonly<Record<string, string>>;
+};
+
+const FINANCE = "finance";
+
+const FINANCE_ONLY = "Professional indemnity policy";
+
+const BID_LIBRARY = {
+  templateId: "bid-library",
+  collection: NORTHGATE.collection,
+  subjectIri: null,
+} as const;
+
+const northgateConcept = (concept: Concept, trust: AskedConcept["trust"]) => ({
+  title: concept.title,
+  collection: NORTHGATE.collection,
+  kind: concept.kind,
+  body: concept.body,
+  trust,
+  frontmatter: { tags: [...concept.tags] },
+});
+
+const NORTHGATE_CONCEPTS = [
+  ...TYPED.map((concept) => northgateConcept(concept, "unverified")),
+  ...IMPORTED.map((concept) =>
+    northgateConcept(
+      concept,
+      VERIFIED_AT_IMPORT.has(concept.key) ? "human-reviewed" : "unverified",
+    ),
+  ),
+];
+
+const NORTHGATE_BODIES = new Map(NORTHGATE_CONCEPTS.map(({ title, body }) => [title, body]));
+
+const guideAlreadyHeld = (guides: number, groups: number): readonly Refusal[] => {
+  if (guides > 0) {
+    return [{ path: ["workspaceId"], message: "a workspace is seeded with one guide" }];
+  }
+  return groups === 0
+    ? []
+    : [{ path: ["workspaceId"], message: `the workspace already holds a group named ${FINANCE}` }];
+};
+
+const guideRefusals = async (app: TestApp, asked: GuideAsked): Promise<readonly Refusal[]> => {
+  const { workspaceId, userId, financeUserIds } = asked;
+  const members = await membersOf(app, workspaceId);
+  const held = await app.database.superuser.query<{ guides: number; groups: number }>(
+    `SELECT (SELECT count(*) FROM guide_definition WHERE workspace_id = $1)::int AS guides,
+            (SELECT count(*) FROM "group" WHERE workspace_id = $1 AND name = $2)::int AS groups`,
+    [workspaceId, FINANCE],
+  );
+  const [counted] = held.rows;
+  return [
+    ...writerRefused(members.get(userId)),
+    ...guideAlreadyHeld(counted?.guides ?? 0, counted?.groups ?? 0),
+    ...strangersAmong(financeUserIds, members, ["financeUserIds"]),
+  ];
+};
+
+const sectionsOf = async (
+  app: TestApp,
+  who: Seeder,
+  guideId: string,
+): Promise<readonly SeededSection[]> => {
+  const { sections } = await actingIn(app, who, async (principal, tx) => {
+    const coverage = await coverageOf(principal, tx, guideId);
+    if (!coverage.ok || coverage.value === undefined) {
+      throw new Error(`the seeded guide ${guideId} cannot be read back`);
+    }
+    const read: SeededSection[] = [];
+    for (const { sectionId, writeUpId, prompt } of coverage.value.sections) {
+      const footnotes = await footnotesOf(principal, tx, writeUpId);
+      if (!footnotes.ok || footnotes.value === undefined) {
+        throw new Error(`the seeded write-up ${writeUpId} cannot be read back`);
+      }
+      const includes = footnotes.value.map(({ label, iri, title }) => ({ id: label, iri, title }));
+      read.push({ sectionId, writeUpId, prompt, includes });
+    }
+    return { sections: read };
+  });
+  return sections;
+};
+
+const shapeHeld = (sections: readonly SeededSection[]): void => {
+  const shape = {
+    sections: sections.length,
+    writeUps: new Set(sections.map((section) => section.writeUpId)).size,
+    includesAtSeed: sections.reduce((total, section) => total + section.includes.length, 0),
+  };
+  const expected = {
+    sections: NORTHGATE.sections,
+    writeUps: NORTHGATE.writeUps,
+    includesAtSeed: NORTHGATE.includesAtSeed,
+  };
+  if (JSON.stringify(shape) !== JSON.stringify(expected)) {
+    throw new Error(`the Northgate guide seeded ${JSON.stringify(shape)}, not the fixture table`);
+  }
+};
+
+const northgateBodyOf = (title: string): string => {
+  const body = NORTHGATE_BODIES.get(title);
+  if (body === undefined) throw new Error(`the guide includes ${title}, no Northgate concept`);
+  return body;
+};
+
+const paragraphsOf = (section: SeededSection): string =>
+  section.includes.map(({ id, title }) => `${northgateBodyOf(title)}[^${id}]`).join("\n\n");
+
+const guideDoors = (app: TestApp) => ({
+  git: openTestGit(app),
+  postgres: app.doors.postgres,
+  clock: app.doors.clock,
+});
+
+const briefsWritten = async (
+  app: TestApp,
+  principal: UserPrincipal,
+  sections: readonly SeededSection[],
+) => {
+  for (const section of sections) {
+    const saved = await saveBrief(principal, guideDoors(app), {
+      writeUpId: section.writeUpId,
+      markdown: paragraphsOf(section),
+      base: 1,
+    });
+    if (!saved.ok || !saved.value.saved || saved.value.version !== 2) {
+      throw new Error(`the Brief of "${section.prompt}" was not saved as version 2`);
+    }
+  }
+};
+
+export const seedGuide = async (app: TestApp, asked: GuideAsked): Promise<GuideSeeded> => {
+  const { workspaceId, userId } = asked;
+  refuse(await guideRefusals(app, asked));
+  const { concepts } = await seedConcepts(
+    app,
+    conceptsSeeding.parse({ workspaceId, userId, concepts: NORTHGATE_CONCEPTS }),
+  );
+  const financeOnly = concepts.find(({ title }) => title === FINANCE_ONLY);
+  if (financeOnly === undefined) throw new Error(`the Northgate seed holds no ${FINANCE_ONLY}`);
+  const finance = await groupMade(app, workspaceId, FINANCE, [
+    ...new Set([userId, ...asked.financeUserIds]),
+  ]);
+  await narrowedTo(
+    app,
+    { workspaceId, userId },
+    { iri: financeOnly.iri, sensitivity: "Internal" },
+    finance.id,
+  );
+
+  const principal = await actingIn(app, { workspaceId, userId }, async (resolved) => resolved);
+  const seeded = await seedGuideRows(principal, guideDoors(app), BID_LIBRARY);
+  if (!seeded.ok) throw new Error(`the guide was refused: ${String(seeded.error)}`);
+  const { guideId } = seeded.value;
+  const sections = await sectionsOf(app, { workspaceId, userId }, guideId);
+  shapeHeld(sections);
+  await briefsWritten(app, principal, sections);
+  return {
+    guideId,
+    groupId: finance.id,
+    sections,
+    concepts: Object.fromEntries(concepts.map(({ title, iri }) => [title, iri])),
+  };
 };
 
 const SEEDED_AT_MOST = 5_000;

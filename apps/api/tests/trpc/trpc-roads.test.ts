@@ -512,6 +512,8 @@ describe("every mutation on an own-transaction road", () => {
       "ask.question",
       "inbox.accept",
       "inbox.decline",
+      "knowledge.includeAvailable",
+      "knowledge.saveBrief",
       "knowledge.saveConcept",
       "members.approveRequest",
       "members.bulkChangeRole",

@@ -16,7 +16,14 @@ import {
 } from "../../kernel/index.ts";
 import type { Tx } from "../../store/postgres/index.ts";
 import type { Frontmatter } from "../file.ts";
-import { trustOf, trustWords, verificationOf, type VerificationRow } from "../trust.ts";
+import {
+  trustOf,
+  trustWords,
+  verificationOf,
+  weakestTrust,
+  type Trust,
+  type VerificationRow,
+} from "../trust.ts";
 import { latestVerificationOf } from "./latest-verification.ts";
 
 const KIND_PAGE_SIZE = 50;
@@ -130,30 +137,31 @@ const KIND_CONCEPTS = `SELECT c.iri, c.title, c.kind, c.status, c.frontmatter, c
         ORDER BY c.title COLLATE "C", c.iri
         LIMIT $8`;
 
-type KindConceptRow = {
+type TrustRow = {
   readonly iri: string;
-  readonly title: string;
-  readonly kind: string;
   readonly status: string;
   readonly frontmatter: Frontmatter;
   readonly content_hash: string;
 } & VerificationRow;
 
+type KindConceptRow = TrustRow & { readonly title: string; readonly kind: string };
+
+const trustOfRow = (row: TrustRow, judgedAt: Date): Trust =>
+  trustOf(
+    {
+      status: row.status,
+      frontmatter: row.frontmatter,
+      contentHash: row.content_hash,
+      verification: verificationOf(row),
+    },
+    judgedAt,
+  );
+
 const kindConceptOf = (row: KindConceptRow, judgedAt: Date): KindConcept => ({
   iri: ids.conceptIri.parse(row.iri),
   title: row.title,
   kind: row.kind,
-  trustWords: trustWords(
-    trustOf(
-      {
-        status: row.status,
-        frontmatter: row.frontmatter,
-        contentHash: row.content_hash,
-        verification: verificationOf(row),
-      },
-      judgedAt,
-    ),
-  ),
+  trustWords: trustWords(trustOfRow(row, judgedAt)),
 });
 
 const kindConceptsOf = (rows: readonly KindConceptRow[], judgedAt: Date): KindConcepts => {
@@ -189,5 +197,41 @@ export const readKindConcepts = async (
       KIND_PAGE_SIZE + 1,
     ]);
     return kindConceptsOf(rows, judgedAt);
+  });
+};
+
+type CitedIris = readonly string[];
+
+const sectionTrustWordsAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.custom<readonly CitedIris[]>(),
+  refuses: ["role-forbids"],
+});
+
+const TRUST_OF = `SELECT c.iri, c.status, c.frontmatter, c.content_hash, ${LATEST_VERIFICATION.columns}
+    FROM concept_index c
+    ${LATEST_VERIFICATION.joins}
+   WHERE c.workspace_id = $1 AND ${readableClause("c", 2)} AND c.iri = ANY($4::text[])`;
+
+/** The trust words of each section, in the order given, each section as the concepts it cites. */
+export const readSectionTrustWords = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  sections: readonly CitedIris[],
+  judgedAt: Date,
+): Promise<Result<readonly string[], RefusalOf<typeof sectionTrustWordsAction> | Error>> => {
+  const admitted = admit(sectionTrustWordsAction, principal, sections);
+  if (!admitted.ok) return err(admitted.error);
+  const reader = admitted.value;
+  return attempt(async () => {
+    const { rows } = await tx.query<TrustRow>(TRUST_OF, [
+      reader.workspaceId,
+      ...readableParameters(reader),
+      [...new Set(sections.flat())],
+    ]);
+    const trusts = new Map(rows.map((row) => [row.iri, trustOfRow(row, judgedAt)]));
+    return sections.map((cited) =>
+      trustWords(weakestTrust(cited.flatMap((iri) => trusts.get(iri) ?? []))),
+    );
   });
 };
