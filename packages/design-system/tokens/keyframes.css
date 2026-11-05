@@ -1,4 +1,4 @@
-/* The only animations in the system. Nothing decorative moves. */
+/* These are the only animations in the system. Do not add a decorative one. */
 @keyframes ba-spin {
   to {
     transform: rotate(360deg);

@@ -1,41 +1,21 @@
-# The api tier's image — ONE image, two commands.
+# `deploy/platform.compose.yaml` runs this image twice. The `migrate` service runs `pnpm migrate`,
+# and the `api` service runs `CMD`. The runtime stage keeps pnpm, the root manifest, and
+# `pnpm-workspace.yaml` because `pnpm migrate` is a root script.
 #
-# `deploy/platform.compose.yaml` runs this image twice: `migrate` overrides the command with
-# `pnpm migrate` and runs to completion, then `api` runs this file's `CMD`. That is why pnpm
-# is in the runtime stage and why the root manifest and `pnpm-workspace.yaml` ship with it:
-# `pnpm migrate` is a root script that filters to this workspace, and a rollback is the
-# previous digest of *this* image (ADR 0022), so the two must never skew.
+# Node 24 strips types as it loads, so no stage compiles `apps/api`. `erasableSyntaxOnly` in
+# `tsconfig.base.json` keeps the source strippable.
 #
-# The image also carries `apps/web`'s build. The api serves the SPA on the `app.` hostname
-# (ADR 0006, amended 2026-09-02), and `apps/api/src/config.ts` reads it from `WEB_ROOT`,
-# whose default resolves to `<repo>/apps/web/dist`. This image keeps the repository's own
-# layout under `/app`, so that default is the correct path and the deploy unit sets no fifth
-# variable to find the shell.
-#
-# Nothing is compiled: Node 24 strips types as it loads, and `erasableSyntaxOnly` in
-# `tsconfig.base.json` is what keeps that true. The build stages exist for `apps/web` and for
-# the production dependency tree, not for `apps/api`.
-#
-# Base image read from Docker Hub on 24/09/2026: `node:24.21.0-trixie-slim`, on the
-# Node 24 line, pinned by the tag's manifest digest as well as its tag — the tag
-# is the label a person reads, the digest is what actually ships. Debian rather than Alpine,
-# because the lockfile's platform binaries and every test this tier has are resolved against
-# glibc today; an image is the wrong place to change a libc. Debian 13 (trixie) rather than
-# 12, because 12 has passed from Debian's security team to its long-term-support team, which
-# patches fewer packages.
+# The base is Debian, not Alpine, because the lockfile's platform binaries and this tier's tests
+# resolve against glibc. It is Debian 13 because Debian 12 has moved to its long-term-support
+# team, which patches fewer packages.
 FROM node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c AS base
 
-# pnpm's version is the root manifest's `packageManager` field and nowhere else:
-# `corepack install` with no argument reads it, so this image cannot carry a second pin that
-# ages alone. The cache is world-readable because the runtime stage runs as `node`, not root.
+# `corepack install` reads the pnpm version from the root manifest's `packageManager` field, so
+# this file does not pin pnpm. The cache is world-readable because the runtime runs as `node`.
 #
-# From pnpm 12 the package corepack caches is a wrapper around a native binary, which the
-# package's install script would fetch; corepack runs no install script, so the wrapper
-# fetches the binary on its first run and keeps it beside itself in the cache. That first run
-# is the `pnpm --version` here, as root, before the cache turns read-only: the runtime runs as
-# `node` and could not write the binary, and a container should not fetch its own tooling.
-# `--pm-on-fail=ignore` because pnpm 12 otherwise records the version it runs as in a
-# `pnpm-lock.yaml` under /app, root-only, which the runtime would inherit and fail to read.
+# pnpm 12 fetches its native binary on its first run. `pnpm --version` is that first run, as root,
+# so the binary lands in the cache before the cache becomes read-only. `--pm-on-fail=ignore`
+# stops pnpm 12 from writing a root-owned `pnpm-lock.yaml` under /app that the runtime cannot read.
 ENV COREPACK_HOME=/opt/corepack \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /app
@@ -43,18 +23,15 @@ COPY package.json ./
 RUN corepack enable && corepack install && pnpm --pm-on-fail=ignore --version \
  && chmod -R a+rX "$COREPACK_HOME"
 
-# Every workspace manifest, and nothing else, so a source edit does not invalidate the
-# install layer. `pnpm-workspace.yaml` lists six projects; the lockfile is checked against
-# all of them, so all six are copied even though the runtime needs four. `packages/devtools`
-# is here for its manifest alone: it is imported by suites and by the lint config, and it does
-# not run in this image, so no stage below copies a line of it.
+# This stage copies only the workspace manifests, so a source edit does not invalidate the
+# install layer. pnpm checks the lockfile against all six projects in `pnpm-workspace.yaml`, so
+# all six manifests are copied, although the runtime needs four.
 FROM base AS manifests
-# `tsconfig.base.json` joins them because every workspace's tsconfig extends it and vite
-# reads the chain at build time. Node needs none of it: type stripping reads no tsconfig,
-# which is why the runtime stage below inherits from `base` and not from here.
+# Every workspace tsconfig extends `tsconfig.base.json`, and vite reads it at build time. The
+# runtime stage builds on `base`, not on this stage, because type stripping reads no tsconfig.
 COPY pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
-# The patches `pnpm-workspace.yaml` names (`patchedDependencies`): an install refuses to
-# start without the files, frozen lockfile or not, so they travel with the manifests.
+# `pnpm install` refuses to start without the patch files that `patchedDependencies` in
+# `pnpm-workspace.yaml` names.
 COPY patches/ patches/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
@@ -63,37 +40,28 @@ COPY packages/design-system/package.json packages/design-system/
 COPY packages/devtools/package.json packages/devtools/
 COPY packages/schema/package.json packages/schema/
 
-# The SPA's build. It needs the dev dependency tree (vite, tailwind, esbuild's platform
-# binary — `pnpm-workspace.yaml` allows that one build script), which is exactly why it
-# happens in a stage the runtime never inherits from.
+# The SPA build needs the dev dependencies, so it runs in a stage the runtime does not inherit.
 FROM manifests AS web
 RUN pnpm install --frozen-lockfile
 COPY packages/design-system/ packages/design-system/
-# The SPA mints a connected source's id with the platform's one minter, which the schema package holds.
+# The SPA imports its id minter from the schema package.
 COPY packages/schema/src packages/schema/src
 COPY apps/web/ apps/web/
 RUN pnpm --filter @better-answers/web run build
 
-# The production dependency tree, installed from the same frozen lockfile.
+# This stage uses a filtered install, not `pnpm deploy`. `pnpm deploy` copies the workspace
+# packages into `node_modules`, their `exports` maps point at TypeScript source, and Node does
+# not strip types inside `node_modules`. The `...` suffix selects the api and its workspace
+# dependencies: core, schema, and design-system.
 #
-# `pnpm install --prod --filter @better-answers/api...` rather than `pnpm deploy`: the api
-# imports `@better-answers/core` and `@better-answers/schema` through their `exports` maps,
-# which point at TypeScript source, and Node will not strip types inside `node_modules`. A
-# `pnpm deploy` bundle copies those workspace packages *into* `node_modules`, so every
-# `@better-answers/*` import would fail at load. A filtered install keeps them where they
-# are — real directories under `/app/packages`, reached by the symlink pnpm writes — and the
-# `...` suffix selects the api together with its workspace dependencies and nothing else:
-# those two, and `@better-answers/design-system`, whose logo and stylesheet `src/auth/` reads
-# through its `exports` map as files rather than importing them.
-#
-# pnpm links an optional peer that any workspace brings and `--prod` installs it, so
-# `better-auth`'s peers on drizzle-kit, vitest and react would ship here with their build tooling,
-# three esbuild binaries among it. The lockfile cannot drop them: an `overrides` removal leaves an
-# optional peer in place, and the Renovate app locks with `--ignore-pnpmfile`, so a hook would
-# come undone in every pull request it opens. Every optional peer the api loads is one its own
-# dependencies also reach, so a link to a package deleted here is one nothing follows. A required
-# peer is kept all the same, since its package may load it; `tests/images/image.test.ts` follows no peer,
-# so one kept that way turns it red for a person to declare or override away, as TypeScript was.
+# `--prod` still installs the optional peers that any workspace brings, so `better-auth`'s
+# peers on drizzle-kit, vitest, and react would ship with their build tools. An `overrides`
+# removal leaves an optional peer in place, and Renovate locks with `--ignore-pnpmfile`, so
+# neither the lockfile nor a pnpmfile hook can drop them. The script below deletes every store
+# entry that the api's dependencies and required peers do not reach. Every optional peer the api
+# loads is also reached through its dependencies, so no deleted package is loaded.
+# The script keeps required peers. `tests/images/image.test.ts` fails on a kept peer, and a
+# person must then declare it or override it away.
 FROM manifests AS prod-deps
 RUN pnpm install --frozen-lockfile --prod --filter @better-answers/api...
 RUN node --input-type=module <<'JS'
@@ -142,42 +110,25 @@ JS
 
 FROM base AS runtime
 
-# What this stage needs from the operating system beyond Node, and why each one is here.
+# The HEALTHCHECK below runs wget and must match the probe in `deploy/platform.compose.yaml`.
+# The slim base image has neither wget nor curl.
 #
-# wget, because the deploy unit's healthcheck and this image's HEALTHCHECK must be the same
-# probe (`deploy/platform.compose.yaml` § api) and node:*-slim carries neither wget nor curl.
+# The api is the only process that writes a workspace's git repository, so it needs git. The
+# erasure routine rewrites history with `git filter-repo`, which needs Python.
 #
-# git, because this image is the only process that writes a workspace's repository (ADR 0012):
-# every governed write, every read of a file at a commit and the erasure routine's history
-# rewrite are git commands run from here. The base image carries no git at all.
+# git-filter-repo comes from PyPI at an exact version, not from apt, so the image, the CI runner,
+# and developer machines run the same tested version. `.github/actions/git-filter-repo` and
+# `scripts/cloud-setup.sh` read the version from the `ARG` line below.
+# `--break-system-packages` is safe because pip installs under /usr/local, which apt does not
+# manage. pip is purged in the same layer, and `apps/api/tests/images/image.test.ts` checks
+# that the tool survived the purge.
 #
-# `git filter-repo` and the Python it runs on, because the erasure routine's git step is that
-# tool (ADR 0020) — a text replacement across every commit, then `git reflog expire
-# --expire=now --all` and `git gc --prune=now` on the bare repository. The recorded and
-# rejected alternative is a dulwich rewrite in the worker: the api is the only git writer and
-# the worker holds no git credential, so that alternative founds a second writer for one
-# routine and hands the worker a credential the worker's rules say it does not have.
-#
-# The tool comes from PyPI at an exact version rather than from apt. Debian 13 packages 2.47.0
-# today, but it holds a package at one version for the life of a release, while the runner and
-# the machines this repository is developed on install the version pinned here; a rewrite
-# proved at one version and run at another is a rewrite nobody has tested, and the pin here is
-# what keeps them from skewing. Version read from PyPI on 11/09/2026: git-filter-repo 2.47.0,
-# the current release, published as a pure-Python wheel that needs no build tooling.
-# `--break-system-packages` is answering the marker Debian sets to protect apt's own Python
-# packages — this install lands under /usr/local, which apt owns nothing under, and an image
-# has no system Python application to break. pip is purged in the same layer, because what
-# this image should carry is the tool and not the means of getting it, and
-# `apps/api/tests/images/image.test.ts` reads the version back out of the built image, so a purge
-# that took the tool with it is red rather than quiet.
-#
-# The `# renovate:` line is read by `renovate.json`'s custom manager and sits directly above
-# the `ARG` it describes (`T-211`). `check.yml` installs the runner's copy at whatever this
-# line pins, so a bump here moves the image and the runner together.
+# The custom manager in `renovate.json` reads the `# renovate:` line only when it sits directly
+# above the `ARG`.
 # renovate: datasource=pypi depName=git-filter-repo
 ARG GIT_FILTER_REPO_VERSION=2.47.0
-# The upgrade is there because install leaves a package the base already carries at the
-# base's version, security updates included.
+# `apt-get install` leaves a package the base already has at the base's version, so
+# `apt-get upgrade` applies its security updates.
 RUN apt-get update \
  && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends wget git python3 python3-pip \
@@ -190,69 +141,58 @@ RUN apt-get update \
 ENV NODE_ENV=production \
     PORT=3000
 
-# The Node image ships npm beside corepack, and this image's pnpm is corepack's: `corepack
-# enable` in `base` linked `pnpm` to corepack's shim, which runs the version `corepack install`
-# cached from `packageManager`. Nothing here calls npm or npx, yet npm brings a dependency tree
-# of its own that every image scan reads. The build stages keep npm, because they never ship.
+# This image runs pnpm through corepack and never calls npm or npx. Deleting npm removes its
+# dependency tree from image scans. The build stages keep npm because they do not ship.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
-# The repository's own project list — one source for it, not a second copy that ages
-# alone — plus the two settings that are true of an image and false of a
-# checkout. pnpm 11 verifies the dependency tree before `pnpm run` and repairs it by
-# installing; this image has no lockfile, no registry credential and no writable /app, so
-# that repair can only fail. The tree was built at image build time and is the artefact.
-# pnpm 12 also records the version it runs as in `pnpm-lock.yaml` before every command,
-# resolving it from the registry, which fails here for the same reasons and fails every
-# `pnpm migrate` with it, after some 70 seconds of fetch retries when the registry is out of
-# reach; corepack has already run the version `packageManager` pins, so `pmOnFail: ignore`
-# drops a check that has nothing left to catch.
+# This copies the repository's `pnpm-workspace.yaml` and appends two settings for the image. The
+# has no lockfile, no registry credential, and no writable /app, so any pnpm install fails here.
+# `verifyDepsBeforeRun: false` stops pnpm from reinstalling before `pnpm run`.
+# `pmOnFail: ignore` stops pnpm 12 from resolving its own version from the registry before each
+# command, which fails `pnpm migrate` after about 70 seconds of retries.
 COPY pnpm-workspace.yaml ./
-# The patch files that workspace file names, so no pnpm command reads a reference to a
-# path that is not there. Nothing installs here; the tree above already carries the patch.
+# pnpm commands read the patch paths in `pnpm-workspace.yaml`, so the files must exist even
+# though nothing installs here.
 COPY patches/ patches/
 RUN printf '\n# Set by apps/api/Dockerfile: an image never installs, and corepack picks pnpm.\nverifyDepsBeforeRun: false\npmOnFail: ignore\n' >> pnpm-workspace.yaml
 
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=prod-deps /app/packages/core/node_modules ./packages/core/node_modules
-# The design system's dependencies are its two faces, which `src/auth/page-style.ts` serves to
-# the api's own pages. This is also the link `tests/images/image.test.ts` follows.
+# `src/auth/page-style.ts` serves the design system's fonts to the api's pages.
+# `tests/images/image.test.ts` follows this link.
 COPY --from=prod-deps /app/packages/design-system/node_modules ./packages/design-system/node_modules
 COPY --from=prod-deps /app/packages/schema/node_modules ./packages/schema/node_modules
 
 COPY apps/api/package.json apps/api/
 COPY apps/api/src apps/api/src
-# The lifted third-party snapshots `src/server.ts` imports (ADR 0005: parts are lifted, not
-# depended on), with the notice each one ships under.
+# `src/server.ts` imports these third-party snapshots. Each keeps its licence notice.
 COPY apps/api/lifts apps/api/lifts
 COPY packages/core/package.json packages/core/
 COPY packages/core/src packages/core/src
-# What the api's own pages inline: the logo, the stylesheet and the tokens it imports.
+# The api's pages inline the logo, the stylesheet, and the tokens the stylesheet imports.
 COPY packages/design-system/package.json packages/design-system/styles.css packages/design-system/
 COPY packages/design-system/assets packages/design-system/assets
 COPY packages/design-system/tokens packages/design-system/tokens
 COPY packages/schema/package.json packages/schema/
 COPY packages/schema/src packages/schema/src
-# `migrationsFolder` (packages/schema/src/index.ts) is this directory; `pnpm migrate` reads it.
+# `pnpm migrate` reads this directory. `migrationsFolder` in `packages/schema/src/index.ts` names it.
 COPY packages/schema/migrations packages/schema/migrations
-# Where `WEB_ROOT`'s default resolves to, so the SPA is served with no configuration.
+# The image keeps the repository layout under /app, so the default `WEB_ROOT` in
+# `apps/api/src/config.ts` resolves to this path and the deploy unit sets no variable for it.
 COPY --from=web /app/apps/web/dist apps/web/dist
 
-# uid 1000, which is the uid `init` in `deploy/stores.compose.yaml` chowns `/data/git` to;
-# nothing here runs as root to own a volume. `node` is that user in this base
-# image, and `HOME` is set so pnpm's cache lands somewhere the process can write.
+# `init` in `deploy/stores.compose.yaml` chowns `/data/git` to uid 1000, which is the `node`
+# user in this base image. `HOME` gives pnpm a writable cache directory.
 ENV HOME=/home/node
 USER node
 
 EXPOSE 3000
 
-# The loopback, so the probe carries no public hostname. There is no fifth hostname variable
-# to set: the api's fence holds the loopback (localhost, 127.0.0.1, ::1) as a fixed role
-# carrying /health alone (T-030). Do not point this at a hostname — a probe that has to know
-# the estate's DNS is a probe that breaks when the DNS changes. /health answers 503 until the
-# authorization server is ready, which is what makes `worker`'s wait on `api` mean something
-# (ADR 0007). This is the rationale for both copies of the probe: the `api` service in
-# `deploy/platform.compose.yaml` runs the same command with the same thresholds, and points here.
+# The probe uses the loopback, so it needs no public hostname. On the loopback the api answers
+# /health and nothing else. /health returns 503 until the authorization server is ready, and the
+# `worker` service's wait on `api` depends on that. The `api` service in
+# `deploy/platform.compose.yaml` runs the same probe with the same thresholds, so change both together.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=12 \
   CMD wget -qO- http://127.0.0.1:3000/health || exit 1
 

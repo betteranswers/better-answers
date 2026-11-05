@@ -1,9 +1,5 @@
-/* Base palette. Neutral-led, one accent, four semantics.
-   Neutrals are cool-grey with a faint blue cast (Vercel/Linear register).
-   Trust is never carried by colour alone — semantics tint tags that
-   already say the word. */
+/* Components read the aliases in `tokens/semantic.css`, not these values. */
 :root {
-  /* Neutral ramp — light */
   --grey-0: #ffffff;
   --grey-25: #fcfcfd;
   --grey-50: #f7f8f9;
@@ -19,19 +15,19 @@
   --grey-900: #17191c;
   --grey-950: #0b0c0e;
 
-  /* Accent — "ink blue". Interactive only: links, focus, primary action. */
+  /* The accent, ink blue, is for interactive elements only: links, focus, and the primary
+     action. */
   --accent-50: #eef2ff;
   --accent-100: #dde5ff;
   --accent-200: #bccbfe;
   --accent-300: #93aafc;
   --accent-400: #6685f7;
   --accent-500: #3f62ea;
-  --accent-600: #2e4bd4; /* primary */
+  --accent-600: #2e4bd4;
   --accent-700: #2639aa;
   --accent-800: #233285;
   --accent-900: #1d2a68;
 
-  /* Semantics */
   --green-50: #e8f6ef;
   --green-200: #a9dcc4;
   --green-600: #137a52;

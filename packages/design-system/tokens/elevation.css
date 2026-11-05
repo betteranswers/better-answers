@@ -1,5 +1,4 @@
-/* Shadows are quiet: a hairline plus a short, low-alpha drop.
-   Nothing in the app floats more than a dialog. */
+/* --shadow-dialog is the largest shadow. Nothing else may cast a larger one. */
 :root {
   --shadow-none: none;
   --shadow-xs: 0 1px 2px rgba(11, 12, 14, 0.05);

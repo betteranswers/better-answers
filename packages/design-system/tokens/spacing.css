@@ -1,4 +1,4 @@
-/* 4px base. 2px and 6px exist because dense controls need them. */
+/* --space-0-5 and --space-1-5 are off the 4px scale. Dense controls need them. */
 :root {
   --space-0: 0px;
   --space-0-5: 2px;
@@ -17,8 +17,8 @@
   --space-24: 96px;
   --space-32: 128px;
 
-  /* The band's first two cells take the rail's and the menu's widths, so hiding
-     the nav moves nothing in the band. */
+  /* The band's first two cells use --rail-w and --sidebar-w, so hiding the nav does not
+     move anything in the band. */
   --sidebar-w: 248px;
   --rail-w: 56px;
   --band-h: 48px;

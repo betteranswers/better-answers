@@ -1,16 +1,8 @@
-/* Geist and Geist Mono.
-   SUBSTITUTION: the repository ships no brand webfont. Geist is the closest match to the
-   Vercel/Linear reference styling (readme.md §7).
+/* This file names the families and does not load them. An app with a bundler imports
+   `tokens/fonts-hosted.css`, and a page opened from disk links `tokens/fonts-remote.css`.
 
-   This file names the two families and nothing else, because the two consumers load the
-   faces differently and only one of them can resolve a package name: an application with a
-   bundler imports `tokens/fonts-hosted.css` (the self-hosted @fontsource packages, so a
-   page makes no third-party request), and a page opened straight from disk — the
-   specimen cards and the thumbnail — links `tokens/fonts-remote.css` beside `styles.css`.
-
-   `--font-sans-default` is the face the product ships; `--font-sans` is what everything
-   reads, so an axis that replaces the family (the bridge's accessible reading mode) can
-   re-point it without losing what it is falling back to. */
+   Read --font-sans, not --font-sans-default. The accessible reading mode in
+   `tokens/tailwind-bridge.css` changes --font-sans and falls back to the default. */
 :root {
   --font-sans-default:
     "Geist Variable", "Geist", "Geist Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI",

@@ -1,5 +1,5 @@
-/* Type scale. 14px is the app's body size (dense, Linear register);
-   16px is the reading size for prose (answers, guides, docs). */
+/* --text-base (14px) is the interface body size. --text-lg (16px) is the size for prose:
+   answers, guides, and docs. */
 :root {
   --text-2xs: 11px;
   --text-xs: 12px;
@@ -24,7 +24,6 @@
   --weight-medium: 500;
   --weight-semibold: 600;
 
-  /* Optical tracking: tighten as size grows, open up the small caps-y bits. */
   --tracking-display: -0.022em;
   --tracking-heading: -0.014em;
   --tracking-body: -0.006em;

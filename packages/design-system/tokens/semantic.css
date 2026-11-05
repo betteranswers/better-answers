@@ -1,8 +1,7 @@
-/* Semantic aliases. Components reference only these, never the base ramp. */
+/* Components read only these aliases, never the base palette in `tokens/colors.css`. */
 :root {
   color-scheme: light;
 
-  /* Surfaces */
   --surface-page: var(--grey-25);
   --surface-card: var(--grey-0);
   --surface-raised: var(--grey-0);
@@ -14,7 +13,6 @@
   --surface-inverse: var(--grey-900);
   --surface-scrim: rgba(11, 12, 14, 0.44);
 
-  /* Text */
   --text-primary: var(--grey-900);
   --text-body: var(--grey-800);
   --text-secondary: var(--grey-600);
@@ -25,16 +23,16 @@
   --text-link-hover: var(--accent-700);
   --text-on-accent: #ffffff;
 
-  /* Lines */
   --border-subtle: var(--grey-150);
   --border-default: var(--grey-200);
   --border-strong: var(--grey-300);
   --border-inverse: rgba(255, 255, 255, 0.14);
   --border-focus: var(--accent-600);
-  /* What tells a person a field, checkbox or radio is there: 3:1 on every surface, both themes. */
+  /* The border of a field, checkbox, or radio. It must keep 3:1 contrast on every surface in
+     both themes. */
   --border-control: var(--grey-500);
 
-  /* Controls. The primary button is the accent fill, the one solid object on the board. */
+  /* The primary button uses the accent fill. It is the only solid object on a page. */
   --control-primary-bg: var(--control-accent-bg);
   --control-primary-bg-hover: var(--control-accent-bg-hover);
   --control-primary-bg-active: var(--accent-800);
@@ -47,13 +45,14 @@
   --control-danger-fg: var(--red-600);
   --control-disabled-bg: var(--grey-100);
   --control-disabled-fg: var(--grey-400);
-  /* The first shadow paints on top, so the ink edge is drawn a pixel wider, where it meets the
-     page at 3:1 whatever fills the control. */
+  /* The first shadow paints on top, so the ink edge shows as a 1px band outside the pale ring.
+     That band keeps 3:1 contrast against the page whatever the control's fill. */
   --focus-ring:
     0 0 0 var(--focus-ring-width) var(--accent-200),
     0 0 0 calc(var(--focus-ring-width) + 1px) var(--accent-600);
 
-  /* Trust words — a tint behind a word that already says it */
+  /* Colour never carries trust alone. A trust colour only tints a tag whose word already
+     states the trust level. */
   --trust-verified-bg: var(--green-50);
   --trust-verified-fg: var(--green-700);
   --trust-verified-border: var(--green-200);
@@ -70,7 +69,6 @@
   --trust-draft-fg: var(--violet-700);
   --trust-draft-border: var(--violet-200);
 
-  /* Feedback */
   --status-success-fg: var(--green-700);
   --status-warning-fg: var(--amber-700);
   --status-danger-fg: var(--red-700);
@@ -104,7 +102,7 @@
   --border-strong: #3a3f47;
   --border-inverse: rgba(0, 0, 0, 0.2);
 
-  /* Each step keeps white words at 4.5:1 or more. */
+  /* Each primary fill keeps white text at 4.5:1 contrast or more. */
   --control-primary-bg: var(--accent-500);
   --control-primary-bg-hover: var(--accent-600);
   --control-primary-bg-active: var(--accent-700);
@@ -117,7 +115,8 @@
   --control-danger-fg: #f08078;
   --control-disabled-bg: #1b1e22;
   --control-disabled-fg: #5b6068;
-  /* The pale ring holds 3:1 on every primary fill; the ink edge holds it on the page. */
+  /* The pale ring keeps 3:1 contrast on every primary fill, and the ink edge keeps 3:1 on the
+     page. */
   --focus-ring:
     0 0 0 var(--focus-ring-width) var(--accent-200),
     0 0 0 calc(var(--focus-ring-width) + 1px) var(--accent-400);

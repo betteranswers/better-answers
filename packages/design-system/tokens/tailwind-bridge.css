@@ -1,40 +1,7 @@
-/*
- * Tailwind v4 / shadcn bridge
- * ---------------------------------------------------------------------------
- * shadcn, Kibo UI, AI Elements and Magic UI all read one fixed set of CSS
- * variable names. This file points those names at this design system's tokens, so a
- * component installed from any of those registries comes out in our styling
- * with no edits to the component file.
- *
- * It is NOT imported by styles.css — it only makes sense inside an app that
- * has Tailwind v4. In apps/web/src/index.css, in this order:
- *
- *   @import "tailwindcss";
- *   @import "@fontsource-variable/geist";
- *   @import "@fontsource-variable/geist-mono";
- *   @import "<design-system>/styles.css";           <- our tokens
- *   @import "<design-system>/tokens/tailwind-bridge.css";
- *
- * Two things to know before reading the map below.
- *
- * 1. shadcn's word "accent" does not mean our accent. In shadcn, `accent` is
- *    the faint tint a menu item takes on hover. Our ink blue is not that. So
- *    ink blue maps to `ring` (focus) and to `brand`, and shadcn's `accent`
- *    maps to our --surface-hover. Getting this backwards is the single most
- *    common way a re-skin ends up looking wrong.
- *
- * 2. shadcn's `primary` is the solid default button. Ours is the accent fill,
- *    ink blue with white words, so `primary` maps to the primary control
- *    tokens, which alias the accent. Everything else a kit fills with
- *    `primary` takes ink blue too, so a fill that is not an action reads
- *    `foreground` instead.
- */
-
-/* ---------------------------------------------------------------------------
- * 1. The shadcn contract, filled with our tokens.
- * Kept as raw values (not var() chains) where a kit may wrap them in
- * colour-mix() or an opacity modifier, which needs a real colour.
- * ------------------------------------------------------------------------ */
+/* Points the CSS variable names that shadcn, Kibo UI, AI Elements, and Magic UI read at
+   this design system's tokens. A component from those registries then needs no edits.
+   `styles.css` does not import this file, because it needs Tailwind v4. Import it after
+   `tailwindcss`, as `apps/web/src/index.css` does. */
 :root {
   --background: var(--surface-page);
   --foreground: var(--text-primary);
@@ -43,19 +10,19 @@
   --popover: var(--surface-raised);
   --popover-foreground: var(--text-primary);
 
-  /* Solid default button — the accent fill, per our register */
+  /* shadcn's `primary` is the solid default button, which is ink blue here. A kit fill that
+     is not an action should use `foreground`, not `primary`. */
   --primary: var(--control-primary-bg);
   --primary-foreground: var(--control-primary-fg);
 
-  /* Quiet button / chip surface */
   --secondary: var(--surface-sunken);
   --secondary-foreground: var(--text-body);
 
-  /* Muted = de-emphasised surface + its text */
   --muted: var(--surface-sunken);
   --muted-foreground: var(--text-secondary);
 
-  /* shadcn "accent" = hover tint, NOT our brand accent. See note 1. */
+  /* shadcn's `accent` is the hover tint of a menu item, not ink blue. Ink blue is `ring` and
+     `brand`. */
   --accent: var(--surface-hover);
   --accent-foreground: var(--text-primary);
 
@@ -66,7 +33,6 @@
   --input: var(--border-control);
   --ring: var(--accent-600);
 
-  /* Sidebar contract (shadcn sidebar block, Kibo layouts) */
   --sidebar: var(--surface-sunken);
   --sidebar-foreground: var(--text-body);
   --sidebar-primary: var(--control-primary-bg);
@@ -76,33 +42,25 @@
   --sidebar-border: var(--border-subtle);
   --sidebar-ring: var(--accent-600);
 
-  /* Charts. Our four semantic hues plus ink blue and one grey.
-     Ordered so the first two read clearly next to each other. */
+  /* The first two chart colours must stay easy to tell apart side by side. */
   --chart-1: var(--accent-600);
   --chart-2: var(--green-600);
   --chart-3: var(--amber-600);
   --chart-4: var(--violet-600);
   --chart-5: var(--grey-400);
 
-  /* Corners. Every kit derives its rounding from this one number. Setting it
-     to 0 squares shadcn, Kibo and AI Elements in a single line. */
+  /* shadcn, Kibo UI, and AI Elements derive every corner radius from --radius. */
   --radius: 0px;
 
-  /* Our brand accent, exposed under a name no kit will overwrite.
-     Use as bg-brand / text-brand. */
+  /* Ink blue, under a name that no kit overwrites. Use it through `bg-brand` and
+     `text-brand`. */
   --brand: var(--accent-600);
   --brand-foreground: #ffffff;
 }
 
-/* ---------------------------------------------------------------------------
- * 2. Dark theme.
- * One switch: [data-theme="dark"] on <html>. The aliases in §1 resolve on
- * :root, so the attribute set on any element below it flips our tokens there
- * and leaves every shadcn name light — a half-flipped page. shadcn's and
- * next-themes' .dark class is not honoured, for the same reason.
- * Values come from our own dark aliases in tokens/semantic.css — this block
- * only re-points the shadcn names that differ from their light mapping.
- * ------------------------------------------------------------------------ */
+/* Set data-theme="dark" on <html> only. The shadcn names resolve on :root, so the attribute
+   on a lower element changes our tokens there but leaves the shadcn names light. The `.dark`
+   class from shadcn and next-themes has no effect. */
 [data-theme="dark"] {
   --destructive: #e5645a;
   --destructive-foreground: #0b0c0e;
@@ -117,15 +75,10 @@
   --chart-5: var(--grey-500);
 }
 
-/* ---------------------------------------------------------------------------
- * 3. Reading mode — dyslexia-friendly.
- * A separate axis from theme, so it combines with light or dark rather than
- * replacing one. Set data-reading-mode="accessible" on <html> alongside
- * whatever data-theme is already there.
- * Font family is left for the reference repo's face to fill in; size, leading
- * and tracking are set here. The measure is not: --measure-prose is the one
- * measure, and it counts characters, so a line keeps its 68 at the larger size.
- * ------------------------------------------------------------------------ */
+/* The accessible reading mode for dyslexic readers. Set data-reading-mode="accessible" on
+   <html>. It works with either theme. Nothing in this package defines --font-accessible, so
+   the family stays on the default face until an app defines it. --measure-prose does not
+   change, because it counts characters. */
 [data-reading-mode="accessible"] {
   --font-sans: var(--font-accessible, var(--font-sans-default));
   --text-body-size: 16px;
@@ -136,12 +89,9 @@
   --tracking-caps: 0.08em;
 }
 
-/* ---------------------------------------------------------------------------
- * 4. Tell Tailwind about the names above, so utilities exist for them:
- * bg-background, text-muted-foreground, border-border, bg-brand, rounded-md…
- * `inline` means Tailwind resolves the var at use, which is what lets the
- * theme flip at runtime.
- * ------------------------------------------------------------------------ */
+/* Creates Tailwind utilities for the names above, such as `bg-background` and
+   `text-muted-foreground`. The block is `inline`, so each utility reads the variable on the
+   element that uses it, and the theme can change at runtime. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -178,7 +128,7 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  /* Every step resolves to 0. The names survive so kit source still compiles. */
+  /* Every step is 0. The names stay so that kit source still compiles. */
   --radius-none: 0px;
   --radius-sm: 0px;
   --radius-md: 0px;
@@ -187,42 +137,33 @@
   --radius-2xl: 0px;
   --radius-3xl: 0px;
 
-  /* One curve, our durations — so kit transitions match ours. */
+  /* These copy the curve and durations in `tokens/motion.css`. Change both together. */
   --ease-standard: cubic-bezier(0.2, 0, 0.13, 1);
   --animate-duration-fast: 120ms;
   --animate-duration-base: 160ms;
   --animate-duration-slow: 240ms;
 }
 
-/* ---------------------------------------------------------------------------
- * 4b. The two families, in a NON-inline @theme.
- * Not inline, because inline bakes the value into the utility and `font-sans`
- * would then miss the accessible reading mode above, which re-points
- * --font-sans at runtime. Non-inline emits `font-family: var(--font-sans)`,
- * which follows it. The value is the `-default` name rather than --font-sans
- * itself: Tailwind writes every theme variable into :root, and
- * `--font-sans: var(--font-sans)` would be a reference to itself.
- * ------------------------------------------------------------------------ */
+/* This block must not be `inline`. Inline copies the value into `font-sans`, which then
+   ignores the reading mode's change to --font-sans. The value is the `-default` name because
+   Tailwind writes theme variables into :root, where `--font-sans: var(--font-sans)` would
+   refer to itself. */
 @theme {
   --font-sans: var(--font-sans-default);
   --font-mono: var(--font-mono-default);
 }
 
-/* ---------------------------------------------------------------------------
- * 5. Corrections the variables cannot reach.
- * A handful of kit components hardcode a radius or a ring instead of reading
- * the token. These rules catch them. Keep this list SHORT — if it grows
- * past a dozen rules, the component should be edited in place instead.
- * ------------------------------------------------------------------------ */
+/* Overrides for kit components that hardcode a radius or a ring. If this list grows past a
+   dozen rules, edit the components instead. */
 @layer utilities {
-  /* Any hardcoded rounded-* utility inside kit output. In base, every utility
-     would beat it; here its two selectors outweigh a utility's one. */
+  /* Squares any `rounded-*` class. In the `base` layer every utility would win, so it sits
+     here, where its two selectors outweigh a utility's one. */
   [class*="rounded-"]:not(.ba-allow-radius) {
     border-radius: 0;
   }
 
-  /* Circles we do keep: spinner ring, radio, avatar. `[class]` gives each the
-     reset's weight, and coming after it, they win. */
+  /* The spinner ring, the radio, and the avatar stay round. `[class]` gives each selector the
+     same weight as the reset above, and the later rule wins. */
   .rounded-full.ba-allow-radius,
   [role="radio"][class],
   [data-slot="avatar"][class] {
@@ -231,17 +172,15 @@
 }
 
 @layer utilities {
-  /* Ours, not the kit's ring, which is under 3:1. Three classes' weight outranks its two-class
-     utilities and `shadow-xs`; an inner-ring part opts out with `!`. */
+  /* Replaces the kit's focus ring, which is under 3:1 contrast. The selector's weight of three
+     classes beats the kit's two-class utilities and `shadow-xs`. A part with an inner ring
+     opts out with `!`. */
   :is(button, a, input, textarea, select, summary, [tabindex]):focus-visible:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
   }
 }
 
-/* ---------------------------------------------------------------------------
- * 6. Reduced motion and reduced transparency, applied to kit output too.
- * ------------------------------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -257,28 +196,18 @@
   }
 }
 
-/* ---------------------------------------------------------------------------
- * 7. Layout — the spacing scale and the layout constants, so a page sizes
- * itself from the tokens rather than from Tailwind's own defaults.
- *
- * The type scale is deliberately absent. Tailwind's font-size namespace is
- * `--text-*` and tokens/typography.css already owns those names, so a theme
- * variable here would point at itself and resolve to nothing, and a copied
- * literal would be a second scale that ages alone. A page reads a type step
- * as var(--text-lg).
- * ------------------------------------------------------------------------ */
+/* The type scale is not mapped here. Tailwind's font-size namespace is `--text-*`, which
+   `tokens/typography.css` already uses, so a theme variable here would refer to itself.
+   Write a type step as `var(--text-lg)`. */
 @theme inline {
-  /* Tailwind's numeric scale becomes multiples of the 4px base, so `p-4` is
-     --space-4 and there is one scale rather than two that nearly agree. */
+  /* Tailwind's numeric scale steps by --space-1, so `p-4` equals --space-4. */
   --spacing: var(--space-1);
 
-  /* The layout constants, named: w-rail, w-sidebar (the menu), h-band,
-     max-w-measure, max-w-page. */
   --spacing-sidebar: var(--sidebar-w);
   --spacing-rail: var(--rail-w);
   --spacing-band: var(--band-h);
-  /* `measure`, not `prose`: Tailwind ships its own `max-w-prose` at 65ch and a theme
-     value of that name does not displace it, so the token would silently lose. */
+  /* The name is `measure` because Tailwind's built-in `max-w-prose` (65ch) wins over a theme
+     value named `prose`. */
   --container-measure: var(--measure-prose);
   --container-measure-narrow: var(--measure-narrow);
   --container-page: var(--page-max);

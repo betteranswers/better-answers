@@ -1,4 +1,4 @@
-/* Fast, flat, no bounce. Nothing decorative moves. */
+/* No easing curve may overshoot, so that nothing bounces. */
 :root {
   --duration-instant: 80ms; /* @kind other */
   --duration-fast: 120ms; /* @kind other */

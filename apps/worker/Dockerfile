@@ -1,122 +1,85 @@
-# The knowledge worker's image (ADR 0005). Built from `apps/worker/` — this tier is a uv
-# workspace, not a pnpm one, and it shares four stores with the api tier and never code, so
-# its image needs nothing from the rest of the repository.
+# The build context is `apps/worker/`, a uv workspace that shares no code with the rest of the
+# repository.
 #
-# Versions read: `python:3.13.16-slim-trixie` from Docker Hub on 04/11/2026 — 3.13 is what
-# `pyproject.toml` requires (`>=3.13,<3.14`) and `.python-version` names — uv 0.13.0
-# from astral-sh/uv's releases on 10/10/2026, and `gcr.io/distroless/cc-debian13:nonroot`
-# from the gcr.io registry on 04/11/2026. Each is pinned by digest as well as by tag: the
-# tag is the label a person reads, the digest is what actually ships. Debian 13 (trixie)
-# rather than 12 for the reason `apps/api/Dockerfile` gives beside its own base image.
+# The runtime is Distroless because the worker needs no shell, package manager, or perl. It reads
+# git through dulwich. On a slim Debian runtime, nearly every scan finding was in a package the
+# worker never ran. `docs/operations/RUNBOOK.md` § A shell in the worker says how an operator gets
+# a shell during an incident.
 #
-# Distroless for the runtime because the worker runs nothing a slim Debian adds: no shell,
-# no package manager, no perl — it reads git through dulwich. On the slim runtime, nearly
-# every finding a scan reported was in a package the worker never ran. What it keeps is
-# glibc, the C++ runtime, OpenSSL, zlib, CA certificates and time zones.
-# `docs/operations/RUNBOOK.md` § A shell in the worker says how an operator gets a shell
-# during an incident all the same.
+# uv comes from Astral's image so the exact version is pinned in this file, not resolved by an
+# installer script at build time. `apps/worker/.tool-versions` pins the same uv for CI, and the
+# `uv` group in `renovate.json` moves both together.
 #
-# uv arrives by `COPY --from` off Astral's own image, which is their documented way to add
-# uv to a Python base. It puts the exact uv version in this file, where a reader looking for
-# the pin finds it, rather than behind an installer script that resolves "latest" at build
-# time — a version nobody read on the day, which is what pinning exists to stop.
-#
-# The redaction seam's model weights are part of this image (ADR 0020, `T-122`). They are
-# fetched at build under `HF_HOME` and the runtime stage sets `HF_HUB_OFFLINE=1` over them,
-# so the image is self-sufficient: a worker on a 4 GB box with no route to a registry still
-# detects, and a weight nobody fetched here fails at once instead of being downloaded onto a
-# production volume on a first document. The corollary belongs with the pin: **nothing may
-# be mounted over `HF_HOME` in a deploy unit.** A host directory there masks every byte this
-# build fetched, and with `HF_HUB_OFFLINE` set beside it the result is not a quiet
-# re-download but a worker that cannot load a model at all — which is why
-# `deploy/platform.compose.yaml` mounts the LMDB and the trees and nothing else, and why
-# `apps/worker/tests/test_image.py` holds that file to it.
+# The image carries the redaction models' weights, and the runtime sets `HF_HUB_OFFLINE=1`. A
+# worker therefore needs no registry, and a weight the build did not fetch fails at once. Do not
+# mount anything over `HF_HOME` in a deploy unit. The mount would hide the weights, and with
+# `HF_HUB_OFFLINE` set the worker could not load a model. `apps/worker/tests/test_image.py`
+# checks `deploy/platform.compose.yaml` for such a mount.
 FROM ghcr.io/astral-sh/uv:0.13.0@sha256:cdc6093146eb3ff6a40107b38f008b789e050e77ad87865e381d9917da55a168 AS uv
 
-# The runtime's base, named here because the `tree` stage reads its accounts before the
-# runtime stage builds on it. `cc` rather than Distroless's own `python3-debian13`: that
-# image carries Debian's Python, 3.13.5 on 24/09/2026, eleven releases behind the 3.13.16
-# pinned below, at a path the build stage's venv does not point to. `nonroot`, so a lost
-# `USER` line would still not run the worker as root.
+# The `tree` stage reads this image's account files, so it is named before that stage. The
+# runtime uses `cc`, not Distroless's `python3-debian13`, because that image carries Debian's
+# older 3.13 at a path the venv does not point to. `nonroot` keeps the worker off root even if
+# the `USER` line is lost.
 FROM gcr.io/distroless/cc-debian13:nonroot@sha256:08476c244888bfb425bae1ae4dd7c17f093e972aab8426883d97f3c6f280f7c1 AS distroless
 
-# The one pin of the Python image. The build stage makes the venv with its interpreter and
-# the `tree` stage hands that same interpreter to the runtime, so the two cannot drift.
+# This is the only pin of the Python image. The build stage creates the venv with this
+# interpreter, and the `tree` stage copies the same interpreter into the runtime, so the two
+# cannot drift. The 3.13 line must match `requires-python` in `pyproject.toml` and
+# `.python-version`. The image uses Debian 13 for the reason `apps/api/Dockerfile` gives above
+# its `FROM`.
 FROM python:3.13.16-slim-trixie@sha256:cf50a4f6ac4f026458b08d5222023d700ac806410dff5e9ca8728fa44f2b850f AS interpreter
 
 FROM interpreter AS build
 COPY --from=uv /uv /uvx /usr/local/bin/
-# `--no-dev` is what keeps ruff, mypy, pytest, mutmut and testcontainers — the
-# `[dependency-groups] dev` list — out of the image. psycopg and dulwich are not on that
-# list: the work loop opens a connection on every tick and reads a bare repository on every
-# job, so both ship. `UV_PYTHON_DOWNLOADS=never` makes the
-# base image's interpreter the only interpreter: a build that silently fetched its own would
-# ship a Python nobody pinned.
+# `--no-dev` keeps the `[dependency-groups] dev` tools out of the image.
+# `UV_PYTHON_DOWNLOADS=never` makes the base image's interpreter the only one the build can use,
+# so the build fails instead of fetching an unpinned Python.
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
-# The lockfile's dependencies first, so a source edit does not re-resolve them. `--frozen`
-# fails rather than updating `uv.lock`: the committed lockfile is the pin.
-#
-# Then the project, installed editable from its `__init__.py` alone, which is all the install
-# reads.
+# The locked dependencies install before the source is copied, so a source edit does not
+# re-resolve them. `--frozen` fails instead of updating `uv.lock`. The project install reads only
+# `__init__.py`, so that file is copied alone.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY src/better_answers_worker/__init__.py src/better_answers_worker/__init__.py
 RUN uv sync --frozen --no-dev
 COPY src/better_answers_worker/redaction src/better_answers_worker/redaction
 
-# The weights, fetched by loading each pinned model through the seam's own analyzer —
-# `redaction/weights.py` says why a load and not a snapshot, and holds the model ids, so no
-# id is spelled in this file. The cache mount is why a source edit does not re-download
-# nearly two gigabytes on every local rebuild, and the copy out of it is why the weights
-# are in the image and not only in the builder's cache, which a `--mount=type=cache` does
-# not ship. The module does that copy rather than a `cp` of the mount, and that is the
-# point of the argument it is given: the mount is shared by every build on a machine, so
-# copying the whole of it made the image whatever the mount held — a model dropped from the
-# table kept shipping because an older build had fetched it — while the module copies the
-# repositories the table declares and nothing beside them.
+# `redaction/weights.py` holds the model ids and says why it loads each model instead of
+# downloading a snapshot. The cache mount stops a local rebuild from downloading about 2 GB again.
+# A cache mount does not ship, so the module copies the weights out to /data/worker/hf-cache. It
+# copies only the repositories its model table declares, because every build on a machine shares
+# the mount, and the mount can hold models the table has dropped.
 RUN --mount=type=cache,target=/hf-cache,uid=0 \
     HF_HOME=/hf-cache /app/.venv/bin/python -m better_answers_worker.redaction.weights \
     /data/worker/hf-cache
 
-# The list of public suffixes, warmed the same way and shipped the same way, for a
-# failure that is the weights' opposite. A weight the build missed raises on the first
-# job. A suffix list the build missed costs two connection attempts and their timeouts
-# inside the first email address every worker process matches, and then answers
-# correctly off the copy bundled in `tldextract`'s own wheel — so nothing fails, nothing
-# is logged where anyone looks, and the bill is paid again by the next process.
-# `redaction/suffixes.py` carries the rest: why the fence has to be the `ENV` in the
-# runtime stage rather than anything either tier could call, and why a cache hit is the
-# only thing that reaches it through Presidio.
-#
-# Its own step, its own mount and its own target. The weights step above copies what the
-# model table declares and nothing beside it, which is the point of that step; a second
-# thing folded into it would be a second thing that table does not name.
+# The public suffix list is warmed and shipped the same way. If the build misses the list,
+# nothing fails. Each worker process instead spends two connection timeouts on its first email
+# match, then falls back to the copy in `tldextract`'s wheel. `redaction/suffixes.py` explains
+# the rest. The list has its own step and mount so the weights step copies only what its model
+# table names.
 RUN --mount=type=cache,target=/tldextract-cache,uid=0 \
     TLDEXTRACT_CACHE=/tldextract-cache \
     /app/.venv/bin/python -m better_answers_worker.redaction.suffixes \
     /data/worker/tldextract-cache
 
-# What the runtime adds to its base, staged under /runtime because the runtime cannot run a
-# command to do it.
+# The runtime base has no shell, so this stage builds under /runtime what the runtime adds.
 #
-# The interpreter sits at the path the venv's `python` already names, so the venv the
-# build stage made runs unchanged. pip and the wheel `ensurepip` would install it from stay
-# out: nothing installs a package at runtime, and pip's vendored libraries carried the slim
-# runtime's two high-severity findings that had a fix.
+# The interpreter sits at the path the venv's `python` names, so the venv runs unchanged. pip and
+# the `ensurepip` wheels stay out because nothing installs at runtime, and pip's vendored
+# libraries carried high-severity scan findings.
 #
-# Five Debian libraries the standard library loads on the worker's own paths and the base
-# does not carry: libffi for ctypes, bzip2, xz, SQLite and libuuid. Each comes with its
-# package record, in `status.d` where Distroless keeps its own, so a scanner names and
-# dates it; a library copied without one would be a finding nobody is ever shown. The six
-# standard-library modules whose libraries stay out are removed rather than shipped unable
-# to load: curses, readline, both dbm modules and Tk want a terminal, a database file or a
-# display, and the worker opens none.
+# The standard library needs five Debian libraries that the base lacks: libffi, bzip2, xz,
+# SQLite, and libuuid. Each library is copied with its package record into `status.d`, where
+# Distroless keeps its own records, so a scanner can name it. The curses, readline, dbm, and Tk
+# modules are deleted, not shipped unable to load. The worker uses none of them.
 #
-# uid 1000 because `init` in `deploy/stores.compose.yaml` chowns /data/worker/{lmdb,trees}
-# to it, and a home it owns because libraries write their caches under `~`.
+# `init` in `deploy/stores.compose.yaml` chowns /data/worker/lmdb and /data/worker/trees to
+# uid 1000. The user has a home directory because libraries write caches under `~`.
 FROM interpreter AS tree
 COPY --from=distroless /etc/passwd /etc/group /runtime/etc/
 RUN set -eu \
@@ -149,62 +112,41 @@ ENV PATH=/app/.venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1
 COPY --from=build /app/.venv /app/.venv
 
-# The weights the build fetched, at the path the deploy unit already names, owned by the
-# user that reads them. `HF_HUB_OFFLINE` is the fence over them: the seam loads what is
-# here or it raises, and a running worker never reaches a registry.
+# With `HF_HUB_OFFLINE` set, the seam loads these weights or raises, so a running worker never
+# contacts a registry.
 COPY --from=build --chown=worker:worker /data/worker/hf-cache /data/worker/hf-cache
 
-# The suffix list the build warmed, and the variable that makes the container read it.
-# It is owned by the worker rather than merely readable by it because `tldextract` takes
-# a lock file beside a cache entry before reading it, so a directory this user cannot
-# write to is a cache it cannot use — and the way it reports that is to fetch instead,
-# which is the thing being stopped. There is no `OFFLINE` switch to set beside this one:
-# the library has no such mode, and a cache hit is what stands in for it.
+# `tldextract` takes a lock file beside a cache entry before it reads the entry, so the worker
+# must own this directory. If it cannot write there, it fetches the list from the network
+# instead. The library has no offline mode, so the warmed cache is the only guard.
 COPY --from=build --chown=worker:worker /data/worker/tldextract-cache /data/worker/tldextract-cache
-# The two caches above, and one thing that is not a cache at all: the engine's call
-# home. cocoindex reaches `cocoindex.gateway.scarf.sh` when it starts, when an
-# Environment opens and on every update — an outbound request per document of every
-# sync, telling a third party the package, its version and this box's IP. What
-# makes it worth a line here rather than a firewall rule somebody has to remember is
-# that nothing fails when it goes out: the worker indexes either way, so the only place
-# the call is visible is the wire. The variable is the native core's, nothing in the
-# Python package holds it, and `1` is a value a run proved rather than one a document
-# asserted — `apps/worker/tests/test_image.py` carries that run beside the case that
-# holds this line and `deploy/platform.compose.yaml`'s to each other.
+# `COCOINDEX_DISABLE_USAGE_TRACKING=1` stops cocoindex from calling `cocoindex.gateway.scarf.sh`
+# at start, on each Environment open, and on every update. Each call sends a third party the
+# package, its version, and this host's IP, and nothing fails when it goes out. The variable
+# belongs to the native core. `apps/worker/tests/test_image.py` records the run that proved
+# the value `1` and checks that this image and `deploy/platform.compose.yaml` agree.
 ENV HF_HOME=/data/worker/hf-cache \
     HF_HUB_OFFLINE=1 \
     TLDEXTRACT_CACHE=/data/worker/tldextract-cache \
     COCOINDEX_DISABLE_USAGE_TRACKING=1
 
-# The project is installed into the venv editable, so the tier's source is read from here —
-# including `schema_view.py`, the committed, generated view of the api's schema the worker
-# reads and never migrates (ADR 0032).
-#
-# Last of this stage's copies, and on purpose (`T-223`). BuildKit re-runs every instruction
-# below the first one whose input moved, and a `COPY` it re-runs is a new layer even when
-# every byte it copies is the same.
+# The project is installed editable, so the worker reads its source from here, including the
+# generated `schema_view.py`. This is the stage's last `COPY` because BuildKit reruns every
+# instruction below the first changed input. A source edit then rebuilds only this layer.
 COPY src src
 
 USER worker
 
-# A process-level check, not an HTTP one, and deliberately: this tier exposes no HTTP
-# endpoint at all. It has no server, no port and no `/health` — the api↔worker control plane
-# is rows in Postgres, never HTTP (ADR 0005) — so there is nothing to GET. What the probe
-# asks instead is the two halves of "is this worker working": it holds a claimed lease whose
-# heartbeat is fresh, or nothing anywhere has been waiting longer than a lease. Idle is
-# healthy — an empty queue is most of a day — while a job left waiting while nothing
-# heartbeats is a worker that has stopped claiming, which is the failure worth restarting
-# for. The module's own docblock carries that reasoning; this is the rationale for both
-# copies of the probe, since the `worker` service in `deploy/platform.compose.yaml` runs the
-# same command and points here. Eight retries at fifteen seconds is longer than one lease,
-# so a claimant that goes quiet is given the lease's own grace before the container is.
-# Exec form here, in the `worker` service and in `CMD` below, because the image has no shell
-# to run a string form: the `CMD` is the venv's script, whose first line names its Python.
+# The worker serves no HTTP, so the probe runs a Python module. The probe passes while the
+# worker holds a lease with a fresh heartbeat, or while no job has waited longer than a lease.
+# An idle worker is healthy. Eight retries at 15 seconds outlast one lease, so a quiet claimant
+# gets the lease's grace before a restart. The `worker` service in `deploy/platform.compose.yaml`
+# runs the same probe, so change both together. The image has no shell, so the probe and `CMD`
+# use exec form.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=40s --retries=8 \
   CMD ["python", "-m", "better_answers_worker.health"]
 
-# The work loop: claim a job, run it, keep its lease alive, record what it found — over
-# every workspace in turn, for ever. It refuses to claim anything while its committed schema
-# view and the database's migration stamp disagree, and says so once rather than exiting,
-# because a container that exited on a mismatch would be restarted straight back into it.
+# The work loop refuses to claim jobs while its committed schema view and the database's
+# migration stamp disagree. It logs once and keeps running, because a restarted container would
+# hit the same mismatch.
 CMD ["better-answers-worker"]

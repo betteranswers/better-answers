@@ -4,132 +4,52 @@ version = "0.1.0"
 description = "Better Answers — the Python knowledge worker (ADR 0005)"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    # The bare repositories the worker reads at a commit (ADR 0024), in-process: the
-    # runtime image is Distroless and carries no git binary, so a pure-Python git
-    # implementation is one pinned library rather than a second toolchain to patch.
-    # Version read from PyPI's dulwich release metadata on 06/10/2026; Apache-2.0 under
-    # its dual licence, which is the arm this repository takes (ADR 0027).
+    # The runtime image is Distroless and has no git binary, so the worker reads its bare
+    # repositories through this pure-Python git library.
     "dulwich==1.2.17",
-    # The claim protocol and every read the two job kinds make. It was in the dev group
-    # while nothing in `src` opened a connection; the work loop opens one on every tick,
-    # so it belongs to what the image ships.
     "psycopg[binary]==3.3.6",
     "structlog>=26.1.0",
-    # The redaction seam's detector (ADR 0020). Presidio is the frame — the registry that
-    # runs the recognisers, the context enhancer and the anonymizer that writes the
-    # placeholders — and its `gliner` extra is what lets a GLiNER model stand in as the
-    # NER. Both halves move together, so both carry the same pin. Versions read from
-    # PyPI's release metadata on 11/09/2026; MIT, which is the arm this repository takes
-    # (ADR 0027).
+    # Presidio releases these two packages together, so they carry the same pin.
     "presidio-analyzer[gliner]==2.2.364",
     "presidio-anonymizer==2.2.364",
-    # Named here as well as reached through the extra above: the library that decides what
-    # a name or an address is belongs to a version this repository pins itself, and the
-    # extra's own range would let it move underneath the recall the fixture proves. Read
-    # from PyPI on 11/09/2026; Apache-2.0.
+    # Pinned here as well as through the `gliner` extra above. The extra's range would let
+    # GLiNER move under the recall that the redaction fixture proves.
     "gliner==0.2.29",
-    # Tokenisation and lemmas only — the seam removes spaCy's own NER recogniser and keeps
-    # the pipeline for the lemmas Presidio's context enhancer boosts on. Read from PyPI on
-    # 11/09/2026; MIT.
     "spacy==3.8.16",
-    # The English pipeline spaCy loads. Explosion publishes it as a GitHub release asset
-    # and not to PyPI, so the URL under `tool.uv.sources` is its pin and there is no
-    # version to write here. 3.8.0 is the newest English pipeline on that repository's
-    # releases, read on 11/09/2026; MIT.
+    # Explosion publishes this pipeline as a GitHub release asset, not on PyPI. The URL under
+    # `tool.uv.sources` is its pin, and the lock records its hash.
     "en-core-web-sm",
-    # GLiNER's tensor runtime, pinned directly so `tool.uv.sources` can send Linux to the
-    # CPU wheel index below. Version read from PyPI on 11/09/2026 and resolved out of
-    # PyTorch's own CPU channel for Linux, which carries the same release as `+cpu`.
+    # Listed directly so that `tool.uv.sources` can send Linux to the CPU wheel index.
     "torch==2.14.0",
-    # The engine this tier hosts (ADR 0036). One package beneath
-    # `src/better_answers_worker/pipeline/` composes it and nothing else in the tier may
-    # import it — the ban further down is what holds that, and the per-file ignore
-    # beneath it is the single exception. The wheels are abi3 against CPython 3.11, so
-    # one wheel serves this tier's 3.13, and `cp311-abi3` covers manylinux_2_28 on
-    # x86_64 and aarch64 as well as macOS arm64, which is every machine this repository
-    # builds on. Version read from PyPI's release metadata on 10/10/2026; Apache-2.0,
-    # which is the arm this repository takes (ADR 0027).
-    #
-    # The engine also calls home, and the value that refuses that call is proved
-    # against this version alone. `COCOINDEX_DISABLE_USAGE_TRACKING=1` is what stops
-    # the native core reaching `cocoindex.gateway.scarf.sh`; the `ENV` at the end of
-    # `apps/worker/Dockerfile` says why it is refused, and the image suite holds the
-    # three places that set it — image, deploy unit and CI runner — to each other, in
-    # `apps/worker/tests/test_image.py`'s
-    # `test_the_image_and_deploy_unit_refuse_the_engines_gateway_call`. The run that
-    # proved the value: on 10/10/2026, against 1.0.25, the engine was imported on its
-    # own, opened a store and ran two updates, through a proxy that wrote down every
-    # host it was asked for and reached none. Without the variable it asked for
-    # `cocoindex.gateway.scarf.sh:443` four times, and with it set to `1` not once.
-    # A process none of the three started — this tier's gate on a laptop — is covered by
-    # the pipeline package setting it ahead of its import of the engine, because the
-    # core looks once, as it is imported, and reads `RUST_LOG` the same way;
-    # `apps/worker/tests/pipeline/test_pipeline_engine_environment.py` holds *when*.
-    # Bumping this pin re-runs that probe and that suite and re-dates this record in the
-    # same commit.
+    # `COCOINDEX_DISABLE_USAGE_TRACKING=1` stops the engine from calling
+    # `cocoindex.gateway.scarf.sh`, and that was verified against this version only. When you
+    # bump the pin, run the engine through a proxy that logs each host it requests, and confirm
+    # that it requests none. Then rerun `tests/pipeline/test_pipeline_engine_environment.py` and
+    # `test_the_image_and_deploy_unit_refuse_the_engines_gateway_call` in `tests/test_image.py`.
     "cocoindex==1.0.25",
-    # The driver the engine's Postgres target acquires its own connections through, and
-    # the one the pipeline's per-workspace pool is built from. It is named here rather
-    # than left to cocoindex's `postgres` extra, whose floor would let the driver move
-    # underneath a pool whose connection init is the only thing keeping row-level
-    # security in force over the rows a flow lands. Read from PyPI on 10/10/2026;
-    # Apache-2.0.
+    # Pinned here rather than through the cocoindex `postgres` extra, whose floor would let the
+    # driver move. The pipeline's pool connection init is what enforces row-level security.
     "asyncpg==0.32.0",
-    # The object store client the pipeline reads a landed copy with and writes the
-    # normalised copy back through. It is this tier's own rather than the engine's S3
-    # source, because the bytes are addressed by keys the document's catalogue row
-    # already holds and nothing here walks a bucket. Read from PyPI on 10/10/2026;
-    # Apache-2.0.
     "boto3==1.43.115",
-    # The two converters, one per media type (ADR 0013, amended 20/09/2026). `anydoc`
-    # answers a `.docx` as GitHub-flavoured Markdown; `pdf-inspector` answers a PDF as
-    # Markdown and classifies its pages first. Both are Rust extensions with no model in
-    # them, which is what *no model* asks for — *pure Python* was that rule's proxy and
-    # cocoindex above is itself a Rust extension. PDF is `pdf-inspector`'s alone:
-    # `anydoc` bundles its own build of that engine, the two outputs differ, and a media
-    # type has one converter because its output is the span address space.
-    #
-    # A bump here is in no memo's key (ADR 0036). Conversion is unmemoised: every index
-    # run converts every document of its connected source, so the new version reads each one on
-    # its connected source's next run. The one memo, `pipeline/detected.py`'s, is keyed on the
-    # normalised text, so the detector reads again only a document whose text came out
-    # different. Versions read from PyPI's release metadata on 06/10/2026; both MIT,
-    # which is the arm this repository takes (ADR 0027). The wheels are abi3 —
-    # `cp310-abi3` for `anydoc` and `cp38-abi3` for `pdf-inspector` — over
-    # manylinux_2_17 on x86_64 and aarch64 and macOS arm64, which is every machine this
-    # repository builds on.
-    #
-    # Bumping either pin re-runs the first step on the worker image and re-dates its
-    # readings: `apps/worker/tests/test_image.py`'s
-    # `test_both_converters_hold_on_the_image_under_the_engines_runtime`.
+    # When you bump either converter, rerun
+    # `test_both_converters_hold_on_the_image_under_the_engines_runtime` in `tests/test_image.py`.
     "firecrawl-anydoc==0.2.4",
     "pdf-inspector==1.25.2",
-    # The AEAD the credential envelope is sealed and opened under, AES-256-GCM (ADR 0005,
-    # amended 22/09/2026): this tier reaches it through `AESGCM` and the api tier through
-    # Node's own OpenSSL, so the frame one tier writes is one the other reads. The package was
-    # already in the lock beneath `presidio-anonymizer`; `envelope.py` imports it directly, so
-    # it is named here rather than left transitive. No version on this line: the override under
-    # `[tool.uv]` decides what this package resolves to, whatever is asked for here, so the
-    # override holds the pin and a number here would be a second one, ageing away from it.
+    # No version here. The override under `[tool.uv]` holds the only pin for this package.
     "cryptography",
 ]
 
 [project.scripts]
-# The gate the root `check` runs: `uv run --frozen check` (AGENTS.md).
 check = "better_answers_worker.check:main"
 images = "better_answers_worker.check:images"
-# The work loop — the image's default command, and what a test runs with `--once`.
 better-answers-worker = "better_answers_worker.loop:main"
-# This tier's own reading of `contracts/`, written to a module the image carries because it
-# copies no contracts directory to read at boot. Never what CI runs: `check` regenerates and
-# compares, so a hand-edited constant fails here.
+# Do not hand-edit the module this writes. `check` regenerates it and fails if the committed
+# copy differs.
 generate-contract-stamp = "better_answers_worker.generate_contract_stamp:main"
 
 [dependency-groups]
-# All `build.yml`'s worker leg installs to run `tests/test_image.py` against the image it is
-# about to push. That suite reads the image through Docker and imports nothing of this tier,
-# so it needs pytest and not the tier's environment, torch and all. `dev` takes it whole, so
-# pytest is named once.
+# The worker leg of `build.yml` installs only this group to run `tests/test_image.py`, which
+# reads the image through Docker and does not need torch or the rest of the tier.
 probe = ["pytest>=9.1.1"]
 dev = [
     { include-group = "probe" },
@@ -138,46 +58,26 @@ dev = [
     "pytest-xdist>=3.8.0",
     "ruff>=0.16.5",
     "testcontainers==4.15.0",
-    # The root `lint:workflows` linters, pinned here so CI and a laptop run one version of
-    # each and Renovate's pep621 manager moves them.
+    # The root `lint:workflows` linters. They are pinned here so that CI and a laptop run the
+    # same version, and so that Renovate's pep621 manager updates them.
     "actionlint-py==1.7.12.25",
     "shellcheck-py==0.11.0.1",
     "zizmor==1.31.1",
 ]
 
-# THE LINE THE BUILDERS ARE ACTUALLY ON. uv ships this backend inside itself and takes the
-# fast path only when its own version satisfies this range; outside it, it says so —
-# `build_system.requires = ["uv-build>=0.9.4,<0.10.0"] does not contain the current uv version
-# 0.12.17` was on every `uv sync` in CI, because the range was a year behind both builders.
-# The two that matter are named in one place each: `apps/worker/.tool-versions` is the uv CI
-# installs and `apps/worker/Dockerfile`'s `FROM ghcr.io/astral-sh/uv:` is the image's, and
-# both are 0.13.0. The floor is that version and the ceiling is the next minor, so a uv
-# Renovate moves within the 0.13 line stays inside it and a 0.14 is a bump somebody reads.
+# uv uses its built-in backend only when its own version is inside this range. Keep the range
+# on the minor version of the uv in `apps/worker/.tool-versions` and in the `apps/worker/Dockerfile`
+# `FROM ghcr.io/astral-sh/uv:` line.
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
 
-# The one pin for `cryptography`, and the only place in this tier carrying its version.
-# `presidio-anonymizer==2.2.364`, the newest on PyPI, asks for `cryptography>=48.0.1,<49`, and
-# 48.0.1 is exposed to GHSA-g6cj-pr64-35w5, fixed in 50.0.0, and to GHSA-m2h6-j472-rp4c and
-# GHSA-jwv3-5hgf-82ww, fixed in 49.0.0. While that cap holds, no resolution of this
-# dependency graph reaches a release any of the three is fixed in, which is what the security
-# pull request raised against it ran into. The cap is overridden rather than waited out because presidio
-# touches this package at `Cipher(AES, CBC)` and `padding` alone, in
-# `presidio_anonymizer/operators/aes_cipher.py`, and this tier's own use is `AESGCM` in
-# `envelope.py` — none of the three is in code either reaches, and neither major moved
-# either API.
+# `presidio-anonymizer` caps `cryptography` below 49, and 48.x has GHSA-g6cj-pr64-35w5,
+# GHSA-m2h6-j472-rp4c, and GHSA-jwv3-5hgf-82ww. The override is safe because presidio uses
+# only `Cipher(AES, CBC)` and `padding`, and neither API changed in 49 or 50.
 #
-# It goes when presidio lifts the cap: a `presidio-anonymizer` whose requirement admits 50
-# makes this block dead weight, and removing it then puts the version back on the dependency
-# itself. Until then the bump is by hand. Renovate's `pep621` manager reads `dev-dependencies`,
-# `sources`, `index` and `required-version` out of `tool.uv` and no override or constraint
-# list, so this is not a dependency it can see, and the bare name above carries no version for
-# it to bump either — whoever re-reads presidio's cap re-reads this release page in the same
-# sitting.
-#
-# Version read from PyPI's `cryptography` release metadata on 23/09/2026; Apache-2.0 under its
-# dual licence, which is the arm this repository takes (ADR 0027).
+# Delete this override when a `presidio-anonymizer` release allows 50, and put the version back
+# on the dependency. Renovate does not read override lists, so bump this version by hand.
 [tool.uv]
 override-dependencies = ["cryptography==50.0.1"]
 
@@ -185,27 +85,22 @@ override-dependencies = ["cryptography==50.0.1"]
 module-name = "better_answers_worker"
 module-root = "src"
 
-# PyTorch's CPU wheel channel, reached only by what `tool.uv.sources` sends here
-# (`explicit`), so nothing else in the tree resolves out of it by accident.
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [tool.uv.sources]
-# Linux takes the `+cpu` build; macOS arm64 takes PyPI's wheel, which is CPU-only already.
-# The detector runs on the CPU by design (ADR 0020), so the CUDA runtime in PyPI's Linux
-# wheel is two gigabytes of the worker image that nothing in this estate would ever call.
+# The detector runs on the CPU. PyPI's Linux torch wheel bundles about two gigabytes of CUDA
+# that the worker image would never use. The macOS arm64 wheel on PyPI is already CPU-only.
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
-# The spaCy pipeline is a release asset, not a PyPI package, so the download URL is the
-# pin and the lock records its hash.
 en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
 
 [tool.ruff]
 target-version = "py313"
 src = ["src", "tests"]
-# Vendored skills sit under .claude/. force-exclude, because the commit hook names its staged files
-# and ruff lints named files despite excludes.
+# The commit hook passes staged files to ruff by name, and ruff lints named files despite
+# `extend-exclude` unless `force-exclude` is on.
 extend-exclude = [".claude"]
 force-exclude = true
 
@@ -219,31 +114,21 @@ select = [
 max-complexity = 8
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
-# The other half of the conftest guard: the guard wraps the `monkeypatch` fixture, and
-# these two are the way round it. Our own code is never mocked; an external service is
-# replaced behind its adapter with an in-memory implementation.
+# The conftest guard wraps the `monkeypatch` fixture. These two bans block the other way to
+# replace our own code in a test.
 "unittest.mock".msg = "our own code is never mocked; replace the external service behind its adapter"
 "mock".msg = "our own code is never mocked; replace the external service behind its adapter"
-# The redaction seam is a plain function of its arguments, and a cocoindex type crossing
-# into it would make it one only cocoindex could call. The whole tier is banned so that
-# the one module allowed to compose the engine has to declare itself: the pipeline module
-# lifts this ban for its own directory by a per-file ignore when it lands (ADR 0036).
 "cocoindex".msg = "only the pipeline module composes cocoindex, and it lifts this ban by a per-file ignore; a cocoindex type never crosses a module seam"
 
 [tool.ruff.lint.per-file-ignores]
-# The check runner is a script; it is the one place print-shaped output is allowed,
-# `print` being banned everywhere else in the tier. It also starts the gate's own fixed
-# commands, which the `S` rules would read as subprocess calls on untrusted input.
+# `check.py` is the one module allowed to print. S603 is off because it runs only the gate's own
+# fixed commands.
 "src/better_answers_worker/check.py" = ["T20", "S603"]
-# Tests assert, hold throwaway credentials and temp paths, build SQL from fragments and
-# table names they own, and start commands by name. None of it ships in the image.
+# Test code does not ship in the image, so the credential, temp-path, SQL, and subprocess rules
+# are off.
 "tests/**" = ["S101", "S105", "S106", "S108", "S603", "S607", "S608"]
-# The pipeline package, and the one place the cocoindex ban above is lifted: everything
-# beneath this directory is the module that composes the engine (ADR 0036), whose public
-# interface takes and answers plain types so no cocoindex type crosses a seam. One
-# pattern, over that rule alone — a second exemption, or a wider pattern, is what
-# `tests/gates/test_cocoindex_ban.py` refuses, because the ban means nothing once more than one
-# directory can lift it.
+# The only place the cocoindex ban is lifted. `tests/gates/test_cocoindex_ban.py` fails on a
+# second exemption or a wider pattern.
 "src/better_answers_worker/pipeline/**" = ["TID251"]
 
 [tool.mypy]
@@ -251,78 +136,43 @@ python_version = "3.13"
 strict = true
 files = ["src", "tests"]
 
-# The detector's libraries ship no type information, so an import of one is an error under
-# strict mode before a line of ours is read. The overrides are per module and name only
-# what the seam imports: strict stays on over everything this repository wrote, and a
-# value that arrives from one of these is narrowed on the statement after it arrives
-# rather than carried as `Any`. A wildcard here would silence our own code too.
+# These libraries ship no type information, which strict mode reports as an error. Name each
+# module. A wildcard would also silence errors in our own code.
 [[tool.mypy.overrides]]
 module = [
     "presidio_analyzer.*",
     "presidio_anonymizer.*",
     "gliner.*",
     "spacy.*",
-    # The engine's Postgres target is typed against this driver and names its pool in its
-    # own signatures, so the pipeline's pool is the driver's type and not a wrapper of
-    # ours. The package ships no marker saying so, which is an error under strict mode
-    # before a line of ours is read.
     "asyncpg.*",
-    # This tier's own object store client, which ships no marker either. The object store client's
-    # answers are read on the statement after they arrive — the body of a get is taken
-    # out of the response and bound to `bytes` there — so nothing untyped travels
-    # further than the adapter that made the call. The typed distribution beside it is
-    # a second package to pin and to keep in step with the object store client for two method calls.
+    # The worker calls two boto3 methods, which does not justify pinning a separate stubs package.
     "boto3.*",
 ]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# The helpers import as `support.<name>`: declare `tests/` rather than lean on the root
-# conftest's folder being inserted.
+# The test helpers import as `support.<name>`.
 pythonpath = ["tests"]
-# `--strict-markers`: a mistyped marker marks nothing and skips nothing, so it must be an
-# error rather than a warning nobody reads.
 addopts = "-q --strict-markers"
 markers = [
     "image: builds the worker image or reads the workflows that build it; `uv run --frozen images` runs it, `check` does not",
 ]
-# An expected failure that passes is a bug that was fixed and an `xfail` that outlived it.
 xfail_strict = true
-# TWO WARNINGS THIS TIER CANNOT FIX, AND NO WIDER A HOLE THAN THEM. A run that ends "3
-# warnings" is a run nobody reads the warnings of, so the two that arrive from libraries
-# below the detector are named here — each by its category, the opening of its message and
-# the module that raises it — and everything else still reaches the report.
+# Two warnings come from libraries below the detector, and this tier cannot fix them. Each
+# filter matches one warning by category, message, and module, so other warnings still appear.
 #
-# The first is transformers' DeBERTa model, which GLiNER loads: it calls `torch.jit.script`,
-# which torch has deprecated in favour of `torch.compile`. The call is transformers' and the
-# warning is torch's own module, which is why the third field names torch and not the caller.
-# It goes when a `transformers` that has stopped calling it arrives under the `gliner` pin.
-#
-# The second is `gliner/model.py` passing `resume_download` to `snapshot_download`, which
-# huggingface_hub deprecated and ignores. It goes when a `gliner` that has dropped the
-# argument arrives — 0.2.29 is the pin that still passes it.
-#
-# Both are upstream's to remove. Re-read this list whenever either pin moves: a filter for a
-# warning nobody emits any more hides nothing and says something untrue.
+# The first is torch's deprecation of `torch.jit.script`, which transformers calls when GLiNER
+# loads DeBERTa. The second is huggingface_hub's deprecation of `resume_download`, which
+# `gliner/model.py` still passes in 0.2.29. When either pin moves, delete any filter whose
+# warning no longer appears.
 filterwarnings = [
     "ignore:`torch\\.jit\\.script` is deprecated:FutureWarning:torch\\.jit\\._script",
     "ignore:The `resume_download` argument is deprecated:UserWarning:huggingface_hub\\.utils\\._validators",
 ]
 
-# Mutation testing, parked rather than scheduled: no job in .github/workflows/mutation.yml
-# runs this today, and `uv run --frozen mutmut run` is the way to run it by hand. The tier's
-# mutatable source is a few dozen lines of configuration and logging plus a schema view
-# generated from the migration journal, so a score now would measure the generator. The
-# settings stay because `T-006` is what gives the worker behaviour worth mutating, and the
-# leg rejoins the schedule with it.
-# `check.py` is the check runner script, not tier behaviour — the same reason `apps/api`
-# leaves `main.ts` and `migrate.ts` out of Stryker's `mutate`.
-# `tests/` below is the selection mutmut's stats pass collects, not what every mutant runs:
-# a mutant runs only the tests that pass recorded against its function, and one no test
-# reached is reported "no tests". So `tests/test_image.py`, which builds the worker image,
-# costs one build per `mutmut run` — for as long as it imports nothing from
-# `src/better_answers_worker` in-process.
+# No CI job runs mutmut. Run it by hand with `uv run --frozen mutmut run`. Each run builds the
+# worker image once, for `tests/test_image.py`.
 [tool.mutmut]
 source_paths = ["src/better_answers_worker"]
 do_not_mutate = ["src/better_answers_worker/check.py"]
