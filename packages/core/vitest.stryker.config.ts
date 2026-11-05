@@ -1,4 +1,4 @@
-import { mergeConfig } from "vitest/config";
+import { configDefaults, mergeConfig } from "vitest/config";
 import { BaseSequencer, type TestSpecification } from "vitest/node";
 
 import base from "./vitest.config.ts";
@@ -22,6 +22,9 @@ export default mergeConfig(base, {
     // A hosted runner adds `github-actions`, whose job summary would be appended once per mutant,
     // and whose annotations would name only killed mutants.
     reporters: ["default"],
+
+    // Run in place, a gate reads Stryker's instrumented src and fails the initial run.
+    exclude: [...configDefaults.exclude, "test/gates/**"],
 
     env: { GITHUB_STEP_SUMMARY: "" },
 
