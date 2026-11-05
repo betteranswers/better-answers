@@ -19,6 +19,14 @@ const ASCII_WHITESPACE = " \t\n\r\f\v";
 
 export const isAsciiWhitespace = (ch: string): boolean => ASCII_WHITESPACE.includes(ch);
 
+export const trimmedWhitespace = (text: string): string => {
+  let start = 0;
+  let end = text.length;
+  while (start < end && isAsciiWhitespace(text.charAt(start))) start += 1;
+  while (end > start && isAsciiWhitespace(text.charAt(end - 1))) end -= 1;
+  return text.slice(start, end);
+};
+
 export const collapsedWhitespace = (text: string): string =>
   text
     // oxlint-disable-next-line eslint/require-unicode-regexp -- Stryker negates \v to \V, which the u flag refuses at load

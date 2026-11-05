@@ -2,7 +2,7 @@ import re
 from collections.abc import Callable
 from typing import NamedTuple
 
-_TIER_SHARED_WHITESPACE = " \t\n\r\f\v"
+from ..concept_file import TIER_SHARED_WHITESPACE
 
 
 class _Found(NamedTuple):
@@ -37,7 +37,7 @@ def _next_stops(text: str, stops: Callable[[str], bool]) -> list[int]:
 
 def _autolink_ends_of(text: str) -> list[int]:
     def stops(char: str) -> bool:
-        return char == ">" or char in _TIER_SHARED_WHITESPACE
+        return char == ">" or char in TIER_SHARED_WHITESPACE
 
     return _next_stops(text, stops)
 

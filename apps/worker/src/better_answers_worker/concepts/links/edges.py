@@ -146,19 +146,15 @@ def references_of(
             )
         )
 
-    sources = frontmatter.get("sources")
     lineage: list[OutgoingReference] = []
-    if isinstance(sources, list):
-        for ordinal, entry in enumerate(sources):
-            if not isinstance(entry, Mapping | str):
-                continue
-            cited = cited_source(entry)
-            if cited is None or _quotes_passage(*cited):
-                continue
-            target = _target_of(cited[0], path)
-            if target is None:
-                continue
-            lineage.append(OutgoingReference("lineage", ordinal, target, None, None))
+    for ordinal, entry in enumerate(_cited_entries(frontmatter)):
+        cited = cited_source(entry)
+        if cited is None or _quotes_passage(*cited):
+            continue
+        target = _target_of(cited[0], path)
+        if target is None:
+            continue
+        lineage.append(OutgoingReference("lineage", ordinal, target, None, None))
 
     return links + lineage
 

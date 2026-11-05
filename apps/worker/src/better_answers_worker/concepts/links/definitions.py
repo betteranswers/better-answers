@@ -2,9 +2,14 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import NamedTuple
 
-from ..concept_file import Frontmatter, SourceEntry, as_javascript, cited_source
+from ..concept_file import (
+    TIER_SHARED_WHITESPACE,
+    Frontmatter,
+    SourceEntry,
+    as_javascript,
+    cited_source,
+)
 from .scan import (
-    _TIER_SHARED_WHITESPACE,
     _collapsed_whitespace,
     _Found,
     _leading_spaces,
@@ -25,12 +30,12 @@ def _label_key(label: str) -> str:
 
 def _target_after(prose: str, from_: int) -> tuple[int, int] | None:
     start = from_
-    while start < len(prose) and prose[start] in _TIER_SHARED_WHITESPACE:
+    while start < len(prose) and prose[start] in TIER_SHARED_WHITESPACE:
         start += 1
     if start == len(prose):
         return None
     end = start
-    while end < len(prose) and prose[end] not in _TIER_SHARED_WHITESPACE:
+    while end < len(prose) and prose[end] not in TIER_SHARED_WHITESPACE:
         end += 1
     return start, end
 

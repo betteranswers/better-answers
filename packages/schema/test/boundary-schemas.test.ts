@@ -1783,6 +1783,29 @@ describe("a concept's frontmatter that is not a plain object", () => {
   });
 });
 
+describe("a sources entry's blank resource", () => {
+  it.each(["\u001c", "\u0085", "﻿", " "])("is not one made of %j", (resource) => {
+    expect(conceptFrontmatter.safeParse({ sources: [resource] }).success).toBe(true);
+    expect(conceptFrontmatter.safeParse({ sources: [{ resource }] }).success).toBe(true);
+    expect(
+      boundarySchemas.evidence.insert.parse({ ...acceptedRows.evidence[0], resource }).resource,
+    ).toBe(resource);
+  });
+
+  it("is one made only of the six whitespace characters", () => {
+    expect(conceptFrontmatter.safeParse({ sources: [" \t\n\r\f\v"] }).success).toBe(false);
+    expect(conceptFrontmatter.safeParse({ sources: [{ resource: " \t\n\r\f\v" }] }).success).toBe(
+      false,
+    );
+    expect(
+      boundarySchemas.evidence.insert.safeParse({
+        ...acceptedRows.evidence[0],
+        resource: " \t\n\r\f\v",
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe("the frontmatter length limit's unit", () => {
   const astral = (characters: number) => ({ a: "\u{1D11E}".repeat(characters) });
 

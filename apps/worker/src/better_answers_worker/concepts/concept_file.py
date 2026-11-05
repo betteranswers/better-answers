@@ -178,19 +178,29 @@ def resolved_resource(resource: str, from_path: str) -> str:
     return "/" + "/".join(segments)
 
 
+TIER_SHARED_WHITESPACE = " \t\n\r\f\v"
+
+
+def trimmed_whitespace(text: str) -> str:
+    return text.strip(TIER_SHARED_WHITESPACE)
+
+
 def cited_source(entry: SourceEntry | str) -> tuple[str, str | None] | None:
     if isinstance(entry, str):
         hash_at = entry.rfind("#")
-        resource = (entry if hash_at == -1 else entry[:hash_at]).strip()
+        resource = trimmed_whitespace(entry if hash_at == -1 else entry[:hash_at])
         if resource == "":
             return None
         return resource, None if hash_at == -1 else entry[hash_at + 1 :]
     resource_value = entry.get("resource")
-    if not isinstance(resource_value, str) or resource_value.strip() == "":
+    if not isinstance(resource_value, str):
+        return None
+    resource = trimmed_whitespace(resource_value)
+    if resource == "":
         return None
     locator = entry.get("locator")
 
-    return resource_value.strip(), None if locator is None else as_javascript(locator)
+    return resource, None if locator is None else as_javascript(locator)
 
 
 def as_javascript(value: Scalar) -> str:
