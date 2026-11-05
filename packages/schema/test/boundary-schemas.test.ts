@@ -1812,6 +1812,13 @@ describe("the body bound's unit", () => {
     expect(bodyOf("x".repeat(CONCEPT_BODY_MAX + 1)).success).toBe(false);
     expect(bodyOf("x".repeat(CONCEPT_BODY_MAX)).success).toBe(true);
   });
+
+  it("refuses a body with no text, taking one character", () => {
+    expect(bodyOf("").success).toBe(false);
+    expect(bodyOf(" \n\t \n").success).toBe(false);
+    expect(bodyOf("x").success).toBe(true);
+    expect(bodyOf("  kept as written  \n").data?.body).toBe("  kept as written  \n");
+  });
 });
 
 describe("the customType exception, per shape", () => {

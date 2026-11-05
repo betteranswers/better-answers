@@ -50,6 +50,15 @@ export const SEARCH_WORDS = {
   selectFirst: "Please select a match first.",
   more: "More Matches",
   document: "Document",
+  newConcept: "Type it as a new concept",
+} as const;
+
+export const LAUNCH_WORDS = {
+  edit: "Edit",
+  suggest: "Suggest an edit",
+  loading: "The editor is still loading.",
+  suggested: "Your suggestion is waiting for the concept's owner to decide.",
+  suggestedNew: "Your suggestion is waiting for the collection's owner or an Admin to decide.",
 } as const;
 
 const conceptsCounted = (count: number): string => counted(count, "concept", "concepts");

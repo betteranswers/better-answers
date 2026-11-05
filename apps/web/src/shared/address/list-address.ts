@@ -6,6 +6,9 @@ import { asWritten } from "@/shared/address/address-query.ts";
 
 type Held = string | number | undefined;
 
+/** An editor that writes its own fields to the address is not the person leaving the page. */
+export type WriteOptions = { readonly ignoreBlocker?: boolean };
+
 export type ListFields = Readonly<Record<string, z.ZodCatch<z.ZodType<Held>>>>;
 
 type AddressState<Fields extends ListFields> = z.output<z.ZodObject<Fields>>;
@@ -49,16 +52,20 @@ export const useListAddress = <Fields extends ListFields>(prefix: string, fields
     [shape, prefix, fields, search],
   );
 
-  const writeHeld = (patch: readonly (readonly [string, unknown])[]): void => {
+  const writeHeld = (
+    patch: readonly (readonly [string, unknown])[],
+    options: WriteOptions = {},
+  ): void => {
     void navigate({
       to: ".",
       search: (current: Query) => ({ ...current, ...written(prefix, defaults, patch) }),
       replace: true,
+      ignoreBlocker: options.ignoreBlocker === true,
     });
   };
 
-  const write = (patch: Partial<AddressState<Fields>>): void => {
-    writeHeld(Object.entries(patch));
+  const write = (patch: Partial<AddressState<Fields>>, options?: WriteOptions): void => {
+    writeHeld(Object.entries(patch), options);
   };
 
   return { state, write, writeHeld };

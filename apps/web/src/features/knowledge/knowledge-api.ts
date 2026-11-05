@@ -57,6 +57,38 @@ export const useKindConcepts = (open: OpenKind) => {
 
 export type KindConceptsRead = ReturnType<typeof useKindConcepts>;
 
+export type EditRead = inferOutput<Api["knowledge"]["conceptToEdit"]>;
+
+export type EditAsked = inferInput<Api["knowledge"]["conceptToEdit"]>;
+
+export type SaveAsked = inferInput<Api["knowledge"]["saveConcept"]>;
+
+export type Saved = inferOutput<Api["knowledge"]["saveConcept"]>;
+
+export type SourceEntry = EditRead["sources"][number];
+
+export const useReadToEdit = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  return (asked: EditAsked): Promise<EditRead> =>
+    queryClient.query({
+      ...api.knowledge.conceptToEdit.queryOptions(asked),
+      staleTime: 0,
+      gcTime: 0,
+    });
+};
+
+export const useSaveConcept = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  const saving = useMutation(
+    api.knowledge.saveConcept.mutationOptions({
+      onSettled: () => queryClient.invalidateQueries(api.knowledge.pathFilter()),
+    }),
+  );
+  return (asked: SaveAsked): Promise<Saved> => saving.mutateAsync(asked);
+};
+
 type Collections = inferOutput<Api["knowledge"]["collections"]>;
 
 export type CollectionOwned = Collections["collections"][number];

@@ -14,9 +14,18 @@ import { PRODUCT_NAME } from "./src/shared/words.ts";
  * at that boundary.
  */
 const LIBRARY_GROUPS = [
-  { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/u, priority: 40 },
+  {
+    name: "react",
+    test: /node_modules[\\/](react|react-dom|scheduler|use-sync-external-store)[\\/]/u,
+    priority: 40,
+  },
   { name: "tanstack", test: /node_modules[\\/]@tanstack[\\/]/u, priority: 30 },
   { name: "trpc", test: /node_modules[\\/]@trpc[\\/]/u, priority: 30 },
+  {
+    name: "editor",
+    test: /node_modules[\\/](@tiptap|@codemirror|@lezer|prosemirror-[^\\/]+|linkifyjs|marked|orderedmap|rope-sequence|crelt|style-mod|w3c-keyname)[\\/]/u,
+    priority: 35,
+  },
   { name: "vendor", test: /node_modules[\\/]/u, priority: 10 },
 ];
 
