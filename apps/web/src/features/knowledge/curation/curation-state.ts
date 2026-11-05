@@ -16,8 +16,6 @@ export const ALL_KNOWLEDGE_KEYSTROKES = {
 
 export const ALL_KNOWLEDGE_LIST = "all";
 
-export const MOST_SELECTED = 200;
-
 const SORTS = [
   "title",
   "-title",

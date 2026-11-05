@@ -8,6 +8,7 @@ import {
   type SUGGESTION_KINDS,
 } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
+import { MOST_OWNERS_AT_ONCE } from "@better-answers/schema/concept-file";
 
 import { readableClause, readableParameters } from "../access/index.ts";
 import { action, declareActions, record, recordEach } from "../audit/index.ts";
@@ -366,10 +367,8 @@ export const nameOwner = async (
   return ok({ auditEventId, personId });
 };
 
-const OWNERS_AT_ONCE = 200;
-
 export const nameOwnerOfEachInput = z.strictObject({
-  iris: z.array(ids.conceptIri).min(1).max(OWNERS_AT_ONCE),
+  iris: z.array(ids.conceptIri).min(1).max(MOST_OWNERS_AT_ONCE),
   personId: boundarySchemas.conceptOwner.insert.shape.personId,
 });
 

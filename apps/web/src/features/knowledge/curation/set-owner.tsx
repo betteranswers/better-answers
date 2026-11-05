@@ -1,5 +1,7 @@
 import { useId, useRef, useState, type RefObject } from "react";
 
+import { MOST_OWNERS_AT_ONCE } from "@better-answers/schema/concept-file";
+
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { SelectionAction } from "@/shared/list/selection-bar.tsx";
 import type { Outcome } from "@/shared/outcome.tsx";
@@ -10,7 +12,7 @@ import { Label } from "@/shared/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/shared/ui/native-select.tsx";
 
 import { useOwnerChoices, useSetOwners, type Owner } from "../knowledge-api.ts";
-import { ALL_KNOWLEDGE_KEYSTROKES as KEY, MOST_SELECTED } from "./curation-state.ts";
+import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "./curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "./curation-words.ts";
 
 const { outcomeOfFailure } = refusalsOf(WORDS.refusedOnSetOwner);
@@ -21,7 +23,7 @@ const NOTHING_SELECTED: Outcome = { tone: "said", words: WORDS.selectFirst };
 
 const STILL_GOING: Outcome = { tone: "said", words: WORDS.setOwner.stillGoing };
 
-const TOO_MANY: Outcome = { tone: "said", words: WORDS.setOwner.tooMany(MOST_SELECTED) };
+const TOO_MANY: Outcome = { tone: "said", words: WORDS.setOwner.tooMany(MOST_OWNERS_AT_ONCE) };
 
 const nameOf = (owner: Owner): string => (owner.name === "" ? WORDS.unnamed : owner.name);
 
@@ -53,7 +55,7 @@ export const useSetOwner = (selection: Selection) => {
       say(NOTHING_SELECTED);
       return;
     }
-    if (ticked.size > MOST_SELECTED) {
+    if (ticked.size > MOST_OWNERS_AT_ONCE) {
       say(TOO_MANY);
       return;
     }

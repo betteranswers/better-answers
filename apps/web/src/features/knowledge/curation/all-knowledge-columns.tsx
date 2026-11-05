@@ -37,11 +37,13 @@ function TitleCell(properties: { readonly concept: AllKnowledgeRow }) {
   const { concept } = properties;
   const opening = useContext(OpeningContext);
   return (
-    <ConceptLink
-      concept={concept}
-      landsHere={opening.returnedTo === conceptMatchKey(concept.iri)}
-      onLanded={opening.onLanded}
-    />
+    <div className="min-w-36">
+      <ConceptLink
+        concept={concept}
+        landsHere={opening.returnedTo === conceptMatchKey(concept.iri)}
+        onLanded={opening.onLanded}
+      />
+    </div>
   );
 }
 
