@@ -1,14 +1,14 @@
 # Local gates and worktrees
 
-What runs on a developer's or an agent's own machine before CI sees anything: the git hooks `lefthook.yml` declares, the Claude Code hooks under `.claude/hooks/`, and the decisions the tool configuration files at the repository root carry. CI itself is `docs/operations/CI.md`.
+This page covers what runs on a developer's or an agent's machine before CI: the git hooks in `lefthook.yml`, the Claude Code hooks under `.claude/hooks/`, and the tool configuration at the repository root. `docs/operations/CI.md` covers CI.
 
 ## The pre-commit hook
 
-One hook, its commands in parallel over staged files only. No test suite lives here — root `check` owns those. Five commands each run one workspace's own `typecheck` script (`tsc --noEmit`) over its own staged `.ts`/`.tsx` files, so a staged type error is refused at commit.
+The hook runs its commands in parallel over staged files only, and runs no test suite. Five commands each run one workspace's `typecheck` script (`tsc --noEmit`) over that workspace's staged `.ts` and `.tsx` files.
 
-Measured cold on the owner's machine (Apple M4 Pro, 14 cores, 24 GiB; Docker VM 10 CPUs, 15.6 GiB): api 1.9s, web 1.8s, core 1.6s, schema 1.8s, devtools 1.0s. The api is the worst case, and `parallel: true` makes every command wait on the slowest rather than the sum, so 1.9s is the hook's own added cost.
+With `parallel: true`, the hook costs its slowest command, about 1.9s cold for the api.
 
-A command runs only when a file under its own workspace is staged: a change in `packages/core` that breaks `apps/api`'s types passes this hook whenever no `apps/api` file is staged beside it. That is the price of a hook that stays seconds long rather than minutes; root `check` owns the cross-workspace case, and always will.
+A command runs only when a file in its own workspace is staged. A change in `packages/core` that breaks `apps/api`'s types passes the hook when no `apps/api` file is staged. Root `check` catches that case.
 
 ### How to skip, when you mean to
 
@@ -18,50 +18,50 @@ A command runs only when a file under its own workspace is staged: a change in `
 | `LEFTHOOK_EXCLUDE=oxlint git commit …` | one command |
 | `LEFTHOOK_EXCLUDE=oxfmt,oxlint git commit …` | several, comma-separated |
 
-The command names in `lefthook.yml` are the names those variables take. A deliberate skip is one of these; it is never a deleted hook file, because the next `pnpm install` writes it back and the reason for the skip goes with it.
+The variables take the command names in `lefthook.yml`. Do not delete the hook file, which the next `pnpm install` writes back.
 
 ### How it is installed
 
-The root `prepare` script runs `lefthook install`, and pnpm runs `prepare` after every install — so a fresh clone gets the hook with no step to remember. lefthook ships its own postinstall that would do the same, but pnpm 11 only runs a dependency's lifecycle scripts when `pnpm-workspace.yaml`'s `allowBuilds` says so, and that list is for native builds we have inspected, not for a tool wiring itself into `.git`. So `allowBuilds` refuses lefthook's postinstall (`lefthook: false`) and `prepare` does the installing in the open, in a script anyone reading the manifest can see.
+The root `prepare` script runs `lefthook install`, and pnpm runs `prepare` after every install. `pnpm-workspace.yaml`'s `allowBuilds` refuses lefthook's own postinstall (`lefthook: false`), because that list is for inspected native builds.
 
-`prepare` falls back to a message rather than failing, because pnpm runs it in two places that have no business holding a hook: the api's runtime image, where `--prod` leaves lefthook out of the tree entirely, and any install outside a git working tree. A fresh developer clone is the case that must work, and the check workflow asserts it on the only genuinely fresh clone we get — so the fallback cannot hide a real failure.
+`prepare` prints a message instead of failing where no hook belongs: the api's runtime image, where `--prod` leaves lefthook out, and any install outside a git working tree. The check workflow asserts that a fresh clone gets the hook.
 
 ### What each command is for
 
-- `oxfmt` writes, and `stage_fixed` puts what it wrote into the commit, so a formatting-only CI failure cannot happen and no second commit is needed to fix it. `--no-error-on-unmatched-pattern` is what makes handing over the whole staged set safe.
-- `oxlint` runs the one lint config over the staged TypeScript and root scripts (`.ts`, `.tsx`, `.mjs`, `.js`), with the flag root `lint` passes, so a disable that suppresses nothing is refused at commit too. `--no-error-on-unmatched-pattern` lets through a commit whose only staged script the lint config ignores.
-- `ruff-format` and `ruff-check` give both tiers the same first word. `root: apps/worker/` makes the staged paths relative to the worker, which is where `uv` finds the locked environment ruff lives in. `--only-group dev` syncs ruff's group and not the worker's own dependencies, so a commit never fetches torch: on Linux that comes from PyTorch's CPU wheel host, which a sandboxed clone may not reach.
-- `comment-gate-python` runs the checker root `comment-gate:python` runs, over the staged `.py` files. It carries no `root:`, because the checker reads a file's place, such as `apps/worker/src/`, from its repository path.
-- `actionlint` runs the command root `lint:workflows` runs, over the staged workflows alone. It and the shellcheck it runs over each `run:` step come from the worker's locked dev group, so a commit and CI read a workflow with the same versions. The first run builds actionlint's Python package, which downloads the release from GitHub and checks it against the hash the package carries. uv caches the build after that.
-- The five `*-typecheck` commands are every workspace with a `typecheck` script but the design system, which has neither a `tsconfig.json` nor a `scripts` block. `root:` is what scopes each command to its own workspace's staged files, so these five never see each other's changes.
+- `oxfmt` writes its fixes, and `stage_fixed` adds them to the commit, so CI never fails on formatting alone. `--no-error-on-unmatched-pattern` lets it take the whole staged set.
+- `oxlint` runs the lint config over staged `.ts`, `.tsx`, `.mjs`, and `.js` files with root `lint`'s flag, so it also refuses a disable comment that suppresses nothing. `--no-error-on-unmatched-pattern` lets a commit through when the config ignores its only staged script.
+- `ruff-format` and `ruff-check` run with `root: apps/worker/`, where `uv` finds ruff's locked environment. `--only-group dev` syncs only ruff's group, so a commit never fetches torch. On Linux, torch comes from PyTorch's CPU wheel host, which a sandboxed clone may not reach.
+- `comment-gate-python` runs root `comment-gate:python`'s checker over staged `.py` files. It has no `root:`, because the checker reads a file's place, such as `apps/worker/src/`, from its repository path.
+- `actionlint` runs root `lint:workflows`'s command over staged workflows. actionlint and the shellcheck it runs on each `run:` step come from the worker's locked dev group, so a commit and CI use the same versions. The first run builds actionlint's Python package, which downloads the release from GitHub and checks it against the package's hash. uv caches the build.
+- The five `*-typecheck` commands cover every workspace with a `typecheck` script except the design system, which has no `tsconfig.json` and no `scripts` block. `root:` scopes each command to its own workspace's staged files.
 
 ## The pre-push hook
 
-Before a push that carries commits to a branch leaves the machine, the hook runs every step root `check:gates` names and the three prose suites `check:docs` adds to them: `check:docs:core`, `check:docs:devtools` and `check:docs:web`. `format:check` is in both scripts and runs once. In a sample of 30 failed pull requests, about half failed on one of these, and CI took five to nine minutes to say so. This hook says so before the push.
+Before a push that carries commits to a branch, the hook runs every step of root `check:gates` and the three prose suites `check:docs` adds: `check:docs:core`, `check:docs:devtools`, and `check:docs:web`. `format:check` is in both scripts and runs once.
 
-Each step is a command of its own, and the commands run in parallel. A failure therefore names its gate, and `LEFTHOOK_EXCLUDE` can skip one gate and keep the rest. The list repeats the steps the two scripts name, and `packages/devtools/test/root-config/lefthook-config.test.ts` holds it to them in both directions: a gate added to either script fails that suite until the hook runs it too. The same file pushes through the real `lefthook.yml` in a throwaway repository, with a stand-in `pnpm`, from the main checkout and from a linked worktree.
+Each step is its own command, run in parallel, so a failure names its gate. `packages/devtools/test/root-config/lefthook-config.test.ts` holds the hook's list to the two scripts in both directions.
 
-Measured on the owner's machine (the same one as above) with every gate passing, the whole hook took 20s to 24s over three runs on 12/10/2026, where `check:gates` and `check:docs` one after the other take about 37s. `check:docs:devtools` is the slowest command and sets the wait. The core suite starts Postgres in Docker, as every vitest run in that workspace does, so the hook needs Docker running.
+With every gate passing, the hook takes 20s to 24s, and `check:docs:devtools` is the slowest command. The hook needs Docker running, because the core suite starts Postgres.
 
-A failed gate stops the push. The gates' summary names each failure with the command that runs it alone, and the hook's own summary under it marks `gates` failed:
+A failed gate stops the push. The gates' summary names each failure with the command that runs it alone, and the hook's summary marks `gates` failed:
 
 ```
 ✗ knip: run it alone with pnpm run knip (3.14 seconds)
 ```
 
-The gates read the working tree, not the commits being pushed, so push from a clean tree. An untracked file counts too: `format:check` reads one that no ignore pattern covers, and refuses the push if it is unformatted.
+The gates read the working tree, not the pushed commits, so push from a clean tree. `format:check` also reads any untracked file that no ignore pattern covers.
 
 ### When the gates run
 
-Git hands the hook one line per ref it pushes: the local ref and its sha, then the remote ref and its sha. `scripts/pre-push.sh` reads them, and runs the gates when any line sends a sha that is not all zeros to a ref under `refs/heads/`. Every other push carries no commit CI would check, so the script prints one line and lets it through:
+Git passes the hook one line per pushed ref: the local ref and its sha, then the remote ref and its sha. `scripts/pre-push.sh` runs the gates when any line sends a sha that is not all zeros to a ref under `refs/heads/`. Otherwise it prints one line and lets the push through:
 
 ```
 gates skipped: every ref pushed is a deletion or outside refs/heads/, so none carries commits
 ```
 
-That covers a tag's push or deletion, a ref in a namespace of its own (such as ordna's archived `refs/ordna/`), and a branch's deletion. A dirty working tree cannot block any of them. A tag pushed beside a branch's new commits still runs the gates, as does a branch push that only deletes files. The suite pushes each of these cases through the hook.
+That covers a tag's push or deletion, a ref in its own namespace (such as ordna's archived `refs/ordna/`), and a branch deletion. A dirty working tree cannot block these. A tag pushed with a branch's new commits still runs the gates, and so does a branch push that only deletes files.
 
-The gates live in a second hook, `pre-push-gates`, because lefthook hands git's lines to a job with `use_stdin` and to nothing else. A `skip` condition, a `setup` step and a `files` command all read an empty stdin, so none of them can tell a tag from a branch. `pre-push` is therefore one job, `gates`, which runs the script, and the script runs `pnpm exec lefthook run pre-push-gates`.
+lefthook passes git's lines only to a job with `use_stdin`, not to a `skip` condition, a `setup` step, or a `files` command. So `pre-push` is one job, `gates`, which runs the script, and the script runs the gates in a second hook with `pnpm exec lefthook run pre-push-gates`.
 
 ### How to skip the pre-push hook
 
@@ -71,20 +71,20 @@ The gates live in a second hook, `pre-push-gates`, because lefthook hands git's 
 | `LEFTHOOK_EXCLUDE=knip git push` | one gate |
 | `LEFTHOOK_EXCLUDE=knip,check:docs:core git push` | several, comma-separated |
 
-`LEFTHOOK=0` skips it as it skips the pre-commit hook. `pnpm exec lefthook run pre-push-gates` runs every gate without pushing. `lefthook run pre-push` by hand would wait on stdin for lines only git sends.
+`LEFTHOOK=0` also skips this hook. To run every gate without pushing, run `pnpm exec lefthook run pre-push-gates`. Run by hand, `lefthook run pre-push` waits on stdin for lines only git sends.
 
 ### What each command's `run` carries
 
-- `{without-git-env}` unsets every variable `git rev-parse --local-env-vars` lists. Pushed from a linked worktree, git runs the hook with `GIT_DIR` set to the worktree's git directory, and every gate would inherit it. `GIT_DIR` outranks the directory `git -C <dir>` names, so a suite that builds a throwaway repository would read and write the worktree's own repository in its place. A push from the main checkout sets no `GIT_DIR`, so only a worktree shows this.
-- `: {files};`, in the `gates` job alone, does nothing when it runs. It is there because a pre-push command that names no files template is skipped when the push changes no file still on disk, and a push that only deletes files is one of those. Naming `{files}` makes lefthook read the hook's own `files` list instead, which is `lefthook.yml` alone and never empty. lefthook skips on a push's files only in a hook named `pre-push`, so the commands of `pre-push-gates` need no such thing.
+- `{without-git-env}` unsets every variable that `git rev-parse --local-env-vars` lists. On a push from a linked worktree, git sets `GIT_DIR` to the worktree's git directory. `GIT_DIR` outranks the directory `git -C <dir>` names, so a suite that builds a throwaway repository would write to the worktree's repository instead. A push from the main checkout sets no `GIT_DIR`, so only a worktree shows this.
+- `: {files};`, in the `gates` job only, does nothing when it runs. Without a files template, lefthook skips a `pre-push` command when the push changes no file still on disk, as when a push only deletes files. `{files}` makes lefthook read the hook's own `files` list, `lefthook.yml`, which is never empty. `pre-push-gates` needs no template, because lefthook skips on a push's files only in a hook named `pre-push`.
 
 ### Where it is installed
 
-Git keeps hooks in the common git directory, so one `pre-push` serves the main checkout and every worktree, and each run reads the `lefthook.yml` of the checkout it runs in. `prepare` installs it with the other two. `pre-push-gates` is not a name git calls, so `lefthook install` writes no file for it. lefthook also re-installs the hooks whenever one of them runs under a `lefthook.yml` that has changed since the last install, so a checkout that has not run `pnpm install` since this hook landed picks it up at its next commit.
+Git keeps hooks in the common git directory, so one `pre-push` serves every checkout. Each run reads its own checkout's `lefthook.yml`. `prepare` installs it with the other two hooks. Git never calls `pre-push-gates`, so `lefthook install` writes no file for it. lefthook reinstalls the hooks when one runs under a changed `lefthook.yml`, so an older install gets the hook at its next commit.
 
 ## The commit-message hook
 
-The `commit-msg` hook runs commitlint over every commit's message. Its config, `commitlint.config.mjs` at the root, is the one the `pr-title` job in `check.yml` reads too, so one config checks the form everywhere. `packages/devtools/test/root-config/commit-msg-hook.test.ts` commits through the hook's own command in a throwaway repository: a Conventional message goes in, and a declarative subject, a subject naming its ticket and one over 90 characters are each refused.
+The `commit-msg` hook runs commitlint with `commitlint.config.mjs`, the config the `pr-title` job in `check.yml` also reads. It refuses a declarative subject, a subject naming its ticket, and a subject over 90 characters. `packages/devtools/test/root-config/commit-msg-hook.test.ts` tests it.
 
 ## The Claude Code hooks
 
@@ -92,85 +92,120 @@ The `commit-msg` hook runs commitlint over every commit's message. Its config, `
 
 ### Creating a worktree
 
-`worktree-create-hook.sh` replaces native worktree creation for every worktree Claude Code makes, such as an `Agent(isolation: "worktree")` fork or `claude --worktree`. Claude Code sends JSON on stdin carrying `.name`, and the hook's stdout must be exactly the created directory, so every diagnostic goes to stderr.
+`worktree-create-hook.sh` replaces native worktree creation for every Claude Code worktree, such as an `Agent(isolation: "worktree")` fork or `claude --worktree`. Claude Code sends JSON with `.name` on stdin. The hook's stdout must be exactly the created directory, so diagnostics go to stderr.
 
-The layout stays native, `.claude/worktrees/<name>` on branch `worktree-<name>`, so the ignore patterns keep working. The base depends on where the request comes from, read from the input's `.cwd`, because `CLAUDE_PROJECT_DIR` names the main checkout in both cases. A request from the main checkout is independent work, so it starts from `origin/main` after a fetch, or from the local `main` when the fetch fails. A request from a linked worktree is a delegate building part of that session's branch, so it starts from that worktree's `HEAD`. The branch is made with `--no-track`, so a bare `git pull` or `git push` never aims at `main`.
+The layout stays native, `.claude/worktrees/<name>` on branch `worktree-<name>`. The hook picks the base from the input's `.cwd`, because `CLAUDE_PROJECT_DIR` names the main checkout in both cases.
 
-The hook then gives the worktree a jCodeMunch index and a jDocMunch index of its own. Without them, every edit in the worktree registers in the main checkout's indexes. A machine without either tool gets a line on stderr and a worktree all the same.
+- From the main checkout, the base is `origin/main` after a fetch, or the local `main` if the fetch fails.
+- From a linked worktree, the request is a delegate building that session's branch, so the base is that worktree's `HEAD`.
 
-The hook installs nothing. pnpm installs on the first `pnpm exec` and uv syncs on the first `uv run`. `packages/devtools/test/gates/worktree-create-hook.test.ts` holds the base choice, `--no-track` and the indexes.
+The branch uses `--no-track`, so a bare `git pull` or `git push` never targets `main`. The hook gives the worktree its own jCodeMunch and jDocMunch indexes, so its edits do not register in the main checkout's indexes. Without either tool, the hook writes a line to stderr and still creates the worktree.
 
-Nothing in this repository removes a worktree. A hook-created worktree carries no Claude Code marker, so Claude Code's own sweep leaves it alone. pstack's worktree-cleanup playbook removes merged ones, and `pnpm reap-containers` removes stopped test containers.
+The hook installs nothing. pnpm installs on the first `pnpm exec`, and uv syncs on the first `uv run`. `packages/devtools/test/gates/worktree-create-hook.test.ts` tests the hook.
+
+Nothing in this repository removes a worktree, and Claude Code's sweep skips hook-created ones, which carry no Claude Code marker. pstack's worktree-cleanup playbook removes merged ones, and `pnpm reap-containers` removes stopped test containers.
 
 ### The doc watcher's log cap
 
-The jDocMunch watcher runs as the launchd service `us.gravelle.jdocmunch-watch`. On 06/10/2026 a loop in it wrote a 159 GB `~/.doc-index/logs/watch.err`. Its plist now carries `SoftResourceLimits` → `FileSize` of 1 GB, so no file the watcher writes can grow past that. The limit binds the index files too, and the largest is 64 MB, so the cap stays far above it.
+The launchd service `us.gravelle.jdocmunch-watch` runs the jDocMunch watcher. Its plist sets `FileSize` under `SoftResourceLimits` to 1 GB. The cap also binds the index files, the largest of which is 64 MB.
 
-`jdocmunch-mcp watch-install` writes the plist afresh and drops the cap. Put it back with:
+`jdocmunch-mcp watch-install` rewrites the plist without the cap. To restore the cap, run:
 
 ```
 bash scripts/jdocmunch-watch-cap.sh
 ```
 
-It adds the cap and reloads the service with `launchctl bootout` and `bootstrap`. When the cap is already there it changes nothing, unless an earlier run left the service unloaded, and then it loads it. A `SessionStart` hook, `.claude/hooks/watch-cap-hook.sh`, runs it with `--check` when a session starts fresh, not on a resume. When the cap is missing, the session opens with a message naming the command. The hook only reads the plist: nothing but a person running the script changes it. Set `JDOCMUNCH_WATCH_PLIST` to point the script at another plist.
+The script adds the cap and reloads the service with `launchctl bootout` and `bootstrap`. If the cap is present, it changes nothing, except to load a service an earlier run left unloaded. `JDOCMUNCH_WATCH_PLIST` points it at another plist.
+
+A `SessionStart` hook, `.claude/hooks/watch-cap-hook.sh`, runs the script with `--check` on a fresh session, not on a resume. If the cap is missing, the session opens with a message naming the command. The hook never changes the plist.
 
 ## The `check` runner
 
-`scripts/check.mjs` is `check` for a TypeScript workspace and for the root: it runs every step named on its command line, even after one fails, and ends by naming all of them. Each argument is a script in the manifest of the directory it runs in, so a manifest's `check` reads as the list of gates that workspace has and adding one is a word. Failures are collected rather than thrown at the first, because a session told only about lint fixes lint, runs `check` again, and is then told about types — three runs of a browser suite to learn three things.
+`scripts/check.mjs` is `check` for each TypeScript workspace and for the root. It runs every step named on its command line, continues past failures, and ends by naming every step that failed. Each argument is a script in the manifest of the directory it runs in, so a manifest's `check` lists that workspace's gates.
 
-pnpm can select scripts by regular expression and `--no-bail` will keep going past a failure, but as of pnpm 11.24.0 that combination exits 0 with failed scripts behind it, which is the silent pass this file exists to refuse. `pnpm -r --no-bail` — the recursive form the root uses over the workspaces — does report a non-zero exit and is unaffected. The worker's equivalent is `apps/worker/src/better_answers_worker/check.py`; the two are separate because a uv workspace is not a pnpm one and neither tier can run the other's.
+The runner collects every failure rather than stopping at the first. A session told only about lint fixes lint, runs `check` again, and is then told about types.
+
+pnpm can also select scripts by regular expression with `--no-bail`, but as of pnpm 11.24.0 that combination exits 0 when scripts fail. `pnpm -r --no-bail`, which the root uses across workspaces, does report a non-zero exit.
+
+The worker has its own runner, `apps/worker/src/better_answers_worker/check.py`, because a uv workspace is not a pnpm workspace.
 
 ## The shared test Postgres
 
-By default every test run starts its own Postgres container. Several worktrees running `check` at once then run several servers, and on 15/10/2026 four of them took a 14-core Mac to a load average of 45. One shared server per pinned image avoids that. It is opt-in on a laptop. In CI only `full-worker` uses it, started with `deploy/test-postgres.sh up`, so that the suite's four pytest workers share one server instead of starting four.
+By default every test run starts its own Postgres container. A shared server per pinned image is opt-in on a laptop. In CI only `full-worker` uses it, started with `deploy/test-postgres.sh up`, so its four pytest workers share one server.
 
-Start the server for this checkout's pin, then export the line it prints:
+To use it, start the server for this checkout's pin and export the line it prints:
 
 ```sh
 deploy/test-postgres.sh up
 export TEST_POSTGRES_URI=shared
 ```
 
-With `TEST_POSTGRES_URI=shared`, the warm harness in `packages/schema`, `packages/core` and `apps/api`, and the worker's pytest harness, start no Postgres container. Each works out its server's address from the image `packages/schema/src/postgres-image.ts` pins, so the variable needs no change when a branch moves to another pin. Each tier clones its databases from a template on that server. The template is named for a digest of `packages/schema/migrations` and of the harness that builds it, so worktrees on different migrations never share one. The first run on a new migration set builds its template, and every later run reuses it. Leave the variable unset, or empty, and a run starts its own container as before. A `postgresql://` URI in the variable is used as given.
+With `TEST_POSTGRES_URI=shared`, the warm harness in `packages/schema`, `packages/core`, and `apps/api`, and the worker's pytest harness, start no container. Each derives the server's address from the image that `packages/schema/src/postgres-image.ts` pins. Each tier clones its databases from a template named for a digest of `packages/schema/migrations` and the harness that builds it. The first run on a new migration set builds the template, and later runs reuse it. A `postgresql://` URI is used as given.
 
-Each pinned image gets its own server: the compose project and port come from the image's digest. A worktree on a newer pin runs `up` and gets a second server beside the first, so neither wipes nor borrows the other. `deploy/test-postgres.sh address` prints the project and address for this checkout's pin without starting anything. `up` names any other server still running. `down` stops this pin's server and discards everything on it, and `down --all` stops every one. Their data lives in memory, so a Docker restart discards it too, and the next run rebuilds its template in seconds. `TEST_POSTGRES_PORT` and `TEST_POSTGRES_PROJECT` move a server off its derived port and project stem. They are separate servers from the dev database `deploy/local-database.sh` starts.
+Each pinned image gets its own server, with the compose project and port derived from the image's digest, so a worktree on a newer pin gets a second server. The servers keep data in memory, so a Docker restart discards it, and the next run rebuilds its template in seconds. `TEST_POSTGRES_PORT` and `TEST_POSTGRES_PROJECT` override the derived port and project stem. These servers are separate from the dev database that `deploy/local-database.sh` starts.
 
-After upgrading from the single shared server, run `deploy/test-postgres.sh down --all` once. It also clears the old server on port 55433, which would otherwise come back after every Docker restart.
+| `deploy/test-postgres.sh` command | What it does |
+| --- | --- |
+| `up` | Starts this pin's server, and names any other server still running. |
+| `address` | Prints this pin's project and address without starting anything. |
+| `down` | Stops this pin's server and discards its data. |
+| `down --all` | Stops every server. |
 
-What to expect:
+If the machine ran the older single shared server, run `deploy/test-postgres.sh down --all` once. It clears that server on port 55433, which otherwise returns after every Docker restart.
 
-- A run with the variable set but no server listening, or a URI that is not a superuser, stops at once with a line naming `TEST_POSTGRES_URI` and the `up` command. It never falls back to a container.
-- Every server carries its image as `better_answers.image`. Under `shared`, a run refuses a server with no stamp or another image's; with an explicit URI, it refuses another image's. That catches the rare case of two pins deriving one port: start the second with `TEST_POSTGRES_PORT=<free port> deploy/test-postgres.sh up` and export the same `TEST_POSTGRES_PORT`.
-- Two loaded servers can exhaust the Docker VM's memory. Clear old ones with `down --all` once no worktree uses their pin.
-- If a server runs out of memory, Postgres stops every session at once, and every run using it fails together. `down` then `up` clears it.
-- A run's databases carry its process id. A run that is killed leaves them behind, and the next run on the machine drops them once that process has gone.
-- Each run stamps its template with the time it used it. A template no run has used for a day is dropped by the next run of the same tier, so old migration sets do not fill the server. A run held open for longer than a day can lose its template; restart it and it rebuilds one.
-- `pnpm reap-containers` and Ryuk select only containers testcontainers labelled, so neither touches the shared servers.
-- Some test files still start a server of their own: the two that replay part of the migration history, `roles-surface.test.ts` and `apps/api/tests/deploy/browse-role.test.ts`, which read or alter roles across the whole server, and the case in `warm-postgres/cold-start.test.ts` that proves the path without a warm server. Garage still starts a container per run.
-- Renovate proposes updates to the pin each weekend and holds a Postgres major in the Dependency Dashboard. Production's Postgres is a Coolify resource set to the pin by hand: after merging a pin update, re-point it to the new image reference, and run `ALTER EXTENSION vector UPDATE` when pgvector's version moved.
+The shared servers follow these rules:
+
+- If the variable is set but no server listens, or the URI is not a superuser, a run stops with a message naming `TEST_POSTGRES_URI` and the `up` command. It never falls back to a container.
+- Every server carries its image as `better_answers.image`. Under `shared`, a run refuses a server with no stamp or another image's. With an explicit URI, it refuses another image's. If two pins derive one port, start the second with `TEST_POSTGRES_PORT=<free port> deploy/test-postgres.sh up` and export the same `TEST_POSTGRES_PORT`.
+- Two loaded servers can exhaust the Docker VM's memory. Clear old servers with `down --all` once no worktree uses their pin.
+- If a server runs out of memory, Postgres ends every session, and every run on it fails. Run `down`, then `up`.
+- A run's databases carry its process id. The next run on the machine drops a killed run's databases once that process has gone.
+- Each run stamps its template with its last use. The next run of the same tier drops a template unused for a day. A run held open longer can lose its template. Restart it to rebuild one.
+- `pnpm reap-containers` and Ryuk select only containers that testcontainers labelled, so neither touches the shared servers.
+- Some tests still start their own server. `roles-surface.test.ts` and `apps/api/tests/deploy/browse-role.test.ts` replay part of the migration history and read or alter roles across the whole server. A case in `warm-postgres/cold-start.test.ts` proves the path without a warm server. Garage still starts a container per run.
+- Renovate proposes pin updates each weekend and holds a Postgres major in the Dependency Dashboard. Production's Postgres is a Coolify resource set to the pin by hand. After merging a pin update, re-point it to the new image reference. If pgvector's version moved, also run `ALTER EXTENSION vector UPDATE`.
 
 ## The tool configuration at the repository root
 
-**`cubic.yaml`** is the reviewer's configuration, read from `main` only. Cubic enables five custom agents per repository, the repository's own first and then the organization's, and drops a sixth with no error, so each custom rule takes one of those slots; the API-auth agent was absorbed into the Principal rule rather than deleted, tenant scoping and request validation being what that rule is for.
+### `cubic.yaml`
 
-**`jscpd.config.mjs`** is a JavaScript module and not the `.jscpd.json` the tool reads on its own. jscpd 5.1.2 parses its config with a strict JSON parser — a `//` line is rejected, and the run then continues on the defaults and exits zero, so a config nobody could read looks exactly like a tree with nothing in it. `scripts/jscpd.mjs` turns these values into the command line instead, which the tool cannot half-read. The threshold is zero because a percentage is a dial someone tunes down the day it fires; a copy is either folded into a helper or named, in the config or beside the copy itself with jscpd's `jscpd:ignore-start` and `jscpd:ignore-end` comments.
+`cubic.yaml` configures the reviewer, and Cubic reads it from `main` only. Cubic enables five custom agents per repository, the repository's own first, then the organization's, and drops a sixth with no error. Each custom rule takes one of those slots. The Principal rule holds the API-auth checks, tenant scoping and request validation, instead of a separate agent.
 
-What it is blind to, and why: the SPA's `shared/ui` is installed from a registry rather than written; `**/lifts/**` is a verbatim third-party snapshot edited upstream; `schema_view.py` is generated from the migration journal, so two tables with the same columns are the schema's doing; the two lockfiles are resolver output, excluded by name as well as by format; and build output, installed dependencies, the Python environment and the agents' worktrees are not source this repository writes.
+### `jscpd.config.mjs`
 
-**`knip.config.ts`** runs over the pnpm workspace as a step of root `check`: a file no code reaches, an export nothing imports, a dependency no workspace uses and a dependency used but never declared each fail the branch.
+`jscpd.config.mjs` is a JavaScript module, not the `.jscpd.json` that jscpd reads by default. jscpd 5.1.2 parses its config as strict JSON. It rejects a `//` line, then runs on the defaults and exits zero. `scripts/jscpd.mjs` passes the module's values on the command line instead.
 
-The tier's process entry points are deliberately not listed. The api's `main.ts`, `migrate.ts` and `ops.ts`, the two servers its suite exposes, the schema's worker-view generator, the SPA's `main.tsx`, the two oxlint plugins and the `check` runner are every one of them already reached by knip's own plugins, which read the manifests' scripts, the SPA's `index.html` and `.oxlintrc.json`'s `jsPlugins` specifiers. Naming them again is a second copy of the manifest, and knip says so on every run ("Remove redundant entry pattern"): a configuration that argues with the tool teaches the next session to ignore its output. Leaving them inferred also keeps the gate honest — the day a manifest stops naming one, knip reports the file as unreached rather than an entry nobody starts.
+The threshold is zero, because a percentage gets loosened the day it fails. Fold each copy into a helper, or name it in the config or beside the copy with `jscpd:ignore-start` and `jscpd:ignore-end` comments.
 
-Nothing in the configuration names `.gitnexus/`. A GitNexus index is written there per checkout and excluded from git through `.git/info/exclude`, and knip parses that file beside `.gitignore` — from a worktree too, following the worktree's `gitdir` to the common one; `knip --debug` lists both under "Parsed gitignore files". The directory is therefore invisible to knip in every checkout, analysed or not, and an `ignore` naming it would suppress nothing, which knip prints as "Remove from ignore" on every run: that hint fires when a pattern suppresses no issue, not when it matches no file. `packages/devtools/test/scans/knip.test.ts` proves the exclude file is read, both ways, so a knip release that stopped reading it fails there before the gate names `.gitnexus/run.cjs`. Silencing a hint is `--no-config-hints` and nothing narrower, which would take the redundant-entry hints with it, and those are the ones this configuration is written to keep agreeing with.
+jscpd skips these paths:
 
-`includeEntryExports` is on at the top level. By default knip reports nothing an entry file exports, reading an entry as a package's published API, and `packages/core`'s `exports` map makes every slice's barrel an entry, so a re-export nothing imported used to pass the gate. Nothing in this repository is published, so an entry's export that nothing imports is as dead as any other, in every workspace and in the next one added. `apps/web` alone writes it out as `false`: its `src/shared/ui` is registry source installed ahead of the pages that will import it (ADR 0033), and an export of a component nothing imports yet is no more dead than the component, which its `entry` already says. The suite reads each workspace's value the way knip does, a workspace's own before the top level's, and proves both halves over a throwaway slice.
+- The SPA's `shared/ui`, installed from a registry.
+- `**/lifts/**`, a verbatim third-party snapshot edited upstream.
+- `schema_view.py`, generated from the migration journal.
+- The two lockfiles, excluded by name as well as by format.
+- Build output, installed dependencies, the Python environment, and the agents' worktrees.
 
-An export is kept ahead of its caller only when the action it belongs to has no transport yet and a block under `docs/specs/route/` wires it. It carries knip's own tag on an `export` line of its own, `/** @public <block> */` — `/** @public S3 */` — so the tag covers the names beside it and no others, and the tag goes when the block's row in `docs/specs/v01-route.md` turns done. The input, result and refusal types of an action a transport already reaches are never kept: the transport infers them, and a later block that wants a name by hand adds one line to the barrel. A barrel itself is never deleted, because it is the slice's face, the list `better-answers/import-direction` reads (ADR 0029).
+### `knip.config.ts`
 
-`--production` and `--strict` are diagnostics, not gates. Production mode drops the test entries and the manifests' scripts, so every test helper and every script-run command — `migrate.ts` and `ops.ts` — reads as unused; strict mode then refuses devDependencies to what it counts as production, so every devDependency a helper imports reads as unlisted. Gating either would mean a second copy of every manifest's entry points as production patterns, the copy the paragraph on entry points above refuses.
+knip runs over the pnpm workspace as a step of root `check`. A file no code reaches, an export nothing imports, a dependency no workspace uses, or a dependency used but undeclared fails the branch.
 
-**`pnpm-workspace.yaml`** is the workspace manifest. `apps/worker/` is a uv workspace, not a pnpm one, and a documentation site would join the `packages:` list the day one is lifted in.
+The configuration lists no process entry points. knip's plugins already reach the api's `main.ts`, `migrate.ts`, and `ops.ts`, the two servers the api's suite exposes, the schema's worker-view generator, the SPA's `main.tsx`, the two oxlint plugins, and the `check` runner. The plugins read the manifests' scripts, the SPA's `index.html`, and `.oxlintrc.json`'s `jsPlugins` specifiers. Listing the entry points again draws knip's "Remove redundant entry pattern" hint on every run. Leaving them inferred also means that the day a manifest stops naming one, knip reports the file as unreached.
 
-`allowBuilds` runs one package's postinstall script, esbuild's, because that script puts the platform binary where vite and drizzle-kit reach it. `cpu-features`, `protobufjs` and `ssh2` are optional native accelerations we do not take. lefthook is `false` for the reason above. `false` rather than no entry at all, because pnpm 11 makes an undecided build script a hard error and silence would fail every fresh install.
+The configuration does not name `.gitnexus/`, where each checkout keeps its GitNexus index. `.git/info/exclude` excludes the directory, and knip parses that file beside `.gitignore`, from a worktree too, through the worktree's `gitdir`. `knip --debug` lists both under "Parsed gitignore files". An `ignore` entry for the directory would suppress nothing and draw knip's "Remove from ignore" hint on every run. `packages/devtools/test/scans/knip.test.ts` fails if a knip release stops reading the exclude file. Do not silence hints with `--no-config-hints`, which also silences the redundant-entry hints.
 
-`patchedDependencies` holds two patches, and a patch is a liability at every upgrade, so each reason is written down. Each is keyed by package name alone, so a bump that leaves its hunks applying installs unchanged, and one that moves them fails the install on its own pull request. The testcontainers patch gives each test process a Ryuk of its own. `@stryker-mutator/vitest-runner` 10.0.0 joins a test's suite chain with a space where vitest 5 joins it with ` > `, so no mutant's name filter selected a test, and the patch builds the name as the running vitest does (`docs/operations/CI.md`, *A runner fault fails the leg*). It also misses a suite that fails on its own. A test file that failed to load, or a hook that threw, fails no test, so vitest never bails. The run goes on through every related file, and the mutant reads survived, or under CI's contention waits out its suite and reads Timeout, which counts as killed. The patch cancels the run on such a failure and counts it as one failed test, whose reason names the file, and the hook when one threw. It is retired when the fix is upstream.
+`includeEntryExports` is on at the top level. By default knip reports nothing an entry file exports, treating it as published API. `packages/core`'s `exports` map makes every slice's barrel an entry, and nothing here is published, so an entry's unimported export is dead in every workspace. Only `apps/web` sets it to `false`, because its `src/shared/ui` is registry source installed ahead of the pages that will import it, and its `entry` covers those components. A workspace's own value overrides the top level's.
+
+An export is kept ahead of its caller only when its action has no transport yet and a block under `docs/specs/route/` wires it. It carries knip's tag on its own `export` line, `/** @public <block> */`, for example `/** @public S3 */`, so the tag covers only that line's names. Remove the tag when the block's row in `docs/specs/v01-route.md` turns done. Never keep the input, result, or refusal types of an action a transport already reaches. The transport infers them, and a later block that needs a name adds one line to the barrel. Never delete a barrel. It is the list that `better-answers/import-direction` reads.
+
+`--production` and `--strict` are diagnostics, not gates. Production mode drops the test entries and the manifests' scripts, so every test helper and script-run command, such as `migrate.ts` and `ops.ts`, reads as unused. Strict mode then refuses devDependencies in what it counts as production, so every devDependency a helper imports reads as unlisted.
+
+### `pnpm-workspace.yaml`
+
+`pnpm-workspace.yaml` is the workspace manifest. `apps/worker/` is a uv workspace, not a pnpm one. A documentation site would join the `packages:` list.
+
+`allowBuilds` runs only esbuild's postinstall, which puts the platform binary where vite and drizzle-kit reach it. `cpu-features`, `protobufjs`, and `ssh2` are optional native accelerations the repository does not use. pnpm 11 runs a dependency's lifecycle scripts only when `allowBuilds` allows them, and fails an install on an undecided one. Each refused package, lefthook included, is therefore `false` rather than absent.
+
+`patchedDependencies` holds two patches, each keyed by package name alone. A bump that leaves a patch's hunks applying installs unchanged. A bump that moves them fails the install on its own pull request.
+
+- The testcontainers patch gives each test process its own Ryuk.
+- The `@stryker-mutator/vitest-runner` 10.0.0 patch fixes two faults, and is retired when the fix is upstream. First, the runner joins a test's suite chain with a space where vitest 5 uses ` > `, so no mutant's name filter selects a test. The patch builds the name as vitest does (`docs/operations/CI.md`, *A runner fault fails the leg*). Second, a test file that failed to load, or a hook that threw, fails no test, so vitest never bails. The mutant reads survived, or under CI's contention reads Timeout, which counts as killed. The patch cancels the run on such a failure and counts one failed test, whose reason names the file, and the hook if one threw.
