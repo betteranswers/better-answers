@@ -111,7 +111,7 @@ const COVER = "We hold every cover a buyer asks for.";
 
 type Briefed = { readonly writeUpId: string; readonly version: number };
 
-type GuideWorld = {
+type GuideSetup = {
   readonly ng: Northgate;
   readonly scenario: Scenario;
   readonly guideId: string;
@@ -152,7 +152,7 @@ const briefWith = (
     labels.map((label) => `${sentence}[^${label}]`).join("\n\n"),
   );
 
-const guideWorld = once(async (): Promise<GuideWorld> => {
+const guideSetup = once(async (): Promise<GuideSetup> => {
   const scenario = await arrange();
   const ng = await northgate(db(), scenario);
   const { guideId } = answered(
@@ -178,20 +178,20 @@ const guideWorld = once(async (): Promise<GuideWorld> => {
   return { ng, scenario, guideId, overview, insurance };
 });
 
-const guideOf = (as: UserPrincipal, world: GuideWorld, guideId = world.guideId) =>
-  exportGuideSnapshot(as, world.scenario.postgres, { guideId, at: AT });
+const guideOf = (as: UserPrincipal, setup: GuideSetup, guideId = setup.guideId) =>
+  exportGuideSnapshot(as, setup.scenario.postgres, { guideId, at: AT });
 
-const everyExportOf = async (as: UserPrincipal, world: GuideWorld) => [
-  await snapshotOf(as, world.scenario),
-  await recordsOf(as, world.scenario),
-  await guideOf(as, world),
+const everyExportOf = async (as: UserPrincipal, setup: GuideSetup) => [
+  await snapshotOf(as, setup.scenario),
+  await recordsOf(as, setup.scenario),
+  await guideOf(as, setup),
 ];
 
 describe("who may export", () => {
-  it("an owning Editor is refused every export", async () => {
-    const world = await guideWorld();
-    const { scenario } = world;
-    const person = await memberAs(scenario, "Editor", world.ng.finance);
+  it("refuses every export to an owning Editor", async () => {
+    const setup = await guideSetup();
+    const { scenario } = setup;
+    const person = await memberAs(scenario, "Editor", setup.ng.finance);
     await seedingWith(db().pool, (seed) =>
       seed.conceptOwner({
         workspaceId: scenario.workspaceId,
@@ -200,7 +200,7 @@ describe("who may export", () => {
       }),
     );
 
-    const refused = await everyExportOf(person, world);
+    const refused = await everyExportOf(person, setup);
     const left = {
       events: await exportEventsBy(scenario, person),
       usage: await usageBy(scenario, person),
@@ -210,7 +210,7 @@ describe("who may export", () => {
       [scenario.workspaceId, person.userId],
     );
     const promoted = confirmed(await principalFor(db(), scenario.workspaceId, person.userId));
-    const admitted = await everyExportOf(promoted, world);
+    const admitted = await everyExportOf(promoted, setup);
 
     expect(refused).toEqual(
       Array.from({ length: 3 }, () => ({ ok: false, error: "role-forbids" })),
@@ -219,47 +219,47 @@ describe("who may export", () => {
     expect(admitted.map(({ ok }) => ok)).toEqual([true, true, true]);
   });
 
-  it("an export past its confirmation window is refused", async () => {
-    const world = await guideWorld();
-    const admin = await memberAs(world.scenario, "Admin", world.ng.finance);
+  it("refuses an export past its confirmation window", async () => {
+    const setup = await guideSetup();
+    const admin = await memberAs(setup.scenario, "Admin", setup.ng.finance);
     const stale = confirmed(admin, STALE_BY_MS);
 
-    const refused = await everyExportOf(stale, world);
+    const refused = await everyExportOf(stale, setup);
 
     expect(refused).toEqual(
       Array.from({ length: 3 }, () => ({ ok: false, error: "confirmation-too-old" })),
     );
-    expect(await exportEventsBy(world.scenario, admin)).toEqual([]);
-    expect(await usageBy(world.scenario, admin)).toEqual([]);
+    expect(await exportEventsBy(setup.scenario, admin)).toEqual([]);
+    expect(await usageBy(setup.scenario, admin)).toEqual([]);
   });
 
-  it("an Admin removed from the workspace is refused every export", async () => {
-    const world = await guideWorld();
-    const admin = await memberAs(world.scenario, "Admin", world.ng.finance);
+  it("refuses every export to an Admin removed from the workspace", async () => {
+    const setup = await guideSetup();
+    const admin = await memberAs(setup.scenario, "Admin", setup.ng.finance);
     await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
-      world.scenario.workspaceId,
+      setup.scenario.workspaceId,
       admin.userId,
     ]);
 
-    const refused = await everyExportOf(admin, world);
+    const refused = await everyExportOf(admin, setup);
 
     expect(refused).toEqual(
       Array.from({ length: 3 }, () => ({ ok: false, error: "not-a-member" })),
     );
-    expect(await exportEventsBy(world.scenario, admin)).toEqual([]);
-    expect(await usageBy(world.scenario, admin)).toEqual([]);
+    expect(await exportEventsBy(setup.scenario, admin)).toEqual([]);
+    expect(await usageBy(setup.scenario, admin)).toEqual([]);
   });
 });
 
 describe("what an export records", () => {
-  it("each export writes one audit event", async () => {
-    const world = await guideWorld();
-    const { scenario } = world;
-    const admin = await memberAs(scenario, "Admin", world.ng.finance);
+  it("writes one audit event for each export", async () => {
+    const setup = await guideSetup();
+    const { scenario } = setup;
+    const admin = await memberAs(scenario, "Admin", setup.ng.finance);
 
     const snapshot = answered(await snapshotOf(admin, scenario));
     const records = answered(await recordsOf(admin, scenario));
-    const guide = answered(await guideOf(admin, world));
+    const guide = answered(await guideOf(admin, setup));
 
     const rowsIn = (name: string) => csvLinesOf(records.zip, name).length - 1;
     expect(snapshot.head).toBe((await bundleHistory(scenario.git, scenario.workspaceId)).at(-1));
@@ -272,8 +272,8 @@ describe("what an export records", () => {
       },
       {
         action: "knowledge.guide.exported",
-        subject_id: world.guideId,
-        detail: { guideId: world.guideId, sections: guide.sections },
+        subject_id: setup.guideId,
+        detail: { guideId: setup.guideId, sections: guide.sections },
       },
       {
         action: "knowledge.records.exported",
@@ -287,17 +287,17 @@ describe("what an export records", () => {
     ]);
   });
 
-  it("a guide snapshot writes one usage row per write-up", async () => {
-    const world = await guideWorld();
-    const admin = await memberAs(world.scenario, "Admin", world.ng.finance);
+  it("writes one usage row per write-up for a guide snapshot", async () => {
+    const setup = await guideSetup();
+    const admin = await memberAs(setup.scenario, "Admin", setup.ng.finance);
 
-    answered(await snapshotOf(admin, world.scenario));
-    answered(await recordsOf(admin, world.scenario));
-    const guide = answered(await guideOf(admin, world));
+    answered(await snapshotOf(admin, setup.scenario));
+    answered(await recordsOf(admin, setup.scenario));
+    const guide = answered(await guideOf(admin, setup));
 
     expect(guide.sections).toBe(2);
-    expect(await usageBy(world.scenario, admin)).toEqual(
-      [world.overview, world.insurance]
+    expect(await usageBy(setup.scenario, admin)).toEqual(
+      [setup.overview, setup.insurance]
         .map(({ writeUpId, version }) => ({
           write_up_id: writeUpId,
           write_up_version: version,
@@ -309,11 +309,11 @@ describe("what an export records", () => {
 });
 
 describe("a guide snapshot", () => {
-  it("dates each Brief, names its trust, and is not maintained", async () => {
-    const world = await guideWorld();
-    const admin = await memberAs(world.scenario, "Admin", world.ng.finance);
+  it("dates each Brief, names its trust, marks itself unmaintained", async () => {
+    const setup = await guideSetup();
+    const admin = await memberAs(setup.scenario, "Admin", setup.ng.finance);
 
-    const guide = answered(await guideOf(admin, world));
+    const guide = answered(await guideOf(admin, setup));
 
     expect(guide.name).toBe("guide-company-2026-06-02.md");
     expect(guide.markdown).toMatch(
@@ -330,38 +330,37 @@ describe("a guide snapshot", () => {
   });
 
   it("says how many sections it leaves out", async () => {
-    const world = await guideWorld();
-    const outsider = await memberAs(world.scenario, "Admin");
-    const insider = await memberAs(world.scenario, "Admin", world.ng.finance);
+    const setup = await guideSetup();
+    const outsider = await memberAs(setup.scenario, "Admin");
+    const insider = await memberAs(setup.scenario, "Admin", setup.ng.finance);
     const leftOut = (markdown: string): number =>
       Number(
         /\n\n(\d+) sections? (?:is|are) left out, because you cannot read/u.exec(markdown)?.[1],
       );
 
-    const outside = answered(await guideOf(outsider, world)).markdown;
-    const inside = answered(await guideOf(insider, world)).markdown;
+    const outside = answered(await guideOf(outsider, setup)).markdown;
+    const inside = answered(await guideOf(insider, setup)).markdown;
 
     expect(leftOut(outside)).toBeGreaterThan(leftOut(inside));
     expect(outside).toMatch(/\n\n\d+ sections are left out, because you cannot read them/u);
   });
 
-  it("an unknown guide is not found", async () => {
-    const world = await guideWorld();
-    const admin = await memberAs(world.scenario, "Admin");
+  it("reports an unknown guide as not found", async () => {
+    const setup = await guideSetup();
+    const admin = await memberAs(setup.scenario, "Admin");
 
-    expect(await guideOf(admin, world, ulid())).toEqual({ ok: false, error: "not-found" });
-    expect(await exportEventsBy(world.scenario, admin)).toEqual([]);
+    expect(await guideOf(admin, setup, ulid())).toEqual({ ok: false, error: "not-found" });
+    expect(await exportEventsBy(setup.scenario, admin)).toEqual([]);
   });
 
-  it("takes a guide id and nothing else", () => {
+  it("accepts a guide id and nothing else", () => {
     expect(exportGuideInput.safeParse({ guideId: ulid() }).success).toBe(true);
     expect(exportGuideInput.safeParse({}).success).toBe(false);
     expect(exportGuideInput.safeParse({ guideId: ulid(), colour: "red" }).success).toBe(false);
   });
 });
 
-/** A guide about a concept, with a sub-section's Brief written and a section's left blank. */
-const subjectWorld = once(async () => {
+const conceptGuideSnapshot = once(async () => {
   const scenario = await arrange();
   const subjectIri = await shelveOne(db().pool, scenario.workspaceId, {
     path: "knowledge/company/smith-and-jones.md",
@@ -383,20 +382,20 @@ const subjectWorld = once(async () => {
 
 describe("a guide snapshot about a concept", () => {
   it("names the file after the concept, in plain words", async () => {
-    const guide = await subjectWorld();
+    const guide = await conceptGuideSnapshot();
 
     expect(guide.name).toBe("guide-smith-jones-bids-2026-2026-06-02.md");
     expect(guide.markdown).toMatch(/^# “Smith & Jones” bids \(2026\)!\n/u);
   });
 
-  it("heads a sub-section one level below its section", async () => {
-    const guide = await subjectWorld();
+  it("puts a sub-section's heading one level below its section", async () => {
+    const guide = await conceptGuideSnapshot();
 
     expect(guide.markdown).toContain("\n### 6.1 Security testing\n\n");
   });
 
   it("leaves out a section whose Brief is blank", async () => {
-    const guide = await subjectWorld();
+    const guide = await conceptGuideSnapshot();
 
     expect(guide.sections).toBe(1);
     expect(guide.markdown).not.toContain("What we offer");
@@ -404,24 +403,24 @@ describe("a guide snapshot about a concept", () => {
 });
 
 describe("an Admin outside a concept's audience", () => {
-  it("exports nothing of a concept outside their audience", async () => {
-    const world = await guideWorld();
-    const outsider = await memberAs(world.scenario, "Admin");
-    const insider = await memberAs(world.scenario, "Admin", world.ng.finance);
+  it("exports nothing of a concept outside the Admin's audience", async () => {
+    const setup = await guideSetup();
+    const outsider = await memberAs(setup.scenario, "Admin");
+    const insider = await memberAs(setup.scenario, "Admin", setup.ng.finance);
     const withheld = [
       `knowledge/${NORTHGATE.collection}/professional-indemnity-policy.md`,
-      world.ng.iri("professionalIndemnity"),
+      setup.ng.iri("professionalIndemnity"),
       "Professional indemnity policy",
-      world.insurance.writeUpId,
+      setup.insurance.writeUpId,
       COVER,
     ];
     const carriedBy = async (as: UserPrincipal): Promise<string> => {
       const zips = [
-        answered(await snapshotOf(as, world.scenario)),
-        answered(await recordsOf(as, world.scenario)),
+        answered(await snapshotOf(as, setup.scenario)),
+        answered(await recordsOf(as, setup.scenario)),
       ];
       const files = zips.flatMap(({ zip }) => [...zipEntries(zip)]);
-      const { markdown } = answered(await guideOf(as, world));
+      const { markdown } = answered(await guideOf(as, setup));
       return [...files.flatMap(([name, bytes]) => [name, bytes.toString("utf8")]), markdown].join(
         "\n",
       );
@@ -436,19 +435,19 @@ describe("an Admin outside a concept's audience", () => {
 });
 
 describe("the knowledge base snapshot", () => {
-  it("the snapshot holds every concept file and no skeleton", async () => {
-    const world = await guideWorld();
-    const { git, workspaceId } = world.scenario;
-    const admin = await memberAs(world.scenario, "Admin", world.ng.finance);
+  it("holds every concept file and no skeleton", async () => {
+    const setup = await guideSetup();
+    const { git, workspaceId } = setup.scenario;
+    const admin = await memberAs(setup.scenario, "Admin", setup.ng.finance);
 
-    const snapshot = answered(await snapshotOf(admin, world.scenario));
+    const snapshot = answered(await snapshotOf(admin, setup.scenario));
 
     const entries = zipEntries(snapshot.zip);
     const tree = (await commitFacts(git, workspaceId, snapshot.head)).files;
     const concepts = [...TYPED, ...IMPORTED].map(
       ({ slug }) => `knowledge/${NORTHGATE.collection}/${slug}.md`,
     );
-    expect(tree).toContain(`guides/${world.guideId}.yaml`);
+    expect(tree).toContain(`guides/${setup.guideId}.yaml`);
     expect(snapshot.name).toBe("knowledge-base-2026-06-02.zip");
     expect([...entries.keys()]).toEqual([BUNDLE_MANIFEST_PATH, ...concepts].toSorted());
     expect(entries.get(BUNDLE_MANIFEST_PATH)?.toString("utf8")).toBe(
@@ -469,13 +468,13 @@ const ORPHAN = "knowledge/policies/orphan.md";
 
 const FORMULA_TITLE = '=HYPERLINK("https://example.invalid")';
 
-type ShelfWorld = {
+type KnowledgeBaseSetup = {
   readonly scenario: Scenario;
   readonly bundle: BundleIndexed;
   readonly finance: string;
 };
 
-const SHELF: ReadonlyMap<string, string> = new Map([
+const KNOWLEDGE_BASE_FILES: ReadonlyMap<string, string> = new Map([
   [BUNDLE_MANIFEST_PATH, "owner: Acme\n"],
   [EXPENSES, "Claim within thirty days.\n"],
   [VETTING, "Every hire is vetted.\n"],
@@ -485,10 +484,10 @@ const SHELF: ReadonlyMap<string, string> = new Map([
   ["guides/01K4GUIDE0000000000000000.yaml", "sections: []\n"],
 ]);
 
-const shelfOf = async (): Promise<ShelfWorld> => {
+const knowledgeBaseSetup = async (): Promise<KnowledgeBaseSetup> => {
   const scenario = await arrange();
   const finance = await groupNamed(db(), scenario, "finance", [scenario.editor]);
-  const bundle = await bundleIndexed(db(), scenario, SHELF, [
+  const bundle = await bundleIndexed(db(), scenario, KNOWLEDGE_BASE_FILES, [
     { path: EXPENSES, title: "Expenses", sensitivity: "Internal", audienceGroups: null },
     { path: VETTING, title: "Vetting", sensitivity: "Restricted", audienceGroups: null },
     { path: SALARIES, title: "Salary bands", sensitivity: "Internal", audienceGroups: [finance] },
@@ -509,11 +508,11 @@ const shelfOf = async (): Promise<ShelfWorld> => {
   return { scenario, bundle, finance };
 };
 
-const shelfWorld = once(shelfOf);
+const sharedKnowledgeBaseSetup = once(knowledgeBaseSetup);
 
 describe("a knowledge base an Admin partly reads", () => {
-  it("a file with no index row is left out", async () => {
-    const { scenario } = await shelfWorld();
+  it("leaves out a file that has no index row", async () => {
+    const { scenario } = await sharedKnowledgeBaseSetup();
     const admin = await memberAs(scenario, "Admin");
 
     const snapshot = answered(await snapshotOf(admin, scenario));
@@ -526,8 +525,8 @@ describe("a knowledge base an Admin partly reads", () => {
     ]);
   });
 
-  it("a Restricted concept is exported for an Admin", async () => {
-    const { scenario, bundle } = await shelfWorld();
+  it("exports a Restricted concept for an Admin", async () => {
+    const { scenario, bundle } = await sharedKnowledgeBaseSetup();
     const admin = await memberAs(scenario, "Admin");
 
     const snapshot = answered(await snapshotOf(admin, scenario));
@@ -539,8 +538,8 @@ describe("a knowledge base an Admin partly reads", () => {
     ).toHaveLength(1);
   });
 
-  it("the records name each owner, verification and use", async () => {
-    const { scenario, bundle } = await shelfWorld();
+  it("names each owner, verification and use in the records", async () => {
+    const { scenario, bundle } = await sharedKnowledgeBaseSetup();
     const admin = await memberAs(scenario, "Admin");
     const [editor, viewer] = [scenario.editor.userId, scenario.viewer.userId];
     const [editorName, viewerName] = [await nameOf(editor), await nameOf(viewer)];
@@ -580,8 +579,8 @@ describe("a knowledge base an Admin partly reads", () => {
     ]);
   });
 
-  it("a CSV cell starting = is made inert", async () => {
-    const { scenario, bundle } = await shelfWorld();
+  it("neutralises a CSV cell that starts with =", async () => {
+    const { scenario, bundle } = await sharedKnowledgeBaseSetup();
     const admin = await memberAs(scenario, "Admin");
 
     const records = answered(await recordsOf(admin, scenario));
@@ -595,8 +594,8 @@ describe("a knowledge base an Admin partly reads", () => {
     ).toBe(true);
   });
 
-  it("a knowledge base past its byte cap is refused", async () => {
-    const { scenario } = await shelfWorld();
+  it("refuses a knowledge base over its byte cap", async () => {
+    const { scenario } = await sharedKnowledgeBaseSetup();
     const admin = await memberAs(scenario, "Admin");
 
     const refused = await exportBundleSnapshot(
@@ -611,7 +610,7 @@ describe("a knowledge base an Admin partly reads", () => {
 });
 
 describe("a knowledge base whose head cannot be exported", () => {
-  it("a head the store never recorded is refused", async () => {
+  it("refuses a head the store never recorded", async () => {
     const scenario = await arrange();
     await bundleIndexed(db(), scenario, new Map([[EXPENSES, "Claim.\n"]]), [
       { path: EXPENSES, title: "Expenses", sensitivity: "Internal", audienceGroups: null },
@@ -628,7 +627,7 @@ describe("a knowledge base whose head cannot be exported", () => {
     expect(await exportEventsBy(scenario, admin)).toEqual([]);
   });
 
-  it("a knowledge base with no commit is not found", async () => {
+  it("reports a knowledge base with no commit as not found", async () => {
     const scenario = await arrange();
     const admin = await memberAs(scenario, "Admin");
 
@@ -639,23 +638,28 @@ describe("a knowledge base whose head cannot be exported", () => {
 const FINANCE_ONLY = "FINANCE ONLY: the board approved a 40% cut.\n";
 
 const landedAfter = async (
-  { scenario, bundle }: ShelfWorld,
+  { scenario, bundle }: KnowledgeBaseSetup,
   changed: ReadonlyMap<string, string>,
 ) => {
   const { git, workspaceId } = scenario;
-  const sha = await treeCommitted(git, workspaceId, new Map([...SHELF, ...changed]), "Land");
+  const sha = await treeCommitted(
+    git,
+    workspaceId,
+    new Map([...KNOWLEDGE_BASE_FILES, ...changed]),
+    "Land",
+  );
   await seedingWith(db().pool, (seed) =>
     seed.bundleCommit({ workspaceId, sha, parentSha: bundle.head }),
   );
 };
 
-const carried = (zip: Uint8Array): string =>
+const zipText = (zip: Uint8Array): string =>
   [...zipEntries(zip)].map(([name, bytes]) => `${name}\n${bytes.toString("utf8")}`).join("\n");
 
-describe("an export while a change lands", () => {
-  it("a narrowing landing as the export starts stays out", async () => {
-    const world = await shelfOf();
-    const { scenario, bundle, finance } = world;
+describe("an export while a change is landing", () => {
+  it("leaves out a narrowing that lands as the export starts", async () => {
+    const setup = await knowledgeBaseSetup();
+    const { scenario, bundle, finance } = setup;
     const admin = await memberAs(scenario, "Admin");
 
     const snapshot = await whileGitPausesAt(
@@ -667,18 +671,18 @@ describe("an export while a change lands", () => {
             WHERE workspace_id = $1 AND iri = $2`,
           [scenario.workspaceId, bundle.iriOf(EXPENSES), finance],
         );
-        await landedAfter(world, new Map([[EXPENSES, FINANCE_ONLY]]));
+        await landedAfter(setup, new Map([[EXPENSES, FINANCE_ONLY]]));
       },
     );
 
     const { zip } = answered(snapshot);
     expect([...zipEntries(zip).keys()]).toEqual([BUNDLE_MANIFEST_PATH, FORMULA, VETTING]);
-    expect(carried(zip)).not.toContain(FINANCE_ONLY);
+    expect(zipText(zip)).not.toContain(FINANCE_ONLY);
   });
 
-  it("a commit landing after the head is read refuses", async () => {
-    const world = await shelfOf();
-    const { scenario, bundle } = world;
+  it("refuses when a commit lands after the head is read", async () => {
+    const setup = await knowledgeBaseSetup();
+    const { scenario, bundle } = setup;
     const admin = await memberAs(scenario, "Admin");
     const movedTo = (from: string, to: string) =>
       db().pool.query("UPDATE concept_index SET path = $3 WHERE workspace_id = $1 AND iri = $2", [
@@ -695,7 +699,7 @@ describe("an export while a change lands", () => {
         await movedTo(EXPENSES, SALARIES);
         await movedTo(SALARIES, EXPENSES);
         await landedAfter(
-          world,
+          setup,
           new Map([
             [EXPENSES, "Pay bands.\n"],
             [SALARIES, "Claim within thirty days.\n"],
@@ -706,12 +710,12 @@ describe("an export while a change lands", () => {
 
     expect(snapshot).toEqual({ ok: false, error: "unrecorded-head" });
     expect(await exportEventsBy(scenario, admin)).toEqual([]);
-    expect(carried(answered(await snapshotOf(admin, scenario)).zip)).not.toContain("Pay bands.");
+    expect(zipText(answered(await snapshotOf(admin, scenario)).zip)).not.toContain("Pay bands.");
   });
 });
 
-describe("records past their row cap", () => {
-  it("keeps a family's newest 50,000 rows and says so", async () => {
+describe("records over their row cap", () => {
+  it("keeps a record family's newest 50,000 rows and says so", async () => {
     const scenario = await arrange();
     const iri = await shelveOne(db().pool, scenario.workspaceId, {
       path: "knowledge/policies/expenses.md",
@@ -803,8 +807,8 @@ const describedBy = (zip: Uint8Array): Promise<readonly Record<string, string>[]
       }),
   );
 
-describe("the export's zip", () => {
-  it("the zip round trips through unzip", async () => {
+describe("the export's zip file", () => {
+  it("round-trips through unzip", async () => {
     const zip = answered(zipOf(ENTRIES, AT));
 
     expect(await unzipped(zip)).toEqual({
@@ -819,7 +823,7 @@ describe("the export's zip", () => {
     expect([...zipEntries(zip)]).toEqual([["knowledge/café/naïve.md", Buffer.from(NOT_UTF8)]]);
   });
 
-  it("one set of files always writes the same bytes", () => {
+  it("writes the same bytes for the same files every time", () => {
     expect(zipOf(ENTRIES.toReversed(), AT)).toEqual(zipOf(ENTRIES, AT));
   });
 
@@ -833,7 +837,7 @@ describe("the export's zip", () => {
     expect(zipEntries(answered(zipOf(entries.slice(1), AT))).size).toBe(65_535);
   });
 
-  it("refuses rather than pass its byte cap", () => {
+  it("refuses to exceed its byte cap", () => {
     const zip = answered(zipOf([{ path: "binary.bin", bytes: NOT_UTF8 }], AT));
 
     expect(zipOf([{ path: "binary.bin", bytes: NOT_UTF8 }], AT, zip.length - 1)).toEqual({
@@ -846,7 +850,7 @@ describe("the export's zip", () => {
     });
   });
 
-  it("dates each entry and compresses only what shrinks", async () => {
+  it("dates each entry and compresses only what gets smaller", async () => {
     const zip = answered(zipOf(ENTRIES, AT));
 
     const dated = { madeBy: "2.0", needs: "2.0", modified: "2026 Jun 1 23:30:00" };
@@ -858,7 +862,7 @@ describe("the export's zip", () => {
     ]);
   });
 
-  it("marks names UTF-8 and counts entries where strict readers look", () => {
+  it("sets the UTF-8 flag and entry counts strict readers check", () => {
     const zip = Buffer.from(answered(zipOf(ENTRIES.slice(0, 2), AT)));
     const central = zip.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
     const end = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
@@ -885,7 +889,7 @@ describe("the export's zip", () => {
     expect(zipOf(text(1_000), AT, 1_000)).toMatchObject({ ok: true });
   });
 
-  it("refuses once its files together pass the cap", () => {
+  it("refuses once its files together exceed the cap", () => {
     const noise = (name: string) => ({ path: name, bytes: randomBytes(400) });
 
     expect(zipOf([noise("one.bin")], AT, 600)).toMatchObject({ ok: true });

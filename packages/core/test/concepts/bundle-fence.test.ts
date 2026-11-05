@@ -56,13 +56,13 @@ const waitingOnTheFence = async (): Promise<boolean> =>
 
 const STILL_WAITING = "still waiting";
 
-const PROMPTLY_MS = 2_000;
+const WAIT_MS = 2_000;
 
-const promptly = <T>(answer: Promise<T>): Promise<T | typeof STILL_WAITING> =>
+const orStillWaiting = <T>(answer: Promise<T>): Promise<T | typeof STILL_WAITING> =>
   Promise.race([
     answer,
     new Promise<typeof STILL_WAITING>((resolve) =>
-      setTimeout(() => resolve(STILL_WAITING), PROMPTLY_MS),
+      setTimeout(() => resolve(STILL_WAITING), WAIT_MS),
     ),
   ]);
 
@@ -93,7 +93,7 @@ const writerParkedBehindARewrite = async (scenario: Scenario) => {
 const reconciling = (scenario: Scenario) =>
   reconcile(RECONCILER, doorsOf(scenario), { workspaceId: scenario.workspaceId });
 
-describe("a bundle another process is rewriting", () => {
+describe("a bundle that another process is rewriting", () => {
   it("holds a concept write until the rewrite ends", async () => {
     const scenario = await arrange();
     const { writing, release } = await writerParkedBehindARewrite(scenario);
@@ -114,7 +114,7 @@ describe("a bundle another process is rewriting", () => {
     expect(await writing).toMatchObject({ ok: true, value: { written: true } });
   });
 
-  it("leaves a writer waiting on the fence holding no row", async () => {
+  it("leaves the member row unlocked while a write waits", async () => {
     const scenario = await arrange();
     const { writing, release } = await writerParkedBehindARewrite(scenario);
 
@@ -125,11 +125,11 @@ describe("a bundle another process is rewriting", () => {
     expect(await writing).toMatchObject({ ok: true });
   });
 
-  it("skips a reconciler tick queued behind a parked writer", async () => {
+  it("answers `held` to a reconciler run behind a waiting write", async () => {
     const scenario = await arrange();
     const { writing, release } = await writerParkedBehindARewrite(scenario);
 
-    const answered = await promptly(reconciling(scenario));
+    const answered = await orStillWaiting(reconciling(scenario));
     await release();
     await writing;
 
@@ -137,19 +137,19 @@ describe("a bundle another process is rewriting", () => {
   });
 });
 
-describe("the reconciler beside a write elsewhere", () => {
-  it("shares the bundle with a write under way", async () => {
+describe("the reconciler while another process writes to the bundle", () => {
+  it("runs without waiting for the other write", async () => {
     const scenario = await arrange();
     const writing = await writingElsewhere(db().pool, scenario.workspaceId);
 
-    const answered = await promptly(reconciling(scenario));
+    const answered = await orStillWaiting(reconciling(scenario));
     await writing.release();
 
     expect(answered).toMatchObject({ ok: true });
   });
 });
 
-describe("the fence's slots", () => {
+describe("the fence's holder slots in one pool", () => {
   const aSmallPool = () => new pg.Pool({ ...db().pool.options, max: FENCE_HOLDERS_PER_POOL + 1 });
 
   it("frees the lock and the slot when the work throws", async () => {
@@ -173,7 +173,7 @@ describe("the fence's slots", () => {
     expect(alone).toEqual({ ok: true, value: 2 });
   });
 
-  it("answers held at once when every slot is taken", async () => {
+  it("answers `held` at once when every slot is taken", async () => {
     const small = aSmallPool();
     const door = openPostgres(small);
     let open = (): void => undefined;
@@ -184,7 +184,7 @@ describe("the fence's slots", () => {
       withWorkspaceFence(bootstrap, door, ulid(), "shared", () => gate),
     );
 
-    const answered = await promptly(
+    const answered = await orStillWaiting(
       tryWorkspaceFence(bootstrap, door, ulid(), "shared", async () => 1),
     );
     open();
@@ -215,7 +215,7 @@ describe("the fence's slots", () => {
     return { most, finished };
   };
 
-  it("never holds more than the cap, and every holder finishes", async () => {
+  it("never admits more holders than the cap, and all finish", async () => {
     const runs = [await holdersAtOnce(), await holdersAtOnce(), await holdersAtOnce()];
 
     for (const run of runs) {

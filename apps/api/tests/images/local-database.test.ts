@@ -80,22 +80,22 @@ afterAll(() => {
 });
 
 describe("the local database", () => {
-  it("starts on its loopback port, saying how to stop it", () => {
+  it("starts on a loopback port and prints how to stop", () => {
     expect(outcomeOf(upFirst)).toEqual("ran");
     expect(upFirst.stdout).toContain(`127.0.0.1:${String(port)}`);
     expect(upFirst.stdout).toContain("deploy/local-database.sh down");
     expect(upFirst.stdout).toContain("--wipe");
   });
 
-  it("names the synthetic workspace's id and concepts as it seeds", () => {
+  it("prints the synthetic workspace's id and concepts while seeding", () => {
     expect(upFirst.stdout).toContain(SEEDED_LOCALLY);
   });
 
-  it("runs the one pinned image, by digest", () => {
+  it("runs only the pinned Postgres image, by digest", () => {
     expect(imagesOf(project)).toEqual([POSTGRES_IMAGE]);
   });
 
-  it("applies every migration and stamps the contract as `migrate` does", async () => {
+  it("applies every migration and stamps the contract like `migrate`", async () => {
     const owner = signedInAs("better_answers", "better_answers");
     try {
       const applied = await owner.query<{ migrations: number }>(
@@ -109,7 +109,7 @@ describe("the local database", () => {
     }
   });
 
-  describe("read through the browsing role, as a GUI profile reads", () => {
+  describe("read as browse_ro, the role a GUI connects with", () => {
     let browse: pg.Pool;
 
     beforeAll(() => {
@@ -120,7 +120,7 @@ describe("the local database", () => {
       await browse.end();
     });
 
-    it("holds one source in the synthetic workspace, indexed and unpublished", async () => {
+    it("has one indexed, unpublished source in the synthetic workspace", async () => {
       const connectedSources = await browse.query(
         `SELECT id, connector, state, published_at FROM connected_source
           WHERE workspace_id = $1`,
@@ -136,7 +136,7 @@ describe("the local database", () => {
       ]);
     });
 
-    it("holds one converted markdown document, naming no landed copy", async () => {
+    it("has one converted markdown document with no normalised copy", async () => {
       const documents = await browse.query(
         `SELECT id, connected_source_id, media_type, outcome, normalised_key, content_hash
            FROM source_document WHERE workspace_id = $1`,
@@ -154,7 +154,7 @@ describe("the local database", () => {
       ]);
     });
 
-    it("holds the passages the document-passage agreement's redacted case cuts", async () => {
+    it("has the passages from the redacted document-passage fixture", async () => {
       const passages = await browse.query(
         `SELECT id, connected_source_id, source_document_id, ordinal, char_start, char_end, locator, content
            FROM "index".passage WHERE workspace_id = $1 ORDER BY ordinal`,
@@ -169,7 +169,7 @@ describe("the local database", () => {
       );
     });
 
-    it("holds the redaction's placeholder and no sort code anywhere", async () => {
+    it("has the redaction placeholder and no sort code anywhere", async () => {
       const held = await browse.query<{ text: string }>(
         `SELECT content AS text FROM "index".passage WHERE workspace_id = $1
          UNION ALL
@@ -182,7 +182,7 @@ describe("the local database", () => {
       expect(text).not.toMatch(/\b\d{2}[- ]?\d{2}[- ]?\d{2}\b/);
     });
 
-    it("holds three concepts, the Restricted one citing the document", async () => {
+    it("has three concepts and the Restricted one cites the document", async () => {
       const concepts = await browse.query(
         `SELECT iri, title, kind, sensitivity, audience, status FROM concept_index
           WHERE workspace_id = $1 ORDER BY path`,
@@ -215,7 +215,7 @@ describe("the local database", () => {
       ]);
     });
 
-    it("matches a concept by a word of its body", async () => {
+    it("finds a concept by full-text search on a body word", async () => {
       const matched = await browse.query(
         "SELECT title FROM concept_index WHERE workspace_id = $1 AND search @@ to_tsquery('english', 'receipt')",
         [SYNTHETIC_WORKSPACE],
@@ -224,10 +224,10 @@ describe("the local database", () => {
     });
   });
 
-  describe("the synthetic seed, run where the local database runs it", () => {
-    it("seeds from the drill's call without adding a second copy", () => {
+  describe("deploy/seed-synthetic.sh run inside the local database container", () => {
+    it("reports the fixture present and adds no second copy", () => {
       const [container] = containersOf(project);
-      assert(container !== undefined, "the local database runs a container");
+      assert(container !== undefined, "the local database runs no container");
       const seeded = spawnSync(
         "docker",
         [
@@ -247,7 +247,7 @@ describe("the local database", () => {
     });
   });
 
-  it("keeps its data across a restart, seeding no second copy", async () => {
+  it("keeps its data across a restart without seeding again", async () => {
     const owner = signedInAs("better_answers", "better_answers");
     let marker: string;
     const client = await owner.connect();
@@ -286,13 +286,13 @@ describe("the local database", () => {
     }
   }, 180_000);
 
-  it("refuses a port already in use, and starts nothing", async () => {
+  it("refuses a port already in use and starts no container", async () => {
     expect(
       await upOnATakenPort((taken, name) => localDatabase(taken, ["up"], name), `${project}-taken`),
     ).toEqual({ status: 1, containers: [], namesThePort: true });
   });
 
-  it("refuses a fixture left under another id, saying to wipe", async () => {
+  it("refuses a fixture under another id and says to wipe", async () => {
     const owner = signedInAs("better_answers", "better_answers");
     const client = await owner.connect();
     let earlier: string;
@@ -315,7 +315,7 @@ describe("the local database", () => {
     });
   }, 180_000);
 
-  it("drops its data only when told to wipe it", () => {
+  it("deletes its data volume only on down --wipe", () => {
     expect(volumesOf(project)).toHaveLength(1);
     const wiped = localDatabase(port, ["down", "--wipe"]);
     expect({

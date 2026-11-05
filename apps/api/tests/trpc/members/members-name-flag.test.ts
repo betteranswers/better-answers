@@ -44,7 +44,7 @@ const FLAG_RAISED = "people.name_flag.raised";
 
 const RUDE_NAME = "Rude Name";
 
-const aWorkspaceWithAFlaggable = async (name = "Calder Joinery") => {
+const aWorkspaceWithAMemberToFlag = async (name = "Calder Joinery") => {
   const workspace = await app.provision({ name });
   const person = await app.person(undefined, RUDE_NAME);
   await app.addMember(workspace.workspaceId, person.id, "Viewer");
@@ -68,7 +68,7 @@ const raisedFor = async (personId: string) =>
     )
   ).rows;
 
-const toldTheOperatorOf = (personId: string) =>
+const operatorEmailsAbout = (personId: string) =>
   delivered.filter((message) => message.text.includes(personId));
 
 const sentToTheOperator = (personId: string) => ({ personId, sentToTheOperator: true });
@@ -76,7 +76,7 @@ const sentToTheOperator = (personId: string) => ({ personId, sentToTheOperator: 
 const whatLanded = async (workspaceId: string, personId: string) => ({
   flagged: await flaggedIn(workspaceId),
   raised: await raisedFor(personId),
-  told: toldTheOperatorOf(personId),
+  told: operatorEmailsAbout(personId),
 });
 
 const NOTHING_LANDED = { flagged: [], raised: [], told: [] };
@@ -88,8 +88,8 @@ const signedInAs = async (workspaceId: string, role: "Editor" | "Viewer") => {
 };
 
 describe("flagging a display name over tRPC", () => {
-  it("answers sent to the operator, flagging on both audit logs", async () => {
-    const { workspace, person, api } = await aWorkspaceWithAFlaggable();
+  it("answers sentToTheOperator and records the flag in both audit logs", async () => {
+    const { workspace, person, api } = await aWorkspaceWithAMemberToFlag();
 
     const answered = await api.members.flagDisplayName.mutate({ personId: person.id });
 
@@ -106,12 +106,12 @@ describe("flagging a display name over tRPC", () => {
     ]);
   });
 
-  it("emails each marked person the workspace, person id and name", async () => {
-    const { workspace, person, api } = await aWorkspaceWithAFlaggable("Hollins Freight");
+  it("emails each operator the workspace, person id, and display name", async () => {
+    const { workspace, person, api } = await aWorkspaceWithAMemberToFlag("Hollins Freight");
 
     await api.members.flagDisplayName.mutate({ personId: person.id });
 
-    const told = toldTheOperatorOf(person.id).toSorted((a, b) => a.to.localeCompare(b.to));
+    const told = operatorEmailsAbout(person.id).toSorted((a, b) => a.to.localeCompare(b.to));
     expect(told).toEqual(
       operators.map((to) => ({
         to,
@@ -134,8 +134,8 @@ describe("flagging a display name over tRPC", () => {
     ).toEqual([]);
   });
 
-  it("answers a second flag alike, writing and emailing nothing new", async () => {
-    const { workspace, person, api } = await aWorkspaceWithAFlaggable();
+  it("answers a repeat flag alike, adding no rows or emails", async () => {
+    const { workspace, person, api } = await aWorkspaceWithAMemberToFlag();
     await api.members.flagDisplayName.mutate({ personId: person.id });
 
     const again = await api.members.flagDisplayName.mutate({ personId: person.id });
@@ -143,11 +143,11 @@ describe("flagging a display name over tRPC", () => {
     expect(again).toEqual(sentToTheOperator(person.id));
     expect(await flaggedIn(workspace.workspaceId)).toHaveLength(1);
     expect(await raisedFor(person.id)).toHaveLength(1);
-    expect(toldTheOperatorOf(person.id)).toHaveLength(operators.length);
+    expect(operatorEmailsAbout(person.id)).toHaveLength(operators.length);
   });
 
-  it("answers alike wherever else the person belongs or is flagged", async () => {
-    const { workspace, api } = await aWorkspaceWithAFlaggable();
+  it("answers the same whatever the person's other workspaces or flags", async () => {
+    const { workspace, api } = await aWorkspaceWithAMemberToFlag();
     const elsewhere = await app.provision();
     const { api: elsewhereApi } = await webSignedIn(app, elsewhere.admin.email);
     const onlyHere = await app.person(undefined, "Only Here");
@@ -175,17 +175,17 @@ describe("flagging a display name over tRPC", () => {
   });
 });
 
-describe("what no Admin action does", () => {
-  it("leaves the flagged display name as the person gave it", async () => {
-    const { person, api } = await aWorkspaceWithAFlaggable();
+describe("an Admin cannot change another person's display name", () => {
+  it("flagging leaves the display name as the person set it", async () => {
+    const { person, api } = await aWorkspaceWithAMemberToFlag();
 
     await api.members.flagDisplayName.mutate({ personId: person.id });
 
     expect(await displayNameHeldBy(app, person.id)).toBe(RUDE_NAME);
   });
 
-  it("renames only the calling Admin, whoever the display-name action names", async () => {
-    const { workspace, person, client } = await aWorkspaceWithAFlaggable();
+  it("setDisplayName renames the calling Admin, ignoring a personId", async () => {
+    const { workspace, person, client } = await aWorkspaceWithAMemberToFlag();
 
     const given = await client.json("/trpc/person.setDisplayName", {
       displayName: "Renamed By An Admin",
@@ -200,9 +200,9 @@ describe("what no Admin action does", () => {
 
 describe("who may flag a display name", () => {
   it.each(["Editor", "Viewer"] as const)(
-    "refuses a member at %s, role-forbids, recording and emailing nothing",
+    "refuses %s members with role-forbids, recording and emailing nothing",
     async (role) => {
-      const { workspace, person } = await aWorkspaceWithAFlaggable();
+      const { workspace, person } = await aWorkspaceWithAMemberToFlag();
       const api = await signedInAs(workspace.workspaceId, role);
 
       const refused = await refusalOfCall(
@@ -216,8 +216,8 @@ describe("who may flag a display name", () => {
     },
   );
 
-  it("refuses an Admin of another workspace pointed at this one", async () => {
-    const { workspace, person } = await aWorkspaceWithAFlaggable();
+  it("refuses another workspace's Admin whose session points at this one", async () => {
+    const { workspace, person } = await aWorkspaceWithAMemberToFlag();
     const api = await anAdminOfElsewherePointedAt(app, workspace.workspaceId);
 
     const refused = await refusalOfCall(
@@ -228,12 +228,12 @@ describe("who may flag a display name", () => {
       data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
     });
     expect(await raisedFor(person.id)).toEqual([]);
-    expect(toldTheOperatorOf(person.id)).toEqual([]);
+    expect(operatorEmailsAbout(person.id)).toEqual([]);
   });
 
-  it("refuses a member of another workspace as no member here", async () => {
+  it("refuses to flag another workspace's member with no-such-member", async () => {
     const mine = await app.provision();
-    const { person: theirs } = await aWorkspaceWithAFlaggable();
+    const { person: theirs } = await aWorkspaceWithAMemberToFlag();
     const { api } = await webSignedIn(app, mine.admin.email);
 
     const refused = await refusalOfCall(
@@ -244,13 +244,13 @@ describe("who may flag a display name", () => {
       data: { httpStatus: 404, refusal: { word: "no-such-member", class: "absent" } },
     });
     expect(await raisedFor(theirs.id)).toEqual([]);
-    expect(toldTheOperatorOf(theirs.id)).toEqual([]);
+    expect(operatorEmailsAbout(theirs.id)).toEqual([]);
   });
 });
 
 describe("the operator's email", () => {
-  it("goes only after the commit, never for a failed flag", async () => {
-    const { workspace, person, api } = await aWorkspaceWithAFlaggable();
+  it("is not sent when the flag fails to commit", async () => {
+    const { workspace, person, api } = await aWorkspaceWithAMemberToFlag();
 
     const failed = await whileCommitsAreRefused(app, "identity_audit_event", () =>
       refusalOfCall(api.members.flagDisplayName.mutate({ personId: person.id })),
@@ -260,8 +260,8 @@ describe("the operator's email", () => {
     expect(await whatLanded(workspace.workspaceId, person.id)).toEqual(NOTHING_LANDED);
   });
 
-  it("fails to one operator yet reaches the other, logging it", async () => {
-    const { person, api } = await aWorkspaceWithAFlaggable();
+  it("logs one operator's failed email and still emails the other", async () => {
+    const { person, api } = await aWorkspaceWithAMemberToFlag();
     const [refused, reached] = operators;
     relayRefuses = refused;
     const answered = await api.members.flagDisplayName
@@ -272,7 +272,7 @@ describe("the operator's email", () => {
 
     expect(answered).toEqual(sentToTheOperator(person.id));
     expect(await raisedFor(person.id)).toHaveLength(1);
-    expect(toldTheOperatorOf(person.id).map((message) => message.to)).toEqual([reached]);
+    expect(operatorEmailsAbout(person.id).map((message) => message.to)).toEqual([reached]);
     expect(app.logs.filter((line) => line["person_id"] === person.id)).toEqual([
       expect.objectContaining({
         level: 40,

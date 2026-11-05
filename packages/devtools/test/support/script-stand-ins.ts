@@ -80,7 +80,8 @@ export const listening = async (
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
     const address = server.address();
-    if (address === null || typeof address === "string") throw new Error("no port to listen on");
+    if (address === null || typeof address === "string")
+      throw new Error("the stand-in server has no TCP port");
     await work(`http://127.0.0.1:${String(address.port)}`, heard);
   } finally {
     await new Promise((resolve) => server.close(resolve));

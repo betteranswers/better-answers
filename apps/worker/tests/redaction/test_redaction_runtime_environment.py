@@ -10,7 +10,7 @@ from support.import_watch import held_when_imported
 TELEMETRY = "ORT_DISABLE_TELEMETRY"
 
 
-def held_when_onnxruntime_was_imported(
+def telemetry_setting_when_onnxruntime_is_imported(
     ran: str, box: dict[str, str]
 ) -> list[dict[str, str]]:
     return held_when_imported("onnxruntime", (TELEMETRY,), ran, box)
@@ -37,16 +37,18 @@ def held_when_onnxruntime_was_imported(
 def test_onnxruntime_is_imported_with_its_telemetry_switched_off(
     why: str, ran: str
 ) -> None:
-    assert held_when_onnxruntime_was_imported(ran, {}) == [{TELEMETRY: "1"}], why
+    assert telemetry_setting_when_onnxruntime_is_imported(ran, {}) == [
+        {TELEMETRY: "1"}
+    ], why
 
 
-def test_a_box_that_switches_the_telemetry_on_is_overruled() -> None:
-    assert held_when_onnxruntime_was_imported(
+def test_onnxruntime_telemetry_stays_off_when_the_environment_enables_it() -> None:
+    assert telemetry_setting_when_onnxruntime_is_imported(
         "import better_answers_worker.redaction.detector", {TELEMETRY: "0"}
     ) == [{TELEMETRY: "1"}]
 
 
-THE_PACKAGE_ALONE = f"""
+IMPORT_ONLY_THE_ROOT_PACKAGE = f"""
 import json
 import os
 import sys
@@ -57,9 +59,9 @@ print(json.dumps([os.environ.get({TELEMETRY!r}), "onnxruntime" in sys.modules]))
 """
 
 
-def test_the_root_alone_switches_telemetry_off_and_loads_no_onnxruntime() -> None:
+def test_importing_the_root_package_disables_telemetry_and_skips_onnxruntime() -> None:
     finished = subprocess.run(
-        [sys.executable, "-c", THE_PACKAGE_ALONE],
+        [sys.executable, "-c", IMPORT_ONLY_THE_ROOT_PACKAGE],
         env={name: value for name, value in os.environ.items() if name != TELEMETRY},
         capture_output=True,
         text=True,

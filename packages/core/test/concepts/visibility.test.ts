@@ -249,8 +249,8 @@ const platformCascade = (
     ),
   );
 
-describe("what a governed write derives from its cited connected sources", () => {
-  it("lands the most restrictive sensitivity on both row and map", async () => {
+describe("what a governed write takes from its cited connected sources", () => {
+  it("gives the row and the map the most restrictive sensitivity", async () => {
     const scenario = await arrange();
     const { written } = await conceptOnBoth(db(), scenario);
 
@@ -259,7 +259,7 @@ describe("what a governed write derives from its cited connected sources", () =>
     );
   });
 
-  it("intersects their audiences, with everyone as the identity", async () => {
+  it("intersects their audiences, treating everyone as no limit", async () => {
     const scenario = await arrange();
     const [hr, sales, board] = await Promise.all([
       groupNamed(db(), scenario, "HR", []),
@@ -295,7 +295,7 @@ describe("what a governed write derives from its cited connected sources", () =>
     });
   });
 
-  it("forces Restricted, not an empty list, when audiences share nobody", async () => {
+  it("sets Restricted, not an empty list, when audiences share nobody", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", [scenario.viewer]);
     const sales = await groupNamed(db(), scenario, "Sales", []);
@@ -318,7 +318,7 @@ describe("what a governed write derives from its cited connected sources", () =>
     expect(seen.value.found).toBe(false);
   });
 
-  it("floors a Person at Restricted whatever its evidence says", async () => {
+  it("keeps a Person concept at Restricted whatever its evidence says", async () => {
     const scenario = await arrange();
     const website = await connectedSourceHolding(db(), scenario.workspaceId, {
       sensitivity: "Public",
@@ -340,7 +340,7 @@ describe("what a governed write derives from its cited connected sources", () =>
     });
   });
 
-  it("lands a kind named __proto__ at the fallback sensitivity", async () => {
+  it("gives a kind named __proto__ the fallback sensitivity", async () => {
     const scenario = await arrange();
 
     const written = await conceptCiting(scenario, scenario.editor, [], {
@@ -355,7 +355,7 @@ describe("what a governed write derives from its cited connected sources", () =>
     });
   });
 
-  it("refuses citing an uncatalogued document by name, landing nothing", async () => {
+  it("refuses citing an uncatalogued document by name, writing nothing", async () => {
     const scenario = await arrange();
     const uncatalogued = ulid();
     const path = "knowledge/policy/cites-an-uncatalogued-document.md";
@@ -386,7 +386,7 @@ describe("what a governed write derives from its cited connected sources", () =>
     });
   });
 
-  it("keeps the writer's word when a concept cites no source", async () => {
+  it("keeps the writer's sensitivity when a concept cites no source", async () => {
     const scenario = await arrange();
 
     const written = await conceptCiting(scenario, scenario.editor, [], {
@@ -399,7 +399,7 @@ describe("what a governed write derives from its cited connected sources", () =>
     });
   });
 
-  it("keeps the audience of a re-write that drops its citations", async () => {
+  it("keeps the audience when a re-write drops its citations", async () => {
     const scenario = await arrange();
 
     const { groupId: hr, written } = await conceptForGroup(db(), scenario, "HR", [scenario.editor]);
@@ -473,7 +473,7 @@ describe("what an edit keeps of a concept's citations", () => {
 
     const cited = citing(source.documentId);
     const edited = await rewriteCiting(scenario, scenario.editor, written, cited);
-    assert(edited.ok, `the edit answered: ${inspect(edited)}`);
+    assert(edited.ok, `the edit was refused: ${inspect(edited)}`);
     const event = await db().pool.query<{ detail: { evidenceCount: number } }>(
       "SELECT detail FROM audit_event WHERE id = $1",
       [edited.value.auditEventId],
@@ -484,8 +484,8 @@ describe("what an edit keeps of a concept's citations", () => {
   });
 });
 
-describe("what a re-write may not do to a concept's sensitivity", () => {
-  it("refuses citations that widen the sensitivity or audience, committing nothing", async () => {
+describe("what a re-write cannot do to a concept's sensitivity", () => {
+  it("refuses citations that widen sensitivity or audience, committing nothing", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
@@ -516,7 +516,7 @@ describe("what a re-write may not do to a concept's sensitivity", () => {
     });
   });
 
-  it("refuses an Editor re-writing a withheld concept, even their own", async () => {
+  it("refuses an Editor re-writing any withheld concept, including their own", async () => {
     const scenario = await arrange();
     const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const board = await groupNamed(db(), scenario, "Board", []);
@@ -542,7 +542,7 @@ describe("what a re-write may not do to a concept's sensitivity", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(before.length + 1);
   });
 
-  it("answers a withheld IRI as unminted, refusing its merge key", async () => {
+  it("answers a withheld IRI as missing, refusing its merge key", async () => {
     const scenario = await arrange();
     const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
@@ -578,7 +578,7 @@ describe("what a re-write may not do to a concept's sensitivity", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
   });
 
-  it("takes the write-ups along when a re-write narrows a concept", async () => {
+  it("narrows the write-ups when a re-write narrows a concept", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
@@ -636,7 +636,7 @@ const narrowedWriteUpAndUntouchedConcept = async (
 };
 
 describe("narrowing a connected source", () => {
-  it("cascades to citing concepts and write-ups, writing one audit event", async () => {
+  it("cascades to citing concepts and write-ups with one audit event", async () => {
     const { scenario, connectedSource, other, cited } = await citedBesideAnother();
     const linked = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId], {
       body: `See [the first note](/${cited.path}).`,
@@ -688,7 +688,7 @@ describe("narrowing a connected source", () => {
     ]);
   });
 
-  it("touches no document's passage row, whatever its own sensitivity", async () => {
+  it("changes no document's passage row, whatever the document's sensitivity", async () => {
     const { scenario, hr, connectedSource } = await workspaceWithHrConnectedSource();
 
     const narrowed = await documentUnder(
@@ -752,7 +752,7 @@ describe("narrowing a connected source", () => {
     ]);
   });
 
-  it("holds no passage row while waiting on the concept index", async () => {
+  it("locks no passage row while waiting on the concept index", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
     const elsewhere = await connectedSourceHolding(db(), scenario.workspaceId);
@@ -799,7 +799,7 @@ describe("narrowing a connected source", () => {
     ]);
   });
 
-  it("narrows to named groups; an outside Viewer loses the concept", async () => {
+  it("narrows to named groups, hiding the concept from outside Viewers", async () => {
     const { scenario, hr, connectedSource } = await workspaceWithHrConnectedSource();
     const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
     const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [written.iri]);
@@ -836,7 +836,7 @@ describe("narrowing a connected source", () => {
     expect(editor).toMatchObject({ ok: true, value: { found: true } });
   });
 
-  it("names a malformed field before weighing role, and moves nothing", async () => {
+  it("reports a malformed field before checking role, and changes nothing", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
 
@@ -874,7 +874,7 @@ describe("narrowing a connected source", () => {
     });
   });
 
-  it("refuses a move widening the sensitivity, audience or group list", async () => {
+  it("refuses a change that widens sensitivity, audience or groups", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const sales = await groupNamed(db(), scenario, "Sales", []);
@@ -935,7 +935,7 @@ describe("narrowing a connected source", () => {
     ]);
   });
 
-  it("re-derives nothing when it refuses an unheld group", async () => {
+  it("re-derives nothing when it refuses a group the workspace lacks", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
     await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
@@ -974,7 +974,7 @@ describe("narrowing a connected source", () => {
     expect(outcome).toMatchObject({ ok: true });
   };
 
-  it("makes a concurrent write wait, so it never lands wider", async () => {
+  it("makes a concurrent write wait so it never lands wider", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
@@ -988,7 +988,7 @@ describe("narrowing a connected source", () => {
     );
   });
 
-  it("clamps a swapped-evidence re-write to the row a cascade narrowed", async () => {
+  it("narrows a re-write with swapped evidence to the cascaded row", async () => {
     const scenario = await arrange();
     const cited = await connectedSourceHolding(db(), scenario.workspaceId);
     const other = await connectedSourceHolding(db(), scenario.workspaceId);
@@ -1058,7 +1058,7 @@ describe("narrowing a connected source", () => {
     });
   };
 
-  it("re-derives after waiting on a re-write, ignoring its dropped citation", async () => {
+  it("re-derives after a re-write finishes, ignoring its dropped citation", async () => {
     const scenario = await arrange();
     const dropped = await connectedSourceHolding(db(), scenario.workspaceId);
     const kept = await connectedSourceHolding(db(), scenario.workspaceId);
@@ -1081,7 +1081,7 @@ describe("narrowing a connected source", () => {
     );
   });
 
-  it("recomputes a write-up two actions reach, intersecting audiences to nobody", async () => {
+  it("recomputes a write-up two actions reach, leaving no shared audience", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
     const sales = await groupNamed(db(), scenario, "Sales", [scenario.viewer]);
@@ -1111,7 +1111,7 @@ describe("narrowing a connected source", () => {
     });
   });
 
-  it("serialises narrowings of two sources one concept cites, never deadlocking", async () => {
+  it("serialises narrowing two sources one concept cites, without deadlock", async () => {
     const scenario = await arrange();
     const first = await connectedSourceHolding(db(), scenario.workspaceId);
     const second = await connectedSourceHolding(db(), scenario.workspaceId);
@@ -1195,7 +1195,7 @@ describe("narrowing a connected source", () => {
     );
   });
 
-  it("leaves nothing, passages included, when the transaction fails after it", async () => {
+  it("leaves nothing, passages included, when the transaction later fails", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
@@ -1240,7 +1240,7 @@ describe("narrowing a connected source", () => {
 });
 
 describe("publishing a connected source", () => {
-  it("releases its recorded sensitivity to citing concepts and write-ups only", async () => {
+  it("applies its recorded sensitivity only to citing concepts and write-ups", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const unpublishedForHr = {
@@ -1320,7 +1320,7 @@ const documentSensitivitiesUnder = async (workspaceId: string, connectedSourceId
 };
 
 describe("widening a connected source", () => {
-  it("widens a published source and cascade, recording from and to", async () => {
+  it("widens a published source and cascades, recording both values", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const connectedSource = await connectedSourceForGroups(
@@ -1450,7 +1450,7 @@ describe("widening a connected source", () => {
     });
   });
 
-  it("widens an unpublished connected source, releasing nothing until the publish", async () => {
+  it("widens an unpublished source, releasing nothing until it is published", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, {
       sensitivity: "Restricted",
@@ -1474,7 +1474,7 @@ describe("widening a connected source", () => {
     });
   });
 
-  it("refuses over an unreviewed special-category finding, and moves nothing", async () => {
+  it("refuses over an unreviewed special-category finding and changes nothing", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const cited = await conceptCiting(scenario, scenario.admin, [connectedSource.documentId]);
@@ -1505,7 +1505,7 @@ describe("widening a connected source", () => {
     ).toMatchObject([{ subject_id: reviewed.connectedSourceId }]);
   });
 
-  it("refuses a request that is not wider, and moves nothing", async () => {
+  it("refuses a request that is not wider and changes nothing", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const sales = await groupNamed(db(), scenario, "Sales", []);
@@ -1535,7 +1535,7 @@ describe("widening a connected source", () => {
     ).toEqual([]);
   });
 
-  it("refuses a non-Admin, an unknown source and a foreign group", async () => {
+  it("refuses a non-Admin, an unknown source and another workspace's group", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const elsewhere = await arrange();
@@ -1569,7 +1569,7 @@ describe("widening a connected source", () => {
     ]);
   });
 
-  it("leaves nothing, cascade included, when the transaction fails after it", async () => {
+  it("leaves nothing, cascade included, when the transaction later fails", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const written = await conceptCiting(scenario, scenario.admin, [connectedSource.documentId]);
@@ -1630,11 +1630,11 @@ describe("narrowing documents", () => {
     return beside.outcome;
   };
 
-  it("holds a concurrent concept, which lands at the narrowed sensitivity", async () => {
+  it("makes a concurrent concept wait, landing at the narrowed sensitivity", async () => {
     const scenario = await arrange();
     const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
-    // A shared evidence row: a new one's foreign key would wait on the narrowed document before
-    // the landing reached the connected source.
+    // Seed an evidence row first. A new row's foreign key would wait on the narrowed document
+    // before the write reached the connected source.
     await conceptCiting(scenario, scenario.editor, [handbook.documentId]);
 
     const landed = await besideAnOpenDocumentNarrowing(scenario, handbook, "FOR SHARE", () =>
@@ -1646,7 +1646,7 @@ describe("narrowing documents", () => {
     );
   });
 
-  it("holds a re-write's verification so it weighs the narrowed sensitivity", async () => {
+  it("makes a re-write's verification wait for the narrowed sensitivity", async () => {
     const scenario = await arrange();
     const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
@@ -1665,7 +1665,7 @@ describe("narrowing documents", () => {
     );
   });
 
-  it("holds another source's cascade, which then sees the narrowed document", async () => {
+  it("makes another source's cascade wait, then see the narrowed document", async () => {
     const scenario = await arrange();
     const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
     const brochure = await connectedSourceHolding(db(), scenario.workspaceId, {
@@ -1698,7 +1698,7 @@ describe("narrowing documents", () => {
 });
 
 describe("a cascade under a platform principal", () => {
-  it("re-derives the concepts citing a source's documents, and their write-ups", async () => {
+  it("re-derives concepts citing a source's documents, and their write-ups", async () => {
     const { scenario, connectedSource, other, cited } = await citedBesideAnother();
     const untouched = await conceptCiting(scenario, scenario.editor, [other.documentId]);
     const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [cited.iri]);
@@ -1718,7 +1718,7 @@ describe("a cascade under a platform principal", () => {
 });
 
 describe("an Admin's recorded override", () => {
-  it("widens past floor and evidence, names the Admin, and cascades", async () => {
+  it("widens past floor and evidence, names the Admin, then cascades", async () => {
     const scenario = await arrange();
     const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const person = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
@@ -1772,7 +1772,7 @@ describe("an Admin's recorded override", () => {
     expect(seen.value.found).toBe(true);
   });
 
-  it("stands when the source is later narrowed, outranking the evidence", async () => {
+  it("outranks the evidence when the source is later narrowed", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
@@ -1873,7 +1873,7 @@ const expensesNotes = async (scenario: Scenario) => {
   return { visible, withheld, internal };
 };
 
-describe("find", () => {
+describe("finding concepts", () => {
   it("previews matching concepts the reader may see, never withheld ones", async () => {
     const scenario = await arrange();
     const { visible, withheld, internal } = await expensesNotes(scenario);
@@ -1934,7 +1934,7 @@ describe("find", () => {
     expect(await relatedTo(scenario.viewer, "Is the sky blue?")).toEqual([]);
   });
 
-  it("keeps the limit, reads queries literally, answers nothing to nothing", async () => {
+  it("applies the limit, matches literally, and returns nothing for empty", async () => {
     const scenario = await arrange();
     const internal = await connectedSourceHolding(db(), scenario.workspaceId);
     for (const title of ["Alpha note", "Beta note", "Gamma note"]) {
@@ -1983,7 +1983,7 @@ const retentionIn = (person: UserPrincipal, collections: readonly string[]) =>
     return found.ok ? ok(found.value.map(({ concept }) => concept.path)) : found;
   });
 
-describe("the collections a reader meets", () => {
+describe("the collections a reader sees", () => {
   it("answers an unreadable collection as one that does not exist", async () => {
     const scenario = await arrange();
     await auditsReadableAndLmsWithheld(scenario);

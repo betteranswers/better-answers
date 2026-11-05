@@ -52,7 +52,7 @@ const {
   invitedMany,
   cancelledInvitation,
   memberAt,
-  invitationLeft,
+  invitationSeeded,
   invitationsOf,
   invitationEvents,
   emailsCountedTo,
@@ -72,7 +72,7 @@ const counted = (workspace: ProvisionedWorkspace, at: Date) =>
   as(workspace, workspace.adminUserId, (principal, tx) => countInvitations(principal, tx, { at }));
 
 describe("inviting a person by address", () => {
-  it("keeps the address lower-case, waiting seven days, with its event", async () => {
+  it("lower-cases the address, expires in seven days, records the event", async () => {
     const workspace = await provisionedWorkspace(db(), "Calder");
     const address = addressOf("priya");
 
@@ -143,7 +143,7 @@ describe("inviting a person by address", () => {
     );
   });
 
-  it("refuses a current member already-a-member, however the address is cased", async () => {
+  it("refuses a member's address in any case with already-a-member", async () => {
     const workspace = await provisionedWorkspace(db(), "Members");
     const editor = await memberAt(workspace, "Editor");
 
@@ -157,7 +157,7 @@ describe("inviting a person by address", () => {
     expect(await invitationEvents(workspace)).toEqual([]);
   });
 
-  it("refuses a role outside the three, and a non-address", async () => {
+  it("refuses an unknown role and an invalid address", async () => {
     const workspace = await provisionedWorkspace(db(), "Refusing");
 
     expect(await invite(workspace, addressOf("sam"), "Owner")).toEqual({
@@ -171,7 +171,7 @@ describe("inviting a person by address", () => {
     expect(await invitationsOf(workspace)).toEqual([]);
   });
 
-  it("replaces a waiting invitation to the address, cancelling it", async () => {
+  it("cancels a waiting invitation to the address and replaces it", async () => {
     const workspace = await provisionedWorkspace(db(), "Replacing");
     const address = addressOf("priya");
 
@@ -219,7 +219,7 @@ describe("inviting a person by address", () => {
     ]);
   });
 
-  it("leaves one waiting of two concurrent invitations to one address", async () => {
+  it("leaves one waiting invitation after two concurrent invites", async () => {
     const workspace = await provisionedWorkspace(db(), "Concurrent");
     const address = addressOf("priya");
 
@@ -241,7 +241,7 @@ describe("inviting a person by address", () => {
     expect(await invitationsOf(workspace)).toHaveLength(2);
   });
 
-  it("cancels nothing when the action's event cannot be written", async () => {
+  it("cancels nothing when the audit event cannot be written", async () => {
     const workspace = await provisionedWorkspace(db(), "Unwritten");
     const address = addressOf("priya");
     const standing = answeredValue(await invite(workspace, address, "Viewer"));
@@ -280,7 +280,7 @@ const aRequestIn = async (workspace: ProvisionedWorkspace, requester?: { email: 
 };
 
 describe("an approved access request's invitation", () => {
-  it("is minted by the same step, replacing a waiting one", async () => {
+  it("is created by the approval and replaces a waiting one", async () => {
     const workspace = await provisionedWorkspace(db(), "Approving");
     const requester = await seedingWith(db().pool, (seed) => seed.user());
     const direct = answeredValue(await invite(workspace, requester.email, "Viewer"));
@@ -342,7 +342,7 @@ describe("an approved access request's invitation", () => {
     return { workspace, ...(await aRequestIn(workspace)) };
   };
 
-  it("counts against no address's ceiling, nor the workspace's", async () => {
+  it("counts against neither the address's nor the workspace's ceiling", async () => {
     const { workspace, requester, approving } = await aRequestWaiting("ApprovingUncounted");
 
     answeredValue(await approving());
@@ -351,7 +351,7 @@ describe("an approved access request's invitation", () => {
     expect(await emailsCountedFrom(workspace)).toBe(0);
   });
 
-  it("fails as its event fails, in that failure's words", async () => {
+  it("fails with the audit event's error when that write fails", async () => {
     const { workspace, approving } = await aRequestWaiting("ApprovingUnrecorded");
 
     const failed = await whileWritesAreRefused(db().pool, "audit_event", approving);
@@ -366,7 +366,7 @@ describe("an approved access request's invitation", () => {
   });
 });
 
-describe("a marked workspace's invitations", () => {
+describe("invitations in a workspace marked for testing", () => {
   const approvingFrom = async (workspace: ProvisionedWorkspace, email: string) =>
     (await aRequestIn(workspace, { email })).approving();
 
@@ -378,7 +378,7 @@ describe("a marked workspace's invitations", () => {
       )
     ).rows;
 
-  it("refuses resending to an address off its domain, renewing nothing", async () => {
+  it("refuses resending to an address outside its domain", async () => {
     const workspace = await provisionedWorkspace(db(), "MarkedResend");
     const ana = addressOf("ana");
     const invited = answeredValue(await invite(workspace, ana, "Viewer"));
@@ -392,7 +392,7 @@ describe("a marked workspace's invitations", () => {
     expect(await emailsCountedTo(workspace, ana)).toBe(1);
   });
 
-  it("resends one to an address on its domain", async () => {
+  it("resends an invitation to an address on its domain", async () => {
     const workspace = await provisionedWorkspace(db(), "MarkedResendOnDomain");
     const onDomain = await marked(workspace);
     const invited = answeredValue(await invite(workspace, onDomain("ana"), "Viewer"));
@@ -402,7 +402,7 @@ describe("a marked workspace's invitations", () => {
     expect(resent).toMatchObject({ ok: true, value: { invitationId: invited.invitationId } });
   });
 
-  it("refuses approving a request from an address off its domain", async () => {
+  it("refuses approving a request from an address outside its domain", async () => {
     const workspace = await provisionedWorkspace(db(), "MarkedApprove");
     await marked(workspace);
 
@@ -437,7 +437,7 @@ describe("a marked workspace's invitations", () => {
 });
 
 describe("resending an invitation", () => {
-  it("renews a waiting invitation for seven days, with its event", async () => {
+  it("renews a waiting invitation for seven days, recording the event", async () => {
     const workspace = await provisionedWorkspace(db(), "Resending");
     const address = addressOf("priya");
     const invited = answeredValue(await invite(workspace, address, "Editor"));
@@ -471,7 +471,7 @@ describe("resending an invitation", () => {
     ]);
   });
 
-  it("refuses an address's sixth email in an hour, renewing nothing", async () => {
+  it("refuses a sixth email to an address within an hour", async () => {
     const workspace = await provisionedWorkspace(db(), "ResendCeiling");
     const address = addressOf("priya");
     const invited = await atTheCeiling(workspace, address);
@@ -495,7 +495,7 @@ describe("resending an invitation", () => {
     expect(await emailsCountedTo(workspace, address)).toBe(5);
   });
 
-  it("answers when the hour's ceiling lifts, and lifts it then", async () => {
+  it("says when the hourly ceiling lifts, and allows sending then", async () => {
     const workspace = await provisionedWorkspace(db(), "ResendCeilingLifts");
     const invited = await atTheCeiling(workspace, addressOf("priya"));
 
@@ -544,7 +544,7 @@ describe("resending an invitation", () => {
   });
 });
 
-describe("an invitation email that did not go", () => {
+describe("an invitation email that was not sent", () => {
   const LAST_SECOND = new Date("2031-06-15T09:59:59.000Z");
 
   const returned = (
@@ -555,13 +555,13 @@ describe("an invitation email that did not go", () => {
       ok(await returnUnsentEmails(principal, tx, [unsent])),
     );
 
-  it("takes a counted invitation, never an approval's", () => {
+  it("accepts counted invitations but not approval invitations, by type", () => {
     type Unsent = Parameters<typeof returnUnsentEmails>[2];
     expectTypeOf<readonly Counted<InvitationToSend>[]>().toExtend<Unsent>();
     expectTypeOf<readonly Approved[]>().not.toExtend<Unsent>();
   });
 
-  it("lets a resend the ceiling refused go once returned", async () => {
+  it("allows a refused resend once the unsent email is returned", async () => {
     const workspace = await provisionedWorkspace(db(), "UnsentReturned");
     const address = addressOf("priya");
     const invited = await atTheCeiling(workspace, address);
@@ -576,7 +576,7 @@ describe("an invitation email that did not go", () => {
     expect(await emailsCountedFrom(workspace)).toBe(5);
   });
 
-  it("returns nothing to an hour it was not counted in", async () => {
+  it("returns an email only to the hour that counted it", async () => {
     const workspace = await provisionedWorkspace(db(), "UnsentOtherHour");
     const address = addressOf("priya");
     const invited = await atTheCeiling(workspace, address);
@@ -589,7 +589,7 @@ describe("an invitation email that did not go", () => {
     expect(ceilingOf(await resending(workspace, invited.invitationId, LAST_SECOND))).toBe(1);
   });
 
-  it("returns no more than was counted, banking no room", async () => {
+  it("never returns more emails than were counted", async () => {
     const workspace = await provisionedWorkspace(db(), "UnsentFloor");
     const address = addressOf("priya");
     const invited = answeredValue(await invite(workspace, address, "Viewer"));
@@ -605,7 +605,7 @@ describe("an invitation email that did not go", () => {
 });
 
 describe("cancelling an invitation", () => {
-  it("cancels a waiting invitation, with its event", async () => {
+  it("cancels a waiting invitation and records the event", async () => {
     const workspace = await provisionedWorkspace(db(), "Cancelling");
     const invited = answeredValue(await invite(workspace, addressOf("priya"), "Viewer"));
 
@@ -654,7 +654,7 @@ describe("what resending and cancelling refuse", () => {
 
   it.each(VERBS)("refuses %s an accepted invitation", async (_verb, action) => {
     const workspace = await provisionedWorkspace(db(), "Accepted");
-    const accepted = await invitationLeft(workspace, {
+    const accepted = await invitationSeeded(workspace, {
       email: addressOf("priya"),
       status: "accepted",
     });
@@ -667,7 +667,7 @@ describe("what resending and cancelling refuse", () => {
     expect(await invitationsOf(workspace)).toMatchObject([{ status: "accepted" }]);
   });
 
-  it.each(VERBS)("refuses %s an id of no known form", async (_verb, action) => {
+  it.each(VERBS)("refuses %s a malformed id", async (_verb, action) => {
     const workspace = await provisionedWorkspace(db(), "Shapeless");
 
     const refused = await as(workspace, workspace.adminUserId, (principal, tx) =>
@@ -677,20 +677,23 @@ describe("what resending and cancelling refuse", () => {
     expect(refused).toEqual({ ok: false, error: "malformed" });
   });
 
-  it.each(VERBS)("keeps an Admin elsewhere from %s this one's", async (_verb, action) => {
-    const workspace = await provisionedWorkspace(db(), "Held");
-    const elsewhere = await provisionedWorkspace(db(), "Reaching");
-    const invited = answeredValue(await invite(workspace, addressOf("priya"), "Viewer"));
+  it.each(VERBS)(
+    "keeps another workspace's Admin from %s this invitation",
+    async (_verb, action) => {
+      const workspace = await provisionedWorkspace(db(), "Held");
+      const elsewhere = await provisionedWorkspace(db(), "Reaching");
+      const invited = answeredValue(await invite(workspace, addressOf("priya"), "Viewer"));
 
-    const reached = await as(elsewhere, elsewhere.adminUserId, (principal, tx) =>
-      action(principal, tx, invited.invitationId),
-    );
+      const reached = await as(elsewhere, elsewhere.adminUserId, (principal, tx) =>
+        action(principal, tx, invited.invitationId),
+      );
 
-    expect(reached).toEqual({ ok: false, error: "no-such-invitation" });
-    expect(await invitationsOf(workspace)).toMatchObject([
-      { status: "pending", expires_at: new Date(A_WEEK_LATER) },
-    ]);
-  });
+      expect(reached).toEqual({ ok: false, error: "no-such-invitation" });
+      expect(await invitationsOf(workspace)).toMatchObject([
+        { status: "pending", expires_at: new Date(A_WEEK_LATER) },
+      ]);
+    },
+  );
 });
 
 const oneOfEach = async (name: string) => {
@@ -706,15 +709,15 @@ const oneOfEach = async (name: string) => {
   );
   const waiting = answeredValue(await invite(workspace, addresses.waiting, "Editor"));
   const cancelled = await cancelledInvitation(workspace, addresses.cancelled, "Admin");
-  const accepted = await invitationLeft(workspace, {
+  const accepted = await invitationSeeded(workspace, {
     email: addresses.accepted,
     status: "accepted",
   });
   return { workspace, addresses, expired, waiting, cancelled, accepted };
 };
 
-describe("the invitations by status", () => {
-  it("lists each status's own invitations, each row carrying it", async () => {
+describe("listing invitations by status", () => {
+  it("lists each status's invitations, with the status on each row", async () => {
     const { workspace, addresses, expired, waiting, cancelled, accepted } =
       await oneOfEach("Listing");
     const elsewhere = await provisionedWorkspace(db(), "Unlisted");
@@ -787,7 +790,7 @@ describe("the invitations by status", () => {
     });
   });
 
-  it("counts the rows each status lists", async () => {
+  it("counts the invitations in each status", async () => {
     const { workspace } = await oneOfEach("Counting");
     const second = await invite(workspace, addressOf("second"), "Viewer");
     expect(second.ok).toBe(true);
@@ -811,7 +814,7 @@ describe("the invitations by status", () => {
     expect(rows.map((row) => row.invitationId)).toEqual([newer.invitationId, older.invitationId]);
   });
 
-  it("lists waiting when asked no status", async () => {
+  it("lists waiting invitations when no status is given", async () => {
     const { workspace, waiting } = await oneOfEach("Unasked");
 
     const rows = answeredValue(await listed(workspace, undefined, INVITED_AT));
@@ -836,7 +839,7 @@ describe("the invitations by status", () => {
     });
   });
 
-  it("holds an invitation waiting until the instant it expires", async () => {
+  it("keeps an invitation waiting until the moment it expires", async () => {
     const workspace = await provisionedWorkspace(db(), "Instant");
     answeredValue(await invite(workspace, addressOf("edge"), "Viewer"));
     const justBefore = new Date(Date.parse(A_WEEK_LATER) - 1);
@@ -865,14 +868,14 @@ describe("the invitations by status", () => {
     });
   });
 
-  it("reads no input, or one naming no status, as waiting", () => {
+  it("defaults to waiting when the input names no status", () => {
     expect([inputOf(listInvitationsInput, undefined), inputOf(listInvitationsInput, {})]).toEqual([
       { status: "waiting" },
       { status: "waiting" },
     ]);
   });
 
-  it("refuses a status outside the four, malformed", () => {
+  it("refuses an unknown status as malformed", () => {
     expect(() => inputOf(listInvitationsInput, { status: "pending" })).toThrow(/status/);
   });
 });
@@ -898,7 +901,7 @@ describe("who may act on invitations", () => {
     ["count", (principal, tx) => countInvitations(principal, tx, { at: INVITED_AT })],
   ];
 
-  it.each(verbs)("refuses an Editor and a Viewer the %s verb", async (_verb, verb) => {
+  it.each(verbs)("refuses %s to an Editor and a Viewer", async (_verb, verb) => {
     const workspace = await provisionedWorkspace(db(), "Roles");
     const invited = answeredValue(await invite(workspace, addressOf("priya"), "Viewer"));
 
@@ -915,7 +918,7 @@ describe("who may act on invitations", () => {
     ]);
   });
 
-  it.each(verbs)("answers the %s verb's failed statement as a failure", async (_verb, verb) => {
+  it.each(verbs)("returns an error for %s in an aborted transaction", async (_verb, verb) => {
     const workspace = await provisionedWorkspace(db(), "Failing");
     const invited = answeredValue(await invite(workspace, addressOf("priya"), "Viewer"));
 

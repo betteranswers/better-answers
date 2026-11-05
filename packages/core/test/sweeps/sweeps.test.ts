@@ -72,7 +72,7 @@ const passesRecorded = async () => {
 const A_PASS_ID = matching.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/);
 
 describe("a sweep pass over every workspace", () => {
-  it("removes orphaned uploads past the grace and the map's leftovers", async () => {
+  it("removes old orphaned uploads and leftover map generations", async () => {
     const first = await workspaceWithLeftovers("First");
     const second = await workspaceWithLeftovers("Second");
     await provisionedWorkspace(db(), "Clean");
@@ -106,7 +106,7 @@ describe("a sweep pass over every workspace", () => {
     ]);
   });
 
-  it("counts but keeps orphaned uploads when list-only; leftovers still go", async () => {
+  it("in list-only mode, keeps orphaned uploads but removes map leftovers", async () => {
     const workspace = await workspaceWithLeftovers("Listed");
 
     const pass = await sweepEveryWorkspace(SWEEPS, doors(), { uploadSweep: "list" });
@@ -124,7 +124,7 @@ describe("a sweep pass over every workspace", () => {
     expect(await generationsOf(workspace.workspaceId)).toEqual([1]);
   });
 
-  it("goes on past a refused workspace and names it", async () => {
+  it("continues past a failing workspace and reports its id", async () => {
     const stuck = await workspaceWithLeftovers("Stuck");
     const orphaned = await provisionedWorkspace(db(), "Orphaned");
     const orphan = `uploads/${ulid().toLowerCase()}/${ulid().toLowerCase()}/original`;
@@ -161,7 +161,7 @@ describe("a sweep pass over every workspace", () => {
     ]);
   });
 
-  it("still sweeps, but fails when its row cannot be written", async () => {
+  it("sweeps, then fails when it cannot write its pass row", async () => {
     const workspace = await workspaceWithLeftovers("Unrecorded");
 
     const pass = await whileWritesAreRefused(db().pool, "sweep_pass", () =>
@@ -173,7 +173,7 @@ describe("a sweep pass over every workspace", () => {
     expect(await storedIn(workspace)).toEqual({ ok: true, value: [] });
   });
 
-  it("finds nothing over tidy workspaces and still leaves its row", async () => {
+  it("finds nothing in tidy workspaces and still writes its row", async () => {
     await provisionedWorkspace(db(), "Tidy");
 
     const pass = await sweepEveryWorkspace(SWEEPS, doors(), { uploadSweep: "remove" });
@@ -208,8 +208,8 @@ describe("a sweep pass over every workspace", () => {
   });
 });
 
-describe("a sweep pass while another holder has the sweeps' lock", () => {
-  it("is skipped, and removes nothing from any store", async () => {
+describe("a sweep pass while another holder has the sweeps lock", () => {
+  it("skips and removes nothing from any store", async () => {
     const workspace = await workspaceWithLeftovers("Held");
 
     const pass = await withSweepLock(SWEEPS, doors().postgres, () =>
@@ -225,7 +225,7 @@ describe("a sweep pass while another holder has the sweeps' lock", () => {
     expect(await passesRecorded()).toEqual([]);
   });
 
-  it("runs once the holder lets go", async () => {
+  it("runs once the other holder releases the lock", async () => {
     const workspace = await workspaceWithLeftovers("Released");
     await withSweepLock(SWEEPS, doors().postgres, async () => undefined);
 
@@ -236,8 +236,8 @@ describe("a sweep pass while another holder has the sweeps' lock", () => {
   });
 });
 
-describe("a sweep by hand", () => {
-  it("waits while another holder has the lock, then runs", async () => {
+describe("a sweep run by hand", () => {
+  it("waits for another holder to release the lock, then runs", async () => {
     const order: string[] = [];
     let letGo = (): void => undefined;
     const holding = new Promise<void>((resolve) => {
@@ -272,8 +272,8 @@ const sessionLocksHeld = async (): Promise<number> => {
   return Number(found.rows[0]?.held ?? 0);
 };
 
-describe("the session lock a sweep by hand holds", () => {
-  it("is released once its work ends", async () => {
+describe("the session lock held by a sweep run by hand", () => {
+  it("is released when the work finishes", async () => {
     let during = 0;
 
     await withSweepLock(SWEEPS, doors().postgres, async () => {
@@ -283,7 +283,7 @@ describe("the session lock a sweep by hand holds", () => {
     expect({ during, after: await sessionLocksHeld() }).toEqual({ during: 1, after: 0 });
   });
 
-  it("is released when its work throws", async () => {
+  it("is released when the work throws", async () => {
     let during = 0;
 
     const run = withSweepLock(SWEEPS, doors().postgres, async () => {
@@ -296,8 +296,8 @@ describe("the session lock a sweep by hand holds", () => {
   });
 });
 
-describe("a sweep pass and the spend held", () => {
-  it("settles a reservation a day past its expiry", async () => {
+describe("a sweep pass and held spend reservations", () => {
+  it("settles a reservation a day after it expires", async () => {
     const workspace = await provisionedWorkspace(db(), "Reserved");
     await seedingWith(db().pool, (seed) =>
       seed.spendReservation({ workspaceId: workspace.workspaceId }),

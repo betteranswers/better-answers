@@ -89,14 +89,14 @@ const confirmedOf = async (client: TestClient): Promise<Date | null | undefined>
   ).rows[0]?.confirmed;
 };
 
-const heldOn = (client: TestClient) => webClientOf(client).api.person.secondFactor.query();
+const secondFactorOn = (client: TestClient) => webClientOf(client).api.person.secondFactor.query();
 
 const noticesTo = (email: string, subject: string): number =>
   app().emails.filter((message) => message.to === email && message.subject === subject).length;
 
 const askToConfirm = async (client: TestClient): Promise<unknown> => {
   const asked = await client.json(PASSKEY_OPTIONS, {});
-  expect(asked.status, "the confirm was not asked").toBe(200);
+  expect(asked.status, "the passkey-options request failed").toBe(200);
   return asked.json();
 };
 
@@ -122,7 +122,7 @@ const wrongCodesFrom = async (clients: readonly TestClient[], key: string, times
 };
 
 describe("confirming with a passkey", () => {
-  it("stamps the session it confirms and makes no other", async () => {
+  it("confirms the current session and creates no new session", async () => {
     const { person, device, client } = await aPasskeyHolder();
     const before = await sessionsOf(person.id);
 
@@ -136,7 +136,7 @@ describe("confirming with a passkey", () => {
     expect(await confirmedOf(client)).toBeInstanceOf(Date);
   });
 
-  it("asks for the person's own passkeys, with user verification", async () => {
+  it("requests the person's own passkeys and requires user verification", async () => {
     const { client: setUpIn } = await aPersonSignedIn(app());
     const { device } = await passkeyAddedOn(setUpIn);
     await passkeyAddedOn((await aPersonSignedIn(app())).client);
@@ -149,7 +149,7 @@ describe("confirming with a passkey", () => {
     ]);
   });
 
-  it("refuses another person's passkey, stamping nothing", async () => {
+  it("refuses another person's passkey and leaves the session unconfirmed", async () => {
     const { device: theirs } = await passkeyAddedOn((await aPersonSignedIn(app())).client);
     const { client } = await aPasskeyHolder();
 
@@ -163,7 +163,7 @@ describe("confirming with a passkey", () => {
   it.each([
     ["made without user verification", { verified: false }],
     ["signed by another key", { signedWithAnotherKey: true }],
-  ])("refuses an answer %s, stamping nothing", async (_how, assertion) => {
+  ])("refuses an assertion %s and confirms nothing", async (_how, assertion) => {
     const { device, client } = await aPasskeyHolder();
 
     const answered = await confirmOn(client, device, assertion);
@@ -173,7 +173,7 @@ describe("confirming with a passkey", () => {
     expect(await confirmedOf(client)).toBeNull();
   });
 
-  it("refuses a challenge already answered", async () => {
+  it("refuses an answer to a challenge already used", async () => {
     const { device, client } = await aPasskeyHolder();
     const response = device.get(await askToConfirm(client));
     expect((await client.json(PASSKEY, { response })).status).toBe(200);
@@ -184,7 +184,7 @@ describe("confirming with a passkey", () => {
     expect(await again.json()).toEqual({ error: "challenge-gone" });
   });
 
-  it("refuses a person who holds no passkey", async () => {
+  it("answers 409 to a person without a passkey", async () => {
     const { client } = await aPersonSignedIn(app());
 
     const asked = await client.json(PASSKEY_OPTIONS, {});
@@ -193,7 +193,7 @@ describe("confirming with a passkey", () => {
     expect(await asked.json()).toEqual({ error: "no-passkey" });
   });
 
-  it("refuses a malformed answer, leaving the challenge to answer", async () => {
+  it("refuses a malformed answer and keeps the challenge open", async () => {
     const { device, client } = await aPasskeyHolder();
     const options = await askToConfirm(client);
 
@@ -208,18 +208,18 @@ describe("confirming with a passkey", () => {
 
   it.each<[string, StoreRefusing]>([
     [
-      "the stamp cannot be recorded",
+      "the passkey_last_use commit fails",
       (work) => whileCommitsAreRefused(app(), "passkey_last_use", work),
     ],
     [
-      "the challenge cannot be taken",
+      "the challenge delete fails",
       (work) => whileTheApiLacks(app(), "DELETE", "verification", work),
     ],
     [
-      "the passkeys cannot be read",
+      "the passkey read fails",
       (work) => whileTheApiCannotRead(app(), "passkey", "public_key", work),
     ],
-  ])("answers unanswered when %s, stamping nothing", async (_why, refusing) => {
+  ])("answers 502 when %s and confirms nothing", async (_why, refusing) => {
     const { device, client } = await aPasskeyHolder();
     const response = device.get(await askToConfirm(client));
 
@@ -232,9 +232,9 @@ describe("confirming with a passkey", () => {
 });
 
 describe("confirming with an authenticator", () => {
-  it("confirms this session with a working code", async () => {
+  it("confirms this session with a correct code", async () => {
     const { client, key } = await anAdminWithAnAuthenticator(app());
-    expect((await heldOn(client)).thisSession).toMatchObject({
+    expect((await secondFactorOn(client)).thisSession).toMatchObject({
       confirmed: false,
       setupGranted: false,
       standing: "confirm",
@@ -243,18 +243,18 @@ describe("confirming with an authenticator", () => {
     const answered = await confirmWithTheAuthenticator(client, key);
 
     expect(await answered.json()).toEqual({ confirmed: true });
-    expect((await heldOn(client)).thisSession).toMatchObject({
+    expect((await secondFactorOn(client)).thisSession).toMatchObject({
       confirmed: true,
       setupGranted: false,
       standing: "confirmed",
     });
   });
 
-  it("refuses wrong codes, and the sixth makes the next wait", async () => {
+  it("answers 429 to a correct code after six wrong ones", async () => {
     const { client, key } = await aPersonWithAnAuthenticator(app());
 
     const statuses = await wrongCodesFrom([client], key, 6);
-    const held = await heldOn(client);
+    const held = await secondFactorOn(client);
     const waiting = await client.json(AUTHENTICATOR, { code: codeOf(key) });
 
     expect(statuses).toEqual([400, 400, 400, 400, 400, 400]);
@@ -264,7 +264,7 @@ describe("confirming with an authenticator", () => {
     expect(await confirmedOf(client)).toBeNull();
   });
 
-  it("checks one of several wrong codes sent at once", async () => {
+  it("checks only one of several concurrent wrong codes", async () => {
     const { client, key } = await aPersonWithAnAuthenticator(app());
     await wrongCodesFrom([client], key, 5);
 
@@ -276,17 +276,17 @@ describe("confirming with an authenticator", () => {
     );
 
     expect(statuses.toSorted((one, other) => one - other)).toEqual([400, 429, 429, 429]);
-    expect((await heldOn(client)).waits.authenticator).toBeLessThanOrEqual(30);
+    expect((await secondFactorOn(client)).waits.authenticator).toBeLessThanOrEqual(30);
   });
 
-  it("caps one person's tries across five sessions", async () => {
+  it("limits one person's wrong codes across five sessions", async () => {
     const person = await app().person();
     const clients: TestClient[] = [];
     for (let signedIn = 0; signedIn < 5; signedIn += 1) {
       clients.push(await signedInClient(app(), person.email));
     }
     const last = clients.at(-1);
-    assert(last !== undefined, "five sessions signed in");
+    assert(last !== undefined, "the five sessions did not sign in");
     const { setupAddress } = await setUpOn(last);
 
     const statuses = await wrongCodesFrom(clients, keyIn(setupAddress), 7);
@@ -294,7 +294,7 @@ describe("confirming with an authenticator", () => {
     expect(statuses).toEqual([400, 400, 400, 400, 400, 400, 429]);
   });
 
-  it("sends one notice for a run of wrong codes", async () => {
+  it("sends one notice for six wrong codes in a row", async () => {
     const { person, client, key } = await aPersonWithAnAuthenticator(app());
 
     await wrongCodesFrom([client], key, 6);
@@ -302,7 +302,7 @@ describe("confirming with an authenticator", () => {
     expect(noticesTo(person.email, FAILURES_NOTICE)).toBe(1);
   });
 
-  it("refuses a person who holds no authenticator", async () => {
+  it("answers 409 to a person without an authenticator", async () => {
     const { client } = await aPersonSignedIn(app());
 
     const answered = await client.json(AUTHENTICATOR, { code: "123456" });
@@ -311,7 +311,7 @@ describe("confirming with an authenticator", () => {
     expect(await answered.json()).toEqual({ error: "no-authenticator" });
   });
 
-  it("lets a recovery code and passkey through while it waits", async () => {
+  it("accepts a recovery code and a passkey during the wait", async () => {
     const { client, key, device, recoveryCodes } = await aPersonHoldingEverything(app());
     expect(await wrongCodesFrom([client], key, 7)).toContain(429);
 
@@ -324,7 +324,7 @@ describe("confirming with an authenticator", () => {
   });
 });
 
-const aPersonHoldingCodesAlone = async () => {
+const aPersonWithOnlyRecoveryCodes = async () => {
   const { client } = await aPersonSignedIn(app());
   const { recoveryCodes } = await webClientOf(client).api.person.replaceRecoveryCodes.mutate({
     replacing: false,
@@ -339,8 +339,8 @@ const aReplacementStarted = async () => {
   return { ...held, ...startedAnswer.parse(await started.json()) };
 };
 
-describe("spending a recovery code", () => {
-  it("grants setup to the spending session alone", async () => {
+describe("using a recovery code", () => {
+  it("grants setup only to the session that used the code", async () => {
     const { person, client, recoveryCodes } = await aPersonHoldingEverything(app());
     const elsewhere = await signedInClient(app(), person.email);
 
@@ -352,21 +352,21 @@ describe("spending a recovery code", () => {
     expect(refused.status).toBe(409);
     expect(await refused.json()).toEqual({ error: "setup-not-granted" });
     expect(started.status).toBe(200);
-    expect((await heldOn(client)).thisSession).toMatchObject({
+    expect((await secondFactorOn(client)).thisSession).toMatchObject({
       confirmed: false,
       setupGranted: true,
     });
     expect(noticesTo(person.email, CODE_USED_NOTICE)).toBe(1);
   });
 
-  it("refuses a code that is not one of the person's", async () => {
+  it("refuses a code that is not the person's", async () => {
     const { client } = await aPersonHoldingEverything(app());
 
     const spent = await client.json(RECOVERY, { code: "0000-0000-0000-0000" });
 
     expect(spent.status).toBe(400);
     expect(await spent.json()).toEqual({ error: "recovery-code-wrong" });
-    expect((await heldOn(client)).thisSession?.setupGranted).toBe(false);
+    expect((await secondFactorOn(client)).thisSession?.setupGranted).toBe(false);
   });
 
   it("leaves the old factors and codes when setup is abandoned", async () => {
@@ -376,12 +376,12 @@ describe("spending a recovery code", () => {
 
     await confirmWithTheAuthenticator(later, key);
     expect((await confirmOn(later, device)).status).toBe(200);
-    expect((await heldOn(later)).recoveryCodes?.unused).toBe(9);
+    expect((await secondFactorOn(later)).recoveryCodes?.unused).toBe(9);
   });
 });
 
-describe("replacing the factors after a spent code", () => {
-  it("swaps in a new authenticator, answering ten fresh codes", async () => {
+describe("replacing the factors after using a recovery code", () => {
+  it("replaces the factors with a new authenticator and ten codes", async () => {
     const { person, client, recoveryCodes, setupAddress } = await aReplacementStarted();
 
     const finished = await client.json(REPLACE_FINISH, { code: codeNow(setupAddress) });
@@ -390,7 +390,7 @@ describe("replacing the factors after a spent code", () => {
     const fresh = issued.parse(await finished.json());
     expect(fresh.recoveryCodes).toHaveLength(10);
     for (const code of fresh.recoveryCodes) expect(code).toMatch(RECOVERY_CODE);
-    const held = await heldOn(client);
+    const held = await secondFactorOn(client);
     expect(held.passkeys).toEqual([]);
     expect(held.authenticator).toBe("set-up");
     expect(held.thisSession).toMatchObject({ confirmed: true, setupGranted: false });
@@ -399,7 +399,7 @@ describe("replacing the factors after a spent code", () => {
     expect(await oldCode.json()).toEqual({ error: "recovery-code-wrong" });
   });
 
-  it("confirms with the new key's code, never the old key's", async () => {
+  it("accepts the new key's code and refuses the old key's", async () => {
     const { person, client, key, setupAddress } = await aReplacementStarted();
     expect((await client.json(REPLACE_FINISH, { code: codeNow(setupAddress) })).status).toBe(200);
     const later = await signedInClient(app(), person.email);
@@ -412,7 +412,7 @@ describe("replacing the factors after a spent code", () => {
     expect(withTheNew.status).toBe(200);
   });
 
-  it("swaps in a new passkey, answering ten fresh codes", async () => {
+  it("replaces the factors with a new passkey and ten codes", async () => {
     const { person, client, recoveryCodes } = await aPersonHoldingEverything(app());
     await client.json(RECOVERY, { code: recoveryCodes[0] });
 
@@ -421,7 +421,7 @@ describe("replacing the factors after a spent code", () => {
     expect(answered.status).toBe(200);
     const added = issued.extend({ passkeyId: z.string() }).parse(await answered.json());
     expect(added.recoveryCodes).toHaveLength(10);
-    const held = await heldOn(client);
+    const held = await secondFactorOn(client);
     expect(held.passkeys.map((passkey) => passkey.id)).toEqual([added.passkeyId]);
     expect(held.authenticator).toBe("none");
     expect(held.thisSession).toMatchObject({ confirmed: true, setupGranted: false });
@@ -437,10 +437,10 @@ describe("replacing the factors after a spent code", () => {
 
     expect(finished.status).toBe(400);
     expect(await finished.json()).toEqual({ error: "code-wrong" });
-    expect((await heldOn(client)).passkeys).toHaveLength(1);
+    expect((await secondFactorOn(client)).passkeys).toHaveLength(1);
   });
 
-  it("refuses a finish from a session without the grant", async () => {
+  it("refuses a finish from a session without a setup grant", async () => {
     const { client } = await aPersonHoldingEverything(app());
 
     const finished = await client.json(REPLACE_FINISH, { code: "123456" });
@@ -449,8 +449,8 @@ describe("replacing the factors after a spent code", () => {
     expect(await finished.json()).toEqual({ error: "setup-not-granted" });
   });
 
-  it("refuses a first setup's start to a granted session", async () => {
-    const { client, recoveryCodes } = await aPersonHoldingCodesAlone();
+  it("refuses a first-setup start from a session with a grant", async () => {
+    const { client, recoveryCodes } = await aPersonWithOnlyRecoveryCodes();
     await client.json(RECOVERY, { code: recoveryCodes[0] });
 
     const started = await client.json("/authenticator/start", {});
@@ -459,8 +459,8 @@ describe("replacing the factors after a spent code", () => {
     expect(await started.json()).toEqual({ error: "replacement-setup-needed" });
   });
 
-  it("refuses a first setup's finish to a granted session", async () => {
-    const { client, recoveryCodes } = await aPersonHoldingCodesAlone();
+  it("refuses a first-setup finish from a session with a grant", async () => {
+    const { client, recoveryCodes } = await aPersonWithOnlyRecoveryCodes();
     const { setupAddress } = startedAnswer.parse(
       await (await client.json("/authenticator/start", {})).json(),
     );
@@ -470,10 +470,10 @@ describe("replacing the factors after a spent code", () => {
 
     expect(finished.status).toBe(409);
     expect(await finished.json()).toEqual({ error: "replacement-setup-needed" });
-    expect((await heldOn(client)).authenticator).toBe("awaiting-code");
+    expect((await secondFactorOn(client)).authenticator).toBe("awaiting-code");
   });
 
-  it("refuses a finish no setup was started for", async () => {
+  it("refuses a finish when no replacement setup was started", async () => {
     const { client, recoveryCodes } = await aPersonHoldingEverything(app());
     await client.json(RECOVERY, { code: recoveryCodes[0] });
 
@@ -491,7 +491,7 @@ const aRestoredPerson = async () => {
 };
 
 describe("setting up after an operator's restore", () => {
-  it("waits on the restore code before any setup", async () => {
+  it("refuses any setup until the restore code is entered", async () => {
     const { client } = await aRestoredPerson();
 
     const answers = [
@@ -505,7 +505,7 @@ describe("setting up after an operator's restore", () => {
     }
   });
 
-  it("refuses an add asked for before the restore", async () => {
+  it("refuses a passkey add requested before the restore", async () => {
     const { person, client } = await aPersonSignedIn(app());
     const asked = await client.json("/passkeys/add-options", { name: "Phone" });
     const response = aPasskeyDevice(client.origin).create(await asked.json());
@@ -517,7 +517,7 @@ describe("setting up after an operator's restore", () => {
     expect(await answered.json()).toEqual({ error: "restore-code-needed" });
   });
 
-  it("refuses an authenticator started before the restore", async () => {
+  it("refuses to finish an authenticator started before the restore", async () => {
     const { person, client } = await aPersonSignedIn(app());
     const { setupAddress } = startedAnswer.parse(
       await (await client.json("/authenticator/start", {})).json(),
@@ -528,10 +528,10 @@ describe("setting up after an operator's restore", () => {
 
     expect(finished.status).toBe(409);
     expect(await finished.json()).toEqual({ error: "restore-code-needed" });
-    expect((await heldOn(client)).authenticator).toBe("awaiting-code");
+    expect((await secondFactorOn(client)).authenticator).toBe("awaiting-code");
   });
 
-  it("refuses setup to a grant from before the restore", async () => {
+  it("refuses setup to a grant made before the restore", async () => {
     const { person, client, recoveryCodes } = await aPersonHoldingEverything(app());
     expect((await client.json(RECOVERY, { code: recoveryCodes[0] })).status).toBe(200);
     const restoredLater = new Date(Date.now() + 1000);
@@ -549,10 +549,10 @@ describe("setting up after an operator's restore", () => {
       { error: "restore-code-needed" },
       { error: "setup-not-granted" },
     ]);
-    expect((await heldOn(client)).thisSession?.setupGranted).toBe(false);
+    expect((await secondFactorOn(client)).thisSession?.setupGranted).toBe(false);
   });
 
-  it("refuses a recovery code and new codes while restored", async () => {
+  it("refuses using or replacing recovery codes after a restore", async () => {
     const { person, client, recoveryCodes } = await aPersonHoldingEverything(app());
     await restoredWithACode(app().database.superuser, person.email, new Date());
 
@@ -566,13 +566,13 @@ describe("setting up after an operator's restore", () => {
     expect(made).toMatchObject({
       data: { refusal: { word: "restore-code-needed", class: "precondition" } },
     });
-    const held = await heldOn(client);
+    const held = await secondFactorOn(client);
     expect(held.recoveryCodes?.unused).toBe(10);
     expect(held.thisSession?.setupGranted).toBe(false);
     expect(noticesTo(person.email, CODE_USED_NOTICE)).toBe(0);
   });
 
-  it("refuses a wrong or expired restore code, granting nothing", async () => {
+  it("refuses a wrong or expired restore code and grants nothing", async () => {
     const { person, client, code } = await aRestoredPerson();
     const wrong = await client.json(RESTORE, { code: "not-the-code" });
     await app().database.superuser.query(
@@ -584,10 +584,10 @@ describe("setting up after an operator's restore", () => {
 
     expect([wrong.status, expired.status]).toEqual([400, 400]);
     expect(await expired.json()).toEqual({ error: "restore-code-wrong" });
-    expect((await heldOn(client)).thisSession?.setupGranted).toBe(false);
+    expect((await secondFactorOn(client)).thisSession?.setupGranted).toBe(false);
   });
 
-  it("grants setup once for the right restore code", async () => {
+  it("grants replacement setup once for the correct restore code", async () => {
     const { client, code } = await aRestoredPerson();
 
     const accepted = await client.json(RESTORE, { code });
@@ -605,7 +605,7 @@ describe("setting up after an operator's restore", () => {
 });
 
 describe("the confirm and recovery routes", () => {
-  it.each(ROUTES)("refuses %s with no session", async (path) => {
+  it.each(ROUTES)("answers 401 at %s with no session", async (path) => {
     const answered = await app().client().json(path, {});
 
     expect(answered.status).toBe(401);
@@ -624,7 +624,7 @@ describe("the confirm and recovery routes", () => {
     expect(refused.status).toBe(403);
   });
 
-  it.each(ROUTES)("answers 429 at %s past ten tries", async (path) => {
+  it.each(ROUTES)("answers 429 at %s after ten calls", async (path) => {
     const { client } = await aPersonSignedIn(app());
     const statuses: number[] = [];
 
@@ -639,7 +639,7 @@ describe("the confirm and recovery routes", () => {
 });
 
 describe("an email sign-in", () => {
-  it("leaves the session unconfirmed, even with a factor held", async () => {
+  it("leaves the session unconfirmed when the person has a factor", async () => {
     const { person, client } = await aPersonWithAnAuthenticator(app());
 
     expect(await confirmedOf(client)).toBeNull();

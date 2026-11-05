@@ -14,7 +14,7 @@ const sessionIdOf = async (client: TestClient): Promise<string | null> =>
     .nullable()
     .parse(await (await client.fetch("/get-session")).json())?.session.id ?? null;
 
-const sessionsRead = z.array(
+const sessionList = z.array(
   z.strictObject({
     id: z.string(),
     device: z.string().min(1),
@@ -26,13 +26,13 @@ const sessionsRead = z.array(
 const aSecondSessionFor = async (email: string): Promise<TestClient> =>
   signedInClient(app(), email);
 
-describe("the person's sessions over the wire", () => {
-  it("answers the read's shape, the current session first", async () => {
+describe("the person's sessions through the web API", () => {
+  it("lists sessions in the expected shape, current session first", async () => {
     const { person, client } = await aPersonSignedIn(app());
     await aSecondSessionFor(person.email);
     const { api } = await webTabOf(client);
 
-    const held = sessionsRead.parse(await api.person.sessions.query());
+    const held = sessionList.parse(await api.person.sessions.query());
 
     expect(held).toHaveLength(2);
     expect(held[0]?.current).toBe(true);
@@ -40,13 +40,13 @@ describe("the person's sessions over the wire", () => {
     expect(new Set(held.map((session) => session.id)).size).toBe(2);
   });
 
-  it("signs one session out, ending it alone", async () => {
+  it("signs out one session and leaves the others", async () => {
     const { person, client } = await aPersonSignedIn(app());
     const elsewhere = await aSecondSessionFor(person.email);
     const { api } = await webTabOf(client);
-    const held = sessionsRead.parse(await api.person.sessions.query());
+    const held = sessionList.parse(await api.person.sessions.query());
     const other = held.find((session) => !session.current);
-    assert(other !== undefined, "the second session is listed");
+    assert(other !== undefined, "the second session is not listed");
     const mine = await sessionIdOf(client);
     expect(mine).not.toBeNull();
 
@@ -54,7 +54,7 @@ describe("the person's sessions over the wire", () => {
 
     expect(ended).toEqual({ ended: 1 });
     expect(await sessionIdOf(elsewhere)).toBeNull();
-    expect(await sessionIdOf(client), "the current session survives").toBe(mine);
+    expect(await sessionIdOf(client), "the current session was signed out").toBe(mine);
     const recorded = await app().database.superuser.query<{ detail: unknown }>(
       `SELECT detail FROM identity_audit_event
         WHERE subject_id = $1 AND action = 'people.person.sessions_ended'`,
@@ -77,21 +77,21 @@ describe("the person's sessions over the wire", () => {
     for (const elsewhere of [second, third]) {
       expect(await sessionIdOf(elsewhere)).toBeNull();
     }
-    expect(await sessionIdOf(client), "the current session survives").toBe(mine);
+    expect(await sessionIdOf(client), "the current session was signed out").toBe(mine);
   });
 
-  it("leaves a session past its expiry out of the read", async () => {
+  it("leaves an expired session out of the list", async () => {
     const { person, client } = await aPersonSignedIn(app());
     const expired = await aSeededSessionFor(app(), person.id, {}, new Date(Date.now() - 1_000));
     const { api } = await webTabOf(client);
 
-    const held = sessionsRead.parse(await api.person.sessions.query());
+    const held = sessionList.parse(await api.person.sessions.query());
 
     expect(held.map((session) => session.id)).not.toContain(expired);
     expect(held).toHaveLength(1);
   });
 
-  it("refuses a caller with no session", async () => {
+  it("answers 401 to a caller with no session", async () => {
     const client = app().client();
     const answered = await client.fetch("/trpc/person.sessions");
 

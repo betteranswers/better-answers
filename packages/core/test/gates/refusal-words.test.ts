@@ -194,16 +194,16 @@ const catalogueAsRead = (): Readonly<Record<string, string>> =>
     ]),
   );
 
-describe("the refusal-word walk", () => {
-  it("classes a word in one of seven classes", () => {
+describe("the refusal catalogue", () => {
+  it("has exactly seven refusal classes", () => {
     expect([...REFUSAL_CLASSES]).toEqual(SEVEN_CLASSES);
   });
 
-  it("holds one class and declaring slice for every union word", () => {
+  it("records each word's class and owning slice", () => {
     expect(catalogueAsRead()).toEqual(CATALOGUED);
   });
 
-  it("answers every word's class under one record", () => {
+  it("classesIn maps every word to its class", () => {
     const classes = Object.fromEntries(
       Object.entries(CATALOGUED).map(([word, said]) => [word, said.split(" by ")[0]]),
     );
@@ -212,7 +212,7 @@ describe("the refusal-word walk", () => {
   });
 
   it.skipIf(sourceTreeIsInstrumented())(
-    "matches the catalogue and every refusal union's words both ways",
+    "holds exactly the words the source's refusal unions use",
     () => {
       const held = new Set(Object.keys(catalogueAsRead()));
       const named = wordsInRefusalUnions(coreSourceFiles());
@@ -223,7 +223,7 @@ describe("the refusal-word walk", () => {
     },
   );
 
-  it("refuses a word a second owner declares, naming both", () => {
+  it("throws on a word two slices declare, naming both", () => {
     const restated = { ...REFUSAL_CATALOGUE, transport: { "no-such-binding": "absent" } } as const;
 
     expect(() => refusalsIn(restated)).toThrow(
@@ -231,21 +231,21 @@ describe("the refusal-word walk", () => {
     );
   });
 
-  it("refuses a word that is not lower case and hyphenated", () => {
+  it("throws on a word that is not lower-case and hyphenated", () => {
     expect(() => refusalsIn({ sources: { NoSuchThing: "absent" } })).toThrow(
       "refusal: NoSuchThing is not a refusal word, which is lower case and hyphenated",
     );
   });
 
-  it("builds a union from a declared word and no other", () => {
+  it("types a union only from words a slice declared", () => {
     expectTypeOf<SourceRefusal<"no-such-binding">>().toEqualTypeOf<"no-such-binding">();
-    // @ts-expect-error — a word no slice declared is no refusal word.
+    // @ts-expect-error — no slice declares "no-such-thing".
     expectTypeOf<SourceRefusal<"no-such-thing">>().toBeString();
-    // @ts-expect-error — a store door's own word is a defect, never a refusal.
+    // @ts-expect-error — "no-bucket" is a store door's defect, not a refusal word.
     expectTypeOf<SourceRefusal<"no-bucket">>().toBeString();
   });
 
-  it("answers an action's union in catalogued words alone", () => {
+  it("types each action's refusals in catalogued words only", () => {
     expectTypeOf<ConnectUploadRefusal>().toExtend<EveryCataloguedWord | Error>();
     expectTypeOf<ProvisionRefusal>().toExtend<EveryCataloguedWord>();
     expectTypeOf<AddMemberRefusal>().toExtend<EveryCataloguedWord>();
@@ -266,7 +266,7 @@ describe("the refusal-word walk", () => {
     >();
   });
 
-  it("classes every word the git door's commit answers", () => {
+  it("catalogues every refusal the git door's commit returns", () => {
     expectTypeOf<CommitRefusal>().toExtend<WriteConceptRefusal>();
     expectTypeOf<CommitRefusal>().toExtend<EveryCataloguedWord>();
     expectTypeOf<WriteConceptRefusal>().toExtend<EveryCataloguedWord>();
@@ -275,7 +275,7 @@ describe("the refusal-word walk", () => {
     expectTypeOf<CommitRefusal | "invented">().not.toExtend<EveryCataloguedWord>();
   });
 
-  it("names each refused item in a catalogued word alone", () => {
+  it("types each refused item's word as a catalogued word", () => {
     expectTypeOf<RefusedItems<MemberRefusal<"last-admin" | "no-such-member">>>().toEqualTypeOf<{
       readonly word: "last-admin" | "no-such-member";
       readonly items: Readonly<Record<string, "last-admin" | "no-such-member">>;
@@ -284,11 +284,11 @@ describe("the refusal-word walk", () => {
       readonly word: EveryCataloguedWord;
       readonly items: Readonly<Record<string, EveryCataloguedWord>>;
     }>();
-    // @ts-expect-error — an item's word must be a word some slice declared.
+    // @ts-expect-error — no slice declares "no-such-thing".
     expectTypeOf<RefusedItems<MemberRefusal<"no-such-thing">>>().toBeObject();
   });
 
-  it("answers a bulk action's items in catalogued words alone", () => {
+  it("types a bulk action's refused items in catalogued words only", () => {
     type Answered = EveryCataloguedWord | RefusedItems<EveryCataloguedWord> | Error;
     expectTypeOf<BulkChangeRoleRefusal>().toExtend<Answered>();
     expectTypeOf<BulkRemoveMembersRefusal>().toExtend<Answered>();

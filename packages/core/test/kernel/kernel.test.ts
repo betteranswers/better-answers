@@ -32,7 +32,7 @@ const bootstrap: PlatformPrincipal = {
   actorId: "process:better-answers-bootstrap",
 };
 
-describe("the actor a record names", () => {
+describe("the actor id a record stores", () => {
   it("names a person by their person id, never an email", () => {
     expect(actorIdOf(person("Editor"))).toBe("human:01JQ0000000000000000000PER");
   });
@@ -41,19 +41,19 @@ describe("the actor a record names", () => {
     expect(actorIdOf(bootstrap)).toBe("process:better-answers-bootstrap");
   });
 
-  it("refuses a bare string where an actor id belongs", () => {
+  it("rejects a plain string typed as an actor id", () => {
     expectTypeOf<string>().not.toExtend<ActorId>();
     expectTypeOf<"human:01JQ">().toExtend<ActorId>();
     expectTypeOf<"process:better-answers-erasure">().toExtend<ActorId>();
     expectTypeOf<"better-answers-import/1.2">().toExtend<ActorId>();
 
-    // @ts-expect-error — an actor id no code minted is the shape the audit trail rests on.
+    // @ts-expect-error — an email string is not an actor id.
     const composed: ActorId = "priya@example.com";
     expect(composed).toBe("priya@example.com");
   });
 });
 
-describe("the try/catch every slice entry point wraps its library in", () => {
+describe("attempt, the try/catch around each slice's library calls", () => {
   const errorOfThrown = async (
     thrown: unknown,
   ): Promise<{ isError: boolean; message: string; cause: unknown }> => {
@@ -68,7 +68,7 @@ describe("the try/catch every slice entry point wraps its library in", () => {
     };
   };
 
-  it("keeps the driver's own Error, its class and fields intact", async () => {
+  it("returns the driver's thrown Error object unchanged", async () => {
     const thrown = Object.assign(new TypeError("deadlock detected"), {
       constraint: "member_pkey",
     });
@@ -89,7 +89,7 @@ describe("the try/catch every slice entry point wraps its library in", () => {
     });
   });
 
-  it("names any other thrown value, kept as the cause", async () => {
+  it("wraps any other thrown value, keeping it as the cause", async () => {
     const thrown = { code: 42 };
 
     expect(await errorOfThrown(thrown)).toEqual({
@@ -100,19 +100,19 @@ describe("the try/catch every slice entry point wraps its library in", () => {
   });
 });
 
-describe("attemptResult, for an operation that answers a Result", () => {
-  it("answers the operation's value as it came", async () => {
+describe("attemptResult, for an operation that returns a Result", () => {
+  it("returns the operation's value unchanged", async () => {
     expect(await attemptResult(async () => ok("landed"))).toEqual({ ok: true, value: "landed" });
   });
 
-  it("answers the operation's refusal as it came", async () => {
+  it("returns the operation's refusal unchanged", async () => {
     expect(await attemptResult(async () => err("rename-refused"))).toEqual({
       ok: false,
       error: "rename-refused",
     });
   });
 
-  it("answers a rejection as the normalised Error, beside the refusals", async () => {
+  it("returns a rejection as an Error alongside the refusal types", async () => {
     const answered = await attemptResult(async (): Promise<Result<string, "held">> => {
       // oxlint-disable-next-line typescript/only-throw-error -- the test throws a non-Error to prove attemptResult normalises it
       throw "the socket hung up";
@@ -124,10 +124,10 @@ describe("attemptResult, for an operation that answers a Result", () => {
   });
 });
 
-describe("reading a store's constraint names into a slice's words", () => {
+describe("refusalFor, mapping a store's constraint names to refusal words", () => {
   const named = { workspace_short_name_unique: "slug-taken" } as const;
 
-  it("answers the mapped refusal word for a named constraint", () => {
+  it("returns the mapped refusal word for the error's constraint", () => {
     const violation = Object.assign(new Error("duplicate key value violates unique constraint"), {
       constraint: "workspace_short_name_unique",
     });
@@ -135,7 +135,7 @@ describe("reading a store's constraint names into a slice's words", () => {
     expect(refusalFor(violation, named)).toBe("slug-taken");
   });
 
-  it("falls back to the constraint named in the message", () => {
+  it("falls back to the constraint named in the error message", () => {
     const violation = new Error(
       'duplicate key value violates unique constraint "workspace_short_name_unique"',
     );
@@ -143,13 +143,13 @@ describe("reading a store's constraint names into a slice's words", () => {
     expect(refusalFor(violation, named)).toBe("slug-taken");
   });
 
-  it("hands back the store's own error for an unmapped constraint", () => {
+  it("returns the store's error for an unmapped constraint", () => {
     const failure = Object.assign(new Error("deadlock detected"), { constraint: "member_pkey" });
 
     expect(refusalFor(failure, named)).toBe(failure);
   });
 
-  it("answers for the violated constraint, not one its name contains", () => {
+  it("matches the whole constraint name, not a name inside it", () => {
     const overlapping = { member_pkey: "one", member_pkey_v2: "the other" } as const;
     const violation = Object.assign(
       new Error('duplicate key value violates unique constraint "member_pkey_v2"'),
@@ -160,8 +160,8 @@ describe("reading a store's constraint names into a slice's words", () => {
   });
 });
 
-describe("the shape of a name a store can hand back", () => {
-  it("takes a relative name made of plain segments", () => {
+describe("isPortablePath, the path shape a store accepts", () => {
+  it("accepts a relative path of plain segments", () => {
     expect(isPortablePath("knowledge/expenses.md")).toBe(true);
     expect(
       isPortablePath("erasures/01JQ0000000000000000000WSP/01JQ00000000000000000ERQ.json"),
@@ -170,7 +170,7 @@ describe("the shape of a name a store can hand back", () => {
     expect(isPortablePath(".hidden/..trailing/a..b")).toBe(true);
   });
 
-  it("refuses a dot segment, wherever in the name it sits", () => {
+  it("rejects a . or .. segment anywhere in the path", () => {
     expect(isPortablePath(".")).toBe(false);
     expect(isPortablePath("..")).toBe(false);
     expect(isPortablePath("knowledge/./expenses.md")).toBe(false);
@@ -178,7 +178,7 @@ describe("the shape of a name a store can hand back", () => {
     expect(isPortablePath("knowledge/expenses.md/..")).toBe(false);
   });
 
-  it("refuses an empty name, empty segment or edge separator", () => {
+  it("rejects empty paths, empty segments, and leading or trailing slashes", () => {
     expect(isPortablePath("")).toBe(false);
     expect(isPortablePath("/")).toBe(false);
     expect(isPortablePath("/knowledge/expenses.md")).toBe(false);
@@ -186,7 +186,7 @@ describe("the shape of a name a store can hand back", () => {
     expect(isPortablePath("knowledge/expenses.md/")).toBe(false);
   });
 
-  it("refuses a control character, which a listing would quote", () => {
+  it("rejects a control character but accepts a space", () => {
     expect(isPortablePath("knowledge/expenses\u0000.md")).toBe(false);
     expect(isPortablePath("knowledge/expenses\t.md")).toBe(false);
     expect(isPortablePath("knowledge/expenses\n.md")).toBe(false);
@@ -196,7 +196,7 @@ describe("the shape of a name a store can hand back", () => {
     expect(isPortablePath("knowledge/travel expenses.md")).toBe(true);
   });
 
-  it("takes a name outside the ASCII range", () => {
+  it("accepts non-ASCII characters", () => {
     expect(isPortablePath("knowledge/dépenses.md")).toBe(true);
     expect(isPortablePath("knowledge/\u{1d11e}.md")).toBe(true);
   });

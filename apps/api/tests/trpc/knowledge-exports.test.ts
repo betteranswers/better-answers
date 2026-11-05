@@ -44,9 +44,9 @@ const aWorkspaceHoldingAGuide = async () => {
   return { workspace, seeded };
 };
 
-describe("the exports over tRPC", () => {
+describe("the knowledge exports over tRPC", () => {
   it.each(["Editor", "Viewer"] as const)(
-    "refuses each export at %s, role-forbids",
+    "refuses every export to a %s with role-forbids",
     async (role) => {
       const calls = [
         (api: Api) => api.knowledge.exportBundle.mutate({}),
@@ -60,7 +60,7 @@ describe("the exports over tRPC", () => {
     },
   );
 
-  it("answers an Admin the knowledge base as a zip", async () => {
+  it("exports the knowledge base to an Admin as a zip", async () => {
     const { workspace } = await aWorkspaceHoldingAGuide();
     await seedManifest(app(), { workspaceId: workspace.workspaceId, userId: workspace.admin.id });
     const { api } = await webSignedIn(app(), workspace.admin.email);
@@ -74,7 +74,7 @@ describe("the exports over tRPC", () => {
     expect(entries.filter((entry) => !entry.startsWith("knowledge/"))).toEqual([]);
   });
 
-  it("answers an Admin the records as three tables", async () => {
+  it("exports the records to an Admin as three CSV files", async () => {
     const { workspace } = await aWorkspaceHoldingAGuide();
     const { api } = await webSignedIn(app(), workspace.admin.email);
 
@@ -88,7 +88,7 @@ describe("the exports over tRPC", () => {
     expect(file.families).toEqual(["owners", "verifications", "usage"]);
   });
 
-  it("answers an Admin the guide, recording its usage", async () => {
+  it("exports a guide to an Admin and records its usage", async () => {
     const { workspace, seeded } = await aWorkspaceHoldingAGuide();
     const { workspaceId } = workspace;
     const { api } = await webSignedIn(app(), workspace.admin.email);

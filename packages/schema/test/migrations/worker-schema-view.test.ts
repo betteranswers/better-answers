@@ -31,7 +31,7 @@ const tableNames = (pythonSource: string): Set<string> =>
   new Set([...pythonSource.matchAll(/^ {4}"([^"]+)": \{$/gm)].map((match) => match[1] ?? ""));
 
 describe("the worker's schema view", () => {
-  it("knows every table the migrated database holds, and no other", async () => {
+  it("names every table in the migrated database, and no other", async () => {
     const rows = await introspect(db.pool);
     assertNoUndeclaredTables(rows);
 
@@ -39,12 +39,12 @@ describe("the worker's schema view", () => {
     const committed = tableNames(readFileSync(viewPath, "utf8"));
 
     const stale = [...migrated].filter((name) => !committed.has(name));
-    expect(stale, "tables the committed view is missing — regenerate it").toEqual([]);
+    expect(stale, "the committed view is missing these tables, so regenerate it").toEqual([]);
     const unknown = [...committed].filter((name) => !migrated.has(name));
-    expect(unknown, "tables the journal does not know — the view claims too much").toEqual([]);
+    expect(unknown, "the committed view names tables the migrated database lacks").toEqual([]);
   });
 
-  it("matches a regeneration and carries the last migration id", async () => {
+  it("matches its regeneration and names the last migration", async () => {
     const migration = lastMigration();
 
     const regenerated = renderWorkerSchemaView(await introspect(db.pool), migration);
@@ -52,7 +52,7 @@ describe("the worker's schema view", () => {
     expect(regenerated).toContain(`MIGRATION_ID = "${migration.tag}"`);
   });
 
-  it("stamps the instant the migrator wrote, for the worker's check", async () => {
+  it("stores the migrator's timestamp for the worker's check", async () => {
     const migration = lastMigration();
     const stamped = await db.pool.query<{ created_at: string }>(
       "SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC LIMIT 1",
@@ -62,7 +62,7 @@ describe("the worker's schema view", () => {
     expect(Number(stamped.rows[0]?.created_at)).toBe(migration.when);
   });
 
-  it("refuses a journal whose migrations share an instant", () => {
+  it("refuses a journal where two migrations share a timestamp", () => {
     const entries = journalEntries();
     expect(entries.map((entry) => entry.when)).toEqual(
       entries.map((entry) => entry.when).toSorted((a, b) => a - b),
@@ -70,7 +70,7 @@ describe("the worker's schema view", () => {
     expect(new Set(entries.map((entry) => entry.when)).size).toBe(entries.length);
 
     const last = entries.at(-1);
-    assert(last !== undefined, "the journal has an entry");
+    assert(last !== undefined, "the journal has no entries");
 
     const later = { idx: 9999, tag: "9999_a-second-at-the-same-instant", when: last.when };
     expect(journalEntriesOf({ entries: [...entries, later] })).toEqual({

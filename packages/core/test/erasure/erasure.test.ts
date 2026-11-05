@@ -79,7 +79,7 @@ const workspaceWithARequest = async () => {
 };
 
 describe("recording a subject request", () => {
-  it("lands the request and its audit event, counting the identifiers", async () => {
+  it("writes the request and an audit event counting its identifiers", async () => {
     const { scenario, subject, recorded, requestId } = await workspaceWithARequest();
 
     assert(recorded.ok, inspect(recorded));
@@ -132,7 +132,7 @@ describe("recording a subject request", () => {
     ).toMatchObject([{ detail: { identifierCount: 2 } }]);
   });
 
-  it("writes the identifier set the boundary parsed, trimmed of spaces", async () => {
+  it("stores the identifiers with surrounding whitespace trimmed", async () => {
     const scenario = await arrange();
 
     const recorded = await recordingAs(
@@ -154,7 +154,7 @@ describe("recording a subject request", () => {
     ]);
   });
 
-  it("leaves no request when the audit log refuses the event", async () => {
+  it("writes no request when the audit event write fails", async () => {
     const scenario = await arrange();
 
     await whileWritesAreRefused(db().pool, "audit_event", async () => {
@@ -169,7 +169,7 @@ describe("recording a subject request", () => {
     ).toEqual([]);
   });
 
-  it("refuses an Editor and a Viewer before a row exists", async () => {
+  it("refuses an Editor and a Viewer and writes no row", async () => {
     const scenario = await arrange();
 
     for (const person of [scenario.editor, scenario.viewer]) {
@@ -179,7 +179,7 @@ describe("recording a subject request", () => {
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses an unknown kind before a row exists", async () => {
+  it("refuses an unknown kind and writes no row", async () => {
     const scenario = await arrange();
 
     expect(await recordingAs(scenario.admin, requestOf({ kind: "portability" }))).toEqual({
@@ -189,7 +189,7 @@ describe("recording a subject request", () => {
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses a one-word name, which would withhold an ordinary word", async () => {
+  it("refuses a one-word name as too broad to withhold", async () => {
     const scenario = await arrange();
 
     const recorded = await recordingAs(
@@ -216,28 +216,25 @@ describe("recording a subject request", () => {
     ["an email", { emails: ["x@"], names: [], other: [] }, "x@"],
     ["a name", { emails: [], names: ["Al"], other: [] }, "Al"],
     ["another identifier", { emails: [], names: [], other: ["7\n "] }, "7"],
-  ])(
-    "refuses %s under three characters, which withholds ordinary words",
-    async (_kind, identifiers, refused) => {
-      const scenario = await arrange();
+  ])("refuses %s under three characters as too broad", async (_kind, identifiers, refused) => {
+    const scenario = await arrange();
 
-      const recorded = await recordingAs(
-        scenario.admin,
-        requestOf({ kind: "erasure", identifiers: { ...IDENTIFIERS, ...identifiers } }),
-      );
+    const recorded = await recordingAs(
+      scenario.admin,
+      requestOf({ kind: "erasure", identifiers: { ...IDENTIFIERS, ...identifiers } }),
+    );
 
-      expect(recorded).toEqual({
-        ok: false,
-        error: {
-          word: "identifier-too-broad",
-          said:
-            `The identifier "${refused}" is too broad to withhold: one under 3 characters ` +
-            "would withhold those characters in every document of the workspace.",
-        },
-      });
-      expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
-    },
-  );
+    expect(recorded).toEqual({
+      ok: false,
+      error: {
+        word: "identifier-too-broad",
+        said:
+          `The identifier "${refused}" is too broad to withhold: one under 3 characters ` +
+          "would withhold those characters in every document of the workspace.",
+      },
+    });
+    expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
+  });
 
   it("records a two-word name and a three-character identifier", async () => {
     const scenario = await arrange();
@@ -249,7 +246,7 @@ describe("recording a subject request", () => {
     expect(await requestRowsIn(scenario.workspaceId)).toMatchObject([{ identifiers }]);
   });
 
-  it("answers an error, landing nothing, for a clock started early", async () => {
+  it("fails and writes nothing when the clock starts before receipt", async () => {
     const scenario = await arrange();
 
     const recorded = await recordingAs(
@@ -262,8 +259,8 @@ describe("recording a subject request", () => {
   });
 });
 
-describe("the clock", () => {
-  it("is one month on across month and year ends", () => {
+describe("the due date of a subject request", () => {
+  it("falls one month later, across month and year ends", () => {
     expect(dueDateOf(new Date("2026-04-02T11:00:00.000Z"))).toEqual(
       new Date("2026-05-02T11:00:00.000Z"),
     );
@@ -285,7 +282,7 @@ describe("the clock", () => {
     );
   });
 
-  it("answers the 29th in a leap February", () => {
+  it("falls on 29 February in a leap year", () => {
     expect(dueDateOf(new Date("2028-01-31T09:00:00.000Z"))).toEqual(
       new Date("2028-02-29T09:00:00.000Z"),
     );
@@ -294,7 +291,7 @@ describe("the clock", () => {
     );
   });
 
-  it("falls due in the factory's rows as dueDateOf reckons", async () => {
+  it("matches dueDateOf in rows the seed factory writes", async () => {
     const scenario = await arrange();
     const started = [
       new Date("2026-01-31T09:00:00.000Z"),
@@ -317,7 +314,7 @@ describe("the clock", () => {
     expect(seeded.map((row) => row.dueAt)).toEqual(started.map(dueDateOf));
   });
 
-  it("answers the extension once taken, and the month before", async () => {
+  it("is the extension date when the request has one", async () => {
     const scenario = await arrange();
     const extended = new Date("2026-07-02T11:00:00.000Z");
 
@@ -344,7 +341,7 @@ describe("the clock", () => {
 });
 
 describe("reading a subject request", () => {
-  it("hands the Admin the row, refusing an Editor and Viewer", async () => {
+  it("returns the row to an Admin and refuses other roles", async () => {
     const { scenario, subject, requestId } = await workspaceWithARequest();
 
     expect(await readingRequestAs(scenario.admin, requestId)).toEqual({
@@ -372,7 +369,7 @@ describe("reading a subject request", () => {
     }
   });
 
-  it("finds no request held elsewhere and refuses a malformed id", async () => {
+  it("refuses another workspace's request and a malformed id", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const theirs = await recordingAs(elsewhere.admin, requestOf());

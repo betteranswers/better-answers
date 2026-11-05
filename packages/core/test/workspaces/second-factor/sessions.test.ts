@@ -150,7 +150,7 @@ const idsHeld = async (personId: string) =>
   ).rows.map((row) => row.id);
 
 describe("reading a person's own sessions", () => {
-  it("lists the person's sessions alone, the current one first", async () => {
+  it("lists only the person's sessions, current one first", async () => {
     const person = await aPersonWith(3);
     const other = await aPersonWith(1);
 
@@ -172,7 +172,7 @@ describe("reading a person's own sessions", () => {
     ).not.toContain(sessionAt(other, 0));
   });
 
-  it("carries no field holding an address", async () => {
+  it("returns no IP address field", async () => {
     const person = await aPersonWith(1);
 
     const held = answered(await read(person, 0));
@@ -181,7 +181,7 @@ describe("reading a person's own sessions", () => {
     expect(JSON.stringify(held)).not.toMatch(/ip/i);
   });
 
-  it("names an agent it cannot read as an unknown device", async () => {
+  it("shows an unreadable user agent as an unknown device", async () => {
     const person = await aPersonWith(2, AN_UNREADABLE_AGENT);
 
     const held = answered(await read(person, 0));
@@ -189,7 +189,7 @@ describe("reading a person's own sessions", () => {
     expect(held.map((session) => session.device)).toEqual(["Unknown device", "Unknown device"]);
   });
 
-  it("refuses an id the boundary does not name", async () => {
+  it("refuses malformed person and session ids", async () => {
     await aPersonWith(1);
 
     expect(
@@ -200,19 +200,22 @@ describe("reading a person's own sessions", () => {
     });
   });
 
-  it("leaves a session past its expiry unlisted", async () => {
+  it("does not list an expired session", async () => {
     const person = await aPersonWith(1);
     const expired = await anExpiredSessionOf(person);
 
     const held = answered(await read(person, 0));
 
     expect(held.map((session) => session.id)).toEqual([sessionAt(person, 0)]);
-    expect(await idsHeld(person.personId), "the row is the sweep's to delete").toContain(expired);
+    expect(
+      await idsHeld(person.personId),
+      "the read deleted the expired session row instead of leaving it for the sweep",
+    ).toContain(expired);
   });
 });
 
 describe("signing one session out", () => {
-  it("ends it, keeps the current one, and records it", async () => {
+  it("ends the session, keeps the current one, and records it", async () => {
     const person = await aPersonWith(2);
 
     const ended = await signOut(person, 0);
@@ -236,7 +239,7 @@ describe("signing one session out", () => {
     expect(await recordsOf(person.personId)).toEqual([]);
   });
 
-  it("refuses a session no one holds, ending nothing", async () => {
+  it("refuses an unknown session, ending nothing", async () => {
     const person = await aPersonWith(1);
 
     const refused = await signOutOf(person, NOBODY_HOLDING);
@@ -258,7 +261,7 @@ describe("signing one session out", () => {
 });
 
 describe("signing every other session out", () => {
-  it("ends the rest, keeps the current one, and records each", async () => {
+  it("ends the other sessions, keeps the current one, records each", async () => {
     const person = await aPersonWith(3);
 
     const ended = await signOutOthers(person, 1);
@@ -270,7 +273,7 @@ describe("signing every other session out", () => {
     ]);
   });
 
-  it("writes no record when this session is alone", async () => {
+  it("writes no record when there is no other session", async () => {
     const person = await aPersonWith(1);
 
     const ended = await signOutOthers(person, 0);
@@ -311,7 +314,7 @@ describe("signing every other session out", () => {
     expect(accessHeld.rowCount).toBe(1);
   });
 
-  it("ends the live sessions alone, and records those", async () => {
+  it("ends and records only the unexpired sessions", async () => {
     const person = await aPersonWith(2);
     const expired = await anExpiredSessionOf(person);
 

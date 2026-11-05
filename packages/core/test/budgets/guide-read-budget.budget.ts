@@ -73,14 +73,14 @@ const erasureMapReadMs = async ({ scenario, subjectRequestId }: Seeded) => {
   });
 };
 
-describe("the guide records' reads at 3,000 concepts", () => {
+describe("reading guide records at 3,000 concepts", () => {
   let seeded: Seeded;
 
   beforeAll(async () => {
     seeded = await seedTheGuideRecords();
   }, 600_000);
 
-  it("records the footnote read and the erasure map", async () => {
+  it("times the footnote read and the erasure map read", async () => {
     const footnoteReads: { readonly ms: number; readonly footnotes: number }[] = [];
     for (let read = 0; read < FOOTNOTE_READS; read += 1) {
       footnoteReads.push(await footnoteReadMs(seeded));

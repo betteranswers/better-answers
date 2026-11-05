@@ -37,6 +37,6 @@ it.each([
       monthly: "2026-08-01T12:00:00.000Z",
     },
   ],
-])("dates beyond use from %s by calendar interval", (anchoredAt, expected) => {
+])("computes the beyond-use dates from %s by calendar interval", (anchoredAt, expected) => {
   expect(isoOf(beyondUseFrom(new Date(anchoredAt)))).toEqual(expected);
 });

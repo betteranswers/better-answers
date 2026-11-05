@@ -59,8 +59,8 @@ const added = async (personId: string, passkeyId: string, sessionId: string) =>
     carried: ITS_OWN_AGE,
   });
 
-describe("recording a passkey added", () => {
-  it("records it by id and confirms the adding session", async () => {
+describe("recording a new passkey", () => {
+  it("records the passkey by id and confirms its session", async () => {
     const personId = await seedPerson(db().pool);
     const passkeyId = await passkeyFor(db().pool, personId);
     const sessionId = await aSession(personId);
@@ -74,7 +74,7 @@ describe("recording a passkey added", () => {
     ]);
   });
 
-  it("issues no codes to someone needing no factor", async () => {
+  it("issues no codes to someone who needs no second factor", async () => {
     const personId = await seedPerson(db().pool);
     const passkeyId = await passkeyFor(db().pool, personId);
 
@@ -123,7 +123,7 @@ describe("recording a passkey added", () => {
     expect(await recoveryCodesHeldBy(adminUserId)).toBe(1);
   });
 
-  it("stamps no session another person holds", async () => {
+  it("confirms no session that belongs to another person", async () => {
     const personId = await seedPerson(db().pool);
     const passkeyId = await passkeyFor(db().pool, personId);
     const strangersSession = await aSession(await seedPerson(db().pool));
@@ -134,7 +134,7 @@ describe("recording a passkey added", () => {
     expect(await confirmedAt(strangersSession)).toBeNull();
   });
 
-  it("refuses a passkey another person holds, recording nothing", async () => {
+  it("refuses another person's passkey, recording nothing", async () => {
     const personId = await seedPerson(db().pool);
     const strangersPasskey = await passkeyFor(db().pool, await seedPerson(db().pool));
     const sessionId = await aSession(personId);
@@ -194,7 +194,7 @@ describe("renaming a passkey", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("takes a name exactly at the limit", async () => {
+  it("accepts a name exactly at the limit", async () => {
     const personId = await seedPerson(db().pool);
     const passkeyId = await passkeyFor(db().pool, personId);
     const name = "é".repeat(PASSKEY_NAME_MAX_LENGTH);
@@ -219,7 +219,7 @@ describe("renaming a passkey", () => {
 });
 
 describe("removing a passkey", () => {
-  it("lets someone needing no factor remove their only one", async () => {
+  it("lets someone who needs no factor remove their only passkey", async () => {
     const personId = await seedPerson(db().pool);
     const passkeyId = await passkeyFor(db().pool, personId);
     await recordPasskeyUse(bootstrap, door(), {
@@ -269,7 +269,7 @@ describe("removing a passkey", () => {
     expect(removed).toEqual({ ok: true, value: { passkeyId } });
   });
 
-  it("leaves an Admin one of two passkeys removed at once", async () => {
+  it("keeps one of an Admin's two passkeys removed concurrently", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     const passkeys = [
       await passkeyFor(db().pool, adminUserId),
@@ -304,7 +304,7 @@ describe("removing a passkey", () => {
 });
 
 describe("recording a passkey's use", () => {
-  it("keeps the latest use of the passkey holding the credential", async () => {
+  it("stores the latest use time for the credential's passkey", async () => {
     const personId = await seedPerson(db().pool);
     const passkeyId = await passkeyFor(db().pool, personId);
     const credentialId = await credentialOf(passkeyId);
@@ -315,7 +315,7 @@ describe("recording a passkey's use", () => {
     expect(await lastUseOf(passkeyId)).toEqual(LATER);
   });
 
-  it("writes nothing for a credential no passkey holds", async () => {
+  it("writes nothing for an unknown credential", async () => {
     const used = await recordPasskeyUse(bootstrap, door(), {
       credentialId: "no-such-credential",
       at: AT,
@@ -326,7 +326,7 @@ describe("recording a passkey's use", () => {
 });
 
 describe("dismissing the passkey offer", () => {
-  it("keeps the first dismissal, which the second-factor read answers", async () => {
+  it("keeps the first dismissal time, which the second-factor read returns", async () => {
     const personId = await seedPerson(db().pool);
 
     const first = await dismissPasskeyOffer(bootstrap, door(), { personId, now: AT });
@@ -348,7 +348,7 @@ describe("dismissing the passkey offer", () => {
     });
   });
 
-  it("refuses a person nobody holds", async () => {
+  it("refuses an unknown person", async () => {
     const dismissed = await dismissPasskeyOffer(bootstrap, door(), {
       personId: "01J00000000000000000000000",
       now: AT,

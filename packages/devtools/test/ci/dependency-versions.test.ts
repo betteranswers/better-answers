@@ -33,19 +33,19 @@ const renovateSchema = z.object({
 
 const packageRules = renovateSchema.parse(JSON.parse(read("renovate.json"))).packageRules;
 
-const holdOn = (pattern: string): string => {
+const allowedVersionsFor = (pattern: string): string => {
   const hold = packageRules.find(
     (rule) => rule.allowedVersions !== undefined && rule.matchPackageNames?.includes(pattern),
   )?.allowedVersions;
   if (hold === undefined) {
     throw new Error(
-      `renovate.json holds no version for ${pattern}, and a deleted hold must fail here rather than read as one that matches`,
+      `renovate.json has no allowedVersions rule for ${pattern}. The test fails here so that a deleted rule does not pass as a matching version.`,
     );
   }
   return hold;
 };
 
-const installedWithThePasskeyPlugin = (name: string): z.infer<typeof manifestSchema> =>
+const installedInApi = (name: string): z.infer<typeof manifestSchema> =>
   manifestOf(path.join("apps/api/node_modules", name, "package.json"));
 
 const ceilingOf = (caretRange: string | undefined): string => {
@@ -54,24 +54,23 @@ const ceilingOf = (caretRange: string | undefined): string => {
   return `<${Number(major) + 1}`;
 };
 
-describe("renovate.json's better-auth holds", () => {
+describe("the better-auth version rules in renovate.json", () => {
   it("holds @better-auth/utils at the version better-auth depends on", () => {
-    const required =
-      installedWithThePasskeyPlugin("better-auth").dependencies["@better-auth/utils"];
+    const required = installedInApi("better-auth").dependencies["@better-auth/utils"];
 
     expect(required).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(holdOn("@better-auth/utils")).toBe(required);
+    expect(allowedVersionsFor("@better-auth/utils")).toBe(required);
     expect(manifestOf("apps/api/package.json").dependencies["@better-auth/utils"]).toBe(required);
   });
 
-  it("holds @simplewebauthn below the next major passkey takes", () => {
-    const passkey = installedWithThePasskeyPlugin("@better-auth/passkey").dependencies;
+  it("holds @simplewebauthn below the next major of @better-auth/passkey's range", () => {
+    const passkey = installedInApi("@better-auth/passkey").dependencies;
     const ceilings = ["@simplewebauthn/server", "@simplewebauthn/browser"].map((name) =>
       ceilingOf(passkey[name]),
     );
 
     expect(new Set(ceilings).size).toBe(1);
-    expect(holdOn("@simplewebauthn/**")).toBe(ceilings[0]);
+    expect(allowedVersionsFor("@simplewebauthn/**")).toBe(ceilings[0]);
   });
 
   it("groups better-auth after the npm non-major rule", () => {
@@ -94,7 +93,7 @@ const pinsOf = (directory: string): readonly (readonly [string, string])[] => {
 };
 
 describe("the workspaces' manifests", () => {
-  it("name each external package at one version", () => {
+  it("pin each external package at one version", () => {
     const named = Map.groupBy(
       rootAndWorkspaceManifests().flatMap((directory) =>
         pinsOf(directory).map(([name, version]) => ({ name, directory, version })),
@@ -110,11 +109,11 @@ describe("the workspaces' manifests", () => {
 
     expect(
       rootAndWorkspaceManifests().length,
-      "the root manifest counts: it pins the same lint and type tools devtools does",
+      "fewer than five manifests were read. Read the root package.json too, because it pins the same lint and type tools as packages/devtools.",
     ).toBeGreaterThan(4);
     expect(
       split,
-      "two workspaces name one package at two versions, so the lock carries two copies. Move them together.",
+      "two manifests name one package at different versions, so the lockfile keeps two copies. Set every manifest to the same version.",
     ).toEqual([]);
   });
 });

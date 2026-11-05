@@ -1042,19 +1042,19 @@ const unrefinedOf = (
   return found;
 };
 
-describe("1 — every table has a boundary", () => {
+describe("1. every table has a boundary schema", () => {
   it("registers exactly the PgTables the public entry point exports", () => {
     const exportedTables = Object.values(publicEntry).filter((value) => is(value, PgTable));
     const registeredTables = registryNames.map((name) => boundarySchemas[name].table);
     expect(new Set(registeredTables)).toEqual(new Set(exportedTables));
   });
 
-  it("has an accepted row for exactly the registered tables", () => {
+  it("has an accepted sample row for exactly the registered tables", () => {
     expect(Object.keys(acceptedRows).toSorted()).toEqual(registryNames.toSorted());
   });
 });
 
-describe("2 — the key sets agree", () => {
+describe("2. each schema's keys match the generated schema's", () => {
   for (const name of registryNames) {
     for (const form of forms) {
       it(`${name}.${form} names exactly the generated keys`, () => {
@@ -1079,7 +1079,7 @@ const admitsNull = (
     checks.some((check) => check.includes(`jsonb_typeof(${column.name}) = '`))
   );
 
-describe("3 — optionality and nullability agree, per key, at runtime", () => {
+describe("3. optionality and nullability match each column at runtime", () => {
   for (const name of registryNames) {
     for (const form of forms) {
       it(`${name}.${form} accepts undefined and null exactly where the column does`, () => {
@@ -1111,7 +1111,7 @@ describe("3 — optionality and nullability agree, per key, at runtime", () => {
   }
 });
 
-describe("4 — a refinement only narrows, proved against the column", () => {
+describe("4. Postgres accepts every row a refined schema accepts", () => {
   let db: MigratedPostgres;
 
   beforeAll(async () => {
@@ -1232,7 +1232,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
   });
 });
 
-describe("the rejection half: a violated refinement never reaches Postgres", () => {
+describe("a row that violates a refinement never reaches Postgres", () => {
   const rejectedRows = {
     workspace: [
       { id: "not-a-ulid", name: "Workspace A", shortName: "a" },
@@ -1592,8 +1592,8 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
   }
 });
 
-describe("what a finding may hold", () => {
-  it("has exactly these columns, none for a personal detail", () => {
+describe("the columns a finding holds", () => {
+  it("are exactly these, with none for a personal detail", () => {
     expect(Object.keys(boundarySchemas.finding.select.shape).toSorted()).toEqual(
       [
         "workspaceId",
@@ -1619,8 +1619,8 @@ describe("what a finding may hold", () => {
   });
 });
 
-describe("what a flag on an answer holds", () => {
-  it("names no one who closed it: the audit event does", () => {
+describe("the columns of a flag on an answer", () => {
+  it("name nobody who closed it, since the audit event does", () => {
     expect(Object.keys(boundarySchemas.questionFeedback.select.shape).toSorted()).toEqual(
       [
         "workspaceId",
@@ -1640,11 +1640,11 @@ describe("what a flag on an answer holds", () => {
   });
 });
 
-describe("the rules in force a connected source carries", () => {
+describe("a connected source's rules in force", () => {
   const asKey = (tier: string) => tier.replaceAll("-", "_");
   const keyed: readonly string[] = RULES_IN_FORCE_KEYS;
 
-  it("keys the column on the two tiers a source switches", () => {
+  it("keys the column by the two switchable tiers", () => {
     expect(RULES_IN_FORCE_KEYS).toEqual(["default_on", "default_off"]);
     expect(RULES_IN_FORCE_KEYS).toEqual(
       REDACTION_TIERS.filter((tier) => tier !== REDACTION_ALWAYS_TIER).map(asKey),
@@ -1681,7 +1681,7 @@ describe("the emails a suppression holds", () => {
 });
 
 describe("the scopes an ingress counter row takes", () => {
-  it("takes the person scope a signed-in caller is counted by", () => {
+  it("takes the person scope that counts a signed-in caller", () => {
     const row = { ...acceptedRows.ingressCounter[0], scope: "person" };
     expect(boundarySchemas.ingressCounter.insert.safeParse(row).success).toBe(true);
   });
@@ -1690,14 +1690,14 @@ describe("the scopes an ingress counter row takes", () => {
 describe("who a subject request is about", () => {
   const stranger = acceptedRows.subjectRequest[1];
 
-  it("takes a never-signed-in subject, with the id null or absent", () => {
+  it("accepts a never-signed-in subject with a null or absent id", () => {
     expect(boundarySchemas.subjectRequest.insert.safeParse(stranger).success).toBe(true);
 
     const { personId: _absent, ...omitted } = { ...stranger };
     expect(boundarySchemas.subjectRequest.insert.safeParse(omitted).success).toBe(true);
   });
 
-  it("keeps the identifier set's three kinds apart", () => {
+  it("keeps emails, names and other identifiers apart", () => {
     const parsed = boundarySchemas.subjectRequest.insert.parse(stranger);
     expect(parsed.identifiers).toEqual({
       emails: ["priya@client.invalid"],
@@ -1719,7 +1719,7 @@ describe("a __proto__ key in a concept's frontmatter", () => {
       '{"title":"T","__proto__":"x","sources":[{"resource":"/s/a.pdf","__proto__":null}]}',
     );
 
-    assert(parsed.success, "the frontmatter parses");
+    assert(parsed.success, "the frontmatter failed to parse");
     expect(parsed.data.frontmatter).toEqual(
       Object.fromEntries([
         ["title", "T"],
@@ -1751,7 +1751,7 @@ describe("a __proto__ key in a concept's frontmatter", () => {
         '"sources":[{"resource":"/s/a.pdf","__proto__":"d","___proto__":"e","____proto__":"f"}]}',
     );
 
-    assert(parsed.success, "the frontmatter parses");
+    assert(parsed.success, "the frontmatter failed to parse");
     expect(parsed.data.frontmatter).toEqual(
       Object.fromEntries([
         ["__proto__", "a"],
@@ -1783,10 +1783,10 @@ describe("a concept's frontmatter that is not a plain object", () => {
   });
 });
 
-describe("the frontmatter bound's unit", () => {
+describe("the frontmatter length limit's unit", () => {
   const astral = (characters: number) => ({ a: "\u{1D11E}".repeat(characters) });
 
-  it("counts the characters `char_length` counts, not the units JavaScript measures", () => {
+  it("counts characters as char_length does, not UTF-16 code units", () => {
     const inside = astral(CONCEPT_FRONTMATTER_MAX - 100);
     expect(JSON.stringify(inside).length).toBeGreaterThan(CONCEPT_FRONTMATTER_MAX);
     expect(conceptFrontmatter.safeParse(inside).success).toBe(true);
@@ -1795,12 +1795,12 @@ describe("the frontmatter bound's unit", () => {
   });
 });
 
-describe("the body bound's unit", () => {
+describe("the body length limit's unit", () => {
   const astral = (characters: number) => "\u{1D11E}".repeat(characters);
   const bodyOf = (body: string) =>
     boundarySchemas.conceptIndex.insert.safeParse({ ...acceptedRows.conceptIndex[0], body });
 
-  it("counts the characters `char_length` counts, not the units JavaScript measures", () => {
+  it("counts characters as char_length does, not UTF-16 code units", () => {
     const inside = astral(CONCEPT_BODY_MAX - 100);
     expect(inside.length).toBeGreaterThan(CONCEPT_BODY_MAX);
     expect(bodyOf(inside).success).toBe(true);
@@ -1808,12 +1808,12 @@ describe("the body bound's unit", () => {
     expect(bodyOf(astral(CONCEPT_BODY_MAX + 1)).success).toBe(false);
   });
 
-  it("refuses a body over the cap, taking one at it", () => {
+  it("refuses a body over the limit, accepting one at it", () => {
     expect(bodyOf("x".repeat(CONCEPT_BODY_MAX + 1)).success).toBe(false);
     expect(bodyOf("x".repeat(CONCEPT_BODY_MAX)).success).toBe(true);
   });
 
-  it("refuses a body with no text, taking one character", () => {
+  it("refuses a body with no text, accepting one character", () => {
     expect(bodyOf("").success).toBe(false);
     expect(bodyOf(" \n\t \n").success).toBe(false);
     expect(bodyOf("x").success).toBe(true);
@@ -1821,7 +1821,7 @@ describe("the body bound's unit", () => {
   });
 });
 
-describe("the customType exception, per shape", () => {
+describe("the custom-type columns, per schema", () => {
   const tooShort = Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0);
 
   it("passage.select requires an embedding of the model choice's width", () => {
@@ -1849,13 +1849,13 @@ describe("the customType exception, per shape", () => {
     expect(insert.safeParse({ ...row, embedding: tooShort }).success).toBe(false);
   });
 
-  it("passage.update skips an absent embedding and checks a present one", () => {
+  it("passage.update accepts no embedding and checks a given one", () => {
     const update = boundarySchemas.passage.update;
     expect(update.safeParse({ content: "edited" }).success).toBe(true);
     expect(update.safeParse({ embedding: tooShort }).success).toBe(false);
   });
 
-  it("passage.select reads a row with or without search", () => {
+  it("passage.select reads a row with or without a search column", () => {
     const row = {
       ...acceptedRows.passage[0],
       sourceDocumentId: null,
@@ -1869,12 +1869,12 @@ describe("the customType exception, per shape", () => {
     expect(select.safeParse(row).success).toBe(true);
   });
 
-  it("passage.insert and update carry no search key", () => {
+  it("passage.insert and update have no search key", () => {
     expect(Object.keys(boundarySchemas.passage.insert.shape)).not.toContain("search");
     expect(Object.keys(boundarySchemas.passage.update.shape)).not.toContain("search");
   });
 
-  it("conceptIndex.select reads a row with or without search", () => {
+  it("conceptIndex.select reads a row with or without a search column", () => {
     const row = {
       ...acceptedRows.conceptIndex[0],
       audienceGroups: null,
@@ -1887,7 +1887,7 @@ describe("the customType exception, per shape", () => {
     expect(select.safeParse({ ...row, search: 1 }).success).toBe(false);
   });
 
-  it("conceptIndex.insert and update drop a search the row sets", () => {
+  it("conceptIndex.insert and update strip a search value", () => {
     const forged = { search: "'forged':1A" };
     const inserted = boundarySchemas.conceptIndex.insert.parse({
       ...acceptedRows.conceptIndex[0],
@@ -1908,14 +1908,14 @@ describe("the customType exception, per shape", () => {
     }
   });
 
-  it("modelKey.update skips an absent frame and checks a present one", () => {
+  it("modelKey.update accepts no frame and checks a given one", () => {
     const update = boundarySchemas.modelKey.update;
     expect(update.safeParse({ provider: "mistral" }).success).toBe(true);
     expect(update.safeParse({ sealed: "a frame written as text" }).success).toBe(false);
   });
 });
 
-describe("5 — the inferred type is pinned", () => {
+describe("5. the inferred select types match the pinned shapes", () => {
   type Equal<A, B> =
     (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
   type NoneOf<T extends never> = T;
@@ -2766,7 +2766,7 @@ describe("5 — the inferred type is pinned", () => {
   type _noPinOutlivesItsTable = NoneOf<Exclude<keyof SelectShapes, Table>>;
   type _everyTableHasAHoldingPin = NoneOf<Mismatched>;
 
-  it("holds at compile time (the assertions above are types)", () => {
+  it("passes when the type assertions above compile", () => {
     expect(true).toBe(true);
   });
 });

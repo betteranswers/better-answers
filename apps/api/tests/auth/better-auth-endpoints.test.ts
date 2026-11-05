@@ -99,8 +99,8 @@ afterAll(async () => {
   await database.end();
 });
 
-describe("what Better Auth mounts behind the fence's catch-all", () => {
-  it("mounts exactly the set the committed snapshot names", () => {
+describe("the paths Better Auth mounts behind the hostname catch-all", () => {
+  it("match the committed snapshot exactly", () => {
     const mounted = mountedPaths(auth);
 
     refreshSnapshotWhenAsked(mounted);
@@ -117,11 +117,11 @@ describe("what Better Auth mounts behind the fence's catch-all", () => {
 
     expect(
       { added, removed },
-      "Better Auth's mounted set has moved. `added` is a path the fence's catch-all now admits on app. and nobody has reviewed; `removed` is a path something may still call. Read both against the one origin's needs, and against sign-in never taking a password, then refresh tests/auth/better-auth-endpoints.txt.",
+      "Better Auth now mounts a different set of paths. `added` lists paths the hostname catch-all now sends to app. without review. `removed` lists paths that code may still call. Check both against what the app. origin needs, and confirm sign-in still never takes a password, then refresh tests/auth/better-auth-endpoints.txt.",
     ).toEqual({ added: [], removed: [] });
   });
 
-  it("refuses an empty snapshot, so mounting nothing cannot pass", () => {
+  it("are non-empty and include every path the flows use", () => {
     const mounted = mountedPaths(auth);
 
     expect(mounted.length).toBeGreaterThan(0);
@@ -129,13 +129,13 @@ describe("what Better Auth mounts behind the fence's catch-all", () => {
     for (const drivenPath of DRIVEN_BY_THE_FLOW) expect(mounted).toContain(drivenPath);
   });
 
-  it("mounts nothing under the share agent's surface", () => {
+  it("include nothing under the share agent's /agent/v1 path", () => {
     for (const mounted of [...readSnapshot(), ...mountedPaths(auth)]) {
       expect(mounted.startsWith("/agent/v1")).toBe(false);
     }
   });
 
-  it("names the catch-all entry it reviews, which names it back", () => {
+  it("link to the catch-all entry, which links back", () => {
     expect(CATCH_ALL?.paths).toEqual(["/*"]);
     expect(CATCH_ALL?.reason).toContain("better-auth-endpoints.txt");
     expect(readFileSync(SNAPSHOT, "utf8")).toContain("ingress/hostnames.ts");

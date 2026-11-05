@@ -47,7 +47,7 @@ def _refuse_a_container(*_args: object, **_kwargs: object) -> None:
 
 
 @pytest.fixture(name="maintenance")
-def this_processes_server() -> str:
+def maintenance_database() -> str:
     return on_database(_migrated_cluster().conninfo, "postgres")
 
 
@@ -123,7 +123,7 @@ def _tables_cloned_from(maintenance: str, template: str) -> set[str]:
     return {str(row[0]) for row in rows}
 
 
-def test_shares_the_located_server_and_constructs_no_container(
+def test_uses_the_server_at_the_locator_without_a_container(
     maintenance: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     dead = f"case_{_a_dead_pid()}_{uuid.uuid4().int % 10**9}"
@@ -139,7 +139,7 @@ def test_shares_the_located_server_and_constructs_no_container(
     assert dead not in _case_names(maintenance)
 
 
-def test_a_clone_holds_the_question_months_of_the_servers_clock() -> None:
+def test_a_clone_has_question_partitions_for_this_and_next_month() -> None:
     with migrated_postgres_at() as (connection, _conninfo):
         made = connection.execute(
             "SELECT child.relname FROM pg_inherits"
@@ -155,7 +155,7 @@ def test_a_clone_holds_the_question_months_of_the_servers_clock() -> None:
     assert made == clock
 
 
-def test_the_template_name_turns_with_the_servers_month() -> None:
+def test_the_template_name_changes_with_the_month() -> None:
     assert template_name("2026-11") != template_name("2026-10")
 
 
@@ -177,7 +177,7 @@ def _refusal_for(locator: str, monkeypatch: pytest.MonkeyPatch) -> str:
     return str(raised.value)
 
 
-def _assert_one_line_naming_the_way_out(message: str) -> None:
+def _assert_one_line_naming_locator_and_up_command(message: str) -> None:
     assert "\n" not in message
     assert LOCATOR in message
     assert UP_COMMAND in message
@@ -190,10 +190,10 @@ def test_refuses_an_unreachable_locator_in_one_line(
         "postgresql://nobody:nothing@127.0.0.1:1/postgres", monkeypatch
     )
 
-    _assert_one_line_naming_the_way_out(message)
+    _assert_one_line_naming_locator_and_up_command(message)
 
 
-def test_refuses_a_locator_signed_in_as_no_superuser(
+def test_refuses_a_locator_whose_login_is_not_a_superuser(
     maintenance: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     login = f"probe_{uuid.uuid4().hex[:12]}"
@@ -213,7 +213,7 @@ def test_refuses_a_locator_signed_in_as_no_superuser(
         with _admin(maintenance) as admin:
             admin.execute(SQL("DROP ROLE {}").format(Identifier(login)))
 
-    _assert_one_line_naming_the_way_out(message)
+    _assert_one_line_naming_locator_and_up_command(message)
 
 
 OTHER_IMAGE = f"other/image:tag@sha256:{'0' * 64}"
@@ -269,23 +269,23 @@ print(shared_address())
 """
 
 
-def the_harness_answers_in_a_fresh_process() -> list[str]:
+def image_and_address_from_a_fresh_process() -> list[str]:
     script = CHILD_PRINTS_THE_IMAGE_AND_ADDRESS.format(tests=str(Path(__file__).parent))
     return subprocess.run(
         (sys.executable, "-c", script), capture_output=True, text=True, check=True
     ).stdout.splitlines()
 
 
-def test_the_harness_pins_the_image_whatever_the_caller_sets(
+def test_the_harness_ignores_test_postgres_image_from_the_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv(PORT_OVERRIDE, raising=False)
     monkeypatch.delenv("TEST_POSTGRES_IMAGE", raising=False)
-    unset = the_harness_answers_in_a_fresh_process()
+    unset = image_and_address_from_a_fresh_process()
 
     monkeypatch.setenv("TEST_POSTGRES_IMAGE", OTHER_IMAGE)
 
-    assert the_harness_answers_in_a_fresh_process() == unset
+    assert image_and_address_from_a_fresh_process() == unset
     assert unset == [pinned_postgres_image(), shared_address()]
 
 
@@ -347,7 +347,7 @@ def test_shared_refuses_a_server_with_no_image_stamp(
 
     message = _refusal_for(SHARED, monkeypatch)
 
-    _assert_one_line_naming_the_way_out(message)
+    _assert_one_line_naming_locator_and_up_command(message)
     assert "no image stamp" in message
 
 
@@ -361,7 +361,7 @@ def test_refuses_a_server_stamped_with_another_image(
 
     message = _refusal_for(locator, monkeypatch)
 
-    _assert_one_line_naming_the_way_out(message)
+    _assert_one_line_naming_locator_and_up_command(message)
     assert f"stamped {OTHER_IMAGE}" in message
     assert pinned_postgres_image() in message
 
@@ -391,7 +391,7 @@ def test_two_racing_callers_build_one_template_once(
     assert _tables_cloned_from(maintenance, name) == {"built"}
 
 
-def test_templates_with_different_builds_hold_only_their_own(
+def test_templates_with_different_builds_contain_only_their_own_tables(
     maintenance: str, unique: Callable[[str], str]
 ) -> None:
     first, second = unique("tpl_probe"), unique("tpl_probe")
@@ -410,7 +410,7 @@ def test_templates_with_different_builds_hold_only_their_own(
 
 
 @pytest.mark.parametrize("sealed", [False, True], ids=["open", "sealed"])
-def test_drops_a_killed_builders_leftover_and_publishes(
+def test_drops_a_killed_builds_leftover_database_and_publishes_the_template(
     maintenance: str, unique: Callable[[str], str], sealed: bool
 ) -> None:
     name = unique("tpl_probe")
@@ -492,22 +492,22 @@ def test_stamps_an_unstamped_template_rather_than_dropping_it(
     _ensure_another(maintenance, unique)
 
     stamp = _stamp_of(maintenance, unstamped)
-    assert stamp is not None
+    assert stamp is not None, "the template has no timestamp comment"
     assert stamp >= before
 
 
 def test_leaves_stale_templates_outside_its_prefix_alone(
     maintenance: str, unique: Callable[[str], str]
 ) -> None:
-    a_prefix_no_tier_sweeps = "tpl_probe_age"
-    theirs = _planted(maintenance, unique, LONG_AGO, a_prefix_no_tier_sweeps)
+    unswept_prefix = "tpl_probe_age"
+    theirs = _planted(maintenance, unique, LONG_AGO, unswept_prefix)
 
     _ensure_another(maintenance, unique)
 
     assert _row_of(maintenance, theirs) == (True, False)
 
 
-def test_drops_a_killed_builders_leftover_under_another_name(
+def test_drops_a_leftover_building_database_for_another_template(
     maintenance: str, unique: Callable[[str], str]
 ) -> None:
     orphan = f"{unique('tpl_py_age')}_building"
@@ -528,7 +528,7 @@ def test_stamps_the_ensured_template_with_the_time_of_use(
     ensure_template(maintenance, name, partial(_mark, table="used"))
 
     stamp = _stamp_of(maintenance, name)
-    assert stamp is not None
+    assert stamp is not None, "the template has no timestamp comment"
     assert stamp >= before
 
 
@@ -548,7 +548,7 @@ print(json.dumps({{"pid": os.getpid(), "database": row[0]}}))
 """
 
 
-def test_two_processes_clone_under_names_that_never_collide(
+def test_two_processes_get_clones_with_different_names(
     maintenance: str,
 ) -> None:
     script = CHILD_OPENS_ONE_CLONE.format(tests=str(Path(__file__).parent))
@@ -631,7 +631,7 @@ def test_sweeps_a_dead_runs_database_and_keeps_a_live_ones(
             _discard(maintenance, database)
 
 
-def _gone_or_going(maintenance: str, database: str) -> bool:
+def _dropped_or_dropping(maintenance: str, database: str) -> bool:
     # Postgres marks a database it is dropping with a connection limit of -2.
     with _admin(maintenance) as admin:
         row = admin.execute(
@@ -640,24 +640,26 @@ def _gone_or_going(maintenance: str, database: str) -> bool:
     return row is None or row[0] == -2
 
 
-def _held(maintenance: str, database: str, server: str) -> psycopg.Connection | None:
+def _connect_unless_dropped(
+    maintenance: str, database: str, server: str
+) -> psycopg.Connection | None:
     try:
         return psycopg.connect(on_database(server, database))
     except psycopg.OperationalError:
-        # A failed connect carries no SQLSTATE, so the catalog tells a sweep's drop
-        # apart from a server that refused.
-        if _gone_or_going(maintenance, database):
+        # A failed connect has no SQLSTATE, so pg_database is checked to tell a
+        # sweep's drop from a refused connection.
+        if _dropped_or_dropping(maintenance, database):
             return None
         _discard(maintenance, database)
         raise
 
 
 @contextmanager
-def _a_dead_runs_database_held(maintenance: str) -> Iterator[str]:
+def _open_dead_runs_database(maintenance: str) -> Iterator[str]:
     for _attempt in range(5):
         dead = f"case_{_a_dead_pid()}_{uuid.uuid4().int % 10**9}"
         _create(maintenance, dead)
-        session = _held(maintenance, dead, maintenance)
+        session = _connect_unless_dropped(maintenance, dead, maintenance)
         if session is None:
             continue
         try:
@@ -666,30 +668,30 @@ def _a_dead_runs_database_held(maintenance: str) -> Iterator[str]:
                 return
         finally:
             _discard(maintenance, dead)
-    pytest.fail("another run's sweep dropped every database before it was held")
+    pytest.fail("another run's sweep dropped every database before this test connected")
 
 
 def test_sweep_skips_a_dead_runs_database_still_in_use(maintenance: str) -> None:
-    with _a_dead_runs_database_held(maintenance) as dead:
+    with _open_dead_runs_database(maintenance) as dead:
         sweep_dead_cases(maintenance)
 
         assert dead in _case_names(maintenance)
 
 
-def test_a_refused_connection_fails_as_itself_and_leaves_no_database(
+def test_a_refused_connection_raises_and_drops_the_database(
     maintenance: str, unique: Callable[[str], str]
 ) -> None:
     made = unique("probe_refused")
     _create(maintenance, made)
 
     with pytest.raises(psycopg.OperationalError, match="Connection refused"):
-        _held(maintenance, made, _uri_at(1))
+        _connect_unless_dropped(maintenance, made, _uri_at(1))
 
     assert _row_of(maintenance, made) is None
 
 
 @pytest.mark.parametrize("drop", ["finished", "interrupted"])
-def test_a_database_a_sweep_dropped_is_not_held(
+def test_connecting_to_a_database_a_sweep_dropped_returns_none(
     maintenance: str, unique: Callable[[str], str], drop: str
 ) -> None:
     dropped = unique("probe_dropped")
@@ -701,7 +703,7 @@ def test_a_database_a_sweep_dropped_is_not_held(
                 (dropped,),
             )
 
-    assert _held(maintenance, dropped, maintenance) is None
+    assert _connect_unless_dropped(maintenance, dropped, maintenance) is None
 
 
 def test_discards_a_database_an_interrupted_drop_left_invalid(

@@ -32,7 +32,7 @@ describe("recall over the synthetic set", () => {
     rankings = await rankedOverTheRecallSet(suite);
   }, 300_000);
 
-  it("reports each set's recall and fails no build", async () => {
+  it("reports each set's recall without enforcing a threshold", async () => {
     const { set, landed, found, planned } = rankings;
     const entryCap = ASK_CAPS.entryPoints;
     const byFind = ({ question }: RecallQuestion) => found(question);

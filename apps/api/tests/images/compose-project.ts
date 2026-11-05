@@ -8,7 +8,7 @@ export type Run = {
   readonly stderr: string;
 };
 
-/** Compose narrates to stderr on success, so it is read only when the run failed. */
+/** Compose writes progress to stderr even when it succeeds, so stderr is reported only on failure. */
 export const outcomeOf = (run: Run): string =>
   run.status === 0 ? "ran" : `exited ${String(run.status)}: ${run.stderr}`;
 

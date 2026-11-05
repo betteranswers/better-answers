@@ -58,8 +58,8 @@ export const migrationStatementSaying = (tag: string, word: string): string => {
 const THE_MIGRATION_OWNER = "the_migration_owner";
 
 /**
- * Runs `work` as a new non-superuser owner of `objects`, as `migrate` connects, so the policies a
- * superuser escapes bind it. Only inside a transaction.
+ * Runs `work` as a new non-superuser owner of `objects`, as `migrate` connects, so policies that
+ * skip a superuser apply. Call it only inside a transaction.
  */
 export const asTheMigrationOwnerOf = async <T>(
   client: pg.PoolClient,

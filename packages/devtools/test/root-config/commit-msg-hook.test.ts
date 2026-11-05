@@ -45,7 +45,7 @@ const REFUSED_BY_COMMITLINT = [
   },
 ] as const;
 
-/** lefthook runs a command from the repository root, `{1}` standing for the message file's path. */
+/** lefthook runs a command from the repository root and replaces `{1}` with the message file's path. */
 const hooked = (name: string): string => {
   const root = throwawayRepository(path.join(scratch, name));
   const hooks = path.join(scratch, `${name}-hooks`);

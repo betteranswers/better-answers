@@ -24,7 +24,7 @@ const NOW = new Date("2026-11-05T10:00:00Z");
 const FIXED = (suffix: string): ConceptIri =>
   conceptIriOf(WELL_FORMED_ULID.parse(`01${suffix.padStart(24, "0")}`));
 
-type Floor = {
+type Seeded = {
   readonly workspaceId: string;
   readonly postgres: PostgresDoor;
   readonly admin: UserPrincipal;
@@ -33,7 +33,7 @@ type Floor = {
   readonly viewer: UserPrincipal;
 };
 
-const aFloor = async (): Promise<Floor> => {
+const seededWorkspace = async (): Promise<Seeded> => {
   const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Acme");
   const admin = await principalFor(db(), workspaceId, adminUserId);
   const owner = await joinedAs(db(), workspaceId, "Editor", { name: "Olive Owner" });
@@ -48,8 +48,8 @@ const aFloor = async (): Promise<Floor> => {
   };
 };
 
-const shelved = (floor: Floor, concepts: readonly Shelved[]) =>
-  shelve(db().pool, floor.workspaceId, concepts);
+const shelved = (seeded: Seeded, concepts: readonly Shelved[]) =>
+  shelve(db().pool, seeded.workspaceId, concepts);
 
 type Asked = Partial<z.input<typeof allKnowledgeInput>>;
 
@@ -62,21 +62,21 @@ const asked = (overrides: Asked = {}) =>
     ...overrides,
   });
 
-const allKnowledgeAs = (floor: Floor, reader: UserPrincipal, input = asked()) =>
-  withMember(reader, floor.postgres, (fresh, tx) => readAllKnowledge(fresh, tx, input, NOW));
+const allKnowledgeAs = (seeded: Seeded, reader: UserPrincipal, input = asked()) =>
+  withMember(reader, seeded.postgres, (fresh, tx) => readAllKnowledge(fresh, tx, input, NOW));
 
-const kindsAs = (floor: Floor, reader: UserPrincipal) =>
-  withMember(reader, floor.postgres, (fresh, tx) => readKinds(fresh, tx));
+const kindsAs = (seeded: Seeded, reader: UserPrincipal) =>
+  withMember(reader, seeded.postgres, (fresh, tx) => readKinds(fresh, tx));
 
-const knowledgeRead = async (floor: Floor, reader: UserPrincipal, input = asked()) =>
-  answered(answered(await allKnowledgeAs(floor, reader, input)));
+const knowledgeRead = async (seeded: Seeded, reader: UserPrincipal, input = asked()) =>
+  answered(answered(await allKnowledgeAs(seeded, reader, input)));
 
-const kindsRead = async (floor: Floor, reader: UserPrincipal) =>
-  answered(answered(await kindsAs(floor, reader))).kinds;
+const kindsRead = async (seeded: Seeded, reader: UserPrincipal) =>
+  answered(answered(await kindsAs(seeded, reader))).kinds;
 
 const READS = [
-  ["All knowledge", (floor: Floor, reader: UserPrincipal) => allKnowledgeAs(floor, reader)],
-  ["Kinds", (floor: Floor, reader: UserPrincipal) => kindsAs(floor, reader)],
+  ["All knowledge", (seeded: Seeded, reader: UserPrincipal) => allKnowledgeAs(seeded, reader)],
+  ["Kinds", (seeded: Seeded, reader: UserPrincipal) => kindsAs(seeded, reader)],
 ] as const;
 
 const REFUSED = { ok: true, value: { ok: false, error: "owner-forbids" } };
@@ -84,75 +84,77 @@ const REFUSED = { ok: true, value: { ok: false, error: "owner-forbids" } };
 const ADMITTED = { ok: true, value: { ok: true } };
 
 describe("who may read the Curation tables", () => {
-  it.each(READS)("an Editor owning nothing is refused %s", async (_name, read) => {
-    const floor = await aFloor();
-    await shelved(floor, [{ path: "knowledge/company/expenses.md" }]);
+  it.each(READS)("refuses %s to an Editor who owns nothing", async (_name, read) => {
+    const seeded = await seededWorkspace();
+    await shelved(seeded, [{ path: "knowledge/company/expenses.md" }]);
 
-    const owning = await read(floor, floor.owner);
-    const owningNothing = await read(floor, floor.ownsNothing);
+    const owning = await read(seeded, seeded.owner);
+    const owningNothing = await read(seeded, seeded.ownsNothing);
 
     expect(owning).toMatchObject(ADMITTED);
     expect(owningNothing).toEqual(REFUSED);
   });
 
   it("reads rows for an Editor who owns a collection", async () => {
-    const floor = await aFloor();
-    await shelved(floor, [{ path: "knowledge/company/expenses.md", title: "Expenses" }]);
+    const seeded = await seededWorkspace();
+    await shelved(seeded, [{ path: "knowledge/company/expenses.md", title: "Expenses" }]);
 
-    const owning = await knowledgeRead(floor, floor.owner);
+    const owning = await knowledgeRead(seeded, seeded.owner);
 
     expect(owning.rows.map(({ title }) => title)).toEqual(["Expenses"]);
   });
 
-  it.each(READS)("a Viewer owning nothing is refused %s", async (_name, read) => {
-    const floor = await aFloor();
+  it.each(READS)("refuses %s to a Viewer who owns nothing", async (_name, read) => {
+    const seeded = await seededWorkspace();
 
-    expect(await read(floor, floor.viewer)).toEqual(REFUSED);
+    expect(await read(seeded, seeded.viewer)).toEqual(REFUSED);
   });
 
-  it.each(READS)("an Admin owning nothing is admitted to %s", async (_name, read) => {
-    const floor = await aFloor();
+  it.each(READS)("admits an Admin who owns nothing to %s", async (_name, read) => {
+    const seeded = await seededWorkspace();
 
-    expect(await read(floor, floor.admin)).toMatchObject(ADMITTED);
+    expect(await read(seeded, seeded.admin)).toMatchObject(ADMITTED);
   });
 
-  it.each(READS)("a Viewer owning a collection is admitted to %s", async (_name, read) => {
-    const floor = await aFloor();
-    await nameOwnerAs(floor.admin, floor.postgres, {
+  it.each(READS)("admits a Viewer who owns a collection to %s", async (_name, read) => {
+    const seeded = await seededWorkspace();
+    await nameOwnerAs(seeded.admin, seeded.postgres, {
       collection: "people",
-      personId: floor.viewer.userId,
+      personId: seeded.viewer.userId,
     });
 
-    expect(await read(floor, floor.viewer)).toMatchObject(ADMITTED);
+    expect(await read(seeded, seeded.viewer)).toMatchObject(ADMITTED);
   });
 
-  it.each(READS)("a person owning only one concept is refused %s", async (_name, read) => {
-    const floor = await aFloor();
-    const iri = await shelveOne(db().pool, floor.workspaceId, { path: "knowledge/people/rota.md" });
-    await nameOwnerAs(floor.admin, floor.postgres, { iri, personId: floor.viewer.userId });
+  it.each(READS)("refuses %s to someone who owns only one concept", async (_name, read) => {
+    const seeded = await seededWorkspace();
+    const iri = await shelveOne(db().pool, seeded.workspaceId, {
+      path: "knowledge/people/rota.md",
+    });
+    await nameOwnerAs(seeded.admin, seeded.postgres, { iri, personId: seeded.viewer.userId });
 
-    expect(await read(floor, floor.viewer)).toEqual(REFUSED);
+    expect(await read(seeded, seeded.viewer)).toEqual(REFUSED);
   });
 
-  it.each(READS)("an owner whose collection is cleared is refused %s", async (_name, read) => {
-    const floor = await aFloor();
-    const before = await read(floor, floor.owner);
-    await nameOwnerAs(floor.admin, floor.postgres, { collection: "company", personId: null });
+  it.each(READS)("refuses %s to an owner whose collection was cleared", async (_name, read) => {
+    const seeded = await seededWorkspace();
+    const before = await read(seeded, seeded.owner);
+    await nameOwnerAs(seeded.admin, seeded.postgres, { collection: "company", personId: null });
 
-    const after = await read(floor, floor.owner);
+    const after = await read(seeded, seeded.owner);
 
     expect(before).toMatchObject(ADMITTED);
     expect(after).toEqual(REFUSED);
   });
 });
 
-describe("what All knowledge says of each concept", () => {
-  it("All knowledge names each concept's owner and last checker", async () => {
-    const floor = await aFloor();
-    const priya = await joinedAs(db(), floor.workspaceId, "Editor", { name: "Priya Anand" });
-    const quentin = await joinedAs(db(), floor.workspaceId, "Editor", { name: "Quentin Quill" });
+describe("the All knowledge row for each concept", () => {
+  it("names each concept's owner and last checker", async () => {
+    const seeded = await seededWorkspace();
+    const priya = await joinedAs(db(), seeded.workspaceId, "Editor", { name: "Priya Anand" });
+    const quentin = await joinedAs(db(), seeded.workspaceId, "Editor", { name: "Quentin Quill" });
     const formerMember = `human:${ulid()}`;
-    await shelved(floor, [
+    await shelved(seeded, [
       {
         iri: FIXED("A"),
         path: "knowledge/company/expenses.md",
@@ -183,14 +185,14 @@ describe("what All knowledge says of each concept", () => {
       },
       { iri: FIXED("F"), path: "knowledge/archive/old.md", title: "Archive" },
     ]);
-    await nameOwnerAs(floor.admin, floor.postgres, {
+    await nameOwnerAs(seeded.admin, seeded.postgres, {
       iri: FIXED("D"),
-      personId: floor.viewer.userId,
+      personId: seeded.viewer.userId,
     });
-    const olive = { id: floor.owner.userId, name: "Olive Owner", own: false };
-    const victor = { id: floor.viewer.userId, name: "Victor Viewer", own: true };
+    const olive = { id: seeded.owner.userId, name: "Olive Owner", own: false };
+    const victor = { id: seeded.viewer.userId, name: "Victor Viewer", own: true };
 
-    const read = await knowledgeRead(floor, floor.admin);
+    const read = await knowledgeRead(seeded, seeded.admin);
 
     expect(read.rows).toEqual([
       {
@@ -258,20 +260,20 @@ describe("what All knowledge says of each concept", () => {
     expect(JSON.stringify(read)).not.toContain(formerMember);
   });
 
-  it("names the checker of a concept changed since", async () => {
-    const floor = await aFloor();
-    const priya = await joinedAs(db(), floor.workspaceId, "Editor", { name: "Priya Anand" });
-    const iri = await shelveOne(db().pool, floor.workspaceId, { path: "knowledge/company/a.md" });
+  it("names the last checker of a concept changed since verified", async () => {
+    const seeded = await seededWorkspace();
+    const priya = await joinedAs(db(), seeded.workspaceId, "Editor", { name: "Priya Anand" });
+    const iri = await shelveOne(db().pool, seeded.workspaceId, { path: "knowledge/company/a.md" });
     await seedingWith(db().pool, (seed) =>
       seed.conceptVerification({
-        workspaceId: floor.workspaceId,
+        workspaceId: seeded.workspaceId,
         iri,
         actor: `human:${priya.userId}`,
         verifiedAt: new Date("2026-10-03T09:00:00Z"),
       }),
     );
 
-    const read = await knowledgeRead(floor, floor.admin);
+    const read = await knowledgeRead(seeded, seeded.admin);
 
     expect(read.rows).toMatchObject([
       {
@@ -287,10 +289,10 @@ const checked = (priya: UserPrincipal, on: string) => [
   { actor: `human:${priya.userId}`, at: new Date(on) },
 ];
 
-const sortedFloor = async () => {
-  const floor = await aFloor();
-  const priya = await joinedAs(db(), floor.workspaceId, "Editor", { name: "Priya Anand" });
-  await shelved(floor, [
+const seededForSorting = async () => {
+  const seeded = await seededWorkspace();
+  const priya = await joinedAs(db(), seeded.workspaceId, "Editor", { name: "Priya Anand" });
+  await shelved(seeded, [
     {
       iri: FIXED("A"),
       path: "knowledge/company/a.md",
@@ -314,15 +316,15 @@ const sortedFloor = async () => {
       checks: checked(priya, "2026-03-01T09:00:00Z"),
     },
   ]);
-  await nameOwnerAs(floor.admin, floor.postgres, {
+  await nameOwnerAs(seeded.admin, seeded.postgres, {
     collection: "people",
-    personId: floor.viewer.userId,
+    personId: seeded.viewer.userId,
   });
-  await nameOwnerAs(floor.admin, floor.postgres, {
+  await nameOwnerAs(seeded.admin, seeded.postgres, {
     iri: FIXED("B"),
-    personId: floor.viewer.userId,
+    personId: seeded.viewer.userId,
   });
-  return floor;
+  return seeded;
 };
 
 const lettersOf = (rows: readonly { readonly iri: ConceptIri }[]): string =>
@@ -341,9 +343,9 @@ describe("sorting, filtering and paging All knowledge", () => {
     ["checked", false, "CDABE"],
     ["checked", true, "BEACD"],
   ] as const)("sorts by %s, descending %s", async (column, desc, letters) => {
-    const floor = await sortedFloor();
+    const seeded = await seededForSorting();
 
-    const read = await knowledgeRead(floor, floor.admin, asked({ sort: { column, desc } }));
+    const read = await knowledgeRead(seeded, seeded.admin, asked({ sort: { column, desc } }));
 
     expect(lettersOf(read.rows)).toBe(letters);
     expect(read.total).toBe(5);
@@ -357,11 +359,11 @@ describe("sorting, filtering and paging All knowledge", () => {
     ],
     ["collection", (group, at) => ({ path: `knowledge/group-${group}/${at}.md`, title: "Same" })],
   ])("breaks a tie in %s by the concept, either way", async (column, grouped) => {
-    const floor = await aFloor();
+    const seeded = await seededWorkspace();
     const GROUPS = 5;
     const tied = Array.from({ length: 40 }, (_unused, at) => FIXED(String(at).padStart(2, "0")));
     await shelved(
-      floor,
+      seeded,
       tied.toReversed().map((iri) => {
         const at = iri.slice(-2);
         return { iri, ...grouped(Number(at) % GROUPS, at) };
@@ -370,19 +372,19 @@ describe("sorting, filtering and paging All knowledge", () => {
     const inGroup = (group: number) => tied.filter((_iri, at) => at % GROUPS === group);
     const groups = Array.from({ length: GROUPS }, (_unused, group) => group);
 
-    const up = await knowledgeRead(floor, floor.admin, asked({ sort: { column, desc: false } }));
-    const down = await knowledgeRead(floor, floor.admin, asked({ sort: { column, desc: true } }));
+    const up = await knowledgeRead(seeded, seeded.admin, asked({ sort: { column, desc: false } }));
+    const down = await knowledgeRead(seeded, seeded.admin, asked({ sort: { column, desc: true } }));
 
     expect(up.rows.map(({ iri }) => iri)).toEqual(groups.flatMap(inGroup));
     expect(down.rows.map(({ iri }) => iri)).toEqual(groups.toReversed().flatMap(inGroup));
   });
 
-  it("keeps each concept's checker beside it under any sort", async () => {
-    const floor = await sortedFloor();
+  it("keeps each concept's checker on its row under every sort", async () => {
+    const seeded = await seededForSorting();
 
     const read = await knowledgeRead(
-      floor,
-      floor.admin,
+      seeded,
+      seeded.admin,
       asked({ sort: { column: "checked", desc: true } }),
     );
 
@@ -403,19 +405,19 @@ describe("sorting, filtering and paging All knowledge", () => {
     ["a collection holding no such kind", { collections: ["people"], kind: "Contract" }, ""],
     ["a collection holding nothing", { collections: ["archive"] }, ""],
   ])("filters by %s", async (_name, filter, letters) => {
-    const floor = await sortedFloor();
+    const seeded = await seededForSorting();
 
-    const read = await knowledgeRead(floor, floor.admin, asked(filter));
+    const read = await knowledgeRead(seeded, seeded.admin, asked(filter));
 
     expect(lettersOf(read.rows)).toBe(letters);
     expect(read.total).toBe(letters.length);
   });
 
   it("pages fifty at a time and reports the total", async () => {
-    const floor = await aFloor();
+    const seeded = await seededWorkspace();
     const numbered = (at: number) => String(at).padStart(3, "0");
     await shelved(
-      floor,
+      seeded,
       Array.from({ length: 120 }, (_unused, at) => ({
         path: `knowledge/company/policy-${numbered(at)}.md`,
         title: `Policy ${numbered(at)}`,
@@ -423,7 +425,7 @@ describe("sorting, filtering and paging All knowledge", () => {
     );
 
     const reads = await Promise.all(
-      [1, 2, 3, 4].map((page) => knowledgeRead(floor, floor.owner, asked({ page }))),
+      [1, 2, 3, 4].map((page) => knowledgeRead(seeded, seeded.owner, asked({ page }))),
     );
 
     expect(reads.map((read) => read.rows.length)).toEqual([50, 50, 20, 0]);
@@ -434,12 +436,12 @@ describe("sorting, filtering and paging All knowledge", () => {
   });
 
   it.each([false, true])(
-    "pages tied concepts without repeating or missing one, descending %s",
+    "pages tied concepts without repeats or gaps, descending %s",
     async (desc) => {
-      const floor = await aFloor();
+      const seeded = await seededWorkspace();
       const tied = Array.from({ length: 120 }, (_unused, at) => FIXED(String(at).padStart(3, "0")));
       await shelved(
-        floor,
+        seeded,
         tied.toReversed().map((iri) => ({
           iri,
           path: `knowledge/company/${iri.slice(-3)}.md`,
@@ -449,7 +451,7 @@ describe("sorting, filtering and paging All knowledge", () => {
 
       const reads = await Promise.all(
         [1, 2, 3].map((page) =>
-          knowledgeRead(floor, floor.admin, asked({ page, sort: { column: "title", desc } })),
+          knowledgeRead(seeded, seeded.admin, asked({ page, sort: { column: "title", desc } })),
         ),
       );
 
@@ -458,21 +460,21 @@ describe("sorting, filtering and paging All knowledge", () => {
   );
 
   it("reports the filtered total on a page past the end", async () => {
-    const floor = await sortedFloor();
+    const seeded = await seededForSorting();
 
     const past = await knowledgeRead(
-      floor,
-      floor.admin,
+      seeded,
+      seeded.admin,
       asked({ collections: ["company"], page: 9 }),
     );
 
     expect(past).toEqual({ rows: [], total: 2, page: 9, pageSize: 50 });
   });
 
-  it("reports an empty table as nothing on its first page", async () => {
-    const floor = await aFloor();
+  it("reports an empty table as no rows on page one", async () => {
+    const seeded = await seededWorkspace();
 
-    const read = await knowledgeRead(floor, floor.admin);
+    const read = await knowledgeRead(seeded, seeded.admin);
 
     expect(read).toEqual({ rows: [], total: 0, page: 1, pageSize: 50 });
   });
@@ -487,7 +489,7 @@ describe("sorting, filtering and paging All knowledge", () => {
     ["an empty kind", { kind: " " }],
     ["a sort by something else", { sort: { column: "body", desc: false } }],
     ["a stray key", { colour: "red" }],
-  ])("refuses %s at the input", (_name, overrides) => {
+  ])("refuses %s in the input", (_name, overrides) => {
     const parsed = allKnowledgeInput.safeParse({
       collections: [],
       sort: { column: "title", desc: false },
@@ -497,7 +499,7 @@ describe("sorting, filtering and paging All knowledge", () => {
     expect(parsed.success).toBe(false);
   });
 
-  it("starts at page one when the page is left out", () => {
+  it("starts at page one when no page is given", () => {
     const parsed = allKnowledgeInput.parse({
       collections: [],
       sort: { column: "title", desc: false },
@@ -507,9 +509,9 @@ describe("sorting, filtering and paging All knowledge", () => {
   });
 });
 
-describe("reading what the reader may read", () => {
-  const shelveCompany = (floor: Floor, hr: string) =>
-    shelved(floor, [
+describe("only what the reader may read", () => {
+  const shelveCompany = (seeded: Seeded, hr: string) =>
+    shelved(seeded, [
       { path: "knowledge/company/expenses.md", title: "Expenses" },
       { path: "knowledge/company/travel.md", title: "Travel" },
       { path: "knowledge/company/lease.md", title: "Lease", kind: "Contract" },
@@ -525,26 +527,26 @@ describe("reading what the reader may read", () => {
       { path: "knowledge/loose.md", title: "Loose", kind: "Contract" },
     ]);
 
-  const floorWithHr = async () => {
-    const floor = await aFloor();
+  const seededWithHr = async () => {
+    const seeded = await seededWorkspace();
     const { id } = await seedingWith(db().pool, (seed) =>
-      seed.group({ workspaceId: floor.workspaceId, name: "HR team" }),
+      seed.group({ workspaceId: seeded.workspaceId, name: "HR team" }),
     );
-    const hrOwner = await joinedAs(db(), floor.workspaceId, "Editor", { group: id });
-    await nameOwnerAs(floor.admin, floor.postgres, {
+    const hrOwner = await joinedAs(db(), seeded.workspaceId, "Editor", { group: id });
+    await nameOwnerAs(seeded.admin, seeded.postgres, {
       collection: "people",
       personId: hrOwner.userId,
     });
-    await shelveCompany(floor, id);
-    return { floor, hrOwner };
+    await shelveCompany(seeded, id);
+    return { seeded, hrOwner };
   };
 
-  it("kind counts leave out a concept the reader cannot read", async () => {
-    const { floor, hrOwner } = await floorWithHr();
+  it("leaves concepts the reader cannot read out of kind counts", async () => {
+    const { seeded, hrOwner } = await seededWithHr();
 
-    const outside = await kindsRead(floor, floor.owner);
-    const inside = await kindsRead(floor, hrOwner);
-    const admins = await kindsRead(floor, floor.admin);
+    const outside = await kindsRead(seeded, seeded.owner);
+    const inside = await kindsRead(seeded, hrOwner);
+    const admins = await kindsRead(seeded, seeded.admin);
 
     expect(outside).toEqual([
       {
@@ -590,11 +592,11 @@ describe("reading what the reader may read", () => {
   });
 
   it("names no withheld concept in All knowledge", async () => {
-    const { floor, hrOwner } = await floorWithHr();
+    const { seeded, hrOwner } = await seededWithHr();
 
-    const outside = await knowledgeRead(floor, floor.owner);
-    const inside = await knowledgeRead(floor, hrOwner);
-    const admins = await knowledgeRead(floor, floor.admin);
+    const outside = await knowledgeRead(seeded, seeded.owner);
+    const inside = await knowledgeRead(seeded, hrOwner);
+    const admins = await knowledgeRead(seeded, seeded.admin);
 
     expect(outside.rows.map(({ title }) => title)).toEqual([
       "Expenses",
@@ -623,12 +625,12 @@ describe("reading what the reader may read", () => {
     expect([outside.total, inside.total, admins.total]).toEqual([5, 7, 6]);
   });
 
-  it("counts a withheld concept in no filter, kind or total", async () => {
-    const { floor } = await floorWithHr();
+  it("counts no withheld concept in any filter, kind or total", async () => {
+    const { seeded } = await seededWithHr();
 
-    const filtered = await knowledgeRead(floor, floor.owner, asked({ collections: ["people"] }));
-    const ofKind = await knowledgeRead(floor, floor.owner, asked({ kind: "Appraisal" }));
-    const secondPage = await knowledgeRead(floor, floor.owner, asked({ page: 2 }));
+    const filtered = await knowledgeRead(seeded, seeded.owner, asked({ collections: ["people"] }));
+    const ofKind = await knowledgeRead(seeded, seeded.owner, asked({ kind: "Appraisal" }));
+    const secondPage = await knowledgeRead(seeded, seeded.owner, asked({ page: 2 }));
 
     expect(filtered.rows.map(({ title }) => title)).toEqual(["Rota"]);
     expect(filtered.total).toBe(1);
@@ -636,15 +638,15 @@ describe("reading what the reader may read", () => {
     expect(secondPage.total).toBe(5);
   });
 
-  it("leaves a draft out of the tables for everyone", async () => {
-    const floor = await aFloor();
-    await shelved(floor, [
+  it("leaves drafts out of the tables for every reader", async () => {
+    const seeded = await seededWorkspace();
+    await shelved(seeded, [
       { path: "knowledge/company/plan.md", title: "Plan", draft: true },
       { path: "knowledge/company/expenses.md", title: "Expenses" },
     ]);
 
-    const read = await knowledgeRead(floor, floor.admin);
-    const kinds = await kindsRead(floor, floor.admin);
+    const read = await knowledgeRead(seeded, seeded.admin);
+    const kinds = await kindsRead(seeded, seeded.admin);
 
     expect(read.rows.map(({ title }) => title)).toEqual(["Expenses"]);
     expect(kinds.map(({ count }) => count)).toEqual([1]);
@@ -653,16 +655,16 @@ describe("reading what the reader may read", () => {
 
 describe("the wide workspace the budget reads", () => {
   it("seeds a wide workspace the Curation reads can count", async () => {
-    const floor = await aFloor();
-    const checker = await joinedAs(db(), floor.workspaceId, "Editor");
-    await seedWideKnowledge(db().pool, floor.workspaceId, {
+    const seeded = await seededWorkspace();
+    const checker = await joinedAs(db(), seeded.workspaceId, "Editor");
+    await seedWideKnowledge(db().pool, seeded.workspaceId, {
       count: 120,
-      owners: [floor.owner.userId],
+      owners: [seeded.owner.userId],
       checker: `human:${checker.userId}`,
     });
 
-    const page = await knowledgeRead(floor, floor.owner);
-    const kinds = await kindsRead(floor, floor.owner);
+    const page = await knowledgeRead(seeded, seeded.owner);
+    const kinds = await kindsRead(seeded, seeded.owner);
 
     expect(page).toMatchObject({ total: 120, pageSize: 50 });
     expect(page.rows).toHaveLength(50);

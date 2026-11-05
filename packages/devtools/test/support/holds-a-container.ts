@@ -8,5 +8,5 @@ const started = await new GenericContainer(POSTGRES_IMAGE)
 
 process.stdout.write(`${started.getId()}\n`);
 
-// testcontainers unrefs its socket to Ryuk, so nothing else keeps this process alive until killed.
+// testcontainers unrefs its Ryuk socket, so this timer keeps the process alive until it is killed.
 setInterval(() => undefined, 60_000);

@@ -14,7 +14,7 @@ import { servedApp } from "../support/suite-app.ts";
 const objects = objectStoreForSuite();
 const { ops } = opsRunner(objects);
 
-const mapped = async (app: TestApp, workspaceId: string): Promise<void> => {
+const seedTwoMapGenerations = async (app: TestApp, workspaceId: string): Promise<void> => {
   const client = await app.database.superuser.connect();
   try {
     const seed = testData(client);
@@ -44,11 +44,11 @@ const finishTheJob = async (app: TestApp, workspaceId: string, status: string): 
   throw new Error(`nothing was ever queued in ${workspaceId}`);
 };
 
-describe("pnpm ops — the restore scripts' commands", () => {
+describe("pnpm ops", () => {
   const served = servedApp();
 
-  describe("map-rebuild — the map made again, on the worker's queue", () => {
-    it("queues a drill's full rebuild and answers the job's id", async () => {
+  describe("map-rebuild, which queues a full map rebuild for the worker", () => {
+    it("queues a drill's full rebuild and prints the job id", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await ops(served(), ["map-rebuild", "--workspace", workspaceId]);
@@ -62,7 +62,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([`map-rebuild: done — enqueued ${queued[0]?.id}`]);
     });
 
-    it("takes the caller's reason from among the six", async () => {
+    it("queues the rebuild with the reason the caller gives", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await ops(served(), [
@@ -77,7 +77,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect((await jobsOf(served(), workspaceId))[0]?.reason).toBe("upgrade");
     });
 
-    it("answers usage to a reason outside the six, queueing nothing", async () => {
+    it("gives a usage error for an unknown reason, queueing nothing", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await ops(served(), [
@@ -95,7 +95,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await jobsOf(served(), workspaceId)).toEqual([]);
     });
 
-    it("refuses a non-id workspace as malformed, naming its flag", async () => {
+    it("refuses a workspace that is not an id as malformed", async () => {
       const run = await ops(served(), ["map-rebuild", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
@@ -104,7 +104,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("waits two minutes by default, as its usage says", async () => {
+    it("help says that --wait polls for 120 seconds", async () => {
       const run = await ops(served(), ["help"]);
 
       expect(run.exitCode).toBe(0);
@@ -114,7 +114,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).toContain("--wait-seconds <n>");
     });
 
-    it("waits for its job, done once the worker finishes it", async () => {
+    it("with --wait, exits 0 once the worker finishes the job", async () => {
       const { workspaceId } = await served().provision();
 
       const waiting = ops(served(), ["map-rebuild", "--workspace", workspaceId, "--wait"]);
@@ -126,7 +126,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it.each(["failed", "poisoned"])(
-      "refuses, stopping the restore, when the awaited job is %s",
+      "exits 1, stopping the restore, when the job is %s",
       async (status) => {
         const { workspaceId } = await served().provision();
 
@@ -140,7 +140,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       },
     );
 
-    it("refuses when the job is still queued after the wait", async () => {
+    it("exits 1 when the job is still queued after waiting", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await ops(served(), [
@@ -157,10 +157,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("map-counts — nodes per label and edges, as JSON", () => {
-    it("answers the live generation's counts on one diffable line", async () => {
+  describe("map-counts, which prints node and edge counts as JSON", () => {
+    it("prints the live generation's counts as one line of JSON", async () => {
       const { workspaceId } = await served().provision();
-      await mapped(served(), workspaceId);
+      await seedTwoMapGenerations(served(), workspaceId);
 
       const run = await ops(served(), ["map-counts", "--workspace", workspaceId]);
 
@@ -174,7 +174,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("answers zero of everything for an unmapped workspace, never refusing", async () => {
+    it("prints empty counts for a workspace with no map", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await ops(served(), ["map-counts", "--workspace", workspaceId]);
@@ -183,17 +183,17 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(answered(run)).toEqual({ live_gen: null, nodes: {}, edges: {} });
     });
 
-    it("answers usage to a non-id workspace before reading anything", async () => {
+    it("exits 2 for a workspace that is not an id", async () => {
       const run = await ops(served(), ["map-counts", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });
   });
 
-  describe("map-sweep — the generations a finished rebuild left behind", () => {
-    it("sweeps all but the live generation, saying what each held", async () => {
+  describe("map-sweep, which deletes every generation except the live one", () => {
+    it("deletes every non-live generation and prints what each held", async () => {
       const { workspaceId } = await served().provision();
-      await mapped(served(), workspaceId);
+      await seedTwoMapGenerations(served(), workspaceId);
 
       const run = await ops(served(), ["map-sweep", "--workspace", workspaceId, "--wait"]);
 
@@ -210,7 +210,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("sweeps nothing when only the live generation stands", async () => {
+    it("deletes nothing when only the live generation exists", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await ops(served(), ["map-sweep", "--workspace", workspaceId]);
@@ -219,21 +219,21 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual(["map-sweep: done — nothing to sweep"]);
     });
 
-    it("answers usage to a non-id workspace before deleting anything", async () => {
+    it("exits 2 for a workspace that is not an id", async () => {
       const run = await ops(served(), ["map-sweep", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });
   });
 
-  describe("the two sweeps by hand never overlap the daily pass", () => {
+  describe("manual sweeps and the daily sweep pass never run together", () => {
     it.each([
       ["map-sweep", "map-sweep: done — nothing to sweep"],
       [
         "object-store-orphans",
         "object-store-orphans: done — removed 0 objects past the 24-hour grace no document names",
       ],
-    ])("%s waits for the pass's sweep lock, then runs", async (command, done) => {
+    ])("%s waits for the daily pass's sweep lock, then runs", async (command, done) => {
       const { workspaceId } = await served().provision();
       let letGo = (): void => undefined;
       const holding = new Promise<void>((resolve) => {

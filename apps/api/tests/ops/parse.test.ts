@@ -27,18 +27,18 @@ const parsed = (argv: readonly string[]) => {
     : { refusal: result.error };
 };
 
-describe("pnpm ops — the command line, parsed before anything runs", () => {
+describe("pnpm ops argument parsing", () => {
   describe("the dispatch rules", () => {
-    it("refuses no command with the usage text", () => {
+    it("returns the usage text when no command is given", () => {
       expect(parsed([])).toEqual({ refusal: USAGE_LISTING });
     });
 
-    it("names an unknown command above the usage text", () => {
+    it("names an unknown command before the usage text", () => {
       expect(parsed(["make-it-so"])).toEqual({ refusal: UNKNOWN_BEFORE_LISTING("make-it-so") });
     });
 
     it.each(["toString", "__proto__"])(
-      "answers %s, a name every object inherits, as unknown",
+      "treats the inherited object property %s as an unknown command",
       (command) => {
         expect(parsed([command, "--workspace", WORKSPACE])).toEqual({
           refusal: UNKNOWN_BEFORE_LISTING(command),
@@ -46,7 +46,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       },
     );
 
-    it("skips one leading -- and no other, as pnpm's separator", () => {
+    it("skips only the first leading --, which pnpm adds", () => {
       expect(parsed(["--", "map-counts", "--workspace", WORKSPACE])).toEqual({
         name: "map-counts",
         asked: { workspaceId: WORKSPACE },
@@ -56,27 +56,30 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       expect(parsed(["--", "--"])).toEqual({ refusal: UNKNOWN_BEFORE_LISTING("--") });
     });
 
-    it.each(["help", "--help"])("reads %s as the help command, flags and all", (word) => {
+    it.each(["help", "--help"])("reads %s as help and ignores any flags", (word) => {
       expect(parsed([word])).toEqual({ name: "help", asked: {} });
       expect(parsed([word, "--workspace", WORKSPACE])).toEqual({ name: "help", asked: {} });
     });
 
-    it.each(SLICE_COMMANDS)("%s needs --workspace, asked ahead of its own flags", (command) => {
-      const refusal = `${command}: --workspace <id> is required`;
+    it.each(SLICE_COMMANDS)(
+      "%s requires --workspace before checking its other flags",
+      (command) => {
+        const refusal = `${command}: --workspace <id> is required`;
 
-      expect(parsed([command])).toEqual({ refusal });
-      expect(parsed([command, "--workspace"])).toEqual({ refusal });
-      expect(parsed([command, "--workspace", "--reason", "upgrade"])).toEqual({ refusal });
-    });
+        expect(parsed([command])).toEqual({ refusal });
+        expect(parsed([command, "--workspace"])).toEqual({ refusal });
+        expect(parsed([command, "--workspace", "--reason", "upgrade"])).toEqual({ refusal });
+      },
+    );
 
-    it("takes the workspace as typed, judging no id", () => {
+    it("takes the workspace as typed, without validating the id", () => {
       expect(parsed(["map-counts", "--workspace", "ws_synthetic"])).toEqual({
         name: "map-counts",
         asked: { workspaceId: "ws_synthetic" },
       });
     });
 
-    it("drops words that name no flag", () => {
+    it("ignores words that are not flags", () => {
       expect(parsed(["map-counts", "stray", "--workspace", WORKSPACE, "words"])).toEqual({
         name: "map-counts",
         asked: { workspaceId: WORKSPACE },
@@ -85,7 +88,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
   });
 
   describe("map-rebuild", () => {
-    it("defaults to a drill's rebuild, waiting for nothing", () => {
+    it("defaults to the drill reason and does not wait", () => {
       expect(parsed(["map-rebuild", "--workspace", WORKSPACE])).toEqual({
         name: "map-rebuild",
         asked: { workspaceId: WORKSPACE, reason: "drill", wait: undefined },
@@ -93,7 +96,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
     });
 
     it.each(["first-build", "model-choice-change", "reconciler", "erasure", "upgrade", "drill"])(
-      "takes the reason %s",
+      "accepts the reason %s",
       (reason) => {
         expect(parsed(["map-rebuild", "--workspace", WORKSPACE, "--reason", reason])).toEqual({
           name: "map-rebuild",
@@ -102,7 +105,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       },
     );
 
-    it("answers usage to a reason outside the six", () => {
+    it("gives a usage error for an unknown reason", () => {
       expect(
         parsed(["map-rebuild", "--workspace", WORKSPACE, "--reason", "because-i-said-so"]),
       ).toEqual({
@@ -118,14 +121,14 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it("waits the whole seconds --wait-seconds names", () => {
+    it("waits the number of seconds --wait-seconds gives", () => {
       expect(parsed(["map-rebuild", "--workspace", WORKSPACE, "--wait-seconds", "30"])).toEqual({
         name: "map-rebuild",
         asked: { workspaceId: WORKSPACE, reason: "drill", wait: 30 },
       });
     });
 
-    it("lets --wait-seconds name the seconds beside a bare --wait", () => {
+    it("uses --wait-seconds over the default of a bare --wait", () => {
       expect(
         parsed(["map-rebuild", "--workspace", WORKSPACE, "--wait", "--wait-seconds", "7"]),
       ).toEqual({
@@ -135,23 +138,20 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
     });
 
     it.each([
-      ["a --wait carrying a value", ["--wait", "soon"]],
-      [
-        "a --wait carrying a value beside --wait-seconds",
-        ["--wait", "soon", "--wait-seconds", "30"],
-      ],
+      ["a --wait with a value", ["--wait", "soon"]],
+      ["a --wait value and --wait-seconds", ["--wait", "soon", "--wait-seconds", "30"]],
       ["a non-numeric --wait-seconds", ["--wait-seconds", "soon"]],
       ["a --wait-seconds of zero", ["--wait-seconds", "0"]],
       ["a negative --wait-seconds", ["--wait-seconds", "-5"]],
       ["a fractional --wait-seconds", ["--wait-seconds", "1.5"]],
-    ])("answers usage to %s", (_shape, flags) => {
+    ])("gives a usage error for %s", (_shape, flags) => {
       expect(parsed(["map-rebuild", "--workspace", WORKSPACE, ...flags])).toEqual({
         refusal:
           "map-rebuild: --wait takes no value; --wait-seconds takes a whole number of seconds",
       });
     });
 
-    it("judges the reason before the wait", () => {
+    it("checks the reason before the wait", () => {
       expect(
         parsed(["map-rebuild", "--workspace", WORKSPACE, "--reason", "nope", "--wait", "soon"]),
       ).toEqual({
@@ -161,14 +161,14 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
     });
   });
 
-  describe("the commands that take a workspace alone", () => {
+  describe("the commands that take only --workspace", () => {
     it.each([
       "map-sweep",
       "map-counts",
       "unmapped-passage-rate",
       "reconcile-watermark",
       "reindex-connected-sources",
-    ])("%s asks for the workspace and nothing else", (command) => {
+    ])("%s reads --workspace and ignores other flags", (command) => {
       expect(parsed([command, "--workspace", WORKSPACE, "--wait"])).toEqual({
         name: command,
         asked: { workspaceId: WORKSPACE },
@@ -192,7 +192,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it("answers usage to a --list carrying a value", () => {
+    it("gives a usage error for --list with a value", () => {
       expect(parsed(["object-store-orphans", "--workspace", WORKSPACE, "--list", "now"])).toEqual({
         refusal: "object-store-orphans: --list takes no value",
       });
@@ -213,8 +213,8 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
     it.each([
       ["no --since", []],
       ["a bare --since", ["--since"]],
-      ["a --since that is no instant", ["--since", "yesterday"]],
-    ])("answers usage to %s", (_shape, flags) => {
+      ["a non-instant --since", ["--since", "yesterday"]],
+    ])("gives a usage error for %s", (_shape, flags) => {
       expect(parsed(["replay-erasures", ...flags])).toEqual({
         refusal: "replay-erasures: --since <dump stamp or ISO instant> is required",
       });
@@ -233,7 +233,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
 
     const WAIT_MALFORMED = "erasure-rehearsal: --wait-seconds takes a whole number of seconds";
 
-    it("seeds, waiting 120 seconds for the index job by default", () => {
+    it("seeds and waits 120 seconds for indexing by default", () => {
       expect(
         parsed(["erasure-rehearsal", "--workspace", WORKSPACE, "--synthetic", "--seed"]),
       ).toEqual({
@@ -245,7 +245,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
     it.each([
       ["a bare --wait", ["--wait"], 120],
       ["--wait-seconds 5", ["--wait-seconds", "5"], 5],
-    ])("seeds, waiting for %s", (_shape, wait, waitSeconds) => {
+    ])("seeds and waits for %s", (_shape, wait, waitSeconds) => {
       expect(
         parsed(["erasure-rehearsal", "--workspace", WORKSPACE, "--synthetic", "--seed", ...wait]),
       ).toEqual({
@@ -254,7 +254,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it("runs, writing the report where it is told", () => {
+    it("runs and writes the report to the --report path", () => {
       expect(
         parsed([
           "erasure-rehearsal",
@@ -271,7 +271,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it("leaves a wait out of a run", () => {
+    it("ignores --wait-seconds on a run", () => {
       expect(
         parsed([
           "erasure-rehearsal",
@@ -290,7 +290,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it("leaves a report out of a seed", () => {
+    it("ignores --report on a seed", () => {
       expect(
         parsed([
           "erasure-rehearsal",
@@ -310,7 +310,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
     it.each([
       ["--seed", []],
       ["--run", ["--report", "report.md"]],
-    ])("answers usage to %s with a wait not in seconds", (phase, report) => {
+    ])("gives a usage error for %s with a non-numeric wait", (phase, report) => {
       expect(
         parsed([
           "erasure-rehearsal",
@@ -325,7 +325,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       ).toEqual({ refusal: WAIT_MALFORMED });
     });
 
-    it("answers usage without --synthetic, the caller's consent to run here", () => {
+    it("gives a usage error without --synthetic, the caller's consent", () => {
       expect(parsed(["erasure-rehearsal", "--workspace", WORKSPACE, "--seed"])).toEqual({
         refusal: SYNTHETIC_MISSING,
       });
@@ -334,7 +334,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       ).toEqual({ refusal: SYNTHETIC_MISSING });
     });
 
-    it("answers usage to neither or both phases at once", () => {
+    it("gives a usage error for neither phase or both phases", () => {
       const neither = ["erasure-rehearsal", "--workspace", WORKSPACE, "--synthetic"];
 
       expect(parsed([...neither, "--seed", "--run"])).toEqual({ refusal: PHASE_MISSING });
@@ -342,14 +342,14 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       expect(parsed([...neither, "--seed", "now"])).toEqual({ refusal: PHASE_MISSING });
     });
 
-    it("answers usage to a reportless run, which would prove nothing", () => {
+    it("gives a usage error for --run without --report", () => {
       const running = ["erasure-rehearsal", "--workspace", WORKSPACE, "--synthetic", "--run"];
 
       expect(parsed(running)).toEqual({ refusal: REPORT_MISSING });
       expect(parsed([...running, "--report"])).toEqual({ refusal: REPORT_MISSING });
     });
 
-    it("judges consent, phase, report and wait in that order", () => {
+    it("checks consent, phase, report, then wait, in that order", () => {
       const asking = ["erasure-rehearsal", "--workspace", WORKSPACE];
 
       expect(parsed([...asking, "--wait-seconds", "x"])).toEqual({ refusal: SYNTHETIC_MISSING });
@@ -367,7 +367,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
 
     const REQUIRED = "import-bundle: --from <directory> and --as <member email> are required";
 
-    it("lands as Internal and for real by default", () => {
+    it("defaults to Internal sensitivity and a real run", () => {
       expect(parsed(["import-bundle", "--workspace", WORKSPACE, ...FLAGS])).toEqual({
         name: "import-bundle",
         asked: {
@@ -380,7 +380,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it.each(["Restricted", "Internal", "Public"])("lands at the class %s", (sensitivity) => {
+    it.each(["Restricted", "Internal", "Public"])("accepts the sensitivity %s", (sensitivity) => {
       expect(
         parsed(["import-bundle", "--workspace", WORKSPACE, ...FLAGS, "--sensitivity", sensitivity]),
       ).toEqual({
@@ -395,7 +395,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it("runs dry with a bare --dry-run", () => {
+    it("sets a dry run for a bare --dry-run", () => {
       expect(parsed(["import-bundle", "--workspace", WORKSPACE, ...FLAGS, "--dry-run"])).toEqual({
         name: "import-bundle",
         asked: {
@@ -418,21 +418,21 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
         "import-bundle: --sensitivity must be one of Restricted, Internal, Public",
       ],
       [
-        "an unknown sensitivity beside no --as",
+        "a bad sensitivity without --as",
         ["--from", "/tmp/bundle", "--sensitivity", "Secret"],
         REQUIRED,
       ],
       [
-        "a --dry-run carrying a value",
+        "a --dry-run with a value",
         [...FLAGS, "--dry-run", "yes"],
         "import-bundle: --dry-run takes no value",
       ],
       [
-        "a --dry-run value beside a bad sensitivity",
+        "bad --dry-run and --sensitivity values",
         [...FLAGS, "--sensitivity", "Secret", "--dry-run", "yes"],
         "import-bundle: --sensitivity must be one of Restricted, Internal, Public",
       ],
-    ])("answers usage to %s", (_shape, flags, refusal) => {
+    ])("gives a usage error for %s", (_shape, flags, refusal) => {
       expect(parsed(["import-bundle", "--workspace", WORKSPACE, ...flags])).toEqual({ refusal });
     });
   });
@@ -445,7 +445,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
     const REQUIRED =
       "update-concept-body: --iri <iri> and --as <member email> are required, with the new body on stdin";
 
-    it("writes against the hash it expects", () => {
+    it("writes with --expect as the expected content hash", () => {
       expect(
         parsed(["update-concept-body", "--workspace", WORKSPACE, ...FLAGS, "--expect", "h1"]),
       ).toEqual({
@@ -459,7 +459,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it("runs dry without a hash, and with one", () => {
+    it("accepts --dry-run with or without --expect", () => {
       expect(
         parsed(["update-concept-body", "--workspace", WORKSPACE, ...FLAGS, "--dry-run"]),
       ).toEqual({
@@ -502,12 +502,12 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
         "update-concept-body: --expect <content hash> is required on a write; run with --dry-run to read the hash the concept stands at",
       ],
       [
-        "a --dry-run carrying a value",
+        "a --dry-run with a value",
         [...FLAGS, "--dry-run", "yes"],
         "update-concept-body: --dry-run takes no value",
       ],
-      ["a --dry-run value beside no --iri", ["--as", "a@b.c", "--dry-run", "yes"], REQUIRED],
-    ])("answers usage to %s", (_shape, flags, refusal) => {
+      ["a --dry-run value without --iri", ["--as", "a@b.c", "--dry-run", "yes"], REQUIRED],
+    ])("gives a usage error for %s", (_shape, flags, refusal) => {
       expect(parsed(["update-concept-body", "--workspace", WORKSPACE, ...flags])).toEqual({
         refusal,
       });
@@ -515,7 +515,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
   });
 
   describe("set-model-key", () => {
-    it("takes the provider as typed, judging no word", () => {
+    it("takes the provider as typed, without validating it", () => {
       expect(
         parsed(["set-model-key", "--workspace", WORKSPACE, "--provider", "anthropic"]),
       ).toEqual({
@@ -524,7 +524,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it("answers usage with no --provider", () => {
+    it("gives a usage error without --provider", () => {
       const refusal =
         "set-model-key: --workspace <id> and --provider <anthropic|mistral|cloudflare> are required, with the key on standard input";
 
@@ -536,14 +536,14 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
   });
 
   describe("set-spending-limit", () => {
-    it("takes the sum as typed, judging no pounds", () => {
+    it("takes the --gbp sum as typed, without validating it", () => {
       expect(parsed(["set-spending-limit", "--workspace", WORKSPACE, "--gbp", "12.50"])).toEqual({
         name: "set-spending-limit",
         asked: { workspaceId: WORKSPACE, gbp: "12.50" },
       });
     });
 
-    it("answers usage with no --gbp", () => {
+    it("gives a usage error without --gbp", () => {
       expect(parsed(["set-spending-limit", "--workspace", WORKSPACE])).toEqual({
         refusal: "set-spending-limit: --workspace <id> and --gbp <pounds a month> are required",
       });
@@ -565,7 +565,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it.each(["--purpose", "--provider", "--model"])("answers usage without %s", (flag) => {
+    it.each(["--purpose", "--provider", "--model"])("gives a usage error without %s", (flag) => {
       expect(
         parsed(["set-model-choice", "--workspace", WORKSPACE, ...without(FLAGS, flag)]),
       ).toEqual({
@@ -603,7 +603,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
     });
 
     it.each(["--provider", "--model", "--from", "--gbp-per-million-in", "--gbp-per-million-out"])(
-      "answers usage without %s",
+      "gives a usage error without %s",
       (flag) => {
         expect(parsed(["set-model-price", ...without(FLAGS, flag)])).toEqual({
           refusal:
@@ -623,7 +623,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it.each(["--provider", "--model", "--threshold"])("answers usage without %s", (flag) => {
+    it.each(["--provider", "--model", "--threshold"])("gives a usage error without %s", (flag) => {
       expect(parsed(["set-decision-threshold", ...without(FLAGS, flag)])).toEqual({
         refusal:
           "set-decision-threshold: --provider <cloudflare>, --model <model> and --threshold <probability> are required",
@@ -654,7 +654,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       ["no --admin", ["--name", "Acme", "--short-name", "acme"]],
       ["no --short-name", ["--name", "Acme", "--admin", "a@b.c"]],
       ["no --name", ["--short-name", "acme", "--admin", "a@b.c"]],
-    ])("answers usage to %s", (_shape, flags) => {
+    ])("gives a usage error for %s", (_shape, flags) => {
       expect(parsed(["provision-workspace", ...flags])).toEqual({
         refusal:
           "provision-workspace: --name <name>, --short-name <short name> and --admin <email> are required",
@@ -675,7 +675,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
     it.each([
       ["no --name", ["--email", "matthew@phew.invalid"]],
       ["no --email", ["--name", "Matthew Burgess"]],
-    ])("answers usage to %s", (_shape, flags) => {
+    ])("gives a usage error for %s", (_shape, flags) => {
       expect(parsed(["add-person", ...flags])).toEqual({
         refusal: "add-person: --email <address> and --name <display name> are required",
       });
@@ -686,7 +686,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
     const REQUIRED =
       "add-member: --workspace <id>, --email <email> and --role <Admin|Editor|Viewer> are required";
 
-    it.each(["Admin", "Editor", "Viewer"])("takes the role %s", (role) => {
+    it.each(["Admin", "Editor", "Viewer"])("accepts the role %s", (role) => {
       expect(
         parsed(["add-member", "--workspace", WORKSPACE, "--email", "a@b.c", "--role", role]),
       ).toEqual({
@@ -695,7 +695,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it.each(["Owner", "admin"])("answers usage to the role word %s", (role) => {
+    it.each(["Owner", "admin"])("gives a usage error for the role %s", (role) => {
       expect(
         parsed(["add-member", "--workspace", WORKSPACE, "--email", "a@b.c", "--role", role]),
       ).toEqual({ refusal: "add-member: --role must be one of Admin, Editor, Viewer" });
@@ -706,8 +706,8 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       ["no --workspace", ["--email", "a@b.c", "--role", "Editor"]],
       ["no --email", ["--workspace", WORKSPACE, "--role", "Editor"]],
       ["no --role", ["--workspace", WORKSPACE, "--email", "a@b.c"]],
-      ["an unknown role beside no --email", ["--workspace", WORKSPACE, "--role", "Owner"]],
-    ])("answers usage to %s", (_shape, flags) => {
+      ["an unknown role without --email", ["--workspace", WORKSPACE, "--role", "Owner"]],
+    ])("gives a usage error for %s", (_shape, flags) => {
       expect(parsed(["add-member", ...flags])).toEqual({ refusal: REQUIRED });
     });
   });
@@ -726,7 +726,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
         { name: "Acme Group", shortName: "acme-group" },
       ],
       ["neither, which the store refuses", [], { name: undefined, shortName: undefined }],
-    ])("renames to %s", (_shape, flags, renamed) => {
+    ])("parses a rename of %s", (_shape, flags, renamed) => {
       expect(parsed(["rename-workspace", "--workspace", WORKSPACE, ...flags])).toEqual({
         name: "rename-workspace",
         asked: { workspaceId: WORKSPACE, ...renamed },
@@ -737,7 +737,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       ["no flags at all", []],
       ["no --workspace", ["--name", "Acme Group", "--short-name", "acme"]],
       ["a bare --workspace", ["--workspace", "--name", "Acme Group"]],
-    ])("answers usage to %s", (_shape, flags) => {
+    ])("gives a usage error for %s", (_shape, flags) => {
       expect(parsed(["rename-workspace", ...flags])).toEqual({
         refusal:
           "rename-workspace: --workspace <id> is required, with --name <name>, --short-name <short name> or both",
@@ -766,7 +766,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       ["no --email", ["--grant"]],
       ["no --email beside --revoke", ["--revoke"]],
       ["a bare --email", ["--email", "--grant"]],
-    ])("answers usage to %s", (_shape, flags) => {
+    ])("gives a usage error for %s", (_shape, flags) => {
       expect(parsed(["operator", ...flags])).toEqual({
         refusal: "operator: --email <email> and one of --grant or --revoke are required",
       });
@@ -781,7 +781,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it("answers usage without --email", () => {
+    it("gives a usage error without --email", () => {
       const refusal = "restore-sign-in: --email <email> is required";
 
       expect(parsed(["restore-sign-in"])).toEqual({ refusal });
@@ -792,14 +792,14 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
   describe("smoke", () => {
     const ORIGIN = "http://127.0.0.1:3000";
 
-    it("notes nothing by hand unless told to", () => {
+    it("asks for no manual checks without --find, --guide, or --ask", () => {
       expect(parsed(["smoke", "--url", ORIGIN])).toEqual({
         name: "smoke",
         asked: { url: ORIGIN, byHand: [] },
       });
     });
 
-    it("notes by hand in a fixed order, whatever the typing", () => {
+    it("orders manual checks the same, whatever the flag order", () => {
       expect(parsed(["smoke", "--url", ORIGIN, "--find", "--guide", "--ask"])).toEqual({
         name: "smoke",
         asked: { url: ORIGIN, byHand: ["find", "guide", "ask"] },
@@ -814,7 +814,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it("reads a --find carrying a value as no note", () => {
+    it("ignores a --find that carries a value", () => {
       expect(parsed(["smoke", "--url", ORIGIN, "--find", "yes"])).toEqual({
         name: "smoke",
         asked: { url: ORIGIN, byHand: [] },
@@ -828,7 +828,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       });
     });
 
-    it("answers usage without --url", () => {
+    it("gives a usage error without --url", () => {
       const refusal = "smoke: --url <origin> is required (http://127.0.0.1:3000 inside the stack)";
 
       expect(parsed(["smoke"])).toEqual({ refusal });
@@ -856,7 +856,7 @@ describe("pnpm ops — the command line, parsed before anything runs", () => {
       ["a bare --tokens", ["--tokens"]],
       ["a --tokens of commas", ["--tokens", ",,"]],
       ["a --tokens of spaces", ["--tokens", " , "]],
-    ])("answers usage to %s", (_shape, flags) => {
+    ])("gives a usage error for %s", (_shape, flags) => {
       expect(parsed(["dump-grep", ...flags])).toEqual({
         refusal: "dump-grep: --tokens <a,b,…> is required",
       });

@@ -23,12 +23,12 @@ const isListed = async (value: string): Promise<boolean | undefined> => {
   return rows[0]?.inside;
 };
 
-describe("an IN list of SQL string literals", () => {
-  it.each(LISTED)("holds %j as the value itself", async (value) => {
+describe("listed, an IN list of SQL string literals", () => {
+  it.each(LISTED)("matches %j, a value in the list", async (value) => {
     expect(await isListed(value)).toBe(true);
   });
 
-  it.each(["it", "s", "'"])("leaves %j out of it", async (value) => {
+  it.each(["it", "s", "'"])("does not match %j, a fragment of a listed value", async (value) => {
     expect(await isListed(value)).toBe(false);
   });
 });

@@ -13,8 +13,8 @@ beforeAll(async () => {
   };
 });
 
-describe("ending a pool before its database goes away", () => {
-  it("resolves once every pool client's connection has closed", async () => {
+describe("endPool, ending a pool before its database stops", () => {
+  it("resolves once every client connection has closed", async () => {
     const pool = new pg.Pool({ connectionString: db.connectionUri, max: 2 });
     const closed: boolean[] = [];
     pool.on("connect", (client) => {

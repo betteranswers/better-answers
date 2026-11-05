@@ -10,8 +10,8 @@ const CACHED = {
   iidfile: "/tmp/the-id-this-build-wrote",
 };
 
-describe("the build an image probe runs", () => {
-  it("uses buildx on a runner and a plain build elsewhere", () => {
+describe("the docker build command an image probe runs", () => {
+  it("uses buildx with a shared cache, else a plain build", () => {
     expect(buildCommand(API, CACHED)).toEqual([
       "docker",
       "buildx",
@@ -38,7 +38,7 @@ describe("the build an image probe runs", () => {
     ]);
   });
 
-  it("reads each image's layers from its own package's cache tag", () => {
+  it("reads each image's cache from that image's own tag", () => {
     expect(buildCommand(BACKUP, CACHED)).toContain(
       "type=registry,ref=ghcr.io/an-owner/backup:buildcache",
     );
@@ -47,7 +47,7 @@ describe("the build an image probe runs", () => {
     );
   });
 
-  it("reads the shared cache and exports nothing to it", () => {
+  it("reads the shared cache without exporting to it", () => {
     expect(buildCommand(BACKUP, CACHED)).toEqual([
       "docker",
       "buildx",
@@ -65,7 +65,7 @@ describe("the build an image probe runs", () => {
     ]);
   });
 
-  it("refuses the daemon's own builder, taking a container one", () => {
+  it("picks a docker-container builder and rejects the default one", () => {
     expect(
       builderThatCanExport(
         "Name:          builder-1c0ffee\n" +
@@ -92,7 +92,7 @@ describe("the build an image probe runs", () => {
     ).toBeUndefined();
   });
 
-  it("asks the daemon nothing unless a cache registry is named", async () => {
+  it("queries the builder only when IMAGE_CACHE_REGISTRY is set", async () => {
     const refuseToAsk = (): Promise<string | undefined> => {
       throw new Error("the probe asked the daemon for a builder it could not have used");
     };

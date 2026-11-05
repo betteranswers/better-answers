@@ -40,14 +40,14 @@ describe("the table-ownership map", () => {
     expect(Object.keys(TABLE_OWNERS).toSorted()).toEqual([...declaredTableNames()].toSorted());
   });
 
-  it("gives the identity provider exactly the identity set", () => {
+  it("gives the identity provider exactly the identity set tables", () => {
     const provided = Object.entries(TABLE_OWNERS)
       .filter(([, owner]) => owner === IDENTITY_PROVIDER)
       .map(([table]) => table);
     expect(provided.toSorted()).toEqual([...IDENTITY_SET].toSorted());
   });
 
-  it("gives every cross-owner access a reason and a declared table", () => {
+  it("gives every cross-owner access a reason and declared table", () => {
     for (const entry of CROSS_OWNER_TABLE_ACCESS) {
       expect({
         table: entry.table,
@@ -57,7 +57,7 @@ describe("the table-ownership map", () => {
     }
   });
 
-  it("never records a table's owner as its cross-owner reader", () => {
+  it("never lists a table's owner as its cross-owner reader", () => {
     for (const entry of CROSS_OWNER_TABLE_ACCESS) {
       expect({ table: entry.table, by: entry.by }).not.toEqual({
         table: entry.table,
@@ -71,7 +71,7 @@ const opensAsAnOwner = (owner: string, inCore: ReadonlySet<string>): boolean =>
   OWNERS_OUTSIDE_CORE.some((known) => known === owner) ? isDirectory(owner) : inCore.has(owner);
 
 describe("every owner the map names", () => {
-  it("is a core directory, or a listed outside directory", () => {
+  it("is a core directory or a listed outside directory", () => {
     const inCore = coreDirectories();
     for (const owner of ownersNamed()) {
       const opens = opensAsAnOwner(owner, inCore);
@@ -79,7 +79,7 @@ describe("every owner the map names", () => {
     }
   });
 
-  it("keeps no outside path for an owner that left", () => {
+  it("lists no outside directory that no table's owner uses", () => {
     const named = new Set(ownersNamed());
     for (const owner of OWNERS_OUTSIDE_CORE) {
       expect({ owner, used: named.has(owner) }).toEqual({ owner, used: true });

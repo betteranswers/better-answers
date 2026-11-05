@@ -7,7 +7,7 @@ describe("the slow-test threshold", () => {
     expect(slowTestThreshold({ GITHUB_ACTIONS: "true" })).toBe(5_000);
   });
 
-  it("keeps vitest's 300 ms outside GitHub Actions", () => {
+  it("keeps vitest's 300 ms default outside GitHub Actions", () => {
     expect(slowTestThreshold({})).toBe(300);
   });
 });

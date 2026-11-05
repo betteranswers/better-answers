@@ -8,10 +8,10 @@ const app = appForSuite();
 const signInEmailTo = async (email: string) => {
   await app().client().json("/email-otp/send-verification-otp", { email, type: "sign-in" });
   const sent = app().emails.filter(({ to }) => to === email);
-  expect(sent, "a code request sends exactly one email").toHaveLength(1);
+  expect(sent, "a code request did not send exactly one email").toHaveLength(1);
   const [message] = sent;
   const code = message === undefined ? undefined : codeIn(message);
-  if (message === undefined || code === undefined) throw new Error(`no code went to ${email}`);
+  if (message === undefined || code === undefined) throw new Error(`no code was sent to ${email}`);
   return { message, code };
 };
 
@@ -25,7 +25,7 @@ describe("the sign-in email", () => {
     expect(message.subject).not.toContain(code);
   });
 
-  it("gives the link and the code their own lines", async () => {
+  it("puts the link and the code on separate lines", async () => {
     const person = await app().person();
 
     const { message, code } = await signInEmailTo(person.email);
@@ -47,7 +47,7 @@ describe("the sign-in email", () => {
     );
   });
 
-  it("reads the code whatever digits the link holds", () => {
+  it("finds the code when the link also contains digits", () => {
     const message = {
       to: "a@example.test",
       subject: "S",
@@ -57,7 +57,7 @@ describe("the sign-in email", () => {
     expect(codeIn(message)).toBe("654321");
   });
 
-  it("holds the same code in large type in its HTML", async () => {
+  it("shows the code in large type in its HTML", async () => {
     const person = await app().person();
 
     const { message, code } = await signInEmailTo(person.email);

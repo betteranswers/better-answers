@@ -67,7 +67,7 @@ const conceptWrittenIn = async (
   return written.value.iri;
 };
 
-const sharedPastItsEvidence = (workspace: Awaited<ReturnType<TestApp["provision"]>>, iri: string) =>
+const widenToEveryone = (workspace: Awaited<ReturnType<TestApp["provision"]>>, iri: string) =>
   actingIn(app, { workspaceId: workspace.workspaceId, userId: workspace.admin.id }, (admin, tx) =>
     overrideConceptSensitivity(admin, tx, { iri, sensitivity: "Internal", audience: "everyone" }),
   );
@@ -121,8 +121,8 @@ const restrictedSourcedConcept = async () => {
 
 const REMUNERATION_QUESTION = { question: "How is the board's remuneration reviewed?" };
 
-describe("a Restricted-sourced concept, to a Viewer's token", () => {
-  it("is no match through find, though the Admin finds it", async () => {
+describe("a concept from a Restricted document, read by a Viewer", () => {
+  it("is absent from the Viewer's find, not the Admin's", async () => {
     const { iri, viewer, admin } = await restrictedSourcedConcept();
 
     const found = await called(viewer.client, viewer.token, "find", { query: "remuneration" });
@@ -140,7 +140,7 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
       seeded = await restrictedSourcedConcept();
     });
 
-    it("answers ask as an unrelated question, the record's id apart", async () => {
+    it("answers the Viewer like an unrelated question, except record ids", async () => {
       const { viewer } = seeded;
 
       const asked = await called(viewer.client, viewer.token, "ask", REMUNERATION_QUESTION);
@@ -164,7 +164,7 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
       expect(JSON.stringify(asked)).not.toContain("better-answers.com/c/");
     });
 
-    it("is cited to its Admin under the product's origin", async () => {
+    it("is cited to the Admin with its app page URL", async () => {
       const { iri, admin } = seeded;
 
       const seen = await called(admin.client, admin.token, "ask", REMUNERATION_QUESTION);
@@ -189,7 +189,7 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
     });
   });
 
-  it("opens as an unminted IRI, though the Admin opens it", async () => {
+  it("opens for the Admin but answers the Viewer as missing", async () => {
     const { iri, viewer, admin } = await restrictedSourcedConcept();
     const absentIri = "https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ";
 
@@ -213,7 +213,7 @@ const COVERED_TITLE = "The covered handbook";
 const COVERED_TEXT = "The kingfisher handbook explains the rule.";
 const COVERING_TITLE = "Kingfisher policy";
 
-const documentsAndTheConceptOverThem = async () => {
+const seedDocumentsAndCoveringConcept = async () => {
   const workspace = await app.provision();
   const viewer = await app.person();
   await app.addMember(workspace.workspaceId, viewer.id, "Viewer");
@@ -257,9 +257,9 @@ const documentsAndTheConceptOverThem = async () => {
   };
 };
 
-describe("the document layer through the MCP entries", () => {
-  it("previews a document as its layer's match, skipping covered ones", async () => {
-    const { iri, standalone, viewer } = await documentsAndTheConceptOverThem();
+describe("documents through the MCP find and open entries", () => {
+  it("lists uncovered documents after concepts and omits covered documents", async () => {
+    const { iri, standalone, viewer } = await seedDocumentsAndCoveringConcept();
 
     const found = await called(viewer.client, viewer.token, "find", { query: QUERY });
 
@@ -299,8 +299,8 @@ describe("the document layer through the MCP entries", () => {
     expect(JSON.stringify(found)).not.toContain(COVERED_TITLE);
   });
 
-  it("pages through nextCursor, each match once, none past the end", async () => {
-    const { iri, standalone, viewer } = await documentsAndTheConceptOverThem();
+  it("pages with nextCursor, returning each match once, then no cursor", async () => {
+    const { iri, standalone, viewer } = await seedDocumentsAndCoveringConcept();
 
     const first = await called(viewer.client, viewer.token, "find", { query: QUERY, limit: 1 });
     const cursor = structured(first)["nextCursor"];
@@ -337,8 +337,8 @@ describe("the document layer through the MCP entries", () => {
     });
   });
 
-  it("opens a wire locator's passage, with its document and sensitivity", async () => {
-    const { standalone, viewer } = await documentsAndTheConceptOverThem();
+  it("opens a passage by locator with its title and sensitivity", async () => {
+    const { standalone, viewer } = await seedDocumentsAndCoveringConcept();
 
     const opened = await called(viewer.client, viewer.token, "open", {
       locator: standalone.locator,
@@ -362,8 +362,8 @@ describe("the document layer through the MCP entries", () => {
     );
   });
 
-  it("answers every unreachable locator with the one word and shape", async () => {
-    const { standalone, underReview, elsewhere, viewer } = await documentsAndTheConceptOverThem();
+  it("answers every unreachable locator with the same not-found shape", async () => {
+    const { standalone, underReview, elsewhere, viewer } = await seedDocumentsAndCoveringConcept();
     const nonsense = "not an address at all";
     const pastTheEnd = `${standalone.documentId}/chars:0-${codePointsOf(INVOICE_TEXT) + 1}`;
 
@@ -385,8 +385,8 @@ describe("the document layer through the MCP entries", () => {
     }
   });
 
-  it("renders each evidence item's wire locator, which opens its passage", async () => {
-    const { iri, covered, viewer } = await documentsAndTheConceptOverThem();
+  it("renders each evidence locator, and that locator opens the passage", async () => {
+    const { iri, covered, viewer } = await seedDocumentsAndCoveringConcept();
 
     const concept = await called(viewer.client, viewer.token, "open", { iri });
 
@@ -414,8 +414,8 @@ describe("the document layer through the MCP entries", () => {
 const VERIFIED_TITLE = "Heron policy";
 const VERIFIED_AT = "2026-06-01T09:30:00.000Z";
 
-describe("a verified concept through the MCP entries", () => {
-  it("carries its verifier and date under the wire's keys", async () => {
+describe("a verified concept in MCP find and open", () => {
+  it("returns its verifier and date as checkedBy and checkedAt", async () => {
     const workspace = await app.provision();
     const iri = await conceptWrittenIn(workspace, {
       mergeKey: "note:heron-policy",
@@ -505,7 +505,7 @@ const aConceptCitingRestrictedMinutes = async () => {
     body,
     message: "Record the kingfisher review",
   });
-  await sharedPastItsEvidence(workspace, iri);
+  await widenToEveryone(workspace, iri);
   return {
     iri,
     heron,
@@ -517,8 +517,8 @@ const aConceptCitingRestrictedMinutes = async () => {
   };
 };
 
-describe("a concept citing Restricted minutes, opened over MCP", () => {
-  it("answers the Viewer the whole read, each source by id", async () => {
+describe("opening a concept that cites Restricted minutes over MCP", () => {
+  it("returns the Viewer the full concept, each source by id", async () => {
     const { iri, heron, body, handbook, viewer } = await aConceptCitingRestrictedMinutes();
 
     const opened = await called(viewer.client, viewer.token, "open", { iri });
@@ -563,7 +563,7 @@ describe("a concept citing Restricted minutes, opened over MCP", () => {
     });
   });
 
-  it("gives the Viewer no locator, id or title of minutes", async () => {
+  it("hides the minutes' locator, id and title from the Viewer", async () => {
     const { iri, minutes, viewer, admin } = await aConceptCitingRestrictedMinutes();
 
     const opened = await called(viewer.client, viewer.token, "open", { iri });

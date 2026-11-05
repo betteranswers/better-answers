@@ -55,8 +55,8 @@ const messageOf = async (response: Response): Promise<string> =>
 
 const MEMBER_ROLE_CHECK = "member_role_check";
 
-describe("the model choices list over the wire", () => {
-  it("answers one model choice per purpose, embedding fixed with dimensions", async () => {
+describe("modelChoices.list over HTTP", () => {
+  it("lists each purpose's model, with embedding fixed and its dimensions", async () => {
     const workspace = await app().provision();
     await seedModelChoices(workspace.workspaceId);
 
@@ -67,7 +67,7 @@ describe("the model choices list over the wire", () => {
   });
 
   it.each(["Admin", "Editor", "Viewer"] as const)(
-    "lets a member at %s read the list",
+    "lets a member with role %s read the list",
     async (role) => {
       const workspace = await app().provision();
       await seedModelChoices(workspace.workspaceId);
@@ -107,7 +107,7 @@ describe("the model choices list over the wire", () => {
   });
 });
 
-describe("what the model choices list refuses", () => {
+describe("callers the model choices list refuses", () => {
   it("refuses a request with no session", async () => {
     const response = await listModelChoices(app().client());
 
@@ -115,7 +115,7 @@ describe("what the model choices list refuses", () => {
     expect(await messageOf(response)).toBe("no-session");
   });
 
-  it("refuses a signed-in person with no workspace picked yet", async () => {
+  it("refuses a signed-in person with no active workspace", async () => {
     const response = await listModelChoices(await memberOfTwoWorkspaces(app()));
 
     expect(response.status).toBe(401);
@@ -145,7 +145,7 @@ describe("what the model choices list refuses", () => {
     expect(await messageOf(response)).toBe("credentials-revoked");
   });
 
-  it("refuses a member role outside the platform's three", async () => {
+  it("refuses a role other than Admin, Editor or Viewer", async () => {
     const workspace = await app().provision();
     const client = await signedInClient(app(), workspace.admin.email);
     const { superuser } = app().database;
@@ -170,7 +170,7 @@ describe("what the model choices list refuses", () => {
     expect(await constraintDefinition(app(), MEMBER_ROLE_CHECK)).toBe(definition);
   });
 
-  it("refuses one address's flood before each request spends a lookup", async () => {
+  it("rate-limits an address before looking up its session", async () => {
     const client = app().client("203.0.113.60");
     const statuses: number[] = [];
     stopTheClock();
@@ -185,7 +185,7 @@ describe("what the model choices list refuses", () => {
     expect((await listModelChoices(app().client("203.0.113.61"))).status).toBe(401);
   });
 
-  it("refuses a session whose active workspace is no workspace id", async () => {
+  it("refuses a session whose active workspace id is malformed", async () => {
     const workspace = await app().provision();
     const client = await signedInClient(app(), workspace.admin.email);
     await sessionPointedAt(app(), workspace.admin.id, "not-a-workspace-id");

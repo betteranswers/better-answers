@@ -24,8 +24,8 @@ const aPersonInASession = async () => {
   return { personId, sessionId: await aSession(personId) };
 };
 
-describe("a passkey confirm's challenge", () => {
-  it("is taken once, by the session that asked", async () => {
+describe("the challenge for a passkey confirmation", () => {
+  it("can be taken once, by the session that requested it", async () => {
     const { personId, sessionId } = await aPersonInASession();
     expect(await keeping(personId, sessionId, "first")).toEqual({ ok: true, value: undefined });
 
@@ -33,7 +33,7 @@ describe("a passkey confirm's challenge", () => {
     expect(await taking(sessionId)).toEqual({ ok: true, value: undefined });
   });
 
-  it("answers only the latest a session asked for", async () => {
+  it("returns only the session's latest challenge", async () => {
     const { personId, sessionId } = await aPersonInASession();
     await keeping(personId, sessionId, "first");
     await keeping(personId, sessionId, "second");
@@ -41,14 +41,14 @@ describe("a passkey confirm's challenge", () => {
     expect(await taking(sessionId)).toEqual({ ok: true, value: "second" });
   });
 
-  it("answers nothing once five minutes have passed", async () => {
+  it("returns nothing after five minutes", async () => {
     const { personId, sessionId } = await aPersonInASession();
     await keeping(personId, sessionId, "first");
 
     expect(await taking(sessionId, after(301))).toEqual({ ok: true, value: undefined });
   });
 
-  it("is never kept under another person's session", async () => {
+  it("is never stored under another person's session", async () => {
     const { personId } = await aPersonInASession();
     const stranger = await aPersonInASession();
 
@@ -61,7 +61,7 @@ describe("a passkey confirm's challenge", () => {
 });
 
 describe("a person's passkey credentials", () => {
-  it("names the person's own alone, each counter a number", async () => {
+  it("returns only the person's own, with numeric counters", async () => {
     const { personId } = await aPersonInASession();
     const passkeyId = await passkeyFor(db().pool, personId);
     await passkeyFor(db().pool, (await aPersonInASession()).personId);
@@ -79,7 +79,7 @@ describe("a person's passkey credentials", () => {
     });
   });
 
-  it("refuses an id that is no person's form", async () => {
+  it("refuses a malformed person id", async () => {
     expect(await readPasskeyCredentials(bootstrap, door(), { personId: "not an id" })).toEqual({
       ok: false,
       error: "malformed",

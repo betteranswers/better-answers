@@ -11,7 +11,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("the browser suite's api needs a port as its one argument");
 }
 
-/** Bound before the harness loads, so a taken port fails this server before another's `/health` can pass for its own. Playwright waits on 503. */
+/** Listens before the harness loads, so a taken port fails at once instead of another server's `/health` passing for this one. Playwright retries on 503. */
 let served: Hono | undefined;
 const listening = serve({
   fetch: (request) => served?.fetch(request) ?? new Response(null, { status: 503 }),
@@ -47,7 +47,7 @@ const app = await startApp({
   },
   objectStore: objects,
   webRoot: path.join(repositoryRoot, "apps/web/dist"),
-  // A passkey's relying party is a domain, never an IP, so the product is served on `localhost`.
+  // WebAuthn needs a domain as the relying party, not an IP address, so the product uses `localhost`.
   publicUrl: `http://localhost:${port}`,
   hostnames: {
     app: "localhost",

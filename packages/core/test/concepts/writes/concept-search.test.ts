@@ -26,8 +26,8 @@ const RETENTION = {
   frontmatter: { title: "Retention Schedule", type: "Policy", tags: ["compliance"] },
 } as const;
 
-describe("the search column writeConcept lands", () => {
-  it("weighs title A, tags and Also-known-as B, body C", async () => {
+describe("the search vector `writeConcept` stores", () => {
+  it("weights title A, tags and Also-known-as B, body C", async () => {
     const scenario = await arrange();
 
     const written = await conceptCiting(scenario, scenario.admin, [], {
@@ -52,7 +52,7 @@ describe("the search column writeConcept lands", () => {
     ]);
   });
 
-  it("weighs the description B", async () => {
+  it("weights the description B", async () => {
     const scenario = await arrange();
 
     const written = await conceptCiting(scenario, scenario.admin, [], {
@@ -75,7 +75,7 @@ describe("the search column writeConcept lands", () => {
     ]);
   });
 
-  it("moves the vector with a rewritten body", async () => {
+  it("updates the vector when the body is rewritten", async () => {
     const scenario = await arrange();
     const first = await conceptCiting(scenario, scenario.admin, [], {
       ...RETENTION,

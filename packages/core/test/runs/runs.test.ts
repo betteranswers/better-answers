@@ -92,8 +92,8 @@ const finishedAudit = async (
   }
 };
 
-describe("what the api puts on the worker's queue", () => {
-  it("queues a rebuild for a reason and answers its id", async () => {
+describe("queueing a job for the worker", () => {
+  it("queues a rebuild with its reason and returns its id", async () => {
     const scenario = await arrange();
 
     const queued = await enqueueJob(scenario.admin, scenario.postgres, {
@@ -119,7 +119,7 @@ describe("what the api puts on the worker's queue", () => {
     ]);
   });
 
-  it("queues a nightly audit, which carries no reason at all", async () => {
+  it("queues a nightly audit without a reason", async () => {
     const scenario = await arrange();
 
     const queued = await enqueueJob(scenario.admin, scenario.postgres, {
@@ -135,7 +135,7 @@ describe("what the api puts on the worker's queue", () => {
     expect(rows.rows).toEqual([{ reason: null }]);
   });
 
-  it("queues for the platform in the workspace it names", async () => {
+  it("queues a job for the platform in the named workspace", async () => {
     const scenario = await arrange();
 
     const queued = await enqueueJob(mapMaintenance, scenario.postgres, {
@@ -152,7 +152,7 @@ describe("what the api puts on the worker's queue", () => {
     expect(rows.rows).toEqual([{ id: queued.value.jobId, reason: "reconciler" }]);
   });
 
-  it("refuses a person naming another tenant's workspace, queuing nothing", async () => {
+  it("refuses a job for another tenant's workspace and queues nothing", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
 
@@ -168,10 +168,10 @@ describe("what the api puts on the worker's queue", () => {
     expect(rows.rowCount).toBe(0);
   });
 
-  it("refuses a reasonless rebuild and an audit carrying a reason", async () => {
+  it("refuses a reasonless rebuild and an audit with a reason", async () => {
     const scenario = await arrange();
 
-    // @ts-expect-error a rebuild without its reason is outside the input, on purpose
+    // @ts-expect-error a rebuild requires a reason, and this call omits it
     const noReason = await enqueueJob(mapMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       kind: "full-rebuild",
@@ -179,7 +179,7 @@ describe("what the api puts on the worker's queue", () => {
     const spuriousReason = await enqueueJob(mapMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       kind: "nightly-audit",
-      // @ts-expect-error an audit carries no reason, on purpose
+      // @ts-expect-error an audit takes no reason, and this call passes one
       reason: "drill",
     });
 
@@ -206,7 +206,7 @@ describe("what the api puts on the worker's queue", () => {
     expect(rows.rowCount).toBe(0);
   });
 
-  it("refuses a person whose credentials were revoked, queuing nothing", async () => {
+  it("refuses a person with revoked credentials and queues nothing", async () => {
     const kept = await arrange();
     const revoked = await arrange();
     await db().pool.query(
@@ -238,10 +238,10 @@ const CONNECTED_SOURCE = "01K4Q9F3V8YXP7R2M6ZKWC3TDS";
 
 const ANOTHER_CONNECTED_SOURCE = "01K4Q9F3V8YXP7R2M6ZKWC3TDT";
 
-const boundJob = (workspaceId: WorkspaceId) =>
+const sourceIndexJob = (workspaceId: WorkspaceId) =>
   ({ workspaceId, kind: "index", subjectId: CONNECTED_SOURCE, reason: "connected" }) as const;
 
-const actionOf = <T>(scenario: Scenario, work: (tx: Tx) => Promise<T>): Promise<T> =>
+const asPlatformAction = <T>(scenario: Scenario, work: (tx: Tx) => Promise<T>): Promise<T> =>
   withScope(mapMaintenance, scenario.postgres, scenario.workspaceId, (tx) => work(tx));
 
 const jobsIn = async (workspaceId: string) =>
@@ -252,9 +252,9 @@ const jobsIn = async (workspaceId: string) =>
     ),
   );
 
-const queuedBound = async (scenario: Scenario): Promise<string> => {
-  const first = await actionOf(scenario, (tx) =>
-    enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId)),
+const queueSourceIndexJob = async (scenario: Scenario): Promise<string> => {
+  const first = await asPlatformAction(scenario, (tx) =>
+    enqueueJobIn(mapMaintenance, tx, sourceIndexJob(scenario.workspaceId)),
   );
   if (!first.ok) throw new Error(`the job was not queued: ${String(first.error)}`);
   return first.value.jobId;
@@ -263,12 +263,12 @@ const queuedBound = async (scenario: Scenario): Promise<string> => {
 const reasonsIn = async (workspaceId: string): Promise<readonly string[]> =>
   (await jobsIn(workspaceId)).map((row) => z.string().parse(row["reason"]));
 
-describe("an action landing its rows and job in one transaction", () => {
-  it("rolls back with the action it rode in, queuing nothing", async () => {
+describe("enqueueing a job inside an action's transaction", () => {
+  it("rolls the job back when the action's transaction aborts", async () => {
     const scenario = await arrange();
 
-    const action = actionOf(scenario, async (tx) => {
-      const enqueued = await enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId));
+    const action = asPlatformAction(scenario, async (tx) => {
+      const enqueued = await enqueueJobIn(mapMaintenance, tx, sourceIndexJob(scenario.workspaceId));
 
       await abortTheTransaction(tx);
       return enqueued;
@@ -278,13 +278,13 @@ describe("an action landing its rows and job in one transaction", () => {
     expect(await jobsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("answers an already-queued source's job id, and the action commits", async () => {
+  it("returns the existing job id and lets the action commit", async () => {
     const scenario = await arrange();
-    const firstJobId = await queuedBound(scenario);
+    const firstJobId = await queueSourceIndexJob(scenario);
 
-    const second = await actionOf(scenario, async (tx) => {
+    const second = await asPlatformAction(scenario, async (tx) => {
       const answered = await enqueueJobIn(mapMaintenance, tx, {
-        ...boundJob(scenario.workspaceId),
+        ...sourceIndexJob(scenario.workspaceId),
         reason: "restored",
       });
       await tx.query("SELECT 1");
@@ -308,20 +308,23 @@ describe("an action landing its rows and job in one transaction", () => {
     ["rule-change", "wiped"],
     ["wiped", "rule-change"],
   ] as const)(
-    "takes %s onto the queued job, keeping it past %s",
+    "replaces the queued reason with %s, kept over %s",
     async (emptying, alsoEmptying) => {
       const scenario = await arrange();
-      const firstJobId = await queuedBound(scenario);
+      const firstJobId = await queueSourceIndexJob(scenario);
 
-      const taken = await actionOf(scenario, (tx) =>
-        enqueueJobIn(mapMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: emptying }),
+      const taken = await asPlatformAction(scenario, (tx) =>
+        enqueueJobIn(mapMaintenance, tx, {
+          ...sourceIndexJob(scenario.workspaceId),
+          reason: emptying,
+        }),
       );
       expect(taken).toEqual({ ok: true, value: { jobId: firstJobId } });
       expect(await reasonsIn(scenario.workspaceId)).toEqual([emptying]);
 
       for (const reason of ["restored", alsoEmptying] as const) {
-        const later = await actionOf(scenario, (tx) =>
-          enqueueJobIn(mapMaintenance, tx, { ...boundJob(scenario.workspaceId), reason }),
+        const later = await asPlatformAction(scenario, (tx) =>
+          enqueueJobIn(mapMaintenance, tx, { ...sourceIndexJob(scenario.workspaceId), reason }),
         );
         expect(later).toEqual({ ok: true, value: { jobId: firstJobId } });
         expect(await reasonsIn(scenario.workspaceId)).toEqual([emptying]);
@@ -329,16 +332,19 @@ describe("an action landing its rows and job in one transaction", () => {
     },
   );
 
-  it("queues afresh beside a job waiting out its backoff", async () => {
+  it("queues a new job beside one waiting out its backoff", async () => {
     const scenario = await arrange();
-    const retrying = await queuedBound(scenario);
+    const retrying = await queueSourceIndexJob(scenario);
     await db().pool.query(
       "UPDATE job SET attempts = 1, backoff_ends_at = now() + interval '1 minute' WHERE id = $1",
       [retrying],
     );
 
-    const fresh = await actionOf(scenario, (tx) =>
-      enqueueJobIn(mapMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: "wiped" }),
+    const fresh = await asPlatformAction(scenario, (tx) =>
+      enqueueJobIn(mapMaintenance, tx, {
+        ...sourceIndexJob(scenario.workspaceId),
+        reason: "wiped",
+      }),
     );
 
     assert(fresh.ok);
@@ -347,20 +353,20 @@ describe("an action landing its rows and job in one transaction", () => {
     expect(await reasonsIn(scenario.workspaceId)).toEqual(["connected", "wiped"]);
   });
 
-  it("rejects an enqueue that another action's commit overtook", async () => {
+  it("throws when another action queues the same subject first", async () => {
     const scenario = await arrange();
     const firstLanded = Promise.withResolvers<undefined>();
     const held = Promise.withResolvers<undefined>();
-    const first = actionOf(scenario, async (tx) => {
-      const queued = await enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId));
+    const first = asPlatformAction(scenario, async (tx) => {
+      const queued = await enqueueJobIn(mapMaintenance, tx, sourceIndexJob(scenario.workspaceId));
       firstLanded.resolve(undefined);
       await held.promise;
       return queued;
     });
     await firstLanded.promise;
 
-    const second = actionOf(scenario, (tx) =>
-      enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId)),
+    const second = asPlatformAction(scenario, (tx) =>
+      enqueueJobIn(mapMaintenance, tx, sourceIndexJob(scenario.workspaceId)),
     ).then(
       () => "committed",
       (error: unknown) => error,
@@ -378,18 +384,18 @@ describe("an action landing its rows and job in one transaction", () => {
     expect(await jobsIn(scenario.workspaceId)).toHaveLength(1);
   });
 
-  it("queues a second source separately, one run key per subject", async () => {
+  it("queues a second source as a separate job", async () => {
     const scenario = await arrange();
 
-    const firstJobId = await queuedBound(scenario);
-    const other = await actionOf(scenario, (tx) =>
+    const firstJobId = await queueSourceIndexJob(scenario);
+    const other = await asPlatformAction(scenario, (tx) =>
       enqueueJobIn(mapMaintenance, tx, {
-        ...boundJob(scenario.workspaceId),
+        ...sourceIndexJob(scenario.workspaceId),
         subjectId: ANOTHER_CONNECTED_SOURCE,
       }),
     );
 
-    assert(other.ok, "a job was not queued");
+    assert(other.ok, "the second source's job was not queued");
     expect(await jobsIn(scenario.workspaceId)).toEqual([
       {
         id: firstJobId,
@@ -421,32 +427,32 @@ describe("an action landing its rows and job in one transaction", () => {
   ])("refuses %s as malformed", async (_what, asked) => {
     const scenario = await arrange();
 
-    const refused = await actionOf(scenario, (tx) =>
-      // @ts-expect-error each row is outside the queue's input, on purpose
+    const refused = await asPlatformAction(scenario, (tx) =>
+      // @ts-expect-error each row breaks the queue's input type
       enqueueJobIn(mapMaintenance, tx, {
         workspaceId: scenario.workspaceId,
         ...asked,
       }),
     );
 
-    expect(refused, "refused, rather than aborting the action's transaction").toEqual({
+    expect(refused, "enqueueJobIn did not answer malformed").toEqual({
       ok: false,
       error: "malformed",
     });
     expect(await jobsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("gates the enqueue on the role the kind's descriptor names", async () => {
+  it("enqueues only for the role the kind's descriptor names", async () => {
     const scenario = await arrange();
 
     const editor = folded(
       await withMember(scenario.editor, scenario.postgres, (_fresh, tx) =>
-        enqueueJobIn(scenario.editor, tx, boundJob(scenario.workspaceId)),
+        enqueueJobIn(scenario.editor, tx, sourceIndexJob(scenario.workspaceId)),
       ),
     );
     const admin = folded(
       await withMember(scenario.admin, scenario.postgres, (_fresh, tx) =>
-        enqueueJobIn(scenario.admin, tx, boundJob(scenario.workspaceId)),
+        enqueueJobIn(scenario.admin, tx, sourceIndexJob(scenario.workspaceId)),
       ),
     );
 
@@ -455,13 +461,13 @@ describe("an action landing its rows and job in one transaction", () => {
     expect((await jobsIn(scenario.workspaceId)).length).toBe(1);
   });
 
-  it("lands a job queued through the door with its subject", async () => {
+  it("stores the subject of a job queued through enqueueJob", async () => {
     const scenario = await arrange();
 
     const queued = await enqueueJob(
       scenario.admin,
       scenario.postgres,
-      boundJob(scenario.workspaceId),
+      sourceIndexJob(scenario.workspaceId),
     );
 
     assert(queued.ok, "the job was not queued");
@@ -477,8 +483,8 @@ describe("an action landing its rows and job in one transaction", () => {
   });
 });
 
-describe("waiting on a job somebody queued", () => {
-  it("answers the job's status and outcome to a polling caller", async () => {
+describe("polling a queued job with jobById", () => {
+  it("returns the job's status and, once done, its outcome", async () => {
     const scenario = await arrange();
     const queued = await enqueueJob(mapMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
@@ -522,7 +528,7 @@ describe("waiting on a job somebody queued", () => {
     expect(over.value.outcome).toEqual({ checked: 2, mismatched: [] });
   });
 
-  it("answers a failure for an outcome outside the queue agreement", async () => {
+  it("fails when a stored outcome breaks the queue agreement", async () => {
     const scenario = await arrange();
     const jobId = await auditQueuedByCron(scenario);
     await finishedAudit(
@@ -545,7 +551,7 @@ describe("waiting on a job somebody queued", () => {
     expect(String(read.error)).toContain("queue agreement");
   });
 
-  it("answers a person polling their own workspace, whoever queued it", async () => {
+  it("answers an Admin about a job the platform queued", async () => {
     const scenario = await arrange();
     const jobId = await auditQueuedByCron(scenario);
 
@@ -581,7 +587,7 @@ describe("waiting on a job somebody queued", () => {
     expect((await jobById(mapMaintenance, scenario.postgres, asking)).ok).toBe(true);
   });
 
-  it("says no-such-job for an id this workspace never held", async () => {
+  it("answers no-such-job for a job from another workspace", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const queued = await enqueueJob(mapMaintenance, elsewhere.postgres, {
@@ -605,7 +611,7 @@ describe("waiting on a job somebody queued", () => {
   });
 });
 
-describe("what the platform can say about the two parsers agreeing", () => {
+describe("bundleHealth, from the latest nightly audit", () => {
   it("says never-audited until an audit has finished", async () => {
     const scenario = await arrange();
 
@@ -635,7 +641,7 @@ describe("what the platform can say about the two parsers agreeing", () => {
     ["a file the grammar cannot read", { unparsed: ["knowledge/strange.md"] }],
     ["a file the index does not know", { missing_row: ["knowledge/new.md"] }],
     ["a row whose file is gone", { missing_file: ["knowledge/gone.md"] }],
-  ])("says mismatched over %s", async (_finding, found) => {
+  ])("says mismatched for %s", async (_finding, found) => {
     const scenario = await arrange();
     await finishedAudit(
       scenario.workspaceId,
@@ -645,7 +651,7 @@ describe("what the platform can say about the two parsers agreeing", () => {
 
     expect(
       await bundleHealth(scenario.admin, scenario.postgres),
-      "the repository and the index disagree",
+      "bundleHealth missed the audit's finding",
     ).toEqual({ ok: true, value: "mismatched" });
   });
 
@@ -653,7 +659,7 @@ describe("what the platform can say about the two parsers agreeing", () => {
     ["a list missing", { checked: 3, mismatched: [], unparsed: [] }],
     ["a non-list finding", { ...NOTHING_FOUND, mismatched: "" }],
     ["a misshapen entry", { ...NOTHING_FOUND, mismatched: [{ deep: { path: "x" } }] }],
-  ])("says mismatched over an unreadable audit outcome: %s", async (_shape, outcome) => {
+  ])("says mismatched for an unreadable audit outcome: %s", async (_shape, outcome) => {
     const scenario = await arrange();
     const jobId = await auditQueuedByCron(scenario);
     await finishedAudit(
@@ -666,11 +672,11 @@ describe("what the platform can say about the two parsers agreeing", () => {
 
     expect(
       await bundleHealth(scenario.admin, scenario.postgres),
-      "an unreadable outcome is never healthy",
+      "bundleHealth did not read an unreadable outcome as mismatched",
     ).toEqual({ ok: true, value: "mismatched" });
   });
 
-  it("reads the latest finished audit, so a fixed mismatch clears", async () => {
+  it("reports healthy once a later audit finds nothing", async () => {
     const scenario = await arrange();
     await finishedAudit(
       scenario.workspaceId,
@@ -691,7 +697,7 @@ describe("what the platform can say about the two parsers agreeing", () => {
     });
   });
 
-  it("refuses health to a reader who is not an Admin", async () => {
+  it("refuses bundle health to an Editor", async () => {
     const scenario = await arrange();
     await finishedAudit(
       scenario.workspaceId,
@@ -774,7 +780,12 @@ const syncsIn = (scenario: Scenario, scan: SyncScan = SINCE_THE_FIRST_SYNC) =>
     scan,
   });
 
-const readWhole = (jobId: string, status: string, attempts: number, endedMinutesIn: number) => ({
+const wholeSourceSync = (
+  jobId: string,
+  status: string,
+  attempts: number,
+  endedMinutesIn: number,
+) => ({
   jobId,
   connectedSourceId: CONNECTED_SOURCE,
   status,
@@ -789,7 +800,7 @@ const lockHeldOpen = async (scenario: Scenario, jobId: string) => {
   const released = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const step = actionOf(scenario, async (tx) => {
+  const step = asPlatformAction(scenario, async (tx) => {
     const lock = await lockSyncIn(mapMaintenance, tx, {
       workspaceId: scenario.workspaceId,
       jobId,
@@ -803,8 +814,8 @@ const lockHeldOpen = async (scenario: Scenario, jobId: string) => {
   return { step, release };
 };
 
-describe("the syncs a workspace's step has still to consider", () => {
-  it("reads a first attempt's listed documents, and an empty key", async () => {
+describe("the ended syncs the sync cascade has still to process", () => {
+  it("reads a first attempt's moved documents, including an empty list", async () => {
     const scenario = await arrange();
     const listed = await syncEnded(scenario.workspaceId, {
       status: "done",
@@ -847,7 +858,7 @@ describe("the syncs a workspace's step has still to consider", () => {
     });
   });
 
-  it("reads a retried, failed, poisoned, lapsed or keyless sync whole", async () => {
+  it("marks retried, failed, poisoned, lapsed and keyless syncs whole-source", async () => {
     const scenario = await arrange();
     const { workspaceId } = scenario;
     const retried = await syncEnded(workspaceId, {
@@ -879,16 +890,16 @@ describe("the syncs a workspace's step has still to consider", () => {
     expect(read).toEqual({
       ok: true,
       value: [
-        readWhole(retried, "done", 2, 10),
-        readWhole(failed, "failed", 1, 20),
-        readWhole(poisoned, "poisoned", 3, 30),
-        readWhole(lapsed, "claimed", 1, 40),
-        readWhole(keyless, "done", 1, 50),
+        wholeSourceSync(retried, "done", 2, 10),
+        wholeSourceSync(failed, "failed", 1, 20),
+        wholeSourceSync(poisoned, "poisoned", 3, 30),
+        wholeSourceSync(lapsed, "claimed", 1, 40),
+        wholeSourceSync(keyless, "done", 1, 50),
       ],
     });
   });
 
-  it("reads an unreadable key or outcome as the whole source", async () => {
+  it("marks a sync with an unreadable outcome whole-source", async () => {
     const scenario = await arrange();
     const { workspaceId } = scenario;
     const unreadableKey = await syncEnded(workspaceId, {
@@ -905,13 +916,16 @@ describe("the syncs a workspace's step has still to consider", () => {
 
     expect(await syncsIn(scenario)).toEqual({
       ok: true,
-      value: [readWhole(unreadableKey, "done", 1, 10), readWhole(unreadableOutcome, "done", 1, 20)],
+      value: [
+        wholeSourceSync(unreadableKey, "done", 1, 10),
+        wholeSourceSync(unreadableOutcome, "done", 1, 20),
+      ],
     });
   });
 
-  it("never answers a queued job or a live claim", async () => {
+  it("leaves out queued jobs and claims whose lease is live", async () => {
     const scenario = await arrange();
-    await seededBy(db(), (seed) => seed.job(boundJob(scenario.workspaceId)));
+    await seededBy(db(), (seed) => seed.job(sourceIndexJob(scenario.workspaceId)));
     await syncClaimed(
       scenario.workspaceId,
       new Date(Date.now() + 3_600_000),
@@ -930,7 +944,7 @@ describe("the syncs a workspace's step has still to consider", () => {
     expect(read.value.map((sync) => sync.jobId)).toEqual([done]);
   });
 
-  it("answers only syncs that ended at or after the instant", async () => {
+  it("answers only syncs ended at or after the given time", async () => {
     const scenario = await arrange();
     const { workspaceId } = scenario;
     const endedAt = (minutes: number) =>
@@ -1009,7 +1023,7 @@ describe("the syncs a workspace's step has still to consider", () => {
     expect(read.value.map((sync) => sync.jobId)).toEqual([ours]);
   });
 
-  it("refuses an Editor the syncs and the lock", async () => {
+  it("refuses an Editor both the sync list and the lock", async () => {
     const scenario = await arrange();
     const jobId = await syncClaimed(scenario.workspaceId, minutesIn(10));
     const naming = { workspaceId: scenario.workspaceId, jobId, attempts: 1 };
@@ -1027,7 +1041,7 @@ describe("the syncs a workspace's step has still to consider", () => {
     ).toEqual({ ok: false, error: "role-forbids" });
   });
 
-  it("holds a lapsed sync's row until the step's transaction ends", async () => {
+  it("locks a lapsed sync's row until the cascade's transaction ends", async () => {
     const scenario = await arrange();
     const jobId = await syncClaimed(scenario.workspaceId, minutesIn(10));
     const { step, release } = await lockHeldOpen(scenario, jobId);
@@ -1042,7 +1056,7 @@ describe("the syncs a workspace's step has still to consider", () => {
     expect((await fenced).rows).toEqual([{ id: jobId }]);
   });
 
-  it("leaves a claim renewed since the listing free to beat", async () => {
+  it("lets a worker renew a claim the cascade has locked", async () => {
     const scenario = await arrange();
     const jobId = await syncClaimed(scenario.workspaceId, new Date(Date.now() + 60_000));
     const { step, release } = await lockHeldOpen(scenario, jobId);

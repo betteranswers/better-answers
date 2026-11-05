@@ -22,7 +22,7 @@ const erasure: PlatformPrincipal = {
   actorId: "process:better-answers-erasure",
 };
 
-const someone = () => principalOf(ulid(), ulid(), "Admin");
+const newWorkspaceAdmin = () => principalOf(ulid(), ulid(), "Admin");
 
 const streamOf = (text: string): ReadableStream<Uint8Array> =>
   new ReadableStream<Uint8Array>({
@@ -32,9 +32,9 @@ const streamOf = (text: string): ReadableStream<Uint8Array> =>
     },
   });
 
-describe("the object door keeps a workspace's bytes", () => {
-  it("gives back exactly the bytes put, over a stream", async () => {
-    const workspace = someone();
+describe("the object door stores a workspace's bytes", () => {
+  it("streams back exactly the bytes that were put", async () => {
+    const workspace = newWorkspaceAdmin();
     const written = "Grüße, Ada — €5 𝄞";
 
     const put = await putObject(workspace, store().door, "documents/notice.txt", streamOf(written));
@@ -44,8 +44,8 @@ describe("the object door keeps a workspace's bytes", () => {
     expect(await textOf(answered(got))).toEqual("Grüße, Ada — €5 𝄞");
   });
 
-  it("lists only the keys under the prefix asked for", async () => {
-    const workspace = someone();
+  it("lists only the keys under the requested prefix", async () => {
+    const workspace = newWorkspaceAdmin();
     for (const key of ["documents/a.txt", "documents/b.txt", "findings/c.txt", "documents"]) {
       const put = await putObject(workspace, store().door, key, streamOf(key));
       expect(put).toEqual({ ok: true, value: undefined });
@@ -61,9 +61,9 @@ describe("the object door keeps a workspace's bytes", () => {
     });
   });
 
-  it("keeps each workspace's keys out of the other's reach", async () => {
-    const first = someone();
-    const second = someone();
+  it("keeps each workspace from reading or listing another's keys", async () => {
+    const first = newWorkspaceAdmin();
+    const second = newWorkspaceAdmin();
     await putObject(first, store().door, "notes.txt", streamOf("the first workspace's notes"));
     await putObject(second, store().door, "notes.txt", streamOf("the second workspace's notes"));
 
@@ -93,9 +93,9 @@ describe("the object door keeps a workspace's bytes", () => {
   });
 });
 
-describe("the object door keeps platform bytes apart from every workspace's", () => {
-  it("puts a replay copy beyond workspaces, and lists it alone", async () => {
-    const workspace = someone();
+describe("the object door stores platform bytes apart from workspaces", () => {
+  it("stores an erasure copy that no workspace can read", async () => {
+    const workspace = newWorkspaceAdmin();
     const key = `erasures/${ulid()}.json`;
     const copy = '{"pseudonym":"erased-person-01","identifiers":["ada@example.invalid"]}';
 
@@ -127,8 +127,8 @@ describe("the object door keeps platform bytes apart from every workspace's", ()
     expect(platformKeys).not.toContain("erasures/not-the-platform.json");
   });
 
-  it("keeps a platform key shaped like a workspace's out", async () => {
-    const workspace = someone();
+  it("hides from a workspace a platform key under its prefix", async () => {
+    const workspace = newWorkspaceAdmin();
     const key = `workspaces/${workspace.workspaceId}/notes.txt`;
 
     const put = await putPlatformObject(erasure, store().door, key, streamOf("the platform's own"));
@@ -142,7 +142,7 @@ describe("the object door keeps platform bytes apart from every workspace's", ()
   });
 });
 
-describe("the object door refuses keys naming nothing inside a prefix", () => {
+describe("the object door refuses malformed or escaping keys", () => {
   it.each([
     ["nothing at all", ""],
     ["an absolute path", "/documents/notice.txt"],
@@ -150,7 +150,7 @@ describe("the object door refuses keys naming nothing inside a prefix", () => {
     ["an empty segment", "documents//notice.txt"],
     ["a newline", "documents/no\ntice.txt"],
   ])("refuses %s", async (_what, key) => {
-    const workspace = someone();
+    const workspace = newWorkspaceAdmin();
     expect(await putObject(workspace, store().door, key, streamOf("x"))).toEqual({
       ok: false,
       error: "malformed-key",
@@ -165,8 +165,8 @@ describe("the object door refuses keys naming nothing inside a prefix", () => {
     });
   });
 
-  it("takes an empty listing prefix as everything under the workspace", async () => {
-    const workspace = someone();
+  it("lists the whole workspace for an empty prefix", async () => {
+    const workspace = newWorkspaceAdmin();
     expect(await listObjects(workspace, store().door, "")).toEqual({ ok: true, value: [] });
     expect(await listObjects(workspace, store().door, "../elsewhere/")).toEqual({
       ok: false,

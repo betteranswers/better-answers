@@ -31,8 +31,8 @@ export const migrateAsDeployed = async (pool: pg.Pool): Promise<void> => {
 };
 
 /**
- * `pool.end()` resolves before its sockets close; a database stopped in that gap sends 57P01,
- * which the pool re-emits unheard, failing the run.
+ * `pool.end()` resolves before its sockets close. A database stopped in that gap sends 57P01,
+ * which the pool re-emits with no listener, failing the run.
  */
 export const endPool = async (pool: pg.Pool): Promise<void> => {
   let open = pool.totalCount;

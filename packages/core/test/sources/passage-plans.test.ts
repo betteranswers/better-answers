@@ -26,10 +26,7 @@ const HANDBOOK = {
   charEnd: 44,
 } as const;
 
-/**
- * Any other path reads a partition or connected source whole: cheaper than a GIN probe below about a
- * hundred rows, dearer at this many.
- */
+/** Below about a hundred rows Postgres prefers a full scan to a GIN probe, so the test seeds more. */
 const INVOICE_LINES = 500;
 
 const passagesOf = <P, E>(
@@ -92,8 +89,8 @@ const arrangedWithInvoices = async (): Promise<Arranged> => {
     }
     return { handbookConnectedSource: handbookConnectedSource.id, handbook: handbook.id };
   });
-  // VACUUM flushes GIN's pending list and ANALYZE counts the rows; the planner prices both, and
-  // guesses a few rows without them.
+  // The planner needs VACUUM to flush GIN's pending list and ANALYZE to count the rows.
+  // Without them it guesses a few rows.
   await db().pool.query("VACUUM ANALYZE");
   return { admin: scenario.admin, workspaceId, ...seeded };
 };
@@ -132,7 +129,7 @@ const partitionCopyOf = async (parentIndex: string, workspaceId: string): Promis
 };
 
 describe.each(Object.entries(ARMS))(
-  "%s passage plan, as the api, under the passage's policy",
+  "%s passage query plan, as the api role under RLS",
   (_arm, { read, found: handbookFound }) => {
     const searching = (person: UserPrincipal) =>
       planned(db(), person, async (reader, tx) => {
@@ -140,7 +137,7 @@ describe.each(Object.entries(ARMS))(
         return found.ok ? ok(found.value.map(({ passage }) => passage)) : found;
       });
 
-    it("matches through the partition's GIN index on the full-text column", async () => {
+    it("uses the partition's GIN index on the full-text column", async () => {
       const arranged = await arrangedWithInvoices();
 
       const found = await searching(arranged.admin);
@@ -149,7 +146,7 @@ describe.each(Object.entries(ARMS))(
       expect(found.indexes).toContain(`passage_${arranged.workspaceId}_search_gin`);
     });
 
-    it("keeps the partition's GIN index past a cursor", async () => {
+    it("still uses the partition's GIN index after a cursor", async () => {
       const arranged = await arrangedWithInvoices();
 
       const found = await planned(db(), arranged.admin, async (reader, tx) => {
@@ -165,7 +162,7 @@ describe.each(Object.entries(ARMS))(
       expect(found.indexes).toContain(`passage_${arranged.workspaceId}_search_gin`);
     });
 
-    it("cannot use the GIN index unless the match is leakproof", async () => {
+    it("skips the GIN index when the match is not leakproof", async () => {
       const arranged = await arrangedWithInvoices();
 
       await db().pool.query(UNMARK_THE_MATCH);
@@ -182,8 +179,8 @@ describe.each(Object.entries(ARMS))(
   },
 );
 
-describe("previewPassages' plan, as the api and under the passage's policy", () => {
-  it("lists a connected source's passages through the connected-source-first index", async () => {
+describe("previewPassages' query plan, as the api role under RLS", () => {
+  it("uses the index that leads with the connected source", async () => {
     const arranged = await arrangedWithInvoices();
 
     const previewed = await planned(db(), arranged.admin, (admin, tx) =>

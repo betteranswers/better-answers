@@ -107,17 +107,17 @@ PROBED_IMPORTS = REQUIRED_IMPORTS + DETECTOR_IMPORTS + HOST_IMPORTS + CONVERTER_
 WEIGHTS_MODULE = "better_answers_worker.redaction.weights"
 
 
-THE_SAFE_SET = '{"default_on": true, "default_off": false}'
+DEFAULT_ON_RULES_JSON = '{"default_on": true, "default_off": false}'
 SEED = "b0f3a1d2c4e5"
-THE_RULES_IN_FORCE = cast("Mapping[str, bool]", json.loads(THE_SAFE_SET))
+DEFAULT_ON_RULES = cast("Mapping[str, bool]", json.loads(DEFAULT_ON_RULES_JSON))
 
 
-WITHHELD_SPANS = spans_withheld_under(THE_RULES_IN_FORCE)
+WITHHELD_SPANS = spans_withheld_under(DEFAULT_ON_RULES)
 
 
-PLACEHOLDERS_IN_THE_TEXT: Mapping[str, int] = {
+EXPECTED_PLACEHOLDER_COUNTS: Mapping[str, int] = {
     "[withheld]": 6,
-    **typed_placeholders_under(THE_RULES_IN_FORCE),
+    **typed_placeholders_under(DEFAULT_ON_RULES),
 }
 
 
@@ -133,12 +133,13 @@ PINNED_IN_THE_VERSION_STRING = (
 )
 
 NO_DAEMON = (
-    "no Docker daemon answered, so the worker image cannot be read: on CI these tests"
-    " fail rather than skip, because build.yml gates the image push on this workflow"
+    "no Docker daemon answered, so these tests cannot inspect the worker image. On CI"
+    " they fail instead of skipping, because build.yml pushes the image only when"
+    " this workflow passes"
 )
 
 
-def _docker_answers() -> bool:
+def _docker_is_running() -> bool:
     try:
         subprocess.run(
             ["docker", "info", "--format", "{{.ServerVersion}}"],
@@ -151,14 +152,14 @@ def _docker_answers() -> bool:
     return True
 
 
-DOCKER_ANSWERS = _docker_answers()
+DOCKER_IS_RUNNING = _docker_is_running()
 
 
 DAEMON_IS_REQUIRED = os.environ.get("CI", "") != ""
 
 
 PROBE_DEFERRAL_VARIABLE = "IMAGE_PROBE_DEFERRED"
-PROBE_RUNS_IN_THE_JOB_THAT_PUSHES = os.environ.get(PROBE_DEFERRAL_VARIABLE) == "true"
+IMAGE_PROBE_IS_DEFERRED = os.environ.get(PROBE_DEFERRAL_VARIABLE) == "true"
 
 
 IMAGE_ID_VARIABLE = "IMAGE_ID"
@@ -209,7 +210,7 @@ def matrix_leg(tier: str) -> dict[str, str]:
         if leg.get("tier") == tier:
             return leg
     built = ", ".join(leg.get("tier", "?") for leg in legs)
-    message = f"build.yml's image job has no `{tier}` leg; it builds {built}"
+    message = f"build.yml's image job has no `{tier}` leg. It builds {built}"
     raise RuntimeError(message)
 
 
@@ -297,7 +298,7 @@ def required_python_floor() -> tuple[int, int]:
     declared = _pyproject_at("project", "requires-python")
     floor = re.search(r">=\s*(\d+)\.(\d+)", str(declared))
     if floor is None:
-        message = "pyproject.toml's requires-python has no lower bound this can read"
+        message = "pyproject.toml's requires-python has no >= lower bound"
         raise RuntimeError(message)
     return int(floor.group(1)), int(floor.group(2))
 
@@ -335,7 +336,7 @@ def dockerfile_stages() -> list[tuple[str, str]]:
             continue
         found = re.fullmatch(r"FROM (\S+) AS (\S+)", line)
         if found is None:
-            message = f"a FROM this cannot read in {DOCKERFILE}: {line!r}"
+            message = f"cannot parse a FROM line in {DOCKERFILE}: {line!r}"
             raise RuntimeError(message)
         stages.append((found.group(1), found.group(2)))
     return stages
@@ -363,7 +364,7 @@ def exec_form(dockerfile: str, instruction: str) -> list[str] | None:
         line for line in _instructions(dockerfile) if line.split()[0] == instruction
     ]
     if len(lines) != 1:
-        message = f"the Dockerfile has {len(lines)} {instruction} lines; expected one"
+        message = f"the Dockerfile has {len(lines)} {instruction} lines, expected one"
         raise RuntimeError(message)
     written = lines[0].partition(" CMD ")[2] if instruction == "HEALTHCHECK" else ""
     return _json_list(written or lines[0].split(maxsplit=1)[1])
@@ -372,7 +373,7 @@ def exec_form(dockerfile: str, instruction: str) -> list[str] | None:
 def worker_health_check() -> list[str] | None:
     found = re.findall(r"^\s*test: (\[.*\])\s*$", worker_service(), re.M)
     if len(found) != 1:
-        message = f"the worker service sets {len(found)} health checks; expected one"
+        message = f"the worker service sets {len(found)} health checks, expected one"
         raise RuntimeError(message)
     return _json_list(found[0])
 
@@ -380,7 +381,9 @@ def worker_health_check() -> list[str] | None:
 def _declared(path: Path, name: str, value: str) -> str:
     found = re.findall(rf"^{name} = {value}$", path.read_text("utf-8"), re.M)
     if len(found) != 1:
-        message = f"{path} declares {len(found)} {name} this can read; expected one"
+        message = (
+            f"{path} declares {name} in the expected form {len(found)} times, not once"
+        )
         raise RuntimeError(message)
     return str(found[0])
 
@@ -396,7 +399,7 @@ def _pipeline_constant(module: str, name: str) -> int:
 def _worker_limit(key: str) -> str:
     found = re.findall(rf"\b{key}: (\w+)", worker_service())
     if len(found) != 1:
-        message = f"the worker service sets {len(found)} {key}; expected one"
+        message = f"the worker service sets {key} {len(found)} times, expected once"
         raise RuntimeError(message)
     return str(found[0])
 
@@ -439,8 +442,8 @@ SEARCHED = os.pathsep.join(
 RECORDS = "/var/lib/dpkg/status.d"
 
 def unresolved():
-    # The loader's own trace mode, which is what `ldd` runs: the image carries no `ldd`,
-    # and `--list` stops at the first library it cannot find.
+    # The image has no `ldd`, so run the loader in trace mode as `ldd` does.
+    # `--list` would stop at the first missing library.
     loader = sorted(glob.glob("/lib*/ld-linux*.so*"))[0]
     count, missing = 0, {}
     for root in sorted({sys.base_prefix, sys.prefix}):
@@ -515,10 +518,8 @@ def imports(name):
     return True
 
 def cached(model_id):
-    # `local_files_only` is the whole of the question: it answers a path when the cache
-    # holds the model and raises when it would have to reach the network for it, which
-    # is exactly the difference between a weight the build fetched and one the first
-    # run would.
+    # With `local_files_only`, snapshot_download raises when the model is not in the
+    # cache, so a model the build did not fetch returns False.
     try:
         from huggingface_hub import snapshot_download
         snapshot_download(model_id, local_files_only=True)
@@ -586,15 +587,14 @@ class Caught(logging.Handler):
     def emit(self, record):
         reached_out.append(record.getMessage())
 
-# The load is lazy — importing the library builds its extractor, and the list is read on
-# the first address it is asked about — so a handler attached after the import above
-# still sees every attempt the seam makes.
+# tldextract reads the suffix list on the first lookup, not on import, so this handler
+# still sees every fetch that redact() attempts.
 watched = logging.getLogger("tldextract")
 watched.setLevel(logging.WARNING)
 watched.addHandler(Caught(level=logging.WARNING))
 
-# Listed before the seam runs, so what is answered is what the image was carrying and
-# never something this container wrote on its way through.
+# List the cache before redaction runs, so the result shows what the image shipped
+# and not files this container wrote.
 cache = os.environ.get("TLDEXTRACT_CACHE", "")
 warmed = sorted(
     os.path.relpath(os.path.join(where, name), cache)
@@ -713,7 +713,7 @@ SEAM_READINGS: Mapping[str, SeamReading] = {
 }
 
 
-THE_CEILINGS_READING = "T-222"
+SLOWEST_CAPPED_READING = "T-222"
 
 
 LOADS_IN_THE_MARGIN = 4
@@ -723,7 +723,7 @@ CONVERSION_FIXTURES = WORKSPACE / "tests" / "fixtures" / "conversion"
 PROBED_FIXTURES = ("expenses-policy.docx", "rate-card.pdf")
 
 
-CONVERTERS_MAY_ADD_MB = 100
+CONVERTER_MEMORY_LIMIT_MB = 100
 
 
 CONVERTER_PROBE = """
@@ -811,13 +811,11 @@ def probed_fixtures() -> list[list[str]]:
 
 def _read_conversion(stdout: str) -> Conversion:
 
-    answered = _answered(stdout)
+    parsed = _last_json_line(stdout)
     return Conversion(
-        converted={
-            str(name): str(text) for name, text in answered["converted"].items()
-        },
-        deterministic=bool(answered["deterministic"]),
-        added_mb=float(answered["added_mb"]),
+        converted={str(name): str(text) for name, text in parsed["converted"].items()},
+        deterministic=bool(parsed["deterministic"]),
+        added_mb=float(parsed["added_mb"]),
     )
 
 
@@ -847,38 +845,36 @@ class ImageContents:
 
 def _read_contents(stdout: str) -> ImageContents:
 
-    answered = _answered(stdout)
-    major, minor, patch = answered["version"]
+    parsed = _last_json_line(stdout)
+    major, minor, patch = parsed["version"]
     return ImageContents(
-        development=tuple(str(name) for name in answered["development"]),
+        development=tuple(str(name) for name in parsed["development"]),
         version=(int(major), int(minor), int(patch)),
-        base_prefix=str(answered["base_prefix"]),
-        uid=int(answered["uid"]),
-        home=str(answered["home"]),
-        home_is_writable=bool(answered["home_is_writable"]),
-        tools_present=tuple(str(name) for name in answered["tools_present"]),
-        bundled_wheels=tuple(str(path) for path in answered["bundled_wheels"]),
-        command_interpreter=str(answered["command_interpreter"]),
-        shared_object_count=int(answered["shared_object_count"]),
+        base_prefix=str(parsed["base_prefix"]),
+        uid=int(parsed["uid"]),
+        home=str(parsed["home"]),
+        home_is_writable=bool(parsed["home_is_writable"]),
+        tools_present=tuple(str(name) for name in parsed["tools_present"]),
+        bundled_wheels=tuple(str(path) for path in parsed["bundled_wheels"]),
+        command_interpreter=str(parsed["command_interpreter"]),
+        shared_object_count=int(parsed["shared_object_count"]),
         unresolved_shared_objects={
             str(path): tuple(str(name) for name in absent)
-            for path, absent in answered["unresolved_shared_objects"].items()
+            for path, absent in parsed["unresolved_shared_objects"].items()
         },
-        library_file_count=int(answered["library_file_count"]),
+        library_file_count=int(parsed["library_file_count"]),
         unrecorded_library_files=tuple(
-            str(path) for path in answered["unrecorded_library_files"]
+            str(path) for path in parsed["unrecorded_library_files"]
         ),
-        imports={str(name): bool(found) for name, found in answered["imports"].items()},
+        imports={str(name): bool(found) for name, found in parsed["imports"].items()},
         versions={
-            str(name): str(version) for name, version in answered["versions"].items()
+            str(name): str(version) for name, version in parsed["versions"].items()
         },
-        has_tests=bool(answered["has_tests"]),
-        weights={
-            str(model): bool(found) for model, found in answered["weights"].items()
-        },
-        spacy_pipeline=bool(answered["spacy_pipeline"]),
-        hf_home=str(answered["hf_home"]),
-        usage_tracking=str(answered["usage_tracking"]),
+        has_tests=bool(parsed["has_tests"]),
+        weights={str(model): bool(found) for model, found in parsed["weights"].items()},
+        spacy_pipeline=bool(parsed["spacy_pipeline"]),
+        hf_home=str(parsed["hf_home"]),
+        usage_tracking=str(parsed["usage_tracking"]),
     )
 
 
@@ -893,13 +889,13 @@ class Measurement:
 
 def _read_measurement(stdout: str) -> Measurement:
 
-    answered = _answered(stdout)
+    parsed = _last_json_line(stdout)
     return Measurement(
-        runs=int(answered["runs"]),
-        pinned_model=str(answered["pinned_model"]),
-        pinned_load_ms=float(answered["pinned_load_ms"]),
-        seam_ms=float(answered["seam_ms"]),
-        pinned_ms=float(answered["pinned_ms"]),
+        runs=int(parsed["runs"]),
+        pinned_model=str(parsed["pinned_model"]),
+        pinned_load_ms=float(parsed["pinned_load_ms"]),
+        seam_ms=float(parsed["seam_ms"]),
+        pinned_ms=float(parsed["pinned_ms"]),
     )
 
 
@@ -1009,8 +1005,8 @@ def _run_the_image(
     if network is not None:
         arguments += ["--network", network]
 
-    # By name and never by value: `--env NAME` takes the value out of this process's
-    # environment, so a derived list never reaches another user's `ps`.
+    # Pass each variable by name only. `--env NAME` reads the value from this process's
+    # environment, so the value does not appear in `ps` output.
     for name in environment:
         arguments += ["--env", name]
     arguments += [image, "python", "-c", probe]
@@ -1025,30 +1021,31 @@ def _run_the_image(
     return started.stdout
 
 
-def _answered(stdout: str) -> dict[str, Any]:
+def _last_json_line(stdout: str) -> dict[str, Any]:
     lines = [line for line in stdout.splitlines() if line.strip()]
     if not lines:
         message = "the container wrote nothing to stdout"
         raise RuntimeError(message)
-    answered: dict[str, Any] = json.loads(lines[-1])
-    return answered
+    parsed: dict[str, Any] = json.loads(lines[-1])
+    return parsed
 
 
 @pytest.fixture(scope="module")
 def image() -> Iterator[str]:
-    if PROBE_RUNS_IN_THE_JOB_THAT_PUSHES:
+    if IMAGE_PROBE_IS_DEFERRED:
         pytest.skip(
-            "the job that pushes this image runs this file against its own build"
+            f"{PROBE_DEFERRAL_VARIABLE} is set, so the job that pushes the image runs"
+            " these tests on its own build"
         )
-    if not DOCKER_ANSWERS:
+    if not DOCKER_IS_RUNNING:
         if DAEMON_IS_REQUIRED:
             raise RuntimeError(NO_DAEMON)
         pytest.skip(DAEMON_SKIP_REASON)
 
     supplied = os.environ.get(IMAGE_ID_VARIABLE, "").strip()
 
-    # A Docker tag is daemon-wide, so two `check` runs on one daemon would overwrite
-    # it; run by id.
+    # A Docker tag is shared across the daemon, so two `check` runs on one daemon would
+    # overwrite it. Run the image by id instead.
     built_here = _build_the_image(matrix_leg("worker")) if not supplied else None
     try:
         yield built_here or supplied
@@ -1090,22 +1087,22 @@ def test_the_image_carries_no_development_dependency(
     assert list(contents.development) == []
 
 
-def test_the_development_group_counts_the_groups_it_includes() -> None:
+def test_the_dev_group_includes_requirements_from_its_included_groups() -> None:
     assert "pytest" in development_only_distributions()
 
 
-def test_the_tier_pins_the_python_its_manifest_requires() -> None:
+def test_python_version_file_matches_the_requires_python_minimum() -> None:
     assert pinned_python_version() == required_python_floor()
 
 
-def test_the_image_runs_the_interpreter_this_tier_says_it_requires(
+def test_the_image_python_matches_the_python_version_file(
     contents: ImageContents,
 ) -> None:
 
     assert contents.version[:2] == pinned_python_version()
 
 
-def test_the_interpreter_is_the_python_images_not_a_fetched_one(
+def test_the_interpreter_comes_from_the_python_base_image(
     contents: ImageContents,
 ) -> None:
 
@@ -1113,7 +1110,7 @@ def test_the_interpreter_is_the_python_images_not_a_fetched_one(
     assert contents.base_prefix == PYTHON_IMAGE_PREFIX
 
 
-def test_the_runtime_is_distroless_and_renovate_moves_every_pinned_base() -> None:
+def test_the_runtime_is_distroless_and_renovate_updates_every_pinned_base() -> None:
     stages = dockerfile_stages()
     named = {name for _, name in stages}
     renovate = json.loads(RENOVATE.read_text("utf-8"))
@@ -1133,7 +1130,7 @@ def test_the_runtime_is_distroless_and_renovate_moves_every_pinned_base() -> Non
     )
 
 
-def test_the_image_carries_no_shell_package_manager_or_installer_wheel(
+def test_the_image_has_no_shell_package_manager_or_installer_wheel(
     contents: ImageContents,
 ) -> None:
     assert contents.tools_present == ()
@@ -1169,21 +1166,21 @@ def test_a_string_form_healthcheck_or_command_has_no_exec_form() -> None:
     assert exec_form(written, "CMD") is None
 
 
-def test_every_shared_object_in_the_image_resolves_on_its_loader(
+def test_every_shared_object_in_the_image_finds_all_its_dependencies(
     contents: ImageContents,
 ) -> None:
     assert contents.shared_object_count > 0
     assert dict(contents.unresolved_shared_objects) == {}
 
 
-def test_every_library_in_the_image_has_a_scannable_package_record(
+def test_every_library_file_in_the_image_has_a_dpkg_record(
     contents: ImageContents,
 ) -> None:
     assert contents.library_file_count > 0
     assert contents.unrecorded_library_files == ()
 
 
-def test_the_image_carries_the_tier_and_its_generated_schema_view(
+def test_the_image_can_import_the_worker_and_its_schema_view(
     contents: ImageContents,
 ) -> None:
     assert {name: contents.imports[name] for name in REQUIRED_IMPORTS} == dict.fromkeys(
@@ -1191,7 +1188,7 @@ def test_the_image_carries_the_tier_and_its_generated_schema_view(
     )
 
 
-def test_the_image_carries_every_library_the_detector_runs_on(
+def test_the_image_can_import_every_detector_library(
     contents: ImageContents,
 ) -> None:
 
@@ -1202,7 +1199,7 @@ def test_the_image_carries_every_library_the_detector_runs_on(
     assert set(contents.imports) == set(PROBED_IMPORTS)
 
 
-def test_the_image_carries_both_converters_at_their_pinned_versions(
+def test_the_image_has_both_converters_at_their_pinned_versions(
     contents: ImageContents,
 ) -> None:
 
@@ -1216,13 +1213,15 @@ def test_each_converter_is_pinned_exactly_at_the_locked_version() -> None:
     pinned = pinned_converter_versions()
     locked = locked_versions()
 
-    assert None not in pinned.values(), pinned
+    assert None not in pinned.values(), (
+        f"a converter is not pinned with == in pyproject.toml: {pinned}"
+    )
     assert {name: locked.get(name) for name in CONVERTER_DISTRIBUTIONS} == {
         name: {version} for name, version in pinned.items()
     }
 
 
-def test_the_image_carries_every_library_the_host_composes(
+def test_the_image_can_import_cocoindex_asyncpg_and_boto3(
     contents: ImageContents,
 ) -> None:
 
@@ -1231,7 +1230,7 @@ def test_the_image_carries_every_library_the_host_composes(
     )
 
 
-def test_the_image_carries_the_running_model_not_the_measured_one(
+def test_the_image_caches_the_pinned_model_not_the_measured_one(
     contents: ImageContents,
 ) -> None:
 
@@ -1242,7 +1241,7 @@ def test_the_image_carries_the_running_model_not_the_measured_one(
     assert contents.spacy_pipeline is True
 
 
-def test_the_image_holds_its_weights_where_the_deploy_unit_says(
+def test_the_image_hf_home_matches_the_deploy_unit(
     contents: ImageContents,
 ) -> None:
 
@@ -1259,7 +1258,7 @@ def test_the_image_and_deploy_unit_refuse_the_engines_gateway_call(
     assert contents.usage_tracking == "1"
 
 
-def test_the_deploy_unit_mounts_nothing_over_the_images_weights() -> None:
+def test_no_deploy_unit_volume_mounts_over_the_images_hf_home() -> None:
     assert worker_mounts_over(worker_environment("HF_HOME")) == []
 
 
@@ -1285,11 +1284,11 @@ def test_finds_a_commented_lmdb_mount_but_not_a_longer_path(
     assert worker_mounts_over("/data/worker/lmdb") == []
 
 
-def test_the_deploy_unit_mounts_nothing_over_the_images_suffix_list() -> None:
+def test_no_deploy_unit_volume_mounts_over_the_images_tldextract_cache() -> None:
     assert worker_mounts_over(worker_environment("TLDEXTRACT_CACHE")) == []
 
 
-def test_the_build_runs_the_weights_module_to_fetch_them() -> None:
+def test_the_dockerfile_runs_the_weights_module_and_sets_hf_home() -> None:
     dockerfile = DOCKERFILE.read_text("utf-8")
 
     assert WEIGHTS_MODULE in dockerfile
@@ -1332,7 +1331,7 @@ def reaches_a_module(path: str) -> bool:
     )
 
 
-def test_no_module_reaches_the_build_stage_before_the_project_install() -> None:
+def test_the_build_stage_copies_no_module_before_the_project_install() -> None:
     steps = build_stage()
     install = steps.index("RUN uv sync --frozen --no-dev")
     copies = [
@@ -1363,7 +1362,7 @@ def imported_by(path: Path) -> list[str]:
     return names
 
 
-def test_the_redaction_seam_imports_nothing_else_from_the_worker() -> None:
+def test_the_redaction_package_imports_no_other_worker_module() -> None:
     worker = [
         name
         for path in sorted(REDACTION.rglob("*.py"))
@@ -1377,15 +1376,15 @@ def test_the_redaction_seam_imports_nothing_else_from_the_worker() -> None:
     assert [name for name in worker if not name.startswith(seam)] == []
 
 
-def test_the_image_redacts_the_fixture_offline_and_fetches_nothing(
+def test_the_image_redacts_the_fixture_page_with_no_network_access(
     image: str,
 ) -> None:
-    found = _answered(
+    found = _last_json_line(
         _run_the_image(
             image,
             {
                 "PROBE_PAGE": FIXTURE_PAGE.read_text("utf-8"),
-                "PROBE_RULES": THE_SAFE_SET,
+                "PROBE_RULES": DEFAULT_ON_RULES_JSON,
                 "PROBE_SEED": SEED,
             },
             probe=REDACTION_PROBE,
@@ -1394,21 +1393,23 @@ def test_the_image_redacts_the_fixture_offline_and_fetches_nothing(
         )
     )
     redacted = str(found["text"])
-    answered: Mapping[str, Any] = found["counts"]
+    counts: Mapping[str, Any] = found["counts"]
     version = str(found["version"])
 
     for planted in WITHHELD_SPANS:
-        assert planted not in redacted, planted
-    for placeholder, written in PLACEHOLDERS_IN_THE_TEXT.items():
-        assert redacted.count(placeholder) == written, placeholder
+        assert planted not in redacted, f"the redacted page still contains {planted!r}"
+    for placeholder, written in EXPECTED_PLACEHOLDER_COUNTS.items():
+        assert redacted.count(placeholder) == written, (
+            f"the redacted page has the wrong number of {placeholder!r}"
+        )
     assert {
-        category: int(answered[category]) for category in FINDINGS_BY_CATEGORY
+        category: int(counts[category]) for category in FINDINGS_BY_CATEGORY
     } == dict(FINDINGS_BY_CATEGORY)
     assert found["verdict"] == VERDICT
 
     assert version.startswith(f"{_pin('RULE_VERSION')}:")
     for pinned in PINNED_IN_THE_VERSION_STRING:
-        assert _pin(pinned) in version, pinned
+        assert _pin(pinned) in version, f"the rule version string lacks {pinned}"
     assert _pin("GLINER_MODEL_ID_MEASURED").rsplit("/", 1)[-1] not in version
 
     assert found["suffix_cache"] == worker_environment("TLDEXTRACT_CACHE")
@@ -1416,7 +1417,7 @@ def test_the_image_redacts_the_fixture_offline_and_fetches_nothing(
     assert found["reached_out"] == []
 
 
-def test_the_seams_page_cost_is_measured_without_a_budget(
+def test_logs_redact_timing_per_page_without_asserting_a_limit(
     image: str,
 ) -> None:
     measured = _read_measurement(
@@ -1424,7 +1425,7 @@ def test_the_seams_page_cost_is_measured_without_a_budget(
             image,
             {
                 "PROBE_PAGE": FIXTURE_PAGE.read_text("utf-8"),
-                "PROBE_RULES": THE_SAFE_SET,
+                "PROBE_RULES": DEFAULT_ON_RULES_JSON,
                 "PROBE_SEED": SEED,
                 "PROBE_RUNS": str(MEASUREMENT_RUNS),
             },
@@ -1450,8 +1451,8 @@ def test_the_seams_page_cost_is_measured_without_a_budget(
     assert measured.pinned_ms > 0
 
 
-def test_a_documents_ceiling_comes_from_the_slowest_capped_reading() -> None:
-    reading = SEAM_READINGS[THE_CEILINGS_READING]
+def test_pipeline_timing_constants_match_the_slowest_memory_capped_reading() -> None:
+    reading = SEAM_READINGS[SLOWEST_CAPPED_READING]
     margin_s = math.ceil(LOADS_IN_THE_MARGIN * max(reading.load_ms) / 1000)
 
     assert reading.platform == "linux/amd64"
@@ -1469,10 +1470,10 @@ def test_a_documents_ceiling_comes_from_the_slowest_capped_reading() -> None:
 def test_both_converters_hold_on_the_image_under_the_engines_runtime(
     image: str,
 ) -> None:
-    if not DOCKER_ANSWERS:
+    if not DOCKER_IS_RUNNING:
         pytest.skip(DAEMON_SKIP_REASON)
 
-    answered = _read_conversion(
+    conversion = _read_conversion(
         _run_the_image(
             image,
             {"PROBE_FIXTURES": json.dumps(probed_fixtures())},
@@ -1481,17 +1482,19 @@ def test_both_converters_hold_on_the_image_under_the_engines_runtime(
         )
     )
 
-    assert answered.deterministic, "the same bytes must give the same text twice"
-    assert answered.added_mb < CONVERTERS_MAY_ADD_MB
+    assert conversion.deterministic, (
+        "converting the same fixtures twice gave different text"
+    )
+    assert conversion.added_mb < CONVERTER_MEMORY_LIMIT_MB
 
-    assert "| Hotel | 120 |" in answered.converted["expenses-policy.docx"]
-    assert "|Survey|450|" in answered.converted["rate-card.pdf"]
+    assert "| Hotel | 120 |" in conversion.converted["expenses-policy.docx"]
+    assert "|Survey|450|" in conversion.converted["rate-card.pdf"]
     logging.getLogger(__name__).info(
-        "the converters added %.1f MB to the image's peak RSS", answered.added_mb
+        "the converters added %.1f MB to the image's peak RSS", conversion.added_mb
     )
 
 
-def test_runs_as_the_volumes_uid_with_a_writable_home(
+def test_runs_as_the_volume_owner_uid_with_a_writable_home(
     contents: ImageContents,
 ) -> None:
     assert contents.uid == chowned_worker_uid()
@@ -1500,20 +1503,20 @@ def test_runs_as_the_volumes_uid_with_a_writable_home(
     assert contents.home_is_writable is True
 
 
-def test_the_image_leaves_this_tiers_tests_out_of_the_runtime(
+def test_the_image_does_not_contain_the_worker_tests(
     contents: ImageContents,
 ) -> None:
     assert contents.has_tests is False
 
 
-JOB_OPENS = re.compile(r"^ {2}(?P<job>[\w-]+):\s*$")
-RUNS_A_ROOT_SCRIPT = re.compile(r"^ +(?:- )?run: pnpm (?P<script>[\w:.-]+)\s*$")
-THIS_TIERS_GATE = "check:worker"
-THIS_TIERS_IMAGE_GATE = "check:images:worker"
-RUNNER = "node scripts/check.mjs "
+JOB_HEADER = re.compile(r"^ {2}(?P<job>[\w-]+):\s*$")
+PNPM_RUN_LINE = re.compile(r"^ +(?:- )?run: pnpm (?P<script>[\w:.-]+)\s*$")
+WORKER_GATE = "check:worker"
+WORKER_IMAGE_GATE = "check:images:worker"
+CHECK_RUNNER_PREFIX = "node scripts/check.mjs "
 
 
-def _legs_of_check() -> dict[str, list[str]]:
+def _check_workflow_jobs() -> dict[str, list[str]]:
     legs: dict[str, list[str]] = {}
     job = ""
     under_jobs = False
@@ -1522,7 +1525,7 @@ def _legs_of_check() -> dict[str, list[str]]:
             under_jobs = True
         elif not under_jobs:
             continue
-        elif opened := JOB_OPENS.match(line):
+        elif opened := JOB_HEADER.match(line):
             job = opened.group("job")
             legs[job] = []
         elif job:
@@ -1530,11 +1533,9 @@ def _legs_of_check() -> dict[str, list[str]]:
     return legs
 
 
-def _gates_of(lines: list[str]) -> list[str]:
+def _pnpm_scripts_run_by(lines: list[str]) -> list[str]:
     return [
-        found.group("script")
-        for line in lines
-        if (found := RUNS_A_ROOT_SCRIPT.match(line))
+        found.group("script") for line in lines if (found := PNPM_RUN_LINE.match(line))
     ]
 
 
@@ -1545,13 +1546,13 @@ def _root_scripts() -> dict[str, str]:
     return manifest.get("scripts", {})
 
 
-def _steps_of(gates: list[str], scripts: dict[str, str]) -> list[str]:
+def _check_steps_of(gates: list[str], scripts: dict[str, str]) -> list[str]:
     steps: list[str] = []
     for gate in gates:
         command = scripts.get(gate, "")
         steps += (
-            command.removeprefix(RUNNER).split()
-            if command.startswith(RUNNER)
+            command.removeprefix(CHECK_RUNNER_PREFIX).split()
+            if command.startswith(CHECK_RUNNER_PREFIX)
             else [gate]
         )
     return steps
@@ -1561,49 +1562,52 @@ def test_reads_a_run_line_with_or_without_its_dash() -> None:
     a_step_of_its_own = "      - run: pnpm check:worker"
     a_step_whose_if_comes_first = "        run: pnpm check:worker"
 
-    assert _gates_of([a_step_of_its_own, a_step_whose_if_comes_first]) == [
-        THIS_TIERS_GATE,
-        THIS_TIERS_GATE,
+    assert _pnpm_scripts_run_by([a_step_of_its_own, a_step_whose_if_comes_first]) == [
+        WORKER_GATE,
+        WORKER_GATE,
     ]
 
 
-def test_this_tier_reads_the_names_the_workflows_actually_hand_it() -> None:
-    handed = [
+def test_the_workflows_set_the_variables_this_test_file_reads() -> None:
+    image_id_lines = [
         line
         for line in BUILD_WORKFLOW.read_text("utf-8").splitlines()
         if re.search(rf"\b{IMAGE_ID_VARIABLE}:.*outputs\.imageid", line)
     ]
-    legs = _legs_of_check()
+    legs = _check_workflow_jobs()
     scripts = _root_scripts()
-    deferred = {
+    deferred_jobs = {
         job
         for job, lines in legs.items()
         if any(f"{PROBE_DEFERRAL_VARIABLE}:" in line for line in lines)
     }
-    mine = {
+    image_test_jobs = {
         job
         for job, lines in legs.items()
-        if THIS_TIERS_IMAGE_GATE in _steps_of(_gates_of(lines), scripts)
+        if WORKER_IMAGE_GATE in _check_steps_of(_pnpm_scripts_run_by(lines), scripts)
     }
 
-    assert len(handed) == 1, BUILD_WORKFLOW
-    assert mine, CHECK_WORKFLOW
-    assert len(mine) == len({job.split("-", 1)[0] for job in mine}), (
-        f"{CHECK_WORKFLOW}: one leg per lane runs this tier's image suite"
+    assert len(image_id_lines) == 1, (
+        f"{BUILD_WORKFLOW} does not set {IMAGE_ID_VARIABLE} from outputs.imageid once"
     )
-    assert mine == deferred, (
-        f"{CHECK_WORKFLOW}: the leg that runs this tier's image suite is handed the "
-        "deferral, and no other leg is"
+    assert image_test_jobs, f"no job in {CHECK_WORKFLOW} runs {WORKER_IMAGE_GATE}"
+    lanes = {job.split("-", 1)[0] for job in image_test_jobs}
+    assert len(image_test_jobs) == len(lanes), (
+        f"{CHECK_WORKFLOW}: more than one job in a lane runs the worker image tests"
     )
-    assert scripts[THIS_TIERS_IMAGE_GATE].rstrip().endswith("images"), (
-        f"{THIS_TIERS_IMAGE_GATE} runs more than the image suite"
+    assert image_test_jobs == deferred_jobs, (
+        f"{CHECK_WORKFLOW}: the jobs that set {PROBE_DEFERRAL_VARIABLE} are not "
+        "exactly the jobs that run the worker image tests"
+    )
+    assert scripts[WORKER_IMAGE_GATE].rstrip().endswith("images"), (
+        f"{WORKER_IMAGE_GATE} runs more than the worker image tests"
     )
 
 
-def test_the_runner_refuses_the_engines_gateway_call_like_the_image() -> None:
-    legs = _legs_of_check()
+def test_the_ci_runner_disables_cocoindex_usage_tracking_like_the_image() -> None:
+    legs = _check_workflow_jobs()
     running = {
-        job for job, lines in legs.items() if THIS_TIERS_GATE in _gates_of(lines)
+        job for job, lines in legs.items() if WORKER_GATE in _pnpm_scripts_run_by(lines)
     }
     declaring = {
         job
@@ -1617,14 +1621,18 @@ def test_the_runner_refuses_the_engines_gateway_call_like_the_image() -> None:
         if "COCOINDEX_DISABLE_USAGE_TRACKING:" in line
     }
 
-    assert running, CHECK_WORKFLOW
-    assert declaring == running, CHECK_WORKFLOW
+    assert running, f"no job in {CHECK_WORKFLOW} runs {WORKER_GATE}"
+    assert declaring == running, (
+        f"{CHECK_WORKFLOW}: the jobs that set COCOINDEX_DISABLE_USAGE_TRACKING are not "
+        f"the jobs that run {WORKER_GATE}"
+    )
     assert declared == {worker_environment("COCOINDEX_DISABLE_USAGE_TRACKING")}, (
-        CHECK_WORKFLOW
+        f"{CHECK_WORKFLOW} sets COCOINDEX_DISABLE_USAGE_TRACKING to a different value "
+        "from the worker service"
     )
 
 
-def test_a_runner_builds_through_buildx_and_a_laptop_as_before() -> None:
+def test_uses_buildx_with_a_cache_and_docker_build_without_one() -> None:
     leg = {
         "tier": "worker",
         "dockerfile": "apps/worker/Dockerfile",
@@ -1687,13 +1695,13 @@ def test_takes_only_a_builder_that_can_export_a_cache() -> None:
     )
 
 
-def test_a_machine_naming_no_cache_registry_asks_the_daemon_nothing(
+def test_skips_docker_buildx_inspect_when_no_cache_registry_is_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv(CACHE_REGISTRY_VARIABLE, raising=False)
 
     def refuse_to_run(*_arguments: object, **_keywords: object) -> None:
-        message = "the probe asked the daemon for a builder it could not have used"
+        message = "_shared_cache ran docker buildx inspect with no cache registry set"
         raise AssertionError(message)
 
     monkeypatch.setattr(subprocess, "run", refuse_to_run)

@@ -63,7 +63,7 @@ const versionRows = async (section: Section) => {
 };
 
 describe("saving a section's Brief", () => {
-  it("a changed Brief save writes one version and event", async () => {
+  it("writes one version and one event for a changed Brief", async () => {
     const section = await sectionOf("Company overview");
     const markdown = briefCiting(section.ids);
     const eventsBefore = await briefEvents(section);
@@ -100,7 +100,7 @@ describe("saving a section's Brief", () => {
     expect(snapshot.rows[0]?.includes.map((include) => include.id)).toEqual(section.ids);
   });
 
-  it("an unchanged Brief save writes no version", async () => {
+  it("writes no version for an unchanged Brief", async () => {
     const first = await sectionOf("What we offer");
     const markdown = briefCiting(first.ids);
     answered(await saving(first, first.guide.ng.editor, markdown));
@@ -115,7 +115,7 @@ describe("saving a section's Brief", () => {
     expect(await briefEvents(section)).toBe(events);
   });
 
-  it("a whitespace-only change writes a new version", async () => {
+  it("writes a new version for a whitespace-only change", async () => {
     const first = await sectionOf("Certifications");
     const markdown = briefCiting(first.ids);
     answered(await saving(first, first.guide.ng.editor, markdown));
@@ -127,7 +127,7 @@ describe("saving a section's Brief", () => {
     expect((await versionRows(section)).at(-1)?.markdown).toBe(`${markdown} `);
   });
 
-  it("a changed include row writes a new version", async () => {
+  it("writes a new version when an include row changes", async () => {
     const first = await sectionOf("Data protection");
     const markdown = briefCiting(first.ids);
     answered(await saving(first, first.guide.ng.editor, markdown));
@@ -143,7 +143,7 @@ describe("saving a section's Brief", () => {
     expect(saved).toEqual({ saved: true, version: section.base + 1 });
   });
 
-  it("a Brief save leaves the bundle head unmoved", async () => {
+  it("leaves the bundle head unchanged on a Brief save", async () => {
     const section = await sectionOf("Security testing");
     const { git } = section.guide.ng.scenario;
     const before = await head(section.guide.ng.admin, git);
@@ -153,7 +153,7 @@ describe("saving a section's Brief", () => {
     expect(await head(section.guide.ng.admin, git)).toBe(before);
   });
 
-  it("places a marker once or twice alike", async () => {
+  it("treats a marker placed once or twice alike", async () => {
     const section = await sectionOf("Support and service levels");
     const [first] = section.ids;
     const markdown = `Twice.[^${String(first)}] Again.[^${String(first)}]`;
@@ -163,7 +163,7 @@ describe("saving a section's Brief", () => {
     expect(saved.saved).toBe(true);
   });
 
-  it("a Viewer's Brief save is refused", async () => {
+  it("refuses a Brief save by a Viewer", async () => {
     const section = await sectionOf("Company overview");
     const versions = await versionRows(section);
     const events = await briefEvents(section);
@@ -175,7 +175,7 @@ describe("saving a section's Brief", () => {
     expect(await briefEvents(section)).toBe(events);
   });
 
-  it("a marker naming no include row is refused", async () => {
+  it("refuses a marker that names no include row", async () => {
     const section = await sectionOf("Information security");
     const versions = await versionRows(section);
 
@@ -189,7 +189,7 @@ describe("saving a section's Brief", () => {
     expect(await versionRows(section)).toEqual(versions);
   });
 
-  it("a save on a stale version is refused", async () => {
+  it("refuses a save on a stale version", async () => {
     const section = await sectionOf("Company overview");
     answered(await saving(section, section.guide.ng.editor, `${briefCiting(section.ids)} More.`));
     const versions = await versionRows(section);
@@ -200,7 +200,7 @@ describe("saving a section's Brief", () => {
     expect(await versionRows(section)).toEqual(versions);
   });
 
-  it("a save on a withheld section is refused", async () => {
+  it("refuses a save on a withheld section", async () => {
     const section = await sectionOf("Insurance and financial standing");
     const outside = await editorOutsideFinance(db(), section.guide);
     const versions = await versionRows(section);

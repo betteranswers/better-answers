@@ -34,10 +34,10 @@ export const heldAs = async <T>(
 };
 
 /**
- * Each writes to the other once both hold their own member row, so each waits on the other's: a
- * deadlock Postgres ends by aborting one.
+ * Each caller locks its own member row and then acts on the other's, so Postgres detects a
+ * deadlock and aborts one.
  */
-export const bothHoldingTheirOwnRow = <T>(
+export const actingOnEachOther = <T>(
   workspace: ProvisionedWorkspace,
   callers: readonly [string, string],
   action: (principal: UserPrincipal, tx: Tx, other: string) => Promise<Foldable<T>>,
@@ -61,7 +61,7 @@ export const bothHoldingTheirOwnRow = <T>(
   return Promise.all([actingOn(first, second), actingOn(second, first)]);
 };
 
-/** `db` answers the suite's database once its hooks have run, so it is read at each call. */
+/** `db` returns the suite's database only after its hooks run, so call it inside each helper. */
 export const membersSuite = (db: () => MigratedPostgres) => {
   const joining = (workspace: ProvisionedWorkspace, role: Role): Promise<string> =>
     seedingWith(db().pool, async (seed) => {

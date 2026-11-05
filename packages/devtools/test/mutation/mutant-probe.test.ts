@@ -22,8 +22,8 @@ const script = path.join(repositoryRoot, "scripts/mutant-probe.mjs");
 
 const scratch = mkdtempSync(path.join(tmpdir(), "mutant-probe-"));
 afterAll(() => {
-  // The interrupted case's child can still be spawning git as this runs, and rmSync retries
-  // ENOTEMPTY only when given both maxRetries and retryDelay.
+  // The interrupted case's child may still be spawning git here.
+  // rmSync retries ENOTEMPTY only when given both maxRetries and retryDelay.
   rmSync(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
@@ -227,11 +227,11 @@ describe("the mutant probe over a throwaway workspace", () => {
     expect(run.stdout).toContain("verdict: timed out");
     expect(
       await goneWithin(worker, 5_000),
-      `worker ${String(worker)} outlived the probe; a stuck worker answers no message from its parent, so only a signal to its process group reaches it`,
+      `worker ${String(worker)} is still alive after the probe. A stuck worker answers no message from its parent, so the probe must signal its process group.`,
     ).toBe(true);
   }, 30_000);
 
-  it("says src is clean against HEAD after the run", () => {
+  it("reports src unchanged from HEAD after the run", () => {
     const root = workspace("clean");
 
     const run = probe(root, { line: 1, from: "n + 1", to: "n - 1" });
@@ -274,7 +274,7 @@ describe("the mutant probe over a throwaway workspace", () => {
 
     await vi.waitFor(
       () => {
-        const said = `the mutation never reached the disk:\n${stdout}\n${stderr}`;
+        const said = `the probe did not write the mutation to disk before the suite started:\n${stdout}\n${stderr}`;
         assert(readFileSync(file, "utf8").includes("n - 1"), said);
         assert(stderr.includes("RUN"), said);
       },
@@ -290,7 +290,7 @@ describe("the mutant probe over a throwaway workspace", () => {
     expect(stderr).toContain("restored");
   }, 90_000);
 
-  it("restores the file and refuses a verdict on a crash", () => {
+  it("restores the file and gives no verdict on a crash", () => {
     const root = workspace(
       "crashed",
       'import { answer } from "../src/answer.ts";\nthis is not a test\n',
@@ -304,7 +304,7 @@ describe("the mutant probe over a throwaway workspace", () => {
     expect(source(root)).toBe(SOURCE);
   });
 
-  it("restores the file and removes a torn report", () => {
+  it("restores the file and removes a partly written report", () => {
     const root = workspace("torn-report");
     shimVitestReporting(root, '{"numTotalTests": 1, "numFail');
     const temporary = mkdtempSync(path.join(scratch, "tmp-"));
@@ -318,7 +318,7 @@ describe("the mutant probe over a throwaway workspace", () => {
     expect(readdirSync(temporary)).toEqual([]);
   });
 
-  it("refuses a verdict on a changed report shape", () => {
+  it("gives no verdict when the report changes shape", () => {
     const root = workspace("changed-report");
     shimVitestReporting(
       root,
@@ -329,14 +329,14 @@ describe("the mutant probe over a throwaway workspace", () => {
 
     expect(
       verdictOf(run),
-      "a reporter that changed shape reads as a suite that never ran",
+      "the probe gave a verdict on a report of an unknown shape. Treat a report whose shape changed as a suite that did not run.",
     ).toBeUndefined();
     expect(run.stderr).toContain("did not run");
     exited(run, 1);
     expect(source(root)).toBe(SOURCE);
   });
 
-  it("refuses a verdict when one test file failed to run", () => {
+  it("gives no verdict when one test file failed to run", () => {
     const root = workspace("half-ran", SUITE, "this is not a test\n");
 
     const run = probe(root, { line: 2, from: '"answer"', to: '""' });

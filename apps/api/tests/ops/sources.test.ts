@@ -15,13 +15,13 @@ import { servedApp } from "../support/suite-app.ts";
 const objects = objectStoreForSuite();
 const { ops, opsWith, boundAndIndexed } = opsRunner(objects);
 
-describe("pnpm ops — the restore scripts' commands", () => {
+describe("pnpm ops", () => {
   const served = servedApp();
 
-  describe("object-store-orphans — the bytes a failed connect left", () => {
+  describe("object-store-orphans, which removes uploads a failed connect left", () => {
     /**
-     * The store stamps an object with its own clock, so the instant the grace is judged from is
-     * the suite's own, moved on.
+     * The object store stamps each object with the real clock, so the command's clock moves 25 hours
+     * past real time to pass the grace.
      */
     const aDayOn = (): Date => new Date(Date.now() + 25 * 60 * 60 * 1000);
 
@@ -36,7 +36,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       body: new Blob(["The handbook says what the company decided."]).stream(),
     });
 
-    const connectedSourcesOf = async (workspaceId: string, userId: string) => {
+    const connectOnceAndFailOnce = async (workspaceId: string, userId: string) => {
       const admin = await principalOf(served(), workspaceId, userId);
       const doors = { postgres: openPostgres(served().database.pool), objects: objects().door };
 
@@ -46,13 +46,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const failed = await whileWritesAreRefused(served().database.superuser, "job", () =>
         connectUpload(admin, doors, handbook()),
       );
-      if (failed.ok) throw new Error("the connect landed where the queue was refused");
+      if (failed.ok) throw new Error("the connect succeeded although job writes were refused");
       return { admin, named: bound.value.originalKey };
     };
 
-    it("removes only the original no document names, once past grace", async () => {
+    it("removes only the unreferenced upload once the 24-hour grace passes", async () => {
       const { workspaceId, admin: person } = await served().provision();
-      const { admin, named } = await connectedSourcesOf(workspaceId, person.id);
+      const { admin, named } = await connectOnceAndFailOnce(workspaceId, person.id);
 
       const looked = await opsWith(
         served(),
@@ -75,9 +75,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await listObjects(admin, objects().door, "")).toEqual({ ok: true, value: [named] });
     });
 
-    it("removes nothing while the grace still holds over both", async () => {
+    it("removes nothing within the 24-hour grace", async () => {
       const { workspaceId, admin: person } = await served().provision();
-      await connectedSourcesOf(workspaceId, person.id);
+      await connectOnceAndFailOnce(workspaceId, person.id);
 
       const run = await ops(served(), ["object-store-orphans", "--workspace", workspaceId]);
 
@@ -87,7 +87,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("crosses its refusal as word and class code, removing nothing", async () => {
+    it("refuses a malformed workspace with its word and exit code", async () => {
       const run = await ops(served(), ["object-store-orphans", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.malformed);
@@ -96,7 +96,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses when the image has no object store to sweep", async () => {
+    it("exits 1 when no object store is configured", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await opsWith(
@@ -111,8 +111,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("reindex-connected-sources — every source wiped and queued again", () => {
-    it("wipes an indexed source and queues its wiped sync", async () => {
+  describe("reindex-connected-sources, which wipes and requeues every source", () => {
+    it("wipes an indexed source's passages and queues an index job", async () => {
       const { workspaceId, admin } = await served().provision();
       await boundAndIndexed(served(), workspaceId, admin.id, "Expense claims are paid monthly.\n");
 
@@ -127,7 +127,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(after.jobs.at(-1)).toEqual({ kind: "index", reason: "wiped", status: "queued" });
     });
 
-    it("says so when the workspace holds no connected source", async () => {
+    it("reports that the workspace has no connected source", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await ops(served(), ["reindex-connected-sources", "--workspace", workspaceId]);
@@ -138,7 +138,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("answers usage to a non-id workspace before wiping anything", async () => {
+    it("exits 2 for a workspace that is not an id", async () => {
       const run = await ops(served(), ["reindex-connected-sources", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);

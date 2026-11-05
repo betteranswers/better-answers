@@ -69,7 +69,7 @@ const statusOf = async (invitationId: string) =>
   ).rows[0]?.status;
 
 describe("accepting an invitation", () => {
-  it("leaves one member row; the second answers already-a-member", async () => {
+  it("adds one member when accepted twice, refusing the second", async () => {
     const { workspace, personId, invitationId } = await anInvitation("Twice");
 
     const [first, second] = await whileActionsWaitAt(
@@ -99,7 +99,7 @@ describe("accepting an invitation", () => {
     expect(await membersOf(workspace.workspaceId, personId)).toEqual([{ role: "Editor" }]);
     expect(await joinedEvents(personId)).toHaveLength(1);
   });
-  it("answers already-a-member from the index, landing nothing", async () => {
+  it("refuses already-a-member when a membership lands during the accept", async () => {
     const { workspace, personId, invitationId } = await anInvitation("Raced");
 
     const raced = await whileActionsWaitAt(db().pool, "invitation", "UPDATE", async (release) => {

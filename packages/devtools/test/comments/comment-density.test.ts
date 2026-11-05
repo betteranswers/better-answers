@@ -49,7 +49,7 @@ const DILUTED_OVER = diluting(sqlWithRatio(30, 40));
 
 const cloc = clocOver([WORKSPACE], { tree: UNDER, counted: 2 });
 
-describe("the line counter reads what the ceiling is measured on", () => {
+describe("the line counter the ceiling is measured with", () => {
   it("counts a Python docstring as a comment", () => {
     const counted = cloc({
       [`${WORKSPACE}/package.json`]: "{}",
@@ -64,7 +64,7 @@ describe("the line counter reads what the ceiling is measured on", () => {
     expect(clocArgv(["packages"]).join(" ")).toContain("--timeout 0");
   });
 
-  it("walks past a workspace's markdown and JSON", () => {
+  it("ignores a workspace's markdown and JSON", () => {
     const counted = cloc({
       [`${WORKSPACE}/package.json`]: JSON.stringify({ name: "@better-answers/probe" }),
       [`${WORKSPACE}/README.md`]: "# a heading\n\nsome prose\n",
@@ -110,7 +110,7 @@ describe("the ceiling over a throwaway tree", () => {
 
     expect(over).toHaveLength(1);
     const [first] = over;
-    assert(first !== undefined, "one arm is over the ceiling");
+    assert(first !== undefined, "no arm is over the ceiling");
     expect(first.workspace).toBe(WORKSPACE);
     expect(first.arm).toBe("source");
     expect(reportOf(first)).toContain(
@@ -118,7 +118,7 @@ describe("the ceiling over a throwaway tree", () => {
     );
   });
 
-  it("stays silent over a tree under both ceilings", () => {
+  it("accepts a tree under both ceilings", () => {
     expect(overTheCeiling(measure(cloc(UNDER), [WORKSPACE]))).toEqual([]);
   });
 
@@ -136,7 +136,7 @@ describe("the ceiling over a throwaway tree", () => {
     expect(measured.map((one) => one.workspace)).toEqual([WORKSPACE]);
     expect(
       measured[0]?.comment,
-      "the workspace counted the SQL, whose comments hide in one number with ten times as much TypeScript",
+      "the workspace's count included the SQL. Leave it out, because pooled with ten times as much TypeScript, its comments disappear into one number.",
     ).toBe(1);
     expect(overTheCeiling(measured)).toEqual([]);
   });
@@ -176,7 +176,7 @@ describe("the ceiling's wrapper, run as the root manifest runs it", () => {
   });
 });
 
-describe("the ceiling's wrapper, asked for something it does not offer", () => {
+describe("the ceiling's wrapper given an unknown option or no root", () => {
   const refusing = (argv: readonly string[]) => (): string =>
     runsOverThrowawayTree({
       executable: WRAPPER_EXECUTABLE,

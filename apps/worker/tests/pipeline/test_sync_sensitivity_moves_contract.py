@@ -32,7 +32,7 @@ def read_sync_sensitivity_moves() -> dict[str, Any]:
 MOVES = read_sync_sensitivity_moves()["moves"]
 
 
-def test_the_outcome_carries_the_agreed_key_even_when_empty() -> None:
+def test_the_outcome_row_has_the_sensitivity_moved_key_when_empty() -> None:
     key = read_sync_sensitivity_moves()["key"]
 
     assert key == SENSITIVITY_MOVED_KEY
@@ -40,7 +40,7 @@ def test_the_outcome_carries_the_agreed_key_even_when_empty() -> None:
 
 
 @pytest.mark.parametrize("move", MOVES, ids=[move["why"] for move in MOVES])
-def test_the_catalogue_write_names_a_document_exactly_when_it_moved(
+def test_reconcile_catalogue_reports_a_document_only_when_sensitivity_moved(
     database: tuple[psycopg.Connection, str], tmp_path: Path, move: dict[str, Any]
 ) -> None:
     connection, dsn = database

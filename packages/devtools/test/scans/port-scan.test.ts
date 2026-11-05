@@ -157,7 +157,7 @@ describe("the port scan over a throwaway tree", () => {
     ["PORT_OF chained", { portOf: `PORT_OF = KEPT = ("${PORTED}",)` }, "PORT_OF", 1],
     ["PORT_OF unpacked", { portOf: `PORT_OF, KEPT = ("${PORTED}",), 1` }, "PORT_OF", 1],
     ["AGREEMENT as a name", { agreement: "AGREEMENT = LINKS" }, "AGREEMENT", 2],
-  ] as const)("refuses %s, not a literal", (_what, changed, name, line) => {
+  ] as const)("refuses %s as not a literal", (_what, changed, name, line) => {
     expect(findings(declaring(changed))).toEqual([notALiteral(line, name)]);
   });
 
@@ -188,7 +188,7 @@ describe("the port scan over a throwaway tree", () => {
     ]);
   });
 
-  it("walks past a module that declares no port", () => {
+  it("ignores a module that declares no port", () => {
     const tree = { ...declaring(), "apps/worker/src/plain.py": "KEEP = 1\n" };
 
     expect(findings(tree)).toEqual([passed(2)]);

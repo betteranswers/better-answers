@@ -37,8 +37,8 @@ export const anAdminSignedIn = async (app: TestApp) => {
 };
 
 /**
- * Through the library's own enable and first verify, as server functions. The verify swaps the
- * session for one nobody holds, which is ended.
+ * Calls Better Auth's enable and verify as server functions. The verify issues a new session that
+ * no client holds, so this signs it out.
  */
 export const setUpAnAuthenticator = async (app: TestApp, client: TestClient): Promise<string> => {
   const auth = authOver(app);
@@ -257,7 +257,7 @@ export const pendingSessionsPastTheirHour = async (app: TestApp, userId: string)
   );
 };
 
-/** The library judges expiry on the api's clock, so the past is this process's, not the database's. */
+/** Better Auth checks expiry against the api's clock, so the expiry is set from this process. */
 export const codeSentPastItsExpiry = async (app: TestApp, email: string): Promise<void> => {
   const aged = await app.database.superuser.query(
     "UPDATE verification SET expires_at = $2 WHERE identifier = $1",
@@ -348,7 +348,7 @@ export const changedWhileItWaitsOn = async <T>(
   change: () => Promise<unknown>,
 ): Promise<T> => {
   const store = app.database.superuser;
-  // Wrapped, or the lock would be held until the work it blocks had ended.
+  // Returned inside an object, so holdingTable releases the lock without awaiting the blocked work.
   const held = await holdingTable(store, table, async () => {
     const working = work();
     await until(() => isBlockedOnTable(store, table));
@@ -359,8 +359,8 @@ export const changedWhileItWaitsOn = async <T>(
 };
 
 /**
- * The insert lands no row and raises nothing, so Postgres leaves the transaction open: only the
- * transport's rollback can undo the write before it.
+ * The trigger drops the audit row without an error, so Postgres keeps the transaction open. Only a
+ * rollback by the transport undoes the earlier writes.
  */
 export const whileAuditRowsVanish = async <T>(app: TestApp, work: () => Promise<T>): Promise<T> => {
   const { superuser } = app.database;

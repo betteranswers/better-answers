@@ -176,7 +176,7 @@ const opened = (reader: UserPrincipal, iri: ConceptIri) =>
     answered(await open(principal, tx, { iri }, NOW)),
   );
 
-const opensOf = (result: OpenResult): readonly string[] =>
+const evidenceSourcesOf = (result: OpenResult): readonly string[] =>
   result.found
     ? (result.concept?.evidence.flatMap(({ source, locator, iri }) =>
         locator === undefined && iri === undefined ? [] : [source],
@@ -193,7 +193,7 @@ describe("find and open under concurrent read load", () => {
     corpus = await landCorpus();
   }, 300_000);
 
-  it("answers find within budget beside nine concurrent finds", async () => {
+  it("answers find within budget while nine other finds run", async () => {
     const reads = await underLoad(corpus.scenario, (reader) =>
       timed(reader, corpus.plain, async (principal, tx): Promise<FindResult> =>
         answered(await find(principal, tx, { query: BROAD_QUESTION, limit: PAGE }, NOW)),
@@ -206,16 +206,16 @@ describe("find and open under concurrent read load", () => {
       FIND_BUDGET_IN_ONE_ROW_READS,
     );
 
-    expect(readers().totalCount, "the connections the reads ran on").toBe(IN_FLIGHT);
+    expect(readers().totalCount, "the pool connections the reads used").toBe(IN_FLIGHT);
     expect(reads.map(({ value }) => value.matches.length)).toEqual(
       Array.from({ length: IN_FLIGHT * ROUNDS }, () => PAGE),
     );
-    expect(inOneRowReads, "find, in one-row reads, at the median").toBeLessThan(
+    expect(inOneRowReads, "the median find, as a multiple of a one-row read").toBeLessThan(
       FIND_BUDGET_IN_ONE_ROW_READS,
     );
   });
 
-  it("answers open within budget beside nine concurrent opens", async () => {
+  it("answers open within budget while nine other opens run", async () => {
     const reads = await underLoad(corpus.scenario, (reader) => opened(reader, corpus.plain));
 
     const inOneRowReads = await reported(
@@ -224,16 +224,16 @@ describe("find and open under concurrent read load", () => {
       OPEN_BUDGET_IN_ONE_ROW_READS,
     );
 
-    expect(readers().totalCount, "the connections the reads ran on").toBe(IN_FLIGHT);
+    expect(readers().totalCount, "the pool connections the reads used").toBe(IN_FLIGHT);
     expect(reads.map(({ value }) => value.found)).toEqual(
       Array.from({ length: IN_FLIGHT * ROUNDS }, () => true),
     );
-    expect(inOneRowReads, "open, in one-row reads, at the median").toBeLessThan(
+    expect(inOneRowReads, "the median open, as a multiple of a one-row read").toBeLessThan(
       OPEN_BUDGET_IN_ONE_ROW_READS,
     );
   });
 
-  it("opens a concept of four sources within budget under load", async () => {
+  it("opens a concept citing four sources within budget under load", async () => {
     const reads = await underLoad(corpus.scenario, (reader) => opened(reader, corpus.sourced));
 
     const inOneRowReads = await reported(
@@ -242,8 +242,8 @@ describe("find and open under concurrent read load", () => {
       OPEN_BUDGET_IN_ONE_ROW_READS,
     );
 
-    expect(readers().totalCount, "the connections the reads ran on").toBe(IN_FLIGHT);
-    expect(reads.map(({ value }) => opensOf(value))).toEqual(
+    expect(readers().totalCount, "the pool connections the reads used").toBe(IN_FLIGHT);
+    expect(reads.map(({ value }) => evidenceSourcesOf(value))).toEqual(
       alternating(
         IN_FLIGHT * ROUNDS,
         ["Retention handbook", "Backup Frequency"],
@@ -256,8 +256,9 @@ describe("find and open under concurrent read load", () => {
         "./backup-frequency.md",
       ]),
     );
-    expect(inOneRowReads, "open of four sources, in one-row reads, at the median").toBeLessThan(
-      OPEN_BUDGET_IN_ONE_ROW_READS,
-    );
+    expect(
+      inOneRowReads,
+      "the median open of four sources, as a multiple of a one-row read",
+    ).toBeLessThan(OPEN_BUDGET_IN_ONE_ROW_READS);
   });
 });

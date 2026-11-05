@@ -18,8 +18,8 @@ const confirmedAt = (secondFactorConfirmedAtMs: number | null) => ({
   secondFactorConfirmedAtMs,
 });
 
-describe("the one freshness rule", () => {
-  it("admits a confirmation 59 minutes old, refusing one 61", () => {
+describe("requireFreshConfirmation, the one-hour second-factor rule", () => {
+  it("admits a 59-minute-old confirmation and refuses a 61-minute-old one", () => {
     const held = confirmedAt(CONFIRMED_AT.getTime());
 
     expect(requireFreshConfirmation(held, aMinute(59))).toEqual({ ok: true, value: held });
@@ -35,21 +35,21 @@ describe("the one freshness rule", () => {
     expect(requireFreshConfirmation(held, aMinute(60))).toEqual({ ok: true, value: held });
   });
 
-  it("refuses a stamp in the future", () => {
+  it("refuses a confirmation stamped in the future", () => {
     expect(requireFreshConfirmation(confirmedAt(aMinute(5).getTime()), CONFIRMED_AT)).toEqual({
       ok: false,
       error: "confirmation-too-old",
     });
   });
 
-  it("refuses a caller carrying no confirmation, such as a bearer", () => {
+  it("refuses a caller with no confirmation, such as a bearer", () => {
     expect(requireFreshConfirmation(confirmedAt(null), CONFIRMED_AT)).toEqual({
       ok: false,
       error: "confirmation-too-old",
     });
   });
 
-  it("answers the same word for a member and the operator", () => {
+  it("refuses a member and the operator with the same word", () => {
     const twoHoursAgo = CONFIRMED_AT.getTime() - 2 * 60 * 60_000;
     const member: UserPrincipal = {
       kind: "user",
@@ -76,7 +76,7 @@ describe("the one freshness rule", () => {
     });
   });
 
-  it("refuses in a word whose remedy is confirming again", () => {
+  it("refuses with confirmation-too-old, a precondition-class word", () => {
     expect(KERNEL_REFUSALS["confirmation-too-old"]).toBe("precondition");
     expectTypeOf<FreshnessRefusal>().toEqualTypeOf<"confirmation-too-old">();
   });

@@ -107,7 +107,7 @@ describe("Waiting on you", () => {
     }).toEqual({ owner: [suggestionId], another: [] });
   });
 
-  it("lists an unowned concept's suggestion for Admins alone", async () => {
+  it("lists an unowned concept's suggestion only to Admins", async () => {
     const scenario = await arrange();
     const { suggestionId } = await conceptProposedBy(scenario, scenario.viewer, {
       path: `knowledge/unowned/expenses-${nextConcept()}.md`,
@@ -167,7 +167,7 @@ describe("Waiting on you", () => {
     });
   });
 
-  it("names the standing concept's collection, not the proposed path's", async () => {
+  it("names the existing concept's collection, not the proposed path's", async () => {
     const scenario = await arrange();
     const standing = await conceptWritten(scenario);
     const { suggestionId } = await proposedBy(scenario, scenario.viewer, standing, {
@@ -179,7 +179,7 @@ describe("Waiting on you", () => {
     ]);
   });
 
-  it("opens an item beside its concept's current text", async () => {
+  it("opens an item next to its concept's current text", async () => {
     const scenario = await arrange();
     const standing = await conceptWritten(scenario);
     await proposedBy(scenario, scenario.viewer, standing);
@@ -204,7 +204,7 @@ describe("Waiting on you", () => {
     });
   });
 
-  it("opens the asked item of a set holding two", async () => {
+  it("opens the requested item of a two-item set", async () => {
     const scenario = await arrange();
     const one = await conceptWritten(scenario);
     const other = await conceptWritten(scenario);
@@ -224,7 +224,7 @@ describe("Waiting on you", () => {
     );
     assert(set.ok, `the set was not submitted: ${inspect(set)}`);
     const asked = set.value.suggestionIds[1];
-    assert(asked !== undefined, "the set holds the second suggestion");
+    assert(asked !== undefined, "the set has no second suggestion");
 
     const opened = answered(await openedBy(scenario.editor, asked));
 

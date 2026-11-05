@@ -67,8 +67,8 @@ const AUDIT_LOGS_RETENTION = "Audit Logs Retention";
 
 const QUESTION = "how long do we keep audit logs";
 
-describe("find, by any of the query's words", () => {
-  it("matches a question's words, above a one-word match", async () => {
+describe("find matches any of the query's words", () => {
+  it("ranks a several-word match above a one-word match", async () => {
     const { workspaceId, viewer } = await arrange();
     await conceptsLanded(workspaceId, [
       { title: "Audit committee" },
@@ -81,7 +81,7 @@ describe("find, by any of the query's words", () => {
     ]);
   });
 
-  it("reaches a plural title from its singular words", async () => {
+  it("matches a plural title from singular query words", async () => {
     const { workspaceId, viewer } = await arrange();
     await conceptsLanded(workspaceId, [{ title: AUDIT_LOGS_RETENTION }]);
 
@@ -90,7 +90,7 @@ describe("find, by any of the query's words", () => {
     ]);
   });
 
-  it("ranks one word repeated below every word held once", async () => {
+  it("ranks one repeated word below each query word appearing once", async () => {
     const { workspaceId, viewer } = await arrange();
     await conceptsLanded(workspaceId, [
       { title: "Security notes", body: Array.from({ length: 12 }, () => "audit").join(" ") },
@@ -126,7 +126,7 @@ describe("find, by any of the query's words", () => {
     ]);
   });
 
-  it("puts every concept before every passage for one word", async () => {
+  it("puts every concept before every passage for a one-word query", async () => {
     const { workspaceId, viewer } = await arrange();
     await documentLanded(db().pool, workspaceId, {
       title: "The audit handbook",
@@ -144,7 +144,7 @@ describe("find, by any of the query's words", () => {
     ]);
   });
 
-  it("matches nothing on stop words alone, in either arm", async () => {
+  it("matches no concept or passage on stop words alone", async () => {
     const { workspaceId, viewer } = await arrange();
     await documentLanded(db().pool, workspaceId, { title: "Notes", text: "It is what it is." });
     await conceptsLanded(workspaceId, [{ title: "The policy", body: "It is what it is." }]);
@@ -152,7 +152,7 @@ describe("find, by any of the query's words", () => {
     expect(await searching(viewer, "it is the")).toEqual({ query: "it is the", matches: [] });
   });
 
-  it("matches by its words through `!`, `:*`, `&` and parentheses", async () => {
+  it("ignores `!`, `:*`, `&` and parentheses in a query", async () => {
     const { workspaceId, viewer } = await arrange();
     await documentLanded(db().pool, workspaceId, { title: "The trail", text: "An audit trail." });
     await conceptsLanded(workspaceId, [{ title: "Audit Logs" }]);
@@ -200,8 +200,8 @@ const titlesOrLocatorsOf = (result: FindResult): readonly string[] =>
 
 const ALIKE = "Audit logs, kept long.";
 
-describe("find's pages", () => {
-  it("continues each run after the cursor, ending with no cursor", async () => {
+describe("paging find's results", () => {
+  it("pages through each run, the last page without a cursor", async () => {
     const { workspaceId, viewer } = await arrange();
     await threeRunsLanded(workspaceId);
 
@@ -212,7 +212,7 @@ describe("find's pages", () => {
     ]);
   });
 
-  it("names where the page ended in its cursor", async () => {
+  it("encodes the page's last position in its cursor", async () => {
     const { workspaceId, viewer } = await arrange();
     await conceptLanded(workspaceId, { title: "Log rotation" });
     const retention = await conceptLanded(workspaceId, { title: AUDIT_LOGS_RETENTION });
@@ -226,7 +226,7 @@ describe("find's pages", () => {
     });
   });
 
-  it("answers past the end with no matches and no cursor", async () => {
+  it("returns no matches and no cursor past the end", async () => {
     const { workspaceId, viewer } = await arrange();
     await threeRunsLanded(workspaceId);
 
@@ -281,7 +281,7 @@ describe("find's pages", () => {
     expect(page.query).toBe(QUESTION);
   });
 
-  it("pages past a withheld concept as past an absent one", async () => {
+  it("pages after a withheld concept as after an absent one", async () => {
     const { workspaceId, viewer } = await arrange();
     const withheld = await conceptLanded(workspaceId, {
       title: AUDIT_LOGS_RETENTION,
@@ -304,7 +304,7 @@ describe("find's pages", () => {
     expect(past).toEqual(absent);
   });
 
-  it("pages a tie as counted, across a write between pages", async () => {
+  it("pages tied matches stably when a concept lands between pages", async () => {
     const { workspaceId, viewer } = await arrange();
     await conceptsLanded(workspaceId, [
       { title: "Audit Plan" },
@@ -337,7 +337,7 @@ describe("find's pages", () => {
     expect(titlesOf(second).filter((title) => titlesOf(first).includes(title))).toEqual([]);
   });
 
-  it("weighs a Viewer's concepts as before a Restricted one lands", async () => {
+  it("keeps a Viewer's concept ranking after a Restricted concept lands", async () => {
     const { workspaceId, viewer } = await arrange();
     await conceptsLanded(workspaceId, [
       { title: "Audit Logs" },
@@ -359,7 +359,7 @@ describe("find's pages", () => {
     expect(before.titles[0]).toBe("Retention");
   });
 
-  it("weighs a Viewer's passages as before a Restricted one lands", async () => {
+  it("keeps a Viewer's passage ranking after a Restricted passage lands", async () => {
     const { workspaceId, viewer } = await arrange();
     const internal = await connectedSourceHolding(db(), workspaceId);
     for (const [ordinal, content] of ["Audit logs.", "Retention schedule."].entries()) {
@@ -394,7 +394,7 @@ describe("find's pages", () => {
     ]);
   });
 
-  it("matches a Restricted concept for an Admin alone, uncounted", async () => {
+  it("matches a Restricted concept for an Admin only", async () => {
     const { workspaceId, viewer, admin } = await arrange();
     await conceptsLanded(workspaceId, [
       { title: AUDIT_LOGS_RETENTION, sensitivity: "Restricted" },
@@ -414,7 +414,7 @@ describe("find's pages", () => {
     expect(toTheAdmin.nextCursor).toBeDefined();
   });
 
-  it("finds an Admin what a Viewer's search withholds", async () => {
+  it("finds a Restricted passage for an Admin, not a Viewer", async () => {
     const { workspaceId, viewer, admin } = await arrange();
     const payroll = await connectedSourceHolding(db(), workspaceId, { sensitivity: "Restricted" });
     const content = "The salary bands were set at the spring pay review.";
@@ -463,7 +463,7 @@ describe("a failed read", () => {
   it.each([
     ["find from the first run", undefined],
     ["find from the passage run", findCursor.parse(PASSAGES_CURSOR)],
-  ])("answers %s as an error", async (_case, after) => {
+  ])("returns an error for %s", async (_case, after) => {
     const { viewer } = await arrange();
 
     const outcome = await afterAFailedStatement(viewer, (reader, tx) =>
@@ -473,7 +473,7 @@ describe("a failed read", () => {
     expect(outcome?.ok).toBe(false);
   });
 
-  it("answers ask's first read as an error", async () => {
+  it("returns an error when ask's first read fails", async () => {
     const { viewer } = await arrange();
 
     const outcome = await afterAFailedStatement(viewer, (reader, tx) =>
@@ -488,7 +488,7 @@ describe("ask's entry step", () => {
   const relatedTo = async (viewer: UserPrincipal, question: string) =>
     answered(await reading(viewer, (reader, tx) => plannedOn(reader, tx, { question }))).related;
 
-  it("returns a concept whose body alone holds a word", async () => {
+  it("returns a concept matching the question only in its body", async () => {
     const { workspaceId, viewer } = await arrange();
     const records = await conceptLanded(workspaceId, {
       title: "Records",
@@ -517,13 +517,13 @@ describe("ask's entry step", () => {
   });
 });
 
-describe("the cursor find hands out", () => {
+describe("parsing find's cursor", () => {
   it.each([
     ["an empty string", ""],
     ["text outside base64url", "not a cursor!"],
-    ["base64url of no JSON", "ew"],
+    ["base64url that is not JSON", "ew"],
     [
-      "a run find has no name for",
+      "an unknown run name",
       "eyJydW4iOiJtaWRkbGUiLCJib3VuZCI6eyJ3ZWlnaHQiOjAsInJhbmsiOjAsImtleSI6Imh0dHBzOi8vYmV0dGVyLWFuc3dlcnMuY29tL2MvMDFKNk1NTU1NTU1NTU1NTU1NTU1NTU1NTU0ifSwiY291bnRzIjp7InNpemUiOjAsImZyZXF1ZW5jaWVzIjpbXX19",
     ],
     [
@@ -531,11 +531,11 @@ describe("the cursor find hands out", () => {
       "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjotMSwicmFuayI6MCwia2V5IjoiaHR0cHM6Ly9iZXR0ZXItYW5zd2Vycy5jb20vYy8wMUo2TU1NTU1NTU1NTU1NTU1NTU1NTU1NTSJ9LCJjb3VudHMiOnsic2l6ZSI6MCwiZnJlcXVlbmNpZXMiOltdfX0",
     ],
     [
-      "a weight that is no number",
+      "a weight that is not a number",
       "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjoiMSIsInJhbmsiOjAsImtleSI6Imh0dHBzOi8vYmV0dGVyLWFuc3dlcnMuY29tL2MvMDFKNk1NTU1NTU1NTU1NTU1NTU1NTU1NTU0ifSwiY291bnRzIjp7InNpemUiOjAsImZyZXF1ZW5jaWVzIjpbXX19",
     ],
     [
-      "a cursor from before find weighed words",
+      "a cursor from before find weighted words",
       "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsibWF0Y2hlZCI6MCwicmFuayI6MCwia2V5IjoiaHR0cHM6Ly9iZXR0ZXItYW5zd2Vycy5jb20vYy8wMUo2TU1NTU1NTU1NTU1NTU1NTU1NTU1NTSJ9fQ",
     ],
     [
@@ -543,7 +543,7 @@ describe("the cursor find hands out", () => {
       "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjotMC4xLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn0sImNvdW50cyI6eyJzaXplIjowLCJmcmVxdWVuY2llcyI6W119fQ",
     ],
     [
-      "a key that is no IRI",
+      "a key that is not an IRI",
       "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jL25vcGUifSwiY291bnRzIjp7InNpemUiOjAsImZyZXF1ZW5jaWVzIjpbXX19",
     ],
     [
@@ -551,15 +551,15 @@ describe("the cursor find hands out", () => {
       "eyJydW4iOiJwYXNzYWdlcyIsImJvdW5kIjp7IndlaWdodCI6MCwicmFuayI6MCwia2V5IjoiaHR0cHM6Ly9iZXR0ZXItYW5zd2Vycy5jb20vYy8wMUo2TU1NTU1NTU1NTU1NTU1NTU1NTU1NTSJ9LCJjb3VudHMiOnsic2l6ZSI6MCwiZnJlcXVlbmNpZXMiOltdfX0",
     ],
     [
-      "a key it does not know",
+      "an unknown extra key",
       "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn0sImNvdW50cyI6eyJzaXplIjowLCJmcmVxdWVuY2llcyI6W119LCJleHRyYSI6MX0",
     ],
     [
-      "a cursor that counted no corpus",
+      "a cursor without corpus counts",
       "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn19",
     ],
     [
-      "a word held by more rows than were counted",
+      "a word frequency above the corpus size",
       "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn0sImNvdW50cyI6eyJzaXplIjoxLCJmcmVxdWVuY2llcyI6WzJdfX0",
     ],
     [
@@ -573,7 +573,7 @@ describe("the cursor find hands out", () => {
     expect(findCursor.safeParse(cursor).success).toBe(false);
   });
 
-  it("reads a passage's position by document and offset", () => {
+  it("parses a passage position as document and character offset", () => {
     expect(findCursor.parse(PASSAGES_CURSOR)).toEqual({
       run: "passages",
       bound: {

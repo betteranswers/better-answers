@@ -49,7 +49,7 @@ const judged = z.object({
 
 const recordsIn = (workspaceId: string) => recordsOf(app(), workspaceId);
 
-/** Anthropic's refusal once the account's credit is used up. */
+/** Anthropic's error response when the account has no credit left. */
 const creditUsedUp: Answering = () =>
   new Response(
     JSON.stringify({
@@ -63,8 +63,8 @@ const creditUsedUp: Answering = () =>
     { status: 400 },
   );
 
-describe("ask, judged over MCP", () => {
-  it("AE1: returns both fits word for word, none from lms", async () => {
+describe("ask over MCP with a judging model", () => {
+  it("AE1: returns both fits word for word, nothing from lms", async () => {
     const { asking } = await anAdminAsking();
     wire.answerWith(judgeSaying([USERS.title, SUPPLIER.title]));
 
@@ -95,7 +95,7 @@ describe("ask, judged over MCP", () => {
     }
   });
 
-  it("holds no connection while the judge is called", async () => {
+  it("holds no database connection while calling the judge", async () => {
     const { asking } = await anAdminAsking();
     const contended: string[] = [];
     wire.answerWith(async (sent) => {
@@ -124,7 +124,7 @@ describe("ask, judged over MCP", () => {
     ]);
   });
 
-  it("answers related, judging failed, when the provider's credit runs out", async () => {
+  it("returns related knowledge as judging-failed when provider credit runs out", async () => {
     const { workspaceId, asking } = await anAdminAsking();
     wire.answerWith(creditUsedUp);
 
@@ -194,10 +194,10 @@ const A_JUDGED_ANSWER = {
   readableCollections: ["audits"],
 };
 
-describe("the ask entry's answer, from the wire to the text", () => {
-  it("renders a fit in full, a preview as one line", () => {
+describe("rendering the ask entry's answer as text", () => {
+  it("renders fits in full and previews as single lines", () => {
     const entry = entriesAt(PUBLIC_URL).find(({ name }) => name === "ask");
-    assert(entry !== undefined, "ask is composed");
+    assert(entry !== undefined, "entriesAt has no ask entry");
 
     const wired = entry.output.parse(A_JUDGED_ANSWER);
     const lines = entry.render(wired).split("\n");

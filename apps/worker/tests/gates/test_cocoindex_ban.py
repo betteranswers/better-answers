@@ -8,18 +8,18 @@ from support.roots import WORKER_ROOT
 
 BANNED_API = "TID251"
 
-AN_IMPORT_OF_COCOINDEX = "import cocoindex\n\nflow = cocoindex.flow\n"
-A_NAME_TAKEN_OFF_COCOINDEX = "from cocoindex import flow\n\nFLOW = flow\n"
-AN_IMPORT_THE_TIER_MAKES = "import structlog\n\nlogger = structlog.get_logger()\n"
+IMPORTS_COCOINDEX_MODULE = "import cocoindex\n\nflow = cocoindex.flow\n"
+IMPORTS_A_NAME_FROM_COCOINDEX = "from cocoindex import flow\n\nFLOW = flow\n"
+IMPORTS_STRUCTLOG = "import structlog\n\nlogger = structlog.get_logger()\n"
 
 
-THE_ONE_EXEMPT_PATTERN = "src/better_answers_worker/pipeline/**"
+PIPELINE_PACKAGE_PATTERN = "src/better_answers_worker/pipeline/**"
 
 
-A_MODULE_OF_THE_PIPELINE_PACKAGE = "src/better_answers_worker/pipeline/flow.py"
+PIPELINE_MODULE = "src/better_answers_worker/pipeline/flow.py"
 
 
-def rules_fired_over(source: str, filename: str) -> list[str]:
+def ruff_codes_for(source: str, filename: str) -> list[str]:
     completed = subprocess.run(
         (
             "ruff",
@@ -46,43 +46,43 @@ def rules_fired_over(source: str, filename: str) -> list[str]:
     [
         (
             "the module imported whole",
-            AN_IMPORT_OF_COCOINDEX,
+            IMPORTS_COCOINDEX_MODULE,
             "src/better_answers_worker/redaction/engine.py",
         ),
         (
             "one name taken off it",
-            A_NAME_TAKEN_OFF_COCOINDEX,
+            IMPORTS_A_NAME_FROM_COCOINDEX,
             "src/better_answers_worker/redaction/engine.py",
         ),
         (
             "the tier's tests, which are part of the tier",
-            AN_IMPORT_OF_COCOINDEX,
+            IMPORTS_COCOINDEX_MODULE,
             "tests/test_redaction.py",
         ),
     ],
 )
 def test_refuses_an_import_of_cocoindex(why: str, source: str, filename: str) -> None:
-    assert BANNED_API in rules_fired_over(source, filename), why
+    assert BANNED_API in ruff_codes_for(source, filename), why
 
 
-def test_leaves_an_import_the_tier_really_makes_alone() -> None:
+def test_accepts_an_import_of_another_library() -> None:
     filename = "src/better_answers_worker/redaction/engine.py"
 
-    assert rules_fired_over(AN_IMPORT_THE_TIER_MAKES, filename) == []
+    assert ruff_codes_for(IMPORTS_STRUCTLOG, filename) == []
 
 
-def paths_the_ban_is_lifted_for() -> list[str]:
+def paths_exempt_from_the_ban() -> list[str]:
     manifest = tomllib.loads((WORKER_ROOT / "pyproject.toml").read_text())
     ignores: dict[str, list[str]] = manifest["tool"]["ruff"]["lint"]["per-file-ignores"]
     return sorted(pattern for pattern, rules in ignores.items() if BANNED_API in rules)
 
 
-def test_the_pipeline_package_may_compose_the_engine() -> None:
-    fired = rules_fired_over(AN_IMPORT_OF_COCOINDEX, A_MODULE_OF_THE_PIPELINE_PACKAGE)
+def test_the_pipeline_package_may_import_cocoindex() -> None:
+    fired = ruff_codes_for(IMPORTS_COCOINDEX_MODULE, PIPELINE_MODULE)
 
     assert BANNED_API not in fired
 
 
-def test_lifts_the_ban_for_the_pipeline_package_alone() -> None:
+def test_only_the_pipeline_package_is_exempt_from_the_ban() -> None:
 
-    assert paths_the_ban_is_lifted_for() == [THE_ONE_EXEMPT_PATTERN]
+    assert paths_exempt_from_the_ban() == [PIPELINE_PACKAGE_PATTERN]

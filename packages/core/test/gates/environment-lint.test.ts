@@ -28,7 +28,7 @@ const lint = oxlintOver(
   { tree: { [SOURCE]: READS_A_SETTING }, flagged: [SOURCE] },
 );
 
-describe("the environment lint fires on a setting read in source", () => {
+describe("node/no-process-env flags a process.env read in source", () => {
   it.each([
     ["a slice of the business logic", SOURCE],
     ["a store door", "packages/core/src/store/postgres/index.ts"],
@@ -55,7 +55,7 @@ const EXCUSED: readonly (readonly [string, string])[] = [
   ["a browser spec", "apps/web/e2e/models-and-spend.spec.ts"],
 ];
 
-describe("the environment lint passes where a read is deliberate", () => {
+describe("node/no-process-env allows a read in an excused file", () => {
   it.each(EXCUSED)("%s", (_what, file) => {
     expect(lint.flagged({ [file]: READS_A_SETTING })).toEqual([]);
   });
@@ -66,19 +66,19 @@ const unexcused = oxlintOver(
   { tree: { [SOURCE]: READS_A_SETTING }, flagged: [SOURCE] },
 );
 
-describe("each of those passes only because an override excuses it", () => {
+describe("flags each excused file once its override is removed", () => {
   it.each(EXCUSED)("%s", (_what, file) => {
     expect(unexcused.flagged({ [file]: READS_A_SETTING })).toEqual([file]);
   });
 });
 
-describe("the configuration the repository commits", () => {
-  it("fails a run rather than warning through one", () => {
+describe("the committed .oxlintrc.json", () => {
+  it("sets node/no-process-env to error, not warn", () => {
     expect(config.rules[RULE]).toBe(SEVERITY);
     expect(config.plugins).toContain("node");
   });
 
-  it("excuses config modules, the pass-through, tooling and suites, nothing wider", () => {
+  it("excuses only config modules, the git door, tooling and tests", () => {
     expect(excused.map((override) => override.files)).toEqual([
       ["apps/api/src/config.ts", "apps/web/playwright.config.ts"],
       ["packages/core/src/store/git/door.ts"],
@@ -91,8 +91,8 @@ describe("the configuration the repository commits", () => {
 const DOOR = "packages/core/src/store/git/door.ts";
 const UNEXCUSED_DOOR = "packages/core/src/store/git/probe.ts";
 
-describe("the git store door, the one excused source file", () => {
-  it("reads it in exactly one place", () => {
+describe("the git store door, the only excused source file", () => {
+  it("reads process.env in exactly one place", () => {
     const source = readFileSync(path.join(repositoryRoot, DOOR), "utf8");
     const reported = lint
       .output({ [UNEXCUSED_DOOR]: source })

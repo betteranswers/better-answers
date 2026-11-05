@@ -115,24 +115,27 @@ describe("the job that probes every image it pushes", () => {
     expect(unprobed).toEqual([]);
   });
 
-  it("gives the called check a group apart from its caller's", () => {
+  it("gives the called check its own concurrency group", () => {
     expect(checkWorkflow().concurrency.group).not.toEqual(buildWorkflow().concurrency.group);
   });
 
-  it("defers probes the caller ran, or whose inputs are unchanged", () => {
+  it("defers probes the caller ran or whose inputs are unchanged", () => {
     const check = checkWorkflow();
     const read = deferralsRead();
     const [first] = read;
-    assert(first !== undefined, "a leg reads the deferral");
+    assert(first !== undefined, "no leg of check.yml reads IMAGE_PROBE_DEFERRED");
     const { input: given, answer } = first;
 
-    expect(read.length, "the image suites run in one leg, which reads the deferral once").toBe(1);
+    expect(
+      read.length,
+      "more than one leg of check.yml reads IMAGE_PROBE_DEFERRED. The image suites run in one leg, so exactly one step reads it.",
+    ).toBe(1);
     expect(check.on.workflow_call.inputs[given]?.["default"]).toBe(false);
     expect(buildWorkflow().jobs.check.with?.[given]).toBe(true);
     expect(check.jobs["lane"]?.outputs?.[answer]).toEqual("${{ steps.lane.outputs.images }}");
   });
 
-  it("hands the deferral to exactly the legs reading it", () => {
+  it("sets IMAGE_PROBE_DEFERRED on exactly the legs that run image suites", () => {
     const reading = trackedWorkspacesReadingTheDeferral();
     const wanted = checkLegs()
       .filter(([, steps]) => runsImageSuites(steps))
@@ -140,11 +143,11 @@ describe("the job that probes every image it pushes", () => {
 
     expect(
       reading.size,
-      "the workspaces that read the deferral are apps/api and apps/worker; this suite spells the variable too, and reads it in no leg",
+      "IMAGE_PROBE_DEFERRED is read outside apps/api and apps/worker, or one of them stopped reading it. Only those two workspaces read it. This suite also names the variable, but no leg runs it.",
     ).toBe(2);
     expect(
       legsCarryingTheDeferral(),
-      "a leg runs an image-contents suite it never tells to stand down, or is told and runs none",
+      "a leg runs an image suite without setting IMAGE_PROBE_DEFERRED, or sets it and runs no image suite. Set it on exactly the legs that run an image suite.",
     ).toEqual(wanted);
   });
 
@@ -162,25 +165,28 @@ describe("the job that probes every image it pushes", () => {
   it("builds each image once and pushes the bytes it probed", () => {
     const built = imageJob().steps.filter(builds);
     const [build] = built;
-    assert(build !== undefined, "the image job builds its image");
+    assert(build !== undefined, "the image job has no docker/build-push-action step");
 
     expect(
       built.length,
-      "a second build can run a step again and push bytes the probe never read",
+      "the image job builds its image more than once. A second build can rerun a step and push bytes the probe never read, so build once.",
     ).toBe(1);
     expect(input(build, "outputs")).toContain("type=docker");
   });
 
   it("writes the layer cache only on a run of main", () => {
     const [build] = imageJob().steps.filter(builds);
-    assert(build !== undefined, "the image job builds its image");
+    assert(build !== undefined, "the image job has no docker/build-push-action step");
 
     const exported = MAIN_ONLY_EXPORT.exec(input(build, "cache-to"))?.groups?.["export"];
 
     expect(
       exported,
-      `an export not guarded by ${MAIN_REF} runs on a branch or a dispatch and moves the tag main reads and ships`,
+      `the cache-to export is not guarded by ${MAIN_REF}. Without the guard, a branch or dispatch run moves the cache tag that main reads and ships.`,
     ).toBeDefined();
-    expect(exported, "a run on main keeps the cache warm").toContain(":buildcache");
+    expect(
+      exported,
+      "a run on main does not export to :buildcache. Export it so the layer cache stays current.",
+    ).toContain(":buildcache");
   });
 });

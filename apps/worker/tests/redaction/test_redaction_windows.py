@@ -14,7 +14,7 @@ from support.planted_page import FIXTURE_PAGE
 HEADING_LESS_PAGE = FIXTURE_PAGE.parent / "depot-delivery-terms.txt"
 
 
-class ACut(NamedTuple):
+class PresidioCut(NamedTuple):
     page_length: int
     at: int
     word_starts_at: int
@@ -23,16 +23,16 @@ class ACut(NamedTuple):
     fragment: str
 
 
-THE_CUTS_PRESIDIO_MAKES: tuple[ACut, ...] = (
-    ACut(2484, 607, 605, 616, "significant", "gnificant"),
-    ACut(2664, 201, 198, 205, "numbers", "bers"),
+PRESIDIO_WORD_CUTS: tuple[PresidioCut, ...] = (
+    PresidioCut(2484, 607, 605, 616, "significant", "gnificant"),
+    PresidioCut(2664, 201, 198, 205, "numbers", "bers"),
 )
 
 
-THE_LENGTHS_T168_MEASURED = (2484, 2637, 2664, 2740)
+MEASURED_PAGE_LENGTHS = (2484, 2637, 2664, 2740)
 
 
-THE_HEADINGS_ON_THE_WHOLE_PAGE = (
+HEADING_OFFSETS = (
     0,
     815,
     1097,
@@ -44,14 +44,14 @@ THE_HEADINGS_ON_THE_WHOLE_PAGE = (
     2749,
     2939,
 )
-THE_FIRST_HEADING_EVERY_LENGTH_KEEPS = 815
+FIRST_HEADING_IN_EVERY_LENGTH = 815
 
 
-THE_CONTACTS_RUN = 1641
-THE_CONTACTS_RUN_ENDS_AT = 2019
+CONTACTS_SECTION_START = 1641
+CONTACTS_SECTION_END = 2019
 
 
-THE_PREAMBLES_THAT_MOVE_THE_GRID = (
+PREAMBLES_OF_GROWING_LENGTH = (
     "Delivery terms.",
     "Delivery terms for the Northgate depot.",
     "Delivery terms for the Northgate depot, as agreed.",
@@ -69,17 +69,17 @@ THE_PREAMBLES_THAT_MOVE_THE_GRID = (
 )
 
 
-THE_CATEGORY_A_FRAGMENT_WAS_RAISED_UNDER = "person-name"
-THE_PEOPLE_EVERY_LENGTH_STILL_NAMES = frozenset(
+PERSON_NAME_CATEGORY = "person-name"
+NAMES_FOUND_AT_EVERY_LENGTH = frozenset(
     {"Rosalind Petheridge", "Callum Whitcombe", "Imogen Sarkar", "Oliver Denbigh"}
 )
 
 
-THE_DEPOT_MANAGER = "Marguerite Ashdown"
-THE_DEPOT_SORT_CODE = "00-00-00 and the account number is 12345678"
+DEPOT_MANAGER_NAME = "Marguerite Ashdown"
+DEPOT_BANK_DETAILS = "00-00-00 and the account number is 12345678"
 
 
-THE_DEPOT_FIXTURES_ANSWER: tuple[tuple[str, int, int], ...] = (
+DEPOT_PAGE_FINDINGS: tuple[tuple[str, int, int], ...] = (
     ("person-name", 227, 245),
     ("job-title", 253, 266),
     ("home-address", 323, 361),
@@ -97,13 +97,13 @@ def heading_less_page() -> str:
     return HEADING_LESS_PAGE.read_text(encoding="utf-8")
 
 
-def page_at(length: int) -> str:
+def page_tail(length: int) -> str:
     page = whole_page()
     assert len(page) >= length, f"{FIXTURE_PAGE.name} is shorter than {length}"
     return page[len(page) - length :]
 
 
-def under(preamble: str) -> tuple[str, int]:
+def with_preamble(preamble: str) -> tuple[str, int]:
     tail = heading_less_page().split("\n\n", 1)[1]
     return f"{preamble}\n\n{tail}", len(preamble) + 2
 
@@ -131,11 +131,13 @@ def headings_in(text: str) -> list[int]:
     ]
 
 
-def spans_past_the_shared_heading(text: str, offset: int) -> list[tuple[str, int, int]]:
+def spans_from_first_shared_heading(
+    text: str, offset: int
+) -> list[tuple[str, int, int]]:
     return [
         (finding.category, finding.start + offset, finding.end + offset)
         for finding in findings_of(spans_detected(text))
-        if finding.start + offset >= THE_FIRST_HEADING_EVERY_LENGTH_KEEPS
+        if finding.start + offset >= FIRST_HEADING_IN_EVERY_LENGTH
     ]
 
 
@@ -164,11 +166,11 @@ def names_on(text: str) -> set[str]:
     return {
         text[finding.start : finding.end]
         for finding in findings_of(spans_detected(text))
-        if finding.category == THE_CATEGORY_A_FRAGMENT_WAS_RAISED_UNDER
+        if finding.category == PERSON_NAME_CATEGORY
     }
 
 
-def test_no_window_edge_splits_a_word_on_a_stepped_page() -> None:
+def test_no_window_edge_splits_a_word_and_windows_stay_bounded() -> None:
 
     for text in (whole_page(), heading_less_page()):
         starts, ends = edges_of(text)
@@ -184,14 +186,14 @@ def test_no_window_edge_splits_a_word_on_a_stepped_page() -> None:
     assert longest <= CharacterBasedTextChunker().chunk_size * 2
 
 
-def test_every_window_begins_where_the_page_begins_something() -> None:
+def test_windows_start_at_headings_and_never_span_one() -> None:
 
     page = whole_page()
 
-    assert tuple(headings_in(page)) == THE_HEADINGS_ON_THE_WHOLE_PAGE
+    assert tuple(headings_in(page)) == HEADING_OFFSETS
 
     windows = AnchoredWindows().chunk(page)
-    heading_at = set(THE_HEADINGS_ON_THE_WHOLE_PAGE)
+    heading_at = set(HEADING_OFFSETS)
 
     assert heading_at <= {window.start for window in windows}
     for window in windows:
@@ -199,10 +201,10 @@ def test_every_window_begins_where_the_page_begins_something() -> None:
             window.start
         )
 
-    assert (THE_CONTACTS_RUN, THE_CONTACTS_RUN_ENDS_AT) in [
+    assert (CONTACTS_SECTION_START, CONTACTS_SECTION_END) in [
         (window.start, window.end) for window in windows
     ]
-    assert "\n\n" in page[THE_CONTACTS_RUN:THE_CONTACTS_RUN_ENDS_AT]
+    assert "\n\n" in page[CONTACTS_SECTION_START:CONTACTS_SECTION_END]
 
 
 def test_a_heading_inside_a_code_fence_opens_no_window() -> None:
@@ -221,7 +223,7 @@ def test_a_heading_inside_a_code_fence_opens_no_window() -> None:
 A_RUN_WITH_NO_BOUNDARY = "x" * 600 + " " + "y" * 600
 
 
-THE_WINDOWS_OF_A_RUN_WITH_NO_BOUNDARY = f"""
+PRINT_WINDOWS_OF_A_RUN_WITH_NO_BOUNDARY = f"""
 import json
 from better_answers_worker.redaction.detector import AnchoredWindows
 
@@ -230,9 +232,9 @@ print(json.dumps([[one.start, one.end] for one in windows]))
 """
 
 
-def test_a_run_without_a_boundary_still_steps_forward() -> None:
+def test_windows_advance_through_text_with_no_boundary() -> None:
     finished = subprocess.run(
-        [sys.executable, "-c", THE_WINDOWS_OF_A_RUN_WITH_NO_BOUNDARY],
+        [sys.executable, "-c", PRINT_WINDOWS_OF_A_RUN_WITH_NO_BOUNDARY],
         capture_output=True,
         text=True,
         check=True,
@@ -245,14 +247,16 @@ def test_a_run_without_a_boundary_still_steps_forward() -> None:
     assert windows[-1][1] == len(A_RUN_WITH_NO_BOUNDARY)
 
 
-def test_the_seams_windows_never_cut_a_word_presidio_cuts() -> None:
+def test_anchored_windows_avoid_the_word_cuts_presidio_makes() -> None:
 
-    for cut in THE_CUTS_PRESIDIO_MAKES:
-        text = page_at(cut.page_length)
+    for cut in PRESIDIO_WORD_CUTS:
+        text = page_tail(cut.page_length)
 
-        theirs = [window.start for window in CharacterBasedTextChunker().chunk(text)]
+        presidio_starts = [
+            window.start for window in CharacterBasedTextChunker().chunk(text)
+        ]
 
-        assert cut.at in cuts_in(text, theirs), cut
+        assert cut.at in cuts_in(text, presidio_starts), cut
         assert text[cut.word_starts_at : cut.word_ends_at] == cut.word, cut
         assert text[cut.at : cut.word_ends_at] == cut.fragment, cut
 
@@ -262,10 +266,10 @@ def test_the_seams_windows_never_cut_a_word_presidio_cuts() -> None:
         assert cuts_in(text, ends) == [], cut
 
 
-def test_windows_cover_every_length_at_the_offsets_they_claim() -> None:
+def test_window_text_matches_its_offsets_and_windows_cover_the_page() -> None:
 
-    for length in THE_LENGTHS_T168_MEASURED:
-        text = page_at(length)
+    for length in MEASURED_PAGE_LENGTHS:
+        text = page_tail(length)
 
         windows = AnchoredWindows().chunk(text)
 
@@ -279,51 +283,51 @@ def test_windows_cover_every_length_at_the_offsets_they_claim() -> None:
         ), length
 
 
-def test_no_measured_length_raises_part_of_a_word() -> None:
+def test_no_measured_length_finds_part_of_a_word() -> None:
 
-    for length in THE_LENGTHS_T168_MEASURED:
-        assert partial_spans_on(page_at(length)) == [], length
+    for length in MEASURED_PAGE_LENGTHS:
+        assert partial_spans_on(page_tail(length)) == [], length
 
 
-def test_every_length_answers_as_the_whole_page_in_shared_runs() -> None:
+def test_every_length_finds_the_same_spans_as_the_whole_page() -> None:
 
     page = whole_page()
-    expected = spans_past_the_shared_heading(page, 0)
+    expected = spans_from_first_shared_heading(page, 0)
 
-    for length in THE_LENGTHS_T168_MEASURED:
+    for length in MEASURED_PAGE_LENGTHS:
         offset = len(page) - length
-        here = spans_past_the_shared_heading(page_at(length), offset)
+        here = spans_from_first_shared_heading(page_tail(length), offset)
 
         assert here == expected, length
 
 
-def test_a_headingless_page_answers_the_same_at_every_length() -> None:
+def test_a_headingless_page_finds_the_same_spans_under_every_preamble() -> None:
 
-    first, tail_at = under(THE_PREAMBLES_THAT_MOVE_THE_GRID[0])
+    first, tail_at = with_preamble(PREAMBLES_OF_GROWING_LENGTH[0])
     expected = spans_past(first, tail_at)
 
-    for preamble in THE_PREAMBLES_THAT_MOVE_THE_GRID:
-        text, offset = under(preamble)
+    for preamble in PREAMBLES_OF_GROWING_LENGTH:
+        text, offset = with_preamble(preamble)
 
         assert spans_past(text, offset) == expected, len(preamble)
 
 
-def test_a_page_with_no_heading_still_finds_what_it_plants() -> None:
+def test_a_headingless_page_finds_its_planted_details() -> None:
 
     text = heading_less_page()
 
     found = [text[f.start : f.end] for f in findings_of(spans_detected(text))]
 
-    assert THE_DEPOT_MANAGER in found
-    assert THE_DEPOT_SORT_CODE in found
+    assert DEPOT_MANAGER_NAME in found
+    assert DEPOT_BANK_DETAILS in found
     assert partial_spans_on(text) == []
     assert (
         tuple((f.category, f.start, f.end) for f in findings_of(spans_detected(text)))
-        == THE_DEPOT_FIXTURES_ANSWER
+        == DEPOT_PAGE_FINDINGS
     )
 
 
-def test_every_length_still_names_the_people_the_page_names() -> None:
+def test_every_length_finds_the_person_names_on_the_page() -> None:
 
-    for length in THE_LENGTHS_T168_MEASURED:
-        assert names_on(page_at(length)) >= THE_PEOPLE_EVERY_LENGTH_STILL_NAMES, length
+    for length in MEASURED_PAGE_LENGTHS:
+        assert names_on(page_tail(length)) >= NAMES_FOUND_AT_EVERY_LENGTH, length

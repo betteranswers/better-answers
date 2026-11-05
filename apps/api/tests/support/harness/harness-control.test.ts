@@ -49,7 +49,7 @@ describe("the browser suite's second-factor harness", () => {
     });
   });
 
-  it("gives saved recovery codes beside the authenticator, unless told not", async () => {
+  it("adds ten saved recovery codes unless asked for none", async () => {
     const [saved, none] = [await app().person(), await app().person()];
     const enrolled = z.object({ key: z.string(), recoveryCodes: z.array(z.string()) });
 
@@ -87,7 +87,7 @@ describe("the browser suite's second-factor harness", () => {
     expect((await client.json("/second-factor/restore", { code })).status).toBe(200);
   });
 
-  it("ends a pending session once its hour is moved past", async () => {
+  it("ends a pending session once aged past its hour", async () => {
     const { admin } = await app().provision();
     const pending = await signedInByEmailOnly(app(), admin.email);
     expect((await webClientOf(pending).api.person.secondFactor.query()).thisSession?.standing).toBe(
@@ -118,8 +118,8 @@ const heldIn = async (
   return counted.rows[0]?.held ?? 0;
 };
 
-describe("a seed the browser suite's harness cannot write", () => {
-  it("answers 400 naming the flag a default-on finding cannot carry", async () => {
+describe("seeds the browser suite's harness refuses", () => {
+  it("answers 400 naming `kept` on a default-on finding", async () => {
     const { workspaceId } = await app().provision();
     const finding = { category: "home-address", ruleId: "UK_HOME_ADDRESS", spans: 1 };
 
@@ -142,7 +142,7 @@ describe("a seed the browser suite's harness cannot write", () => {
     expect(await heldIn("connected_source", workspaceId)).toBe(0);
   });
 
-  it("leaves no model choice when a seed's second is refused", async () => {
+  it("writes no model choice when the second one fails", async () => {
     const { workspaceId } = await app().provision();
     const answering = { purpose: "answering", provider: "anthropic" };
 
@@ -161,7 +161,7 @@ describe("a seed the browser suite's harness cannot write", () => {
     expect(await heldIn("model_choice", workspaceId)).toBe(0);
   });
 
-  it("leaves no question when a seed's flag is refused", async () => {
+  it("writes no question when one of its flags fails", async () => {
     const { workspaceId } = await app().provision();
 
     const answered = await asked("/__harness/questions", {
@@ -183,7 +183,7 @@ describe("a seed the browser suite's harness cannot write", () => {
     expect(await heldIn("question_asked", workspaceId)).toBe(0);
   });
 
-  it("answers 400 naming an unreadable reason that holds a space", async () => {
+  it("answers 400 naming an unreadable reason that contains a space", async () => {
     const { workspaceId } = await app().provision();
 
     const answered = await asked(
@@ -205,21 +205,21 @@ describe("a seed the browser suite's harness cannot write", () => {
     expect(await heldIn("connected_source", workspaceId)).toBe(0);
   });
 
-  it("answers 400 naming the field the store's own schema refuses", async () => {
+  it("answers 400 naming a workspace id the store's schema rejects", async () => {
     const answered = await asked("/__harness/connected-sources", aSeedOf("no-such-workspace", {}));
 
     expect(answered.status).toBe(400);
     expect(answered.said).toMatchObject({ fields: [{ field: "workspaceId" }] });
   });
 
-  it("answers 400 naming the constraint a write trips", async () => {
+  it("answers 400 naming the foreign key a write breaks", async () => {
     const answered = await asked("/__harness/connected-sources", aSeedOf(ulid(), {}));
 
     expect(answered.status).toBe(400);
     expect(answered.said).toMatchObject({ constraint: matching.stringMatching(/_fk$/) });
   });
 
-  it("leaves a fault of the harness's own a 500", async () => {
+  it("answers 500 to a fault in the harness itself", async () => {
     const { workspaceId } = await app().provision();
 
     const answered = await new Hono()
@@ -233,7 +233,7 @@ describe("a seed the browser suite's harness cannot write", () => {
     expect(answered.status).toBe(500);
   });
 
-  it("answers 400 naming the field another route's schema refuses", async () => {
+  it("answers 400 naming a role the members route rejects", async () => {
     const { workspaceId, admin } = await app().provision();
 
     const answered = await asked("/__harness/members", {

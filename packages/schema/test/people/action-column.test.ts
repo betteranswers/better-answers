@@ -28,7 +28,7 @@ const namedAsBefore = async (client: pg.PoolClient): Promise<void> => {
   for (const statement of NAMES_BEFORE_THE_ACTION) await client.query(statement);
 };
 
-/** As the superuser, since taking ownership would itself wait on a lock with no bound. */
+/** Runs as the superuser, because taking ownership would wait on a lock with no timeout. */
 const replayed = async (client: pg.PoolClient): Promise<void> => {
   for (const statement of migrationStatements(THE_MIGRATION)) await client.query(statement);
 };
@@ -135,7 +135,7 @@ const derivedOf = async (client: pg.PoolClient) =>
 const ACTION_PATTERN = String.raw`'^(people|knowledge|sources|platform)\.[a-z][a-z_]*\.[a-z][a-z_]*$'::text`;
 
 describe("migration 0073 over audit logs written before it", () => {
-  it("keeps every row where it lay, under its stored name", async () => {
+  it("keeps every row without rewriting the tables", async () => {
     const [before, after] = await withRollback(db().pool, async (client) => {
       await namedAsBefore(client);
       await seededBefore(client);
@@ -191,7 +191,7 @@ describe("migration 0073 over audit logs written before it", () => {
     expect(landed).toEqual({ family: "knowledge", subject_kind: "concept" });
   });
 
-  it("refuses an action of no family by the new check", async () => {
+  it("refuses an unknown action family under the new check", async () => {
     const refused = await replayedThen((client) =>
       refusalOf(client, () =>
         client.query(AN_IDENTITY_SET_AUDIT_EVENT_ROW, [
@@ -206,7 +206,7 @@ describe("migration 0073 over audit logs written before it", () => {
     expect(refused).toBe("identity_audit_event_action_check");
   });
 
-  it("leaves no lock bound on the migrations after it", async () => {
+  it("leaves no lock timeout set for the migrations after it", async () => {
     const after = await replayedThen(async (client) => {
       const shown = await client.query<{ lock_timeout: string }>("SHOW lock_timeout");
       return shown.rows[0]?.lock_timeout;
@@ -215,7 +215,7 @@ describe("migration 0073 over audit logs written before it", () => {
     expect(after).toBe("0");
   });
 
-  it("fails rather than waits behind an open audit write", async () => {
+  it("fails instead of waiting behind an open audit write", async () => {
     await withCommit(db().pool, namedAsBefore);
     try {
       const blocked = whileAnAuditWriteIsOpen(db().pool, () => withRollback(db().pool, replayed));

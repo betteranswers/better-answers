@@ -18,7 +18,7 @@ const WS_WATCHED = "01J6TEEEEEEEEEEEEEEEEEEEEE";
 const PROVISION_SETTLES_WITHIN_MS = 10_000;
 const POLL_MS = 10;
 
-/** A statement that conflicts with nothing never waits, so any bound tells waiting from not. */
+/** A statement with no lock conflict never waits, so any timeout separates waiting from not waiting. */
 const SHORT_LOCK_WAIT_MS = 1_000;
 
 const outcomeOf = (statement: Promise<unknown>, done: string): Promise<string> =>
@@ -112,8 +112,8 @@ const inAShortWait = async (
   return outcome;
 };
 
-describe("provisioning beside a transaction writing documents and passages", () => {
-  it("lets a document's writer add its passage, aborting neither side", async () => {
+describe("provisioning while another transaction writes documents and passages", () => {
+  it("lets the writer add its passage, and neither transaction aborts", async () => {
     const { connectedSourceId } = await aTenantAtWork(WS_WRITING);
 
     const writer = await opened();
@@ -184,7 +184,7 @@ describe("provisioning beside a transaction writing documents and passages", () 
     });
   });
 
-  it("locks in modes blocking no passage access or document read", async () => {
+  it("takes locks that block no passage access or document read", async () => {
     await withRollback(db().pool, async (client) => {
       await testData(client).workspace({ id: WS_WATCHED, name: "Watched" });
       await client.query("SET LOCAL ROLE app_rt");

@@ -7,7 +7,7 @@ import {
   untilContainerGone,
 } from "../support/held-containers.ts";
 
-/** Ryuk's own timer is ten seconds; a shorter one only shortens the wait for what it clears. */
+/** Ryuk's default timeout is ten seconds. A shorter one only shortens the wait before Ryuk removes containers. */
 const QUICK_RYUK = { TESTCONTAINERS_RYUK_RECONNECTION_TIMEOUT: "1s" };
 
 const CLEARED_WITHIN_MS = 20_000;
@@ -19,8 +19,8 @@ describe("a test process's Ryuk", () => {
     try {
       held.push(await live.container);
 
-      // Started after the first holds its container, so an unpatched testcontainers would join
-      // the first's Ryuk and its session.
+      // This process starts after the first holds its container, so an unpatched
+      // testcontainers would reuse the first process's Ryuk and session.
       const killed = holdAContainer(QUICK_RYUK);
       try {
         held.push(await killed.container);

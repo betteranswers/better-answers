@@ -167,10 +167,10 @@ const uploadRaw = (
     duplex: "half",
   });
 
-const crossedRefusal = z.object({ error: z.object({ data: z.object({ refusal: z.unknown() }) }) });
+const refusalResponse = z.object({ error: z.object({ data: z.object({ refusal: z.unknown() }) }) });
 
 const refusalIn = async (response: Response) =>
-  crossedRefusal.parse(await response.json()).error.data.refusal;
+  refusalResponse.parse(await response.json()).error.data.refusal;
 
 const FIRST_PART = new TextEncoder().encode("The handbook says ");
 const LAST_PART = new TextEncoder().encode("what the company decided.");
@@ -218,8 +218,8 @@ const pastTheCap = () => {
   return { body, sent, total };
 };
 
-describe("the upload, one mutation over the split link", () => {
-  it("lands a connected source with its document and index job", async () => {
+describe("uploading through sources.connect over tRPC's split link", () => {
+  it("creates a connected source, its document and an index job", async () => {
     const { workspace, api, sent } = await anAdmin();
     const finance = await seededIn(app, (seed) =>
       seed.group({ workspaceId: workspace.workspaceId }),
@@ -273,7 +273,7 @@ describe("the upload, one mutation over the split link", () => {
     ]);
   });
 
-  it("keeps a descriptor's non-ASCII name intact through the encoded header", async () => {
+  it("keeps a non-ASCII source name intact in the encoded header", async () => {
     const { workspace, api } = await anAdmin();
     const described = handbookDescribed({ name: "Llawlyfr y staff — ŵ" });
 
@@ -284,7 +284,7 @@ describe("the upload, one mutation over the split link", () => {
     );
   });
 
-  it("batches every call that is not bytes, as one request", async () => {
+  it("batches non-upload calls into one request", async () => {
     const { api, sent } = await anAdmin();
 
     await Promise.all([api.sources.list.query(), api.session.member.query()]);
@@ -314,7 +314,7 @@ describe("the upload, one mutation over the split link", () => {
     expect(await connectedSourcesIn(admin.workspace.workspaceId)).toBe(0);
   });
 
-  it("refuses a body passing the cap mid-stream, before its end", async () => {
+  it("refuses a body that exceeds the cap before it ends", async () => {
     const admin = await anAdmin();
     const { body, sent, total } = pastTheCap();
 
@@ -326,7 +326,7 @@ describe("the upload, one mutation over the split link", () => {
     expect(await connectedSourcesIn(admin.workspace.workspaceId)).toBe(0);
   }, 180_000);
 
-  it("refuses missing or unreadable descriptor fields by name alone", async () => {
+  it("refuses missing or unreadable upload headers, naming each field", async () => {
     const { workspace, client } = await anAdmin();
     const headers = uploadHeaders(handbookDescribed(), workspace.workspaceId);
     headers.delete("x-upload-file-name");
@@ -348,8 +348,8 @@ describe("the upload, one mutation over the split link", () => {
   });
 });
 
-describe("ten concurrent uploads, whose action opens its own transaction", () => {
-  it("holds at most one pooled connection each, none while streaming", async () => {
+describe("ten concurrent uploads that each open their own transaction", () => {
+  it("use at most one pooled connection each, none while streaming", async () => {
     const admin = await anAdmin();
     const { pool } = app.doors.postgres;
     const watched = { held: 0, peak: 0 };
@@ -384,8 +384,8 @@ describe("ten concurrent uploads, whose action opens its own transaction", () =>
   });
 });
 
-describe("a revocation landed while a mutation runs", () => {
-  it("refuses the mutation, whose member read waits on it", async () => {
+describe("a credentials revocation that commits while a mutation runs", () => {
+  it("refuses the mutation, which waits for the revocation's lock", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
     const revocation = await revocationHeldOpen(app, workspace.admin.id);
@@ -415,7 +415,7 @@ describe("a revocation landed while a mutation runs", () => {
     expect(connectedSource.rows).toEqual([{ sensitivity: "Internal" }]);
   });
 
-  it("never holds up a read, which resolves its member unheld", async () => {
+  it("never blocks a read, which reads its member without waiting", async () => {
     const { workspace, api } = await anAdmin();
     await unpublishedConnectedSource(workspace.workspaceId);
     const revocation = await revocationHeldOpen(app, workspace.admin.id);
@@ -440,7 +440,7 @@ const anAdminWhoseConnectedSourceHoldsAHealthCue = async () => {
   return { api, connectedSourceId, documentId };
 };
 
-describe("the Sources procedures over the wire", () => {
+describe("the Sources procedures over tRPC", () => {
   it("lists an upload's state, counts, last sync and unreadable reason", async () => {
     const { workspace, api } = await anAdmin();
     const described = handbookDescribed();
@@ -511,7 +511,7 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("answers the runs of a connected source by its subject", async () => {
+  it("lists a connected source's runs through runs.ofSubject", async () => {
     const { api } = await anAdmin();
     const described = handbookDescribed();
     const bound = await api.sources.connect.mutate(new Blob([HANDBOOK]), uploadOptions(described));
@@ -531,7 +531,7 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("lists a sync that overrode spans with no span's address", async () => {
+  it("lists a sync that overrode kept spans without their locations", async () => {
     const { workspace, api } = await anAdmin();
     const run = await aSyncThatOverrodeAKeptSpan(workspace.workspaceId);
 
@@ -551,7 +551,7 @@ describe("the Sources procedures over the wire", () => {
     expect(addressesIn(listed, run)).toEqual([]);
   });
 
-  it("answers a subject's runs with no span's address in them", async () => {
+  it("lists a subject's runs without the overridden spans' locations", async () => {
     const { workspace, api } = await anAdmin();
     const run = await aSyncThatOverrodeAKeptSpan(workspace.workspaceId);
 
@@ -561,7 +561,7 @@ describe("the Sources procedures over the wire", () => {
     expect(addressesIn(runs, run)).toEqual([]);
   });
 
-  it("reads findings by group, counting kept spans an erasure overrides", async () => {
+  it("groups findings and counts kept spans an erasure overrode", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId, documentId } = await unpublishedConnectedSource(
       workspace.workspaceId,
@@ -607,7 +607,7 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("keeps findings in text, hiding finding ids, queuing a sync", async () => {
+  it("keeps findings in text, queues a sync, hides finding ids", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId, documentId } = await unpublishedConnectedSource(
       workspace.workspaceId,
@@ -650,7 +650,7 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("dismisses a special-category group and queues the sync reading it", async () => {
+  it("dismisses a special-category group and queues a sync", async () => {
     const { api, connectedSourceId, documentId } =
       await anAdminWhoseConnectedSourceHoldsAHealthCue();
 
@@ -671,7 +671,7 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("refuses to dismiss a non-special-category group in its own word", async () => {
+  it("refuses to dismiss a non-special-category group with not-special-category", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId, documentId } = await unpublishedConnectedSource(
       workspace.workspaceId,
@@ -700,7 +700,7 @@ describe("the Sources procedures over the wire", () => {
     });
   });
 
-  it("narrows the documents a group of findings sits in", async () => {
+  it("narrows the documents that contain a group of findings", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId, documentId } = await unpublishedConnectedSource(
       workspace.workspaceId,
@@ -728,7 +728,7 @@ describe("the Sources procedures over the wire", () => {
     });
   });
 
-  it("publishes an indexed source at the instant the Clock gives", async () => {
+  it("publishes an indexed source at the Clock's current time", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
     await finishedSync(workspace.workspaceId, connectedSourceId, { documents: 1, passages: 1 });
@@ -766,7 +766,7 @@ describe("the Sources procedures over the wire", () => {
     });
   });
 
-  it("widens a connected source's sensitivity, refusing a non-wider one", async () => {
+  it("widens a source's sensitivity, then refuses one not wider", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
 

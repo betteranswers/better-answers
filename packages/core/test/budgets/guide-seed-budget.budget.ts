@@ -74,7 +74,7 @@ const coverageReadMs = async (ng: Northgate, guideId: string) =>
 
 describe("seeding a guide at 3,000 concepts", () => {
   it(
-    "records seeding a guide and reading its coverage",
+    "times seeding a guide and reading its coverage",
     async () => {
       const ng = await northgateAmongThousands();
 

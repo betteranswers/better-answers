@@ -42,7 +42,7 @@ const mint = async (
   return (expiresIn === null ? token : token.setExpirationTime(expiresIn)).sign(privateKey);
 };
 
-const verifierPublishing = (
+const verifierWithKeys = (
   ...keys: readonly Awaited<ReturnType<typeof keyed>>["jwk"][]
 ): ReturnType<typeof createTokenVerifier> =>
   createTokenVerifier({
@@ -60,10 +60,10 @@ const refusalOf = async (
     (thrown: unknown) => thrown,
   );
 
-describe("the bearer verifier", () => {
+describe("the bearer token verifier", () => {
   it("accepts this issuer's token for this audience, returning its claims", async () => {
     const key = await keyed();
-    const verifier = verifierPublishing(key.jwk);
+    const verifier = verifierWithKeys(key.jwk);
 
     const info = await verifier.verifyAccessToken(await mint(key.privateKey, key.jwk.kid, {}));
 
@@ -85,7 +85,7 @@ describe("the bearer verifier", () => {
 
     expect(
       await refusalOf(
-        verifierPublishing(key.jwk),
+        verifierWithKeys(key.jwk),
         await mint(key.privateKey, key.jwk.kid, {}, options),
       ),
     ).toMatchObject({
@@ -99,7 +99,7 @@ describe("the bearer verifier", () => {
 
     expect(
       await refusalOf(
-        verifierPublishing(published.jwk),
+        verifierWithKeys(published.jwk),
         await mint(rogue.privateKey, rogue.jwk.kid, {}),
       ),
     ).toMatchObject({
@@ -112,7 +112,7 @@ describe("the bearer verifier", () => {
 
     expect(
       await refusalOf(
-        verifierPublishing(key.jwk),
+        verifierWithKeys(key.jwk),
         await mint(key.privateKey, key.jwk.kid, { workspace: null }),
       ),
     ).toMatchObject({
@@ -120,7 +120,7 @@ describe("the bearer verifier", () => {
     });
   });
 
-  it("rereads the key set once for an unseen kid", async () => {
+  it("rereads the key set once for an unknown key id", async () => {
     const first = await keyed();
     const second = await keyed();
     let published = [first.jwk];
@@ -141,7 +141,7 @@ describe("the bearer verifier", () => {
     expect(reads).toBe(2);
   });
 
-  it("reads the key set once for a known kid", async () => {
+  it("reads the key set once for a known key id", async () => {
     const key = await keyed();
     let reads = 0;
     const verifier = createTokenVerifier({
@@ -179,10 +179,10 @@ describe("the bearer verifier", () => {
           .sign(key.privateKey),
       "the bearer's claims are not the surface's",
     ],
-  ])("refuses %s, saying why", async (_case, bearer, reason) => {
+  ])("refuses %s and gives the reason", async (_case, bearer, reason) => {
     const key = await keyed();
 
-    expect(await refusalOf(verifierPublishing(key.jwk), await bearer(key))).toMatchObject({
+    expect(await refusalOf(verifierWithKeys(key.jwk), await bearer(key))).toMatchObject({
       code: "invalid_token",
       message: reason,
     });

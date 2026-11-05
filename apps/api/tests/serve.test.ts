@@ -5,7 +5,7 @@ import { expect, it } from "vitest";
 import { heldPort, released } from "./support/loopback-port.ts";
 import { workspaceRoot } from "./support/roots/roots.ts";
 
-/** Well under the harness's start-up, so only a server that binds before it starts can exit in time. */
+/** Shorter than the harness start-up, so only a server that binds its port first exits in time. */
 const BEFORE_START_UP_MS = 3000;
 
 type Exit = { readonly code: number | string | null | undefined; readonly output: string };
@@ -22,7 +22,7 @@ const servedOn = (port: number): Promise<Exit> =>
     );
   });
 
-it("exits at once when another listener holds its port", async () => {
+it("exits with code 1 when its port is already taken", async () => {
   const held = await heldPort();
   try {
     const exit = await servedOn(held.port);

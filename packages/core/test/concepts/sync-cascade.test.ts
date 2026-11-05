@@ -182,7 +182,7 @@ describe("a sync that narrows a cited document", () => {
     }
   });
 
-  it("re-derives the named documents' concepts, recording the sync once", async () => {
+  it("re-derives the named documents' concepts and records the sync once", async () => {
     const scenario = await arrange();
     const { narrowed, onNarrowed, onUntouched } = await twoCitedDocuments(scenario);
     const jobId = await narrowedBySync(scenario, narrowed);
@@ -209,7 +209,7 @@ describe("a sync that narrows a cited document", () => {
     });
   });
 
-  it("records a sync that moved nothing, re-deriving nothing", async () => {
+  it("records a sync that moved nothing and re-derives nothing", async () => {
     const scenario = await arrange();
     const { narrowed, onNarrowed } = await twoCitedDocuments(scenario);
     await documentSetTo(scenario, narrowed.documentId, "Restricted");
@@ -241,7 +241,7 @@ describe("a sync that narrows a cited document", () => {
     expect(await heldRow(scenario, onUntouched.iri)).toEqual(INTERNAL_TO_EVERYONE);
   });
 
-  it("follows a lapsed claim, then its next attempt", async () => {
+  it("follows a sync whose claim lapsed, then its next attempt", async () => {
     const scenario = await arrange();
     const { narrowed, onNarrowed } = await twoCitedDocuments(scenario);
     await documentSetTo(scenario, narrowed.documentId, "Restricted");
@@ -263,7 +263,7 @@ describe("a sync that narrows a cited document", () => {
     ]);
   });
 
-  it("waits for a lapsed claimant's write in flight", async () => {
+  it("waits for a lapsed claimant's write that is still running", async () => {
     const scenario = await arrange();
     const { narrowed, onNarrowed } = await twoCitedDocuments(scenario);
     const jobId = await syncLapsed(scenario, narrowed.connectedSourceId);
@@ -290,7 +290,7 @@ describe("a sync that narrows a cited document", () => {
     expect(await heldRow(scenario, onNarrowed.iri)).toEqual(RESTRICTED_TO_ADMINS);
   });
 
-  it("lets an Admin's override finish while it waits", async () => {
+  it("lets an Admin's override finish while the pass waits", async () => {
     const scenario = await arrange();
     const { narrowed, onUntouched } = await twoCitedDocuments(scenario);
     const jobId = await syncLapsed(scenario, narrowed.connectedSourceId);
@@ -326,7 +326,7 @@ describe("a sync that narrows a cited document", () => {
     expect((await following).followed).toEqual([{ jobId, concepts: 2 }]);
   });
 
-  it("records one event for two passes at once", async () => {
+  it("records one event when two passes run at once", async () => {
     const scenario = await arrange();
     const { narrowed } = await twoCitedDocuments(scenario);
     await narrowedBySync(scenario, narrowed);
@@ -372,7 +372,7 @@ describe("a sync that narrows a cited document", () => {
     expect(await heldRow(scenario, onNarrowed.iri)).toEqual(RESTRICTED_TO_ADMINS);
   });
 
-  it("records a sync of a connected source that is gone", async () => {
+  it("records a sync of a connected source that was deleted", async () => {
     const scenario = await arrange();
     const jobId = await syncEnded(scenario, { connectedSourceId: ulid(), moved: [ulid()] });
 
@@ -405,7 +405,7 @@ const refusingTheMarkerOf = async <T>(jobId: string, work: () => Promise<T>): Pr
 };
 
 describe("a sync whose re-derivation fails", () => {
-  it("is named, and followed once it stops failing", async () => {
+  it("is reported, and followed once it stops failing", async () => {
     const scenario = await arrange();
     const first = await connectedSourceHolding(db(), scenario.workspaceId);
     const second = await connectedSourceHolding(db(), scenario.workspaceId);
@@ -434,8 +434,8 @@ describe("a sync whose re-derivation fails", () => {
   });
 });
 
-describe("a sync that lifts a cited document", () => {
-  it("widens unless an override or other evidence holds it", async () => {
+describe("a sync that widens a cited document", () => {
+  it("widens unless an override or other evidence keeps it narrow", async () => {
     const scenario = await arrange();
     const source = await connectedSourceHolding(db(), scenario.workspaceId);
     const stillRestricted = await documentUnder(

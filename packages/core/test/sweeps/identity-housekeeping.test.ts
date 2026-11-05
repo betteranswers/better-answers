@@ -72,7 +72,7 @@ const windowsLeft = async (): Promise<readonly string[]> =>
     await db().pool.query<{ key: string }>("SELECT key FROM ingress_counter ORDER BY window_start")
   ).rows.map((row) => row.key);
 
-describe("the identity set's housekeeping", () => {
+describe("identity housekeeping", () => {
   it("deletes expired sessions and keeps live ones", async () => {
     const { userId } = await person();
     await sessionEnding(userId, { expiresAt: at(-MINUTE_MS) });
@@ -84,7 +84,7 @@ describe("the identity set's housekeeping", () => {
     expect(await sessionsLeft()).toEqual([live]);
   });
 
-  it("deletes a pending session past its hour", async () => {
+  it("deletes a pending session older than one hour", async () => {
     const { userId } = await person();
     const daysLeft = at(30 * DAY_MS);
     await sessionEnding(userId, { expiresAt: daysLeft, pendingSince: at(-HOUR_MS - MINUTE_MS) });
@@ -99,7 +99,7 @@ describe("the identity set's housekeeping", () => {
     expect(await sessionsLeft()).toEqual([withinItsHour]);
   });
 
-  it("deletes link and code rows past a day's grace", async () => {
+  it("deletes link and code rows a day after they expire", async () => {
     const { email } = await person();
     const sessionId = ulid();
     const pastTheGrace = at(-DAY_MS - MINUTE_MS);
@@ -115,7 +115,7 @@ describe("the identity set's housekeeping", () => {
     expect(await verificationsLeft()).toEqual([]);
   });
 
-  it("keeps rows within the day's grace, and live ones", async () => {
+  it("keeps rows expired less than a day, and live ones", async () => {
     const { email } = await person();
     const withinTheGrace = await verificationCodeFor(db().pool, email, at(-DAY_MS + MINUTE_MS));
     const live = await signInLinkFor(db().pool, email, at(5 * MINUTE_MS));
@@ -126,7 +126,7 @@ describe("the identity set's housekeeping", () => {
     expect(await verificationsLeft()).toEqual([withinTheGrace, live]);
   });
 
-  it("deletes ingress windows a day old, keeping later ones", async () => {
+  it("deletes ingress windows over a day old, keeping newer ones", async () => {
     await countedAt("ip", "203.0.113.1", at(-DAY_MS - 2 * MINUTE_MS));
     await countedAt("ip", "203.0.113.2", at(-DAY_MS + 2 * MINUTE_MS));
     await countedAt("ip", "203.0.113.3", NOW);
@@ -137,7 +137,7 @@ describe("the identity set's housekeeping", () => {
     expect(await windowsLeft()).toEqual(["203.0.113.2", "203.0.113.3"]);
   });
 
-  it("leaves second-factor throttle rows, however old", async () => {
+  it("keeps second-factor throttle rows of any age", async () => {
     const { userId } = await person();
     await secondFactorRowsFor(db().pool, userId);
 
@@ -150,7 +150,7 @@ describe("the identity set's housekeeping", () => {
     expect(throttled.rows.map((row) => row.kind)).toEqual(["authenticator", "restore-code"]);
   });
 
-  it("still deletes sessions and windows when codes are refused", async () => {
+  it("deletes sessions and windows even when deleting codes fails", async () => {
     await oneOfEachExpired();
 
     const result = await whileWritesAreRefused(db().pool, "verification", swept);
@@ -162,7 +162,7 @@ describe("the identity set's housekeeping", () => {
     expect(await windowsLeft()).toEqual([]);
   });
 
-  it("still deletes sessions and codes when windows are refused", async () => {
+  it("deletes sessions and codes even when deleting windows fails", async () => {
     await oneOfEachExpired();
 
     const result = await whileWritesAreRefused(db().pool, "ingress_counter", swept);
@@ -174,7 +174,7 @@ describe("the identity set's housekeeping", () => {
     expect(await verificationsLeft()).toEqual([]);
   });
 
-  it("answers counts alone, naming no person or address", async () => {
+  it("returns only counts, with no person or address", async () => {
     const { userId, email } = await person();
     await sessionEnding(userId, { expiresAt: at(-MINUTE_MS) });
     await verificationCodeFor(db().pool, email, at(-2 * DAY_MS));

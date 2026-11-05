@@ -48,8 +48,8 @@ const movedByTheAdmin = (
     changeRole(principal, tx, { ...inputOf(changeRoleInput, { personId, role }), at: new Date() }),
   );
 
-describe("becoming one who must hold a second factor", () => {
-  it("clears every session's stamp and hour on becoming Admin", async () => {
+describe("becoming someone who must have a second factor", () => {
+  it("clears every session's confirmation and pending time on becoming Admin", async () => {
     const workspace = await provisionedWorkspace(db(), "Promoted");
     const editor = await joining(workspace, "Editor");
     const stamped = await confirmedSession(editor, AT);
@@ -65,7 +65,7 @@ describe("becoming one who must hold a second factor", () => {
     expect(await isPromoted(editor)).toBe(true);
   });
 
-  it("promotes no one already an Admin in another workspace", async () => {
+  it("does not promote someone already an Admin elsewhere", async () => {
     const elsewhere = await provisionedWorkspace(db(), "Elsewhere");
     const here = await provisionedWorkspace(db(), "Here");
     const editor = await joining(here, "Editor");
@@ -81,7 +81,7 @@ describe("becoming one who must hold a second factor", () => {
     expect(await isPromoted(editor)).toBe(false);
   });
 
-  it("names each person a bulk move promotes", async () => {
+  it("lists each person a bulk role change promotes", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkPromoted");
     const viewer = await joining(workspace, "Viewer");
     const stamped = await confirmedSession(viewer);
@@ -143,13 +143,13 @@ const stampsAfter = async (personId: string, remove: Removal) => {
   return [await confirmedAt(removing), await confirmedAt(other)];
 };
 
-const KEPT_HERE_ENDED_THERE = [
+const KEPT_ON_REMOVING_SESSION_ONLY = [
   { confirmed: AT, pending: null },
   { confirmed: null, pending: null },
 ];
 
-describe("a confirmation outliving its factor", () => {
-  it("ends with a removed passkey, except on the removing session", async () => {
+describe("a session confirmation after its factor is removed", () => {
+  it("ends when a passkey is removed, except on that session", async () => {
     const personId = await seedPerson(db().pool);
     const passkeyId = await passkeyFor(db().pool, personId);
 
@@ -157,10 +157,10 @@ describe("a confirmation outliving its factor", () => {
       removePasskey(bootstrap, door(), { personId, passkeyId, sessionId }),
     );
 
-    expect(stamps).toEqual(KEPT_HERE_ENDED_THERE);
+    expect(stamps).toEqual(KEPT_ON_REMOVING_SESSION_ONLY);
   });
 
-  it("ends with a removed authenticator, except on the removing session", async () => {
+  it("ends when an authenticator is removed, except on that session", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: true });
 
@@ -168,6 +168,6 @@ describe("a confirmation outliving its factor", () => {
       removeAuthenticator(bootstrap, door(), { personId, sessionId }),
     );
 
-    expect(stamps).toEqual(KEPT_HERE_ENDED_THERE);
+    expect(stamps).toEqual(KEPT_ON_REMOVING_SESSION_ONLY);
   });
 });

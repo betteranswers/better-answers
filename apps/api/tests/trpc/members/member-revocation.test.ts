@@ -97,7 +97,7 @@ const connectedInBoth = async () => {
   return { ...members, inHere, inElsewhere, host: app().client() };
 };
 
-/** A bearer's `iat` is in whole seconds, so one minted in the revocation's own second reads as before it. */
+/** A token's `iat` is in whole seconds, so a token issued in the revocation's second counts as issued before it. */
 const untilTheSecondAfter = async (instantMs: number): Promise<void> => {
   const wait = Math.ceil(instantMs / 1000) * 1000 - Date.now();
   if (wait > 0) await sleep(wait);
@@ -111,8 +111,8 @@ const tokenAnswers = async (
   refresh: (await refresh(host, tokens.refreshToken ?? "")).status,
 });
 
-describe("ending a member's sign-ins and tokens here, over tRPC", () => {
-  it("refuses every session the member holds here, admitting one elsewhere", async () => {
+describe("ending a member's sign-ins and tokens in one workspace", () => {
+  it("ends the member's sessions here, not in their other workspace", async () => {
     const { here, elsewhere, person, admin } = await aMemberOfTwoWorkspaces();
     const first = await signedInHere(person.email, here.workspaceId);
     const second = await signedInHere(person.email, here.workspaceId);
@@ -139,7 +139,7 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
     expect(await revocationsIn(elsewhere.workspaceId)).toEqual([]);
   });
 
-  it("admits the member's fresh sign-in once the revocation lands", async () => {
+  it("accepts a sign-in the member makes after the revocation", async () => {
     const { here, person, admin } = await aMemberOfTwoWorkspaces();
     const before = await signedInHere(person.email, here.workspaceId);
     await admin.members.endEverySignInAndToken.mutate({ personId: person.id });
@@ -154,7 +154,7 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
     });
   });
 
-  it("admits the member's MCP bearer issued after the revocation lands", async () => {
+  it("accepts an MCP token issued after the revocation", async () => {
     const { here, person, admin } = await aMemberOfTwoWorkspaces();
     const before = await connectAsHost(app(), app().client(), person, { pick: here.workspaceId });
     const { revokedAt } = await admin.members.endEverySignInAndToken.mutate({
@@ -171,7 +171,7 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
     }).toEqual({ before: 401, again: 200 });
   });
 
-  it("ends the member's tokens for this workspace, not another's", async () => {
+  it("revokes the member's tokens for this workspace only", async () => {
     const { elsewhere, person, admin, inHere, inElsewhere, host } = await connectedInBoth();
 
     await admin.members.endEverySignInAndToken.mutate({ personId: person.id });
@@ -186,7 +186,7 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
     });
   });
 
-  it("keeps elsewhere's tokens when this one's is presented to revoke", async () => {
+  it("keeps the other workspace's tokens when revoking this one again", async () => {
     const { person, admin, inHere, inElsewhere, host } = await connectedInBoth();
     await admin.members.endEverySignInAndToken.mutate({ personId: person.id });
 
@@ -197,7 +197,7 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
     expect(await tokenAnswers(host, inElsewhere)).toEqual({ mcp: 200, refresh: 200 });
   });
 
-  it("answers alike whether or not the person belongs elsewhere", async () => {
+  it("answers alike for people with and without other workspaces", async () => {
     const { here, elsewhere, person, admin } = await aMemberOfTwoWorkspaces();
     const onlyHere = await app().person(undefined, "Sam Okoro");
     await app().addMember(here.workspaceId, onlyHere.id, "Viewer");
@@ -218,7 +218,7 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
     }
   });
 
-  it("lists the action's instant, taken from the api's clock", async () => {
+  it("lists the revocation time, which the api's clock sets", async () => {
     const { person, admin } = await aMemberOfTwoWorkspaces();
     const before = Date.now();
 
@@ -235,7 +235,7 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
     );
   });
 
-  it("revokes the only Admin's own credentials, ending their session", async () => {
+  it("lets the only Admin revoke themself, ending their session", async () => {
     const workspace = await app().provision();
     const { api } = await webSignedIn(app(), workspace.admin.email);
 
@@ -248,7 +248,7 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
   });
 });
 
-describe("a revoked Admin on the People procedures", () => {
+describe("a revoked Admin calling the People procedures", () => {
   it("refuses a revoked Admin's session on every People procedure", async () => {
     const workspace = await app().provision();
     const second = await app().person(undefined, "Ada Hartley");
@@ -280,7 +280,7 @@ describe("a revoked Admin on the People procedures", () => {
 
 describe("who may end a member's sign-ins and tokens", () => {
   it.each(["Editor", "Viewer"] as const)(
-    "refuses a member at %s, role-forbids, recording nothing",
+    "refuses %s members with role-forbids and records nothing",
     async (role) => {
       const workspace = await app().provision();
       const actor = await app().person();
@@ -296,7 +296,7 @@ describe("who may end a member's sign-ins and tokens", () => {
     },
   );
 
-  it("refuses an Admin of another workspace pointed at this one", async () => {
+  it("refuses another workspace's Admin whose session points at this one", async () => {
     const workspace = await app().provision();
     const api = await anAdminOfElsewherePointedAt(app(), workspace.workspaceId);
 
@@ -308,7 +308,7 @@ describe("who may end a member's sign-ins and tokens", () => {
     expect(await whatLanded(workspace.workspaceId, workspace.admin.id)).toEqual(NOTHING_LANDED);
   });
 
-  it("refuses a member of another workspace as no member here", async () => {
+  it("refuses another workspace's member with no-such-member", async () => {
     const mine = await app().provision();
     const theirs = await app().provision();
     const stranger = await app().person();
@@ -328,7 +328,7 @@ describe("who may end a member's sign-ins and tokens", () => {
 });
 
 describe("a revocation that fails partway", () => {
-  it("leaves instant and tokens when its audit row never lands", async () => {
+  it("changes nothing when its audit row fails to write", async () => {
     const { here, person, admin } = await aMemberOfTwoWorkspaces();
     await connectAsHost(app(), app().client(), person, { pick: here.workspaceId });
 

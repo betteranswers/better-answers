@@ -191,7 +191,7 @@ describe("the deploy tree", () => {
     });
   });
 
-  it("reports a compose image a digest does not pin", () => {
+  it("reports a compose image that no digest pins", () => {
     const work = mkdtempSync(path.join(tmpdir(), "compose-digests-"));
     onTestFinished(() => {
       rmSync(work, { recursive: true, force: true });
@@ -221,7 +221,7 @@ describe("the deploy tree", () => {
     ]);
   });
 
-  it("carries no `<read on the day>` placeholder in parsed fields", () => {
+  it("leaves no `<read on the day>` placeholder in parsed fields", () => {
     for (const file of [
       "deploy/backup.Dockerfile",
       "deploy/stores.compose.yaml",
@@ -282,7 +282,7 @@ describe("the deploy tree", () => {
     }
   });
 
-  it("keeps the drill's traps out of the production restore", () => {
+  it("keeps the drill's staging cleanup out of the production restore", () => {
     const script = read("deploy/restore-production.sh");
     expect(script).not.toMatch(/wipe_staging|trap .*EXIT|PROD_DATABASE_URL/);
     expect(script).not.toMatch(/rm -rf \/data/);
@@ -291,7 +291,7 @@ describe("the deploy tree", () => {
     expect(read(`${operationsDocuments}/RUNBOOK.md`)).toContain("restore-production.sh");
   });
 
-  it("pauses backups from the restore's first change until api answers", () => {
+  it("stops backups before the first change, restarting after the smoke", () => {
     const lines = liveLines("deploy/restore-production.sh").map((line) => line.trim());
     const stopped = linesMatching(lines, /^stores stop backup$/);
     const started = linesMatching(lines, /^stores start backup$/);
@@ -304,10 +304,10 @@ describe("the deploy tree", () => {
     });
     const [stop] = stopped;
     const [start] = started;
-    assert(stop !== undefined, "the restore stops backup");
-    assert(start !== undefined, "the restore starts backup");
-    assert(firstChange !== undefined, "the restore stops api");
-    assert(smoke !== undefined, "the restore runs the smoke");
+    assert(stop !== undefined, "restore-production.sh never runs `stores stop backup`");
+    assert(start !== undefined, "restore-production.sh never runs `stores start backup`");
+    assert(firstChange !== undefined, "restore-production.sh never runs `platform stop api`");
+    assert(smoke !== undefined, "restore-production.sh never runs `pnpm ops smoke`");
     expect({ beforeTheFirstChange: stop < firstChange }).toEqual({ beforeTheFirstChange: true });
     expect({ afterApiAnswers: start > smoke }).toEqual({ afterApiAnswers: true });
   });
@@ -336,7 +336,7 @@ describe("the deploy tree", () => {
     }
   });
 
-  it("runs the replay's one-shot on the service holding both stores", () => {
+  it("runs the one-shot replay on the service mounting both stores", () => {
     const services = composeServices(read("deploy/platform.compose.yaml"));
     const api = services.find((service) => service.name === "api");
     const migrate = services.find((service) => service.name === "migrate");
@@ -361,7 +361,7 @@ describe("the deploy tree", () => {
     const anchor = read("deploy/platform.compose.yaml")
       .split("x-bootstrap: &bootstrap")[1]
       ?.split("\nservices:")[0];
-    assert(anchor !== undefined, "platform.compose.yaml holds the x-bootstrap anchor");
+    assert(anchor !== undefined, "platform.compose.yaml has no x-bootstrap anchor");
     expect(anchor).toContain("S3_ENDPOINT: http://objectstore:3900");
     expect(anchor).toContain("S3_REGION: garage");
     expect(anchor).toContain("S3_BUCKET: ${S3_BUCKET:?");
@@ -370,10 +370,10 @@ describe("the deploy tree", () => {
     expect(read("deploy/garage.toml")).toContain('s3_region = "garage"');
   });
 
-  it("joins staging's projects on an internal network made first", () => {
+  it("joins staging's projects to an internal network created first", () => {
     const drill = read("deploy/restore-drill.sh");
     const projects = fencedIn(drill, "the staging projects");
-    assert(projects !== undefined, "the drill fences the staging projects");
+    assert(projects !== undefined, "restore-drill.sh has no `>>> the staging projects` fence");
 
     const work = mkdtempSync(path.join(tmpdir(), "staging-projects-"));
     onTestFinished(() => {
@@ -449,7 +449,7 @@ describe("the deploy tree", () => {
     const api = composeServices(read("deploy/platform.compose.yaml")).find(
       (service) => service.name === "api",
     );
-    assert(api !== undefined, "platform.compose.yaml runs an api service");
+    assert(api !== undefined, "platform.compose.yaml has no api service");
     const pinnedBy = /^ {4}image: ghcr\.io\/betteranswers\/api@\$\{(\w+):\?\}$/m.exec(
       api.body,
     )?.[1];
@@ -494,7 +494,7 @@ describe("the deploy tree", () => {
     const drill = read("deploy/restore-drill.sh");
 
     const guard = fencedIn(drill, "workspace id");
-    assert(guard !== undefined, "the drill fences the workspace id guard");
+    assert(guard !== undefined, "restore-drill.sh has no `>>> workspace id` fence");
     expect(drill.indexOf("# >>> workspace id")).toBeLessThan(drill.indexOf("## 0 wipe staging"));
     expect(guard).toContain(`[[ "\${DRILL_WORKSPACE}" =~ ${ULID_PATTERN} ]]`);
 
@@ -540,7 +540,7 @@ describe("the deploy tree", () => {
     expect(drill).toContain("seed-synthetic.sh");
   });
 
-  it("proves the rehearsal in its seven steps, in order", () => {
+  it("runs the rehearsal's seven steps in order", () => {
     const drill = read("deploy/restore-drill.sh");
     const at = (needle: string): number => positionOf(drill, needle);
     const steps = [
@@ -569,7 +569,7 @@ describe("the deploy tree", () => {
     const drill = read("deploy/restore-drill.sh");
 
     const guard = fencedIn(drill, "seed status");
-    assert(guard !== undefined, "the drill fences the seed status guard");
+    assert(guard !== undefined, "restore-drill.sh has no `>>> seed status` fence");
 
     const ran = (status: number): BashRun =>
       bashRan([
@@ -595,9 +595,9 @@ describe("the deploy tree", () => {
     });
   });
 
-  it("fails the drill when a command answers not built", () => {
+  it("fails the drill when a command exits as not built", () => {
     const commands = fencedIn(read("deploy/restore-drill.sh"), "the drill's commands");
-    assert(commands !== undefined, "the drill fences its commands");
+    assert(commands !== undefined, "restore-drill.sh has no `>>> the drill's commands` fence");
 
     const ran = (status: number): BashRun =>
       bashRan([
@@ -626,7 +626,7 @@ describe("the deploy tree", () => {
     });
   });
 
-  it("fails the counts when map-counts finds its tables absent", () => {
+  it("fails the counts when map-counts finds no map tables", () => {
     const ran = countsRan(
       "map-counts: not built — map_generation, map_node, map_edge absent from this schema",
       NOT_BUILT_EXIT,
@@ -646,7 +646,7 @@ describe("the deploy tree", () => {
     });
   });
 
-  it("records the counts, with no recorded run to compare", () => {
+  it("records the counts when no earlier run exists to compare", () => {
     expect(countsRan(STAGING_COUNTS, 0)).toEqual({
       code: 0,
       output:
@@ -655,11 +655,11 @@ describe("the deploy tree", () => {
     });
   });
 
-  it("fails the drill when no pre-erasure passage holds the subject", () => {
+  it("fails the drill when no pre-erasure passage contains the subject", () => {
     const drill = read("deploy/restore-drill.sh");
 
     const check = fencedIn(drill, "found before");
-    assert(check !== undefined, "the drill fences the found-before check");
+    assert(check !== undefined, "restore-drill.sh has no `>>> found before` fence");
 
     const ran = (grepped: readonly string[]): BashRun =>
       bashRan(
@@ -688,7 +688,7 @@ describe("the deploy tree", () => {
 
   it("restores the newest dump of any tier, with its globals", () => {
     const newest = fencedIn(read("deploy/restore-drill.sh"), "the newest dump");
-    assert(newest !== undefined, "the drill fences the newest dump");
+    assert(newest !== undefined, "restore-drill.sh has no `>>> the newest dump` fence");
 
     const listedAtTheDrillsHour: Readonly<Record<string, readonly string[]>> = {
       hourly: [
@@ -749,23 +749,23 @@ describe("the deploy tree", () => {
 
   const releaseJob = (name: string) => readWorkflow("release.yml", releaseJobsSchema).jobs[name];
 
-  it("waits out the pull, within the job's timeout", () => {
+  it("waits for the image pull within the promote job's timeout", () => {
     const script = read("deploy/await-release.sh");
     const polls = Number(/AWAIT_RELEASE_POLLS:-(\d+)/.exec(script)?.[1]);
     const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);
 
     expect(
       (polls - 1) * delaySeconds,
-      "twice the three minutes a fresh image took to pull and start; no sleep follows the last poll",
+      "await-release.sh polls for less than 360 seconds. A fresh image took three minutes to pull and start, so poll for at least twice that. No sleep follows the last poll.",
     ).toBeGreaterThanOrEqual(360);
     const promote = releaseJob("promote");
-    assert(promote !== undefined, "release.yml has a promote job");
+    assert(promote !== undefined, "release.yml has no promote job");
     expect(awaitSeconds(polls)).toBeLessThan(promote["timeout-minutes"] * 60);
   });
 
-  it("re-reads health briefly before the record, within its timeout", () => {
+  it("polls health three times before recording, within the timeout", () => {
     const job = releaseJob("record");
-    assert(job !== undefined, "release.yml has a record job");
+    assert(job !== undefined, "release.yml has no record job");
     const polls = Number(
       job.steps.find((step) => step.run?.includes("deploy/await-release.sh"))?.env?.[
         "AWAIT_RELEASE_POLLS"
@@ -774,7 +774,7 @@ describe("the deploy tree", () => {
 
     expect(
       { polls, fits: awaitSeconds(polls) < job["timeout-minutes"] * 60 },
-      "production answered on this digest at the smoke, so a few polls ride out a blip",
+      "the record job must set AWAIT_RELEASE_POLLS to 3 and finish within its timeout. Production already passed the smoke on this digest, so 3 polls are enough to cover a brief failure.",
     ).toEqual({ polls: 3, fits: true });
   });
 
@@ -802,7 +802,7 @@ describe("the deploy tree", () => {
     expect(releases).toContain("Access debt recorded 04/09/2026");
     expect(
       releases,
-      "an on-box promotion records its home as the same tag, pushed by hand",
+      'RELEASES.md no longer shows `git push origin "refs/tags/${tag}"`. An on-box promotion records itself as a release tag that the owner pushes by hand.',
     ).toContain('git push origin "refs/tags/${tag}"');
 
     const rows = releases.split("\n").filter((line) => /^\| 20\d\d-/.test(line));
@@ -814,7 +814,7 @@ describe("the deploy tree", () => {
     expect(runbook).toContain("the `release/*` tag rolled back to");
   });
 
-  it("promotes main's head image, and refuses by name without one", () => {
+  it("promotes the head's image and refuses a head without one", () => {
     const release = read(".github/workflows/release.yml");
     const build = read(".github/workflows/build.yml");
 
@@ -825,7 +825,7 @@ describe("the deploy tree", () => {
 
     const cutTo = /DOCKER_METADATA_SHORT_SHA_LENGTH: "(\d+)"/.exec(build)?.[1];
     expect(cutTo).toEqual("7");
-    assert(cutTo !== undefined, "build.yml sets the short sha length");
+    assert(cutTo !== undefined, "build.yml does not set DOCKER_METADATA_SHORT_SHA_LENGTH");
     expect(release).toContain(`tag="sha-\${head:0:${cutTo}}"`);
     expect(release).toContain('"ghcr.io/${OWNER}/$1:${tag}"');
     expect(release).not.toMatch(/ghcr\.io\/\$\{OWNER\}\/[^"\s]*:main\b/);
@@ -839,7 +839,7 @@ describe("the deploy tree", () => {
     const pinned = /"pgvector\/pgvector:([^@"]+)@sha256:[0-9a-f]{64}"/.exec(
       read(POSTGRES_PIN),
     )?.[1];
-    assert(pinned !== undefined, "the Postgres pin names a pgvector tag and digest");
+    assert(pinned !== undefined, "the Postgres pin has no pgvector tag and digest");
 
     expect({
       pinned: groupsOf(pinned),
@@ -856,7 +856,7 @@ describe("the deploy tree", () => {
 
   it("matches the pin's image, tag and digest for Renovate", () => {
     const pinned = /"([^"]+)"/.exec(read(POSTGRES_PIN))?.[1];
-    assert(pinned !== undefined, "the Postgres pin is a quoted image");
+    assert(pinned !== undefined, "the Postgres pin is not a quoted image");
 
     expect(postgresPinAsRenovateReadsIt()).toEqual({
       depName: pinned.split(":")[0],
@@ -869,7 +869,7 @@ describe("the deploy tree", () => {
     const renovate = renovateSchema.parse(JSON.parse(read("renovate.json")));
     const manager = renovate.customManagers.find((candidate) => candidate.customType === "regex");
 
-    assert(manager !== undefined, "renovate.json has a regex manager");
+    assert(manager !== undefined, "renovate.json has no regex manager");
     const patterns = manager.managerFilePatterns;
     expect(patterns.filter((pattern) => !/^\/.+\/$/.test(pattern))).toEqual([]);
     const selects = patterns.map((pattern) => new RegExp(pattern.slice(1, -1)));

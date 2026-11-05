@@ -63,8 +63,8 @@ const CONTENDED_WORKSPACE = {
   concurrency: 1,
 };
 `,
-  // Pinned so the failing file runs first: a cancel saves only the files after it, so an earlier
-  // slow sibling still times out.
+  // The failing file runs first because a cancel stops only the files after it.
+  // A slow file before it would still time out.
   "vitest.config.mjs": `export default {
   test: {
     sequence: {
@@ -188,8 +188,8 @@ const mutantsOfStrykerOver = (files: Readonly<Record<string, string>>): readonly
     );
     return Object.values(parsed.files).flatMap((file) => file.mutants);
   } finally {
-    // A forked stryker worker outliving the CLI leaves an entry here, and rmSync retries
-    // ENOTEMPTY only when given both maxRetries and retryDelay.
+    // A forked Stryker worker that outlives the CLI can still write here.
+    // rmSync retries ENOTEMPTY only when given both maxRetries and retryDelay.
     rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 };
@@ -208,14 +208,14 @@ const rowAt = (
   );
   if (found === undefined) {
     throw new Error(
-      `no ${mutatorName} → ${replacement} mutant on line ${String(line)}; the report holds:\n${rows.map((row) => `${String(row.location.start.line)} ${row.mutatorName} ${row.replacement ?? ""} ${row.status}`).join("\n")}`,
+      `the report has no ${mutatorName} → ${replacement} mutant on line ${String(line)}. It has:\n${rows.map((row) => `${String(row.location.start.line)} ${row.mutatorName} ${row.replacement ?? ""} ${row.status}`).join("\n")}`,
     );
   }
   return found;
 };
 
 describe("the vitest runner's patch over a throwaway workspace", () => {
-  it("kills load-time and nested-only mutants, and keeps a survivor", () => {
+  it("kills load-time and nested-only mutants, and reports a survivor", () => {
     const rows = mutantsOfStrykerOver({
       "stryker.config.mjs": STRYKER_CONFIG,
       "src/family.ts": SOURCE,
@@ -241,14 +241,14 @@ describe("the vitest runner's patch over a throwaway workspace", () => {
 
     expect(
       rowAt(rows, 10, "BlockStatement", "{}"),
-      "reached only while a test runs, so its run is filtered to that test",
+      "the line 10 mutant was not killed by exactly one test. Code reached only while a test runs must be filtered to that test.",
     ).toMatchObject({
       status: "Killed",
       testsCompleted: 1,
     });
   });
 
-  it("kills at once a mutant whose file or hook fails", () => {
+  it("kills a mutant immediately when its file or hook fails", () => {
     const rows = mutantsOfStrykerOver(CONTENDED_WORKSPACE);
     const importFails = rowAt(rows, 8, "StringLiteral", '""');
     const beforeAllThrows = rowAt(rows, 1, "StringLiteral", '""');

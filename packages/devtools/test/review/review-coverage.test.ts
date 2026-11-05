@@ -121,7 +121,7 @@ describe("what counts as a review", () => {
     const pullRequest = parsePullRequest(fixture("pr-783-merge-head-view.json"));
     const runs = parseCheckRuns(fixture("pr-783-merge-head-check-runs.json"));
 
-    it("is not a review, and Cubic is asked", () => {
+    it("counts no review, so the next step asks Cubic", () => {
       const result = assess("783", pullRequest, runs, NOW);
 
       expect(result.exitCode).toBe(1);
@@ -131,7 +131,7 @@ describe("what counts as a review", () => {
       expect(nextOf(result.report)).toBe(askCubic("783"));
     });
 
-    it("adds the label once Cubic's reply names its limit", () => {
+    it("adds the label once Cubic replies naming its limit", () => {
       const answered = {
         ...pullRequest,
         comments: [
@@ -161,7 +161,7 @@ describe("the next step", () => {
     );
   });
 
-  it("waits on a scanner only until an AI review", () => {
+  it("waits for a scanner only when no AI review exists", () => {
     const scanning = run("CodeQL", null, "", ago(5), "in_progress");
     const reviewed = assessed("7", [REVIEWED, scanning]);
     const unreviewed = assessed("7", [NOT_STARTED, scanning]);
@@ -192,7 +192,7 @@ describe("the next step", () => {
     );
   });
 
-  it("adds the label when Cubic answers with its limit", () => {
+  it("adds the label when Cubic replies naming its limit", () => {
     const result = assessed("5", [NOT_STARTED, SKIPPED], {
       comments: [comment(ASK, 3), comment(LIMIT_REPLY, 3, "cubic-dev-ai")],
     });
@@ -229,7 +229,7 @@ describe("the next step", () => {
     expect(nextOf(result.report)).toBe(addLabel("5"));
   });
 
-  it("ends the options once the label is on", () => {
+  it("offers no next step once the label is on", () => {
     const result = assessed("5", [NOT_STARTED, SKIPPED], {
       labels: labelled,
       reviews: CUBIC_REVIEWED_BEFORE,
@@ -251,7 +251,7 @@ describe("the next step", () => {
     expect(nextOf(edge.report)).toBe(addLabel("5"));
   });
 
-  it("asks Cubic when it has had no turn", () => {
+  it("asks Cubic when it has not run on this head", () => {
     const labelledNever = assessed("5", [NOT_STARTED, SKIPPED], { labels: labelled });
     const noCubicRun = assessed("5", [SKIPPED]);
 

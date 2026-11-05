@@ -5,11 +5,11 @@ import { appForSuite } from "../support/suite-app.ts";
 
 const app = appForSuite();
 
-describe("the update-user endpoint, to a person who is signed in", () => {
+describe("the update-user endpoint for a signed-in person", () => {
   it.each([
     ["set", "Mallory <mallory@acme.invalid>"],
     ["blank", ""],
-  ])("refuses to %s their display name, leaving it unchanged", async (_action, name) => {
+  ])("answers 404 when asked to %s the display name", async (_action, name) => {
     const person = await app().person(undefined, "Priya Shah");
     const client = await signedInClient(app(), person.email);
     expect((await client.fetch("/get-session")).status).toBe(200);
@@ -21,8 +21,8 @@ describe("the update-user endpoint, to a person who is signed in", () => {
   });
 });
 
-describe("a first sign-in that carries a name of its own", () => {
-  it("stores no name, so only the display-name action sets one", async () => {
+describe("a first sign-in that sends a name", () => {
+  it("stores an empty name instead of the one sent", async () => {
     const client = app().client();
     const email = `first-${Date.now()}@acme.invalid`;
     await client.json("/email-otp/send-verification-otp", { email, type: "sign-in" });

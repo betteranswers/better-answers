@@ -41,8 +41,8 @@ type PathsAnsweringAResult<Leaves> = [ResultAnswering<Leaves>] extends [never]
   ? "none"
   : ResultAnswering<Leaves>["path"];
 
-describe("what a procedure may answer the wire", () => {
-  it("reaches every router procedure by the path its caller names", () => {
+describe("the outputs of router procedures", () => {
+  it("lists every router procedure by its call path", () => {
     expect(Object.keys(appRouter._def.procedures).sort()).toEqual([
       "ask.giveFeedback",
       "ask.question",
@@ -235,16 +235,16 @@ describe("what a procedure may answer the wire", () => {
     >();
   });
 
-  it("names the mark only in the guard", () => {
+  it("mentions the test workspace mark only in testing-domain.ts", () => {
     expect(filesMatching(API_SOURCE, NAMES_THE_MARK)).toEqual([]);
     expect(filesMatching(CORE_SOURCE, NAMES_THE_MARK)).toEqual(NAMING_THE_MARK_IN_CORE);
   });
 
-  it("answers no Result, which would cross a refusal as success", () => {
+  it("returns no Result from any procedure, so refusals stay errors", () => {
     expectTypeOf<PathsAnsweringAResult<EveryProcedure>>().toEqualTypeOf<"none">();
   });
 
-  it("names the procedure that answered one, by its path", () => {
+  it("reports the path of a procedure that returns a Result", () => {
     expectTypeOf<
       PathsAnsweringAResult<Leaf<"sources.narrow", Result<string, "no-such-binding">>>
     >().toEqualTypeOf<"sources.narrow">();

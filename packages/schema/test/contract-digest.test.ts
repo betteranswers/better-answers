@@ -14,7 +14,7 @@ import {
 import { CONTRACT_DIGEST } from "../src/contract-stamp.ts";
 
 describe("the api tier's contract digest", () => {
-  it("is byte-identical to a regeneration, so hand edits fail", () => {
+  it("matches its regeneration byte for byte, so hand edits fail", () => {
     expect(readFileSync(CONTRACT_STAMP_MODULE, "utf8")).toBe(
       renderContractStamp(contractDigest(CONTRACTS_ROOT)),
     );
@@ -26,7 +26,7 @@ describe("the api tier's contract digest", () => {
     );
   });
 
-  it("is the whole hash the stamp column is narrowed to", () => {
+  it("is a 64-character hex hash the stamp column accepts", () => {
     expect(CONTRACT_DIGEST).toMatch(/^[0-9a-f]{64}$/);
     expect(CONTRACT_DIGEST_PATTERN.test(CONTRACT_DIGEST)).toBe(true);
   });
@@ -46,7 +46,7 @@ const digestOf = (files: Readonly<Record<string, string>>): string => {
 };
 
 describe("what the contract digest reads", () => {
-  it("leaves a prose fix to the top-level README out", () => {
+  it("ignores an edit to the top-level README", () => {
     const before = digestOf({ "README.md": "teh cases", "concept-file/cases.json": "[]" });
     expect(digestOf({ "README.md": "the cases", "concept-file/cases.json": "[]" })).toBe(before);
     expect(digestOf({ "README.md": "teh cases", "concept-file/cases.json": "[1]" })).not.toBe(
@@ -54,11 +54,11 @@ describe("what the contract digest reads", () => {
     );
   });
 
-  it.each(["1b\n2", "1b\n\n2"])("never lets content %j pose as a second file", (forged) => {
+  it.each(["1b\n2", "1b\n\n2"])("digests content %j apart from two separate files", (forged) => {
     expect(digestOf({ a: forged })).not.toBe(digestOf({ a: "1", b: "2" }));
   });
 
-  it("digests a CRLF file apart from its LF twin", () => {
+  it("gives CRLF and LF line endings different digests", () => {
     expect(digestOf({ "a.json": "{\r\n}\r\n" })).not.toBe(digestOf({ "a.json": "{\n}\n" }));
   });
 });

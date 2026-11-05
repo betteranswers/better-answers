@@ -46,7 +46,7 @@ type Canned = {
   failWith?: Error;
 };
 
-const inboundOf = (response: Canned) => {
+const responseStreamOf = (response: Canned) => {
   const stream = new Readable({ read() {} });
   stream.push(Buffer.from(response.body ?? ""));
   if (response.holdOpen !== true) stream.push(null);
@@ -57,8 +57,8 @@ const inboundOf = (response: Canned) => {
   });
 };
 
-/** Like Node's `request`, it sends nothing until `end`. */
-const observedAnswering = (
+/** Like Node's `request`, the fake sends nothing until `end` is called. */
+const recordingRequest = (
   response: Canned,
 ): { readonly request: HttpsRequest; readonly observed: Observed } => {
   const observed: Observed = {
@@ -90,7 +90,7 @@ const observedAnswering = (
             outbound.emit("error", response.failWith);
             return;
           }
-          const inbound = inboundOf(response);
+          const inbound = responseStreamOf(response);
           observed.response = inbound;
           callback(inbound);
         });
@@ -102,9 +102,9 @@ const observedAnswering = (
   return { request: answer, observed };
 };
 
-const answering = (response: Canned): HttpsRequest => observedAnswering(response).request;
+const answering = (response: Canned): HttpsRequest => recordingRequest(response).request;
 
-const heldLookups = (): { readonly lookup: Lookup; readonly settleOne: () => void } => {
+const pausedLookups = (): { readonly lookup: Lookup; readonly settleOne: () => void } => {
   const held: Array<() => void> = [];
   return {
     lookup: () =>
@@ -117,9 +117,9 @@ const heldLookups = (): { readonly lookup: Lookup; readonly settleOne: () => voi
 
 const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
-describe("the transport's lookup answer", () => {
-  it("answers an all-addresses lookup with an array, else one address", async () => {
-    const { request, observed } = observedAnswering({ status: 200, body: "{}" });
+describe("the request the metadata fetcher sends", () => {
+  it("answers an all-addresses lookup with every address, otherwise one", async () => {
+    const { request, observed } = recordingRequest({ status: 200, body: "{}" });
     const fetcher = createClientMetadataFetcher({ lookup: resolvesTo(publicAnswer), request });
 
     const response = await fetcher("https://claude.ai/oauth/mcp-oauth-client-metadata");
@@ -131,8 +131,8 @@ describe("the transport's lookup answer", () => {
     ]);
   });
 
-  it("pins the address, keeping the hostname for Host and SNI", async () => {
-    const { request, observed } = observedAnswering({ status: 200, body: "{}" });
+  it("uses the hostname for Host and SNI, without an agent", async () => {
+    const { request, observed } = recordingRequest({ status: 200, body: "{}" });
     const fetcher = createClientMetadataFetcher({ lookup: resolvesTo(publicAnswer), request });
 
     await fetcher("https://claude.ai/oauth/mcp-oauth-client-metadata");
@@ -146,7 +146,7 @@ describe("the transport's lookup answer", () => {
     ["an IPv4", "https://104.18.32.47/doc"],
     ["a bracketed IPv6", "https://[2606:4700::6812:202f]/doc"],
   ])("sends no SNI for %s literal", async (_kind, url) => {
-    const { request, observed } = observedAnswering({ status: 200, body: "{}" });
+    const { request, observed } = recordingRequest({ status: 200, body: "{}" });
     const fetcher = createClientMetadataFetcher({ lookup: resolvesTo(publicAnswer), request });
 
     await fetcher(url);
@@ -154,8 +154,8 @@ describe("the transport's lookup answer", () => {
     expect(observed.servername).toBeUndefined();
   });
 
-  it("hands the caller's signal to the request", async () => {
-    const { request, observed } = observedAnswering({ status: 200, body: "{}" });
+  it("passes the caller's abort signal to the request", async () => {
+    const { request, observed } = recordingRequest({ status: 200, body: "{}" });
     const fetcher = createClientMetadataFetcher({ lookup: resolvesTo(publicAnswer), request });
     const caller = new AbortController();
 
@@ -165,7 +165,7 @@ describe("the transport's lookup answer", () => {
   });
 });
 
-describe("the transport's reply", () => {
+describe("the response the metadata fetcher returns", () => {
   it("reads the status text and body of a GET", async () => {
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo(publicAnswer),
@@ -179,10 +179,10 @@ describe("the transport's reply", () => {
   });
 
   it.each([
-    ["a HEAD", "HEAD", 200],
-    ["a 204", "GET", 204],
-    ["a 304", "GET", 304],
-  ])("carries no body for %s", async (_case, method, status) => {
+    ["a HEAD request", "HEAD", 200],
+    ["a 204 response", "GET", 204],
+    ["a 304 response", "GET", 304],
+  ])("returns no body for %s", async (_case, method, status) => {
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo(publicAnswer),
       request: answering({ status, body: "ignored" }),
@@ -194,7 +194,7 @@ describe("the transport's reply", () => {
     expect(response.body).toBeNull();
   });
 
-  it("keeps every value of a repeated header, skipping absent ones", async () => {
+  it("keeps each repeated header value and drops undefined headers", async () => {
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo(publicAnswer),
       request: answering({
@@ -210,7 +210,7 @@ describe("the transport's reply", () => {
     expect(response.headers.get("cache-control")).toBe("max-age=60");
   });
 
-  it("rejects with the request's own error", async () => {
+  it("rejects with the error the request emitted", async () => {
     const failure = new Error("connect ECONNREFUSED");
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo(publicAnswer),
@@ -222,7 +222,7 @@ describe("the transport's reply", () => {
 });
 
 describe("the SSRF policy", () => {
-  it("refuses anything but https", async () => {
+  it("rejects a URL that is not HTTPS", async () => {
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo(publicAnswer),
       request: answering({ status: 200 }),
@@ -232,7 +232,7 @@ describe("the SSRF policy", () => {
     );
   });
 
-  it("refuses any method but GET and HEAD", async () => {
+  it("rejects any method other than GET and HEAD", async () => {
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo(publicAnswer),
       request: answering({ status: 200 }),
@@ -250,8 +250,8 @@ describe("the SSRF policy", () => {
     ["a CGNAT (shared space)", "100.64.0.1", 4],
     ["an IPv6 loopback", "::1", 6],
     ["an IPv6 unique local", "fd00::1", 6],
-  ] as const)("refuses %s answer (%s), sending nothing", async (_class, address, family) => {
-    const { request, observed } = observedAnswering({ status: 200 });
+  ] as const)("rejects %s address (%s) before any request", async (_class, address, family) => {
+    const { request, observed } = recordingRequest({ status: 200 });
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo({ address, family }),
       request,
@@ -261,8 +261,8 @@ describe("the SSRF policy", () => {
     expect(observed.requests).toBe(0);
   });
 
-  it("refuses a private answer behind a public first one", async () => {
-    const { request, observed } = observedAnswering({ status: 200 });
+  it("rejects a private address listed after a public one", async () => {
+    const { request, observed } = recordingRequest({ status: 200 });
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo(publicAnswer, { address: "10.0.0.5", family: 4 }),
       request,
@@ -272,7 +272,7 @@ describe("the SSRF policy", () => {
     expect(observed.requests).toBe(0);
   });
 
-  it("refuses a hostname with no answers", async () => {
+  it("rejects a hostname with no DNS addresses", async () => {
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo(),
       request: answering({ status: 200 }),
@@ -280,7 +280,7 @@ describe("the SSRF policy", () => {
     await expect(fetcher("https://nowhere.example/doc")).rejects.toThrow("no DNS addresses");
   });
 
-  it("returns a redirect unfollowed, never fetching a private location", async () => {
+  it("returns a redirect to a private address without following it", async () => {
     let lookups = 0;
     const fetcher = createClientMetadataFetcher({
       lookup: async () => {
@@ -301,14 +301,14 @@ describe("the SSRF policy", () => {
   });
 });
 
-describe("the lift's guards", () => {
+describe("the fetcher's safeguards", () => {
   const native = {
     Request: Object.getOwnPropertyDescriptor(globalThis, "Request"),
     Response: Object.getOwnPropertyDescriptor(globalThis, "Response"),
   };
 
   describe.each([
-    ["Node's own global Response", () => {}],
+    ["Node's built-in global Response", () => {}],
     [
       "the global Response that @hono/node-server's serve() installs",
       () => void getRequestListener(() => new Response()),
@@ -323,9 +323,9 @@ describe("the lift's guards", () => {
     });
 
     it.each([600, 999])(
-      "refuses status %i as a transport error, staying up",
+      "rejects status %i as a TypeError and destroys the response",
       async (status) => {
-        const { request, observed } = observedAnswering({ status, body: "{}", holdOpen: true });
+        const { request, observed } = recordingRequest({ status, body: "{}", holdOpen: true });
         const fetcher = createClientMetadataFetcher({ lookup: resolvesTo(publicAnswer), request });
 
         const refused = fetcher("https://claude.ai/doc");
@@ -340,8 +340,8 @@ describe("the lift's guards", () => {
     );
   });
 
-  it("abandons a silent lookup when the signal aborts, sending nothing", async () => {
-    const { request, observed } = observedAnswering({ status: 200 });
+  it("times out a hung lookup and sends no request", async () => {
+    const { request, observed } = recordingRequest({ status: 200 });
     const fetcher = createClientMetadataFetcher({ lookup: () => new Promise(() => {}), request });
 
     await expect(
@@ -350,7 +350,7 @@ describe("the lift's guards", () => {
     expect(observed.requests).toBe(0);
   }, 2_000);
 
-  it("refuses a lookup when the signal has already aborted", async () => {
+  it("skips the lookup when the signal has already aborted", async () => {
     let lookups = 0;
     const fetcher = createClientMetadataFetcher({
       lookup: async () => {
@@ -366,8 +366,8 @@ describe("the lift's guards", () => {
     expect(lookups).toBe(0);
   });
 
-  it("counts an abandoned lookup against the bound until it settles", async () => {
-    const { lookup, settleOne } = heldLookups();
+  it("counts an aborted lookup toward the 32-lookup limit until resolved", async () => {
+    const { lookup, settleOne } = pausedLookups();
     let lookups = 0;
     const fetcher = createClientMetadataFetcher({
       lookup: (hostname) => {

@@ -114,19 +114,19 @@ const seedingInOneDocument = <T>(
   });
 
 describe("the finding factory's default category", () => {
-  it("is one of the redaction agreement's own declared categories", async () => {
+  it("is a category the redaction agreement declares", async () => {
     const seeded = await withRollback(db.pool, (client) => testData(client).finding());
 
     expect(DECLARED_CATEGORIES.has(seeded.category)).toBe(true);
   });
 
-  it("is not a word the fixture has never declared", () => {
+  it("does not include sort-code, the planted undeclared word", () => {
     expect(DECLARED_CATEGORIES.has("sort-code")).toBe(false);
   });
 });
 
 describe("the finding factory's default span", () => {
-  it("starts each document's spans at nought, whatever was seeded before", async () => {
+  it("starts at zero in each document, whatever was seeded before", async () => {
     const spans = await withRollback(db.pool, async (client) => {
       const seed = testData(client);
       const first = await seed.finding();
@@ -145,7 +145,7 @@ describe("the finding factory's default span", () => {
     ]);
   });
 
-  it("lands two defaults seeded at once on separate spans", async () => {
+  it("gives two defaults seeded at once separate spans", async () => {
     const spans = await seedingInOneDocument(async (seed, inDocument) => {
       const both = await Promise.all([seed.finding(inDocument), seed.finding(inDocument)]);
       return both.map((row) => [row.charStart, row.charEnd]);
@@ -167,7 +167,7 @@ describe("the finding factory's default span", () => {
     expect(spans).toEqual([0, 8]);
   });
 
-  it("lands past every span its document already holds", async () => {
+  it("starts after the last span its document already holds", async () => {
     const spans = await withRollback(db.pool, async (client) => {
       const seed = testData(client);
       const byHand = await seed.finding({ charStart: 8, charEnd: 16 });
@@ -185,15 +185,15 @@ describe("the finding factory's default span", () => {
   });
 });
 
-describe("the category words this package's tests spell by hand", () => {
-  it("names only declared categories, in every file of the tree", () => {
+describe("category words written by hand in this package's tests", () => {
+  it("are all declared, in every file of the test tree", () => {
     const written = categoryWordsInTheTestTree();
 
     expect(written.length).toBeGreaterThanOrEqual(CATEGORY_WORDS_IN_THE_TREE);
     expect(undeclared(written)).toEqual([]);
   });
 
-  it("names an undeclared word written either way", () => {
+  it("reports an undeclared word in object and SQL form", () => {
     const planted = categoryWordsIn(plantedCategoryWords(), "planted.ts");
 
     expect(undeclared(planted)).toEqual([

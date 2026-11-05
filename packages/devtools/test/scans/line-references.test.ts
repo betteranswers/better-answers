@@ -5,7 +5,7 @@ import { lineReferencesIn } from "@better-answers/devtools/line-references";
 const textsIn = (text: string): readonly string[] =>
   lineReferencesIn(text).map((reference) => reference.text);
 
-describe("the line references a doc may not hold", () => {
+describe("the line references a doc must not contain", () => {
   it.each([
     { shape: "a file name and a line", text: "see `x.ts:12`", found: ["x.ts:12"] },
     {

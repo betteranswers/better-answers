@@ -8,7 +8,7 @@ const RULE = "eslint-js/no-restricted-syntax";
 
 const setting = readOxlintConfig().rules[RULE];
 if (setting === undefined) {
-  throw new Error(`.oxlintrc.json's base rules block no longer switches ${RULE} on.`);
+  throw new Error(`.oxlintrc.json's base rules no longer turn on ${RULE}.`);
 }
 
 const FILE = "src/probe.ts";
@@ -84,7 +84,7 @@ describe("the syntax the lint refuses, with what to write instead", () => {
     ["`\\v` with no flag", holding("  return /[\\v]/.test(key);")],
     ["`\\s` under the `u` flag", holding("  return /[\\s]/u.test(key);")],
     ["`\\\\v` under the `u` flag", holding("  return /\\\\v/u.test(key);")],
-  ])("stays silent on %s", (_shape, tree) => {
+  ])("accepts %s", (_shape, tree) => {
     expect(lint.flagged(tree)).toEqual([]);
   });
 });

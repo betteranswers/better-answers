@@ -128,8 +128,8 @@ const oneGroupOnePerson = async (
   return { workspace, person, groupId };
 };
 
-describe("making a group", () => {
-  it("gives an Admin a listed group and writes the action", async () => {
+describe("creating a group", () => {
+  it("creates a group the Admin can list, recording the action", async () => {
     const workspace = await provisioned("Acme");
 
     const groupId = await madeGroup(workspace, "HR team");
@@ -150,7 +150,7 @@ describe("making a group", () => {
     ]);
   });
 
-  it("refuses a taken name, adding neither group nor audit event", async () => {
+  it("refuses a taken name, writing no group or audit event", async () => {
     const workspace = await provisioned("Beta");
     await madeGroup(workspace, "HR team");
 
@@ -163,7 +163,7 @@ describe("making a group", () => {
     expect(await peopleActions(workspace.workspaceId)).toHaveLength(1);
   });
 
-  it("refuses a name blank once trimmed, writing no row", async () => {
+  it("refuses a name that is blank after trimming", async () => {
     const workspace = await provisioned("Gamma");
 
     const made = await asAdmin(workspace, (principal, tx) =>
@@ -191,7 +191,7 @@ describe("renaming a group", () => {
     });
   });
 
-  it("refuses a name another group holds, and renames nothing", async () => {
+  it("refuses another group's name and renames nothing", async () => {
     const workspace = await provisioned("Epsilon");
     const groupId = await madeGroup(workspace, "HR team");
     await madeGroup(workspace, "Sales executives");
@@ -206,7 +206,7 @@ describe("renaming a group", () => {
     expect(listed.value.map((group) => group.name)).toEqual(["HR team", "Sales executives"]);
   });
 
-  it("refuses a group id nobody holds", async () => {
+  it("refuses an unknown group id", async () => {
     const workspace = await provisioned("Zeta");
 
     const renamed = await asAdmin(workspace, (principal, tx) =>
@@ -218,7 +218,7 @@ describe("renaming a group", () => {
 });
 
 describe("deleting a group", () => {
-  it("takes its members with it and writes the action", async () => {
+  it("removes its memberships too and records the action", async () => {
     const { workspace, groupId } = await oneGroupOnePerson("Eta", "Editor");
 
     const deleted = await asAdmin(workspace, (principal, tx) =>
@@ -238,7 +238,7 @@ describe("deleting a group", () => {
     ]);
   });
 
-  it("refuses a group id nobody holds, and deletes nothing", async () => {
+  it("refuses an unknown group id and deletes nothing", async () => {
     const workspace = await provisioned("Theta");
     await madeGroup(workspace, "HR team");
 
@@ -251,8 +251,8 @@ describe("deleting a group", () => {
   });
 });
 
-describe("who is in a group", () => {
-  it("puts one person in several groups, each action naming both", async () => {
+describe("group membership", () => {
+  it("adds one person to several groups, recording each addition", async () => {
     const workspace = await provisioned("Iota");
     const person = await seedMemberAt(workspace, "Viewer");
     const hr = await madeGroup(workspace, "HR team");
@@ -283,7 +283,7 @@ describe("who is in a group", () => {
     ]);
   });
 
-  it("refuses a person outside the workspace, and adds nobody", async () => {
+  it("refuses a person outside the workspace and adds nobody", async () => {
     const workspace = await provisioned("Kappa");
     const groupId = await madeGroup(workspace, "HR team");
     const stranger = await seedPerson(db().pool);
@@ -297,7 +297,7 @@ describe("who is in a group", () => {
     expect(groupMembers.rowCount).toBe(0);
   });
 
-  it("refuses a repeat add, so the audit log records one", async () => {
+  it("refuses a second add, so the audit log records one", async () => {
     const { workspace, person, groupId } = await oneGroupOnePerson("Lambda");
 
     const again = await putInGroup(workspace, groupId, person);
@@ -310,7 +310,7 @@ describe("who is in a group", () => {
     ).toHaveLength(1);
   });
 
-  it("takes a person out, and refuses a second removal", async () => {
+  it("removes a person and refuses a second removal", async () => {
     const { workspace, person, groupId } = await oneGroupOnePerson("Mu");
 
     const removed = await asAdmin(workspace, (principal, tx) =>
@@ -329,7 +329,7 @@ describe("who is in a group", () => {
     ]);
   });
 
-  it("refuses removal from a group id nobody holds", async () => {
+  it("refuses removal from an unknown group id", async () => {
     const workspace = await provisioned("Nu");
     const person = await seedMemberAt(workspace, "Viewer");
 
@@ -476,8 +476,8 @@ const whileTheTableIsGone = async <T>(table: string, work: () => Promise<T>): Pr
   }
 };
 
-describe("what a group action refuses before it reads anything", () => {
-  it("refuses a malformed group id to every verb naming one", async () => {
+describe("what group actions refuse before reading anything", () => {
+  it("refuses a malformed group id in every action taking one", async () => {
     const workspace = await provisioned("Shapeless");
     const person = await seedMemberAt(workspace, "Viewer");
     const verbs = namingAGroup(everyVerb("' OR true --", person));
@@ -489,7 +489,7 @@ describe("what a group action refuses before it reads anything", () => {
     expect(await groupRowCount(workspace.workspaceId)).toBe(0);
   });
 
-  it("refuses a malformed person id to both verbs naming one", async () => {
+  it("refuses a malformed person id in both actions taking one", async () => {
     const { workspace, groupId } = await oneGroupOnePerson("Nameless");
     const verbs = namingAPerson(everyVerb(groupId, "' OR true --"));
     const { run, outcomes } = eachVerb(workspace, verbs);
@@ -515,7 +515,7 @@ describe("what a group action refuses before it reads anything", () => {
 });
 
 describe("an action whose statement the store refuses", () => {
-  it("hands back the store's failure from every verb, writing nothing", async () => {
+  it("returns the store's error from every action and writes nothing", async () => {
     const { workspace, person, groupId } = await oneGroupOnePerson("Failing");
     const verbs = everyVerb(groupId, person);
     const { run, outcomes } = eachVerb(workspace, verbs, abortTheTransaction);
@@ -530,7 +530,7 @@ describe("an action whose statement the store refuses", () => {
     ]);
   });
 
-  it("answers the store's failure, not a member it never wrote", async () => {
+  it("returns the store's error, not a member it never added", async () => {
     const workspace = await provisioned("Unwritten");
     const person = await seedMemberAt(workspace, "Viewer");
     const groupId = await madeGroup(workspace, "HR team");
@@ -551,7 +551,7 @@ describe("an action whose statement the store refuses", () => {
     });
   });
 
-  it("answers the store's failure, not a refusal word", async () => {
+  it("returns the store's error, not a refusal word", async () => {
     const { workspace, person } = await oneGroupOnePerson("Wordless");
     let removed: unknown;
 
@@ -567,9 +567,9 @@ describe("an action whose statement the store refuses", () => {
   });
 });
 
-describe("a role that may not shape who sees what", () => {
+describe("a role that may not manage groups", () => {
   it.each(["Editor", "Viewer"] as const)(
-    "refuses a %s the held-groups check, but answers the Admin",
+    "refuses the held-groups check to %s but not to Admins",
     async (role) => {
       const { workspace, person, groupId } = await oneGroupOnePerson(`Asking${role}`, role);
       const asked = boundarySchemas.group.select.shape.id.parse(groupId);
@@ -587,7 +587,7 @@ describe("a role that may not shape who sees what", () => {
   );
 
   it.each(["Editor", "Viewer"] as const)(
-    "refuses every verb to a %s inside the group",
+    "refuses every action to a %s in the group",
     async (role) => {
       const { workspace, person, groupId } = await oneGroupOnePerson(`Refused${role}`, role);
 
@@ -607,7 +607,7 @@ describe("a role that may not shape who sees what", () => {
 });
 
 describe("an Admin of another workspace", () => {
-  it("reaches and lists none of this workspace's groups", async () => {
+  it("can neither act on nor list this workspace's groups", async () => {
     const { workspace: ours, person: ourPerson, groupId } = await oneGroupOnePerson("Ours");
     const theirs = await provisioned("Theirs");
 
@@ -630,7 +630,7 @@ describe("an Admin of another workspace", () => {
     expect(await peopleActions(theirs.workspaceId)).toEqual([]);
   });
 
-  it("makes its own group under a name another workspace holds", async () => {
+  it("creates a group with a name another workspace uses", async () => {
     const ours = await provisioned("Named");
     const theirs = await provisioned("AlsoNamed");
     await madeGroup(ours, "HR team");
@@ -642,8 +642,8 @@ describe("an Admin of another workspace", () => {
   });
 });
 
-describe("an action whose transaction fails after it", () => {
-  it("leaves neither the group nor its audit event behind", async () => {
+describe("a group action whose transaction later fails", () => {
+  it("leaves no group and no audit event", async () => {
     const workspace = await provisioned("Together");
     let groupId: string | undefined;
 

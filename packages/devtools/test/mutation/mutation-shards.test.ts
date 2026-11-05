@@ -71,7 +71,7 @@ describe("a leg's mutate set, cut into shards", () => {
     "test/audit.test.ts": 600,
   });
 
-  it("reads patterns in order, `!` taking back, never hidden files", () => {
+  it("reads patterns in order, applies `!` exclusions, skips hidden files", () => {
     expect(mutateSet(root, PATTERNS)).toEqual([
       "src/access/index.ts",
       "src/access/vocabulary.ts",
@@ -82,7 +82,7 @@ describe("a leg's mutate set, cut into shards", () => {
     expect(mutateSet(root, [...PATTERNS, "src/main.ts"])).toContain("src/main.ts");
   });
 
-  it("deals files by size, biggest first, onto the lightest shard", () => {
+  it("assigns files biggest first, each to the lightest shard", () => {
     expect(shardSlices(weightsOf(root, mutateSet(root, PATTERNS), undefined), 2)).toEqual([
       ["src/access/index.ts", "src/audit/index.ts"],
       ["src/access/vocabulary.ts", "src/kernel/legacy.ts/index.ts", "src/kernel/parse.ts"],
@@ -108,7 +108,7 @@ describe("a leg's mutate set, cut into shards", () => {
     ]);
   });
 
-  it("keeps slices disjoint and whole as files come and go", () => {
+  it("keeps slices disjoint and complete as files change", () => {
     const grown = treeOf("grown", {
       "src/a.ts": 120,
       "src/b.ts": 80,
@@ -268,7 +268,7 @@ describe("a leg's results, merged from its shards", () => {
 
     expect(
       merged.checkpoint,
-      "two dry runs may number the tests differently, and test 9, which shard one never listed, names none",
+      "the merge did not renumber the tests. Two dry runs can number tests differently, and test 9, which shard one never listed, matches no test.",
     ).toEqual({
       schemaVersion: "1.0",
       thresholds: { high: 80, low: 60 },
@@ -283,7 +283,7 @@ describe("a leg's results, merged from its shards", () => {
     expect(merged.summary).toBe("### core shards: 2 of 2 finished\n");
   });
 
-  it("keeps tests sharing a title apart by file and place", () => {
+  it("keeps same-titled tests apart by file and line", () => {
     const TWIN = { ...A_TEST, line: 12 };
     const one = results(
       { "src/a.ts": [killed("1", "1", ["1", "2"])] },
@@ -308,11 +308,11 @@ describe("a leg's results, merged from its shards", () => {
 
     expect(
       merged.checkpoint?.testFiles,
-      "a test is keyed by file, line and title, so twins sharing a title stay apart",
+      "the merge joined two tests with the same title. Key each test by file, line and title.",
     ).toEqual(one.testFiles);
     expect(
       merged.checkpoint?.files,
-      "a test is matched by file, place and title, as Stryker matches one between runs",
+      "the merge matched tests by something other than file, line and title. Stryker matches a test between runs by all three.",
     ).toEqual({
       "src/a.ts": entry("src/a.ts", killed("1", "1", ["1", "2"])),
       "src/b.ts": entry("src/b.ts", killed("2", "2", ["2"])),
@@ -320,7 +320,7 @@ describe("a leg's results, merged from its shards", () => {
     });
   });
 
-  it("keeps a stopped shard's checkpoint, without what it never reached", () => {
+  it("keeps a stopped shard's checkpoint, minus files it never reached", () => {
     const stopped = results(
       { "src/b.ts": [killed("2", "0", ["0"])] },
       tests("test/answer.test.ts", { id: "0", ...B_TEST }, { id: "1", ...A_TEST }),
@@ -342,7 +342,7 @@ describe("a leg's results, merged from its shards", () => {
     );
   });
 
-  it("fills a silent shard from last run, dropping gone files", () => {
+  it("fills an empty shard from last run, minus deleted files", () => {
     const merged = merge(new Map([[1, left(SHARD_ONE)]]));
 
     expect(merged.checkpoint?.files).toEqual({
@@ -366,7 +366,7 @@ describe("a leg's results, merged from its shards", () => {
     expect(merged.checkpoint?.testFiles?.["test/answer.test.ts"]?.["source"]).toBe("describe()");
   });
 
-  it("keeps the previous run's results when no shard left any", () => {
+  it("keeps the previous run's results when no shard wrote any", () => {
     const merged = merge(new Map());
 
     expect(merged.checkpoint).toEqual({
@@ -382,7 +382,7 @@ describe("a leg's results, merged from its shards", () => {
     expect(merged.report).toBeUndefined();
   });
 
-  describe("for a cut file, each shard holding the whole file", () => {
+  describe("for a cut file held whole by each shard", () => {
     const at = (line: number, status: string): Found => ({
       id: String(line),
       mutatorName: "StringLiteral",
@@ -407,7 +407,7 @@ describe("a leg's results, merged from its shards", () => {
         baseline: results({ "src/cut.ts": [at(4, "Timeout"), at(5, "Timeout")] }, {}),
       });
 
-    it("takes each mutant from the piece holding its first line", () => {
+    it("takes each mutant from the piece containing its first line", () => {
       const nowhere: Found = { id: "nowhere", mutatorName: "StringLiteral", status: "Killed" };
       const merged = cut(
         new Map([
@@ -418,16 +418,16 @@ describe("a leg's results, merged from its shards", () => {
 
       expect(
         merged.checkpoint?.files["src/cut.ts"]?.mutants,
-        "each shard tests its own piece and carries the rest forward from the results it started from",
+        "the merge took a mutant from the wrong piece. Each shard tests its own piece and copies the other pieces from the results it started with.",
       ).toEqual([at(4, "Killed"), at(5, "Killed")]);
     });
 
-    it("fills silent pieces from a sibling's shard, not last run", () => {
+    it("fills empty pieces from a sibling shard, not last run", () => {
       const sibling = left(results({ "src/cut.ts": [at(4, "Survived"), at(5, "Killed")] }, {}));
 
       expect(
         cut(new Map([[2, sibling]])).checkpoint?.files["src/cut.ts"]?.mutants,
-        "the file may have moved since the previous run, whose lines would then be another text's",
+        "the merge filled a piece from the previous run. The file may have changed since then, so its line numbers may point at other code.",
       ).toEqual([at(4, "Survived"), at(5, "Killed")]);
     });
 
@@ -439,7 +439,7 @@ describe("a leg's results, merged from its shards", () => {
     });
   });
 
-  it("leaves a silent shard's files out with no previous run", () => {
+  it("omits an empty shard's files when no previous run exists", () => {
     const merged = mergeShards({
       leg: "core",
       files: OWNERS,
@@ -448,11 +448,11 @@ describe("a leg's results, merged from its shards", () => {
       baseline: undefined,
     });
 
-    assert(merged.checkpoint !== undefined, "the merge writes a checkpoint");
+    assert(merged.checkpoint !== undefined, "the merge wrote no checkpoint");
     expect(Object.keys(merged.checkpoint.files)).toEqual(["src/a.ts"]);
   });
 
-  it("leaves nothing to write when nothing was left", () => {
+  it("writes nothing when no shard left results", () => {
     const merged = mergeShards({
       leg: "core",
       files: OWNERS,
@@ -471,8 +471,8 @@ describe("a leg's results, merged from its shards", () => {
 
 const ordinary = (id: string): Found => ({ id, mutatorName: "ArrowFunction", status: "Killed" });
 
-describe("a leg's files, weighed by their cost last run", () => {
-  it("weighs a file by its mutants, else by its size", () => {
+describe("a leg's files, weighted by their cost last run", () => {
+  it("weights a file by its mutants, else by its size", () => {
     const root = treeOf("weighed", {
       "src/big.ts": 800,
       "src/new.ts": 300,
@@ -529,7 +529,7 @@ export type Doubled = number;
 const lineOfTwoMutants = (name: string, text = name): string =>
   `export const ${name} = (): string => "${text}";`;
 
-/** As Stryker writes a mutant: its line and columns counted from 1, the end column past it. */
+/** Stryker's mutant format: line and columns count from 1, and the end column is one past the mutant. */
 const reported = (
   lines: readonly string[],
   at: number,
@@ -587,10 +587,10 @@ describe("a file too heavy for one shard, cut by line", () => {
     lineOfTwoMutants("d"),
   ];
 
-  it("cuts only where no mutant spans, sharing the mutants evenly", async () => {
+  it("cuts only between mutants, sharing the mutants evenly", async () => {
     expect(
       await piecesOf(root, "src/cut.ts", 2, undefined),
-      "nineteen mutants: seven on lines 2 and 3, ten on 5 to 8, one spanning them, two on line 10",
+      "the pieces do not split the mutants evenly. The file has nineteen mutants: seven on lines 2 and 3, ten on 5 to 8, one across both groups, and two on line 10.",
     ).toEqual([
       { from: 1, to: 3 },
       { from: 4, to: 11 },
@@ -611,7 +611,7 @@ describe("a file too heavy for one shard, cut by line", () => {
     ]);
   });
 
-  it("breaks a tie towards the earlier cut", async () => {
+  it("chooses the earlier cut in a tie", async () => {
     expect(await cut(2, FOUR.slice(0, 3))).toEqual([
       { from: 1, to: 1 },
       { from: 2, to: 3 },
@@ -649,7 +649,7 @@ describe("a file too heavy for one shard, cut by line", () => {
     ]);
   });
 
-  it("pairs two mutants alike in the order they stand", async () => {
+  it("pairs two identical mutants in the order they appear", async () => {
     const alike = [
       lineOfTwoMutants("a", "x"),
       lineOfTwoMutants("b", "x"),
@@ -663,7 +663,7 @@ describe("a file too heavy for one shard, cut by line", () => {
     ]);
   });
 
-  describe("in a leg that names it to be cut", () => {
+  describe("in a leg that lists the file to be cut", () => {
     const leg = sourcesIn("split-leg", {
       "src/cut.ts": THREE_STATEMENTS,
       "src/a.ts": "x".repeat(300),
@@ -677,7 +677,7 @@ describe("a file too heavy for one shard, cut by line", () => {
       mutate: readonly string[] = ["src/**/*.ts"],
     ): Promise<string> => sliceOf(new Map([["core", { root: leg, mutate, split }]]), shard, of);
 
-    it("gives each piece its own shard, then deals the rest", async () => {
+    it("gives each piece its own shard, then assigns the rest", async () => {
       const split = new Map([["src/cut.ts", 2]]);
 
       expect(await Promise.all([1, 2, 3, 4].map((shard) => sliced(split, shard, 4)))).toEqual([
@@ -688,7 +688,7 @@ describe("a file too heavy for one shard, cut by line", () => {
       ]);
     });
 
-    it("cutting a file with its own shard keeps other slices", async () => {
+    it("leaves the other slices unchanged when a file is cut", async () => {
       const whole = await Promise.all([1, 2, 3].map((shard) => sliced(new Map(), shard, 3)));
       const pieces = await Promise.all(
         [1, 2, 3, 4].map((shard) => sliced(new Map([["src/cut.ts", 2]]), shard, 4)),
@@ -697,11 +697,11 @@ describe("a file too heavy for one shard, cut by line", () => {
       expect(whole).toContain("src/cut.ts");
       expect(
         pieces.filter((slice) => !slice.startsWith("src/cut.ts:")),
-        "a shard apiece for the pieces leaves the others' slices as they were",
+        "cutting src/cut.ts changed the other files' slices. Each piece gets its own shard, and the other slices stay the same.",
       ).toEqual(whole.filter((slice) => slice !== "src/cut.ts"));
     });
 
-    it("cuts a leg of one file into its pieces alone", async () => {
+    it("cuts a leg of one file into only its pieces", async () => {
       const split = new Map([["src/cut.ts", 2]]);
 
       expect(
@@ -709,7 +709,7 @@ describe("a file too heavy for one shard, cut by line", () => {
       ).toEqual(["src/cut.ts:1-3", "src/cut.ts:4-11"]);
     });
 
-    it("refuses an unmutated file, and too few shards", async () => {
+    it("refuses cutting an unmutated file, and too few shards", async () => {
       await expect(sliced(new Map([["src/gone.ts", 2]]), 1, 4)).rejects.toThrow(
         new Error("src/gone.ts is named to be cut, but the core leg does not mutate it"),
       );
@@ -842,7 +842,7 @@ describe("the shards command", () => {
     );
     expect(
       writtenTo(out),
-      "the previous run priced every file alike, so the slices are [a, c] and [b]",
+      "the merge wrote the wrong files. The previous run gave every file the same cost, so the slices are [a, c] and [b].",
     ).toEqual({ files: ["src/a.ts", "src/b.ts"], report: false });
   });
 
@@ -859,11 +859,11 @@ describe("the shards command", () => {
     expect(writtenTo(out)).toEqual({ files: ["src/a.ts", "src/b.ts", "src/c.ts"], report: true });
     expect(
       JSON.parse(readFileSync(path.join(out, "stryker-incremental.json"), "utf8")),
-      "keys the schema does not name survive, for the next run's Stryker reads this file back",
+      "the merge dropped keys the schema does not name. Keep them, because the next run's Stryker reads this file back.",
     ).toMatchObject({ schemaVersion: "1.0", thresholds: { high: 80, low: 60 } });
   });
 
-  it("writes nothing, and says so, when nothing was left", async () => {
+  it("writes nothing and says so when no shard left results", async () => {
     const out = path.join(scratch, "merged-four");
 
     expect(await merging(downloaded({}), out)).toBe(
@@ -1167,7 +1167,7 @@ describe("a throwaway leg run as shards by Stryker", () => {
   it("reuses a file's results when a new file moves it", async () => {
     const mergedResults = readReportFile(path.join(merged, "stryker-incremental.json"));
     const one = mergedResults.files["src/one.ts"];
-    assert(one !== undefined, "the merged results hold src/one.ts");
+    assert(one !== undefined, "the merged results have no src/one.ts");
     const marked = {
       ...mergedResults,
       files: {

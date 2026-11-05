@@ -92,7 +92,7 @@ describe("the reuse reading", () => {
     set = await theReuseSet();
   });
 
-  it("counts every fit found and no negative taken", async () => {
+  it("counts every fit and no negative from an accurate judge", async () => {
     const { reading } = await readWith(set, judgingAsLabelled);
 
     expect({ ...reading, judgeMs: undefined }).toEqual({
@@ -108,7 +108,7 @@ describe("the reuse reading", () => {
     expect(reading.judgeMs.worst).toBeGreaterThanOrEqual(reading.judgeMs.median);
   }, 300_000);
 
-  it("names each negative a judge wrongly takes", async () => {
+  it("lists each negative the judge wrongly accepts as a miss", async () => {
     const { reading } = await readWith(set, judgingAllFit);
 
     expect([reading.fits, reading.negatives]).toEqual([
@@ -123,7 +123,7 @@ describe("the reuse reading", () => {
     );
   }, 300_000);
 
-  it("counts a question whose judge failed apart from the tallies", async () => {
+  it("lists a failed judge call only among the misses", async () => {
     const { reading } = await readWith(
       { ...set, questions: set.questions.slice(0, 2) },
       judgingRefused,
@@ -141,7 +141,7 @@ describe("the reuse reading", () => {
     });
   }, 300_000);
 
-  it("reads a decision model's verdicts at its given threshold", async () => {
+  it("applies the given threshold to a decision model's yes probabilities", async () => {
     const { client } = clientAnswering(async (body) => {
       const state = z.object({ state: z.string() }).parse(JSON.parse(body)).state;
       const fits = titlesOf(set, fitsOf(set, state));
@@ -170,7 +170,7 @@ describe("the reuse reading", () => {
     expect(atSevenTenths.spentGbp).toBe("0.002448");
   }, 300_000);
 
-  it("sends a lower effort beside the answer's format", async () => {
+  it("sends the requested effort alongside the JSON output format", async () => {
     const { sent } = await readWith(
       { ...set, questions: set.questions.slice(0, 1) },
       judgingAsLabelled,
@@ -213,7 +213,7 @@ describe("the reuse set's reader", () => {
     expect((await readReuseSet(path)).ok).toBe(false);
   });
 
-  it("reads the set with nothing changed", async () => {
+  it("accepts the unchanged set", async () => {
     const path = join(scratch, "the-set-unchanged.json");
     await writeFile(path, JSON.stringify(altered(await theReuseSet(), {})));
 

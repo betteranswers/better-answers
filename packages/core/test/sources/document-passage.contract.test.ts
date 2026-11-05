@@ -108,7 +108,7 @@ describe("the passage id derived from a document and an ordinal", () => {
     }
   });
 
-  it("derives the id each of the document's passage rows carries", () => {
+  it("matches the id on each of the document's passage rows", () => {
     for (const row of document.passages) {
       expect({
         ordinal: row.ordinal,
@@ -125,7 +125,7 @@ describe("the passage id derived from a document and an ordinal", () => {
     expect(ids).toEqual(ids.toSorted());
   });
 
-  it("derives ids in the agreed shape, never a minted one", () => {
+  it("derives ids in the agreed format, not as ULIDs", () => {
     const pattern = new RegExp(fixture.passage_id.pattern);
 
     for (const { source_document_id, id } of fixture.passage_id.cases) {
@@ -140,7 +140,7 @@ describe("the passage id derived from a document and an ordinal", () => {
 });
 
 describe("the wire locator", () => {
-  it("reads the document and span from every locator that parses", () => {
+  it("parses the document id and span from every valid locator", () => {
     for (const { wire, source_document_id, char_start, char_end } of fixture.locator.must_parse) {
       expect({ wire, read: parseLocator(wire) }).toEqual({
         wire,
@@ -152,7 +152,7 @@ describe("the wire locator", () => {
     }
   });
 
-  it("answers a malformed locator as it answers a withheld passage", () => {
+  it("returns not found for a malformed locator, as when withheld", () => {
     for (const { wire, why } of fixture.locator.must_not_parse) {
       expect({ why, refusal: parseLocator(wire) }).toEqual({
         why,
@@ -161,7 +161,7 @@ describe("the wire locator", () => {
     }
   });
 
-  it("reads each passage row's locator back to the row's span", () => {
+  it("parses each passage row's locator to that row's span", () => {
     for (const row of document.passages) {
       expect({ ordinal: row.ordinal, read: parseLocator(row.locator) }).toEqual({
         ordinal: row.ordinal,
@@ -187,14 +187,14 @@ describe("the normalised text the offsets are counted in", () => {
     expect(document.utf16_units).toBeGreaterThan(document.code_points);
   });
 
-  it("carries the named astral character at the named code point", () => {
+  it("has the fixture's astral character at its stated code point", () => {
     expect(Array.from(document.normalised_text)[document.astral.at]).toBe(
       document.astral.character,
     );
     expect(document.astral.character.length).toBe(document.astral.utf16_units);
   });
 
-  it("is partitioned by its passage rows", () => {
+  it("is split by its passage rows without gaps or overlaps", () => {
     let at = 0;
     for (const row of document.passages) {
       expect({ ordinal: row.ordinal, start: row.char_start }).toEqual({
@@ -211,10 +211,10 @@ describe("the normalised text the offsets are counted in", () => {
 });
 
 describe("the passage a locator opens", () => {
-  it("cuts the agreed passage from the text for each locator", () => {
+  it("returns the agreed passage text for each locator", () => {
     for (const answered of fixture.open.filter((each) => each.expect === "passage")) {
       const parsed = parseLocator(answered.wire);
-      assert(parsed.ok, `${answered.case}: ${inspect(parsed)}`);
+      assert(parsed.ok, `${answered.case}: the locator did not parse: ${inspect(parsed)}`);
 
       expect({
         case: answered.case,
@@ -226,7 +226,7 @@ describe("the passage a locator opens", () => {
     }
   });
 
-  it("cuts by code points, where a UTF-16 slice goes wrong", () => {
+  it("cuts by code points, since a UTF-16 slice is wrong", () => {
     expect(CITED_PAST_THE_ASTRAL.length).toBeGreaterThan(0);
     for (const answered of CITED_PAST_THE_ASTRAL) {
       const { charStart, charEnd } = spanOf(answered.wire);
@@ -246,7 +246,7 @@ describe("the passage a locator opens", () => {
     }
   });
 
-  it("answers not found to a malformed locator before any read", () => {
+  it("returns not found for a malformed locator before reading", () => {
     const atTheParser = fixture.open.filter((each) => each.refused_by === "the parser");
 
     expect(atTheParser.length).toBeGreaterThan(0);
@@ -258,7 +258,7 @@ describe("the passage a locator opens", () => {
     }
   });
 
-  it("leaves a well-shaped locator for the read to refuse", () => {
+  it("parses a well-formed locator that only the read refuses", () => {
     expect(OUT_OF_RANGE.length).toBeGreaterThan(0);
     expect(IN_ANOTHER_DOCUMENT.length).toBeGreaterThan(0);
     for (const refused of OUT_OF_RANGE) {

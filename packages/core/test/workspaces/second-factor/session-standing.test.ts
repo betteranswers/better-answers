@@ -26,7 +26,7 @@ const facts = (held: Partial<SecondFactorFacts>): SecondFactorFacts => ({
 });
 
 describe("a session's second-factor standing", () => {
-  it("asks nothing of a person who needs no factor", () => {
+  it("requires nothing of a person who needs no factor", () => {
     expect([
       standingOf(facts({})),
       standingOf(facts({ holdsAFactor: true })),
@@ -34,14 +34,14 @@ describe("a session's second-factor standing", () => {
     ]).toEqual(["not-required", "not-required", "not-required"]);
   });
 
-  it("counts a stamp only while a factor stands to confirm", () => {
+  it("counts a confirmation only while the person has a factor", () => {
     expect([
       standingOf(facts({ mustHoldOne: true, holdsAFactor: true, confirmed: true })),
       standingOf(facts({ mustHoldOne: true, confirmed: true })),
     ]).toEqual(["confirmed", "setup"]);
   });
 
-  it("sends a holder to confirm, a granted session to setup", () => {
+  it("sends factor holders to confirm, granted sessions to setup", () => {
     expect([
       standingOf(facts({ mustHoldOne: true, holdsAFactor: true })),
       standingOf(facts({ mustHoldOne: true, holdsAFactor: true, setupGranted: true })),
@@ -51,14 +51,14 @@ describe("a session's second-factor standing", () => {
     ]).toEqual(["confirm", "setup", "confirmed"]);
   });
 
-  it("sends a person holding nothing to setup, granted or not", () => {
+  it("sends people without a factor to setup, granted or not", () => {
     expect([
       standingOf(facts({ mustHoldOne: true })),
       standingOf(facts({ mustHoldOne: true, setupGranted: true })),
     ]).toEqual(["setup", "setup"]);
   });
 
-  it("refuses a pending session in a word outside sign-in's class", () => {
+  it("refuses a pending session with a precondition refusal", () => {
     expect(KERNEL_REFUSALS["second-factor-pending"]).toBe("precondition");
   });
 });
@@ -74,18 +74,18 @@ const EVERY_STEP_BUT_SETUP: readonly PendingStep[] = [
 ];
 
 describe("what a pending session may still do", () => {
-  it("names every step of the pending set", () => {
+  it("lists every step a pending session may take", () => {
     expect([...PENDING_STEPS].sort()).toEqual([...EVERY_STEP_BUT_SETUP, "set-up-a-factor"].sort());
   });
 
-  it("lets a session that is not pending take anything", () => {
+  it("lets a session that is not pending take any step", () => {
     for (const standing of ["not-required", "confirmed"] as const) {
       expect(mayTake(standing, undefined)).toBe(true);
       expect(mayTake(standing, "set-up-a-factor")).toBe(true);
     }
   });
 
-  it("refuses a pending session anything outside the pending set", () => {
+  it("refuses a pending session any step outside the pending set", () => {
     expect([mayTake("confirm", undefined), mayTake("setup", undefined)]).toEqual([false, false]);
   });
 
@@ -107,12 +107,12 @@ const ONE_HOUR_MS = 3_600_000;
 
 const after = (ms: number): Date => new Date(AT.getTime() + ms);
 
-describe("a pending session's clock", () => {
+describe("the time limit on a pending session", () => {
   it("lasts an hour from the first pending read", () => {
     expect(PENDING_SESSION_LIFETIME_MS).toBe(ONE_HOUR_MS);
   });
 
-  it("starts on the first pending read, then runs its hour", () => {
+  it("starts at the first pending read, then keeps running", () => {
     expect([
       pendingClockOf("confirm", null, AT),
       pendingClockOf("setup", null, AT),
@@ -121,7 +121,7 @@ describe("a pending session's clock", () => {
     ]).toEqual(["start", "start", "run", "run"]);
   });
 
-  it("ends a session pending past its hour, never at it", () => {
+  it("ends a session pending past one hour, not at it", () => {
     expect([
       pendingClockOf("confirm", AT, after(ONE_HOUR_MS + 1)),
       pendingClockOf("setup", AT, after(ONE_HOUR_MS + 1)),
@@ -160,8 +160,8 @@ const sessionsOf = async (personId: string) =>
     await db().pool.query<{ id: string }>("SELECT id FROM session WHERE user_id = $1", [personId])
   ).rows.map((row) => row.id);
 
-describe("judging a session at the gate", () => {
-  it("answers a confirmed Admin holding a passkey as confirmed", async () => {
+describe("judging a session with judgeTheSession", () => {
+  it("judges a confirmed Admin with a passkey as confirmed", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     await passkeyFor(db().pool, adminUserId);
     const sessionId = await aSession(adminUserId);
@@ -173,7 +173,7 @@ describe("judging a session at the gate", () => {
     });
   });
 
-  it("reads an authenticator still waiting on its code as none", async () => {
+  it("treats an authenticator that awaits its first code as none", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     await authenticatorFor(db().pool, adminUserId, { verified: false });
     const sessionId = await aSession(adminUserId);
@@ -182,7 +182,7 @@ describe("judging a session at the gate", () => {
     expect(await judged(sessionId, AT)).toMatchObject({ ok: true, value: { standing: "setup" } });
   });
 
-  it("asks an Admin holding an authenticator to confirm", async () => {
+  it("asks an Admin with an authenticator to confirm", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     await authenticatorFor(db().pool, adminUserId, { verified: true });
 
@@ -192,7 +192,7 @@ describe("judging a session at the gate", () => {
     });
   });
 
-  it("holds the operator to the Admin's rule", async () => {
+  it("applies the Admin's rule to the operator", async () => {
     const operatorId = await seedPerson(db().pool, { operator: true });
     await passkeyFor(db().pool, operatorId);
 
@@ -202,7 +202,7 @@ describe("judging a session at the gate", () => {
     });
   });
 
-  it("asks nothing of a person in no workspace", async () => {
+  it("requires nothing of a person in no workspace", async () => {
     const personId = await seedPerson(db().pool);
     const sessionId = await aSession(personId);
 
@@ -213,7 +213,7 @@ describe("judging a session at the gate", () => {
     expect(await confirmedAt(sessionId)).toEqual({ confirmed: null, pending: null });
   });
 
-  it("counts a grant only from after the restore", async () => {
+  it("counts a setup grant only if made after the restore", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     await passkeyFor(db().pool, adminUserId);
     const granted = await aSession(adminUserId);
@@ -232,7 +232,7 @@ describe("judging a session at the gate", () => {
     ]);
   });
 
-  it("finds a session by its token as by its id", async () => {
+  it("finds a session by its token or by its id", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     const sessionId = await aSession(adminUserId);
 
@@ -244,13 +244,13 @@ describe("judging a session at the gate", () => {
     ).toEqual({ ok: true, value: { sessionId, personId: adminUserId, standing: "setup" } });
   });
 
-  it("answers a session nobody holds as gone", async () => {
+  it("answers an unknown session as session-gone", async () => {
     expect(await judged("no-such-session", AT)).toEqual({ ok: false, error: "session-gone" });
   });
 });
 
-describe("the pending clock a judged session carries", () => {
-  it("starts on the first pending read, and only then", async () => {
+describe("the pending time limit on a judged session", () => {
+  it("starts at the first pending read and is not reset", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     const sessionId = await aSession(adminUserId);
 
@@ -260,7 +260,7 @@ describe("the pending clock a judged session carries", () => {
     expect(await confirmedAt(sessionId)).toEqual({ confirmed: null, pending: AT });
   });
 
-  it("keeps a session made hours before its first pending read", async () => {
+  it("keeps a session created hours before its first pending read", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     const sessionId = await aSession(adminUserId);
 
@@ -273,7 +273,7 @@ describe("the pending clock a judged session carries", () => {
     });
   });
 
-  it("keeps a session at its hour, ending one past it", async () => {
+  it("keeps a session at one hour, ending one past it", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     const atItsHour = await aSession(adminUserId, AT);
     const pastItsHour = await aSession(adminUserId, AT);
@@ -285,7 +285,7 @@ describe("the pending clock a judged session carries", () => {
     expect(await sessionsOf(adminUserId)).toEqual([atItsHour]);
   });
 
-  it("stops the clock of a session no longer pending", async () => {
+  it("stops the time limit of a session no longer pending", async () => {
     const { workspaceId, adminUserId } = await provisionedWorkspace(db(), "Acme");
     const sessionId = await aSession(adminUserId, AT);
     await db().pool.query("UPDATE member SET role = 'Editor' WHERE workspace_id = $1", [
@@ -314,7 +314,7 @@ describe("the pending clock a judged session carries", () => {
     expect(await confirmedAt(confirmed)).toEqual({ confirmed: AT, pending: null });
   });
 
-  it("answers a store fault as a failure, never as gone", async () => {
+  it("returns a store fault as an error, not as session-gone", async () => {
     const personId = await seedPerson(db().pool);
     const sessionId = await aSession(personId);
     await db().pool.query(
@@ -332,7 +332,7 @@ describe("the pending clock a judged session carries", () => {
     }
   });
 
-  it("never waits on a row another transaction holds", async () => {
+  it("never waits on a row another transaction has locked", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     await passkeyFor(db().pool, adminUserId);
     const confirmed = await aSession(adminUserId);

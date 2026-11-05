@@ -82,10 +82,13 @@ describe("the Curation budgets at 3,000 concepts", () => {
 
     await recordFigures("All knowledge's first page", figuresOf(page));
     await recordFigures("Kinds", figuresOf(kinds));
-    expect(percentile(page, 0.5), "the first page's median, in milliseconds").toBeLessThan(
-      PAGE_BUDGET_MS,
+    expect(
+      percentile(page, 0.5),
+      "All knowledge's first page at the median, in milliseconds",
+    ).toBeLessThan(PAGE_BUDGET_MS);
+    expect(percentile(kinds, 0.5), "the Kinds read at the median, in milliseconds").toBeLessThan(
+      KINDS_BUDGET_MS,
     );
-    expect(percentile(kinds, 0.5), "Kinds' median, in milliseconds").toBeLessThan(KINDS_BUDGET_MS);
   });
 
   it("snapshots the knowledge base within its budget", async () => {
@@ -107,7 +110,7 @@ describe("the Curation budgets at 3,000 concepts", () => {
       ...figuresOf(snapshot),
       ["files in the zip", String(carried)],
     ]);
-    expect(carried, "the zip holds every concept and the manifest").toBe(CONCEPTS + 1);
+    expect(carried, "the files in the zip: every concept plus the manifest").toBe(CONCEPTS + 1);
     expect(percentile(snapshot, 0.5), "the snapshot's median, in milliseconds").toBeLessThan(
       SNAPSHOT_BUDGET_MS,
     );

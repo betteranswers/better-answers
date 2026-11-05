@@ -30,7 +30,11 @@ export const holdAContainer = (env: Readonly<Record<string, string>> = {}): Hold
       err += chunk;
     });
     child.on("exit", (code, signal) => {
-      reject(new Error(`the holder ended (${String(code ?? signal)}) holding nothing:\n${err}`));
+      reject(
+        new Error(
+          `the holder process exited (${String(code ?? signal)}) before it held a container:\n${err}`,
+        ),
+      );
     });
   });
   return { process: child, container };

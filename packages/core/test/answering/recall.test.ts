@@ -27,7 +27,7 @@ import {
 const suite = visibilitySuite();
 const { db } = suite;
 
-const carryingACollection = (
+const namesACollection = (
   question: RecallQuestion,
 ): question is RecallQuestion & { readonly collection: string } =>
   question.collection !== undefined;
@@ -41,7 +41,7 @@ describe("recall over the synthetic set", () => {
 
   const bothSets = () => bothSetsOf(rankings.set);
 
-  it("lands a set whose walk adds no concept", async () => {
+  it("seeds the set with no map edges for the walk", async () => {
     const { rows } = await db().pool.query<{ edges: number }>(
       "SELECT count(*)::int AS edges FROM map_edge WHERE workspace_id = $1",
       [rankings.workspaceId],
@@ -50,14 +50,14 @@ describe("recall over the synthetic set", () => {
     expect(rows).toEqual([{ edges: 0 }]);
   });
 
-  it("keeps a narrowed reading inside the collection named", async () => {
+  it("keeps results for a named collection inside that collection", async () => {
     const { set, landed, planned } = rankings;
     const groupOf = new Map<string | undefined, string>(
       answersOf(set).map(({ key, group }) => [landed.get(key), group]),
     );
     const narrowed = (await bothSets())
       .flatMap(([, questions]) => questions)
-      .filter(carryingACollection);
+      .filter(namesACollection);
     const readings: { question: string; returned: number; outside: readonly string[] }[] = [];
     for (const { question, collection } of narrowed) {
       const ranking = await planned(question, collection);
@@ -72,7 +72,7 @@ describe("recall over the synthetic set", () => {
     expect(readings.reduce((sum, { returned }) => sum + returned, 0)).toBeGreaterThan(0);
   }, 300_000);
 
-  it("ranks ask's plan step as find ranks", async () => {
+  it("ranks ask's entry points the same as find", async () => {
     const { found, planned } = rankings;
     const depth = Math.min(RECALL_DEPTH, ASK_CAPS.entryPoints);
     const readings: { question: string; byFind: string; byAsk: string; found: number }[] = [];
@@ -95,7 +95,7 @@ describe("recall over the synthetic set", () => {
 });
 
 describe("recall", () => {
-  it("counts every Answer, any Answer and each Answer named", async () => {
+  it("computes every-Answer, any-Answer and per-Answer recall", async () => {
     const landed = new Map([
       ["first", "iri:first"],
       ["second", "iri:second"],
@@ -136,7 +136,7 @@ const placed = async (path: string, text: string | undefined): Promise<string> =
   return path;
 };
 
-describe("the recall set's reader", () => {
+describe("reading the recall set", () => {
   it.each([
     ["a file that is not there", undefined],
     ["text that is not JSON", "{ groups: "],
@@ -166,7 +166,7 @@ const altered = (
   };
 };
 
-describe("the buyer-worded set's reader", () => {
+describe("reading the buyer-worded question set", () => {
   it.each([
     ["a question that names no Answer", { question: { answers: [] } }],
     [
@@ -183,7 +183,7 @@ describe("the buyer-worded set's reader", () => {
     expect((await readBuyerQuestions(path)).ok).toBe(false);
   });
 
-  it("reads the set with nothing changed", async () => {
+  it("reads the unchanged set", async () => {
     const held = await theBuyerQuestions(await theRecallSet());
     const path = join(scratch, "the-set-unchanged.json");
     await writeFile(path, JSON.stringify(altered(held, {})));
@@ -258,8 +258,8 @@ const syntheticTexts = async (): Promise<readonly (readonly [string, boolean])[]
   ];
 };
 
-describe("the synthetic sets' provenance", () => {
-  it("takes no title, question or wording from the customer's bundle", async (context) => {
+describe("where the synthetic sets' wording comes from", () => {
+  it("copies no title, question or wording from the customer's bundle", async (context) => {
     context.skip(
       !existsSync(CUSTOMER_BUNDLE),
       "the customer's bundle is machine-local, so only the owner's machine can compare against it",
@@ -278,18 +278,18 @@ describe("the synthetic sets' provenance", () => {
 const wordingsOf = ({ title, body, paraphrases }: RecallAnswer): readonly string[] =>
   [title, ...body.split("\n"), ...paraphrases].map(phraseOf);
 
-const wordsItsAnswer = (answer: RecallAnswer | undefined, question: string): boolean =>
+const questionRepeatsAnswer = (answer: RecallAnswer | undefined, question: string): boolean =>
   answer !== undefined && wordingsOf(answer).includes(phraseOf(question));
 
 describe("the buyer-worded set", () => {
-  it("words no question as its Answer's title or line", async () => {
+  it("phrases each question differently from its Answer's title and lines", async () => {
     const set = await theRecallSet();
     const byKey = new Map(answersOf(set).map((answer) => [answer.key, answer]));
     const { questions } = await theBuyerQuestions(set);
 
     const repeating = questions.flatMap(({ question, answers }) =>
       answers
-        .filter((key) => wordsItsAnswer(byKey.get(key), question))
+        .filter((key) => questionRepeatsAnswer(byKey.get(key), question))
         .map((key) => `${question} (${key})`),
     );
 

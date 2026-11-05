@@ -35,8 +35,8 @@ const sessionFor = async (served: boolean): Promise<TestClient> =>
   served ? aPendingSession() : sharedSession;
 
 /**
- * Code-sending endpoints are counted per client address ahead of the gate, at 5 per ten minutes,
- * and the shared session's sign-in used one.
+ * The rate limit on code-sending endpoints counts per client address before the gate, 5 per ten
+ * minutes, and the shared session's sign-in used one.
  */
 const sharedSessionFromAFreshAddress = (): Pick<TestClient, "fetch"> => {
   const fresh = app().client();
@@ -58,7 +58,7 @@ const refusedAsPending = async (answered: Response): Promise<boolean> => {
 
 const procedureDef = z.object({ type: z.string() });
 
-/** A procedure is a function carrying its definition, which tRPC types by its own internals. */
+/** A tRPC procedure is a function whose `_def` tRPC types only internally, so it is parsed here. */
 const typeOf = (procedure: unknown): string =>
   procedureDef.parse(typeof procedure === "function" ? Reflect.get(procedure, "_def") : undefined)
     .type;
@@ -72,8 +72,8 @@ const askedOver = (client: TestClient, path: string, type: string): Promise<Resp
     ? client.fetch(`${TRPC_ENDPOINT}/${path}`)
     : client.json(`${TRPC_ENDPOINT}/${path}`, {});
 
-describe("the pending set over tRPC", () => {
-  it("names only procedures the router holds", () => {
+describe("tRPC procedures open to a pending session", () => {
+  it("lists only procedures that exist in the router", () => {
     const held = new Set(PROCEDURES.map(([path]) => path));
     expect([...PENDING_PROCEDURES.keys()].filter((path) => !held.has(path))).toEqual([]);
     expect([...PENDING_PROCEDURES.keys()].sort()).toEqual([
@@ -82,7 +82,7 @@ describe("the pending set over tRPC", () => {
     ]);
   });
 
-  it.each(PROCEDURES)("answers %s to a pending session as the set says", async (path, type) => {
+  it.each(PROCEDURES)("refuses %s to a pending session unless it is listed", async (path, type) => {
     const answered = await askedOver(await sessionFor(PENDING_PROCEDURES.has(path)), path, type);
 
     expect(await refusedAsPending(answered)).toBe(!PENDING_PROCEDURES.has(path));
@@ -110,8 +110,8 @@ const OPEN_TO_A_PENDING_SESSION = new Set([
 
 const UNSUPPORTED_MEDIA_TYPE = 415;
 
-/** JSON first; a path that takes forms alone refuses it before any gate, so it is asked again. */
-const askedOfTheLibrary = async (
+/** Sends JSON first. A form-only path answers 415 before any gate, so the call is repeated as a form. */
+const callLibraryEndpoint = async (
   client: Pick<TestClient, "fetch">,
   path: string,
   method: string,
@@ -137,27 +137,27 @@ const SERVED = ENDPOINTS.filter(([path]) => OPEN_TO_A_PENDING_SESSION.has(path))
 
 const GATED = ENDPOINTS.filter(([path]) => !OPEN_TO_A_PENDING_SESSION.has(path));
 
-describe("the pending set in the library's endpoints", () => {
-  it("leaves endpoints on both sides of the set", () => {
+describe("Better Auth endpoints open to a pending session", () => {
+  it("finds both open and gated endpoints", () => {
     expect({ served: SERVED.length > 0, gated: GATED.length > 0 }).toEqual({
       served: true,
       gated: true,
     });
   });
 
-  it("names only paths the library mounts", () => {
+  it("lists only paths that Better Auth mounts", () => {
     const mounted = new Set(ENDPOINTS.map(([path]) => path));
     expect([...OPEN_TO_A_PENDING_SESSION].filter((path) => !mounted.has(path))).toEqual([]);
   });
 
-  it.each(SERVED)("serves %s to a pending session, as the set says", async (path, method) => {
-    const answered = await askedOfTheLibrary(await aPendingSession(), path, method);
+  it.each(SERVED)("serves %s to a pending session", async (path, method) => {
+    const answered = await callLibraryEndpoint(await aPendingSession(), path, method);
 
     expect(await refusedAsPending(answered)).toBe(false);
   });
 
-  it.each(GATED)("refuses or hides %s from a pending session", async (path, method) => {
-    const answered = await askedOfTheLibrary(sharedSessionFromAFreshAddress(), path, method);
+  it.each(GATED)("refuses %s to a pending session or answers 404", async (path, method) => {
+    const answered = await callLibraryEndpoint(sharedSessionFromAFreshAddress(), path, method);
 
     const pending = await refusedAsPending(answered);
     const absent = answered.status === 404;
@@ -191,7 +191,7 @@ const API_ROUTES = {
   "GET /.well-known/oauth-protected-resource/mcp": "open",
 } as const;
 
-const askedOfTheApi = (client: TestClient, method: string, path: string): Promise<Response> => {
+const callApiRoute = (client: TestClient, method: string, path: string): Promise<Response> => {
   const asked = `${path}?sig=x`;
   if (method === "GET") {
     return client.fetch(asked, { redirect: "manual", headers: { "sec-fetch-dest": "document" } });
@@ -215,17 +215,17 @@ const mountedRoutes = (): readonly string[] =>
     ),
   ].sort();
 
-describe("the pending set in the api's own routes", () => {
-  it("names every route the api mounts, and nothing else", () => {
+describe("the api's own routes and a pending session", () => {
+  it("lists exactly the GET and POST routes the api mounts", () => {
     expect(mountedRoutes()).toEqual(Object.keys(API_ROUTES).sort());
   });
 
   it.each(Object.entries(API_ROUTES))(
-    "answers %s to a pending session as %s",
+    "treats %s as %s for a pending session",
     async (route, held) => {
       const [method = "", path = ""] = route.split(" ");
       const client = await sessionFor(held === "open");
-      const answered = await askedOfTheApi(client, method, path);
+      const answered = await callApiRoute(client, method, path);
 
       expect(await refusedAsPending(answered)).toBe(held === "refused");
     },

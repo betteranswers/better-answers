@@ -132,7 +132,7 @@ const timedWrites = async (scenario: Scenario): Promise<readonly number[]> => {
     head = written.value.sha;
     expect(
       await inboundLinks(db().pool, scenario.workspaceId, written.value.iri),
-      `the links waiting for ${pendingPath(target)}`,
+      `the inbound links to the concept at ${pendingPath(target)}`,
     ).toBe(CITERS_EACH);
   }
   return writeMs;
@@ -171,7 +171,7 @@ const timedBackfills = async (
       backfillMs.push(performance.now() - started);
       expect(
         await inboundLinks(tx, workspaceId, landed.iri),
-        `the links waiting for ${pendingPath(target)}`,
+        `the inbound links to the concept at ${pendingPath(target)}`,
       ).toBe(CITERS_EACH);
     });
   }
@@ -275,7 +275,7 @@ const timedRewrites = async (
     head = written.value.sha;
     expect(
       await writeUpsIncluding(scenario.workspaceId, written.value.iri),
-      `the write-ups including cited rule ${target}`,
+      `the write-ups that include cited rule ${target}`,
     ).toBe(CITING_WRITE_UPS);
   }
   return writeMs;
@@ -283,7 +283,7 @@ const timedRewrites = async (
 
 describe("the governed write over a workspace of 3,000 concepts", () => {
   it(
-    "records the governed write at 3,000 concepts",
+    "times writes and backfills at 3,000 concepts",
     async () => {
       const scenario = await arrange();
       const commitSha = await seedTheWorkspace(scenario);
@@ -301,7 +301,7 @@ describe("the governed write over a workspace of 3,000 concepts", () => {
     WRITE_BUDGET_TIMEOUT_MS,
   );
   it(
-    "records the governed write over citing write-ups",
+    "times rewrites of concepts that write-ups include",
     async () => {
       const scenario = await arrange();
       await seedTheWorkspace(scenario);

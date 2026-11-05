@@ -92,11 +92,11 @@ describe("a folder with no cap", () => {
     ]);
   });
 
-  it.each(["fixtures", "__snapshots__"])("walks past a %s folder", (name) => {
+  it.each(["fixtures", "__snapshots__"])("ignores a %s folder", (name) => {
     expect(findings(filesIn(`packages/probe/test/${name}`, 40))).toEqual([]);
   });
 
-  it("walks past a folder outside the source and test trees", () => {
+  it("ignores a folder outside the source and test trees", () => {
     expect(findings(filesIn("docs/plans", 40))).toEqual([]);
   });
 });
@@ -175,7 +175,7 @@ describe("the table of caps", () => {
     expect(CAPS.filter(({ reason }) => reason.trim() === "")).toEqual([]);
   });
 
-  it("caps only the two folders a tool fixes in place", () => {
+  it("caps only the two folders a tool writes into", () => {
     expect(folders).toEqual([
       "apps/web/src/shared/ui",
       "apps/worker/src/better_answers_worker/redaction",
@@ -255,7 +255,7 @@ describe("the gate over a throwaway repository", () => {
     expect(ran.stdout).not.toContain(PROBE);
   });
 
-  it("walks past tracked files that are fixtures", () => {
+  it("ignores tracked files that are fixtures", () => {
     const ran = spawned(repositoryOf(filesIn("packages/probe/test/fixtures", 40)));
 
     expect(ran.stdout).not.toContain("packages/probe");
@@ -286,7 +286,7 @@ describe("the gate over a throwaway repository", () => {
 });
 
 describe("the gate over this repository", () => {
-  it("passes, so no folder grew and no cap went stale", () => {
+  it("passes with no oversized folder and no stale cap", () => {
     const ran = spawned(repositoryRoot);
 
     expect(ran.stdout).toMatch(/^each of the \d+ folders read holds 15 tracked files or fewer/u);

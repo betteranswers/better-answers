@@ -92,8 +92,8 @@ const withWorkspace = async (fn: (client: pg.PoolClient) => Promise<void>): Prom
   });
 };
 
-describe("a connected source nobody configured", () => {
-  it("feeds both upload destinations, is kept, and is only received", async () => {
+describe("a connected source created with defaults only", () => {
+  it("goes to both upload destinations, is kept, and starts received", async () => {
     await withWorkspace(async (client) => {
       await seedConnectedSourceOfAConnectorAlone(client, WORKSPACE, UPLOAD_CONNECTED_SOURCE);
 
@@ -109,8 +109,8 @@ describe("a connected source nobody configured", () => {
   });
 });
 
-describe("the four closed word sets a connected source carries", () => {
-  it("admits every word each set declares", async () => {
+describe("a connected source's four closed word sets", () => {
+  it("accept every word each set declares", async () => {
     await withWorkspace(async (client) => {
       const landed: string[] = [];
       for (const connector of CONNECTORS) {
@@ -162,7 +162,7 @@ describe("the four closed word sets a connected source carries", () => {
     });
   });
 
-  it("refuses stray words, empty destinations and a NULL destination", async () => {
+  it("refuse unknown words, empty destinations and a NULL destination", async () => {
     await withWorkspace(async (client) => {
       const refusals = [
         await attemptConnectedSourceOf(
@@ -210,8 +210,8 @@ describe("the four closed word sets a connected source carries", () => {
   });
 });
 
-describe("the catalogue a sync reconciles", () => {
-  it("keeps every column given and leaves sync columns empty", async () => {
+describe("the document catalogue a sync reconciles", () => {
+  it("stores every given column and leaves the sync columns empty", async () => {
     await withConnectedSources(async (client) => {
       await seedCataloguedDocument(client, THE_HANDBOOK);
       const landed = await client.query(
@@ -265,7 +265,7 @@ describe("the catalogue a sync reconciles", () => {
     });
   });
 
-  it("admits an item once per source, and under another source", async () => {
+  it("accepts an item once per source, and again under another", async () => {
     await withConnectedSources(
       async (client) => {
         await seedCataloguedDocument(client, THE_HANDBOOK);
@@ -288,7 +288,7 @@ describe("the catalogue a sync reconciles", () => {
     );
   });
 
-  it("admits every declared sensitivity and outcome, and refuses others", async () => {
+  it("accepts every declared sensitivity and outcome, and refuses others", async () => {
     await withConnectedSources(async (client) => {
       const landed: string[] = [];
       for (const sensitivity of SENSITIVITIES) {
@@ -342,7 +342,7 @@ describe("the catalogue a sync reconciles", () => {
   });
 });
 
-describe("the key from evidence to the document it locates into", () => {
+describe("the foreign key from evidence to its source document", () => {
   it("refuses a cited document's deletion until nothing cites it", async () => {
     await withConnectedSources(async (client) => {
       await seedCataloguedDocument(client, THE_HANDBOOK);
@@ -391,7 +391,7 @@ describe("the key from evidence to the document it locates into", () => {
     });
   });
 
-  it("refuses evidence on an uncatalogued or another tenant's document", async () => {
+  it("refuses evidence on an uncatalogued document or another tenant's", async () => {
     await withWorkspace(async (client) => {
       const theirs = await testData(client).sourceDocument();
       const refusals = [
@@ -404,7 +404,7 @@ describe("the key from evidence to the document it locates into", () => {
   });
 });
 
-describe("the audit log's unique pair", () => {
+describe("the audit log's unique workspace and id pair", () => {
   const withAuditEventRow = async (fn: (client: pg.PoolClient, id: string) => Promise<void>) => {
     await withWorkspace(async (client) => {
       const event = await testData(client).auditEvent({ workspaceId: WORKSPACE });
@@ -412,7 +412,7 @@ describe("the audit log's unique pair", () => {
     });
   };
 
-  it("is a target for a later composite foreign key", async () => {
+  it("can be the target of a composite foreign key", async () => {
     await withAuditEventRow(async (client, id) => {
       await client.query(
         `CREATE TABLE keyed_to_the_audit_log (
@@ -432,7 +432,7 @@ describe("the audit log's unique pair", () => {
     });
   });
 
-  it("refuses a second audit event on the same pair", async () => {
+  it("refuses a second audit event with the same pair", async () => {
     await withAuditEventRow(async (client, id) => {
       expect(await attemptAuditEventRowReusingAnId(client, WORKSPACE, id)).toBe("audit_event_pkey");
     });
@@ -448,7 +448,7 @@ const namedAs0052ReadsThem = async (client: pg.PoolClient): Promise<void> => {
 };
 
 describe("the migration separating an Admin's narrowing from the seam's verdict", () => {
-  it("backfills an Admin's last narrowing everywhere, never the seam's", async () => {
+  it("copies only an Admin's last narrowing, in every workspace", async () => {
     await withWorkspace(async (client) => {
       const seed = testData(client);
       await seed.workspace({ id: OTHER_WORKSPACE, name: "The catalogue's other workspace" });

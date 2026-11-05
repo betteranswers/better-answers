@@ -8,8 +8,8 @@ import {
   inAnthropicRange,
 } from "../../src/ingress/limits.ts";
 
-describe("the client key an address becomes", () => {
-  it("keys every address in one IPv6 /64 alike, however spelt", () => {
+describe("clientKeyOf", () => {
+  it("gives every spelling of one IPv6 /64 the same key", () => {
     const keys = new Set(
       [
         "2001:db8:85a3::8a2e:370:7334",
@@ -23,21 +23,21 @@ describe("the client key an address becomes", () => {
     expect([...keys]).toEqual(["2001:0db8:85a3:0000::/64"]);
   });
 
-  it("keeps two IPv6 /64s apart, and IPv4 as itself", () => {
+  it("separates two IPv6 /64s and keeps an IPv4 address unchanged", () => {
     expect(clientKeyOf("2001:db8:85a3::1")).not.toBe(clientKeyOf("2001:db8:85a4::1"));
     expect(clientKeyOf("203.0.113.9")).toBe("203.0.113.9");
 
     expect(clientKeyOf("::ffff:203.0.113.9")).toBe("203.0.113.9");
   });
 
-  it("keys a bracket anywhere but the ends as given", () => {
+  it("returns the input unchanged when brackets do not wrap it", () => {
     expect(clientKeyOf("[2001:db8::1]:443")).toBe("[2001:db8::1]:443");
     expect(clientKeyOf("2001:db8::[1]")).toBe("2001:db8::[1]");
   });
 });
 
-describe("the client address a request names", () => {
-  it("counts a blank address among those naming none", () => {
+describe("clientIpOf", () => {
+  it("returns the unknown address for a blank or missing header", () => {
     for (const blank of ["", "   "]) {
       expect(clientIpOf(new Headers({ [CLIENT_IP_HEADER]: blank }))).toBe(UNKNOWN_CLIENT_IP);
     }
@@ -45,8 +45,8 @@ describe("the client address a request names", () => {
   });
 });
 
-describe("the count a request by address spends", () => {
-  it("is its route group's, for its address's key", () => {
+describe("addressKeyOf", () => {
+  it("prefixes the client key with the route group", () => {
     const from = (address: string): Headers => new Headers({ [CLIENT_IP_HEADER]: address });
 
     expect(addressKeyOf("oauth", from("203.0.113.9"))).toBe("oauth:203.0.113.9");
@@ -55,20 +55,20 @@ describe("the count a request by address spends", () => {
   });
 });
 
-describe("whether a client key is in Anthropic's published range", () => {
-  it("holds the range's first and last address, and neither neighbour", () => {
+describe("inAnthropicRange", () => {
+  it("includes both ends of the range but neither neighbour", () => {
     expect(["160.79.104.0", "160.79.111.255"].map(inAnthropicRange)).toEqual([true, true]);
     expect(["160.79.103.255", "160.79.112.0"].map(inAnthropicRange)).toEqual([false, false]);
   });
 
-  it("holds an IPv4-mapped address by the IPv4 it keys as", () => {
+  it("matches an IPv4-mapped IPv6 address by its IPv4 address", () => {
     const from = (address: string): Headers => new Headers({ [CLIENT_IP_HEADER]: address });
 
     expect(inAnthropicRange(clientIpOf(from("::ffff:160.79.104.1")))).toBe(true);
     expect(inAnthropicRange(clientIpOf(from("::ffff:203.0.113.9")))).toBe(false);
   });
 
-  it("holds no key that is not an IPv4 address", () => {
+  it("returns false for every key that is not IPv4", () => {
     const keys = [UNKNOWN_CLIENT_IP, clientKeyOf("2001:db8:85a3::1"), "", "160.79.104.1:443"];
 
     expect(keys.map(inAnthropicRange)).toEqual([false, false, false, false]);

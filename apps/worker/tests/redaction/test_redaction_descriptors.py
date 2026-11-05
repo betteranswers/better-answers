@@ -40,7 +40,7 @@ from better_answers_worker.redaction.pseudonyms import (
 )
 from support.roots import REPOSITORY_ROOT, WORKER_ROOT
 
-AGREEMENT = REPOSITORY_ROOT / "contracts" / "redaction" / "cases.json"
+REDACTION_CASES = REPOSITORY_ROOT / "contracts" / "redaction" / "cases.json"
 CHECK_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "check.yml"
 BUILD_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "build.yml"
 
@@ -51,8 +51,8 @@ HF_HOME_IN_CI = "${{ runner.temp }}/huggingface"
 PINS_FILE = "apps/worker/src/better_answers_worker/redaction/pins.py"
 
 
-def agreement() -> dict[str, Any]:
-    raw = AGREEMENT.read_text(encoding="utf-8")
+def redaction_cases() -> dict[str, Any]:
+    raw = REDACTION_CASES.read_text(encoding="utf-8")
     return dict(json.loads(raw))
 
 
@@ -65,7 +65,7 @@ def _public_version(installed: str) -> str:
     return installed.partition("+")[0]
 
 
-def pinned_by_the_installer() -> dict[str, str]:
+def pyproject_pins() -> dict[str, str]:
     pins: dict[str, str] = {}
     for requirement in manifest()["project"]["dependencies"]:
         name, _, pinned = str(requirement).partition("==")
@@ -97,24 +97,26 @@ def descriptor_digest() -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def test_the_descriptors_and_the_agreement_name_the_same_categories() -> None:
+def test_descriptors_and_the_cases_file_list_the_same_categories() -> None:
     declared = sorted(descriptor.category for descriptor in DESCRIPTORS)
-    agreed = sorted(category["category"] for category in agreement()["categories"])
+    agreed = sorted(
+        category["category"] for category in redaction_cases()["categories"]
+    )
 
     assert declared == agreed
 
 
-def test_descriptors_take_tier_placeholder_and_narrowing_from_the_agreement() -> None:
+def test_descriptor_tier_placeholder_and_narrowing_match_the_cases_file() -> None:
     by_category = {descriptor.category: descriptor for descriptor in DESCRIPTORS}
 
-    for category in agreement()["categories"]:
+    for category in redaction_cases()["categories"]:
         descriptor = by_category[category["category"]]
         assert descriptor.tier == category["tier"], descriptor.category
         assert descriptor.placeholder == category["placeholder"], descriptor.category
         assert descriptor.narrows_to == category["narrows_to"], descriptor.category
 
 
-def test_the_entity_table_inverts_what_raises_each_category() -> None:
+def test_category_by_entity_maps_each_entity_to_its_one_category() -> None:
 
     raised = [
         (entity, descriptor.category)
@@ -126,7 +128,7 @@ def test_the_entity_table_inverts_what_raises_each_category() -> None:
     assert len(raised) == len({entity for entity, _ in raised})
 
 
-def test_the_always_set_has_the_lowest_thresholds() -> None:
+def test_always_tier_categories_have_the_lowest_thresholds() -> None:
 
     always = [item.threshold for item in DESCRIPTORS if item.tier == "always"]
     switchable = [item.threshold for item in DESCRIPTORS if item.tier != "always"]
@@ -144,7 +146,7 @@ def test_only_pattern_raised_categories_declare_enhancer_words() -> None:
     assert without_context == ["special-category", "person-name", "job-title"]
 
 
-def test_only_the_special_category_row_declares_cues_that_withhold() -> None:
+def test_only_the_special_category_declares_cues() -> None:
     with_cues = {
         descriptor.category: descriptor.cues
         for descriptor in DESCRIPTORS
@@ -156,44 +158,42 @@ def test_only_the_special_category_row_declares_cues_that_withhold() -> None:
     }
 
 
-def test_asks_the_analyzer_for_exactly_the_declared_entities() -> None:
+def test_analyzer_recognisers_support_exactly_the_declared_entities() -> None:
 
     registry = build_analyzer().registry
 
-    answered_for = {
+    supported = {
         entity
         for recogniser in registry.recognizers
         for entity in recogniser.supported_entities
     }
 
-    assert sorted(answered_for) == sorted(CATEGORY_BY_ENTITY)
+    assert sorted(supported) == sorted(CATEGORY_BY_ENTITY)
 
 
-def test_refuses_an_unraisable_category_before_building_an_analyzer() -> None:
+def test_rejects_a_category_no_recogniser_raises_before_building_analyzer() -> None:
 
     refuse_unreachable_entities(DESCRIPTOR_BY_ENTITY, GLINER_LABELS)
-    asking_the_model_for_something_else = {"vehicle": "VEHICLE_REGISTRATION"}
+    unrelated_model_labels = {"vehicle": "VEHICLE_REGISTRATION"}
 
     with pytest.raises(ValueError) as refusal:
-        refuse_unreachable_entities(
-            DESCRIPTOR_BY_ENTITY, asking_the_model_for_something_else
-        )
+        refuse_unreachable_entities(DESCRIPTOR_BY_ENTITY, unrelated_model_labels)
 
     assert "PERSON" in str(refusal.value)
     assert "JOB_TITLE" in str(refusal.value)
     assert "EMAIL_ADDRESS" not in str(refusal.value)
 
 
-def test_refuses_an_undeclared_label_before_building_an_analyzer() -> None:
+def test_rejects_an_undeclared_model_label_before_building_an_analyzer() -> None:
 
-    the_two_the_model_raises = {"person": "PERSON", "job title": "JOB_TITLE"}
+    model_labels = {"person": "PERSON", "job title": "JOB_TITLE"}
 
-    refuse_unreachable_entities(DESCRIPTOR_BY_ENTITY, the_two_the_model_raises)
+    refuse_unreachable_entities(DESCRIPTOR_BY_ENTITY, model_labels)
 
     with pytest.raises(ValueError) as refusal:
         refuse_unreachable_entities(
             DESCRIPTOR_BY_ENTITY,
-            {**the_two_the_model_raises, "vehicle": "VEHICLE_REGISTRATION"},
+            {**model_labels, "vehicle": "VEHICLE_REGISTRATION"},
         )
 
     assert "VEHICLE_REGISTRATION" in str(refusal.value)
@@ -201,16 +201,16 @@ def test_refuses_an_undeclared_label_before_building_an_analyzer() -> None:
     assert "JOB_TITLE" not in str(refusal.value)
 
 
-def test_the_twenty_seventh_name_keeps_the_shape_the_agreement_pins() -> None:
+def test_the_twenty_seventh_pseudonym_matches_the_placeholder_shape() -> None:
 
-    shape = re.compile(agreement()["placeholder_shape"])
-    met_in_order = [f"Person Number {index}" for index in range(27)]
+    shape = re.compile(redaction_cases()["placeholder_shape"])
+    names_in_order = [f"Person Number {index}" for index in range(27)]
 
-    letters = pseudonyms_for(met_in_order, "a-connected-source-seed")
+    assigned = pseudonyms_for(names_in_order, "a-connected-source-seed")
 
-    assert len(letters) == 27
-    first = letters[normalised(met_in_order[0])]
-    twenty_seventh = letters[normalised(met_in_order[26])]
+    assert len(assigned) == 27
+    first = assigned[normalised(names_in_order[0])]
+    twenty_seventh = assigned[normalised(names_in_order[26])]
     assert len(first) == 1
     assert twenty_seventh == first * 2
     assert shape.fullmatch(written_as(twenty_seventh, "[person A]")) is not None
@@ -228,13 +228,13 @@ def test_the_version_string_joins_rule_version_and_detector_pin() -> None:
     assert VERSION_STRING.split(":") == [RULE_VERSION, DETECTOR_PIN]
 
 
-def test_the_version_string_is_written_the_way_the_agreement_says() -> None:
-    pattern = re.compile(agreement()["version_string"]["pattern"])
+def test_the_version_string_matches_the_cases_file_pattern() -> None:
+    pattern = re.compile(redaction_cases()["version_string"]["pattern"])
 
     assert pattern.fullmatch(VERSION_STRING) is not None
 
 
-def test_bumps_the_rule_version_with_its_table() -> None:
+def test_descriptor_digest_is_pinned_beside_the_rule_version() -> None:
 
     digest = "e2244c397c2677efaa5017848d17d8d7a499394902b73585bb67f090231b4d8d"
 
@@ -242,7 +242,7 @@ def test_bumps_the_rule_version_with_its_table() -> None:
     assert RULE_VERSION == "7"
 
 
-def test_the_consumer_domain_list_carries_its_date_and_its_source() -> None:
+def test_consumer_domain_list_has_a_date_and_a_matching_source() -> None:
 
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", READ_ON) is not None
     assert CONSUMER_DOMAINS
@@ -257,8 +257,8 @@ def test_the_consumer_domain_list_carries_its_date_and_its_source() -> None:
     assert cited == set(CONSUMER_DOMAINS)
 
 
-def test_every_pin_is_the_version_the_installer_pins() -> None:
-    pins = pinned_by_the_installer()
+def test_every_pin_matches_the_version_in_pyproject() -> None:
+    pins = pyproject_pins()
 
     assert pins["presidio-analyzer"] == PRESIDIO_VERSION
     assert pins["presidio-anonymizer"] == PRESIDIO_VERSION
@@ -267,21 +267,21 @@ def test_every_pin_is_the_version_the_installer_pins() -> None:
     assert pins["torch"] == TORCH_VERSION
 
 
-def test_pins_the_spacy_pipeline_by_its_download_url() -> None:
+def test_spacy_model_download_url_names_the_pinned_version() -> None:
 
     source = manifest()["tool"]["uv"]["sources"]["en-core-web-sm"]
 
     assert f"{SPACY_MODEL}-{SPACY_MODEL_VERSION}" in str(source["url"])
 
 
-def test_a_wheels_local_version_segment_never_moves_the_pin() -> None:
+def test_a_wheel_local_version_segment_is_ignored_when_comparing_pins() -> None:
 
     assert _public_version("2.14.0+cpu") == TORCH_VERSION
     assert _public_version("2.14.0") == TORCH_VERSION
     assert _public_version("2.13.0+cpu") != TORCH_VERSION
 
 
-def test_every_pin_is_the_version_the_interpreter_reports() -> None:
+def test_every_pin_matches_the_installed_version() -> None:
 
     reported = {
         "presidio-analyzer": PRESIDIO_VERSION,
@@ -296,7 +296,7 @@ def test_every_pin_is_the_version_the_interpreter_reports() -> None:
         assert _public_version(installed_version(distribution)) == pinned, distribution
 
 
-def test_the_check_workflow_caches_weights_where_the_detector_reads() -> None:
+def test_check_workflow_restores_model_weights_into_hf_home() -> None:
 
     workflow = CHECK_WORKFLOW.read_text(encoding="utf-8")
 
@@ -310,7 +310,7 @@ def _weights_keys(workflow: str) -> set[str]:
     return set(re.findall(r"^\s+key: (hugging-face-.*)$", workflow, re.MULTILINE))
 
 
-def test_main_saves_the_weights_under_the_key_check_restores() -> None:
+def test_build_workflow_saves_weights_under_the_key_check_restores() -> None:
     # GitHub scopes a pull request's cache entry to its own ref, which no later
     # run reads.
     check = CHECK_WORKFLOW.read_text(encoding="utf-8")

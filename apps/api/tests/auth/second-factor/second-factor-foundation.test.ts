@@ -43,7 +43,7 @@ const sessionRead = z.object({
   session: z.record(z.string(), z.unknown()),
 });
 
-const authenticatorHeldBy = async (personId: string) => {
+const authenticatorRowsOf = async (personId: string) => {
   const found = await app().database.superuser.query<{
     authenticator_enabled: boolean;
     verified: boolean;
@@ -57,11 +57,11 @@ const authenticatorHeldBy = async (personId: string) => {
 };
 
 describe("an Admin with an authenticator signing in by email code", () => {
-  // The library's own factor check skips email-code sign-in; our gate holds the session pending.
-  it("gets a pending session, refused until it confirms", async () => {
+  // Better Auth's two-factor check skips email-code sign-in, so the API marks the session pending itself.
+  it("can read its session but gets 403 from /me", async () => {
     const { admin } = await app().provision();
     await setUpAnAuthenticator(app(), await signedInByEmailOnly(app(), admin.email));
-    expect(await authenticatorHeldBy(admin.id)).toEqual([
+    expect(await authenticatorRowsOf(admin.id)).toEqual([
       { authenticator_enabled: true, verified: true },
     ]);
 
@@ -78,7 +78,7 @@ describe("an Admin with an authenticator signing in by email code", () => {
 
 describe("the endpoints that change, reveal or list factors or sessions", () => {
   it.each([...FACTOR_PATHS, ...CLOSED_SESSION_PATHS])(
-    "answers %s as absent, to a signed-in person",
+    "answers 404 at %s to a signed-in person",
     async (path) => {
       const person = await app().person();
       const client = await signedInClient(app(), person.email);
@@ -89,14 +89,14 @@ describe("the endpoints that change, reveal or list factors or sessions", () => 
     },
   );
 
-  it("reads the plugins' paths, the key-revealing one among them", () => {
+  it("finds the plugin paths, including /two-factor/get-totp-uri", () => {
     expect(FACTOR_PATHS).toContain("/two-factor/get-totp-uri");
     expect(FACTOR_PATHS).toContain("/passkey/verify-registration");
   });
 });
 
 describe("a session read", () => {
-  it("comes from the database: a deleted session reads as none", async () => {
+  it("returns null once the session row is deleted", async () => {
     const person = await app().person();
     const client = await signedInClient(app(), person.email);
     expect(await (await client.fetch("/get-session")).json()).toMatchObject({
@@ -108,7 +108,7 @@ describe("a session read", () => {
     expect(await (await client.fetch("/get-session")).json()).toBeNull();
   });
 
-  it("carries none of the second factor's own fields, once written", async () => {
+  it("omits the second-factor fields even when they are set", async () => {
     const person = await app().person();
     const client = await signedInClient(app(), person.email);
     await app().database.superuser.query(
@@ -132,8 +132,8 @@ describe("a session read", () => {
   });
 });
 
-describe("the second factor's own fields", () => {
-  it("are declared for the platform alone to write and read", () => {
+describe("the second-factor fields", () => {
+  it("are optional, never accepted as input, and never returned", () => {
     const declared: Record<string, Declared> = {
       ...asBuilt.options.user.additionalFields,
       ...asBuilt.options.session.additionalFields,

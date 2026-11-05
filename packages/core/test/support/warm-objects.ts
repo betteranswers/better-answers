@@ -115,8 +115,8 @@ const providedWarmObjects = (): WarmObjects | undefined => {
   try {
     return inject("warmObjects");
   } catch {
-    // `inject` throws outside a worker as well as where nothing was provided, and both answer
-    // the only question here: this caller has no warm store.
+    // `inject` throws both outside a worker and when nothing was provided. Either way, this caller
+    // has no warm store.
     return undefined;
   }
 };
@@ -177,8 +177,8 @@ const bucketIdFor = async (warm: WarmObjects, name: string): Promise<string> => 
   const refused = await refusalOf("CreateBucket", created);
 
   /**
-   * A mutation run re-enters a file's `beforeAll` against the Garage the run before it left, so
-   * the alias it wants is already standing.
+   * A mutation run re-enters a file's `beforeAll` against the Garage the previous run left, so
+   * the alias may already exist.
    */
   const found = await askAdmin(
     warm,
@@ -189,7 +189,7 @@ const bucketIdFor = async (warm: WarmObjects, name: string): Promise<string> => 
   return (await answerOf("GetBucketInfo", found, bucketShape)).id;
 };
 
-/** The first listing page alone: up to 1,000 keys. */
+/** Reads only the first listing page, which holds up to 1,000 keys. */
 export const keysIn = async (door: ObjectDoor): Promise<readonly string[]> => {
   const listed = await door.client.send(new ListObjectsV2Command({ Bucket: door.bucket }));
   return (listed.Contents ?? []).flatMap((held) => (held.Key === undefined ? [] : [held.Key]));
@@ -254,8 +254,8 @@ export const openObjectStore = async (storeKey?: string): Promise<ObjectStore> =
   if (warm !== undefined) return storeOver(warm, name, NOTHING_TO_STOP);
 
   /**
-   * Vitest takes its `globalSetup` once a process, so a watch or mutation session that opened
-   * on other files has none to hand out.
+   * Vitest runs `globalSetup` once per process, so a watch or mutation session that started on
+   * other files provides no warm store.
    */
   const started = await startGarage();
   try {

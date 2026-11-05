@@ -88,7 +88,7 @@ const removing = (workspace: ProvisionedWorkspace, personId: string) =>
     removeMember(principal, tx, { ...inputOf(removeMemberInput, { personId }), at: new Date() }),
   );
 
-/** Whether any transaction has locked or written the row since it was seeded: its xmax stays 0 until one does. */
+/** Postgres leaves a row's xmax at 0 until a transaction locks or updates it. */
 const rowEverLocked = async (workspaceId: string, userId: string): Promise<boolean> =>
   (
     await db().pool.query<{ locked: boolean }>(
@@ -98,7 +98,7 @@ const rowEverLocked = async (workspaceId: string, userId: string): Promise<boole
     )
   ).rows[0]?.locked ?? true;
 
-describe("stamping a member's last activity", () => {
+describe("recording a member's last activity", () => {
   it("writes the row on the member's first request", async () => {
     const workspace = await provisionedWorkspace(db(), "FirstStamp");
     const viewer = await joining(workspace, "Viewer");
@@ -108,12 +108,12 @@ describe("stamping a member's last activity", () => {
     assert(read.ok);
     expect(read.value).toBe("Viewer");
     const at = await stampedIn(workspace.workspaceId, viewer);
-    expect(at, "the request was answered, so a row should be stamped").toBeDefined();
+    expect(at, "the answered request left no last-active row").toBeDefined();
     assert(at);
     expect(Date.now() - at.getTime()).toBeLessThan(60_000);
   });
 
-  it("stamps once within the hour, and again after it", async () => {
+  it("updates the stamp at most once an hour", async () => {
     const workspace = await provisionedWorkspace(db(), "HourlyStamp");
     const viewer = await joining(workspace, "Viewer");
     const seeded = (await stampedAgo(workspace.workspaceId, viewer, TEN_MINUTES_MS)).at;
@@ -136,11 +136,11 @@ describe("stamping a member's last activity", () => {
     assert(stampedAgain, "the later request was stamped");
     expect(
       stampedAgain.getTime() - backdated.getTime(),
-      "a request an hour on from the last stamp writes it again",
+      "a request over an hour after the last stamp did not write a new one",
     ).toBeGreaterThan(HOUR_MS);
   });
 
-  it("stamps the workspace an MCP call names, and no other", async () => {
+  it("stamps only the workspace that an MCP call names", async () => {
     const first = await provisionedWorkspace(db(), "StampedHere");
     const second = await provisionedWorkspace(db(), "StampedThere");
     const viewer = await joining(first, "Viewer");
@@ -154,7 +154,7 @@ describe("stamping a member's last activity", () => {
     expect(called.value.role).toBe("Viewer");
     expect(
       await stampedIn(second.workspaceId, viewer),
-      "another workspace is untouched",
+      "the MCP call stamped a workspace it did not name",
     ).toBeUndefined();
     const firstStamped = await stampedIn(first.workspaceId, viewer);
     expect(firstStamped).toBeDefined();
@@ -162,12 +162,13 @@ describe("stamping a member's last activity", () => {
     await mcpCallIn(second.workspaceId, viewer);
 
     expect(await stampedIn(second.workspaceId, viewer)).toBeDefined();
-    expect(await stampedIn(first.workspaceId, viewer), "the first stamp stands").toEqual(
-      firstStamped,
-    );
+    expect(
+      await stampedIn(first.workspaceId, viewer),
+      "a call in the second workspace changed the first workspace's stamp",
+    ).toEqual(firstStamped);
   });
 
-  it("leaves the request answered when the stamp fails", async () => {
+  it("still answers the request when the stamp fails", async () => {
     const workspace = await provisionedWorkspace(db(), "FailedStamp");
     const viewer = await joining(workspace, "Viewer");
 
@@ -180,7 +181,7 @@ describe("stamping a member's last activity", () => {
     expect(await stampedIn(workspace.workspaceId, viewer)).toBeUndefined();
   });
 
-  it("never lets a bulk act wait on a held stamp", async () => {
+  it("never makes bulk role changes wait on a locked stamp", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkPastAStamp");
     const viewer = await joining(workspace, "Viewer");
     const editor = await joining(workspace, "Editor");
@@ -199,11 +200,11 @@ describe("stamping a member's last activity", () => {
     expect(acted.value.changed).toEqual([editor]);
     expect(
       await stampedIn(workspace.workspaceId, workspace.adminUserId),
-      "the stamp was dropped, not waited on",
+      "the stamp was written after waiting instead of being dropped",
     ).toEqual(stale);
   });
 
-  it("never lets a stamp wait on a bulk act", async () => {
+  it("never makes a stamp wait on a bulk role change", async () => {
     const workspace = await provisionedWorkspace(db(), "StampPastABulk");
     const viewer = await joining(workspace, "Viewer");
     const editor = await joining(workspace, "Editor");
@@ -222,7 +223,7 @@ describe("stamping a member's last activity", () => {
       expect(read.value).toBe("Admin");
       expect(
         await stampedIn(workspace.workspaceId, workspace.adminUserId),
-        "the stamp landed while the bulk act held its rows",
+        "no stamp was written while the bulk change held its rows",
       ).toBeDefined();
 
       await release();
@@ -237,7 +238,7 @@ describe("stamping a member's last activity", () => {
     });
   });
 
-  it("a removal deletes the row here alone", async () => {
+  it("deletes only this workspace's row when a member is removed", async () => {
     const ours = await provisionedWorkspace(db(), "RowRemoved");
     const theirs = await provisionedWorkspace(db(), "RowKept");
     const viewer = await joining(ours, "Viewer");
@@ -254,7 +255,7 @@ describe("stamping a member's last activity", () => {
     expect(await stampedIn(theirs.workspaceId, viewer)).toBeDefined();
   });
 
-  it("locks no row stamped within the hour", async () => {
+  it("does not lock a row stamped within the hour", async () => {
     const workspace = await provisionedWorkspace(db(), "FreshStampUnlocked");
     const viewer = await joining(workspace, "Viewer");
     await stampedAgo(workspace.workspaceId, viewer, TEN_MINUTES_MS);
@@ -265,11 +266,11 @@ describe("stamping a member's last activity", () => {
 
     expect(
       await rowEverLocked(workspace.workspaceId, viewer),
-      "a request within the hour reads the row and opens no write",
+      "a request within the hour locked or wrote the last-active row",
     ).toBe(false);
   });
 
-  it("leaves the request answered when the pool has ended", async () => {
+  it("still answers the request when the pool has ended", async () => {
     const workspace = await provisionedWorkspace(db(), "PoolEnded");
     const viewer = await joining(workspace, "Viewer");
     const pool = new pg.Pool({
@@ -293,7 +294,7 @@ describe("stamping a member's last activity", () => {
     expect(answered.value).toBe("Viewer");
     expect(
       await stampedIn(workspace.workspaceId, viewer),
-      "no connection was left for the stamp, and it was let go",
+      "the stamp was written even though the pool had ended",
     ).toBeUndefined();
   });
 
@@ -310,7 +311,7 @@ describe("stamping a member's last activity", () => {
     expect(read.value).toBe("Viewer");
     expect(
       await stampedIn(workspace.workspaceId, viewer),
-      "the person had left before the stamp",
+      "a stamp was written for a member removed mid-request",
     ).toBeUndefined();
   });
 });

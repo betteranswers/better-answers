@@ -14,13 +14,13 @@ from support.roots import REPOSITORY_ROOT
 CONTRACTS_DIR = REPOSITORY_ROOT / "contracts"
 
 
-def read_links() -> dict[str, Any]:
+def read_link_cases() -> dict[str, Any]:
     raw = (CONTRACTS_DIR / "links" / "cases.json").read_text(encoding="utf-8")
     return cast("dict[str, Any]", json.loads(raw))
 
 
-def test_makes_exactly_the_links_each_case_names_by_ordinal() -> None:
-    fixture = read_links()
+def test_derives_the_links_each_contract_case_expects() -> None:
+    fixture = read_link_cases()
     citing = fixture["citing"]
 
     made = [
@@ -68,8 +68,8 @@ def test_makes_exactly_the_links_each_case_names_by_ordinal() -> None:
     ]
 
 
-def test_leaves_unresolved_exactly_the_paths_each_case_names() -> None:
-    fixture = read_links()
+def test_reports_the_unresolved_paths_each_contract_case_expects() -> None:
+    fixture = read_link_cases()
     citing = fixture["citing"]
 
     made = [
@@ -101,8 +101,8 @@ def test_leaves_unresolved_exactly_the_paths_each_case_names() -> None:
     ]
 
 
-def test_resolves_each_mark_to_the_source_each_case_names() -> None:
-    fixture = read_links()
+def test_resolves_each_mark_to_the_source_its_contract_case_expects() -> None:
+    fixture = read_link_cases()
 
     read = [
         {
@@ -122,8 +122,8 @@ def test_resolves_each_mark_to_the_source_each_case_names() -> None:
     ]
 
 
-def test_places_each_mark_where_the_body_writes_it() -> None:
-    fixture = read_links()
+def test_each_mark_offset_points_at_its_text_in_the_body() -> None:
+    fixture = read_link_cases()
 
     for case in fixture["cases"]:
         _links, marks = links_and_marks_of(case["body"], {"sources": case["sources"]})

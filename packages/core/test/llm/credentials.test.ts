@@ -31,7 +31,7 @@ const door = () => openPostgres(db().runtimePool);
 const aWorkspace = (): Promise<string> =>
   seedingWith(db().pool, async (seed) => (await seed.workspace()).id);
 
-const setting = (workspaceId: string, key: string, provider = "anthropic") =>
+const setKey = (workspaceId: string, key: string, provider = "anthropic") =>
   setModelKey(bootstrap, door(), modelKeySetting, { workspaceId, provider, key });
 
 const keyReadIn = (
@@ -53,7 +53,7 @@ const rowsOf = async (workspaceId: string) => {
   return stored.rows;
 };
 
-const frameCopied = async (
+const copySealedKey = async (
   from: string,
   onto: { readonly workspaceId: string; readonly provider: ModelProvider },
 ): Promise<void> => {
@@ -81,7 +81,7 @@ const shown = (value: unknown): string =>
     value instanceof Error ? `${value.message}\n${value.stack ?? ""}` : "",
   ].join("\n");
 
-const writtenOut = (bytes: Uint8Array): readonly string[] => {
+const printedFormsOf = (bytes: Uint8Array): readonly string[] => {
   const held = Buffer.from(bytes);
   const hex = held.toString("hex");
   return [
@@ -115,7 +115,7 @@ const printedDuring = async (work: () => Promise<unknown>): Promise<string> => {
   return printed.join("\n");
 };
 
-const NOT_ONE_HEADER_VALUE = [
+const MALFORMED_KEYS = [
   ["an empty key", ""],
   ["a key of spaces", "   "],
   ["a key with a space in it", "sk-test u9"],
@@ -127,7 +127,7 @@ const NOT_ONE_HEADER_VALUE = [
 describe("a workspace's model key", () => {
   it("reads a key back only inside its own workspace", async () => {
     const [holder, other] = [await aWorkspace(), await aWorkspace()];
-    await setting(holder, A_KEY);
+    await setKey(holder, A_KEY);
 
     const inItsOwn = await revealedIn(holder);
     const inAnother = await keyReadIn(other);
@@ -138,7 +138,7 @@ describe("a workspace's model key", () => {
 
   it("refuses a read outside any workspace's transaction", async () => {
     const workspaceId = await aWorkspace();
-    await setting(workspaceId, A_KEY);
+    await setKey(workspaceId, A_KEY);
 
     const read = await attempt(() =>
       withIdentityRead(bootstrap, door(), (tx) => credentials.readModelKey(tx, "anthropic")),
@@ -153,7 +153,7 @@ describe("a workspace's model key", () => {
   it("writes one audit event naming the provider, never the key", async () => {
     const workspaceId = await aWorkspace();
 
-    await setting(workspaceId, A_KEY);
+    await setKey(workspaceId, A_KEY);
 
     const events = await eventsOf(workspaceId);
     expect(events).toEqual([
@@ -170,7 +170,7 @@ describe("a workspace's model key", () => {
     expect(JSON.stringify(events)).not.toContain(A_KEY);
   });
 
-  it("keeps no key whose audit event was not written", async () => {
+  it("stores no key when writing its audit event fails", async () => {
     const workspaceId = boundarySchemas.workspace.select.shape.id.parse(await aWorkspace());
 
     const stored = await attempt(() =>
@@ -188,19 +188,19 @@ describe("a workspace's model key", () => {
     expect(await rowsOf(workspaceId)).toEqual([]);
   });
 
-  it("opens no row sealed under another envelope key", async () => {
+  it("refuses to open a key sealed under another envelope key", async () => {
     const workspaceId = await aWorkspace();
-    await setting(workspaceId, A_KEY);
+    await setKey(workspaceId, A_KEY);
 
     const read = await keyReadIn(workspaceId, "anthropic", openCredentials(ANOTHER_ENVELOPE_KEY));
 
     expect(read).toEqual({ ok: false, error: "envelope-not-authentic" });
   });
 
-  it("shows a stored key nowhere but the provider's read", async () => {
+  it("reveals a stored key only through readModelKey", async () => {
     const workspaceId = await aWorkspace();
 
-    const set = await setting(workspaceId, A_KEY);
+    const set = await setKey(workspaceId, A_KEY);
     const read = await keyReadIn(workspaceId);
     const rows = await rowsOf(workspaceId);
     const underAnother = await keyReadIn(
@@ -209,12 +209,12 @@ describe("a workspace's model key", () => {
       openCredentials(ANOTHER_ENVELOPE_KEY),
     );
     const refused = await whileWritesAreRefused(db().pool, "model_key", () =>
-      setting(workspaceId, A_NEWER_KEY),
+      setKey(workspaceId, A_NEWER_KEY),
     );
 
-    assert(read.ok, "the key was stored, so its absence means something");
-    expect(read.value?.reveal(), "the key was stored, so its absence means something").toBe(A_KEY);
-    assert(!refused.ok, "the store's refusal reaches the caller as an error");
+    assert(read.ok, "reading the stored key failed");
+    expect(read.value?.reveal(), "the read did not reveal the stored key").toBe(A_KEY);
+    assert(!refused.ok, "setting a key succeeded while writes were refused");
     const everythingElse = [
       shown(set),
       shown(read),
@@ -229,44 +229,46 @@ describe("a workspace's model key", () => {
     expect(everythingElse).not.toContain(A_NEWER_KEY);
   });
 
-  it("prints neither key while setting and reading one", async () => {
+  it("prints neither the model key nor the envelope key", async () => {
     const workspaceId = await aWorkspace();
     let revealed: string | undefined;
 
     const printed = await printedDuring(async () => {
-      await setting(workspaceId, A_KEY);
+      await setKey(workspaceId, A_KEY);
       revealed = await revealedIn(workspaceId);
     });
     const control = await printedDuring(async () => {
       process.stdout.write(`${A_KEY} ${String(ENVELOPE_KEY)}\n`);
     });
 
-    expect(revealed, "a key was set and read while the process was watched").toBe(A_KEY);
-    const secrets = [A_KEY, ...writtenOut(ENVELOPE_KEY)];
+    expect(revealed, "the watched set and read did not return the key").toBe(A_KEY);
+    const secrets = [A_KEY, ...printedFormsOf(ENVELOPE_KEY)];
     expect(secrets.filter((secret) => printed.includes(secret))).toEqual([]);
     expect(
       secrets.filter((secret) => control.includes(secret)).length,
-      "the watch sees a printed key",
+      "the watch missed a key the control printed",
     ).toBeGreaterThan(1);
   });
 
   it.each([
     ["opening to read", () => openCredentials(A_SHORT_ENVELOPE_KEY)],
     ["opening to set", () => openModelKeySetting(A_SHORT_ENVELOPE_KEY)],
-  ])("%s names no byte of a short key", async (_side, open) => {
+  ])("%s fails and hides the short key's bytes", async (_side, open) => {
     const opened = await attempt(async () => open());
 
-    assert(!opened.ok, "a short envelope key opens nothing");
+    assert(!opened.ok, "opening with a short envelope key succeeded");
     expect(opened.error.message).toBe("credentials: an envelope key is 32 bytes, not 5");
     const thrown = shown(opened.error);
-    expect(writtenOut(A_SHORT_ENVELOPE_KEY).filter((form) => thrown.includes(form))).toEqual([]);
+    expect(printedFormsOf(A_SHORT_ENVELOPE_KEY).filter((form) => thrown.includes(form))).toEqual(
+      [],
+    );
   });
 
   it("leaves one current key when a key is set twice", async () => {
     const workspaceId = await aWorkspace();
 
-    await setting(workspaceId, A_KEY);
-    await setting(workspaceId, A_NEWER_KEY);
+    await setKey(workspaceId, A_KEY);
+    await setKey(workspaceId, A_NEWER_KEY);
 
     expect(await rowsOf(workspaceId)).toHaveLength(1);
     expect(await revealedIn(workspaceId)).toBe(A_NEWER_KEY);
@@ -276,54 +278,54 @@ describe("a workspace's model key", () => {
     ]);
   });
 
-  it("reads a workspace with no key as none", async () => {
+  it("reads no key for a workspace that set none", async () => {
     const workspaceId = await aWorkspace();
 
     expect(await keyReadIn(workspaceId)).toEqual({ ok: true, value: undefined });
   });
 
-  it("holds each model provider's key apart", async () => {
+  it("keeps a separate key for each model provider", async () => {
     const workspaceId = await aWorkspace();
 
-    await setting(workspaceId, A_KEY, "anthropic");
-    await setting(workspaceId, A_NEWER_KEY, "mistral");
+    await setKey(workspaceId, A_KEY, "anthropic");
+    await setKey(workspaceId, A_NEWER_KEY, "mistral");
 
     expect(await revealedIn(workspaceId, "anthropic")).toBe(A_KEY);
     expect(await revealedIn(workspaceId, "mistral")).toBe(A_NEWER_KEY);
   });
 
-  it("opens no frame copied onto another workspace's row", async () => {
+  it("refuses a sealed key copied onto another workspace's row", async () => {
     const [holder, other] = [await aWorkspace(), await aWorkspace()];
-    await setting(holder, A_KEY);
+    await setKey(holder, A_KEY);
 
-    await frameCopied(holder, { workspaceId: other, provider: "anthropic" });
+    await copySealedKey(holder, { workspaceId: other, provider: "anthropic" });
 
     expect(await revealedIn(other)).toBe("envelope-not-authentic");
   });
 
-  it("opens no frame copied onto another provider's row", async () => {
+  it("refuses a sealed key copied onto another provider's row", async () => {
     const workspaceId = await aWorkspace();
-    await setting(workspaceId, A_KEY, "anthropic");
+    await setKey(workspaceId, A_KEY, "anthropic");
 
-    await frameCopied(workspaceId, { workspaceId, provider: "mistral" });
+    await copySealedKey(workspaceId, { workspaceId, provider: "mistral" });
 
     expect(await revealedIn(workspaceId, "mistral")).toBe("envelope-not-authentic");
   });
 
-  it("stores a key of exactly the longest length", async () => {
+  it("stores a key of exactly 1,024 characters", async () => {
     const workspaceId = await aWorkspace();
     const longest = "k".repeat(LONGEST_KEY);
 
-    const set = await setting(workspaceId, longest);
+    const set = await setKey(workspaceId, longest);
 
     expect(set.ok).toBe(true);
     expect(await revealedIn(workspaceId)).toBe(longest);
   });
 
-  it.each(NOT_ONE_HEADER_VALUE)("refuses %s, storing nothing", async (_case, key) => {
+  it.each(MALFORMED_KEYS)("refuses %s, storing nothing", async (_case, key) => {
     const workspaceId = await aWorkspace();
 
-    const set = await setting(workspaceId, key);
+    const set = await setKey(workspaceId, key);
 
     expect(set).toEqual({ ok: false, error: "malformed" });
     expect(await rowsOf(workspaceId)).toEqual([]);
@@ -333,21 +335,21 @@ describe("a workspace's model key", () => {
   it("refuses a model provider outside the closed set", async () => {
     const workspaceId = await aWorkspace();
 
-    expect(await setting(workspaceId, A_KEY, "openai")).toEqual({ ok: false, error: "malformed" });
+    expect(await setKey(workspaceId, A_KEY, "openai")).toEqual({ ok: false, error: "malformed" });
     expect(await rowsOf(workspaceId)).toEqual([]);
   });
 
   it("refuses a workspace that does not exist", async () => {
     const nowhere = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
 
-    expect(await setting(nowhere, A_KEY)).toEqual({ ok: false, error: "no-such-workspace" });
+    expect(await setKey(nowhere, A_KEY)).toEqual({ ok: false, error: "no-such-workspace" });
     expect(await rowsOf(nowhere)).toEqual([]);
   });
 
-  it("answers the workspace and model provider it set", async () => {
+  it("returns the workspace and model provider it set", async () => {
     const workspaceId = await aWorkspace();
 
-    expect(await setting(workspaceId, A_KEY, "mistral")).toEqual({
+    expect(await setKey(workspaceId, A_KEY, "mistral")).toEqual({
       ok: true,
       value: { workspaceId, provider: "mistral" },
     });
@@ -369,7 +371,7 @@ describe("a Workers AI key", () => {
   it("stores an account id and a token as one key", async () => {
     const workspaceId = await aWorkspace();
 
-    const set = await setting(workspaceId, A_WORKERS_AI_KEY, "cloudflare");
+    const set = await setKey(workspaceId, A_WORKERS_AI_KEY, "cloudflare");
 
     expect(set).toEqual({ ok: true, value: { workspaceId, provider: "cloudflare" } });
     expect(await revealedIn(workspaceId, "cloudflare")).toBe(A_WORKERS_AI_KEY);
@@ -378,7 +380,7 @@ describe("a Workers AI key", () => {
   it.each(NOT_A_WORKERS_AI_KEY)("refuses %s, storing nothing", async (_case, key) => {
     const workspaceId = await aWorkspace();
 
-    expect(await setting(workspaceId, key, "cloudflare")).toEqual({
+    expect(await setKey(workspaceId, key, "cloudflare")).toEqual({
       ok: false,
       error: "malformed",
     });
@@ -386,9 +388,9 @@ describe("a Workers AI key", () => {
     expect(await eventsOf(workspaceId)).toEqual([]);
   });
 
-  it("holds another provider's key to no such form", async () => {
+  it("accepts another provider's key without the Workers AI form", async () => {
     const workspaceId = await aWorkspace();
 
-    expect((await setting(workspaceId, "invented_Token-u15", "anthropic")).ok).toBe(true);
+    expect((await setKey(workspaceId, "invented_Token-u15", "anthropic")).ok).toBe(true);
   });
 });

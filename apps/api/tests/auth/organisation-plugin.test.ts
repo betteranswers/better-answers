@@ -164,13 +164,13 @@ describe("the organisation plugin's mounted paths", () => {
 });
 
 describe("the organisation plugin's writes and short name check", () => {
-  it.each(CLOSED)("refuses %s for Admin, Editor and Viewer", async (where, callOf) => {
+  it.each(CLOSED)("answers 404 to %s for Admin, Editor and Viewer", async (where, callOf) => {
     const scene = await aScene();
     const before = await identityRows();
 
     for (const role of ROLES) {
       const answered = await send(scene.clients[role], where, callOf(scene));
-      expect(answered.status, `${where} as ${role}`).toBe(404);
+      expect(answered.status, `${where} as ${role} did not answer 404`).toBe(404);
     }
 
     expect(await identityRows()).toEqual(before);
@@ -178,13 +178,13 @@ describe("the organisation plugin's writes and short name check", () => {
 });
 
 describe("the organisation plugin's kept endpoints", () => {
-  it.each(KEPT)("still answers %s to a signed-in person", async (where, callOf) => {
+  it.each(KEPT)("answers 200 to %s for a signed-in person", async (where, callOf) => {
     const scene = await aKeptScene();
 
     expect((await send(scene.client, where, callOf(scene))).status).toBe(200);
   });
 
-  it("switches the session's workspace through the picker's path", async () => {
+  it("switches the session's active workspace through set-active", async () => {
     const scene = await aKeptScene();
 
     await setActiveWorkspace(scene.client, scene.other);
@@ -208,7 +208,7 @@ describe("the organisation plugin's kept endpoints", () => {
     ]);
   });
 
-  it("answers an Admin no for every organisation write", async () => {
+  it("reports that an Admin lacks every organisation write permission", async () => {
     const scene = await aKeptScene();
     const writes = [
       { organization: ["update"] },

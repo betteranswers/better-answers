@@ -22,7 +22,7 @@ const whyLint = oxlintOver(pluginConfigFor({ [WHY_RULE]: "error" }), {
   flagged: [FILE],
 });
 
-describe("the doc-block rule fires on a declaration's line comment", () => {
+describe("the doc-block rule refuses a declaration's line comment", () => {
   it("names the form to write and why", () => {
     const output = docBlockLint.output(holding("// Kept short.\nexport const keep = 1;\n"));
 
@@ -59,7 +59,7 @@ describe("the doc-block rule fires on a declaration's line comment", () => {
   });
 });
 
-describe("the doc-block rule stays silent off a declaration", () => {
+describe("the doc-block rule accepts comments not on a declaration", () => {
   it.each([
     ["a doc block", "/** Kept short. */\nexport const keep = 1;\n"],
     ["a plain block comment", "/* Kept short. */\nexport const keep = 1;\n"],
@@ -95,7 +95,7 @@ describe("the doc-block rule stays silent off a declaration", () => {
     ],
     ["a notice", "// SPDX-License-Identifier: MIT\nexport const keep = 1;\n"],
     ["a triple-slash reference", '/// <reference types="node" />\nexport const keep = 1;\n'],
-  ])("walks past %s", (_what, source) => {
+  ])("accepts %s", (_what, source) => {
     expect(docBlockLint.flagged(holding(source))).toEqual([]);
   });
 });
@@ -134,7 +134,7 @@ describe("the doc-block rule's fix", () => {
     );
   });
 
-  it("reports but leaves a comment that would close early", () => {
+  it("reports, without converting, a comment that would close early", () => {
     const source = "// Matches */ in a path.\nexport const keep = 1;\n";
 
     expect(fixed(source, byItself, 1)).toBe(source);

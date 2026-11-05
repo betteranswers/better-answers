@@ -10,12 +10,12 @@ const MANIFEST = {
   content_version: "2026-09-22",
 };
 
-describe("the bundle manifest, the file a bundle describes itself with", () => {
-  it("sits at the bundle's root under the platform's reserved name", () => {
+describe("the bundle manifest, the file that describes a bundle", () => {
+  it("lives at knowledge/manifest.yaml in the bundle", () => {
     expect(BUNDLE_MANIFEST_PATH).toBe("knowledge/manifest.yaml");
   });
 
-  it("accepts the five keys, trimming what a person typed", () => {
+  it("accepts the five keys and trims whitespace a person typed", () => {
     expect(bundleManifest.parse({ ...MANIFEST, owner: "  Acme  " })).toEqual(MANIFEST);
   });
 

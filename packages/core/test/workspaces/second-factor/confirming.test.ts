@@ -171,7 +171,7 @@ const waitsAt = async (personId: string, now: Date) => {
 };
 
 describe("confirming by passkey", () => {
-  it("stamps the existing session and creates no other", async () => {
+  it("confirms the existing session and creates no new one", async () => {
     const personId = await seedPerson(db().pool);
     const passkeyId = await passkeyFor(db().pool, personId);
     const sessionId = await aSession(personId);
@@ -188,7 +188,7 @@ describe("confirming by passkey", () => {
     ]);
   });
 
-  it("refuses another person's credential, stamping nothing", async () => {
+  it("refuses another person's passkey and confirms nothing", async () => {
     const personId = await seedPerson(db().pool);
     const sessionId = await aSession(personId);
     const strangersPasskey = await passkeyFor(db().pool, await seedPerson(db().pool));
@@ -214,7 +214,7 @@ describe("confirming by passkey", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("stamps nothing when the passkey's removal wins the race", async () => {
+  it("confirms nothing when a concurrent removal of the passkey wins", async () => {
     const personId = await seedPerson(db().pool);
     const passkeyId = await passkeyFor(db().pool, personId);
     const sessionId = await aSession(personId);
@@ -241,7 +241,7 @@ describe("confirming by passkey", () => {
 });
 
 describe("confirming by authenticator", () => {
-  it("stamps the session and clears the failures counted", async () => {
+  it("confirms the session and clears the counted failures", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: true });
     const sessionId = await aSession(personId);
@@ -261,7 +261,7 @@ describe("confirming by authenticator", () => {
     ]);
   });
 
-  it("refuses while the setup still waits on its code", async () => {
+  it("refuses while the authenticator setup awaits its first code", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: false });
     const sessionId = await aSession(personId);
@@ -276,7 +276,7 @@ describe("confirming by authenticator", () => {
     expect(await confirmedAt(sessionId)).toEqual(UNCONFIRMED);
   });
 
-  it("refuses a person nobody holds, before their session", async () => {
+  it("refuses an unknown person before checking the session", async () => {
     const sessionId = await aSession(await seedPerson(db().pool));
 
     const confirmed = await confirmByAuthenticator(bootstrap, door(), {
@@ -289,8 +289,8 @@ describe("confirming by authenticator", () => {
   });
 });
 
-describe("the authenticator's failures", () => {
-  it("cost nothing five times, then double up to fifteen minutes", async () => {
+describe("failed authenticator codes", () => {
+  it("add no wait five times, then double to fifteen minutes", async () => {
     const personId = await seedPerson(db().pool);
     const waits: number[] = [];
     let now = AT;
@@ -305,7 +305,7 @@ describe("the authenticator's failures", () => {
     expect(waits).toEqual([0, 0, 0, 0, 0, 30, 60, 120, 240, 480, 900, 900]);
   });
 
-  it("answer the wait left, and none once it passes", async () => {
+  it("report the remaining wait, and none once it passes", async () => {
     const personId = await seedPerson(db().pool);
     await failingTimes(personId, 6);
 
@@ -317,7 +317,7 @@ describe("the authenticator's failures", () => {
     ]);
   });
 
-  it("cost an attempt stamped before them no wait", async () => {
+  it("allow an attempt dated before them", async () => {
     const personId = await seedPerson(db().pool);
     await failingTimes(personId, 5, after(1));
 
@@ -326,7 +326,7 @@ describe("the authenticator's failures", () => {
     expect(reserved).toEqual({ ok: true, value: { waitSeconds: 30, noticeDue: false } });
   });
 
-  it("pass one of four tries sent at once", async () => {
+  it("allow only one of four concurrent tries", async () => {
     const personId = await seedPerson(db().pool);
     await failingTimes(personId, 5);
 
@@ -341,7 +341,7 @@ describe("the authenticator's failures", () => {
     expect(await failuresOf(personId)).toEqual([{ kind: "authenticator", failures: 6 }]);
   });
 
-  it("make one notice due, and another only after a confirm", async () => {
+  it("trigger one notice, and another only after a confirmation", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: true });
     const first = await failingTimes(personId, 7);
@@ -369,7 +369,7 @@ describe("the authenticator's failures", () => {
     expect(second).toEqual([free, free, free, free, counted(true)]);
   });
 
-  it("leave a recovery code and a passkey working meanwhile", async () => {
+  it("leave recovery codes and passkeys working during the wait", async () => {
     const personId = await seedPerson(db().pool);
     const passkeyId = await passkeyFor(db().pool, personId);
     await failingTimes(personId, 6);
@@ -383,17 +383,17 @@ describe("the authenticator's failures", () => {
   });
 });
 
-describe("reserving an authenticator try", () => {
+describe("reserving an authenticator attempt", () => {
   it("refuses a malformed person id", async () => {
     expect(await reserving("not-an-id")).toEqual({ ok: false, error: "malformed" });
   });
 
-  it("counts nothing for a person nobody holds", async () => {
+  it("counts nothing for an unknown person", async () => {
     expect(await reserving(NOBODY)).toEqual({ ok: false, error: "person-gone" });
     expect(await failuresOf(NOBODY)).toEqual([]);
   });
 
-  it("answers the store's failure, not a wait", async () => {
+  it("returns the store's error, not a wait", async () => {
     const personId = await seedPerson(db().pool);
     const gone = new pg.Pool(db().runtimePool.options);
     await gone.end();
@@ -406,7 +406,7 @@ describe("reserving an authenticator try", () => {
 });
 
 describe("spending a recovery code", () => {
-  it("grants only the spending session, leaving it unconfirmed", async () => {
+  it("grants only the session that spent it, leaving it unconfirmed", async () => {
     const personId = await seedPerson(db().pool);
     const [code = ""] = await tenCodesFor(personId);
     const spender = await aSession(personId);
@@ -423,7 +423,7 @@ describe("spending a recovery code", () => {
     ]);
   });
 
-  it("counts a wrong code, then refuses even a right one", async () => {
+  it("counts wrong codes, then refuses even the right one", async () => {
     const personId = await seedPerson(db().pool);
     const [code = ""] = await tenCodesFor(personId);
     const sessionId = await aSession(personId);
@@ -457,7 +457,7 @@ describe("spending a recovery code", () => {
     expect(await grantOf(sessionId)).toBeNull();
   });
 
-  it("counts its failures apart from the authenticator's", async () => {
+  it("counts its failures separately from the authenticator's", async () => {
     const personId = await seedPerson(db().pool);
     await failingTimes(personId, 5);
     await tenCodesFor(personId);
@@ -474,7 +474,7 @@ describe("spending a recovery code", () => {
     ]);
   });
 
-  it("forgets only its own failures when the right code works", async () => {
+  it("clears only its own failures when the right code works", async () => {
     const personId = await seedPerson(db().pool);
     await failingTimes(personId, 2);
     const [code = ""] = await tenCodesFor(personId);
@@ -533,7 +533,7 @@ describe("spending a recovery code", () => {
 });
 
 describe("replacing the factors", () => {
-  it("keeps the new passkey alone and issues ten fresh codes", async () => {
+  it("keeps only the new passkey and issues ten fresh codes", async () => {
     const { personId, sessionId, left } = await anAdminRecovering();
     const keptPasskeyId = await passkeyFor(db().pool, personId);
 
@@ -571,7 +571,7 @@ describe("replacing the factors", () => {
     });
   });
 
-  it("installs the parked authenticator secret, removing every passkey", async () => {
+  it("installs the parked authenticator secret and removes every passkey", async () => {
     const { personId, sessionId } = await anAdminRecovering();
     const encryptedSecret = "sealed-new-secret";
     const parked = await parkAuthenticatorSecret(bootstrap, door(), {
@@ -615,7 +615,7 @@ describe("replacing the factors", () => {
   });
 
   it.each(["passkey", "authenticator"] as const)(
-    "sends every other session back to confirm, by %s",
+    "makes every other session confirm again after replacing by %s",
     async (by) => {
       const { personId, sessionId } = await anAdminRecovering();
       const lost = await passkeyFor(db().pool, personId);
@@ -633,7 +633,7 @@ describe("replacing the factors", () => {
     },
   );
 
-  it("parks one secret a session, for ten minutes", async () => {
+  it("parks one secret per session for ten minutes", async () => {
     const { personId, sessionId } = await anAdminRecovering();
     for (const encryptedSecret of ["sealed-first", "sealed-second"]) {
       await parkAuthenticatorSecret(bootstrap, door(), {
@@ -677,7 +677,7 @@ describe("replacing the factors", () => {
     expect(await grantOf(sessionId)).toEqual(AT);
   });
 
-  it("refuses a session without the grant, changing nothing", async () => {
+  it("refuses a session without a setup grant, changing nothing", async () => {
     const { personId } = await anAdminRecovering();
     const sessionId = await aSession(personId);
     const keptPasskeyId = await passkeyFor(db().pool, personId);
@@ -763,7 +763,7 @@ describe("replacing the factors", () => {
     expect(parked).toEqual({ ok: false, error: "session-gone" });
   });
 
-  it("forgets a parked secret once a passkey replaces them", async () => {
+  it("discards a parked secret once a passkey replaces the factors", async () => {
     const { personId, sessionId } = await anAdminRecovering();
     const asked = { personId, sessionId, now: AT };
     await parkAuthenticatorSecret(bootstrap, door(), {
@@ -798,7 +798,7 @@ describe("accepting a restore code", () => {
     ]);
   });
 
-  it("adds nothing for a wrong or an expired code", async () => {
+  it("grants nothing for a wrong or an expired code", async () => {
     const { personId, sessionId } = await aRestoredPerson(after(-1));
 
     const answers = [
@@ -821,7 +821,7 @@ describe("accepting a restore code", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("leaves setup closed to the mailbox once the code expires", async () => {
+  it("keeps setup closed once the restore code expires", async () => {
     const { personId } = await aRestoredPerson(after(60));
     const aWeekOn = after(7 * 24 * 3600);
     await sweepIdentitySet(SWEEPS, door(), { now: aWeekOn });
@@ -872,7 +872,7 @@ describe("accepting a restore code", () => {
     ]);
   });
 
-  it("takes no code once no restore is required", async () => {
+  it("accepts no code when no restore is required", async () => {
     const email = addressOf("priya");
     const personId = await seedPerson(db().pool, { email });
     await restoreCodeFor(db().pool, email, { hash: RESTORE_HASH, expiresAt: after(60) });
@@ -906,7 +906,7 @@ describe("accepting a restore code", () => {
 });
 
 describe("reading a person's second factor for a session", () => {
-  it("answers the restore marker, the waits and this session", async () => {
+  it("returns the restore flag, the waits and this session's standing", async () => {
     const { personId, sessionId } = await aRestoredPerson();
     await failingTimes(personId, 6);
 
@@ -923,7 +923,7 @@ describe("reading a person's second factor for a session", () => {
     });
   });
 
-  it("answers a granted session that is not yet confirmed", async () => {
+  it("reports a granted session that is not yet confirmed", async () => {
     const personId = await seedPerson(db().pool);
     const { sessionId } = await aGrantedSession(personId);
 

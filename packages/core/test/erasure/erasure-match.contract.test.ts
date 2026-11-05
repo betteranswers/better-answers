@@ -128,20 +128,20 @@ const sweep = (): Sweep => {
   return theSweep;
 };
 
-describe("an identifier as the erasure-match agreement normalises it", () => {
-  it("is normalised as every case of the agreement answers", () => {
+describe("normalising an identifier under the erasure-match agreement", () => {
+  it("gives the normalised form each agreement case expects", () => {
     for (const { identifier, normalised, why } of fixture.normalisation.cases) {
       expect({ why, normalised: normalisedIdentifier(identifier) }).toEqual({ why, normalised });
     }
   });
 
-  it("treats as whitespace exactly the code points the agreement lists", () => {
+  it("treats exactly the agreement's listed code points as whitespace", () => {
     expect(sweep().spaced.toSorted()).toEqual(fixture.normalisation.whitespace.toSorted());
   });
 });
 
-describe("an occurrence as the erasure-match agreement answers it", () => {
-  it("is found exactly where each agreement case names, nowhere else", () => {
+describe("finding an identifier in text under the erasure-match agreement", () => {
+  it("finds exactly the occurrences each agreement case lists", () => {
     for (const { kind, identifier, text, occurrences, why } of fixture.cases) {
       const characters = Array.from(text);
       const matches = matchesOf(kind, identifier)(text);
@@ -155,30 +155,30 @@ describe("an occurrence as the erasure-match agreement answers it", () => {
     }
   });
 
-  it("folds each code point as the agreement's Unicode 15.1 digest", () => {
+  it("folds code points to match the agreement's Unicode 15.1 digest", () => {
     expect(digestOf(sweep().folding)).toBe(fixture.digests.folding.sha256);
   });
 
-  it("is unbounded by exactly the word characters the digest names", () => {
+  it("treats exactly the digest's word characters as continuing a word", () => {
     const lines = sweep().words.map((character) => `${hexOf(character)}\n`);
 
     expect(digestOf(lines)).toBe(fixture.digests.word_characters.sha256);
   });
 
-  it("is unbounded for an address by exactly the listed joiners", () => {
+  it("treats exactly the listed joiners as continuing an address", () => {
     expect(sweep().joiners.toSorted()).toEqual(fixture.boundary.address_joiners.toSorted());
   });
 });
 
-describe("the floor the erasure-match agreement states", () => {
-  it("is the one the schema states beside the identifier limits", () => {
+describe("the minimum identifier size in the erasure-match agreement", () => {
+  it("equals the minimums that the schema package exports", () => {
     expect({
       characters: SUBJECT_IDENTIFIER_FLOOR,
       nameWords: SUBJECT_NAME_WORDS_FLOOR,
     }).toEqual({ characters: fixture.floor.characters, nameWords: fixture.floor.name_words });
   });
 
-  it("is cleared by exactly the identifiers the agreement names", () => {
+  it("accepts exactly the identifiers the agreement marks as long enough", () => {
     for (const { kind, identifier, clears_the_floor: clears, why } of fixture.cases) {
       expect({ why, clears: floorNotCleared(kind, identifier) === undefined }).toEqual({
         why,

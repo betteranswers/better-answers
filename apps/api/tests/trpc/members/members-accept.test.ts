@@ -119,7 +119,7 @@ const accepting = (api: Api, invitationId: string) =>
   refusalOfCall(api.person.acceptInvitation.mutate({ invitationId }));
 
 describe("accepting an invitation over tRPC", () => {
-  it("reads the invitation, naming the workspace, role and inviter", async () => {
+  it("shows the invitee the workspace, role, and inviter", async () => {
     const { api, invitationId } = await anInvitee("Editor");
 
     const read = await api.person.invitation.query({ invitationId });
@@ -133,7 +133,7 @@ describe("accepting an invitation over tRPC", () => {
     });
   });
 
-  it("joins at the invited role, the session pointed at it", async () => {
+  it("joins at the invited role and switches the session there", async () => {
     const { admin, api, address, invitationId } = await anInvitee("Editor");
     const personId = await personIdOf(address);
 
@@ -159,7 +159,7 @@ describe("accepting an invitation over tRPC", () => {
     expect(await admin.api.members.invitations.query()).toEqual([]);
   });
 
-  it("moves a member of another workspace to the one joined", async () => {
+  it("switches another workspace's member to the new one, keeping both", async () => {
     const elsewhere = await app().provision({ name: "Elsewhere Ltd" });
     const person = await app().person(anAddress("sam"), "Sam Okoro");
     await app().addMember(elsewhere.workspaceId, person.id, "Viewer");
@@ -183,7 +183,7 @@ describe("accepting an invitation over tRPC", () => {
     expect(await membersOf(elsewhere.workspaceId, person.id)).toEqual([{ role: "Viewer" }]);
   });
 
-  it("matches the invited address whatever its case", async () => {
+  it("accepts an invitation whose address differs only in case", async () => {
     const { api, invitationId } = await anUpperCaseInvitation();
     await api.person.setDisplayName.mutate({ displayName: "Una Price" });
 
@@ -217,7 +217,7 @@ describe("reading a person's own invitations over tRPC", () => {
     ]);
   });
 
-  it("matches the invited address whatever its case", async () => {
+  it("lists an invitation whose address differs only in case", async () => {
     const { api, invitationId } = await anUpperCaseInvitation();
 
     expect(await api.person.invitations.query()).toMatchObject([{ invitationId }]);
@@ -237,7 +237,7 @@ describe("reading a person's own invitations over tRPC", () => {
     expect(await api.person.invitations.query()).toEqual([]);
   });
 
-  it("leaves out an expired invitation until a resend revives it", async () => {
+  it("omits an expired invitation until an Admin resends it", async () => {
     const { admin, api, invitationId } = await anInvitee();
 
     clockShift.ms = EIGHT_DAYS_MS;
@@ -279,7 +279,7 @@ describe("reading a person's own invitations over tRPC", () => {
   });
 });
 
-describe("refusing an accept over tRPC", () => {
+describe("refusing to accept an invitation over tRPC", () => {
   it("refuses a person signed in with another address", async () => {
     const { admin, invitationId, address } = await anInvitee();
     const other = anAddress("other");
@@ -306,7 +306,7 @@ describe("refusing an accept over tRPC", () => {
     await nothingLanded({ workspaceId: admin.workspace.workspaceId, address, invitationId });
   });
 
-  it("refuses an expired invitation until a resend revives it", async () => {
+  it("refuses an expired invitation until an Admin resends it", async () => {
     const { admin, api, address, invitationId } = await anInvitee();
 
     clockShift.ms = EIGHT_DAYS_MS;
@@ -326,7 +326,7 @@ describe("refusing an accept over tRPC", () => {
     }
   });
 
-  it("refuses a cancelled invitation no-such-invitation", async () => {
+  it("refuses a cancelled invitation with no-such-invitation", async () => {
     const { admin, api, address, invitationId } = await anInvitee();
     await admin.api.members.cancelInvitation.mutate({ invitationId });
 
@@ -342,7 +342,7 @@ describe("refusing an accept over tRPC", () => {
   it.each([
     ["an id no invitation holds", "01J0000000000000000000000Z"],
     ["a link that names no id", "not-an-invitation"],
-  ])("refuses %s no-such-invitation", async (_link, invitationId) => {
+  ])("refuses %s with no-such-invitation", async (_link, invitationId) => {
     const { api } = await anInvitee();
 
     expect(await accepting(api, invitationId)).toMatchObject(
@@ -350,7 +350,7 @@ describe("refusing an accept over tRPC", () => {
     );
   });
 
-  it("refuses a current member already-a-member, once or twice", async () => {
+  it("refuses a second accept with already-a-member, joining once", async () => {
     const { admin, api, address, invitationId } = await anInvitee("Viewer");
     await api.person.acceptInvitation.mutate({ invitationId });
 
@@ -362,7 +362,7 @@ describe("refusing an accept over tRPC", () => {
     expect(await joinedEventsOf(personId)).toHaveLength(1);
   });
 
-  it("reads a nameless invitee their invitation, joining them once named", async () => {
+  it("lets a nameless invitee read but not accept until named", async () => {
     const { workspace, api: adminApi } = await anAdmin();
     const address = anAddress("nameless");
     await adminApi.members.invite.mutate({ addresses: [address], role: "Viewer" });
@@ -395,7 +395,7 @@ describe("refusing an accept over tRPC", () => {
 });
 
 describe("a failed accept over tRPC", () => {
-  it("lands no member, no event, and no workspace pick", async () => {
+  it("adds no member, records no event, and picks no workspace", async () => {
     const { admin, api, address, invitationId } = await anInvitee();
 
     const failed = await whileCommitsAreRefused(app(), "member", () =>

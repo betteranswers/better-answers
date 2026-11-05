@@ -46,7 +46,7 @@ const bundleDoors = (app: TestApp) => ({
 
 type Provisioned = Awaited<ReturnType<TestApp["provision"]>>;
 
-const replayedAfterTheWindow = async (
+const replayedAfterACrash = async (
   app: TestApp,
   write: (
     principal: UserPrincipal,
@@ -58,7 +58,7 @@ const replayedAfterTheWindow = async (
   const git = openTestGit(app);
   await initRepository(git, workspaceId);
   const principal = await principalOf(app, workspaceId, admin.id);
-  await lostInTheWindow(app, () => write(principal, bundleDoors(app), admin));
+  await crashBetweenCommitAndRows(app, () => write(principal, bundleDoors(app), admin));
   const sha = await head(principal, git);
 
   const run = await ops(app, ["reconcile-watermark", "--workspace", workspaceId]);
@@ -88,7 +88,7 @@ const restoreDrillNote = (
     status: "stable",
   });
 
-const lostInTheWindow = async (
+const crashBetweenCommitAndRows = async (
   app: TestApp,
   action: () => Promise<{ readonly ok: boolean }>,
 ): Promise<void> => {
@@ -108,11 +108,11 @@ const lostInTheWindow = async (
   }
 };
 
-describe("pnpm ops — the restore scripts' commands", () => {
+describe("pnpm ops", () => {
   const served = servedApp();
 
-  describe("reconcile-watermark — the reconciler on demand, the restore's path", () => {
-    it("refuses without a repositories' root, having no bundle to reconcile", async () => {
+  describe("reconcile-watermark, which runs the reconciler during a restore", () => {
+    it("refuses without GIT_STORE_DIR because it cannot open the bundle", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await opsWith(
@@ -128,7 +128,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses a missing repositories' root directory, naming it", async () => {
+    it("refuses a missing GIT_STORE_DIR directory and names it", async () => {
       const { workspaceId } = await served().provision();
       const missing = `${served().gitStoreDir}/does-not-exist`;
 
@@ -145,13 +145,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("answers usage to a non-id workspace before opening anything", async () => {
+    it("exits 2 for a workspace that is not an id", async () => {
       const run = await ops(served(), ["reconcile-watermark", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });
 
-    it("refuses a missing repository, which means an unrestored store", async () => {
+    it("refuses a missing repository, which means the store is unrestored", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await ops(served(), ["reconcile-watermark", "--workspace", workspaceId]);
@@ -160,7 +160,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual(["reconcile-watermark: REFUSED — no-such-repository"]);
     });
 
-    it("exits 0 when rows and bundle agree, reporting its findings", async () => {
+    it("exits 0 and reports counts when rows and bundle agree", async () => {
       const { workspaceId } = await served().provision();
       await initRepository(openTestGit(served()), workspaceId);
 
@@ -172,8 +172,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("replays a missed commit and lands its concept's row", async () => {
-      const { workspaceId, sha } = await replayedAfterTheWindow(served(), restoreDrillNote);
+    it("replays a commit that has no row and writes it", async () => {
+      const { workspaceId, sha } = await replayedAfterACrash(served(), restoreDrillNote);
 
       const landed = await served().database.superuser.query<{ path: string; commit_sha: string }>(
         "SELECT path, commit_sha FROM concept_index WHERE workspace_id = $1",
@@ -182,8 +182,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(landed.rows).toEqual([{ path: "knowledge/restore-drill.md", commit_sha: sha }]);
     });
 
-    it("refuses a diverged history, exiting as a precondition", async () => {
-      const { workspaceId } = await replayedAfterTheWindow(served(), restoreDrillNote);
+    it("refuses a diverged history with the precondition exit code", async () => {
+      const { workspaceId } = await replayedAfterACrash(served(), restoreDrillNote);
       await divergeHistory(openTestGit(served()), workspaceId);
 
       const run = await ops(served(), ["reconcile-watermark", "--workspace", workspaceId]);
@@ -192,8 +192,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual(["reconcile-watermark: REFUSED — history-diverged"]);
     });
 
-    it("replays a missed manifest commit, landing its row, no concept", async () => {
-      const { workspaceId, admin, sha } = await replayedAfterTheWindow(
+    it("replays a manifest commit with no row, adding no concept", async () => {
+      const { workspaceId, admin, sha } = await replayedAfterACrash(
         served(),
         (principal, doors, author) =>
           writeManifest(principal, doors, {
@@ -230,7 +230,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("import-bundle — the company's bundle landed through the governed write", () => {
+  describe("import-bundle, which imports a company bundle through governed writes", () => {
     const BUNDLE_FIXTURE = fileURLToPath(new URL("../fixtures/bundle", import.meta.url));
     const BUNDLE_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";
     const IMPORTED_AT = new Date("2026-09-22T10:00:00.000Z");
@@ -375,7 +375,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return files;
     };
 
-    it("lands the fixture, saying each concept, then each rewritten file", async () => {
+    it("imports the fixture, printing each concept, then each rewritten file", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
 
       const run = await importing(served(), workspaceId, admin.email);
@@ -389,7 +389,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("analyses the map for the planner once landed", async () => {
+    it("runs ANALYZE on the map tables after the import", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
       const superuser = served().database.superuser;
       for (const table of ["map_node", "map_edge"]) {
@@ -411,7 +411,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(estimated.rows).toEqual(held.rows);
     });
 
-    it("commits the manifest first, then each concept, landing their rows", async () => {
+    it("commits the manifest, then each concept, and writes their rows", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
 
       await importing(served(), workspaceId, admin.email);
@@ -441,7 +441,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
     });
 
-    it("normalises the manifest, rewrites links as IRIs, leaves no email", async () => {
+    it("normalises the manifest, rewrites links as IRIs, and removes emails", async () => {
       const { workspaceId, admin, mona } = await bundleWorkspace(served());
 
       await importing(served(), workspaceId, admin.email);
@@ -472,7 +472,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
     });
 
-    it("open follows a rewritten link to the concept it names", async () => {
+    it("opens the concept that a rewritten link points to", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
       await importing(served(), workspaceId, admin.email);
       const opening = (iri: ConceptIri) =>
@@ -484,16 +484,16 @@ describe("pnpm ops — the restore scripts' commands", () => {
         await iriOf(served(), workspaceId, "knowledge/company/answers/support-hours.md"),
       );
       assert(from.found, "the linking concept did not open");
-      assert(from.concept !== undefined, "the linking concept did not open");
+      assert(from.concept !== undefined, "the linking concept opened without its content");
       const link = /\]\((https:\/\/[^)]+)\)/.exec(from.concept.body);
-      assert(link !== null, "the concept links to another");
+      assert(link !== null, "the concept has no link");
       const to = await opening(ids.conceptIri.parse(link[1]));
 
-      assert(to.found, `nothing stands at ${String(link[1])}`);
+      assert(to.found, `no concept opens at ${String(link[1])}`);
       expect(to.concept?.frontmatter["title"]).toBe("Advanced plan");
     });
 
-    it("imports verified events as checks that find and open show", async () => {
+    it("imports verifications that find and open then show as trust", async () => {
       const { workspaceId, admin, mona, theo } = await bundleWorkspace(served());
 
       await importing(served(), workspaceId, admin.email);
@@ -610,7 +610,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return calledTool(served().client(), accessToken, "open", { iri });
     };
 
-    it("renders imported evidence over MCP, a page as its place", async () => {
+    it("renders imported evidence over MCP with the page locator", async () => {
       const opened = await openedOverMcp(TWO_SOURCES);
 
       expect(rendered(opened).split("\n").slice(-3)).toEqual([
@@ -620,7 +620,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("answers no locator over MCP for none or only spaces", async () => {
+    it("omits the locator over MCP when missing or blank", async () => {
       const opened = await openedOverMcp([
         ...TWO_SOURCES,
         "  - id: PROD-006",
@@ -642,7 +642,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("renders a newline-ended body over MCP without an extra blank", async () => {
+    it("adds no blank line over MCP after a final newline", async () => {
       const opened = await openedOverMcp(TWO_SOURCES, `${SUPPORT_HOURS}\n`);
 
       expect(rendered(opened).split("\n").slice(0, 5)).toEqual([
@@ -654,7 +654,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("skips what already landed on a rerun, and says so", async () => {
+    it("skips and reports already imported concepts on a rerun", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
       await importing(served(), workspaceId, admin.email);
 
@@ -670,7 +670,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await verificationRowsOf(served(), workspaceId)).toHaveLength(7);
     });
 
-    it("leaves the watermark at the head, with nothing to replay", async () => {
+    it("leaves the watermark at the head, so nothing needs replaying", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
       await importing(served(), workspaceId, admin.email);
       const sha = await head(
@@ -686,7 +686,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("reports what a dry run would do, writing nothing", async () => {
+    it("reports what a dry run would do and writes nothing", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
 
       const run = await importing(served(), workspaceId, admin.email, { flags: ["--dry-run"] });
@@ -699,7 +699,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await indexRowsOf(served(), workspaceId)).toEqual([]);
     });
 
-    it("lands the bundle at the class the flag names", async () => {
+    it("imports at the sensitivity that --sensitivity names", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
 
       const run = await importing(served(), workspaceId, admin.email, {
@@ -712,7 +712,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ).toEqual(new Set(["Restricted"]));
     });
 
-    it("refuses to run as a Viewer, and writes nothing", async () => {
+    it("refuses to run as a Viewer and writes nothing", async () => {
       const { workspaceId } = await bundleWorkspace(served());
       const viewer = await served().person();
       await served().addMember(workspaceId, viewer.id, "Viewer");
@@ -726,7 +726,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await commitsOf(served(), workspaceId)).toEqual([]);
     });
 
-    it("refuses to run as an Editor, and writes nothing", async () => {
+    it("refuses to run as an Editor and writes nothing", async () => {
       const { workspaceId } = await bundleWorkspace(served());
 
       const run = await importing(served(), workspaceId, MONA);
@@ -763,7 +763,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await commitsOf(served(), workspaceId)).toEqual([]);
     });
 
-    it("exits 1 for an unsound tree, classed by no word", async () => {
+    it("exits 1 with no refusal word for an invalid tree", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
       const from = await mkdtemp(path.join(tmpdir(), "bundle-"));
 
@@ -776,7 +776,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await commitsOf(served(), workspaceId)).toEqual([]);
     });
 
-    it("refuses a non-member's email, telling the operator to invite them", async () => {
+    it("refuses a non-member's email and says to invite them", async () => {
       const { workspaceId } = await bundleWorkspace(served());
 
       const run = await importing(served(), workspaceId, "nobody@acme.invalid");
@@ -787,7 +787,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses a directory it cannot read, naming it", async () => {
+    it("refuses an unreadable directory and names it", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
 
       const run = await opsWith(
@@ -810,7 +810,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
     });
 
-    it("answers usage to a --dry-run carrying a value, writing nothing", async () => {
+    it("gives a usage error for --dry-run with a value", async () => {
       const { workspaceId, admin } = await bundleWorkspace(served());
 
       const run = await importing(served(), workspaceId, admin.email, {
@@ -822,7 +822,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await indexRowsOf(served(), workspaceId)).toEqual([]);
     });
 
-    it("lands in a workspace provision-workspace and add-member stood up", async () => {
+    it("imports into a workspace set up by provision-workspace and add-member", async () => {
       const owner = await served().person(undefined, "Liam Owner");
       const provisioned = await provisioning(served(), [
         "--name",

@@ -47,7 +47,7 @@ const linesSince = (before: number, event: string) =>
     .logs.slice(before)
     .filter((line) => line["event"] === event);
 
-const codeAskedFor = async (email: string) => {
+const requestCodeFor = async (email: string) => {
   const client = app().client();
   await client.json("/email-otp/send-verification-otp", { email, type: "sign-in" });
   return { client, code: app().codeSentTo(email) };
@@ -78,9 +78,9 @@ describe("a sign-in, recorded on the identity-set audit log", () => {
     ]);
   });
 
-  it("carries no address, IP or user agent in its row", async () => {
+  it("stores no email, IP or user agent in its row", async () => {
     const person = await app().person();
-    const { client, code } = await codeAskedFor(person.email);
+    const { client, code } = await requestCodeFor(person.email);
 
     const signedIn = await client.fetch("/sign-in/email-otp", {
       method: "POST",
@@ -105,9 +105,9 @@ describe("a sign-in, recorded on the identity-set audit log", () => {
     expect(row?.["whole"]).not.toContain(USER_AGENT);
   });
 
-  it("keeps a refused code a log line, recording nothing", async () => {
+  it("logs a wrong code without recording an audit event", async () => {
     const person = await app().person();
-    const { client, code } = await codeAskedFor(person.email);
+    const { client, code } = await requestCodeFor(person.email);
     const wrong = aWrongCode(code);
     const before = app().logs.length;
 
@@ -118,7 +118,7 @@ describe("a sign-in, recorded on the identity-set audit log", () => {
     expect(linesSince(before, "auth.sign_in")).toMatchObject([{ level: 30, outcome: "refused" }]);
   });
 
-  it("signs the person in though its record fails, logging it", async () => {
+  it("signs the person in, logging an error when auditing fails", async () => {
     const person = await app().person();
     const client = app().client();
     const before = unrecorded().length;
@@ -143,12 +143,12 @@ describe("a sign-in, recorded on the identity-set audit log", () => {
 });
 
 describe("an expired sign-in code", () => {
-  it("still answers expired after another person's code is tried", async () => {
+  it("still answers OTP_EXPIRED after another person tries a code", async () => {
     const holder = await app().person();
-    const { client, code } = await codeAskedFor(holder.email);
+    const { client, code } = await requestCodeFor(holder.email);
     await codeSentPastItsExpiry(app(), holder.email);
     const other = await app().person();
-    const tried = await codeAskedFor(other.email);
+    const tried = await requestCodeFor(other.email);
     const wrong = aWrongCode(tried.code);
     const otherTry = await tried.client.json("/sign-in/email-otp", {
       email: other.email,
@@ -157,16 +157,17 @@ describe("an expired sign-in code", () => {
 
     const typed = await client.json("/sign-in/email-otp", { email: holder.email, otp: code });
 
-    expect(await otherTry.json(), "the other try never reached the library's lookup").toMatchObject(
-      { code: "INVALID_OTP" },
-    );
+    expect(
+      await otherTry.json(),
+      "the other person's wrong code did not answer INVALID_OTP",
+    ).toMatchObject({ code: "INVALID_OTP" });
     expect(typed.status).toBe(400);
     expect(await typed.json()).toMatchObject({ code: "OTP_EXPIRED" });
   });
 });
 
 describe("a consent, recorded on the consented workspace's audit log", () => {
-  it("records the assistant under the person in the picked workspace", async () => {
+  it("records the assistant's consent in the workspace the person picked", async () => {
     const { person, second } = await memberOfTwo(app());
 
     await connectAsHost(app(), app().client(), person, { pick: second });
@@ -182,7 +183,7 @@ describe("a consent, recorded on the consented workspace's audit log", () => {
     ]);
   });
 
-  it("keeps a declined consent a log line, recording nothing", async () => {
+  it("logs a declined consent without recording an audit event", async () => {
     const { admin } = await app().provision();
     const client = app().client();
     const consent = await driveToPage(app(), client, admin);
@@ -201,7 +202,7 @@ describe("a consent, recorded on the consented workspace's audit log", () => {
     ]);
   });
 
-  it("records nothing when sent to sign in again first", async () => {
+  it("records nothing when the person must sign in again first", async () => {
     const { admin, workspaceId } = await app().provision();
     const client = app().client();
     await signIn(app(), client, admin.email);
@@ -212,7 +213,7 @@ describe("a consent, recorded on the consented workspace's audit log", () => {
     });
     const start = await client.fetch(`${PUBLIC_URL}${asked}`, { redirect: "manual" });
     const sentTo = start.headers.get("location");
-    assert(sentTo !== null, "the authorization redirected");
+    assert(sentTo !== null, "the authorization did not redirect");
     const toSignIn = new URL(sentTo, PUBLIC_URL);
     expect(toSignIn.pathname).toBe("/sign-in");
     const before = app().logs.length;
@@ -224,14 +225,14 @@ describe("a consent, recorded on the consented workspace's audit log", () => {
 
     expect((await consentRowsBy(admin.id)).rows).toEqual([]);
     const answeredTo = answered.headers.get("location");
-    assert(answeredTo !== null, "the consent redirected");
+    assert(answeredTo !== null, "the consent did not redirect");
     expect(new URL(answeredTo, PUBLIC_URL).pathname).toBe("/sign-in");
     expect(linesSince(before, "auth.consent")).toMatchObject([
       { level: 30, principal: admin.id, outcome: "deferred" },
     ]);
   });
 
-  it("connects the assistant though its record fails, logging it", async () => {
+  it("connects the assistant, logging an error when auditing fails", async () => {
     const { person, second } = await memberOfTwo(app());
     const before = unrecorded().length;
 

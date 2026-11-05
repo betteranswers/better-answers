@@ -7,7 +7,7 @@ const FACTS = [
   { id: "filed-accounts", atLeast: 2 },
 ];
 
-describe("the unmet mark a seeded write-up carries", () => {
+describe("the unmet mark on a seeded write-up", () => {
   it("marks a write-up whose fact has too few includes", () => {
     expect(
       leavesAFactUnmet(FACTS, [
@@ -17,7 +17,7 @@ describe("the unmet mark a seeded write-up carries", () => {
     ).toBe(true);
   });
 
-  it("leaves a write-up unmarked once every fact reaches its floor", () => {
+  it("leaves a write-up unmarked once every fact reaches its minimum", () => {
     expect(
       leavesAFactUnmet(FACTS, [
         { expectedFactId: "public-liability" },
@@ -27,7 +27,7 @@ describe("the unmet mark a seeded write-up carries", () => {
     ).toBe(false);
   });
 
-  it("counts an include toward its own expected fact alone", () => {
+  it("counts an include only toward its own expected fact", () => {
     expect(
       leavesAFactUnmet(FACTS, [
         { expectedFactId: "filed-accounts" },
@@ -37,7 +37,7 @@ describe("the unmet mark a seeded write-up carries", () => {
     ).toBe(true);
   });
 
-  it("leaves a write-up expecting no fact unmarked", () => {
+  it("leaves a write-up that expects no fact unmarked", () => {
     expect(leavesAFactUnmet([], [])).toBe(false);
   });
 });

@@ -31,7 +31,7 @@ const anAdminAsking = async () => {
 const judgeState = z.object({ verdict: z.string(), judgeState: z.string() });
 
 describe("the server's model client", () => {
-  it("sends the workspace's model, its key and the Messages body", async () => {
+  it("sends the workspace's model and key with the Messages body", async () => {
     const { workspaceId, asking } = await anAdminAsking();
     await judgingSetUp(app(), workspaceId);
     wire.answerWith(judgeSaying([RETENTION.title]));
@@ -48,7 +48,7 @@ describe("the server's model client", () => {
       "anthropic-version": "2023-06-01",
     });
     const [first] = sent;
-    assert(first !== undefined, "the judge was called");
+    assert(first !== undefined, "the judge was never called");
     expect(JSON.parse(first.body)).toEqual({
       model: SONNET,
       max_tokens: 16_000,
@@ -92,7 +92,7 @@ describe("the server's model client", () => {
     });
   });
 
-  it("sends nothing before the workspace's model is chosen", async () => {
+  it("calls no model before the workspace chooses one", async () => {
     const { workspaceId, asking } = await anAdminAsking();
     await judgingSetUp(app(), workspaceId, { chosen: false });
     wire.answerWith(judgeSaying([RETENTION.title]));
@@ -107,7 +107,7 @@ describe("the server's model client", () => {
     });
   });
 
-  it("logs each attempt with no prompt, answer or key", async () => {
+  it("logs each model call without the prompt, answer or key", async () => {
     const { workspaceId, asking } = await anAdminAsking();
     await judgingSetUp(app(), workspaceId);
     wire.answerWith(judgeSaying([RETENTION.title]));
@@ -133,11 +133,11 @@ describe("the server's model client", () => {
     expect(logged).not.toContain("<question>");
     expect(logged).not.toContain(A_MODEL_KEY);
     const last = wire.sent.at(-1);
-    assert(last !== undefined, "the model was called");
+    assert(last !== undefined, "the model was never called");
     expect(promptSent(last)).toContain("thirteen months");
   });
 
-  it("answers a judged fit through the tool", async () => {
+  it("returns a judged fit through the ask tool", async () => {
     const { workspaceId, asking } = await anAdminAsking();
     await judgingSetUp(app(), workspaceId);
     wire.answerWith(judgeSaying([RETENTION.title]));

@@ -16,7 +16,7 @@ def pytest_options() -> dict[str, object]:
     return options
 
 
-def test_refuses_a_marker_the_suite_never_declared() -> None:
+def test_pytest_refuses_an_undeclared_marker() -> None:
     addopts = pytest_options()["addopts"]
     assert isinstance(addopts, str)
     assert "--strict-markers" in addopts.split()
@@ -26,24 +26,25 @@ def test_fails_an_expected_failure_that_has_started_passing() -> None:
     assert pytest_options()["xfail_strict"] is True
 
 
-def test_only_the_gate_spreads_the_suite_over_workers() -> None:
+def test_only_the_gate_command_runs_tests_in_parallel_workers() -> None:
     addopts = pytest_options()["addopts"]
     assert isinstance(addopts, str)
     _, command = SUITE
 
     assert command[command.index("-n") + 1] == str(CI_RUNNER_VCPUS), (
-        "-n auto ran slower on a larger machine"
+        "the gate does not pass -n CI_RUNNER_VCPUS. Do not use -n auto, "
+        "because it ran slower on a larger machine"
     )
     assert not {"-n", "--numprocesses"} & set(addopts.split())
 
 
-def test_the_gate_keeps_a_group_in_one_worker() -> None:
+def test_the_gate_runs_each_xdist_group_in_one_worker() -> None:
     _, command = SUITE
 
     assert command[command.index("--dist") + 1] == "loadgroup"
 
 
-def test_the_gate_leaves_the_image_tests_to_the_images_script() -> None:
+def test_image_tests_run_in_the_images_command_not_the_gate() -> None:
     _, gate = SUITE
     _, images = IMAGES
 

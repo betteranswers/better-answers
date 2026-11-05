@@ -39,7 +39,7 @@ const PROBE = {
   render: () => "landed",
 };
 
-const writing = ({ road, ...declared }: Declared, key: string): ServedEntry => {
+const writingEntry = ({ road, ...declared }: Declared, key: string): ServedEntry => {
   const probe = { ...declared, ...PROBE };
   return road === "own-transaction"
     ? {
@@ -92,7 +92,7 @@ const NO_MODEL: ModelClient & StreamingClient = {
   },
 };
 
-const calledAsAnAdmin = async (declared: Declared) => {
+const callAsAdmin = async (declared: Declared) => {
   const workspace = await app().provision();
   const key = `probe-${workspace.workspaceId}`;
   const { logger, logs } = capturingLogger();
@@ -104,7 +104,7 @@ const calledAsAnAdmin = async (declared: Declared) => {
     logger,
     serverVersion: "0.0.0",
     clock: app().doors.clock,
-    entries: [writing(declared, key)],
+    entries: [writingEntry(declared, key)],
     credentials: undefined,
     models: NO_MODEL,
   });
@@ -138,40 +138,38 @@ const probe = (
   annotations: { readOnlyHint },
 });
 
-const FAILED_AT_ITS_STATEMENT = {
+const FAILED_READ_ONLY = {
   said: "probe failed.",
   rows: 0,
   failed: [{ entry: "probe", err: matching.objectContaining({ code: "25006" }) }],
 };
 
-describe("a write inside an entry's transaction", () => {
-  it("fails at its statement where the entry declares the hint", async () => {
-    expect(await calledAsAnAdmin(probe(true))).toEqual(FAILED_AT_ITS_STATEMENT);
+describe("a write in a resolvers-transaction entry", () => {
+  it("fails with a read-only error when readOnlyHint is true", async () => {
+    expect(await callAsAdmin(probe(true))).toEqual(FAILED_READ_ONLY);
   });
 
-  it("lands under an entry that declares it writes", async () => {
-    const { said, rows, failed } = await calledAsAnAdmin(probe(false));
+  it("commits when the entry declares readOnlyHint false", async () => {
+    const { said, rows, failed } = await callAsAdmin(probe(false));
 
     expect([said, rows, failed]).toEqual(["landed", 1, []]);
   });
 });
 
-describe("a write through the own-transaction road's read step", () => {
+describe("a write in an own-transaction entry's read step", () => {
   it.each([
     ["a read-only entry", true],
     ["a writing entry", false],
-  ])("fails at its statement under %s", async (_case, readOnlyHint) => {
-    expect(await calledAsAnAdmin(probe(readOnlyHint, "own-transaction"))).toEqual(
-      FAILED_AT_ITS_STATEMENT,
-    );
+  ])("fails with a read-only error in %s", async (_case, readOnlyHint) => {
+    expect(await callAsAdmin(probe(readOnlyHint, "own-transaction"))).toEqual(FAILED_READ_ONLY);
   });
 });
 
-describe("every entry the server composes", () => {
-  it("lets a write land only where its hint declares one", async () => {
+describe("every entry entriesAt returns", () => {
+  it("commits a write only where readOnlyHint is false", async () => {
     const outcomes: unknown[] = [];
     for (const entry of entriesAt(PUBLIC_URL)) {
-      const { said, rows, failed } = await calledAsAnAdmin(entry);
+      const { said, rows, failed } = await callAsAdmin(entry);
       outcomes.push([entry.name, entry.road, said, rows, failed.map((line) => line.err.code)]);
     }
 
@@ -183,7 +181,7 @@ describe("every entry the server composes", () => {
     ]);
   });
 
-  it("is handed no door to open a second transaction through", () => {
+  it("receives no way to open a second transaction", () => {
     expectTypeOf(entriesAt).parameters.toEqualTypeOf<[origin: string]>();
     expectTypeOf<Parameters<TransactionEntry<z.ZodObject, z.ZodType>["run"]>>().toEqualTypeOf<
       [principal: UserPrincipal, tx: Tx, args: z.infer<z.ZodObject>, now: Date]
@@ -194,14 +192,14 @@ describe("every entry the server composes", () => {
   });
 });
 
-describe("the steps the own-transaction road hands an entry", () => {
-  it("are the record's writes, a read, a reservation, a call", () => {
+describe("the steps an own-transaction entry receives", () => {
+  it("are record writes, a read, a reservation and model calls", () => {
     expectTypeOf<keyof Steps>().toEqualTypeOf<
       "openRecord" | "read" | "reserve" | "callModel" | "decideYesNo" | "completeRecord"
     >();
   });
 
-  it("take a record's data, never a transaction to write through", () => {
+  it("take record data as arguments, never a transaction", () => {
     expectTypeOf<Parameters<Steps["openRecord"]>>().toEqualTypeOf<
       [
         opening: {
@@ -239,12 +237,12 @@ describe("the steps the own-transaction road hands an entry", () => {
     >();
   });
 
-  it("lend a transaction to the read step alone", () => {
+  it("pass a transaction only to the read step", () => {
     expectTypeOf<Parameters<Parameters<Steps["read"]>[0]>>().toEqualTypeOf<[tx: Tx]>();
   });
 });
 
-describe("the door an entry's transaction opens through", () => {
+describe("the transaction doorOf picks for an entry", () => {
   it.each([
     ["read-only where the hint is declared true", { readOnlyHint: true }, withPrincipalRead],
     ["held to its commit where the hint is false", { readOnlyHint: false }, withHeldPrincipal],

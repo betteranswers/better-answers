@@ -38,7 +38,7 @@ const LANE_SCRIPT = "scripts/docs-lane.mjs";
 
 const commandOf = (script: string): string => {
   const command = rootScripts()[script];
-  assert(command !== undefined, `${script} is a root script`);
+  assert(command !== undefined, `the root package.json has no ${script} script`);
   return command;
 };
 
@@ -49,7 +49,7 @@ type Decision = { readonly lane: string; readonly images: string };
 const answerOf = (published: string, key: string): string =>
   new RegExp(`^${key}=(?<value>.*)$`, "m").exec(published)?.groups?.["value"] ?? "";
 
-const answersTo = (changed: readonly string[], separator = "\n"): string => {
+const runLaneScript = (changed: readonly string[], separator = "\n"): string => {
   const run = spawnSync("node", [path.join(repositoryRoot, LANE_SCRIPT)], {
     input: changed.map((changedPath) => `${changedPath}${separator}`).join(""),
     encoding: "utf8",
@@ -60,7 +60,7 @@ const answersTo = (changed: readonly string[], separator = "\n"): string => {
 };
 
 const decide = (changed: readonly string[], separator = "\n"): Decision => {
-  const answered = answersTo(changed, separator);
+  const answered = runLaneScript(changed, separator);
   return { lane: answerOf(answered, "lane"), images: answerOf(answered, "images") };
 };
 
@@ -88,21 +88,21 @@ const LANES: readonly LaneCase[] = [
     images: "no",
     diff: "a web-only change",
     because:
-      "the api image carries the SPA's build, but it is source the suites read on every run, and build.yml probes the image it pushes",
+      "the api image includes the SPA's build, but the suites read this source on every run, and build.yml probes the image it pushes",
   },
   {
     changed: ["packages/core/src/kernel/principal/actor.ts"],
     lane: "full",
     images: "no",
     diff: "a core change",
-    because: "source the api image copies as it stands",
+    because: "the api image copies this file as source, not as an install input",
   },
   {
     changed: ["apps/worker/src/better_answers_worker/work_loop.py"],
     lane: "full",
     images: "no",
     diff: "a worker source change",
-    because: "source the worker image copies as it stands",
+    because: "the worker image copies this file as source, not as an install input",
   },
   {
     changed: ["apps/worker/src/better_answers_worker/redaction/pins.py"],
@@ -117,7 +117,7 @@ const LANES: readonly LaneCase[] = [
     lane: "full",
     images: "yes",
     diff: "the root manifest",
-    because: "it names the pnpm the api image's corepack installs",
+    because: "it names the pnpm version that corepack installs in the api image",
   },
   {
     changed: ["apps/web/package.json"],
@@ -131,7 +131,7 @@ const LANES: readonly LaneCase[] = [
     lane: "full",
     images: "yes",
     diff: "a lockfile change",
-    because: "a lockfile change is every image's dependencies, whatever else the diff touched",
+    because: "the lockfile holds every image's dependencies, whatever else the diff changes",
   },
   {
     changed: ["apps/worker/uv.lock"],
@@ -145,7 +145,7 @@ const LANES: readonly LaneCase[] = [
     lane: "full",
     images: "yes",
     diff: "a Dockerfile",
-    because: "it is the image",
+    because: "the Dockerfile defines the image",
   },
   {
     changed: ["deploy/backup.sh"],
@@ -159,49 +159,49 @@ const LANES: readonly LaneCase[] = [
     lane: "full",
     images: "yes",
     diff: "the node pin",
-    because: "the api image's base must run the node the tree is pinned to",
+    because: "the api image's base must run the Node version that .node-version pins",
   },
   {
     changed: ["apps/worker/.tool-versions"],
     lane: "full",
     images: "yes",
     diff: "the uv pin",
-    because: "the worker image's uv must be the uv the runner resolves the lockfile with",
+    because: "the worker image must use the uv version that the runner resolves the lockfile with",
   },
   {
     changed: ["apps/api/tests/images/image.test.ts"],
     lane: "full",
     images: "yes",
     diff: "an image probe",
-    because: "an edit to a probe is run by that probe and by nothing else",
+    because: "only the image probes run a probe file, so an edit to a probe must run them",
   },
   {
     changed: [".github/workflows/check.yml"],
     lane: "full",
     images: "yes",
     diff: "this workflow",
-    because: "it decides whether the probes run, and an edit to that decision is read by a run",
+    because: "check.yml decides whether the probes run, so an edit to it must run them",
   },
   {
     changed: ["contracts/manifest.json"],
     lane: "full",
     images: "no",
     diff: "a tier contract change",
-    because: "both tiers' suites read the contract, and no image copies a line of it",
+    because: "both tiers' suites read the contract, and no image copies it",
   },
   {
     changed: ["deployment/notes.ts"],
     lane: "full",
     images: "no",
     diff: "a lookalike of deploy/",
-    because: "a directory is matched by its whole name, never by a prefix of it",
+    because: "the script matches a directory by its whole name, so deployment/ is not deploy/",
   },
   {
     changed: ["docs/vision.md", "CONCEPTS.md"],
     lane: "docs",
     images: "no",
     diff: "a prose-only change",
-    because: "every changed path is prose, which is the docs lane's whole rule",
+    because: "the docs lane takes a change only when every changed path is markdown",
   },
   {
     changed: ["docs/vision.md", "apps/web/src/app.tsx"],
@@ -209,18 +209,18 @@ const LANES: readonly LaneCase[] = [
     images: "no",
     diff: "prose mixed with code",
     because:
-      "prose with code: the docs lane runs the suites that read documents, and none of the suites that read the code",
+      "the docs lane runs only the suites that read documents, so a change that includes code takes the full lane",
   },
   {
     changed: ["apps/web/src/app.tsx", "pnpm-lock.yaml"],
     lane: "full",
     images: "yes",
     diff: "source with a lockfile",
-    because: "one image input among any number of other paths is enough",
+    because: "one image input in a change is enough to run the image probes",
   },
 ];
 
-describe("which paths reach which lane", () => {
+describe("the lane that each kind of change takes", () => {
   it.each(LANES)(
     "picks the $lane lane for $diff",
     ({ changed, lane, images, because }: LaneCase) => {
@@ -245,19 +245,19 @@ describe("which lane a change runs in", () => {
     expect(laneOf(["docs/notes.md", "scripts/notes.ts"])).toEqual("full");
   });
 
-  it("refuses every path that only looks like markdown", () => {
+  it("takes the full lane for paths that only resemble markdown", () => {
     expect(laneOf(["docs/page.mdx"])).toEqual("full");
     expect(laneOf(["scripts/notes.md.ts"])).toEqual("full");
     expect(laneOf(["docs/vision.md.bak"])).toEqual("full");
     expect(laneOf(["docs/mdfiles/index.html"])).toEqual("full");
   });
 
-  it("takes the full lane and probes when given no paths", () => {
+  it("takes the full lane and the probes with no paths", () => {
     expect(decide([])).toEqual({ lane: "full", images: "yes" });
     expect(decide([""], "\n")).toEqual({ lane: "full", images: "yes" });
   });
 
-  it("reads the NUL-separated form the workflow actually feeds it", () => {
+  it("reads the NUL-separated paths that the workflow sends", () => {
     expect(laneOf(["docs/a.md", "docs/b.md"], "\0")).toEqual("docs");
     expect(laneOf(["docs/a\nb.md"], "\0")).toEqual("docs");
     expect(laneOf(["docs/a.md", "src/b.ts"], "\0")).toEqual("full");
@@ -292,7 +292,7 @@ const probeFilesOf = (leg: ImageLeg): readonly string[] => {
 
 const COPY = /^COPY\s+(?<words>.+)$/gm;
 
-const copiedFromTheTree = (leg: ImageLeg): readonly string[] =>
+const copiedPathsOf = (leg: ImageLeg): readonly string[] =>
   [...read(leg.dockerfile).matchAll(COPY)].flatMap((found) => {
     const words = (found.groups?.["words"] ?? "").trim().split(/\s+/);
     if (words.some((word) => word.startsWith("--from="))) return [];
@@ -302,7 +302,7 @@ const copiedFromTheTree = (leg: ImageLeg): readonly string[] =>
       .map((source) => path.posix.join(leg.context, source).replace(/\/$/, ""));
   });
 
-const aChangeTo = (copied: string): string =>
+const changedPathIn = (copied: string): string =>
   statSync(path.join(repositoryRoot, copied)).isDirectory() ? `${copied}/a-changed-file` : copied;
 
 const COPIED_SOURCE: readonly string[] = [
@@ -318,11 +318,11 @@ const COPIED_SOURCE: readonly string[] = [
   "packages/schema/src",
 ];
 
-const imagesForACopyOf = (source: string): string =>
+const expectedImagesFor = (source: string): string =>
   COPIED_SOURCE.includes(source) ? "no" : "yes";
 
 describe("which paths are an image's inputs", () => {
-  it("counts every Dockerfile, ignore file and probe build.yml names", () => {
+  it("treats each Dockerfile, .dockerignore and build.yml probe as input", () => {
     const named = imageLegs().flatMap((leg) => [
       leg.dockerfile,
       ...[path.posix.join(leg.context, ".dockerignore")].filter((ignore) =>
@@ -334,42 +334,45 @@ describe("which paths are an image's inputs", () => {
     expect(imageLegs().length).toBeGreaterThan(2);
     expect(
       imageLegs().filter((leg) => probeFilesOf(leg).length !== 1),
-      "a leg's probe names no file this reading can find, or names one in two workspaces",
+      "a leg's probe in build.yml names no test file that this test can find, or names a file that exists in two workspaces",
     ).toEqual([]);
     expect(
       named.filter((input) => imagesOf([input]) !== "yes"),
-      "a change to what build.yml builds or probes would leave the probes deferred",
+      "scripts/docs-lane.mjs does not answer images=yes for a Dockerfile, .dockerignore or probe that build.yml names, so a change to it skips the image probes. Add the path to IMAGE_INPUTS.",
     ).toEqual([]);
   });
 
-  it("counts everything a Dockerfile copies except the source", () => {
-    const copied = [...new Set(imageLegs().flatMap(copiedFromTheTree))];
+  it("counts every non-source path a Dockerfile copies as an input", () => {
+    const copied = [...new Set(imageLegs().flatMap(copiedPathsOf))];
     const misread = copied.filter(
-      (source) => imagesOf([aChangeTo(source)]) !== imagesForACopyOf(source),
+      (source) => imagesOf([changedPathIn(source)]) !== expectedImagesFor(source),
     );
 
     expect(copied.length).toBeGreaterThan(10);
     expect(
       misread,
-      "a Dockerfile copies a path the lane script does not count as an input, or counts source it was told to leave. Add it to the script's list, or to COPIED_SOURCE.",
+      "a Dockerfile copies a path that scripts/docs-lane.mjs does not count as an image input, or the script counts a path that COPIED_SOURCE lists as source. Add an install input to IMAGE_INPUTS in the script, or add a source path to COPIED_SOURCE.",
     ).toEqual([]);
     expect(
       COPIED_SOURCE.filter((source) => !copied.includes(source)),
-      "COPIED_SOURCE names a path no Dockerfile copies",
+      "COPIED_SOURCE names a path that no Dockerfile copies. Delete it from COPIED_SOURCE.",
     ).toEqual([]);
   });
 
-  it("names only paths the tree has", () => {
+  it("lists only image inputs that exist in the tree", () => {
     const list = /const IMAGE_INPUTS = \[(?<list>[^\]]*)\]/.exec(read(LANE_SCRIPT))?.groups?.[
       "list"
     ];
-    assert(list !== undefined, "the lane script declares IMAGE_INPUTS");
+    assert(
+      list !== undefined,
+      "scripts/docs-lane.mjs does not declare `const IMAGE_INPUTS = [...]`",
+    );
     const listed = [...list.matchAll(/"(?<input>[^"]+)"/g)].map((found) => groupOf(found, "input"));
 
     expect(listed.length).toBeGreaterThan(10);
     expect(
       listed.filter((input) => !existsSync(path.join(repositoryRoot, input))),
-      "the lane script names an image input the tree no longer has",
+      "IMAGE_INPUTS in scripts/docs-lane.mjs names a path that does not exist. Correct the path, or delete it.",
     ).toEqual([]);
   });
 });
@@ -408,7 +411,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   },
   {
     file: "packages/devtools/test/ci/docs-lane.test.ts",
-    reads: "no markdown — it holds this table against the script the lane runs",
+    reads: "no markdown. It checks this table against the scripts that check:docs runs",
     inTheLane: "check:docs:devtools",
   },
   {
@@ -422,7 +425,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     reads: "apps/worker/tests/fixtures/redaction/supplier-information-pack.md",
     inTheLane: {
       outside:
-        "it loads the detector's models to read that fixture, which is the weights cache and a uv environment — the whole of what the docs lane exists not to install. The fixture is a test input rather than a document, and an edit to it alone is the one markdown change this lane does not gate: said here so that it is a decision on the record (the process review, 21/09/2026)",
+        "it loads the detector's models to read that fixture, which needs the weights cache and a uv environment. The docs lane exists to avoid installing both. The fixture is a test input, not a document, so an edit to it alone is the one markdown change that this lane does not check. The process review of 21/09/2026 recorded this decision",
     },
   },
   {
@@ -438,7 +441,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   {
     file: "packages/core/test/tier-contract.test.ts",
     reads:
-      "contracts/README.md, by excluding it by name — so a SECOND markdown file under contracts/ is counted as an undeclared fixture and turns this red",
+      "contracts/README.md, which it excludes by name. A second markdown file under contracts/ counts as an undeclared fixture and fails this suite",
     inTheLane: "check:docs:core",
   },
   {
@@ -446,7 +449,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     reads: "the same exclusion, from the other tier",
     inTheLane: {
       outside:
-        "the core-side suite above holds the same coupling and catches the same commit, and this one needs a uv environment to say so a second time",
+        "packages/core/test/tier-contract.test.ts checks the same exclusion and fails on the same commit. This suite needs a uv environment to repeat that check",
     },
   },
   {
@@ -454,7 +457,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     reads: "the same fixture, read through the built worker image",
     inTheLane: {
       outside:
-        "it builds the worker image, which needs a builder and the cache credentials — and what it is about is the image, not the page",
+        "it builds the worker image, which needs a builder and the cache credentials. The suite tests the image, not the markdown page",
     },
   },
 ];
@@ -466,26 +469,29 @@ const SUITES_IN_THE_LANE = PROSE_SUITES.flatMap((suite) =>
 const SUITES_OUTSIDE_THE_LANE = PROSE_SUITES.filter((suite) => typeof suite.inTheLane !== "string");
 
 describe("what the docs lane runs", () => {
-  it("runs its steps through the root check's runner", () => {
+  it("runs its steps through scripts/check.mjs", () => {
     const steps = gatesNamed(commandOf("check:docs"));
 
-    expect(steps.length, "the root check:docs does not call the runner").toBeGreaterThan(1);
+    expect(
+      steps.length,
+      "the root check:docs script does not call scripts/check.mjs with its steps",
+    ).toBeGreaterThan(1);
     expect(steps).toContain("format:check");
     expect(steps.filter((step) => rootScripts()[step] === undefined)).toEqual([]);
   });
 
-  it("runs exactly the prose suites this table puts in it", () => {
+  it("runs exactly the suites that PROSE_SUITES puts in it", () => {
     const commands = gatesNamed(commandOf("check:docs")).map(commandOf).join("\n");
     const named = (suite: { readonly file: string }): boolean =>
       commands.includes(path.basename(suite.file));
 
     expect(
       SUITES_IN_THE_LANE.filter((suite) => !named(suite)).map((suite) => suite.file),
-      "a suite this table puts in the docs lane is run by no step of check:docs.",
+      "PROSE_SUITES puts a suite in the docs lane, but no step of check:docs runs it. Add the suite to the step that its row names.",
     ).toEqual([]);
     expect(
       SUITES_OUTSIDE_THE_LANE.filter(named).map((suite) => suite.file),
-      "check:docs runs a suite this table says the full lane keeps. Move the row, or take the suite back out.",
+      "check:docs runs a suite that PROSE_SUITES keeps in the full lane. Move the row into the docs lane, or remove the suite from check:docs.",
     ).toEqual([]);
   });
 
@@ -498,10 +504,14 @@ describe("what the docs lane runs", () => {
     ).map(({ file, step }) => `${file} is run by ${step}`);
 
     expect(PROSE_SUITES.length).toBeGreaterThan(5);
-    expect(absent, "a row names a suite the tree does not have. Correct it, or delete it.").toEqual(
-      [],
-    );
-    expect(unrunnable, "a row names a step that is not a root script.").toEqual([]);
+    expect(
+      absent,
+      "a row of PROSE_SUITES names a file that does not exist. Correct the path, or delete the row.",
+    ).toEqual([]);
+    expect(
+      unrunnable,
+      "a row of PROSE_SUITES names a step that is not a root script. Name a root script.",
+    ).toEqual([]);
   });
 });
 
@@ -539,7 +549,7 @@ const JOBS_ON_NO_LANE: readonly string[] = [TITLE_JOB];
 
 const checkJobs = (): Readonly<Record<string, Job>> => workflow("check.yml").jobs;
 
-const legsTheFanInRequires = (lane: string): readonly string[] =>
+const legsOfLane = (lane: string): readonly string[] =>
   Object.keys(checkJobs()).filter(
     (job) => job.startsWith(`${lane}-`) && !JOBS_ON_NO_LANE.includes(job),
   );
@@ -596,7 +606,7 @@ const A_BASE = "0123456789abcdef0123456789abcdef01234567";
 
 const TARGET_TIP = "1111111111111111111111111111111111111111";
 
-/** A run's `github` context by the path an expression names; GitHub reads an absent path as "". */
+/** Keys are expression paths such as `github.event_name`. GitHub reads an absent path as "". */
 type Context = Readonly<Record<string, string>>;
 
 type LaneStepCase = {
@@ -698,7 +708,10 @@ const laneStepEnv = (github: Context): Readonly<Record<string, string>> =>
   Object.fromEntries(
     Object.entries(laneStep()?.env ?? {}).map(([name, value]) => {
       const named = EXPRESSION.exec(value)?.groups?.["path"];
-      if (named === undefined) throw new Error(`the lane step's ${name} reads more than a path`);
+      if (named === undefined)
+        throw new Error(
+          `the lane step sets ${name} to more than one expression path, which this test cannot read`,
+        );
       return [name, github[named] ?? ""];
     }),
   );
@@ -713,7 +726,7 @@ type Scratch = {
   readonly fetchHead: string;
 };
 
-const gitOver = ({ asked, fetched, since, fetchHead }: Scratch): string =>
+const gitStub = ({ asked, fetched, since, fetchHead }: Scratch): string =>
   [
     `echo "$1" >> '${asked}'`,
     'for word in "$@"; do before="$last"; last="$word"; done',
@@ -745,7 +758,7 @@ const runTheLaneStep = (
   }
   writeFileSync(asked, "");
   writeFileSync(published, "");
-  stub(bin, "git", gitOver({ asked, fetched, since, fetchHead: path.join(scratch, "fetch-head") }));
+  stub(bin, "git", gitStub({ asked, fetched, since, fetchHead: path.join(scratch, "fetch-head") }));
   if (answered !== undefined) stub(bin, "node", `printf '${answered}'\n`);
   const script = laneStep()?.run ?? "exit 9";
   const ran = spawnSync("bash", ["--noprofile", "--norc", "-eo", "pipefail", "-c", script], {
@@ -775,7 +788,7 @@ const runTheLaneStep = (
   return run;
 };
 
-describe("the lane inside check.yml", () => {
+describe("the lane step in check.yml", () => {
   it.each(LANE_STEPS)("puts $run in $lane", (scenario: LaneStepCase) => {
     const run = runTheLaneStep(scenario);
 
@@ -816,7 +829,7 @@ describe("the lane inside check.yml", () => {
       answered: "lane=full\\nimages=maybe\\n",
       says: "neither",
     },
-  ])("refuses $word, publishing nothing", ({ github, answered, says }) => {
+  ])("refuses $word with no outputs", ({ github, answered, says }) => {
     const run = runTheLaneStep(
       {
         run: "a change",
@@ -837,19 +850,19 @@ describe("the lane inside check.yml", () => {
 
 const IMAGE_GATES = "check:images";
 
-describe("the full lane's legs against the one list of gates", () => {
+describe("the full lane's legs and the root check's gates", () => {
   it("runs the root check's gates and the image gates", () => {
-    const ran = [...new Set(legsTheFanInRequires(CODE_LANE).flatMap(gatesOf).map(wholeGateOf))];
+    const ran = [...new Set(legsOfLane(CODE_LANE).flatMap(gatesOf).map(wholeGateOf))];
 
     expect(
       ran,
-      "the legs and the root check have stopped naming the same gates. Add the gate to a leg, or narrow it in NARROWED: a step no one leg can run is split across the legs, and NARROWED folds the parts back.",
+      "the full lane's legs and the root check no longer run the same gates. Add the missing gate to a leg. If no single leg can run a step, split it across the legs and list its parts in NARROWED, which maps the parts back to the whole step.",
     ).toEqual([...gatesNamed(commandOf("check")), ...gatesNamed(commandOf(IMAGE_GATES))]);
   });
 
   it("runs the image gates on one leg only", () => {
     const imageGates = gatesNamed(commandOf(IMAGE_GATES));
-    const legs = legsTheFanInRequires(CODE_LANE).filter((job) =>
+    const legs = legsOfLane(CODE_LANE).filter((job) =>
       gatesOf(job).some((gate) => imageGates.includes(gate)),
     );
 
@@ -857,33 +870,33 @@ describe("the full lane's legs against the one list of gates", () => {
     expect(legs).toEqual(["full-images"]);
     expect(
       imageGates.filter((gate) => gatesNamed(commandOf("check")).includes(gate)),
-      "the root check runs an image gate, so every laptop run builds the images again",
+      "the root check runs an image gate, so every local run of check rebuilds the images. Run image gates only from check:images.",
     ).toEqual([]);
   });
 
   it("runs each gate on one leg only", () => {
-    const ran = legsTheFanInRequires(CODE_LANE).flatMap(gatesOf);
+    const ran = legsOfLane(CODE_LANE).flatMap(gatesOf);
 
     expect(ran.filter((gate, at) => ran.indexOf(gate) !== at)).toEqual([]);
     expect(ran.filter((gate) => rootScripts()[gate] === undefined)).toEqual([]);
   });
 });
 
-describe("how the legs narrow check:workspaces", () => {
-  it("narrows a step only into root scripts the legs run", () => {
-    const ran = new Set(legsTheFanInRequires(CODE_LANE).flatMap(gatesOf));
+describe("how the legs split check:workspaces", () => {
+  it("splits a step only into root scripts the legs run", () => {
+    const ran = new Set(legsOfLane(CODE_LANE).flatMap(gatesOf));
 
     for (const [whole, parts] of Object.entries(NARROWED)) {
       expect(rootScripts()[whole], `${whole} is not a root script`).toBeDefined();
       expect(parts.filter((part) => rootScripts()[part] === undefined)).toEqual([]);
       expect(
         parts.filter((part) => !ran.has(part)),
-        `${whole} is narrowed past the legs`,
+        `NARROWED splits ${whole} into a part that no full-lane leg runs`,
       ).toEqual([]);
     }
   });
 
-  it("selects, between the narrowings of check:workspaces, every workspace it gates", () => {
+  it("covers every workspace of check:workspaces once across its parts", () => {
     const selected = [
       ...Object.values(NARROWED)
         .flat()
@@ -893,17 +906,18 @@ describe("how the legs narrow check:workspaces", () => {
 
     expect(
       [...selected].sort(),
-      "a workspace with a check script is on no leg, or is on two. The legs run check:workspaces between them or they do not run it at all.",
+      "a workspace with a check script is on no leg, or on two legs. Together, the legs must run every workspace that check:workspaces runs, each one once.",
     ).toEqual([...workspacesGated()].sort());
   });
 
-  it("runs every step a sharded workspace's check names", () => {
+  it("runs every step that a split workspace's check names", () => {
     for (const [directory, steps] of Object.entries(RUN_BY_STEP)) {
       const { name, check } = manifestAt(directory);
 
-      expect(gatesNamed(check), `${directory}'s check names a step no leg runs`).toEqual(
-        Object.keys(steps),
-      );
+      expect(
+        gatesNamed(check),
+        `${directory}'s check steps differ from its RUN_BY_STEP entry, so a step runs on no leg`,
+      ).toEqual(Object.keys(steps));
       for (const [step, script] of Object.entries(steps)) {
         expect(rootScripts()[script]).toEqual(`pnpm --filter ${name} run ${step}`);
         expect(NARROWED["check:workspaces"]).toContain(script);
@@ -915,35 +929,36 @@ describe("how the legs narrow check:workspaces", () => {
 describe("the sharded legs of check.yml", () => {
   it.each(Object.keys(SHARDED_LEGS))("numbers %s's shards 1 to N, one per job", (leg) => {
     const strategy = checkJobs()[leg]?.strategy;
-    assert(strategy !== undefined, `${leg} has a strategy`);
+    assert(strategy !== undefined, `${leg} has no strategy in check.yml`);
 
     expect(
       Object.keys(strategy.matrix),
-      "a second matrix key multiplies the jobs, so two of them run one shard",
+      "the matrix has a key other than shard. A second key multiplies the jobs, so two jobs run the same shard.",
     ).toEqual(["shard"]);
     const shards = strategy.matrix["shard"];
-    assert(shards !== undefined, `${leg} has a shard matrix`);
+    assert(shards !== undefined, `${leg} has no shard matrix`);
     expect(shards.length).toBeGreaterThan(1);
-    expect(shards, "a gap or a repeat leaves some files unrun").toEqual(
-      shards.map((_, at) => at + 1),
-    );
+    expect(
+      shards,
+      "number the shards 1 to N. A gap or a repeat leaves some files untested.",
+    ).toEqual(shards.map((_, at) => at + 1));
     expect(stepsOfJob(leg).flatMap(envOf)).toEqual([
       ["SHARD", "${{ matrix.shard }}/${{ strategy.job-total }}"],
     ]);
     expect(
       strategy["fail-fast"],
-      "a red shard cancels the others, which then report nothing of their own files",
+      "set fail-fast to false. Otherwise a failing shard cancels the others, and they report nothing about their own files.",
     ).toBe(false);
   });
 
-  it("runs each sharded script alone, and no other leg shards", () => {
+  it("runs each sharded script alone, and shards no other leg", () => {
     const slicing = Object.keys(checkJobs()).filter((job) => stepsOfJob(job).some(runsAShard));
 
     expect(slicing).toEqual(Object.keys(SHARDED_LEGS));
     for (const [leg, script] of Object.entries(SHARDED_LEGS)) {
       expect(
         gatesOf(leg),
-        "a gate beside the shard runs once per shard, where one run would do",
+        "a sharded leg must run only its sharded script. Another gate on that leg runs once per shard instead of once. Move it to an unsharded leg.",
       ).toEqual([script]);
     }
   });
@@ -972,7 +987,7 @@ const PROVED_NOTHING = "proved nothing";
 const verdictOf = (run: SpawnSyncReturns<string>): VerdictCase["verdict"] =>
   run.status === 0 ? "passes" : "fails";
 
-/** A matrix leg is one entry in `needs`, its result the shards' together. */
+/** A matrix leg is one entry in `needs`, and its result combines the results of all its shards. */
 const FULL_LEGS = [
   "full-root",
   "full-core",
@@ -1062,7 +1077,7 @@ const VERDICTS: readonly VerdictCase[] = [
   },
 ];
 
-const verdictOn = ({
+const runFanIn = ({
   lane,
   ran,
   title,
@@ -1093,39 +1108,43 @@ const VERDICTS_THAT_SAY_WHY = VERDICTS.flatMap(({ says, ...scenario }) =>
   says === undefined ? [] : [{ ...scenario, says }],
 );
 
-describe("the one verdict check.yml reports", () => {
-  it("hangs the required context off every leg, whatever they did", () => {
+describe("the fan-in job that reports check.yml's result", () => {
+  it("reports the required context after every leg, whatever their results", () => {
     const jobs = Object.keys(checkJobs());
     const fanIn = checkJobs()[FAN_IN];
 
-    expect(jobs.at(-1), "the fan-in is not the last job, so a leg was added after it").toEqual(
-      FAN_IN,
-    );
+    expect(
+      jobs.at(-1),
+      "the fan-in job `check` must be the last job in check.yml. Move the leg that was added after it above `check`.",
+    ).toEqual(FAN_IN);
     expect(fanIn?.needs).toEqual(jobs.filter((job) => job !== FAN_IN));
     expect(
       workflow("build.yml").jobs["image"]?.needs,
-      "build.yml's image waits on its call of check.yml, the run this fan-in closes",
+      "build.yml's image job must need `check`, its call of check.yml, so that it waits for the result that the fan-in job reports.",
     ).toContain("check");
     expect(
       fanIn?.if,
-      "under anything narrower than always() a failed leg leaves the required context skipped, which never reports",
+      "the fan-in job's if must be `${{ always() }}`. Under a narrower condition, a failed leg skips the fan-in job, and a skipped required context never reports.",
     ).toEqual("${{ always() }}");
   });
 
-  it("wants the title's success exactly where it runs", () => {
+  it("requires pr-title success only when pr-title runs", () => {
     const condition = checkJobs()[TITLE_JOB]?.if;
-    assert(condition !== undefined, `${TITLE_JOB} has an if`);
+    assert(condition !== undefined, `${TITLE_JOB} has no if in check.yml`);
     const runsOn = /^\$\{\{ (?<condition>.+) \}\}$/.exec(condition)?.groups?.["condition"];
     const env = stepsOfJob(FAN_IN).flatMap(envOf);
 
-    assert(runsOn !== undefined, `${TITLE_JOB} runs on no condition this reading can find`);
+    assert(
+      runsOn !== undefined,
+      `${TITLE_JOB}'s if is not a single expression that this test can read`,
+    );
     expect(Object.fromEntries(env)["TITLE_WANTED"]).toEqual(
       `\${{ (${runsOn}) && 'success' || 'skipped' }}`,
     );
   });
 
   it.each(VERDICTS)("$verdict on $run", (scenario: VerdictCase) => {
-    const ran = verdictOn(scenario);
+    const ran = runFanIn(scenario);
 
     expect(verdictOf(ran), `${ran.stdout}${ran.stderr}`).toEqual(scenario.verdict);
     expect(ran.stdout).toContain(
@@ -1134,11 +1153,11 @@ describe("the one verdict check.yml reports", () => {
   });
 
   it.each(VERDICTS_THAT_SAY_WHY)("$run says why", ({ says, ...scenario }) => {
-    expect(verdictOn(scenario).stdout).toContain(says);
+    expect(runFanIn(scenario).stdout).toContain(says);
   });
 });
 
-describe("the pull request's title, read by check.yml", () => {
+describe("the pull request title check in check.yml", () => {
   const TITLE_COMMAND = "commitlint";
   const PULL_REQUEST = "7";
   const REPOSITORY = "betteranswers/better-answers";
@@ -1193,7 +1212,7 @@ describe("the pull request's title, read by check.yml", () => {
     return ran;
   };
 
-  it("fetches the commitlint the root manifest pins and installs", () => {
+  it("runs the commitlint version that the root manifest pins", () => {
     expect(COMMITLINT.map(pinnedVersion)).toEqual(COMMITLINT.map(installedVersion));
   });
 
@@ -1225,21 +1244,21 @@ describe("the pull request's title, read by check.yml", () => {
   });
 });
 
-describe("the workflows with no merge queue", () => {
+describe("the workflows, in a repository without a merge queue", () => {
   const workflowDirectory = path.join(repositoryRoot, ".github", "workflows");
   const workflowFiles = readdirSync(workflowDirectory).filter((file) => file.endsWith(".yml"));
   const textOf = (file: string): string => readFileSync(path.join(workflowDirectory, file), "utf8");
 
-  it("name no merge group, whose runs only a queue starts", () => {
+  it("do not use merge_group, which only a merge queue triggers", () => {
     const queueEvent = ["merge", "group"].join("_");
 
     expect(
       workflowFiles.filter((file) => textOf(file).includes(queueEvent)),
-      `a ${queueEvent} trigger or condition has come back into these workflows`,
+      `a workflow names ${queueEvent} again. The repository has no merge queue, so delete the trigger or condition.`,
     ).toEqual([]);
   });
 
-  it("name no job verdict, which a skipped run satisfies", () => {
+  it("name no job verdict, because a skipped run passes it", () => {
     const jobsNamed = z.object({
       jobs: z.record(z.string(), z.object({ name: z.string().optional() })),
     });

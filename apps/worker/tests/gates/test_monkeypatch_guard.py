@@ -5,41 +5,41 @@ import pytest
 
 from better_answers_worker import config, loop
 
-OWN_CODE_REFUSAL = re.escape("Our own code is never mocked")
+OWN_CODE_ERROR = re.escape("Our own code is never mocked")
 
 
 def test_refuses_a_patch_of_the_work_loops_sleep(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    with pytest.raises(RuntimeError, match=OWN_CODE_REFUSAL):
+    with pytest.raises(RuntimeError, match=OWN_CODE_ERROR):
         monkeypatch.setattr(loop, "sleep_until_stopped", lambda _seconds: None)
 
 
-def test_refuses_a_patch_of_this_tiers_own_module(
+def test_refuses_a_patch_of_a_worker_module_function(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    with pytest.raises(RuntimeError, match=OWN_CODE_REFUSAL):
+    with pytest.raises(RuntimeError, match=OWN_CODE_ERROR):
         monkeypatch.setattr(config, "read_bootstrap", lambda: None)
 
 
 def test_refuses_a_patch_named_by_its_dotted_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    with pytest.raises(RuntimeError, match=OWN_CODE_REFUSAL):
+    with pytest.raises(RuntimeError, match=OWN_CODE_ERROR):
         monkeypatch.setattr("better_answers_worker.config.read_bootstrap", lambda: None)
 
 
-def test_refuses_a_patch_of_a_table_this_tier_owns(
+def test_refuses_setitem_on_a_worker_module_namespace(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    with pytest.raises(RuntimeError, match=OWN_CODE_REFUSAL):
+    with pytest.raises(RuntimeError, match=OWN_CODE_ERROR):
         monkeypatch.setitem(vars(config), "REQUIRED", ())
 
 
-def test_refuses_deleting_an_attribute_of_this_tiers_own_module(
+def test_refuses_deleting_an_attribute_of_a_worker_module(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    with pytest.raises(RuntimeError, match=OWN_CODE_REFUSAL):
+    with pytest.raises(RuntimeError, match=OWN_CODE_ERROR):
         monkeypatch.delattr(config, "REQUIRED")
 
 
@@ -49,7 +49,7 @@ def test_patches_a_third_party_attribute(monkeypatch: pytest.MonkeyPatch) -> Non
     assert os.sep == "|"
 
 
-def test_patches_a_third_party_table(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_patches_a_third_party_mapping(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(os.environ, "BETTER_ANSWERS_GUARD_PROBE", "set")
 
     assert os.environ["BETTER_ANSWERS_GUARD_PROBE"] == "set"

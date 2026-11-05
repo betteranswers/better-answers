@@ -99,7 +99,7 @@ const filesUnder = async (folder: string): Promise<readonly string[]> => {
 
 const TEMPLATE_PREFIX = "tpl_ts_";
 
-/** `month` is the server's UTC `YYYY-MM`: a migration makes the question months of the clock it runs on. */
+/** `month` is the server's UTC `YYYY-MM`, because a migration creates question months from the clock it runs on. */
 export const templateNameOver = async (folder: string, month: string): Promise<string> => {
   const files = await filesUnder(folder);
   const contents = await Promise.all(files.map((file) => readFile(path.join(folder, file))));
@@ -185,7 +185,7 @@ const buildAndPublish = async (
   await admin.query(`ALTER DATABASE ${quoted(building)} RENAME TO ${quoted(name)}`);
 };
 
-/** One key for the instance: every build creates the same cluster-wide roles, so builds take turns. */
+/** One lock for the whole instance, because every build creates the same cluster-wide roles. Builds take turns. */
 export const BUILD_LOCK = "hashtextextended('better-answers template build', 0)";
 
 export const ensureTemplate = (
@@ -397,8 +397,8 @@ export const clonedFrom = async (
 };
 
 /**
- * A fresh copy of the warm template, named after `databaseKey` or the running test file; `stop`
- * drops it. Without a warm cluster, starts a container.
+ * A fresh copy of the warm template, named after `databaseKey` or the test file. `stop` drops it.
+ * Without a warm cluster, it starts a container.
  */
 export const openMigratedPostgres = async (databaseKey?: string): Promise<MigratedPostgres> => {
   const warm = providedWarmPostgres();

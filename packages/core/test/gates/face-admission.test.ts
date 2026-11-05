@@ -81,9 +81,9 @@ const directories = (): readonly string[] => [
   ...new Set(asSliceRelative(coreSourceFiles()).map((file) => file.split("/")[0] ?? file)),
 ];
 
-describe("the faces of core, each admitting whoever it takes", () => {
+describe("every core function that takes a person admits them", () => {
   it.skipIf(sourceTreeIsInstrumented())(
-    "finds a person admitted by every function but the steps",
+    "finds no unadmitted person outside the listed steps",
     () => {
       const files = coreSourceFiles();
       const sources = Object.fromEntries(
@@ -105,13 +105,13 @@ describe("the faces of core, each admitting whoever it takes", () => {
     },
   );
 
-  it("leaves out only directories the tree has", () => {
+  it("skips only directories that exist in src", () => {
     const inTree = directories();
 
     expect(HOLDS_NO_ACTION.filter((directory) => !inTree.includes(directory))).toEqual([]);
   });
 
-  it("reads every face the package exports, or leaves it out", () => {
+  it("checks or skips every face the package exports", () => {
     const read = (face: string): boolean => /^[^/]+\/index\.ts$/.test(face);
     const leftOut = (face: string): boolean =>
       HOLDS_NO_ACTION.some((directory) => face.startsWith(`${directory}/`));
@@ -124,7 +124,7 @@ describe("the faces of core, each admitting whoever it takes", () => {
     expect(exportedFaces()).toContain("answering/index.ts");
   });
 
-  it("gives every step the action that admits for it", () => {
+  it("gives every listed step a non-empty reason", () => {
     expect(Object.values(STEPS).filter((why) => why.trim() === "")).toEqual([]);
   });
 });

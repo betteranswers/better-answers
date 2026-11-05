@@ -2,7 +2,7 @@ const MOST_WORDS = 10;
 
 const SHOULD = /\bshould\b/i;
 
-/** Read as the test runs, so an `.each` row or a template literal is already filled in. */
+/** Checks the title as the test runs, after `.each` rows and template literals are filled in. */
 export const holdTitle = (title: string): void => {
   const words = title.split(/\s+/).filter((word) => word !== "").length;
   if (words <= MOST_WORDS && !SHOULD.test(title)) return;

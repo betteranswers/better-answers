@@ -435,7 +435,7 @@ const analyseHeldOff = <T>(work: () => Promise<T>): Promise<T> =>
 describe("importing the bundle", () => {
   beforeAll(() => mapAutovacuumOff(db().pool));
 
-  it("analyses the map for the planner once landed", async () => {
+  it("analyses the map tables for the planner after the import", async () => {
     const { scenario, verifiers } = await arranged();
     const { log, warnings } = warningsKept();
 
@@ -445,7 +445,7 @@ describe("importing the bundle", () => {
     expect(warnings).toEqual([]);
   });
 
-  it("reports a landed import when the analyse fails", async () => {
+  it("reports the import as landed when analysing the map fails", async () => {
     const { scenario, verifiers } = await arranged();
     const { log, warnings } = warningsKept();
 
@@ -463,7 +463,7 @@ describe("importing the bundle", () => {
     ]);
   });
 
-  it("keeps the stopped refusal when the analyse fails too", async () => {
+  it("keeps the stopped refusal when analysing the map also fails", async () => {
     const { scenario, verifiers } = await arranged();
     const { log, warnings } = warningsKept();
 
@@ -501,8 +501,8 @@ describe("importing the bundle", () => {
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     expect(history).toHaveLength(10);
     const [firstSha, secondSha] = history;
-    assert(firstSha !== undefined, "the import committed its manifest");
-    assert(secondSha !== undefined, "the import committed its first concept");
+    assert(firstSha !== undefined, "the import did not commit its manifest");
+    assert(secondSha !== undefined, "the import did not commit its first concept");
     const first = await commitFacts(scenario.git, scenario.workspaceId, firstSha);
     expect({ subject: first.subject, files: first.files, parents: first.parents }).toEqual({
       subject: "Write the bundle's manifest",
@@ -562,13 +562,13 @@ describe("importing the bundle", () => {
     ]);
   });
 
-  it("writes each file in platform form with its minted iri", async () => {
+  it("writes each file in platform form with its minted IRI", async () => {
     const { scenario, verifiers, people } = await arranged();
 
     await imported(scenario, soundBundle(verifiers));
 
     const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
-    assert(sha !== undefined, "the import committed");
+    assert(sha !== undefined, "the import did not commit");
     const file = await fileAtCommit(
       scenario.git,
       scenario.workspaceId,
@@ -576,7 +576,7 @@ describe("importing the bundle", () => {
       "knowledge/company/answers/data-retention-period.md",
     );
     const iri = /"iri": "([^"]+)"/.exec(file)?.[1];
-    assert(iri !== undefined, "the file names its iri");
+    assert(iri !== undefined, "the file does not name its IRI");
     expect(iri).toMatch(/^https:\/\/better-answers\.com\/c\/[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(file).toBe(
       [
@@ -615,7 +615,7 @@ describe("importing the bundle", () => {
     expect(file).not.toContain("@");
   });
 
-  it("keeps __proto__ and constructor keys, as any other key", async () => {
+  it("keeps __proto__ and constructor keys like any other key", async () => {
     const { scenario } = await arranged();
     const path = "knowledge/company/answers/support-hours.md";
 
@@ -633,7 +633,7 @@ describe("importing the bundle", () => {
     );
 
     const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
-    assert(sha !== undefined, "the import committed");
+    assert(sha !== undefined, "the import did not commit");
     const read = parseConceptFile(
       await fileAtCommit(scenario.git, scenario.workspaceId, sha, path),
     );
@@ -706,7 +706,7 @@ describe("importing the bundle", () => {
     );
   });
 
-  it("skips what already landed on a rerun, and says so", async () => {
+  it("skips concepts already landed on a rerun, and reports them", async () => {
     const { scenario, verifiers } = await arranged();
     await imported(scenario, soundBundle(verifiers));
 
@@ -734,7 +734,7 @@ describe("importing the bundle", () => {
     });
   });
 
-  it("stops at a taken merge key, completing once it frees", async () => {
+  it("stops at a taken merge key and completes once freed", async () => {
     const { scenario, verifiers } = await arranged();
     const standing = await standingConcept(
       scenario,
@@ -891,8 +891,8 @@ describe("importing the bundle", () => {
   });
 });
 
-describe("the second pass: each relative link becomes its concept's iri", () => {
-  it("rewrites each link's target to its iri, text untouched", async () => {
+describe("the second pass that rewrites relative links to IRIs", () => {
+  it("rewrites each link target to an IRI, keeping link text", async () => {
     const { scenario, verifiers } = await arranged();
 
     const run = await imported(scenario, soundBundle(verifiers));
@@ -916,7 +916,7 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     expect(history).toHaveLength(10);
     const rewriteSha = history[7];
-    assert(rewriteSha !== undefined, "the import committed its link rewrites");
+    assert(rewriteSha !== undefined, "the import did not commit its link rewrites");
     const rewrite = await commitFacts(scenario.git, scenario.workspaceId, rewriteSha);
     expect({
       subject: rewrite.subject,
@@ -1004,7 +1004,7 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
       const expenses = iri.get("knowledge/company/expenses.md");
       const team = iri.get("knowledge/company/roles/équipe.md");
       const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
-      assert(sha !== undefined, "the import committed");
+      assert(sha !== undefined, "the import did not commit");
       expect(
         await fileAtCommit(
           scenario.git,
@@ -1022,7 +1022,7 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
   );
 });
 
-describe("an imported concept, opened", () => {
+describe("opening an imported concept", () => {
   const SUPPORT_HOURS = "Support answers between 08:00 and 18:00 on working days.";
 
   const TWO_SOURCES = [
@@ -1068,11 +1068,11 @@ describe("an imported concept, opened", () => {
     ]);
   });
 
-  it("answers each source's id, title and page, opening nothing", async () => {
+  it("returns each source's id, title and page without opening any", async () => {
     const opened = await openedImport(TWO_SOURCES);
 
     assert(opened.ok, inspect(opened));
-    assert(opened.value.found, "the imported concept opens");
+    assert(opened.value.found, "the imported concept was not found");
     expect(opened.value.concept?.evidence).toStrictEqual([
       { id: "ENTRY-001", source: "Acme Bid Library v1, entry ENTRY-001", at: "p.4" },
       { id: "PROD-005", source: "Acme Product Library v2, entry PROD-005" },
@@ -1091,7 +1091,7 @@ describe("an imported concept, opened", () => {
     );
 
     assert(opened.ok, inspect(opened));
-    assert(opened.value.found, "the imported concept opens");
+    assert(opened.value.found, "the imported concept was not found");
     expect(opened.value.concept?.evidence).toStrictEqual([
       { id: "PROD-005", source: "Acme Product Library v2, entry PROD-005" },
     ]);
@@ -1281,14 +1281,14 @@ describe("what the import refuses before it writes anything", () => {
 
     const refused = await importing(scenario, scenario.admin, { tree: tree(verifiers) });
 
-    expect(refused, "the refusal names the file and the reason").toEqual({
+    expect(refused, "the refusal does not name the file and the reason").toEqual({
       ok: false,
       error: { kind: "unsound", ...unsound },
     });
     await nothingWritten(scenario);
   });
 
-  it("refuses another workspace's document as it refuses none", async () => {
+  it("refuses another workspace's document like a missing one", async () => {
     const { scenario, verifiers } = await arranged();
     const elsewhere = await arrange();
     const theirs = await documentLanded(db().pool, elsewhere.workspaceId, MINUTES);
@@ -1316,7 +1316,7 @@ describe("what the import refuses before it writes anything", () => {
     await nothingWritten(scenario);
   });
 
-  it.each([false, true])("refuses an Editor the import, by role, dry run %s", async (dryRun) => {
+  it.each([false, true])("refuses an Editor the import by role, dry run %s", async (dryRun) => {
     const { scenario, verifiers } = await arranged();
 
     const refused = await importing(scenario, scenario.editor, {
@@ -1360,7 +1360,7 @@ describe("what the import refuses before it writes anything", () => {
     });
   });
 
-  it("answers a lost manifest commit in the git door's word", async () => {
+  it("returns the git door's error for a lost manifest commit", async () => {
     const { scenario, verifiers } = await arranged();
     const release = await holdMainRef(scenario.git, scenario.workspaceId);
 

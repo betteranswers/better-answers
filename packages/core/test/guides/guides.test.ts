@@ -237,7 +237,7 @@ describe("seeding a guide from a template", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
   });
 
-  it("refuses a seed naming no shipped template", async () => {
+  it("refuses a seed that names no shipped template", async () => {
     const { ng } = await seededOnce();
     const { scenario } = ng;
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
@@ -306,7 +306,7 @@ describe("seeding a guide from a template", () => {
     ]);
   });
 
-  it("reads a withheld fact as missing to an outside Viewer", async () => {
+  it("reads a withheld fact as missing for an outside Viewer", async () => {
     const { ng, guideId } = await seededOnce();
 
     const coverage = await coverageAs(ng.viewer, guideId);
@@ -333,11 +333,11 @@ describe("seeding a guide from a template", () => {
       [ng.admin.userId],
     );
     const [adminRow] = admin.rows;
-    assert(adminRow !== undefined, "the admin has a user row");
+    assert(adminRow !== undefined, "the admin has no user row");
 
     const facts = await commitFacts(git, workspaceId, sha);
     const [parentSha] = facts.parents;
-    assert(parentSha !== undefined, "the skeleton commit has a parent");
+    assert(parentSha !== undefined, "the skeleton commit has no parent");
     const parent = await commitFacts(git, workspaceId, parentSha);
 
     expect(facts.author).toBe(`${adminRow.name} <${adminRow.email}>`);
@@ -652,7 +652,7 @@ const rewordedBody = async (
   );
 };
 
-describe("a change to a concept a write-up includes", () => {
+describe("a change to a concept that a write-up includes", () => {
   it("replaces an unmet mark and keeps a review finding", async () => {
     const { ng, guideId } = await seeded();
     const { workspaceId } = ng.scenario;

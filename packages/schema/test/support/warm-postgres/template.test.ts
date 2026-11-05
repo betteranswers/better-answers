@@ -168,10 +168,10 @@ const anExitedPid = async (): Promise<number> => {
 };
 
 describe("the warm harness under TEST_POSTGRES_URI", () => {
-  it("provides the shared server's template, starting no container", async () => {
+  it("uses the shared server's template without starting a container", async () => {
     const started = await startInChild(adminUri());
     const template = started.templateDatabase;
-    assert(template !== undefined, "the shared harness names its template");
+    assert(template !== undefined, "the shared harness named no template");
 
     expect({
       source: started.source,
@@ -190,10 +190,10 @@ describe("the warm harness under TEST_POSTGRES_URI", () => {
 
   it("reuses the published template on a second start", async () => {
     const first = await startInChild(adminUri());
-    assert(first.templateDatabase !== undefined, "the first start names its template");
+    assert(first.templateDatabase !== undefined, "the first start named no template");
     const builtOnce = await oidOf(first.templateDatabase);
     const second = await startInChild(adminUri());
-    assert(second.templateDatabase !== undefined, "the second start names its template");
+    assert(second.templateDatabase !== undefined, "the second start named no template");
 
     expect({
       published: builtOnce !== undefined,
@@ -202,7 +202,7 @@ describe("the warm harness under TEST_POSTGRES_URI", () => {
     }).toEqual({ published: true, template: first.templateDatabase, oid: builtOnce });
   }, 300_000);
 
-  it("sweeps a dead run's database and keeps a live one's", async () => {
+  it("drops a dead run's database and keeps a live run's", async () => {
     const dead = `ba_swept_${String(process.pid)}_${String(await anExitedPid())}`;
     const live = `ba_kept_${String(process.pid)}_${String(process.pid)}`;
     await asAdmin(async (admin) => {
@@ -235,7 +235,7 @@ describe("a shared template", () => {
     expect({ returned, built: log.built() }).toEqual({ returned: [name, name], built: ["raced"] });
   });
 
-  it("holds only its own build under another name", async () => {
+  it("keeps each name's build apart from another name's", async () => {
     const first = scratchTemplateOfThisWorker("first");
     const second = scratchTemplateOfThisWorker("second");
     await ensureTemplate(adminUri(), first, buildLog().building("first_table"));
@@ -260,7 +260,7 @@ describe("a shared template", () => {
     }).toEqual({ mostAtOnce: 1, built: names.toSorted(), published: [true, true] });
   });
 
-  it("leaves a running build alone while another waits its turn", async ({ signal }) => {
+  it("leaves a running build alone while another waits", async ({ signal }) => {
     const running = `tpl_ts_age_running_${String(process.pid)}`;
     scratchTemplates.push(running, `${running}_building`);
     let release = (): void => undefined;
@@ -304,7 +304,7 @@ describe("a shared template", () => {
     });
   });
 
-  it("seals a published template against every connection", async () => {
+  it("refuses every connection to a published template", async () => {
     const name = scratchTemplateOfThisWorker("sealed");
     await ensureTemplate(adminUri(), name, buildLog().building("sealed"));
     const flags = await asAdmin((admin) =>
@@ -318,7 +318,7 @@ describe("a shared template", () => {
     });
   });
 
-  it("drops day-unused templates to bound the tmpfs, keeping fresh ones", async () => {
+  it("drops templates unused for a day, but keeps fresh ones", async () => {
     const stale = await plantedTemplate("stale", LONG_AGO);
     const fresh = await plantedTemplate("fresh", new Date().toISOString());
 
@@ -334,7 +334,7 @@ describe("a shared template", () => {
     });
   });
 
-  it("stamps an unstamped template rather than dropping it", async () => {
+  it("stamps an unstamped template instead of dropping it", async () => {
     const before = Date.now();
     const unstamped = await plantedTemplate("unstamped", null);
 
@@ -413,7 +413,7 @@ describe("a shared template", () => {
     }
   });
 
-  it("changes its name when the server's month turns", async () => {
+  it("changes its name when the server's month changes", async () => {
     const folder = await mkdtemp(path.join(tmpdir(), "warm-template-"));
     try {
       await writeFile(path.join(folder, "0000_first.sql"), "CREATE TABLE one ();");

@@ -49,11 +49,11 @@ const workspacesWithShortName = async (app: TestApp, shortName: string): Promise
   return found.rowCount ?? 0;
 };
 
-describe("pnpm ops — the restore scripts' commands", () => {
+describe("pnpm ops", () => {
   const served = servedApp();
 
-  describe("provision-workspace — a customer's workspace and its first Admin", () => {
-    const standingOf = async (app: TestApp, id: string) => {
+  describe("provision-workspace, which creates a workspace and its first Admin", () => {
+    const provisionedStateOf = async (app: TestApp, id: string) => {
       const found = await app.database.superuser.query<Record<string, unknown>>(
         `SELECT w.name, w.short_name AS "shortName",
                 EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -66,7 +66,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return found.rows;
     };
 
-    it("stands up workspace, partition, member, config, audit log and repository", async () => {
+    it("creates the workspace, partition, Admin, config, audit event, and repository", async () => {
       const admin = await served().person(undefined, "Priya Shah");
       const shortName = aShortName();
 
@@ -84,7 +84,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         `provision-workspace: done — ${id}, short name ${shortName}, Admin ${admin.email}`,
       ]);
-      expect(await standingOf(served(), id)).toEqual([
+      expect(await provisionedStateOf(served(), id)).toEqual([
         { name: "Acme", shortName, partition: true, ttl: "300000" },
       ]);
       expect(await membersOf(served(), id, admin.id)).toEqual([
@@ -103,7 +103,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("resolves the Admin's email regardless of case, as sign-in does", async () => {
+    it("matches the Admin's email in any case, as sign-in does", async () => {
       const admin = await served().person("Priya.Shah@Acme.Invalid");
 
       const run = await provisioning(served(), [
@@ -121,7 +121,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses no-such-user, says what to do next, writes nothing", async () => {
+    it("refuses an unknown email as no-such-user and writes nothing", async () => {
       const shortName = aShortName();
 
       const run = await provisioning(served(), [
@@ -140,7 +140,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await workspacesWithShortName(served(), shortName)).toBe(0);
     });
 
-    it("refuses no-display-name, says what to do next, writes nothing", async () => {
+    it("refuses a person without a display name as no-display-name", async () => {
       const admin = await served().person(undefined, "");
       const shortName = aShortName();
 
@@ -161,7 +161,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await workspaceCountOf(served(), admin.id)).toBe(0);
     });
 
-    it("refuses slug-taken for a held short name, writing nothing", async () => {
+    it("refuses a short name already in use as slug-taken", async () => {
       const first = await served().person();
       const second = await served().person();
       const shortName = aShortName();
@@ -192,7 +192,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await workspaceCountOf(served(), second.id)).toBe(0);
     });
 
-    it("refuses malformed for a blank name or short name", async () => {
+    it("refuses a blank name or short name as malformed", async () => {
       const admin = await served().person();
 
       const run = await provisioning(served(), [
@@ -211,7 +211,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await workspaceCountOf(served(), admin.id)).toBe(0);
     });
 
-    it("refuses without a repositories' root, before writing anything", async () => {
+    it("refuses without GIT_STORE_DIR and writes nothing", async () => {
       const admin = await served().person();
       const shortName = aShortName();
 
@@ -234,7 +234,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await workspacesWithShortName(served(), shortName)).toBe(0);
     });
 
-    it("answers usage to a missing --name, writing nothing", async () => {
+    it("gives a usage error without --name and writes nothing", async () => {
       const admin = await served().person();
       const shortName = aShortName();
 
@@ -248,7 +248,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await workspaceCountOf(served(), admin.id)).toBe(0);
     });
 
-    it("names both commands in the usage", async () => {
+    it("lists both commands in the help text", async () => {
       const run = await ops(served(), ["help"]);
 
       expect(run.lines.join("\n")).toContain(
@@ -260,9 +260,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("add-member — a signed-in person made a workspace's member", () => {
+  describe("add-member, which adds a known person to a workspace", () => {
     it.each(["Admin", "Editor", "Viewer"])(
-      "makes a person a %s member, with audit events",
+      "adds a person as %s and records an audit event",
       async (role) => {
         const { workspaceId } = await served().provision();
         const person = await served().person();
@@ -282,7 +282,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       },
     );
 
-    it("resolves the email without regard to case, as sign-in does", async () => {
+    it("matches the email in any case, as sign-in does", async () => {
       const { workspaceId } = await served().provision();
       const person = await served().person("Sam.Okoro@Acme.Invalid");
 
@@ -294,7 +294,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses no-such-user, says what to do next, writes nothing", async () => {
+    it("refuses an unknown email as no-such-user and writes nothing", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await adding(served(), workspaceId, "nobody@acme.invalid", "Editor");
@@ -306,7 +306,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await rowsOfAction(served(), workspaceId, "people.member.added")).toEqual([]);
     });
 
-    it("refuses no-display-name, says what to do next, writes nothing", async () => {
+    it("refuses a person without a display name as no-display-name", async () => {
       const { workspaceId } = await served().provision();
       const person = await served().person(undefined, "");
 
@@ -320,7 +320,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await rowsOfAction(served(), workspaceId, "people.member.added")).toEqual([]);
     });
 
-    it("refuses no-such-workspace for an unknown id, and writes nothing", async () => {
+    it("refuses an unknown workspace id as no-such-workspace", async () => {
       const person = await served().person();
       const nowhere = ulid();
 
@@ -334,7 +334,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await auditLogOf(served(), nowhere)).toEqual([]);
     });
 
-    it("refuses already-a-member on any repeat, never changing a role", async () => {
+    it("refuses an existing member as already-a-member, keeping the role", async () => {
       const { workspaceId, admin } = await served().provision();
       const person = await served().person();
       expect((await adding(served(), workspaceId, person.email, "Editor")).exitCode).toBe(0);
@@ -355,7 +355,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await rowsOfAction(served(), workspaceId, "people.member.added")).toHaveLength(1);
     });
 
-    it("answers usage to a fourth role word, and writes nothing", async () => {
+    it("gives a usage error for an unknown role, writing nothing", async () => {
       const { workspaceId } = await served().provision();
       const person = await served().person();
 
@@ -366,7 +366,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await membersOf(served(), workspaceId, person.id)).toEqual([]);
     });
 
-    it("answers usage to a non-id workspace", async () => {
+    it("refuses a workspace that is not an id as malformed", async () => {
       const run = await ops(served(), [
         "add-member",
         "--workspace",
@@ -384,7 +384,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("add-person — a named person before their first sign-in", () => {
+  describe("add-person, which adds a person before their first sign-in", () => {
     const addingPerson = (app: TestApp, flags: readonly string[]): Promise<Run> =>
       opsWith(app, ["add-person", ...flags], {});
 
@@ -416,14 +416,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return found.rows[0]?.rows ?? 0;
     };
 
-    const aVerifier = (): string => `matthew-${ulid().toLowerCase()}@phew.invalid`;
+    const aNewEmail = (): string => `matthew-${ulid().toLowerCase()}@phew.invalid`;
 
     const sessionHolder = z.object({
       user: z.object({ id: z.string(), name: z.string(), emailVerified: z.boolean() }),
     });
 
-    it("writes the person and its row, its id first", async () => {
-      const email = aVerifier();
+    it("writes the person and an audit event, id printed first", async () => {
+      const email = aNewEmail();
 
       const run = await addingPerson(served(), [
         "--email",
@@ -445,9 +445,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("lets add-member take them, and their sign-in finds them", async () => {
+    it("lets add-member add them and links their first sign-in", async () => {
       const { workspaceId } = await served().provision();
-      const email = aVerifier();
+      const email = aNewEmail();
       const added = await addingPerson(served(), ["--email", email, "--name", "Matthew Burgess"]);
       const personId = idOnTheDoneLine(added);
 
@@ -482,20 +482,20 @@ describe("pnpm ops — the restore scripts' commands", () => {
         ["--email", "matthew@phew.invalid", "--name", "Matthew <m@phew.invalid>"],
         "display-name-angle-bracket: a display name is one line of 1 to 100 characters, with no angle brackets or control characters",
       ],
-    ])("refuses %s in the malformed class, writing nothing", async (_shape, flags, said) => {
+    ])("refuses %s with exit 2 and writes nothing", async (_shape, flags, said) => {
       const before = await addedRowCount(served());
 
       const run = await addingPerson(served(), flags);
 
       expect(run).toMatchObject({ exitCode: 2, lines: [`add-person: REFUSED — ${said}`] });
       const [, email] = flags;
-      assert(email !== undefined, "the flags name an address");
+      assert(email !== undefined, "the flags name no address");
       expect(await personsAt(served(), email)).toEqual([]);
       expect(await addedRowCount(served())).toBe(before);
     });
 
-    it("refuses person-exists on a repeat or a signed-in address", async () => {
-      const email = aVerifier();
+    it("refuses a known address as person-exists", async () => {
+      const email = aNewEmail();
       await addingPerson(served(), ["--email", email, "--name", "Matthew Burgess"]);
       const signedIn = await served().person(undefined, "Priya Shah");
       const before = await addedRowCount(served());
@@ -522,13 +522,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await addedRowCount(served())).toBe(before);
     });
 
-    it("exits refused, in no word, when the store is unreachable", async () => {
+    it("exits 1 with no refusal word when Postgres is unreachable", async () => {
       const gone = new Pool({ connectionString: served().database.connectionUri, max: 1 });
       await gone.end();
 
       const run = await opsWith(
         served(),
-        ["add-person", "--email", aVerifier(), "--name", "Matthew Burgess"],
+        ["add-person", "--email", aNewEmail(), "--name", "Matthew Burgess"],
         { doors: { postgres: openPostgres(gone) } },
       );
 
@@ -536,8 +536,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([matching.stringMatching(/^add-person: REFUSED — .*pool/i)]);
     });
 
-    it("answers usage to a missing --name, writing nothing", async () => {
-      const email = aVerifier();
+    it("gives a usage error without --name and writes nothing", async () => {
+      const email = aNewEmail();
       const before = await addedRowCount(served());
 
       const run = await addingPerson(served(), ["--email", email]);
@@ -550,14 +550,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await addedRowCount(served())).toBe(before);
     });
 
-    it("names the command in the usage", async () => {
+    it("lists the command in the help text", async () => {
       const run = await ops(served(), ["help"]);
 
       expect(run.lines.join("\n")).toContain("add-person --email <address> --name <display name>");
     });
   });
 
-  describe("rename-workspace — the platform renames a workspace", () => {
+  describe("rename-workspace, which renames a workspace", () => {
     const renaming = (app: TestApp, workspaceId: string, flags: readonly string[]): Promise<Run> =>
       opsWith(app, ["rename-workspace", "--workspace", workspaceId, ...flags], {});
 
@@ -583,7 +583,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const MALFORMED =
       "rename-workspace: REFUSED — malformed: give --workspace a workspace id, and --name, --short-name or both a value that is not blank";
 
-    it("renames the name, short name or both, recording each change", async () => {
+    it("changes the name, short name, or both, auditing each change", async () => {
       const { workspaceId, shortName } = await served().provision({ name: "Acme" });
       const [first, second] = [aShortName(), aShortName()];
 
@@ -624,7 +624,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("takes back its own short name without refusing, writing nothing", async () => {
+    it("accepts the workspace's current names and writes no event", async () => {
       const { workspaceId, shortName } = await served().provision({ name: "Acme" });
 
       const run = await renaming(served(), workspaceId, [
@@ -644,7 +644,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("refuses slug-taken for another workspace's short name", async () => {
+    it("refuses another workspace's short name as slug-taken", async () => {
       const taken = (await served().provision()).shortName;
       const { workspaceId, shortName } = await served().provision({ name: "Acme" });
 
@@ -665,7 +665,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("refuses no-such-workspace for an unknown id, and writes nothing", async () => {
+    it("refuses an unknown workspace id as no-such-workspace", async () => {
       const nowhere = ulid();
 
       const run = await renaming(served(), nowhere, ["--name", "Acme Group"]);
@@ -681,7 +681,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ["a blank name", ["--name", "   "]],
       ["a blank short name", ["--name", "Acme Group", "--short-name", " "]],
       ["neither --name nor --short-name", []],
-    ])("refuses malformed for %s, changing nothing", async (_shape, flags) => {
+    ])("refuses %s as malformed and changes nothing", async (_shape, flags) => {
       const { workspaceId, shortName } = await served().provision({ name: "Acme" });
 
       const run = await renaming(served(), workspaceId, flags);
@@ -696,7 +696,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("refuses malformed for a workspace that is not an id", async () => {
+    it("refuses a workspace that is not an id as malformed", async () => {
       const run = await renaming(served(), "ws_synthetic", ["--name", "Acme Group"]);
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
@@ -705,7 +705,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("names the command in the usage", async () => {
+    it("lists the command in the help text", async () => {
       const run = await ops(served(), ["help"]);
 
       expect(run.lines.join("\n")).toContain(

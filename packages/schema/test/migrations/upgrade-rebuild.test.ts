@@ -151,7 +151,7 @@ const withFourMaps = async (fn: (client: pg.PoolClient) => Promise<void>): Promi
 describe.each<Migrator>(["the bound owner", "a superuser"])(
   "the lineage rebuilds migration 0099 queues, run by %s",
   (migrator) => {
-    it("queues a rebuild only for a map holding lineage", async () => {
+    it("queues a rebuild only for a map that holds lineage", async () => {
       await withFourMaps(async (client) => {
         await queuingTheUpgradeRebuilds(client, migrator, 1, THE_LINEAGE_UPGRADE);
 
@@ -174,7 +174,7 @@ describe.each<Migrator>(["the bound owner", "a superuser"])(
       });
     });
 
-    it("queues a fresh rebuild beside a retry already tried", async () => {
+    it("queues a new rebuild beside a first build already attempted", async () => {
       await withFourMaps(async (client) => {
         await testData(client).job({
           workspaceId: DERIVED,

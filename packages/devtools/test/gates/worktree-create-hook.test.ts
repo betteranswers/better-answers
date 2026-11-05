@@ -66,7 +66,7 @@ const upstreamOf = (worktree: string): string | undefined => {
 const FILES = { "README.md": "# root\n" };
 
 describe("creating a worktree", () => {
-  it("prints the new directory alone, whatever the indexers print", () => {
+  it("prints only the new directory, whatever the indexers print", () => {
     const root = repositoryHolding(path.join(scratch, "root"), FILES);
     const noisy = recordsItsArgv(path.join(scratch, "noise-argv"), ["echo noise on stdout"]);
 
@@ -76,7 +76,7 @@ describe("creating a worktree", () => {
     expect(run.stdout).toBe(`${root}/.claude/worktrees/fresh\n`);
   });
 
-  it("starts the branch tracking nothing", () => {
+  it("starts the branch with no upstream", () => {
     const { primary } = originAndClone(scratch, "tracking", FILES);
 
     const run = runCreate(primary, { name: "untracked", cwd: primary });
@@ -93,7 +93,7 @@ describe("the base a new worktree starts from", () => {
     return gitIn(run.stdout.trim(), "rev-parse", "HEAD").trim();
   };
 
-  it("is origin's main whatever the main checkout has out", () => {
+  it("is origin's main, whatever branch the main checkout has", () => {
     const { origin, primary } = originAndClone(scratch, "feature-out", FILES);
     const mainTip = commitIn(origin, "merged-since-the-clone.md");
     gitIn(primary, "switch", "-q", "-c", "someone-elses-feature");
@@ -140,7 +140,7 @@ describe("the indexes a new worktree gets", () => {
     expect(readFileSync(docLog, "utf8")).toBe(`- ${created} ${primary}\n`);
   });
 
-  it("creates the worktree without the servers, saying what it costs", () => {
+  it("creates the worktree without the servers, saying what is lost", () => {
     const { primary } = originAndClone(scratch, "no-indexers", FILES);
 
     const run = runCreate(primary, { name: "bare", cwd: primary }, {});

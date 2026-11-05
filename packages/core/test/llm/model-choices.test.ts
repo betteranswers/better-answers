@@ -65,13 +65,13 @@ const listAs = async (seeded: Seeded) => {
 };
 
 describe("a workspace's model choices", () => {
-  it("answers one row per purpose, in purpose order", async () => {
+  it("lists one row per purpose, in purpose order", async () => {
     const seeded = await seedWorkspace(CONFIGURED_MODEL_CHOICES);
 
     expect(await listAs(seeded)).toEqual(LISTED_MODEL_CHOICES);
   });
 
-  it("shows every model choice empty where the workspace chose nothing", async () => {
+  it("lists every purpose with no model for a new workspace", async () => {
     const seeded = await seedWorkspace([]);
 
     const listed = await listAs(seeded);
@@ -89,7 +89,7 @@ describe("a workspace's model choices", () => {
     );
   });
 
-  it("reads a model choice's retention tail in the provider's words", async () => {
+  it("lists a model choice's retention tail in the provider's words", async () => {
     const tail = "Prompts and outputs are deleted within 30 days; no training on customer data.";
     const seeded = await seedWorkspace([
       {
@@ -107,7 +107,7 @@ describe("a workspace's model choices", () => {
     });
   });
 
-  it("answers no tail where nobody read a model choice's terms", async () => {
+  it("lists a null retention tail when none was recorded", async () => {
     const seeded = await seedWorkspace([
       { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
     ]);
@@ -141,7 +141,7 @@ describe("a workspace's model choices", () => {
     });
   });
 
-  it("stays in one workspace by row-level security, not a predicate", async () => {
+  it("limits an unfiltered model_choice query to the member's workspace", async () => {
     const mine = await seedWorkspace([
       { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
     ]);
@@ -161,7 +161,7 @@ describe("a workspace's model choices", () => {
     expect(visible).toEqual({ ok: true, value: [mine.workspaceId] });
   });
 
-  it("hands back a store failure, and the transaction never commits", async () => {
+  it("returns a store failure, and the transaction does not commit", async () => {
     const seeded = await seedWorkspace([]);
     let read: Awaited<ReturnType<typeof listModelChoices>> | undefined;
 

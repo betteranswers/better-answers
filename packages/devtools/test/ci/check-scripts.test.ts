@@ -36,7 +36,7 @@ const workspacesWith = (
 
 const rootCheck = (): string => {
   const check = scriptsOf(".")["check"];
-  assert(check !== undefined, "the root has a check script");
+  assert(check !== undefined, "the root package.json has no check script");
   return check;
 };
 
@@ -46,7 +46,7 @@ const NO_CHECK: Readonly<Record<string, string>> = {
 };
 
 describe("the workspaces' scripts", () => {
-  it("reads every workspace the repository installs, not a fixed list", () => {
+  it("lists every workspace that pnpm installs", () => {
     const directories = workspacePackages();
 
     expect(directories.length).toBeGreaterThan(0);
@@ -63,11 +63,11 @@ describe("the workspaces' scripts", () => {
 
     expect(
       passing,
-      "a workspace's test script passes with no tests. Delete the flag and write a test for what the workspace holds.",
+      "a workspace's test script passes when it finds no tests. Delete --passWithNoTests and write a test for the workspace's code.",
     ).toEqual([]);
   });
 
-  it("gates every workspace, or names why one has no check", () => {
+  it("gives every workspace a check script or a NO_CHECK reason", () => {
     const withoutCheck = workspacePackages()
       .filter((directory) => scriptsOf(directory)["check"] === undefined)
       .sort();
@@ -75,20 +75,23 @@ describe("the workspaces' scripts", () => {
 
     expect(
       withoutCheck.filter((directory) => !named.includes(directory)),
-      "a pnpm workspace carries no check script and is not named in NO_CHECK. Give it a check script, or list it with the reason it has nothing to run.",
+      "a pnpm workspace has no check script and is not listed in NO_CHECK. Add a check script, or add the workspace to NO_CHECK with the reason it has nothing to check.",
     ).toEqual([]);
     expect(
       named.filter((directory) => !withoutCheck.includes(directory)),
-      "a workspace named in NO_CHECK now has a check script. Remove the entry: the reason it carried has stopped being true.",
+      "a workspace listed in NO_CHECK now has a check script. Delete its NO_CHECK entry, because its reason is no longer true.",
     ).toEqual([]);
   });
 
-  it("runs each workspace's check from the root, skipping one without", () => {
+  it("runs every workspace's check from one root script", () => {
     const recursive = Object.values(scriptsOf("."))
       .filter((script) => script.includes("-r "))
       .filter((script) => script.includes("run check"));
 
-    expect(recursive.length, "the root runs no workspace's check").toBe(1);
+    expect(
+      recursive.length,
+      "the root package.json needs exactly one script that runs `run check` with `-r`",
+    ).toBe(1);
     expect(recursive[0]).toContain("--if-present");
     expect(recursive[0]).toContain("--no-bail");
   });
@@ -104,37 +107,40 @@ const stepsOf = (check: string): readonly string[] =>
 const chainsItsSteps = (check: string): boolean =>
   check.includes("&&") || stepsOf(check).length === 0;
 
-describe("one run of check names every failure", () => {
-  it("runs a workspace's gates through the runner, never chained", () => {
+describe("each check script runs every step and reports each failure", () => {
+  it("runs a workspace's gates through scripts/check.mjs, not chained", () => {
     const chained = workspacesWith("check")
       .filter(({ script }) => chainsItsSteps(script))
       .map(({ directory, script }) => `${directory}: ${script}`);
 
     expect(
       chained,
-      "a workspace's check chains its steps. Call scripts/check.mjs with the steps instead: it runs every one and names all that failed.",
+      "a workspace's check script chains its steps with && or names no steps. Call scripts/check.mjs with the step names instead. The runner runs every step and lists each step that failed.",
     ).toEqual([]);
   });
 
-  it("names exactly a workspace's gates as its steps", () => {
+  it("lists exactly the workspace's gate scripts as its check steps", () => {
     const checked = workspacesWith("check");
-    expect(checked.length, "a workspace has a check script to read").toBeGreaterThan(0);
+    expect(checked.length, "no workspace has a check script").toBeGreaterThan(0);
 
     for (const { directory, script: check } of checked) {
       const scripts = scriptsOf(directory);
 
       expect(
         stepsOf(check),
-        `${directory}'s check names a step that is not one of its gates, or leaves a gate out. oxlint is no workspace gate: it runs once from the root, and a workspace copy would annotate every warning twice, on paths CI cannot place on a diff`,
+        `${directory}'s check must list exactly its gate scripts, in the order of GATE_STEPS. It names a step that is not a gate, or it leaves a gate out. Do not add oxlint. It runs once from the root, and a workspace copy annotates every warning twice, on paths that CI cannot place on the diff.`,
       ).toEqual(GATE_STEPS.filter((step) => scripts[step] !== undefined));
     }
   });
 
-  it("runs the root's own steps through the same runner", () => {
+  it("runs the root check through scripts/check.mjs too", () => {
     const scripts = scriptsOf(".");
     const steps = stepsOf(rootCheck());
 
-    expect(steps.length, "the root check does not call the runner").toBeGreaterThan(0);
+    expect(
+      steps.length,
+      "the root check script does not call scripts/check.mjs with any steps",
+    ).toBeGreaterThan(0);
     expect(steps.filter((step) => scripts[step] === undefined)).toEqual([]);
 
     expect(steps).toContain("check:workspaces");
@@ -142,19 +148,19 @@ describe("one run of check names every failure", () => {
   });
 });
 
-describe("the gates a branch never narrows", () => {
-  it("come before the tiers, each running over the whole tree", () => {
+describe("the root gates, which always check the whole tree", () => {
+  it("run before the workspace tiers and recurse into no workspace", () => {
     const scripts = scriptsOf(".");
     const steps = gatesNamed(rootCheck());
     const tiers = steps.indexOf("check:workspaces");
     const gates = steps.slice(0, tiers);
 
-    expect(gates.length, "the root check names no gate ahead of the tiers").toBeGreaterThan(0);
+    expect(gates.length, "the root check names no gate before check:workspaces").toBeGreaterThan(0);
 
     for (const gate of gates) {
       expect(
         scripts[gate],
-        `${gate} recurses into the workspaces, so it is not a root gate`,
+        `${gate} comes before check:workspaces but recurses into the workspaces. Make it run once over the whole tree, or move it into each workspace's check.`,
       ).not.toMatch(/pnpm -r|--filter|uv run(?: --[\w-]+)* check\b/);
     }
     expect(steps.slice(tiers)).toEqual(["check:workspaces", "check:worker"]);
@@ -201,18 +207,18 @@ const runnerEntries = (): readonly RunnerEntry[] =>
   });
 
 describe("the runners start through node", () => {
-  it("starts no runner through its bin shim", () => {
+  it("starts no runner through its pnpm .bin shim", () => {
     const shimmed = everyScript()
       .filter(({ script }) => script.split(/\s+/).some((word) => SHIMMED_RUNNERS.has(word)))
       .map(({ directory, name, script }) => `${directory} ${name}: ${script}`);
 
     expect(
       shimmed,
-      "a script starts vitest or Stryker through pnpm's `.bin` shim, a `#!` file: on macOS every process under it waits on the policy check. Start it as `node ./node_modules/<package>/<its bin file>`.",
+      "a script starts vitest or Stryker through pnpm's `.bin` shim, which is a `#!` file. On macOS, every process under a `#!` file waits on the policy check. Start the runner as `node ./node_modules/<package>/<its bin file>`.",
     ).toEqual([]);
   });
 
-  it("starts each runner at the file its package names", () => {
+  it("starts each runner at the bin file its package declares", () => {
     const moved = runnerEntries()
       .map((entry) => ({
         ...entry,
@@ -226,11 +232,11 @@ describe("the runners start through node", () => {
 
     expect(
       moved,
-      "a script starts a runner at a file its package no longer names as its bin: an upgrade moved it. Point the script at the package's `bin` entry.",
+      "a script starts a runner at a file that its package no longer declares as `bin`, because an upgrade moved the file. Point the script at the file in the package's `bin` entry.",
     ).toEqual([]);
   });
 
-  it("starts only the test and mutation scripts at runners", () => {
+  it("starts runners only from the test and mutation scripts", () => {
     const expected = Object.entries(RUNNER_SCRIPTS).flatMap(([name, pkg]) =>
       workspacesWith(name).map(({ directory }) => `${directory} ${name}: ${pkg}`),
     );
@@ -241,7 +247,7 @@ describe("the runners start through node", () => {
     expect(expected).toContain("packages/core mutation: @stryker-mutator/core");
     expect(
       [...started].sort(),
-      "a workspace's test or mutation script starts no runner entry, or another script does",
+      "only test and mutation scripts may start a runner, as `node ./node_modules/...`. A test or mutation script starts no runner, or another script starts one.",
     ).toEqual([...expected].sort());
   });
 });
@@ -251,7 +257,7 @@ const throwaway = mkdtempSync(path.join(tmpdir(), "check-runner-"));
 afterAll(() => rmSync(throwaway, { recursive: true, force: true }));
 
 describe("the check runner", () => {
-  it("runs every step given, then names the ones that failed", () => {
+  it("runs every step, then lists the steps that failed", () => {
     writeFileSync(
       path.join(throwaway, "package.json"),
       JSON.stringify({
@@ -278,7 +284,7 @@ describe("the check runner", () => {
     expect(run.status).toBe(1);
   });
 
-  it("passes only when every step passed", () => {
+  it("passes only when every step passes", () => {
     writeFileSync(
       path.join(throwaway, "package.json"),
       JSON.stringify({ name: "throwaway", scripts: { lint: "node -e \"''\"" } }),

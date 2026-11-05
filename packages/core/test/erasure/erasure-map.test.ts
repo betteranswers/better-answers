@@ -149,8 +149,8 @@ const workspaceHoldingAMember = async () => {
   return { scenario, email, person, sha, ...seeded, ...identity, request };
 };
 
-describe("the erasure map's union", () => {
-  it("answers one entry per store family, in the union's order", async () => {
+describe("the store families in the erasure map", () => {
+  it("returns one entry per store family, in ERASURE_FAMILIES order", async () => {
     const scenario = await arrange();
     const request = await requestFor(scenario, {
       personId: null,
@@ -188,7 +188,7 @@ describe("the erasure map's union", () => {
     ]);
   });
 
-  it("refuses a store family declared without a finder", () => {
+  it("fails to typecheck when a store family has no finder", () => {
     const findsNothing: ErasureFamilyDescriptor = {
       categories: [],
       find: () => Promise.resolve([]),
@@ -227,7 +227,7 @@ describe("the erasure map's union", () => {
 });
 
 describe("the erasure map for a member", () => {
-  it("names their concept file, commit, verification and identity-set rows", async () => {
+  it("lists the member's concept file, commits, verifications and identity rows", async () => {
     const held = await workspaceHoldingAMember();
 
     const map = await mapOf(held.scenario, held.request);
@@ -283,7 +283,7 @@ describe("the erasure map for a member", () => {
     ]);
   });
 
-  it("finds the owner rows naming the subject", async () => {
+  it("lists the owner rows that name the subject", async () => {
     const held = await workspaceHoldingAMember();
     const { workspaceId, viewer } = held.scenario;
     const owners = await seedingWith(db().pool, async (seed) => {
@@ -314,7 +314,7 @@ describe("the erasure map for a member", () => {
     );
   });
 
-  it("lists a subject's versions and usage by actor", async () => {
+  it("lists the write-up, guide and usage rows by the subject", async () => {
     const held = await workspaceHoldingAMember();
     const { workspaceId, viewer } = held.scenario;
     const heldBy = async (actor: string) =>
@@ -343,7 +343,7 @@ describe("the erasure map for a member", () => {
     ]);
   });
 
-  it("names each question they asked here, and no other", async () => {
+  it("lists only the questions the member asked in this workspace", async () => {
     const held = await workspaceHoldingAMember();
     const { workspaceId, viewer } = held.scenario;
     const elsewhere = await arrange();
@@ -362,7 +362,7 @@ describe("the erasure map for a member", () => {
     });
   });
 
-  it("finds their questions from an address alone", async () => {
+  it("finds the member's questions from an email address only", async () => {
     const held = await workspaceHoldingAMember();
     const theirs = await recordAskedBy(db().pool, held.scenario.workspaceId, held.person.id);
     const byAddress = await requestFor(held.scenario, {
@@ -388,7 +388,7 @@ describe("the erasure map for a member", () => {
     expect(questionsNamedIn(map)?.locations).toEqual([theirs.recordId]);
   });
 
-  it("names their second factor and their last activity here", async () => {
+  it("lists the member's second factors and last activity here", async () => {
     const held = await workspaceHoldingAMember();
     const factors = await secondFactorRowsFor(db().pool, held.person.id);
     await lastActiveIn(db().pool, held.scenario.workspaceId, held.person.id);
@@ -404,7 +404,7 @@ describe("the erasure map for a member", () => {
     ]);
   });
 
-  it("names their restore code and each session-keyed row", async () => {
+  it("lists the member's restore code and rows keyed by session", async () => {
     const held = await workspaceHoldingAMember();
     const restoreCode = await restoreCodeFor(db().pool, held.email, {
       hash: "a".repeat(64),
@@ -421,7 +421,7 @@ describe("the erasure map for a member", () => {
     ]);
   });
 
-  it("carries no text from anything it names", async () => {
+  it("contains no text from the rows and files it lists", async () => {
     const held = await workspaceHoldingAMember();
 
     const named = (await mapOf(held.scenario, held.request)).flatMap((entry) => entry.locations);
@@ -434,7 +434,7 @@ describe("the erasure map for a member", () => {
 });
 
 describe("the erasure map for a subject with no user row", () => {
-  it("says each git and identity family found nothing", async () => {
+  it("returns an empty location list for every family", async () => {
     const scenario = await arrange();
     const stranger = addressOf("a-customer-contact");
     const request = await requestFor(scenario, {
@@ -472,8 +472,8 @@ describe("the erasure map for a subject with no user row", () => {
   });
 });
 
-describe("the erasure map in one workspace's scope", () => {
-  it("names nothing another workspace holds for a member of both", async () => {
+describe("the erasure map of one workspace", () => {
+  it("omits rows another workspace holds for a member of both", async () => {
     const here = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
@@ -653,8 +653,8 @@ const documentsFoundFor = async (
   return map.find((entry) => entry.family === "source-document")?.locations;
 };
 
-describe("the erasure map's documents", () => {
-  it("names only live documents holding the subject, across passages too", async () => {
+describe("the source documents in the erasure map", () => {
+  it("lists live documents naming the subject, even split across passages", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
     const byTheWorkAddress = await documentHolding(workspaceId, [
@@ -686,7 +686,7 @@ describe("the erasure map's documents", () => {
     expect(accessAnswerOf(map).categories).toEqual(["document-text"]);
   });
 
-  it("finds another identifier whole, never as a longer number's prefix", async () => {
+  it("finds an `other` identifier only where it stands whole", async () => {
     const scenario = await arrange();
     const byTheNumber = await documentHolding(scenario.workspaceId, [
       "Payroll number EMP-00417 is closed.",
@@ -698,7 +698,7 @@ describe("the erasure map's documents", () => {
     ).toEqual([byTheNumber]);
   });
 
-  it("searches for no identifier below the floor", async () => {
+  it("skips identifiers below the minimum identifier size", async () => {
     const scenario = await arrange();
     await documentHolding(scenario.workspaceId, ["Ann asked HR about her leave."]);
 
@@ -707,7 +707,7 @@ describe("the erasure map's documents", () => {
     ).toEqual([]);
   });
 
-  it("names a document writing the name as recorded, not folded", async () => {
+  it("finds a Greek name with accents, written as recorded", async () => {
     const scenario = await arrange();
     const asRecorded = await documentHolding(scenario.workspaceId, [
       "The deed was witnessed by Νίκος Παππάς.",
@@ -718,7 +718,7 @@ describe("the erasure map's documents", () => {
     ).toEqual([asRecorded]);
   });
 
-  it("finds the sign-in address for a request by id alone", async () => {
+  it("finds the person's sign-in address for a request without identifiers", async () => {
     const scenario = await arrange();
     const email = addressOf("priya");
     const person = await memberOf(db().pool, scenario.workspaceId, email);
@@ -749,7 +749,7 @@ describe("the erasure map's documents", () => {
     ).toEqual([byTheName]);
   });
 
-  it("names each agreement case's document exactly where the agreement matches", async () => {
+  it("finds a document exactly when its erasure-match agreement case matches", async () => {
     const scenario = await arrange();
     for (const { kind, identifier, text, occurrences, why } of AGREEMENT_CASES) {
       const document = await documentHolding(scenario.workspaceId, [text]);
@@ -768,7 +768,7 @@ describe("the erasure map's documents", () => {
     }
   });
 
-  it("names nothing another workspace holds", async () => {
+  it("lists no document another workspace holds", async () => {
     const here = await arrange();
     const elsewhere = await arrange();
     await documentHolding(elsewhere.workspaceId, [`Ann Raman signed; write to ${WORK_ADDRESS}.`]);
@@ -779,8 +779,8 @@ describe("the erasure map's documents", () => {
   });
 });
 
-describe("the erasure map for a stranger's address in the set", () => {
-  it("names the subject's own code and link, never the stranger's", async () => {
+describe("the erasure map when the identifiers include a stranger's address", () => {
+  it("lists the subject's codes and sign-in link, not the stranger's", async () => {
     const here = await arrange();
     const email = addressOf("priya");
     const person = await memberOf(db().pool, here.workspaceId, email);
@@ -808,7 +808,7 @@ describe("the erasure map for a stranger's address in the set", () => {
 });
 
 describe("the access answer", () => {
-  it("is only the locations and categories a reply may say", async () => {
+  it("holds only the locations and categories a reply may disclose", async () => {
     const held = await workspaceHoldingAMember();
     const map = await mapOf(held.scenario, held.request);
 
@@ -867,7 +867,7 @@ describe("the access answer", () => {
     });
   });
 
-  it("says nothing for a subject the platform holds nothing about", async () => {
+  it("is empty for a subject the platform holds nothing about", async () => {
     const scenario = await arrange();
     const request = await requestFor(scenario, {
       personId: null,

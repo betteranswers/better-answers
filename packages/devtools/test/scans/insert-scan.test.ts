@@ -56,7 +56,7 @@ const findings = (tree: Tree): readonly string[] =>
     .split("\n")
     .filter((line) => line !== "");
 
-describe("the territory the scan reads", () => {
+describe("the files the scan reads", () => {
   it.each([
     ["packages/core/test/workspaces/workspaces.test.ts", true],
     ["apps/web/e2e/page.spec.ts", true],
@@ -69,13 +69,13 @@ describe("the territory the scan reads", () => {
     expect(isSuiteFile(file)).toBe(expected);
   });
 
-  it("scans a module beside a suite, which is no factory", () => {
+  it("scans a non-factory module beside a suite", () => {
     expect(isSuiteFile("packages/core/test/helpers.ts")).toBe(true);
     expect(isFactoryModule("packages/core/test/helpers.ts")).toBe(false);
     expect(isScanned("packages/core/test/helpers.ts")).toBe(true);
   });
 
-  it("lets only a named module hold one", () => {
+  it("allows a raw insert only in a named module", () => {
     expect(isFactoryModule("packages/schema/test/support/probes.ts")).toBe(true);
     expect(isScanned("packages/schema/test/support/probes.ts")).toBe(false);
   });
@@ -94,13 +94,13 @@ describe("the territory the scan reads", () => {
     ["prose that names it", `// a raw INSERT ${"INTO"} belongs in a factory, never here`],
     ["a Python comment naming it", `    # INSERT ${"INTO"} job is what this must not carry`],
     ["a list insert, which names no table", "sys.meta_path.insert(0, Watch())"],
-  ])("walks past %s", (_what, source) => {
+  ])("ignores %s", (_what, source) => {
     expect(rawInsertsIn("one.test.ts", source)).toEqual([]);
   });
 });
 
 describe("the named list of factory modules", () => {
-  const holding = (file: string): readonly unknown[] => {
+  const rawInsertsInFile = (file: string): readonly unknown[] => {
     const found = path.join(repositoryRoot, file);
     return existsSync(found) ? rawInsertsIn(file, readFileSync(found, "utf8")) : [];
   };
@@ -111,11 +111,11 @@ describe("the named list of factory modules", () => {
     );
   });
 
-  it("names only files that carry a raw insert", () => {
-    expect(FACTORY_MODULES.filter((file) => holding(file).length === 0)).toEqual([]);
+  it("names only files that contain a raw insert", () => {
+    expect(FACTORY_MODULES.filter((file) => rawInsertsInFile(file).length === 0)).toEqual([]);
   });
 
-  it("lives where the failure message says it does", () => {
+  it("is at the path the failure message names", () => {
     expect(existsSync(path.join(repositoryRoot, WHERE_THE_LIST_LIVES))).toBe(true);
   });
 });
@@ -132,7 +132,7 @@ describe("the scan over a throwaway tree", () => {
     expect(scan(withTypescriptInsert())).toContain(WHERE_THE_LIST_LIVES);
   });
 
-  it("fails on a Python test carrying a raw insert", () => {
+  it("fails on a Python test containing a raw insert", () => {
     expect(findings(withPythonInsert())).toEqual([
       expect.stringContaining(`${PYTHON_WORKSPACE}/tests/test_one.py:2:`),
     ]);
@@ -147,7 +147,7 @@ describe("the scan over a throwaway tree", () => {
     expect(findings(tree)).toEqual([expect.stringContaining(`${WORKSPACE}/test/rows.ts:1:`)]);
   });
 
-  it("passes over a named factory module that carries one", () => {
+  it("passes a named factory module that contains one", () => {
     const tree = {
       ...CLEAN,
       ["packages/schema/test/support/probes.ts"]: `const q = \`${insert("workspace")}\`;\n`,
@@ -156,7 +156,7 @@ describe("the scan over a throwaway tree", () => {
     expect(scan(tree)).toContain("no raw insert");
   });
 
-  it("passes over a named Python factory module that carries one", () => {
+  it("passes a named Python factory module that contains one", () => {
     const tree = {
       ...CLEAN,
       ["apps/worker/tests/support/factories.py"]: `Q = "${insert("workspace")}"\n`,
@@ -168,13 +168,13 @@ describe("the scan over a throwaway tree", () => {
   it.each([
     ["a regex naming the statement", `expect(cause).toThrow(/INSERT ${"INTO"} job/);\n`],
     ["prose that names it", `// a raw INSERT ${"INTO"} belongs in a factory, never here\n`],
-  ])("passes over a test carrying %s", (_what, line) => {
+  ])("passes a test containing %s", (_what, line) => {
     const tree = { ...CLEAN, [`${WORKSPACE}/test/one.test.ts`]: line };
 
     expect(scan(tree)).toContain("no raw insert");
   });
 
-  it("walks past production code, which is where a statement belongs", () => {
+  it("ignores production code, where a raw insert belongs", () => {
     const tree = {
       ...CLEAN,
       [`${WORKSPACE}/src/workspaces.ts`]: `const q = \`${insert("workspace")}\`;\n`,

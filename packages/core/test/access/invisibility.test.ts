@@ -90,8 +90,8 @@ const passageOf = async (workspaceId: string, document: Sourced): Promise<string
   return row.id;
 };
 
-describe("the audience arm of the read predicate", () => {
-  it("withholds a group's unit until the Viewer joins the group", async () => {
+describe("the audience check on reads", () => {
+  it("hides a group's concept from a Viewer until they join", async () => {
     const scenario = await arrange();
     const { groupId: hr, written } = await conceptForGroup(db(), scenario, "HR", []);
 
@@ -104,7 +104,7 @@ describe("the audience arm of the read predicate", () => {
     expect(await reaches(scenario.viewer, written.iri)).toBe(true);
   });
 
-  it("withholds a deleted group's unit from everyone, the row unchanged", async () => {
+  it("hides a concept from everyone once its group is deleted", async () => {
     const scenario = await arrange();
     const { groupId: hr, written } = await conceptForGroup(db(), scenario, "HR", [
       scenario.viewer,
@@ -125,7 +125,7 @@ describe("the audience arm of the read predicate", () => {
     });
   });
 
-  it("cannot hold groups without a list, or everyone with one", async () => {
+  it("requires a group list exactly when the audience is groups", async () => {
     const scenario = await arrange();
     const written = await conceptCiting(scenario, scenario.editor, []);
     const rewrite = (audience: string, groups: string) =>
@@ -144,7 +144,7 @@ describe("the audience arm of the read predicate", () => {
     );
   });
 
-  it("shows a Restricted unit to Admins alone, narrowed by audience", async () => {
+  it("shows a Restricted concept only to Admins in its audience", async () => {
     const scenario = await arrange();
     const board = await groupNamed(db(), scenario, "Board", [scenario.viewer]);
     const { restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
@@ -171,7 +171,7 @@ describe("the audience arm of the read predicate", () => {
     expect(await reaches(scenario.admin, forBoardAdmins.iri)).toBe(true);
   });
 
-  it("reads a group's passage to a member, not an outsider", async () => {
+  it("shows a group's passage to its members, not to others", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", [scenario.viewer]);
     const toHr = await connectedSourceForGroups(db(), scenario.workspaceId, [hr]);
@@ -184,8 +184,8 @@ describe("the audience arm of the read predicate", () => {
   });
 });
 
-describe("the publish arm of the read predicate", () => {
-  it("reads an unpublished source's passage to nobody, Admins included", async () => {
+describe("the publish check on reads", () => {
+  it("hides an unpublished source's passages from everyone, Admins included", async () => {
     const scenario = await arrange();
     const published = await connectedSourceHolding(db(), scenario.workspaceId);
     const unpublished = await connectedSourceHolding(db(), scenario.workspaceId, {
@@ -202,7 +202,7 @@ describe("the publish arm of the read predicate", () => {
   });
 });
 
-describe("a source the reader may not read", () => {
+describe("a cited source the reader may not read", () => {
   const opened = async (person: UserPrincipal, iri: ConceptIri) =>
     answered(
       await reading(person, (reader, tx) =>
@@ -210,7 +210,7 @@ describe("a source the reader may not read", () => {
       ),
     );
 
-  it("reaches a Viewer as the file's own words alone", async () => {
+  it("shows a Viewer the citation's label but not the document", async () => {
     const scenario = await arrange();
     const minutes = await documentLanded(db().pool, scenario.workspaceId, {
       title: "Board minutes 2026",
@@ -265,8 +265,8 @@ const withheldBesideVisible = async () => {
   return { scenario, withheld, visible };
 };
 
-describe("a Restricted-sourced concept, to a Viewer", () => {
-  it("is invisible to either map walk, as if never mapped", async () => {
+describe("a concept citing a Restricted source, read by a Viewer", () => {
+  it("is missing from walks in both directions, like absent concepts", async () => {
     const { scenario, withheld, entry } = await entryLinkingToWithheld();
 
     const outward = answered(
@@ -293,7 +293,7 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
     expect(admin.map((step) => step.uid).toSorted()).toEqual([entry.iri, withheld.iri].toSorted());
   });
 
-  it("adds nothing to a walk it is one entry of", async () => {
+  it("adds nothing to a walk that starts from it", async () => {
     const { scenario, withheld, entry } = await entryLinkingToWithheld();
     const entries = [withheld.iri, entry.iri];
 
@@ -318,7 +318,7 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
     );
   });
 
-  it("leaves no gap in footnotes and hides its narrowed write-up", async () => {
+  it("omits its footnote and hides a Restricted write-up including it", async () => {
     const { scenario, withheld, visible } = await withheldBesideVisible();
 
     const { behind, narrowed } = await seededBy(db(), async (seed) => {
@@ -374,7 +374,7 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
   });
 });
 
-describe("a re-write that moves only who may read a concept", () => {
+describe("rewriting a concept to change only its audience", () => {
   const heldBy = async (scenario: Scenario, iri: string, writeUp: string) => ({
     concept: await visibilityHeld(db().pool, "concept_index", scenario.workspaceId, iri),
     writeUp: await visibilityHeld(db().pool, "write_up", scenario.workspaceId, writeUp),
@@ -388,7 +388,7 @@ describe("a re-write that moves only who may read a concept", () => {
     value: [{ label: matching.any(String), iri: written.iri, title: written.title }],
   });
 
-  it("takes the write-up along on an audience-only re-write", async () => {
+  it("gives the write-up the concept's new audience", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const toEveryone = await connectedSourceHolding(db(), scenario.workspaceId, {
@@ -419,7 +419,7 @@ describe("a re-write that moves only who may read a concept", () => {
     expect(rewritten.ok).toBe(true);
   });
 
-  it("takes the write-up along on a groups-only re-write", async () => {
+  it("gives the write-up the concept's new audience groups", async () => {
     const scenario = await arrange();
     const bids = await groupNamed(db(), scenario, "Bids", [scenario.editor]);
     const legal = await groupNamed(db(), scenario, "Legal", [scenario.viewer]);
@@ -458,8 +458,8 @@ describe("a re-write that moves only who may read a concept", () => {
   });
 });
 
-describe("a document narrowed under a source its siblings stand under", () => {
-  it("leaves a concept at its sources' class without document classes", async () => {
+describe("a document's own sensitivity under its connected source", () => {
+  it("gives a concept its narrowest source's sensitivity by default", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const onInternal = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
@@ -490,7 +490,7 @@ describe("a document narrowed under a source its siblings stand under", () => {
     ]).toEqual([true, false, false, true, true, true]);
   });
 
-  it("withholds its passages from a Viewer exactly as absent ones", async () => {
+  it("hides a narrowed document's passages from a Viewer entirely", async () => {
     const scenario = await arrange();
     const { internal, narrowedUnderInternal } = await restrictedAndInternal(
       db(),
@@ -514,7 +514,7 @@ describe("a document narrowed under a source its siblings stand under", () => {
     expect(await passagesReadableBy(scenario.admin, internal.documentId)).toEqual([siblingPassage]);
   });
 
-  it("derives Restricted for its citing concept, Internal for its sibling's", async () => {
+  it("makes its citing concept Restricted and a sibling's concept Internal", async () => {
     const scenario = await arrange();
     const { internal, narrowedUnderInternal } = await restrictedAndInternal(
       db(),
@@ -547,7 +547,7 @@ describe("a document narrowed under a source its siblings stand under", () => {
     ]).toEqual([false, true, true, true]);
   });
 
-  it("cannot exceed its source's class: Internal under Restricted stays Restricted", async () => {
+  it("keeps an Internal document under a Restricted source Restricted", async () => {
     const scenario = await arrange();
     const { restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
     const wider = await documentUnder(
@@ -581,8 +581,8 @@ const irisReadBy = async (
   return read.value.map((concept) => concept.iri);
 };
 
-describe("concepts read together by iri", () => {
-  it("answers the readable ones by iri, withheld ones left out", async () => {
+describe("reading several concepts by iri", () => {
+  it("returns only the concepts the reader may read", async () => {
     const { scenario, withheld, visible } = await withheldBesideVisible();
     const iris = [withheld.iri, conceptIriOf(ulid()), visible.iri];
 
@@ -590,7 +590,7 @@ describe("concepts read together by iri", () => {
     expect(await irisReadBy(scenario.admin, iris)).toEqual([visible.iri, withheld.iri].toSorted());
   });
 
-  it("answers none for no iri, and a repeated iri once", async () => {
+  it("returns nothing for no iris, and a repeated iri once", async () => {
     const { scenario, visible } = await withheldBesideVisible();
 
     expect(await irisReadBy(scenario.viewer, [])).toEqual([]);
@@ -615,7 +615,7 @@ const BOARD_RETENTION: WrittenAnswer = {
   sensitivity: "Restricted",
 };
 
-const aroundAWithheldAnswer = async (scenario: Scenario) => {
+const askedBeforeAndAfterWithholding = async (scenario: Scenario) => {
   const before = await asked(db(), scenario.viewer, QUESTION);
   const withheld = await answerWritten(scenario, BOARD_RETENTION);
   const after = await asked(db(), scenario.viewer, QUESTION);
@@ -627,10 +627,10 @@ const irisOf = (answer: AnswerResult): readonly ConceptIri[] =>
   answer.related.map((concept) => concept.iri);
 
 describe("an `Answer` withheld from the asker", () => {
-  it("AE7: refuses alike with no match and only withheld matches", async () => {
+  it("AE7: refuses the same way when every match is withheld", async () => {
     const scenario = await arrange();
 
-    const { before, withheld, after, admins } = await aroundAWithheldAnswer(scenario);
+    const { before, withheld, after, admins } = await askedBeforeAndAfterWithholding(scenario);
 
     expect(withoutRecord(before)).toEqual(REFUSED);
     expect(withoutRecord(after)).toEqual(REFUSED);
@@ -643,7 +643,7 @@ describe("an `Answer` withheld from the asker", () => {
     const scenario = await arrange();
     const visible = await answerWritten(scenario, RETENTION);
 
-    const { before, withheld, after, admins } = await aroundAWithheldAnswer(scenario);
+    const { before, withheld, after, admins } = await askedBeforeAndAfterWithholding(scenario);
 
     expect(irisOf(before)).toEqual([visible.iri]);
     expect(withoutRecord(after)).toEqual(withoutRecord(before));
@@ -651,7 +651,7 @@ describe("an `Answer` withheld from the asker", () => {
     expect(irisOf(admins).toSorted()).toEqual([visible.iri, withheld.iri].toSorted());
   });
 
-  it("AE4: answers a collection of withheld concepts as one unmade", async () => {
+  it("AE4: answers a withheld collection like a nonexistent one", async () => {
     const scenario = await arrange();
     await answerWritten(scenario, RETENTION);
     const withheld = await answerWritten(scenario, { ...BOARD_RETENTION, collection: "board" });
@@ -672,7 +672,7 @@ describe("an `Answer` withheld from the asker", () => {
     expect(admins.readableCollections).toEqual(["audits", "board"]);
   });
 
-  it("spends no entry slot on a withheld `Answer`", async () => {
+  it("does not count a withheld `Answer` against the entry cap", async () => {
     const scenario = await arrange();
     const withheld = await answerWritten(scenario, BOARD_RETENTION);
     const three = await answerWritten(scenario, {
@@ -702,7 +702,7 @@ describe("an `Answer` withheld from the asker", () => {
     expect(await entriesFor(scenario.viewer, 3)).toEqual([three.iri, two.iri, one.iri]);
   });
 
-  it("spends no walked slot on a withheld concept", async () => {
+  it("does not count a withheld concept against the related cap", async () => {
     const scenario = await arrange();
     const [first, second] = [conceptIriOf(ulid()), conceptIriOf(ulid())].toSorted();
     assert(first !== undefined, "the first iri was minted");
@@ -738,7 +738,7 @@ describe("an `Answer` withheld from the asker", () => {
     expect(irisOf(admins)).toEqual([entry, withheld]);
   });
 
-  it("keeps a withheld document's passage from the asker", async () => {
+  it("omits a Restricted document's passage from a Viewer's answer", async () => {
     const scenario = await arrange();
     const minutes = await documentLanded(db().pool, scenario.workspaceId, {
       title: "Board minutes 2026",
@@ -764,7 +764,7 @@ describe("an `Answer` withheld from the asker", () => {
 
   const evidenceOf = (concept: RelatedConcept) => ("evidence" in concept ? concept.evidence : []);
 
-  it("names a source the asker cannot open by its label", async () => {
+  it("names a source the asker cannot open by label only", async () => {
     const scenario = await arrange();
     const minutes = await documentLanded(db().pool, scenario.workspaceId, {
       title: "Board minutes 2026",

@@ -294,7 +294,7 @@ describe("the gate over a throwaway repository", () => {
 
   it("fails a row whose folder holds no tracked file", () => {
     const row = PINS.find(({ kind }) => kind === "run");
-    assert.ok(row !== undefined, "the table holds a run row");
+    assert.ok(row !== undefined, "the table has no run row");
     const held = everyPinHeld().filter((file) => !file.startsWith(`${row.folder}/`));
     const ran = gateIn(tracked(...MIRRORED, ...held));
 
@@ -336,7 +336,7 @@ describe("the gate over a throwaway repository", () => {
 });
 
 describe("the gate over this repository", () => {
-  it("passes, so no folder strays and no row went stale", () => {
+  it("passes with no stray folder and no stale row", () => {
     const ran = gateIn(repositoryRoot);
 
     expect(ran.stdout).toMatch(

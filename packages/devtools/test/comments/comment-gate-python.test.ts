@@ -44,7 +44,7 @@ const findings = (tree: Tree): readonly string[] =>
     .split("\n")
     .filter((line) => line !== "");
 
-describe("the Python check fires on a long or citing comment", () => {
+describe("the Python check refuses a long or citing comment", () => {
   it("refuses a long comment, naming its count and the fix", () => {
     const output = run(holding(TOO_LONG));
 
@@ -136,7 +136,7 @@ describe("the Python check refuses a comment that counts its callers", () => {
     ]);
   });
 
-  it.each(NOT_COUNTED)("walks past %s", (_what, prose) => {
+  it.each(NOT_COUNTED)("accepts %s", (_what, prose) => {
     expect(findings(holding(commented("#", prose)))).toEqual([]);
   });
 
@@ -146,7 +146,7 @@ describe("the Python check refuses a comment that counts its callers", () => {
     expect(findings(module)).toHaveLength(1);
   });
 
-  it("walks past a docstring naming the one caller", () => {
+  it("accepts a docstring naming the one caller", () => {
     const module = { [FILE]: '"""The one caller hands the trimmed name."""\n\nKEEP = 1\n' };
 
     expect(findings(module)).toEqual([]);
@@ -174,23 +174,23 @@ describe("the Python check's exemptions", () => {
     ["a coverage pragma", "# pragma: no cover\n"],
     ["a copy-detection fence", "# jscpd:ignore-start\n# jscpd:ignore-end\n"],
     ["a licence notice", "# SPDX-License-Identifier: MIT\n"],
-  ])("walks past %s", (_what, comment) => {
+  ])("exempts %s", (_what, comment) => {
     expect(findings(holding(comment))).toEqual([]);
   });
 
-  it("walks past a licence notice held in a module docstring", () => {
+  it("exempts a licence notice in a module docstring", () => {
     const notice = `"""Copyright 2026 the authors. ${OVER_THE_CEILING}"""\n\nKEEP = 1\n`;
 
     expect(findings({ [FILE]: notice })).toEqual([]);
   });
 
-  it("holds a docstring opening with `noqa` to the ceiling", () => {
+  it("applies the ceiling to a docstring that opens with `noqa`", () => {
     const opening = `"""noqa ${OVER_THE_CEILING}"""\n\nKEEP = 1\n`;
 
     expect(findings({ [FILE]: opening })).toHaveLength(1);
   });
 
-  it("walks past a hashbang, which deleting would break a command", () => {
+  it("exempts a hashbang, because deleting it breaks a command", () => {
     expect(findings({ [FILE]: "#!/usr/bin/env python3\nKEEP = 1\n" })).toEqual([]);
   });
 
@@ -204,7 +204,7 @@ describe("the Python check's exemptions", () => {
     expect(findings(holding(below))).toHaveLength(1);
   });
 
-  it("stays silent over short comments that cite nothing", () => {
+  it("accepts short comments that cite nothing", () => {
     expect(findings(holding("# Deleting this changes what the engine memoises.\n"))).toEqual([]);
   });
 
@@ -287,7 +287,7 @@ describe("a suppression gives its reason on the same line", () => {
   });
 });
 
-describe("a docstring holds to twenty-five words wherever it sits", () => {
+describe("a docstring is limited to twenty-five words anywhere", () => {
   it.each([
     ["a public worker function", WORKER_MODULE, documented("def reads() -> int:", 26)],
     ["a public async worker function", WORKER_MODULE, documented("async def reads() -> int:", 26)],
@@ -318,7 +318,7 @@ describe("a docstring holds to twenty-five words wherever it sits", () => {
       "packages/devtools/python/probe.py",
       documented("def reads() -> int:", 26),
     ],
-  ])("holds %s to twenty-five words", (_what, file, source) => {
+  ])("limits %s to twenty-five words", (_what, file, source) => {
     const output = run({ [file]: source });
 
     expect(output).toContain("runs to 26 words");
@@ -338,11 +338,11 @@ describe("the Python check reads Python files and nothing else", () => {
       `# ${FORTY_WORDS}\nkeep = 1\n`,
     ],
     ["markdown", "probe.md", `# ${FORTY_WORDS}\n`],
-  ])("walks past a forty-word comment in %s", (_what, file, source) => {
+  ])("ignores a forty-word comment in %s", (_what, file, source) => {
     expect(findings({ [file]: source })).toEqual([]);
   });
 
-  it("walks past a config file named on its command line", () => {
+  it("ignores a config file named on its command line", () => {
     const named = runsOverThrowawayTree({
       ...gate,
       argv: ["probe.toml", FILE],
@@ -357,7 +357,7 @@ describe("the Python check reads Python files and nothing else", () => {
     expect(output).not.toContain("probe.toml");
   });
 
-  it("walks past a skill, which is prose no gate reads", () => {
+  it("ignores a skill, which is prose no gate reads", () => {
     const skill = { "packages/devtools/.claude/skills/probe/example.py": TOO_LONG };
 
     expect(findings(skill)).toEqual([]);
@@ -384,15 +384,15 @@ describe("the Python check refuses a citation a reader cannot open", () => {
     expect(findings({ [FILE]: `"""Kept under T-243."""\n\nKEEP = 1\n` })).toHaveLength(1);
   });
 
-  it("stays silent over a string saying what to do", () => {
+  it("accepts a string saying what to do", () => {
     expect(findings(saying("Name a workspace this person belongs to."))).toEqual([]);
   });
 
-  it("walks past a value with no prose in it", () => {
+  it("accepts a value with no prose in it", () => {
     expect(findings({ [FILE]: 'READ_ON = "2026-09-11"\n' })).toEqual([]);
   });
 
-  it("walks past the same string in a test", () => {
+  it("accepts the same string in a test", () => {
     const inATest = { "tests/test_probe.py": 'USAGE = "The map is Postgres under ADR 0021."\n' };
 
     expect(findings(inATest)).toEqual([]);
@@ -408,12 +408,12 @@ describe("the Python check refuses a citation a reader cannot open", () => {
   });
 });
 
-describe("the check refuses to judge a file it cannot read", () => {
-  it("exits on an unparseable file rather than reporting it clean", () => {
+describe("the check fails on a file it cannot read", () => {
+  it("fails on an unparseable file instead of reporting it clean", () => {
     expect(() => run({ [FILE]: "def broken(\n" })).toThrow(/could not be read/);
   });
 
-  it("refuses a directory named like a module, never skipping it", () => {
+  it("refuses, not skips, a directory named like a module", () => {
     const aDirectory = { "pkg.py/inner.txt": "not a module\n" };
 
     expect(() => run(aDirectory)).toThrow(/exit 2\n\ncomment_gate: pkg\.py could not be read: /);

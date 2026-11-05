@@ -42,8 +42,8 @@ const AN_UNJUDGED_PLAN: AnswerPlan = {
   concepts: [],
 };
 
-describe("a judged-no result of many large `Answer`s", () => {
-  it("stays under the inline limit, each `Answer` as one line", async () => {
+describe("a judged result where every large `Answer` is rejected", () => {
+  it("fits the inline limit, listing each `Answer` as one line", async () => {
     const wire = clientAnswering(async (body) => new Response(judgeReplyTo([], body)));
     const steps = {
       callModel: wire.client.callModel,
@@ -72,7 +72,7 @@ describe("a judged-no result of many large `Answer`s", () => {
 
     const judged = await judgedBy(steps, AN_UNJUDGED_PLAN, asked, ASK_CAPS);
 
-    assert(judged.ok, "the judge is reached");
+    assert(judged.ok, "the judge step failed");
     const { answer } = judged.value;
     expect([answer.verdict, answer.judgeState, answer.answers]).toEqual(["related", "judged", []]);
     expect(answer.related).toHaveLength(ASK_CAPS.related);

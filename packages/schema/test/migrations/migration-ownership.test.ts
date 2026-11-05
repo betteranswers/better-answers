@@ -48,23 +48,26 @@ describe("the migration journal", () => {
   it("names exactly the .sql files in the migrations folder", () => {
     const journalFiles = journalMigrationFiles().map((file) => path.basename(file));
     const [firstFile] = journalMigrationFiles();
-    assert(firstFile !== undefined, "the journal names a migration");
+    assert(firstFile !== undefined, "the journal names no migration");
     const migrationsDir = path.dirname(firstFile);
     const onDisk = readdirSync(migrationsDir).filter((name) => name.endsWith(".sql"));
 
     expect(journalFiles.toSorted()).toEqual(onDisk.toSorted());
   });
 
-  it("counts a near-miss as a claim, but not generated DDL", () => {
+  it("counts a near-miss marker as a claim, but not DDL", () => {
     for (const nearMiss of [
       "-- Custom migration (hand-written SQL; ADR 0031, ADR 0032).",
       "--Custom migration (hand-written SQL; ADR 0032).",
       "-- custom migration (hand-written SQL; ADR 0032).",
     ]) {
       expect
-        .soft(CLAIMS_TO_BE_HAND_WRITTEN.test(nearMiss), `${nearMiss} claims to be hand-written`)
+        .soft(
+          CLAIMS_TO_BE_HAND_WRITTEN.test(nearMiss),
+          `${nearMiss} is not read as a hand-written claim`,
+        )
         .toBe(true);
-      expect.soft(nearMiss, `${nearMiss} is a near-miss, not the marker`).not.toBe(CUSTOM_MARKER);
+      expect.soft(nearMiss, `${nearMiss} equals the exact marker`).not.toBe(CUSTOM_MARKER);
     }
 
     expect(CLAIMS_TO_BE_HAND_WRITTEN.test(CUSTOM_MARKER)).toBe(true);
@@ -74,20 +77,20 @@ describe("the migration journal", () => {
     ).toBe(false);
   });
 
-  it("spells the marker exactly wherever a migration claims it", () => {
+  it("requires the exact marker on every migration claiming hand-written SQL", () => {
     const claiming = journalledMigrations().filter(({ sql }) =>
       CLAIMS_TO_BE_HAND_WRITTEN.test(firstLineOf(sql)),
     );
 
     expect(
       claiming.length,
-      "a migration is hand-written, so the marker rule has something to check",
+      "no migration is hand-written, so the marker rule checks nothing",
     ).toBeGreaterThan(0);
     for (const { tag, sql } of claiming) {
       expect
         .soft(
           firstLineOf(sql),
-          `${tag}.sql claims to be hand-written, so its first line must be the marker`,
+          `${tag}.sql claims to be hand-written, but its first line is not the marker`,
         )
         .toBe("-- Custom migration (hand-written SQL; ADR 0032).");
     }
@@ -100,12 +103,12 @@ describe("the migration journal", () => {
 
     expect(
       generated.length,
-      "a migration is generated, so the forbidden-table rule has something to check",
+      "no migration is generated, so the forbidden-table rule checks nothing",
     ).toBeGreaterThan(0);
     for (const { tag, sql } of generated) {
       for (const forbidden of FORBIDDEN_IN_GENERATED) {
         expect
-          .soft(sql, `${tag}.sql is generated and must not match ${String(forbidden)}`)
+          .soft(sql, `generated ${tag}.sql matches ${String(forbidden)}`)
           .not.toMatch(forbidden);
       }
     }
@@ -135,7 +138,7 @@ const aCopyWithAPlantedLink = (snapshotName: string): string => {
 };
 
 describe("the journal's meta folder", () => {
-  it("pairs entries with snapshots in one unbroken chain", () => {
+  it("pairs every entry with a snapshot in one unbroken chain", () => {
     const read = journalSnapshots();
 
     expect(read).toMatchObject({ ok: true });
@@ -178,7 +181,7 @@ describe("the journal's meta folder", () => {
     });
   });
 
-  it("checks entries, then snapshots, then the chain", () => {
+  it("reports missing snapshots first, then orphaned ones, then the chain", () => {
     const everyFault = aCopyWithAPlantedLink("0002_snapshot.json");
     rmSync(path.join(everyFault, "0001_snapshot.json"));
     writeFileSync(path.join(everyFault, "9999_snapshot.json"), "{}");
@@ -203,15 +206,15 @@ describe("the journal's meta folder", () => {
     expect(() => journalSnapshotsIn(unreadableSnapshot)).toThrow(z.ZodError);
   });
 
-  it("throws on a journal instant that does not increase", () => {
+  it("throws when the journal's timestamps do not increase", () => {
     const meta = aCopyOfMeta();
     const journalPath = path.join(meta, "_journal.json");
     const journal = z
       .looseObject({ entries: z.array(z.looseObject({ when: z.number() })) })
       .parse(JSON.parse(readFileSync(journalPath, "utf8")));
     const [first, second, ...rest] = journal.entries;
-    assert(first !== undefined, "the journal has a first entry");
-    assert(second !== undefined, "the journal has a second entry");
+    assert(first !== undefined, "the journal has no first entry");
+    assert(second !== undefined, "the journal has no second entry");
     writeFileSync(
       journalPath,
       JSON.stringify({ ...journal, entries: [first, { ...second, when: first.when }, ...rest] }),
@@ -236,7 +239,7 @@ describe("the journal's final newline", () => {
     expect(journal.at(-1)).toBe(0x0a);
   });
 
-  it("is put back on a journal written without it", () => {
+  it("is added to a journal written without one", () => {
     const folder = aFolderHoldingAJournalThatReads(A_JOURNAL_AS_DRIZZLE_KIT_WRITES_IT);
     restoreFinalNewline(folder);
 
@@ -245,7 +248,7 @@ describe("the journal's final newline", () => {
     );
   });
 
-  it("is left alone on a journal already ending in one", () => {
+  it("is not doubled on a journal already ending in one", () => {
     const folder = aFolderHoldingAJournalThatReads(`${A_JOURNAL_AS_DRIZZLE_KIT_WRITES_IT}\n`);
     restoreFinalNewline(folder);
 
@@ -267,7 +270,7 @@ const migrationIn = (folder: string): string =>
   readFileSync(path.join(folder, "0000_probe.sql"), "utf8");
 
 describe("the statement separator the generator writes", () => {
-  it("is on a statement's line in every tracked migration", () => {
+  it("never sits on its own line in a tracked migration", () => {
     const ownLine = journalMigrationFiles().filter((file) =>
       readFileSync(file, "utf8").split("\n").includes(SEPARATOR),
     );
@@ -275,7 +278,7 @@ describe("the statement separator the generator writes", () => {
     expect(ownLine).toEqual([]);
   });
 
-  it("is folded from its own line onto the statement above", () => {
+  it("is moved from its own line onto the statement above", () => {
     const folder = aFolderHoldingAMigrationThatReads(
       `CREATE TABLE a (\n  id text\n);\n${SEPARATOR}\nCREATE TABLE b (id text);\n`,
     );
@@ -286,7 +289,7 @@ describe("the statement separator the generator writes", () => {
     );
   });
 
-  it("is left in place when already on the statement's line", () => {
+  it("stays put when it already ends a statement's line", () => {
     const written = `CREATE TABLE a (id text);${SEPARATOR}\nCREATE TABLE b (id text);\n`;
     const folder = aFolderHoldingAMigrationThatReads(written);
 
@@ -294,7 +297,7 @@ describe("the statement separator the generator writes", () => {
     expect(migrationIn(folder)).toBe(written);
   });
 
-  it("is left alone with no statement above it", () => {
+  it("stays put when no statement comes before it", () => {
     const written = `${SEPARATOR}\nCREATE TABLE a (id text);\n`;
     const folder = aFolderHoldingAMigrationThatReads(written);
 
@@ -303,8 +306,7 @@ describe("the statement separator the generator writes", () => {
   });
 });
 
-const THE_ALTER_THAT_LANDED_THE_DEFAULT =
-  'ALTER TABLE "account" ALTER COLUMN "updated_at" SET DEFAULT now();';
+const EXPECTED_DEFAULT_ALTER = 'ALTER TABLE "account" ALTER COLUMN "updated_at" SET DEFAULT now();';
 
 const snapshotSchema = z.looseObject({
   id: z.string(),
@@ -331,20 +333,20 @@ const theDeclarations = (prevId: string): unknown =>
   generateDrizzleJson(declarations, prevId, ["public"]);
 
 describe("the declarations and the DDL generated from them", () => {
-  it("leaves a generate run on this tree nothing to propose", async () => {
+  it("leaves drizzle-kit generate nothing to propose on this tree", async () => {
     const newest = theNewestSnapshot();
 
     expect(await generateMigration(newest, theDeclarations(newest.id))).toEqual([]);
   });
 
-  it("proposes the ALTER for a default missing from the DDL", async () => {
+  it("proposes an ALTER when the snapshot lacks a column default", async () => {
     const before = structuredClone(theNewestSnapshot());
     const column = before.tables["public.account"]?.columns["updated_at"];
-    assert(column !== undefined, "account.updated_at is in the newest snapshot");
+    assert(column !== undefined, "account.updated_at is missing from the newest snapshot");
     delete column.default;
 
     expect(await generateMigration(before, theDeclarations(before.id))).toEqual([
-      THE_ALTER_THAT_LANDED_THE_DEFAULT,
+      EXPECTED_DEFAULT_ALTER,
     ]);
   });
 });
@@ -360,8 +362,8 @@ const theSuggestionFunction = (): string => {
 const arrayOf = (kinds: readonly string[]): string =>
   `ARRAY[${kinds.map((kind) => `'${kind}'`).join(", ")}]`;
 
-describe("what the suggestion function copies from the schema package", () => {
-  it("bounds a set and a frontmatter at their constants", () => {
+describe("submit_suggestion_set and the schema package's constants", () => {
+  it("bounds the set size and frontmatter length by the constants", () => {
     const sql = theSuggestionFunction();
 
     expect(sql).toContain(`BETWEEN 1 AND ${SUGGESTION_SET_MAX}`);
@@ -378,16 +380,17 @@ describe("what the suggestion function copies from the schema package", () => {
   });
 });
 
-describe("what the audience substrate copies from the schema package", () => {
+describe("the audience-substrate migration and the schema package", () => {
   it("uses the declared audience CHECK on both map tables", () => {
     const file = journalMigrationFiles().find((name) => name.endsWith("audience-substrate.sql"));
-    assert(file !== undefined, "the audience substrate is in the journal");
+    assert(file !== undefined, "the audience-substrate migration is missing from the journal");
     const sql = readFileSync(file, "utf8");
 
     for (const table of ["graph_node", "graph_edge"]) {
-      expect(sql, "the substrate predates 0067, so it names graph_node and graph_edge").toContain(
-        `"${table}_audience_check" CHECK (${AUDIENCE_CHECK})`,
-      );
+      expect(
+        sql,
+        "the audience-substrate migration lacks the declared CHECK on graph_node or graph_edge, the map tables before 0067",
+      ).toContain(`"${table}_audience_check" CHECK (${AUDIENCE_CHECK})`);
     }
   });
 });

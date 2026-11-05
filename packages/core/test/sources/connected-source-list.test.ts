@@ -151,8 +151,8 @@ describe("the Sources list an Admin reads", () => {
       outcome: INDEXED,
     });
     const [firstPolicy, secondPolicy] = policies.documentIds;
-    assert(firstPolicy !== undefined, "the first policy document landed");
-    assert(secondPolicy !== undefined, "the second policy document landed");
+    assert(firstPolicy !== undefined, "the seed made no first policy document");
+    assert(secondPolicy !== undefined, "the seed made no second policy document");
     await passagesUnder(scenario, policies.connectedSourceId, firstPolicy, 2);
     await passagesUnder(scenario, policies.connectedSourceId, secondPolicy, 1);
     const rota = await connectedSourceOf(scenario, "Rota", [{ title: "rota.md" }], PUBLISHED_AT);
@@ -248,7 +248,7 @@ describe("the Sources list an Admin reads", () => {
     ]);
   });
 
-  it("shows an unrun source as received with no last sync", async () => {
+  it("shows a never-synced source as received, with no last sync", async () => {
     const scenario = await arrange();
     const minutes = await connectedSourceOf(scenario, "Minutes", [{ title: "minutes.md" }]);
 
@@ -263,7 +263,7 @@ describe("the Sources list an Admin reads", () => {
     ).toEqual([[minutes.connectedSourceId, "received", null]]);
   });
 
-  it("names each unreadable document's reason and counts by reason", async () => {
+  it("lists each unreadable document's reason and a count per reason", async () => {
     const scenario = await arrange();
     const scans = await connectedSourceOf(scenario, "Scans", [
       { title: "Minutes" },
@@ -284,7 +284,7 @@ describe("the Sources list an Admin reads", () => {
     expect(listed?.unreadableByReason).toEqual({ NeedsOcrError: 2, DeadlineExceededError: 1 });
   });
 
-  it("lists no connected source another workspace holds", async () => {
+  it("omits the connected sources of another workspace", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     await connectedSourceOf(elsewhere, "Their handbook", [{ title: "theirs.md" }]);
@@ -293,7 +293,7 @@ describe("the Sources list an Admin reads", () => {
   });
 
   it.each(["editor", "viewer"] as const)(
-    "refuses the %s, as the list is an Admin's",
+    "refuses the %s, because only an Admin may list sources",
     async (role) => {
       const scenario = await arrange();
       await connectedSourceOf(scenario, "Handbook", [{ title: "handbook.md" }]);
@@ -303,8 +303,8 @@ describe("the Sources list an Admin reads", () => {
   );
 });
 
-describe("the runs of a connected source, read by subject", () => {
-  it("answers every sync newest first, in ISO instants", async () => {
+describe("the sync history of one connected source", () => {
+  it("lists every sync newest first, with ISO timestamps", async () => {
     const scenario = await arrange();
     const handbook = await connectedSourceOf(scenario, "Handbook", [{ title: "handbook.md" }]);
     const failed = await syncOver(scenario, handbook.connectedSourceId, {
@@ -350,7 +350,7 @@ describe("the runs of a connected source, read by subject", () => {
     ]);
   });
 
-  it("answers another workspace's subject with nothing", async () => {
+  it("returns nothing for another workspace's connected source", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const theirs = await connectedSourceOf(elsewhere, "Handbook", [{ title: "handbook.md" }]);

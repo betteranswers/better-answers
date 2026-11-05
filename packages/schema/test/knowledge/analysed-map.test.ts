@@ -37,11 +37,14 @@ const aSmallMap = async (client: pg.PoolClient): Promise<void> => {
 const as = (client: pg.PoolClient, role: string): Promise<unknown> =>
   client.query(`SET LOCAL ROLE ${role}`);
 
-describe("analysing the map for the planner", () => {
-  it.each(["app_rt", "worker_rt"])("analyses both map tables when %s asks", async (role) => {
+describe("analyse_map, which updates the map's planner statistics", () => {
+  it.each(["app_rt", "worker_rt"])("analyses both map tables when %s calls it", async (role) => {
     await withRollback(db().pool, async (client) => {
       await aSmallMap(client);
-      expect(await tablesWithStatistics(client), "before the call").toEqual([]);
+      expect(
+        await tablesWithStatistics(client),
+        "the map tables had statistics before the call",
+      ).toEqual([]);
       await as(client, role);
 
       await client.query(ANALYSE_THE_MAP);
@@ -51,7 +54,7 @@ describe("analysing the map for the planner", () => {
     });
   });
 
-  it("analyses nothing when a runtime role runs ANALYZE itself", async () => {
+  it("analyses nothing when a runtime role runs ANALYZE directly", async () => {
     await withRollback(db().pool, async (client) => {
       await aSmallMap(client);
       await as(client, "app_rt");
@@ -63,7 +66,7 @@ describe("analysing the map for the planner", () => {
     });
   });
 
-  it("refuses every caller but the two runtime roles", async () => {
+  it("refuses every role except the two runtime roles", async () => {
     await withRollback(db().pool, async (client) => {
       await aSmallMap(client);
       const stranger = `map_probe_${ulid().toLowerCase()}`;
@@ -78,7 +81,7 @@ describe("analysing the map for the planner", () => {
     });
   });
 
-  it("pins its search path and lock wait, with no arguments", async () => {
+  it("pins its search path and lock timeout, with no arguments", async () => {
     const read = await db().pool.query<{ args: number; settings: readonly string[] }>(
       `SELECT pronargs AS args, proconfig AS settings FROM pg_proc
         WHERE pronamespace = 'public'::regnamespace AND proname = 'analyse_map'`,
@@ -88,7 +91,7 @@ describe("analysing the map for the planner", () => {
     ]);
   });
 
-  it("asks autovacuum to analyse the tables at one percent", async () => {
+  it("tells autovacuum to analyse the map tables at 1% change", async () => {
     const read = await db().pool.query<{ table: string; options: readonly string[] }>(
       `SELECT relname AS "table", reloptions AS options FROM pg_class
         WHERE relnamespace = 'public'::regnamespace AND relname = ANY($1::text[])

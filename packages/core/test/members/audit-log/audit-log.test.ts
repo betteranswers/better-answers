@@ -151,8 +151,8 @@ const eventAboutTheirs = async (
   });
 };
 
-describe("the audit log", () => {
-  it("reads events newest first, naming actors from the person row", async () => {
+describe("reading the audit log", () => {
+  it("lists events newest first and names actors from person rows", async () => {
     const address = "priya.logged@example.invalid";
     const workspace = await provisionedWorkspace(db(), "Logged", {
       name: "Priya Shah",
@@ -214,7 +214,7 @@ describe("the audit log", () => {
     ]);
   });
 
-  it("names an erased person a former member", async () => {
+  it("shows an erased person as a former member", async () => {
     const workspace = await provisionedWorkspace(db(), "Erased");
     const erased = await memberAt(workspace, "Admin", "Sam Okoro");
     await groupsMadeBy(workspace, erased, ["Estimators"]);
@@ -279,7 +279,7 @@ describe("the audit log", () => {
     });
   });
 
-  it("reads one family alone when asked for it", async () => {
+  it("lists only the requested family's events", async () => {
     const workspace = await provisionedWorkspace(db(), "Filtered");
     await groupsMadeBy(workspace, workspace.adminUserId, ["Site team"]);
 
@@ -296,7 +296,7 @@ describe("the audit log", () => {
     expect(knowledge).toEqual({ events: [], nextCursor: null, searchTooBroad: false });
   });
 
-  it("pages from the newest, each resuming where the last stopped", async () => {
+  it("pages from the newest event, each continuing from the last", async () => {
     const workspace = await provisionedWorkspace(db(), "Paged");
     const [one, two, three, four] = await groupsMadeBy(workspace, workspace.adminUserId, [
       "One",
@@ -320,7 +320,7 @@ describe("the audit log", () => {
     expect(last.nextCursor).toBeNull();
   });
 
-  it("says no page follows one that ends on the oldest", async () => {
+  it("returns no cursor when a page ends on the oldest", async () => {
     const workspace = await provisionedWorkspace(db(), "Exact");
     await groupsMadeBy(workspace, workspace.adminUserId, ["One"]);
 
@@ -330,7 +330,7 @@ describe("the audit log", () => {
     expect(page.nextCursor).toBeNull();
   });
 
-  it("pages within the family asked for", async () => {
+  it("pages within the requested family", async () => {
     const workspace = await provisionedWorkspace(db(), "FamilyPaged");
     const [one, two] = await groupsMadeBy(workspace, workspace.adminUserId, ["One", "Two"]);
 
@@ -349,7 +349,7 @@ describe("the audit log", () => {
     expect(second.nextCursor).toBeNull();
   });
 
-  it("never reads another workspace's events, even by another workspace's cursor", async () => {
+  it("never reads another workspace's events, even with its cursor", async () => {
     const ours = await provisionedWorkspace(db(), "Ours");
     const theirs = await provisionedWorkspace(db(), "Theirs", { name: "Una Elsewhere" });
     await groupsMadeBy(theirs, theirs.adminUserId, ["Their group", "Their other group"]);
@@ -379,14 +379,14 @@ describe("the audit log", () => {
     expect(page.events.map((event) => event.action)).toEqual(["platform.workspace.provisioned"]);
   });
 
-  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
+  it.each(["Editor", "Viewer"] as const)("refuses the %s role with role-forbids", async (role) => {
     const workspace = await provisionedWorkspace(db(), `Refused${role}`);
     const member = await memberAt(workspace, role, "Una Member");
 
     expect(await readAs(workspace, member)).toEqual({ ok: false, error: "role-forbids" });
   });
 
-  it("answers the store's own failure rather than an empty page", async () => {
+  it("returns the store's error instead of an empty page", async () => {
     const workspace = await provisionedWorkspace(db(), "Unread");
     let read: Result<unknown, unknown> | undefined;
 
@@ -493,7 +493,7 @@ describe("searching the audit log", () => {
     expect(new Set(subjectsOf(page))).toEqual(new Set([bidWriters]));
   });
 
-  it("finds events by the words of their action", async () => {
+  it("finds events by the words of their action name", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedByAction");
     await priyaOf(workspace);
 
@@ -504,7 +504,7 @@ describe("searching the audit log", () => {
     expect(actionsOf(page)).toEqual(["people.member.role_changed"]);
   });
 
-  it("finds an action by the words the page shows", async () => {
+  it("finds an action by its headline on the page", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedByHeadline");
     await seedingWith(db().pool, async (seed) => {
       for (const action of ["sources.binding.bound", "people.client.consented"]) {
@@ -530,7 +530,7 @@ describe("searching the audit log", () => {
     ]);
   });
 
-  it("searches within the family asked for", async () => {
+  it("searches only within the requested family", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedInFamily", { name: "Hannah" });
 
     const people = pageOf(
@@ -544,7 +544,7 @@ describe("searching the audit log", () => {
     expect(actionsOf(platform)).toEqual(["platform.workspace.provisioned"]);
   });
 
-  it("answers an empty last page when nothing matches", async () => {
+  it("returns an empty final page when nothing matches", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedForNothing");
     await priyaOf(workspace);
 
@@ -554,7 +554,7 @@ describe("searching the audit log", () => {
     });
   });
 
-  it("reads % and _ in a search as themselves", async () => {
+  it("matches % and _ in a search literally", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedLiterally");
     const [sure, plain, underscored] = await groupsMadeBy(workspace, workspace.adminUserId, [
       "100% sure",
@@ -571,7 +571,7 @@ describe("searching the audit log", () => {
     expect(subjectsOf(underscore)).toEqual([underscored]);
   });
 
-  it("never finds a person known only to another workspace", async () => {
+  it("never finds a person who belongs only to another workspace", async () => {
     const ours = await provisionedWorkspace(db(), "OurSearch");
     const theirs = await provisionedWorkspace(db(), "TheirSearch", { name: "Una Elsewhere" });
     await groupsMadeBy(theirs, theirs.adminUserId, ["Their group"]);
@@ -626,7 +626,7 @@ describe("searching the audit log", () => {
     expect(actionsOf(page)).toEqual(["people.group.member_added"]);
   });
 
-  it("reads a search naming 100 groups whole", async () => {
+  it("does not flag a search matching exactly 100 groups", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedHundred");
     await crewsSeeded(workspace, 100);
 
@@ -635,7 +635,7 @@ describe("searching the audit log", () => {
     expect(page.searchTooBroad).toBe(false);
   });
 
-  it("flags a search naming over 100 groups, reading 100", async () => {
+  it("flags a search matching over 100 groups, reading only 100", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedTooBroadly");
     const crews = await crewsSeeded(workspace, 101);
 
@@ -651,7 +651,7 @@ describe("searching the audit log", () => {
     expect(rest.nextCursor).toBeNull();
   });
 
-  it("flags a search naming over 100 people, not 100", async () => {
+  it("flags a search matching over 100 people but not 100", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedPeopleBroadly");
     const crewJoin = (from: number, to: number) =>
       seedingWith(db().pool, async (seed) => {
@@ -675,7 +675,7 @@ describe("searching the audit log", () => {
     expect([hundred.searchTooBroad, more.searchTooBroad]).toEqual([false, true]);
   });
 
-  it("refuses a search over 100 characters, malformed", () => {
+  it("refuses a search over 100 characters as malformed", () => {
     expect(parse(readAuditLogInput, { search: "a".repeat(100) }).ok).toBe(true);
     expect(parse(readAuditLogInput, { search: "a".repeat(101) })).toEqual({
       ok: false,
@@ -755,7 +755,7 @@ describe("the audit log's subjects", () => {
     ]);
   });
 
-  it("names a concept, draft or not, to its audience alone", async () => {
+  it("names a concept, draft or published, only to its audience", async () => {
     const workspace = await provisionedWorkspace(db(), "Audienced");
     const { workspaceId, adminUserId } = workspace;
     const actor = `human:${adminUserId}`;
@@ -815,7 +815,7 @@ describe("the audit log's subjects", () => {
     ]);
   });
 
-  it("says a connected source since removed by its kind alone", async () => {
+  it("shows a removed connected source as removed, without a name", async () => {
     const workspace = await provisionedWorkspace(db(), "Unbound");
     const gone = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
     await seedingWith(db().pool, (seed) =>
@@ -837,7 +837,7 @@ describe("the audit log's subjects", () => {
     ]);
   });
 
-  it("names the person a detail id holds", async () => {
+  it("names the person behind an id in the detail", async () => {
     const workspace = await provisionedWorkspace(db(), "Detailed");
     const address = "priya.detailed@example.invalid";
     const priya = await memberAt(workspace, "Viewer", "Priya Shah", address);
@@ -855,7 +855,7 @@ describe("the audit log's subjects", () => {
     });
   });
 
-  it("names a group by its name as it stands now", async () => {
+  it("names a group by its current name", async () => {
     const workspace = await provisionedWorkspace(db(), "Regrouped");
     const [groupId = ""] = await groupsMadeBy(workspace, workspace.adminUserId, ["Bid writers"]);
     done(
@@ -904,7 +904,7 @@ describe("the audit log's subjects", () => {
     });
   });
 
-  it("reads a deleted group's events as a deleted group", async () => {
+  it("marks the subject of a deleted group's events as deleted", async () => {
     const workspace = await provisionedWorkspace(db(), "Ungrouped");
     const [groupId = ""] = await groupsMadeBy(workspace, workspace.adminUserId, ["Site team"]);
     done(
@@ -920,7 +920,7 @@ describe("the audit log's subjects", () => {
     ]);
   });
 
-  it("names an erased person a former member", async () => {
+  it("shows an erased person as a former member", async () => {
     const workspace = await provisionedWorkspace(db(), "Forgotten");
     const priya = await memberAt(workspace, "Viewer", "Priya Shah");
     await roleChangedOf(workspace, priya);
@@ -942,7 +942,7 @@ describe("the audit log's subjects", () => {
     ]);
   });
 
-  it("reads an invitation erasure deleted without its address", async () => {
+  it("shows an invitation deleted by erasure without its address", async () => {
     const workspace = await provisionedWorkspace(db(), "Unaddressed");
     const invitationId = await invitedBy(workspace, "jo.bloggs@example.invalid");
     await db().pool.query("DELETE FROM invitation WHERE id = $1", [invitationId]);

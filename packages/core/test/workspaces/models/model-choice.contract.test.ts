@@ -35,7 +35,7 @@ const fixture = contractFixture("model-choice", fixtureSchema);
 const db = postgresForSuite();
 
 describe("the model-choice agreement", () => {
-  it("resolves every fixtured call to its expected model choice", async () => {
+  it("resolves every fixture call to its expected model choice", async () => {
     await withRollback(db().pool, async (client) => {
       const seed = testData(client);
       for (const workspace of fixture.workspaces) {

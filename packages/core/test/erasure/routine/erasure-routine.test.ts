@@ -688,7 +688,7 @@ const operatorMarkOf = async (userId: string): Promise<boolean | undefined> => {
   return read.rows[0]?.operator;
 };
 
-const theOperator = async (scenario: Scenario, email: string): Promise<void> => {
+const grantOperatorMark = async (scenario: Scenario, email: string): Promise<void> => {
   const marked = await setOperatorMark(bootstrap, scenario.postgres, { email, change: "grant" });
   if (!marked.ok || !marked.value.changed) throw new Error(`the mark was not set on ${email}`);
 };
@@ -725,7 +725,7 @@ const theDumpCouldTakeItsLock = async (): Promise<boolean> => {
 };
 
 describe("the erasure pseudonym", () => {
-  it("mints one opaque id per request, kept on rerun", async () => {
+  it("creates one opaque pseudonym per request, kept on rerun", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     await completing(scenario, subjectRequestId);
@@ -741,7 +741,7 @@ describe("the erasure pseudonym", () => {
     expect(first[0]?.subject_request_id).toEqual(subjectRequestId);
   });
 
-  it("mints a different one in each workspace erasing the person", async () => {
+  it("creates a different pseudonym in each workspace erasing the person", async () => {
     const email = addressOf("priya");
     const person = await seedingWith(db().pool, (seed) =>
       seed.user({ name: "Priya Anand", email }),
@@ -763,7 +763,7 @@ describe("the erasure pseudonym", () => {
       );
       await completing(scenario, seeded.id);
       const [row] = await erasureRowsIn(scenario.workspaceId);
-      assert(row !== undefined, "the erasure row was written");
+      assert(row !== undefined, "the routine wrote no erasure row");
       pseudonyms.push(row.pseudonym);
     }
 
@@ -777,7 +777,7 @@ describe("the report", () => {
     await theBundleRewritten();
   });
 
-  it("states four beyond-use dates from the lock, in fixed words", async () => {
+  it("states four beyond-use dates counted from the lock time", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     const done = await completing(scenario, subjectRequestId);
@@ -823,8 +823,8 @@ describe("the report", () => {
   });
 });
 
-describe("the factory's erasure request", () => {
-  it("dates beyond use as the routine does", async () => {
+describe("an erasure request from the seed factory", () => {
+  it("has the beyond-use dates the routine computes", async () => {
     const scenario = await arrange();
 
     const seeded = await seedingWith(db().pool, (seed) =>
@@ -840,7 +840,7 @@ describe("the factory's erasure request", () => {
   });
 });
 
-describe("the lock the hourly dump waits behind", () => {
+describe("the advisory lock the hourly dump waits for", () => {
   it("holds the dump's lock throughout the routine, then releases it", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
     const tried: boolean[] = [];
@@ -887,8 +887,8 @@ describe("the lock the hourly dump waits behind", () => {
   });
 });
 
-describe("the audit log an erasure never rewrites", () => {
-  it("books completion to the platform actor, leaving earlier rows unchanged", async () => {
+describe("the audit log during an erasure", () => {
+  it("records completion as the platform actor and keeps earlier rows", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
     const before = await rowTextIn("audit_event", scenario.workspaceId);
     const earlier = new Set(before.map((row) => row.id));
@@ -905,7 +905,7 @@ describe("the audit log an erasure never rewrites", () => {
     ).toEqual([{ id: done.auditEventId, actor: ERASURE_ACTOR, subject: done.erasureRequestId }]);
 
     const [completion] = completions;
-    assert(completion !== undefined, "the completion was recorded");
+    assert(completion !== undefined, "the routine recorded no completion event");
     expect(Object.keys(completion.detail).sort()).toEqual([
       "locations",
       "personId",
@@ -913,7 +913,7 @@ describe("the audit log an erasure never rewrites", () => {
     ]);
   });
 
-  it("keeps a revocation's ended grants as recorded, naming no one", async () => {
+  it("keeps the revocation event's ended grants, which name no one", async () => {
     const { scenario, email, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const issuedAt = new Date("2026-05-01T09:00:00.000Z");
     const clientId = await seedingWith(db().pool, async (seed) => {
@@ -953,7 +953,7 @@ describe("the audit log an erasure never rewrites", () => {
     expect(await grantsEndedRowsAbout(person.id)).toEqual(endedBefore);
   });
 
-  it("leaves the identity-set audit events as they were", async () => {
+  it("leaves the identity audit events unchanged", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const named = await setDisplayName(bootstrap, scenario.postgres, {
       personId: person.id,
@@ -976,7 +976,7 @@ describe("the audit log an erasure never rewrites", () => {
     expect(await userRowOf(person.id)).toMatchObject({ id: person.id, name: "" });
   });
 
-  it("names in its detail the person the map found", async () => {
+  it("records in the completion detail the person the map found", async () => {
     const named = await workspaceWithAnErasureRequest();
     const byAddressAlone = await arrange();
     const email = addressOf("nadia");
@@ -1014,7 +1014,7 @@ describe("the audit log an erasure never rewrites", () => {
 });
 
 describe("a second run of the routine", () => {
-  it("writes one more audit event and moves nothing else", async () => {
+  it("writes one more audit event and changes nothing else", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     const first = await completing(scenario, subjectRequestId);
@@ -1037,12 +1037,12 @@ describe("a second run of the routine", () => {
   });
 });
 
-describe("the git step", () => {
+describe("the git history rewrite", () => {
   beforeAll(async () => {
     await theBundleRewritten();
   });
 
-  it("leaves no object at any commit holding the address", async () => {
+  it("leaves no git object that holds the address", async () => {
     const { email, before, after } = await theBundleRewritten();
 
     expect(before.objects).toContain(`human:${email}`);
@@ -1051,7 +1051,7 @@ describe("the git step", () => {
     expect(after.objects).toContain("human:");
   });
 
-  it("mailmaps every author line in the bundle to the pseudonym", async () => {
+  it("rewrites every author line in the bundle to the pseudonym", async () => {
     const { email, before, after, pseudonym } = await theBundleRewritten();
     expect(before.authors).toEqual([`Priya Anand <${email}>`, `Priya Anand <${email}>`]);
 
@@ -1070,7 +1070,7 @@ describe("the git step", () => {
     expect(after.history).toHaveLength(2);
   });
 
-  it("moves the history no further on a second run", async () => {
+  it("leaves the history unchanged on a second run", async () => {
     const { scenario, subjectRequestId } = await bundleNamingThePerson();
 
     await completing(scenario, subjectRequestId);
@@ -1086,7 +1086,7 @@ describe("the git step", () => {
     expect(await bundleCommitRowsIn(scenario.workspaceId)).toEqual(rows);
   });
 
-  it("rewrites the sign-in address for a request by id alone", async () => {
+  it("rewrites the person's sign-in address for a request without identifiers", async () => {
     const { scenario, email, subjectRequestId } = await bundleNamingThePerson({ byIdAlone: true });
     const before = await everyObjectOf(scenario.git, scenario.workspaceId);
     expect(before).toContain(`human:${email}`);
@@ -1103,12 +1103,12 @@ describe("the git step", () => {
     expect(done.report).toContain("bundle-commit: actorsRewritten 2, found 2, moved 2");
   });
 
-  it("refuses a request naming only an address already erased to", async () => {
+  it("refuses a request naming only an erased pseudonym's address", async () => {
     const { scenario, subjectRequestId } = await bundleNamingThePerson();
     await completing(scenario, subjectRequestId);
     const [erased] = await erasureRowsIn(scenario.workspaceId);
     const rewritten = await bundleHistory(scenario.git, scenario.workspaceId);
-    assert(erased !== undefined, "the first erasure was recorded");
+    assert(erased !== undefined, "the first run recorded no erasure");
     const tombstone = `${erased.pseudonym}@erased.better-answers.invalid`;
     const second = await erasureRequestAbout(scenario.workspaceId, null, tombstone);
 
@@ -1125,7 +1125,7 @@ describe("the git step", () => {
   });
 });
 
-describe("a skeleton commit the person caused", () => {
+describe("a skeleton commit made as the person", () => {
   it("rewrites the author line of a skeleton commit", async () => {
     const scenario = await arrange();
     const { workspaceId, git } = scenario;
@@ -1159,12 +1159,12 @@ describe("a skeleton commit the person caused", () => {
   });
 });
 
-describe("the bundle_commit rows the rewrite moves", () => {
+describe("the bundle_commit rows after the history rewrite", () => {
   beforeAll(async () => {
     await theBundleRewritten();
   });
 
-  it("names the rewritten hashes and parents, carrying the index's key", async () => {
+  it("use the new hashes and parents, as concept_index does", async () => {
     const { before, after, commitOfTheConcept } = await theBundleRewritten();
     expect(before.rows.map((row) => row.sha)).toEqual(before.history);
 
@@ -1175,7 +1175,7 @@ describe("the bundle_commit rows the rewrite moves", () => {
     expect(commitOfTheConcept).toEqual(after.history[0]);
   });
 
-  it("names the pseudonym on each commit row, the person nowhere", async () => {
+  it("name the pseudonym as actor and never the person's id", async () => {
     const { scenario, person, pseudonym, after } = await theBundleRewritten();
 
     expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([
@@ -1185,7 +1185,7 @@ describe("the bundle_commit rows the rewrite moves", () => {
     expect(after.objects).not.toContain(person.id);
   });
 
-  it("leaves the reconciler nothing to replay, head and watermark agreeing", async () => {
+  it("leave the reconciler nothing to replay, with watermark at head", async () => {
     const { scenario } = await theBundleRewritten();
 
     const swept = await reconcile(RECONCILER, doorsOf(scenario), {
@@ -1199,7 +1199,7 @@ describe("the bundle_commit rows the rewrite moves", () => {
     expect(swept.value.watermark).toEqual(swept.value.head);
   });
 
-  it("records both families' work in the report's actions", async () => {
+  it("records the git and commit counts in the report's actions", async () => {
     const { actions } = await theBundleRewritten();
 
     expect(actions).toMatchObject({
@@ -1225,12 +1225,12 @@ const verificationOn = (
   };
 };
 
-describe("the verifications the rewrite moved", () => {
+describe("concept verifications after the history rewrite", () => {
   beforeAll(async () => {
     await theBundleRewritten();
   });
 
-  it("carries each onto the new hash under origin erasure-rewrite", async () => {
+  it("move to the new content hash with origin erasure-rewrite", async () => {
     const {
       email,
       pseudonym,
@@ -1297,7 +1297,7 @@ describe("the verifications the rewrite moved", () => {
     });
   });
 
-  it("reindexes a concept rewritten only in unhashed keys", async () => {
+  it("reindexes a concept whose rewrite left its content hash unchanged", async () => {
     const { email, steadyIri, indexedBefore, indexedAfter } = await theBundleRewritten();
     const steadyBefore = indexedBefore.find((row) => row.iri === steadyIri);
     const steadyAfter = indexedAfter.find((row) => row.iri === steadyIri);
@@ -1311,14 +1311,14 @@ describe("the verifications the rewrite moved", () => {
     expect(steadyAfter?.content_hash).toEqual(steadyBefore?.content_hash);
   });
 
-  it("marks each write-up citing a rehashed concept for review", async () => {
+  it("flags write-ups citing a concept whose hash changed for review", async () => {
     const { iri, steadyIri, reviewMarksBefore, reviewMarksAfter } = await theBundleRewritten();
 
     expect(reviewMarksBefore).toEqual({ [iri]: null, [steadyIri]: null });
     expect(reviewMarksAfter).toEqual({ [iri]: "concept-changed", [steadyIri]: null });
   });
 
-  it("records what it moved in the report's actions", async () => {
+  it("records the reindexed and rehashed counts in the report's actions", async () => {
     const { actions } = await theBundleRewritten();
 
     expect(actions).toMatchObject({
@@ -1354,7 +1354,7 @@ const accessRequestsOf = async (requesterId: string) =>
     ),
   );
 
-describe("the identity set on the person's last workspace", () => {
+describe("the identity rows when this is the person's last workspace", () => {
   it("pseudonymises the user row, keeping its id for audit events", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const acted = await seedingWith(db().pool, (seed) =>
@@ -1380,9 +1380,9 @@ describe("the identity set on the person's last workspace", () => {
     expect(await personNamedBy(scenario.workspaceId, acted.id)).toEqual(person.id);
   });
 
-  it("clears the operator mark with the rest of the identity", async () => {
+  it("clears the person's operator mark", async () => {
     const { scenario, person, email, subjectRequestId } = await workspaceWithAnErasureRequest();
-    await theOperator(scenario, email);
+    await grantOperatorMark(scenario, email);
 
     await completing(scenario, subjectRequestId);
 
@@ -1413,7 +1413,7 @@ describe("the identity set on the person's last workspace", () => {
     });
   });
 
-  it("deletes the restore code and session-keyed rows, never a stranger's", async () => {
+  it("deletes the person's restore code and session rows only", async () => {
     const { scenario, person, email, subjectRequestId } = await workspaceWithAnErasureRequest();
     const { sessionId } = await identityRowsFor(db().pool, { userId: person.id, email });
     const strangersEmail = addressOf("someone");
@@ -1444,7 +1444,7 @@ describe("the identity set on the person's last workspace", () => {
     expect(left.rows.map((row) => row.id).toSorted()).toEqual(notTheirs.toSorted());
   });
 
-  it("empties every identity-set table that names the person", async () => {
+  it("empties every identity table that holds the person's user id", async () => {
     expect(await identityTablesNamingAPerson()).toEqual(
       [...SWEPT_BY_PERSON, ...BEYOND_THE_SWEEP].toSorted(),
     );
@@ -1459,7 +1459,7 @@ describe("the identity set on the person's last workspace", () => {
     expect(await sweptTablesHolding(person.id)).toEqual([]);
   });
 
-  it("deletes the person's second factor, last activity and their flags", async () => {
+  it("deletes the person's second factors, last activity and related flags", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const held = await secondFactorRowsFor(db().pool, person.id);
     await lastActiveIn(db().pool, scenario.workspaceId, person.id);
@@ -1491,7 +1491,7 @@ describe("the identity set on the person's last workspace", () => {
     ]);
   });
 
-  it("keeps the second factor, ending only this workspace's last activity", async () => {
+  it("keeps a person's second factors when they keep another membership", async () => {
     const { scenario, elsewhere, email, person } = await memberHereAndElsewhere();
     const held = await secondFactorRowsFor(db().pool, person.id);
     await lastActiveIn(db().pool, scenario.workspaceId, person.id);
@@ -1511,7 +1511,7 @@ describe("the identity set on the person's last workspace", () => {
     ]);
   });
 
-  it("deletes the subject's own codes, never a stranger's", async () => {
+  it("deletes the subject's codes, not those of a listed stranger", async () => {
     const scenario = await arrange();
     const email = addressOf("priya");
     const person = await memberOf(db().pool, scenario.workspaceId, email);
@@ -1534,7 +1534,7 @@ describe("the identity set on the person's last workspace", () => {
     }).toEqual({ theirs: 0, theStranger: 4 });
   });
 
-  it("keeps a stranger's code whose key holds the subject's address", async () => {
+  it("keeps a stranger's code whose key contains the subject's address", async () => {
     const scenario = await arrange();
     const stranger = addressOf("priya");
     const lookalike = `sign-in-otp-${stranger}`;
@@ -1547,10 +1547,10 @@ describe("the identity set on the person's last workspace", () => {
     expect(await verificationsFor(stranger)).toBe(1);
   });
 
-  it("ends only this member while the person holds another workspace", async () => {
+  it("ends only this membership while the person holds another workspace", async () => {
     const { scenario, elsewhere, email, person } = await memberHereAndElsewhere();
     await identityRowsFor(db().pool, { userId: person.id, email });
-    await theOperator(scenario, email);
+    await grantOperatorMark(scenario, email);
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
 
     await completing(scenario, subjectRequestId);
@@ -1587,7 +1587,7 @@ describe("the identity set on the person's last workspace", () => {
     expect(left.rows.map((row) => row.id).toSorted()).toEqual(kept.toSorted());
   });
 
-  it("deletes the address's invitations in every workspace, never a stranger's", async () => {
+  it("deletes the address's invitations in every workspace, not a stranger's", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
@@ -1618,7 +1618,7 @@ describe("the identity set on the person's last workspace", () => {
     });
   });
 
-  it("reports invitations found here, logging every deletion for the operator", async () => {
+  it("reports local invitations and logs every deletion for the operator", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
@@ -1650,7 +1650,7 @@ describe("the identity set on the person's last workspace", () => {
     ]);
   });
 
-  it("logs one operator line per arm, never an address", async () => {
+  it("logs one operator line per identity arm, with no address", async () => {
     const { runs } = await erasedOnEachArmOnce();
     const namingTheRequest = (done: ErasureRun) => ({
       actor: ERASURE_ACTOR,
@@ -1709,7 +1709,7 @@ describe("the identity set on the person's last workspace", () => {
     });
   });
 
-  it("leaves every invitation standing while the person holds another workspace", async () => {
+  it("leaves every invitation when the person keeps another membership", async () => {
     const staying = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
@@ -1732,7 +1732,7 @@ describe("the identity set on the person's last workspace", () => {
     });
   });
 
-  it("keeps an approved requester's request, its invitation and reason cleared", async () => {
+  it("keeps an approved access request, clearing its invitation and reason", async () => {
     const scenario = await arrange();
     const email = addressOf("priya");
     const requester = await seedingWith(db().pool, (seed) =>
@@ -1755,7 +1755,7 @@ describe("the identity set on the person's last workspace", () => {
     ]);
   });
 
-  it("clears the request's reason while the person holds another workspace", async () => {
+  it("clears the access request reason when another membership remains", async () => {
     const { scenario, email, person } = await memberHereAndElsewhere();
     const { requestId } = await approvedRequestOf(scenario, person.id);
 
@@ -1769,7 +1769,7 @@ describe("the identity set on the person's last workspace", () => {
     });
   });
 
-  it("unlinks a request approved elsewhere whose invitation it deletes", async () => {
+  it("unlinks another workspace's access request from its deleted invitation", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const elsewhere = await arrange();
     const { requestId } = await approvedRequestOf(elsewhere, person.id);
@@ -1810,14 +1810,14 @@ describe("the identity set on the person's last workspace", () => {
     expect(done.report).toContain("- concept-owner: deleted 1, found 1\n");
   });
 
-  it("stores identical identity lines on both arms, never naming elsewhere", async () => {
+  it("keeps identity lines identical across arms and omits other workspaces", async () => {
     const { runs, elsewhereId } = await erasedOnEachArmOnce();
     const identityLinesOf = async (done: ErasureRun) => {
       const row = (await erasureRowsIn(done.workspaceId)).find(
         (stored) => stored.id === done.erasureRequestId,
       );
-      assert(row !== undefined, "the arm's erasure row was written");
-      assert(row.report !== null, "the arm's run wrote its report");
+      assert(row !== undefined, "the run wrote no erasure row");
+      assert(row.report !== null, "the run wrote no report");
       return {
         actions: Object.fromEntries(
           Object.entries(row.actions).filter(([family]) => family.startsWith("identity-")),
@@ -1982,7 +1982,7 @@ const suppressingAs = (
     suppressInTheWorkspace(ERASURE, tx, { ...input, workspaceId: scenario.workspaceId }),
   );
 
-const aMemberAskingUnder = async (asked: (signsInWith: string) => string) => {
+const memberWithRequestFor = async (asked: (signsInWith: string) => string) => {
   const scenario = await arrange();
   const signsInWith = addressOf("priya");
   const person = await memberOf(db().pool, scenario.workspaceId, signsInWith);
@@ -1993,7 +1993,7 @@ const aMemberAskingUnder = async (asked: (signsInWith: string) => string) => {
 
 const aHomeAddress = (): string => addressOf("priya-home");
 
-const theRowHoldingTheAddressAlone = (done: ErasureRun, email: string) => [
+const suppressionOfOnly = (done: ErasureRun, email: string) => [
   {
     workspace_id: done.workspaceId,
     erasure_request_id: done.erasureRequestId,
@@ -2001,14 +2001,14 @@ const theRowHoldingTheAddressAlone = (done: ErasureRun, email: string) => [
   },
 ];
 
-describe("the suppression the workspace keeps for the request", () => {
-  it("writes a row adding the sign-in address, even without documents", async () => {
+describe("the suppression row written for an erasure request", () => {
+  it("adds the sign-in address even when no document matched", async () => {
     const {
       scenario,
       signsInWith,
       email: atHome,
       subjectRequestId,
-    } = await aMemberAskingUnder(aHomeAddress);
+    } = await memberWithRequestFor(aHomeAddress);
 
     const done = await completing(scenario, subjectRequestId);
 
@@ -2022,16 +2022,14 @@ describe("the suppression the workspace keeps for the request", () => {
     ]);
   });
 
-  it("holds the sign-in address for a request by id alone", async () => {
+  it("holds the sign-in address for a request without identifiers", async () => {
     const { scenario, email, subjectRequestId } = await workspaceWithAnErasureRequest({
       byIdAlone: true,
     });
 
     const done = await completing(scenario, subjectRequestId);
 
-    expect(await suppressionsIn(scenario.workspaceId)).toEqual(
-      theRowHoldingTheAddressAlone(done, email),
-    );
+    expect(await suppressionsIn(scenario.workspaceId)).toEqual(suppressionOfOnly(done, email));
   });
 
   it("keeps the sign-in address when the first run's write failed", async () => {
@@ -2045,17 +2043,15 @@ describe("the suppression the workspace keeps for the request", () => {
     const done = await completing(scenario, subjectRequestId, RAN_AGAIN_AT);
 
     expect(died.ok).toBe(false);
-    expect(await suppressionsIn(scenario.workspaceId)).toEqual(
-      theRowHoldingTheAddressAlone(done, email),
-    );
+    expect(await suppressionsIn(scenario.workspaceId)).toEqual(suppressionOfOnly(done, email));
   });
 
-  it("skips a sign-in address the request names in other capitals", async () => {
+  it("adds no duplicate sign-in address that differs only in case", async () => {
     const {
       scenario,
       email: asGiven,
       subjectRequestId,
-    } = await aMemberAskingUnder((signsInWith) => signsInWith.toUpperCase());
+    } = await memberWithRequestFor((signsInWith) => signsInWith.toUpperCase());
 
     await completing(scenario, subjectRequestId);
 
@@ -2064,7 +2060,7 @@ describe("the suppression the workspace keeps for the request", () => {
     ]);
   });
 
-  it("writes a row the boundary admits from fifty-two emails", async () => {
+  it("writes a 52-email row that the boundary schema accepts", async () => {
     const scenario = await arrange();
     const erasure = await anOpenErasure(scenario.workspaceId);
     const fifty = Array.from({ length: 50 }, (_, at) => `person-${at}@example.invalid`);
@@ -2086,7 +2082,7 @@ describe("the suppression the workspace keeps for the request", () => {
     ).toBe(true);
   });
 
-  it("writes nothing for an empty set and no sign-in address", async () => {
+  it("writes nothing for empty identifiers and no sign-in address", async () => {
     const scenario = await arrange();
     const erasure = await anOpenErasure(scenario.workspaceId);
 
@@ -2125,13 +2121,13 @@ describe("the suppression the workspace keeps for the request", () => {
     expect(await suppressionsIn(scenario.workspaceId)).toEqual(before);
   });
 
-  it("counts documents, sources and identifiers on the report, naming none", async () => {
+  it("reports document and identifier counts without naming any identifier", async () => {
     const {
       scenario,
       signsInWith,
       email: atHome,
       subjectRequestId,
-    } = await aMemberAskingUnder(aHomeAddress);
+    } = await memberWithRequestFor(aHomeAddress);
     const connectedSource = await connectedSourceIn(scenario.workspaceId);
     await documentIn(scenario.workspaceId, connectedSource.id);
 
@@ -2146,7 +2142,7 @@ describe("the suppression the workspace keeps for the request", () => {
   });
 });
 
-describe("the full-rebuild the erasure asks for", () => {
+describe("the full-rebuild job an erasure queues", () => {
   it("queues one job with reason erasure", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
@@ -2157,7 +2153,7 @@ describe("the full-rebuild the erasure asks for", () => {
     ]);
   });
 
-  it("queues no second one when the request runs again", async () => {
+  it("queues no second job when the request runs again", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     await completing(scenario, subjectRequestId);
@@ -2168,7 +2164,7 @@ describe("the full-rebuild the erasure asks for", () => {
     ]);
   });
 
-  it("names each connected source holding a found document once", async () => {
+  it("lists each connected source with a found document once", async () => {
     const { scenario, shared, apart, found } = await aMapOverTwoOfThreeConnectedSources();
 
     const rederived = await rederivingOver(scenario, found, LOCKED_AT);
@@ -2186,7 +2182,7 @@ const wipesOf = (connectedSources: readonly { readonly id: string }[]) =>
     .sort()
     .map((subject_id) => ({ kind: "index", subject_id, reason: "wiped", status: "queued" }));
 
-const whatTheWipeLeft = async (workspaceId: string) => ({
+const passagesAndQueuedJobs = async (workspaceId: string) => ({
   passages: await passagesIn(workspaceId),
   queued: await queuedIn(workspaceId),
 });
@@ -2198,14 +2194,14 @@ const everyConnectedSourceWiped = (
   queued: [THE_REBUILD, ...wipesOf([arranged.shared, arranged.apart])],
 });
 
-describe("the wipe of every connected source the map found", () => {
-  it("deletes each source's passages, queueing its sync as wiped", async () => {
+describe("wiping the connected sources the erasure map found", () => {
+  it("deletes each source's passages and queues a wiped sync", async () => {
     const arranged = await aMapOverTwoOfThreeConnectedSources();
 
     const rederived = await rederivingOver(arranged.scenario, arranged.found, null);
 
     expect(rederived.rebuildJobId).not.toBeNull();
-    expect(await whatTheWipeLeft(arranged.scenario.workspaceId)).toEqual(
+    expect(await passagesAndQueuedJobs(arranged.scenario.workspaceId)).toEqual(
       everyConnectedSourceWiped(arranged),
     );
   });
@@ -2225,7 +2221,7 @@ describe("the wipe of every connected source the map found", () => {
     expect(done.map.find((entry) => entry.family === "source-document")?.locations).toEqual([
       named.id,
     ]);
-    expect(await whatTheWipeLeft(workspaceId)).toEqual({
+    expect(await passagesAndQueuedJobs(workspaceId)).toEqual({
       passages: [{ connected_source_id: elsewhere.id, passages: 1 }],
       queued: [THE_REBUILD, ...wipesOf([naming])],
     });
@@ -2234,7 +2230,7 @@ describe("the wipe of every connected source the map found", () => {
     );
   });
 
-  it("wipes restored rows on a replay, queueing no second sync", async () => {
+  it("wipes restored passages on replay, queueing no second sync", async () => {
     const arranged = await aMapOverTwoOfThreeConnectedSources();
 
     await rederivingOver(arranged.scenario, arranged.found, null);
@@ -2242,7 +2238,7 @@ describe("the wipe of every connected source the map found", () => {
     const replayed = await rederivingOver(arranged.scenario, arranged.found, LOCKED_AT);
 
     expect(replayed.rebuildJobId).toBeNull();
-    expect(await whatTheWipeLeft(arranged.scenario.workspaceId)).toEqual(
+    expect(await passagesAndQueuedJobs(arranged.scenario.workspaceId)).toEqual(
       everyConnectedSourceWiped(arranged),
     );
   });
@@ -2250,7 +2246,7 @@ describe("the wipe of every connected source the map found", () => {
   it.each([
     ["restored", "wiped"],
     ["rule-change", "rule-change"],
-  ] as const)("queues nothing behind one queued as %s, leaving it %s", async (queuedAs, left) => {
+  ] as const)("leaves a queued %s sync as %s, adding no job", async (queuedAs, left) => {
     const { scenario, shared, apart, found } = await aMapOverTwoOfThreeConnectedSources();
     await seedingWith(db().pool, (seed) =>
       seed.job({
@@ -2270,7 +2266,7 @@ describe("the wipe of every connected source the map found", () => {
   });
 });
 
-const settledOrWaitingTwo = (settled: readonly unknown[]) => async () =>
+const settledOrTwoWaitingOnLocks = (settled: readonly unknown[]) => async () =>
   settled.length > 0 || (await countWaitingOnLocks(db().pool)) === 2;
 
 const completedForASubjectWithNoUserRow = async () => {
@@ -2300,7 +2296,7 @@ const aMemberHere = async () => {
   };
 };
 
-const heldAheadOfTheMembersEnd = async <T>(
+const pausedBeforeMembershipEnds = async <T>(
   scenario: Scenario,
   subjectRequestId: string,
   member: Member,
@@ -2337,7 +2333,7 @@ describe("the questions a person asked", () => {
     expect(await rowsOf(theirs.recordId)).toEqual(asErased(pseudonym));
   });
 
-  it("removes a question asked at a microsecond's precision", async () => {
+  it("removes a question whose asked_at has microsecond precision", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const theirs = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
     await askedAMicrosecondFiner(db().pool, theirs.recordId);
@@ -2347,7 +2343,7 @@ describe("the questions a person asked", () => {
     expect((await rowsOf(theirs.recordId)).content).toEqual([]);
   });
 
-  it("leaves another member's question and note as they were", async () => {
+  it("leaves another member's question and note unchanged", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     await recordAskedBy(db().pool, scenario.workspaceId, person.id);
     const anothers = await recordAskedBy(db().pool, scenario.workspaceId, scenario.viewer.userId);
@@ -2357,7 +2353,7 @@ describe("the questions a person asked", () => {
     expect(await rowsOf(anothers.recordId)).toEqual(asAsked(anothers.asker));
   });
 
-  it("reaches this workspace's records alone, whichever arm runs", async () => {
+  it("erases this workspace's questions only, when another membership remains", async () => {
     const { scenario, elsewhere, email, person } = await memberHereAndElsewhere();
     const here = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
     const there = await recordAskedBy(db().pool, elsewhere.workspaceId, person.id);
@@ -2369,7 +2365,7 @@ describe("the questions a person asked", () => {
     expect(await rowsOf(there.recordId)).toEqual(asAsked(there.asker));
   });
 
-  it("reaches a former member's questions by their person id", async () => {
+  it("erases a former member's questions found by person id", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest({
       byIdAlone: true,
     });
@@ -2386,7 +2382,7 @@ describe("the questions a person asked", () => {
     );
   });
 
-  it("renames the person's flags alone, on anyone's record", async () => {
+  it("rewrites only the person's flags, on any member's question record", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const { workspaceId, viewer } = scenario;
     const theirs = await recordAskedBy(db().pool, workspaceId, person.id);
@@ -2407,7 +2403,7 @@ describe("the questions a person asked", () => {
     ]);
   });
 
-  it("renames a flag its giver stored while erasure ran", async () => {
+  it("rewrites a flag the person saved while the erasure ran", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const { workspaceId } = scenario;
     const theirs = await recordAskedBy(db().pool, workspaceId, person.id);
@@ -2422,7 +2418,7 @@ describe("the questions a person asked", () => {
       );
       await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
       const erasing = completing(scenario, subjectRequestId).then(() => ended.push("erasure"));
-      await until(settledOrWaitingTwo(ended));
+      await until(settledOrTwoWaitingOnLocks(ended));
       await release();
       await giving;
       await erasing;
@@ -2521,12 +2517,12 @@ describe("the questions a person asked", () => {
     ],
   });
 
-  it("erases a question asked and flagged after its questions step", async () => {
+  it("erases a question asked and flagged after the questions step", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
     const before = await recordAskedBy(db().pool, member.workspaceId, member.userId);
 
-    const { done, met } = await heldAheadOfTheMembersEnd(
+    const { done, met } = await pausedBeforeMembershipEnds(
       scenario,
       subjectRequestId,
       member,
@@ -2542,11 +2538,11 @@ describe("the questions a person asked", () => {
     expect(await rowsOf(met.recordId)).toEqual(asErasedMidRun(pseudonym));
   });
 
-  it("erases by address after a run died ending the member", async () => {
+  it("erases by address after a run fails ending the membership", async () => {
     const { scenario, email, member } = await aMemberHere();
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, null, email);
 
-    const { done: died, met: recordId } = await heldAheadOfTheMembersEnd(
+    const { done: died, met: recordId } = await pausedBeforeMembershipEnds(
       scenario,
       subjectRequestId,
       member,
@@ -2562,12 +2558,12 @@ describe("the questions a person asked", () => {
     expect(await rowsOf(recordId)).toEqual(asErasedMidRun(await pseudonymIn(member.workspaceId)));
   });
 
-  it("counts and logs what it erased as the member ended", async () => {
+  it("counts and logs the questions erased as the membership ended", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
     await recordAskedBy(db().pool, member.workspaceId, member.userId);
 
-    await heldAheadOfTheMembersEnd(scenario, subjectRequestId, member, () =>
+    await pausedBeforeMembershipEnds(scenario, subjectRequestId, member, () =>
       askingThenFlagging(member),
     );
 
@@ -2593,13 +2589,13 @@ describe("the questions a person asked", () => {
     ]);
   });
 
-  it("erases late questions here alone for a member held elsewhere", async () => {
+  it("erases late questions only here when another membership remains", async () => {
     const { scenario, elsewhere, email, person } = await memberHereAndElsewhere();
     const here = { workspaceId: scenario.workspaceId, userId: person.id };
     const there = { workspaceId: elsewhere.workspaceId, userId: person.id };
     const subjectRequestId = await erasureRequestAbout(here.workspaceId, person.id, email);
 
-    const { done, met } = await heldAheadOfTheMembersEnd(
+    const { done, met } = await pausedBeforeMembershipEnds(
       scenario,
       subjectRequestId,
       here,
@@ -2614,12 +2610,12 @@ describe("the questions a person asked", () => {
     expect(await rowsOf(met.there)).toEqual(asAskedMidRun(`human:${person.id}`));
   });
 
-  const stillOpenAtTheMembersEnd = async (
+  const writeOpenAsMembershipEnds = async (
     table: string,
     resume: () => Promise<unknown>,
     write: () => Promise<unknown>,
   ): Promise<void> => {
-    // Wrapped, or the lock would be held until the write it blocks had ended.
+    // Return the promises in an object: awaiting the blocked write here would hold the table lock forever.
     const parked = await holdingTable(db().pool, table, async () => {
       const writing = write();
       await until(() => isBlockedOnTable(db().pool, table));
@@ -2647,19 +2643,19 @@ describe("the questions a person asked", () => {
       flags: 1,
     },
   ])(
-    "erases a late question whose $late was still to commit",
+    "erases a question whose $late was uncommitted when membership ended",
     async ({ table, first, write, flags }) => {
       const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
       const member = { workspaceId: scenario.workspaceId, userId: person.id };
 
-      const { done, met: recordId } = await heldAheadOfTheMembersEnd(
+      const { done, met: recordId } = await pausedBeforeMembershipEnds(
         scenario,
         subjectRequestId,
         member,
         async (resume) => {
           const opened = await openingARecord(member);
           for (const step of first) await step(member, opened.recordId);
-          await stillOpenAtTheMembersEnd(table, resume, () => write(member, opened.recordId));
+          await writeOpenAsMembershipEnds(table, resume, () => write(member, opened.recordId));
           return opened.recordId;
         },
       );
@@ -2673,7 +2669,7 @@ describe("the questions a person asked", () => {
     },
   );
 
-  it("refuses a question that starts once the member is ended", async () => {
+  it("refuses a question started after the membership ended", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
 
@@ -2694,7 +2690,7 @@ describe("the questions a person asked", () => {
           answers.push(answer);
           return answer;
         });
-        await until(settledOrWaitingTwo(answers));
+        await until(settledOrTwoWaitingOnLocks(answers));
         await release();
         return { done: await erasing, asked: await asking };
       },
@@ -2709,7 +2705,7 @@ describe("the questions a person asked", () => {
     expect(theirs.rows).toEqual([]);
   });
 
-  it("erases a question whose opening commits after its questions step", async () => {
+  it("erases a question whose opening commits after the questions step", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
 
@@ -2735,7 +2731,7 @@ describe("the questions a person asked", () => {
     });
   });
 
-  it("erases a member named by address after a failed run", async () => {
+  it("erases a member's questions by address after a failed run", async () => {
     const scenario = await arrange();
     const email = addressOf("priya");
     const person = await memberOf(db().pool, scenario.workspaceId, email);
@@ -2753,7 +2749,7 @@ describe("the questions a person asked", () => {
     );
   });
 
-  it("logs its counts as it commits, kept past a rerun", async () => {
+  it("logs the questions step's counts once across a failed run", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     await recordAskedBy(db().pool, scenario.workspaceId, person.id);
 
@@ -2769,7 +2765,7 @@ describe("the questions a person asked", () => {
     ).toEqual([{ ...line, records_rewritten: 1, questions_removed: 1, feedback_rewritten: 1 }]);
   });
 
-  it("counts what it did on the request's row and report", async () => {
+  it("records the question counts in the erasure row and report", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     await recordAskedBy(db().pool, scenario.workspaceId, person.id);
     await recordAskedBy(db().pool, scenario.workspaceId, person.id);
@@ -2788,7 +2784,7 @@ describe("the questions a person asked", () => {
     );
   });
 
-  it("rewrites again when run over rows a restore brought back", async () => {
+  it("rewrites restored question rows when the routine runs again", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const theirs = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
     await completing(scenario, subjectRequestId);
@@ -2803,7 +2799,7 @@ describe("the questions a person asked", () => {
 });
 
 describe("a subject with no user row", () => {
-  it("erases by suppression alone and reports what each arm did", async () => {
+  it("withholds the identifiers and reports zero for the other families", async () => {
     const { scenario, done } = await completedForASubjectWithNoUserRow();
 
     expect(done.report).toContain("concept-file: found 0, reindexed 0, rewritten 0");
@@ -2856,7 +2852,7 @@ const replayCopiesIn = async (workspaceId: string): Promise<readonly string[]> =
 };
 
 describe("the replay copy the restore reads", () => {
-  it("lands under the platform's prefix, beyond any workspace's principal", async () => {
+  it("is stored under the platform prefix, hidden from workspace principals", async () => {
     const { scenario, subjectRequestId } = await bundleNamingThePerson();
 
     const done = await completing(scenario, subjectRequestId);
@@ -2869,7 +2865,7 @@ describe("the replay copy the restore reads", () => {
     expect(theirs).toEqual({ ok: true, value: [] });
   });
 
-  it("carries the pseudonym, the identifier set and the map", async () => {
+  it("holds the pseudonym, the identifiers and the erasure map", async () => {
     const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
 
     const done = await completing(scenario, subjectRequestId);
@@ -2889,14 +2885,14 @@ describe("the replay copy the restore reads", () => {
     expect(copy.map.map((entry) => entry.family)).toEqual([...ERASURE_FAMILIES]);
 
     const conceptFiles = copy.map.find((entry) => entry.family === "concept-file");
-    assert(conceptFiles !== undefined, "the copy maps the concept files");
+    assert(conceptFiles !== undefined, "the copy has no concept-file entry");
     const found = conceptFiles.locations;
     const paths = found.filter((at) => at.includes(":")).map((at) => at.slice(at.indexOf(":") + 1));
     expect([...new Set(paths)].sort()).toEqual(["knowledge/expenses.md", "knowledge/travel.md"]);
     expect(found.filter((at) => at.endsWith("(author line)"))).toHaveLength(2);
   });
 
-  it("carries nothing a finder does not need", async () => {
+  it("holds only what the family finders need", async () => {
     const { scenario, email, subjectRequestId } = await bundleNamingThePerson();
 
     const done = await completing(scenario, subjectRequestId);
@@ -2926,7 +2922,7 @@ describe("the replay copy the restore reads", () => {
     expect(text).not.toContain("Expenses are claimed within thirty days");
   });
 
-  it("names no person for a subject with no user row", async () => {
+  it("omits personId for a subject with no user row", async () => {
     const { scenario, done } = await completedForASubjectWithNoUserRow();
 
     const copy = await readCopy(scenario.workspaceId, done.erasureRequestId);
@@ -2939,7 +2935,7 @@ describe("the replay copy the restore reads", () => {
     });
   });
 
-  it("refuses to complete when the store refuses the copy", async () => {
+  it("leaves the erasure incomplete when the copy cannot be stored", async () => {
     const { scenario, subjectRequestId } = await bundleNamingThePerson();
 
     const shut = openObjects({
@@ -2949,7 +2945,7 @@ describe("the replay copy the restore reads", () => {
       accessKeyId: "unreachable",
       secretAccessKey: "unreachable",
     });
-    assert(shut.ok, "the door refused its settings");
+    assert(shut.ok, "openObjects refused the test settings");
 
     const run = await runErasure(
       ERASURE,
@@ -2964,7 +2960,7 @@ describe("the replay copy the restore reads", () => {
     expect(await replayCopiesIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("leaves one copy dated the first completion on a rerun", async () => {
+  it("keeps one copy dated at the first completion on rerun", async () => {
     const { scenario, subjectRequestId } = await bundleNamingThePerson();
 
     const first = await completing(scenario, subjectRequestId);
@@ -2980,8 +2976,8 @@ describe("the replay copy the restore reads", () => {
   });
 });
 
-describe("a request the routine will not run", () => {
-  it("refuses an access request, which is answered and never erased", async () => {
+describe("a request the erasure routine refuses", () => {
+  it("refuses an access request, since access requests are never erased", async () => {
     const scenario = await arrange();
     const seeded = await seedingWith(db().pool, (seed) =>
       seed.subjectRequest({ workspaceId: scenario.workspaceId, kind: "access" }),
@@ -2993,7 +2989,7 @@ describe("a request the routine will not run", () => {
     expect(await erasureRowsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses a request this workspace does not hold", async () => {
+  it("refuses a request from another workspace", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const theirs = await seedingWith(db().pool, (seed) =>
@@ -3032,13 +3028,13 @@ const conceptVerifiedBy = async (workspaceId: string, verifier: string): Promise
     return indexed.iri;
   });
 
-describe("the arm the identity step takes", () => {
-  it("takes the last workspace for a person removed elsewhere meanwhile", async () => {
+describe("the identity arm the routine chooses", () => {
+  it("chooses last-workspace when the other membership ends mid-run", async () => {
     const { scenario, elsewhere, email, person } = await memberHereAndElsewhere();
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
 
-    const { done } = await heldAheadOfTheMembersEnd(scenario, subjectRequestId, member, () =>
+    const { done } = await pausedBeforeMembershipEnds(scenario, subjectRequestId, member, () =>
       db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
         elsewhere.workspaceId,
         person.id,
@@ -3053,8 +3049,8 @@ describe("the arm the identity step takes", () => {
   });
 });
 
-describe("the person's actor id on the platform's records", () => {
-  it("rewrites both families for a request by address alone", async () => {
+describe("rows that record the person's actor id", () => {
+  it("rewrites commit and verification actors for an address-only request", async () => {
     const { scenario, email } = await bundleNamingThePerson();
     const byAddress = await erasureRequestAbout(scenario.workspaceId, null, email);
 
@@ -3070,7 +3066,7 @@ describe("the person's actor id on the platform's records", () => {
     expect(done.report).toContain("concept-verification: actorsRewritten 2, found 2, rehashed 1");
   });
 
-  it("leaves another member's commit and verification as they were", async () => {
+  it("leaves another member's commit and verification unchanged", async () => {
     const { scenario, subjectRequestId } = await bundleNamingThePerson();
     await conceptVerifiedBy(scenario.workspaceId, scenario.editor.userId);
 
@@ -3081,7 +3077,7 @@ describe("the person's actor id on the platform's records", () => {
     expect(await actorsIn("concept_verification", scenario.workspaceId)).toContain(theirs);
   });
 
-  it("names no verifier held elsewhere, saying a former member verified", async () => {
+  it("shows a former member as verifier when another membership remains", async () => {
     const { scenario, email, person } = await memberHereAndElsewhere();
     const iri = await conceptVerifiedBy(scenario.workspaceId, person.id);
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
@@ -3095,11 +3091,11 @@ describe("the person's actor id on the platform's records", () => {
     expect(trustWords(trust)).toBe("Verified by a former member · 5 April 2026");
   });
 
-  it("rewrites rows the person lands before the member ends", async () => {
+  it("rewrites rows the person writes before the membership ends", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
 
-    const { done } = await heldAheadOfTheMembersEnd(scenario, subjectRequestId, member, () =>
+    const { done } = await pausedBeforeMembershipEnds(scenario, subjectRequestId, member, () =>
       conceptVerifiedBy(scenario.workspaceId, person.id),
     );
 
@@ -3109,7 +3105,7 @@ describe("the person's actor id on the platform's records", () => {
     expect(await actorsIn("concept_verification", scenario.workspaceId)).toEqual([erased]);
   });
 
-  it("rewrites a version's actor and keeps its prose", async () => {
+  it("rewrites a write-up version's actor and keeps its markdown", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const { workspaceId } = scenario;
     const actor = actorIdOfPerson(person.id);
@@ -3167,7 +3163,7 @@ const A_LATE_CONCEPT = {
   sensitivity: "Internal",
 } as const;
 
-const owningTheLateClaims = async (scenario: Scenario, personId: string): Promise<void> => {
+const ownLateClaimsCollection = async (scenario: Scenario, personId: string): Promise<void> => {
   const { workspaceId } = scenario;
   const held = await db().pool.query(
     "SELECT 1 FROM concept_owner WHERE workspace_id = $1 AND collection = 'late-claims'",
@@ -3185,7 +3181,7 @@ const writingAsThePerson = async (
   email: string,
 ) => {
   const writer = await principalFor(db(), scenario.workspaceId, person.id);
-  await owningTheLateClaims(scenario, person.id);
+  await ownLateClaimsCollection(scenario, person.id);
   const history = await bundleHistory(scenario.git, scenario.workspaceId);
   return writeConcept(writer, doorsOf(scenario), {
     ...A_LATE_CONCEPT,
@@ -3195,7 +3191,11 @@ const writingAsThePerson = async (
   });
 };
 
-const thePersonIn = async (scenario: Scenario, person: { readonly id: string }, email: string) => {
+const personTracesIn = async (
+  scenario: Scenario,
+  person: { readonly id: string },
+  email: string,
+) => {
   const stored = await everyObjectOf(scenario.git, scenario.workspaceId);
   return {
     address: stored.includes(email),
@@ -3206,9 +3206,9 @@ const thePersonIn = async (scenario: Scenario, person: { readonly id: string }, 
   };
 };
 
-const NOWHERE = { address: false, personId: false, authors: [] };
+const NO_TRACE = { address: false, personId: false, authors: [] };
 
-const theMemberRowIsFree = async (scenario: Scenario, person: { readonly id: string }) => {
+const memberRowIsUnlocked = async (scenario: Scenario, person: { readonly id: string }) => {
   const probe = await db().pool.connect();
   try {
     await probe.query("BEGIN");
@@ -3230,22 +3230,22 @@ describe("a commit made as the person while the routine runs", () => {
     const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
 
-    const { done, met } = await heldAheadOfTheMembersEnd(scenario, subjectRequestId, member, () =>
+    const { done, met } = await pausedBeforeMembershipEnds(scenario, subjectRequestId, member, () =>
       writingAsThePerson(scenario, person, email),
     );
 
     expect(met.ok).toBe(true);
     expect(done.ok).toBe(true);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(3);
-    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+    expect(await personTracesIn(scenario, person, email)).toEqual(NO_TRACE);
   });
 
-  it("ends the member once a commit underway lands, then rewrites", async () => {
+  it("ends the membership once an in-flight commit lands, then rewrites", async () => {
     const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
     const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
 
-    const { done, met } = await heldAheadOfTheMembersEnd(
+    const { done, met } = await pausedBeforeMembershipEnds(
       scenario,
       subjectRequestId,
       member,
@@ -3264,7 +3264,7 @@ describe("a commit made as the person while the routine runs", () => {
     expect(done.ok).toBe(true);
     expect(met).toMatchObject({ ok: true });
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(3);
-    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+    expect(await personTracesIn(scenario, person, email)).toEqual(NO_TRACE);
 
     const swept = await reconcile(RECONCILER, doorsOf(scenario), {
       workspaceId: scenario.workspaceId,
@@ -3275,15 +3275,15 @@ describe("a commit made as the person while the routine runs", () => {
     expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([erased, erased, erased]);
   });
 
-  it("stops a hung commit and frees the member row", async () => {
+  it("stops an overdue commit and frees the member row", async () => {
     const { scenario, email, person } = await bundleNamingThePerson();
     const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
     const writer = await principalFor(db(), scenario.workspaceId, person.id);
-    await owningTheLateClaims(scenario, person.id);
+    await ownLateClaimsCollection(scenario, person.id);
     const impatient = { ...doorsOf(scenario), git: { ...scenario.git, commitBudgetMs: 500 } };
     const tip = before.at(-1);
-    assert(tip !== undefined, "the bundle has a head");
+    assert(tip !== undefined, "the bundle has no head commit");
 
     await gate.park();
     const written = await writeConcept(writer, impatient, {
@@ -3292,7 +3292,7 @@ describe("a commit made as the person while the routine runs", () => {
       author: { name: "Priya Anand", email },
       expects: { head: tip },
     });
-    const freeWhileGitHangs = await theMemberRowIsFree(scenario, person);
+    const freeWhileGitHangs = await memberRowIsUnlocked(scenario, person);
     await gate.unpark();
 
     expect(written).toMatchObject({
@@ -3304,14 +3304,14 @@ describe("a commit made as the person while the routine runs", () => {
     expect(await writingAsThePerson(scenario, person, email)).toMatchObject({ ok: true });
   });
 
-  it("holds the rewrite until another process's write lands", async () => {
+  it("waits to rewrite until another process's commit lands", async () => {
     const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
     const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
     const elsewhere = await asAnotherProcess(scenario.git);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
-    await owningTheLateClaims(scenario, scenario.editor.userId);
+    await ownLateClaimsCollection(scenario, scenario.editor.userId);
     const tip = before.at(-1);
-    assert(tip !== undefined, "the bundle has a head");
+    assert(tip !== undefined, "the bundle has no head commit");
 
     await gate.park();
     const writing = writeConcept(
@@ -3336,7 +3336,7 @@ describe("a commit made as the person while the routine runs", () => {
     expect(await writing).toMatchObject({ ok: true });
     expect((await erasing).completedAt).toEqual(LOCKED_AT);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(3);
-    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+    expect(await personTracesIn(scenario, person, email)).toEqual(NO_TRACE);
     const caughtUp = await reconcile(RECONCILER, doorsOf(scenario), {
       workspaceId: scenario.workspaceId,
     });
@@ -3346,13 +3346,13 @@ describe("a commit made as the person while the routine runs", () => {
   it.each([
     { named: "address", naming: (_id: string, email: string) => ({ id: null, email }) },
     { named: "id", naming: (id: string) => ({ id, email: null }) },
-  ])("reaches a late commit by $named after a failed run", async ({ naming }) => {
+  ])("rewrites a late commit after a failed run, by $named", async ({ naming }) => {
     const { scenario, email, person, member } = await aMemberHere();
     const named = naming(person.id, email);
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, named.id, named.email);
     const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
 
-    const { done: died } = await heldAheadOfTheMembersEnd(
+    const { done: died } = await pausedBeforeMembershipEnds(
       scenario,
       subjectRequestId,
       member,
@@ -3367,7 +3367,7 @@ describe("a commit made as the person while the routine runs", () => {
 
     expect(died.ok).toBe(false);
     expect(done.completedAt).toEqual(RAN_AGAIN_AT);
-    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+    expect(await personTracesIn(scenario, person, email)).toEqual(NO_TRACE);
   });
 
   const heldElsewhereNamedByAddress = async () => {
@@ -3386,15 +3386,20 @@ describe("a commit made as the person while the routine runs", () => {
     };
   };
 
-  it("rewrites rows landed before a failed run, held elsewhere", async () => {
+  it("rewrites rows from before a failed run, with another membership", async () => {
     const { scenario, email, person, member, byAddress, gate } =
       await heldElsewhereNamedByAddress();
 
-    const { done: died } = await heldAheadOfTheMembersEnd(scenario, byAddress, member, async () => {
-      await conceptVerifiedBy(scenario.workspaceId, person.id);
-      await writingAsThePerson(scenario, person, email);
-      await gate.refuse();
-    });
+    const { done: died } = await pausedBeforeMembershipEnds(
+      scenario,
+      byAddress,
+      member,
+      async () => {
+        await conceptVerifiedBy(scenario.workspaceId, person.id);
+        await writingAsThePerson(scenario, person, email);
+        await gate.refuse();
+      },
+    );
     await gate.allow();
     await completing(scenario, byAddress, RAN_AGAIN_AT);
 
@@ -3408,11 +3413,11 @@ describe("a commit made as the person while the routine runs", () => {
     );
   });
 
-  it("rewrites a replayed trailer held elsewhere after a failed run", async () => {
+  it("rewrites a commit the reconciler replays when another membership remains", async () => {
     const { scenario, email, person, member, byAddress, gate } =
       await heldElsewhereNamedByAddress();
 
-    const { done: died, met: lost } = await heldAheadOfTheMembersEnd(
+    const { done: died, met: lost } = await pausedBeforeMembershipEnds(
       scenario,
       byAddress,
       member,
@@ -3432,7 +3437,7 @@ describe("a commit made as the person while the routine runs", () => {
 
     expect(died.ok).toBe(false);
     expect(lost.ok).toBe(false);
-    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+    expect(await personTracesIn(scenario, person, email)).toEqual(NO_TRACE);
     assert(swept.ok);
     expect(swept.value.replayed).toHaveLength(1);
     const erased = `human:${await pseudonymIn(scenario.workspaceId)}`;
@@ -3452,11 +3457,11 @@ describe("a commit made as the person while the routine runs", () => {
     await completing(scenario, byAddress);
 
     const erased = `human:${await pseudonymIn(scenario.workspaceId)}`;
-    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+    expect(await personTracesIn(scenario, person, email)).toEqual(NO_TRACE);
     expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([erased, erased]);
   });
 
-  it("rewrites a history naming the person in a trailer alone", async () => {
+  it("rewrites a history naming the person only in a trailer", async () => {
     const { scenario, email, person, subjectRequestId } = await workspaceWithAnErasureRequest({
       byIdAlone: true,
     });
@@ -3472,11 +3477,11 @@ describe("a commit made as the person while the routine runs", () => {
       at: new Date("2026-04-02T11:00:00.000Z"),
     });
     expect(made.ok).toBe(true);
-    expect((await thePersonIn(scenario, person, email)).personId).toBe(true);
+    expect((await personTracesIn(scenario, person, email)).personId).toBe(true);
 
     await completing(scenario, subjectRequestId);
 
-    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+    expect(await personTracesIn(scenario, person, email)).toEqual(NO_TRACE);
   });
 
   it("refuses a write the person starts after the erasure", async () => {
@@ -3485,7 +3490,7 @@ describe("a commit made as the person while the routine runs", () => {
     await completing(scenario, subjectRequestId);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
     const tip = before.at(-1);
-    assert(tip !== undefined, "the bundle has a head");
+    assert(tip !== undefined, "the bundle has no head commit");
 
     const refused = await writeConcept(writer, doorsOf(scenario), {
       ...A_LATE_CONCEPT,

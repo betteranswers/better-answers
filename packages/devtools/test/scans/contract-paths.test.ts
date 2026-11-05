@@ -22,7 +22,7 @@ const withOnePathMoved = (
   const found = mentionsIn(files, roots).find(
     ({ file, path: named }) => file.endsWith(".json") && named.endsWith(".ts"),
   );
-  assert(found !== undefined, "a JSON fixture names a TypeScript file");
+  assert(found !== undefined, "no JSON fixture names a TypeScript file");
   const moved = found.path.replace("/", "/moved-away/");
   const seeded = Object.fromEntries(
     Object.entries(files).map(([file, text]) => [
@@ -61,7 +61,7 @@ describe("the paths a string names", () => {
     "01M2Q3R4S5T6V7W8X9YZAB0001/chars",
     "the docs say so",
     "xapps/api",
-  ])("leaves %s alone", (text) => {
+  ])("finds no path in %s", (text) => {
     expect(pathsNamedIn(text, ROOTS)).toEqual([]);
   });
 });
@@ -140,7 +140,7 @@ describe("this repository's tier contract", () => {
   const existsHere = (repositoryPath: string): boolean =>
     existsSync(path.join(repositoryRoot, repositoryPath));
 
-  it("is read in full, README and fixtures", () => {
+  it("is read in full, with its README and fixtures", () => {
     expect(Object.keys(files)).toContain("contracts/README.md");
     expect(Object.keys(files)).toContain("contracts/manifest.json");
     expect(mentions.length).toBeGreaterThan(20);
@@ -149,7 +149,7 @@ describe("this repository's tier contract", () => {
   it("names only paths the repository holds", () => {
     expect(
       findingsFor(mentions, existsHere),
-      "each line names a path in contracts/ that no longer exists. Point the mention at the file's new path, then regenerate both contract stamps (`pnpm --filter @better-answers/schema run generate:contract-stamp` and, in apps/worker, `uv run --frozen generate-contract-stamp`), because a fixture edit moves the digest.",
+      "each line names a path that a file in contracts/ mentions and the repository no longer has. Point the mention at the file's new path, then regenerate both contract stamps (`pnpm --filter @better-answers/schema run generate:contract-stamp` and, in apps/worker, `uv run --frozen generate-contract-stamp`), because a fixture edit moves the digest.",
     ).toEqual([]);
   });
 

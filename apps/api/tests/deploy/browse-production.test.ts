@@ -76,7 +76,7 @@ const browse = (env: Readonly<Record<string, string>>, script: string = helper):
   };
 };
 
-describe("the production browsing helper", () => {
+describe("deploy/browse-production.sh", () => {
   let port: number;
   let opened: Run;
 
@@ -88,7 +88,7 @@ describe("the production browsing helper", () => {
   it("opens a loopback SSH forward to the database, with keepalives", () => {
     expect({ status: opened.status, stderr: opened.stderr }).toEqual({ status: 0, stderr: "" });
     const argv = opened.sshArgv;
-    assert(argv !== undefined, "the script ran ssh");
+    assert(argv !== undefined, "the script did not run ssh");
     expect(argv).toContain(`-L 127.0.0.1:${String(port)}:127.0.0.1:5999`);
     expect(argv).toContain("-N");
     expect(argv).toContain("-o ServerAliveInterval=15 -o ServerAliveCountMax=4");
@@ -97,14 +97,14 @@ describe("the production browsing helper", () => {
     expect(argv.endsWith(" operator@vpc1.example.invalid")).toBe(true);
   });
 
-  it("says where a GUI points and that Ctrl-C closes it", () => {
+  it("prints the connection details and that Ctrl-C closes the tunnel", () => {
     expect(opened.stdout).toContain(`127.0.0.1:${String(port)}`);
     expect(opened.stdout).toContain("browse_ro");
     expect(opened.stdout).toContain("better_answers");
     expect(opened.stdout).toContain("Ctrl-C closes it");
   });
 
-  it("states neither the address, SSH user, key nor published port", () => {
+  it("prints no host, SSH user, key path, or published port", () => {
     const said = `${opened.stdout}${opened.stderr}`;
     const stated = ["vpc1.example.invalid", "operator", key].filter((value) =>
       said.includes(value),
@@ -115,7 +115,7 @@ describe("the production browsing helper", () => {
     });
   });
 
-  it("leaves the key to ssh when the file names none", async () => {
+  it("omits -i when the estate file names no key", async () => {
     const run = browse({
       ESTATE_FILE: estateFile("no-key", [
         `VPC1_SSH_TARGET=${TARGET}`,
@@ -128,7 +128,7 @@ describe("the production browsing helper", () => {
     expect(run.sshArgv).not.toContain("IdentitiesOnly");
   });
 
-  it("defaults to the main checkout's private file, even in worktrees", async () => {
+  it("reads the main checkout's estate file, also from a worktree", async () => {
     const checkout = repositoryHolding(path.join(scratch, "checkout"), {
       "deploy/browse-production.sh": readFileSync(helper, "utf8"),
     });
@@ -152,7 +152,7 @@ describe("the production browsing helper", () => {
     ]);
   });
 
-  describe("what it refuses before any SSH is started", () => {
+  describe("refusals before ssh starts", () => {
     let taken: Held;
 
     beforeAll(async () => {
@@ -163,20 +163,20 @@ describe("the production browsing helper", () => {
       await released(taken);
     });
 
-    it("refuses a local port something already listens on, naming it", () => {
+    it("refuses a local port already in use and names it", () => {
       const run = browse({ ESTATE_FILE: everyValue, BROWSE_PORT: String(taken.port) });
       expect({ status: run.status, ssh: run.sshArgv }).toEqual({ status: 1, ssh: undefined });
       expect(run.stderr).toContain(`127.0.0.1:${String(taken.port)} is taken`);
     });
 
-    it("refuses a missing private file, naming where it looked", async () => {
+    it("refuses a missing estate file and prints its path", async () => {
       const nowhere = path.join(scratch, "no-such-estate.md");
       const run = browse({ ESTATE_FILE: nowhere, BROWSE_PORT: String(await freePort()) });
       expect({ status: run.status, ssh: run.sshArgv }).toEqual({ status: 1, ssh: undefined });
       expect(run.stderr).toContain(nowhere);
     });
 
-    it("refuses a missing value by name, leaking nothing else", async () => {
+    it("names a missing variable and prints no other value", async () => {
       const run = browse({
         ESTATE_FILE: estateFile("no-port", [`VPC1_SSH_TARGET=${TARGET}`, `VPC1_SSH_KEY=${key}`]),
         BROWSE_PORT: String(await freePort()),
@@ -186,7 +186,7 @@ describe("the production browsing helper", () => {
       expect(run.stderr).not.toContain("vpc1.example.invalid");
     });
 
-    it("refuses a value written twice, as either could be meant", async () => {
+    it("refuses a variable set twice and prints only its name", async () => {
       const run = browse({
         ESTATE_FILE: estateFile("twice", [
           `VPC1_SSH_TARGET=${TARGET}`,
@@ -200,7 +200,7 @@ describe("the production browsing helper", () => {
       expect(run.stderr).not.toContain("elsewhere");
     });
 
-    it("refuses a value of the wrong shape, naming the value", async () => {
+    it("refuses an invalid value and names its variable", async () => {
       const shapes = [
         ["VPC1_DATABASE_PORT", [`VPC1_SSH_TARGET=${TARGET}`, "VPC1_DATABASE_PORT=5999; true"]],
         ["VPC1_DATABASE_PORT", [`VPC1_SSH_TARGET=${TARGET}`, "VPC1_DATABASE_PORT=70000"]],
@@ -227,7 +227,7 @@ describe("the production browsing helper", () => {
       );
     });
 
-    it("refuses a local port that is not a port", () => {
+    it("refuses a BROWSE_PORT that is not a port number", () => {
       const run = browse({ ESTATE_FILE: everyValue, BROWSE_PORT: "55433x" });
       expect({ status: run.status, ssh: run.sshArgv }).toEqual({ status: 1, ssh: undefined });
       expect(run.stderr).toContain("BROWSE_PORT");

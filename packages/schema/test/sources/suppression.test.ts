@@ -129,8 +129,8 @@ const suppressionsStanding = async (client: pg.PoolClient) =>
     )
   ).rows;
 
-describe("the suppression reshaped to one row per erasure request", () => {
-  it("collapses a request's per-document rows into one, in every workspace", async () => {
+describe("the migration to one suppression row per erasure request", () => {
+  it("merges a request's per-document rows into one, in every workspace", async () => {
     await withTwoWorkspacesSuppressedPerDocument(async (client) => {
       const hers = await erasureOf(client, WS, HER_SET, "completed");
       const theirs = await erasureOf(client, ANOTHER_WS, THEIR_SET, "completed");
@@ -146,7 +146,7 @@ describe("the suppression reshaped to one row per erasure request", () => {
     });
   });
 
-  it("backfills completed erasures naming someone, skipping open and id-only ones", async () => {
+  it("backfills only completed erasures that name identifiers", async () => {
     await withTwoWorkspacesSuppressedPerDocument(async (client) => {
       const his = await erasureOf(client, WS, HIS_SET, "completed");
       await erasureOf(client, WS, HER_SET, "open");

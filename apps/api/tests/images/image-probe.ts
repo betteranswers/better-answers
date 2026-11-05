@@ -41,7 +41,7 @@ export interface ContainerRun {
 
   readonly environment?: Readonly<Record<string, string>>;
 
-  /** Linux names the host for a container only when asked; Docker Desktop always does. */
+  /** On Linux, a container resolves the host's name only when asked to. Docker Desktop always does. */
   readonly reachesTheHost?: boolean;
 }
 
@@ -100,7 +100,7 @@ export const sharedCache = async (
   return builder === undefined ? undefined : { builder, registry };
 };
 
-/** Without a shared cache the plain build prints the image's id, and `iidfile` goes unused. */
+/** Without a shared cache, `docker build --quiet` prints the image id, so the build ignores `iidfile`. */
 export const buildCommand = (
   image: ImageUnderTest,
   choice: { readonly cache: SharedCache | undefined; readonly iidfile: string },
@@ -178,8 +178,8 @@ const discardIfBuiltHere = async (image: ImageToRun): Promise<void> => {
 type Environment = Readonly<Record<string, string>>;
 
 /**
- * Names on the command line and values through the docker client's environment, so no value is in the
- * argv a process listing shows.
+ * Passes each variable's name in argv and its value through the docker client's environment, so a
+ * process listing shows no value.
  */
 const docker = async (
   subcommand: "run" | "exec",

@@ -18,7 +18,7 @@ const LINK_PAGE = "/sign-in/link";
 const DESCRIBE = "/sign-in-link/describe";
 const SIGN_IN_BY_LINK = "/sign-in-link/sign-in";
 const SEND_CODE = "/email-otp/send-verification-otp";
-const CONNECTED_SOURCE_COOKIE = "__Host-better-answers.sign-in-link";
+const LINK_COOKIE = "__Host-better-answers.sign-in-link";
 
 const DEAD = { state: "dead" };
 
@@ -51,7 +51,7 @@ const signedInAs = async (client: TestClient): Promise<string | undefined> => {
   return session?.user.email;
 };
 
-const aLinkAfterRewriting = async (prefix: "sign-in-otp-" | "sign-in-link-", set: string) => {
+const aLinkWithItsRowRewritten = async (prefix: "sign-in-otp-" | "sign-in-link-", set: string) => {
   const person = await app().person();
   const asking = app().client();
   const { token } = await askedFor(asking, person.email);
@@ -61,14 +61,14 @@ const aLinkAfterRewriting = async (prefix: "sign-in-otp-" | "sign-in-link-", set
   return { person, asking, token };
 };
 
-const readAndSpent = async (client: TestClient, token: string) => ({
+const readAndSignIn = async (client: TestClient, token: string) => ({
   read: await describedAs(client, token),
   status: (await client.json(SIGN_IN_BY_LINK, { token })).status,
 });
 
-const READS_DEAD = { read: DEAD, status: 410 };
+const DEAD_ON_READ_AND_SIGN_IN = { read: DEAD, status: 410 };
 
-const ageTheCode = (email: string) =>
+const expireTheCode = (email: string) =>
   app().database.superuser.query(
     `UPDATE verification SET expires_at = now() - interval '1 minute'
       WHERE identifier IN ('sign-in-otp-' || $1, 'sign-in-link-' || $1)`,
@@ -84,7 +84,7 @@ const triesSpentOn = async (email: string): Promise<string | undefined> => {
 };
 
 describe("the sign-in email's link", () => {
-  it("carries the link page with its token in the fragment", async () => {
+  it("carries the token in the link page URL's fragment", async () => {
     const person = await app().person();
 
     const { token } = await askedFor(app().client(), person.email);
@@ -123,7 +123,7 @@ const linkRowsOf = async (email: string): Promise<number> =>
   ).rowCount ?? -1;
 
 describe("the code request", () => {
-  it("still sends the code when its link cannot be kept", async () => {
+  it("still sends the code when storing its link fails", async () => {
     const person = await app().person();
 
     const asked = await whileLinksAreRefused(() =>
@@ -136,7 +136,7 @@ describe("the code request", () => {
     expect(app().logs.some((line) => line["event"] === "auth.link_not_kept")).toBe(true);
   });
 
-  it("keeps one link when two codes are asked at once", async () => {
+  it("stores one link when two codes are requested at once", async () => {
     const person = await app().person();
 
     await Promise.all([
@@ -147,19 +147,19 @@ describe("the code request", () => {
     expect(await linkRowsOf(person.email)).toBe(1);
   });
 
-  it("binds the browser that asked with a host-only cookie", async () => {
+  it("sets a host-only cookie on the requesting browser", async () => {
     const person = await app().person();
 
     const { asked } = await askedFor(app().client(), person.email);
 
     const [cookie] = asked.headers.getSetCookie();
-    expect(cookie).toMatch(new RegExp(`^${CONNECTED_SOURCE_COOKIE}=[A-Za-z0-9_-]{43};`));
+    expect(cookie).toMatch(new RegExp(`^${LINK_COOKIE}=[A-Za-z0-9_-]{43};`));
     expect(cookie?.split("; ").slice(1).toSorted()).toEqual(
       ["HttpOnly", "Max-Age=300", "Path=/", "SameSite=Lax", "Secure"].toSorted(),
     );
   });
 
-  it("refuses a cross-site request, setting no cookie and sending nothing", async () => {
+  it("refuses a cross-site request, sets no cookie, sends no email", async () => {
     const person = await app().person();
     const client = app().client();
 
@@ -176,7 +176,7 @@ describe("the code request", () => {
 });
 
 describe("reading a link", () => {
-  it("offers the browser that asked a sign-in as its address", async () => {
+  it("offers the requesting browser a sign-in as its email", async () => {
     const person = await app().person();
     const client = app().client();
     const { token } = await askedFor(client, person.email);
@@ -188,7 +188,7 @@ describe("reading a link", () => {
     });
   });
 
-  it("shows another browser the code, leaving it signed out", async () => {
+  it("shows the code to another browser without signing it in", async () => {
     const person = await app().person();
     const asking = app().client();
     const { code, token } = await askedFor(asking, person.email);
@@ -203,7 +203,7 @@ describe("reading a link", () => {
     expect(await signedInAs(asking)).toBe(person.email.toLowerCase());
   });
 
-  it("answers alike for unknown, spent and expired links", async () => {
+  it("reports one dead state for unknown, used and expired links", async () => {
     const spent = await app().person();
     const spentClient = app().client();
     const spentLink = await askedFor(spentClient, spent.email);
@@ -211,7 +211,7 @@ describe("reading a link", () => {
     const expired = await app().person();
     const expiredClient = app().client();
     const expiredLink = await askedFor(expiredClient, expired.email);
-    await ageTheCode(expired.email);
+    await expireTheCode(expired.email);
 
     expect([
       await describedAs(app().client(), "a".repeat(43)),
@@ -220,7 +220,7 @@ describe("reading a link", () => {
     ]).toEqual([DEAD, DEAD, DEAD]);
   });
 
-  it("answers no-store, so no cache keeps a code", async () => {
+  it("sends cache-control no-store so no cache stores the code", async () => {
     const person = await app().person();
     const { token } = await askedFor(app().client(), person.email);
 
@@ -229,7 +229,7 @@ describe("reading a link", () => {
     expect(read.headers.get("cache-control")).toBe("no-store");
   });
 
-  it("keeps its sign-in apart from the reads' ceiling", async () => {
+  it("signs in after the link's reads hit their limit", async () => {
     const person = await app().person();
     const asking = app().client();
     const { token } = await askedFor(asking, person.email);
@@ -243,7 +243,7 @@ describe("reading a link", () => {
     expect((await asking.json(SIGN_IN_BY_LINK, { token })).status).toBe(200);
   });
 
-  it("refuses one link's reads past its own ceiling", async () => {
+  it("answers 429 to the 11th read of one link", async () => {
     const person = await app().person();
     const { token } = await askedFor(app().client(), person.email);
     stopTheClock();
@@ -258,7 +258,7 @@ describe("reading a link", () => {
 });
 
 describe("signing in through a link", () => {
-  it("spends no sign-in on a link another browser asked for", async () => {
+  it("does not count another browser's refused link attempts as sign-ins", async () => {
     const person = await app().person();
     const { token } = await askedFor(app().client(), person.email);
     const another = app().client();
@@ -281,7 +281,7 @@ describe("signing in through a link", () => {
     expect(byForm).not.toContain(429);
   });
 
-  it("counts a link's sign-in among its address's sign-ins", async () => {
+  it("counts a link sign-in toward the IP address's sign-in limit", async () => {
     const person = await app().person();
     const asking = app().client();
     const { token } = await askedFor(asking, person.email);
@@ -300,7 +300,7 @@ describe("signing in through a link", () => {
     });
   });
 
-  it("signs in the asking browser after a scanner opened it", async () => {
+  it("signs the requesting browser in after a scanner visit", async () => {
     const person = await app().person();
     const asking = app().client();
     const { token } = await askedFor(asking, person.email);
@@ -316,7 +316,7 @@ describe("signing in through a link", () => {
     expect(await signedInAs(scanner)).toBeUndefined();
   });
 
-  it("refuses a browser without the binding cookie, signing nothing in", async () => {
+  it("answers 403 to a browser without the link cookie", async () => {
     const person = await app().person();
     const asking = app().client();
     const { token } = await askedFor(asking, person.email);
@@ -330,7 +330,7 @@ describe("signing in through a link", () => {
     expect((await asking.json(SIGN_IN_BY_LINK, { token })).status).toBe(200);
   });
 
-  it("refuses a browser bound to another address's link", async () => {
+  it("refuses a browser whose cookie belongs to another email's link", async () => {
     const person = await app().person();
     const asking = app().client();
     const { token } = await askedFor(asking, person.email);
@@ -345,7 +345,7 @@ describe("signing in through a link", () => {
     expect(await signedInAs(elsewhere)).toBeUndefined();
   });
 
-  it("dies once the code's three tries are spent", async () => {
+  it("stops working after three wrong codes", async () => {
     const person = await app().person();
     const asking = app().client();
     const { code, token } = await askedFor(asking, person.email);
@@ -359,7 +359,7 @@ describe("signing in through a link", () => {
     expect(await describedAs(asking, token)).toEqual(DEAD);
   });
 
-  it("answers a library failure as unanswered, not dead", async () => {
+  it("answers 502 unanswered when writing the session fails", async () => {
     const person = await app().person();
     const asking = app().client();
     const { token } = await askedFor(asking, person.email);
@@ -372,7 +372,7 @@ describe("signing in through a link", () => {
     expect(await failed.json()).toEqual({ error: "unanswered" });
   });
 
-  it("refuses a cross-site read or sign-in of a link", async () => {
+  it("answers 403 to a cross-site read or sign-in", async () => {
     const person = await app().person();
     const { token } = await askedFor(app().client(), person.email);
     const crossSite = (path: string) =>
@@ -402,17 +402,17 @@ describe("signing in through a link", () => {
     expect((await client.json(SIGN_IN_BY_LINK, { token: "not a token!" })).status).toBe(410);
   });
 
-  it("dies, spending no tries, once its code is replaced", async () => {
-    const { person, asking, token } = await aLinkAfterRewriting(
+  it("is dead once its code is replaced, using no tries", async () => {
+    const { person, asking, token } = await aLinkWithItsRowRewritten(
       "sign-in-otp-",
       "value = 'a-newer-code-hash:0'",
     );
 
-    expect(await readAndSpent(asking, token)).toEqual(READS_DEAD);
+    expect(await readAndSignIn(asking, token)).toEqual(DEAD_ON_READ_AND_SIGN_IN);
     expect(await triesSpentOn(person.email)).toBe("0");
   });
 
-  it("spends none of the code's tries on a wrong token", async () => {
+  it("uses none of the code's tries on a wrong token", async () => {
     const person = await app().person();
     const asking = app().client();
     await askedFor(asking, person.email);
@@ -426,7 +426,7 @@ describe("signing in through a link", () => {
     expect(await triesSpentOn(person.email)).toBe("0");
   });
 
-  it("kills the first link once a new code is sent", async () => {
+  it("ends the first link once a new code is sent", async () => {
     const person = await app().person();
     const asking = app().client();
     const first = await askedFor(asking, person.email);
@@ -436,7 +436,7 @@ describe("signing in through a link", () => {
     expect((await asking.json(SIGN_IN_BY_LINK, { token: second.token })).status).toBe(200);
   });
 
-  it("dies once its code is typed or it is used", async () => {
+  it("answers 410 after its code or the link is used", async () => {
     const typed = await app().person();
     const typedClient = app().client();
     const typedLink = await askedFor(typedClient, typed.email);
@@ -454,7 +454,7 @@ describe("signing in through a link", () => {
     expect(again.map((response) => response.status)).toEqual([410, 410]);
   });
 
-  it("records its method, as a typed code records its own", async () => {
+  it("records the sign-in method for a link and a code", async () => {
     const byLink = await app().person();
     const linkClient = app().client();
     const { token } = await askedFor(linkClient, byLink.email);
@@ -470,7 +470,7 @@ describe("signing in through a link", () => {
     }).toEqual({ link: [{ method: "email_link" }], code: [{ method: "email_code" }] });
   });
 
-  it("resumes the connect-Claude flow the code request carried", async () => {
+  it("resumes the connect-Claude flow started before the code request", async () => {
     const workspace = await app().provision();
     const asking = app().client();
     const started = await asking.fetch(
@@ -478,7 +478,7 @@ describe("signing in through a link", () => {
       { redirect: "manual" },
     );
     const sentTo = started.headers.get("location");
-    assert(sentTo !== null, "the authorization redirected");
+    assert(sentTo !== null, "the authorization did not redirect");
     const query = new URL(sentTo, PUBLIC_URL).search;
     const { token } = await askedFor(asking, workspace.admin.email, {
       oauth_query: query.slice(1),
@@ -494,13 +494,16 @@ describe("signing in through a link", () => {
       postLogin: true,
       oauth_query: query.slice(1),
     });
-    expect(whilePending.status, "an Admin's link sign-in confirms before consent").toBe(403);
+    expect(
+      whilePending.status,
+      "an Admin reached consent before confirming the second factor",
+    ).toBe(403);
     await confirmedByTheHarness(app(), asking);
     const next = await continueAfterPostLogin(asking, query);
     expect(`${next.origin}${next.pathname}`).toBe(`${PUBLIC_URL}/consent`);
   });
 
-  it("returns where the sign-in page was asked to return", async () => {
+  it("carries the sign-in page's redirect through to the sign-in", async () => {
     const person = await app().person();
     const asking = app().client();
     const { token } = await askedFor(asking, person.email, { redirect: "/invitations/01ABC" });
@@ -513,7 +516,7 @@ describe("signing in through a link", () => {
   });
 
   it.each(["//elsewhere.example/x", String.raw`/\elsewhere.example/x`, "/\t/elsewhere.example/x"])(
-    "drops a return path that leaves this origin: %s",
+    "drops the redirect %s, which leaves this origin",
     async (redirect) => {
       const person = await app().person();
       const asking = app().client();
@@ -527,12 +530,12 @@ describe("signing in through a link", () => {
     ["altered", "to_jsonb('A' || (value::jsonb ->> 'sealed'))"],
     ["cut short", `'"AAAA"'::jsonb`],
   ])("is dead when its sealed contents were %s", async (_how, sealedBecomes) => {
-    const { asking, token } = await aLinkAfterRewriting(
+    const { asking, token } = await aLinkWithItsRowRewritten(
       "sign-in-link-",
       `value = jsonb_set(value::jsonb, '{sealed}', ${sealedBecomes})::text`,
     );
 
-    expect(await readAndSpent(asking, token)).toEqual(READS_DEAD);
+    expect(await readAndSignIn(asking, token)).toEqual(DEAD_ON_READ_AND_SIGN_IN);
   });
 });
 
@@ -545,7 +548,7 @@ describe("the link page", () => {
     expect(page.headers.get("cache-control")).toBe("no-store");
   });
 
-  it("serves a few reloads from one address", async () => {
+  it("serves six reloads from one IP address", async () => {
     const client = app().client();
 
     const loads: number[] = [];

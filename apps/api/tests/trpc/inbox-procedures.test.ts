@@ -78,7 +78,7 @@ const withTheStoreFailingToAccept = async <T>(
   }
 };
 
-describe("Waiting on you through the api", () => {
+describe("the Waiting on you inbox over tRPC", () => {
   it("commits an owner's acceptance with the proposer as author", async () => {
     const { workspace, proposer, owner, concept, suggestionId } =
       await aSuggestionWaitingOnAViewer();
@@ -112,7 +112,7 @@ describe("Waiting on you through the api", () => {
     });
   });
 
-  it("answers an outsider's item as not found", async () => {
+  it("answers not-found when a non-owner opens the item", async () => {
     const { owner, outsider, suggestionId } = await aSuggestionWaitingOnAViewer();
     const asTheOwner = await webSignedIn(app(), owner.email);
     const asTheOutsider = await webSignedIn(app(), outsider.email);
@@ -126,7 +126,7 @@ describe("Waiting on you through the api", () => {
     });
   });
 
-  it("returns a stale suggestion to its proposer", async () => {
+  it("returns a stale suggestion to its proposer, committing nothing", async () => {
     const { workspace, owner, concept, suggestionId, suggested } =
       await aSuggestionWaitingOnAViewer();
     const stale = await suggested("Claims are made within ninety days.");
@@ -148,7 +148,7 @@ describe("Waiting on you through the api", () => {
     expect(await authorsOf()).toEqual(before);
   });
 
-  it("answers each item when the store fails partway through", async () => {
+  it("reports each item's outcome when one acceptance fails", async () => {
     const { workspace, proposer, owner, concept, suggestionId } =
       await aSuggestionWaitingOnAViewer();
     const seeded = await seedConcepts(
@@ -160,7 +160,7 @@ describe("Waiting on you through the api", () => {
       }),
     );
     const [other] = seeded.concepts;
-    assert(other !== undefined, "the second concept was seeded");
+    assert(other !== undefined, "the second concept was not seeded");
     const failing = await seedEditSuggestion(app(), {
       workspaceId: workspace.workspaceId,
       userId: proposer.id,

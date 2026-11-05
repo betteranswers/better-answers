@@ -219,8 +219,8 @@ const finalRows = async (client: pg.PoolClient) => {
   return rows.rows;
 };
 
-describe("the queue agreement", () => {
-  it("refuses, hands out and answers exactly as the fixture says", async () => {
+describe("the queue's SQL functions against the queue agreement", () => {
+  it("enqueues, claims and finishes jobs as the fixture expects", async () => {
     await withRollback(db().pool, async (client) => {
       await seedFixture(client);
 
@@ -256,8 +256,8 @@ describe("the queue agreement", () => {
   });
 });
 
-describe("the kinds the queue agreement exercises", () => {
-  it("are the kinds the descriptors declare, neither more nor fewer", () => {
+describe("the job kinds in the queue agreement", () => {
+  it("match the kinds the job descriptors declare", () => {
     const exercised = new Set<string>([
       ...fixture.jobs.map((seeded) => seeded.kind),
       ...fixture.enqueues.map((enqueue) => enqueue.kind),

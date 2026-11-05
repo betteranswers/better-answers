@@ -148,12 +148,12 @@ const FAILED_UNSENT = {
   spend: { open: 0, calls: [] },
 };
 
-describe("the decision judge's call", () => {
+describe("decisionJudgeCall", () => {
   const candidate = A_CANDIDATE;
   const ASK =
     "Does this approved answer answer the question in the state as it was asked? It does not if it answers a different question, a narrower or a wider one, or one about another product, module, plan or audience than the question names.";
 
-  it("states the question, asking of each candidate apart", () => {
+  it("sends the question as state, with one ask per candidate", () => {
     const call = decisionJudgeCall("How long are audit logs kept?", [
       candidate,
       {
@@ -182,13 +182,13 @@ describe("the decision judge's call", () => {
     expect(call.withinMs).toBe(150_000);
   });
 
-  it("reserves every byte stated and a little output each", () => {
+  it("reserves all input bytes and some output tokens per candidate", () => {
     const call = decisionJudgeCall("Who pays the £50 fee?", [candidate, candidate]);
 
     expect(call.most).toEqual({ tokensIn: 2_778, tokensOut: 32 });
   });
 
-  it("AE11: states a placeholder for a National Insurance number", () => {
+  it("AE11: withholds a National Insurance number from the state", () => {
     const call = decisionJudgeCall("Is my National Insurance number AB 12 34 56 C on file?", [
       candidate,
     ]);
@@ -209,7 +209,7 @@ describe("ask with a decision model", () => {
       "https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/run/@cf/cloudflare/clef-flash",
     ]);
     const [sent] = wire.sent;
-    assert(sent !== undefined, "the decision call was sent");
+    assert(sent !== undefined, "the decision call was not sent");
     expect(JSON.parse(sent.body)).toEqual({
       model: "clef-flash",
       state: "How do buyers access audit information?",
@@ -227,7 +227,7 @@ describe("ask with a decision model", () => {
     });
   });
 
-  it("takes a probability at the threshold as yes, below, no", async () => {
+  it("treats a probability at or above the threshold as yes", async () => {
     const { workspaceId, asker } = await aDecidingWorkspace();
     await seededIn(workspaceId, [USERS, SUPPLIER]);
     const wire = decidingWire(
@@ -244,7 +244,7 @@ describe("ask with a decision model", () => {
     expect(titlesOf(answer.related)).toEqual([SUPPLIER.title]);
   });
 
-  it("judges at the threshold stored last, not the first", async () => {
+  it("judges at the most recently stored threshold", async () => {
     const { workspaceId, asker } = await aDecidingWorkspace();
     await seededIn(workspaceId, [USERS, SUPPLIER]);
     await thresholdStored("0.6");
@@ -260,7 +260,7 @@ describe("ask with a decision model", () => {
     expect(titlesOf(answer.answers)).toEqual(titlesOf([USERS, SUPPLIER]));
   });
 
-  it("fails judging, sending nothing, with no stored threshold", async () => {
+  it("fails judging and sends nothing when no threshold is stored", async () => {
     const { workspaceId, asker } = await aDecidingWorkspace({ model: "clef", threshold: null });
     await seededIn(workspaceId, [USERS]);
     const wire = decidingWire(new Map([[USERS.title, 1]]));
@@ -285,7 +285,7 @@ describe("ask with a decision model", () => {
     ]);
   });
 
-  it("fails judging, sending nothing, over the model's window", async () => {
+  it("sends nothing and fails judging over the model's context window", async () => {
     const { workspaceId, asker } = await aDecidingWorkspace();
     const long = (title: string) => anAnswer(title, `${"Audit information. ".repeat(1_400)}\n`);
     await seededIn(workspaceId, [long(USERS.title), long(SUPPLIER.title), long(QUESTION)]);
@@ -296,7 +296,7 @@ describe("ask with a decision model", () => {
     expect(await outcomeOf(answer, wire, workspaceId)).toEqual(FAILED_UNSENT);
   });
 
-  it("sends twenty candidates at the longest Answer's placeholder length", async () => {
+  it("sends twenty longest-allowed `Answer`s in one decision call", async () => {
     const { workspaceId, asker } = await aDecidingWorkspace();
     const sentence = "Buyers read audit information in the console. ";
     const body = sentence.repeat(PLACEHOLDER_LONGEST_ANSWER_CHARACTERS / sentence.length + 1);
@@ -313,7 +313,7 @@ describe("ask with a decision model", () => {
 
     expect(answer.judgeState).toBe("judged");
     const [sent] = wire.sent;
-    assert(sent !== undefined, "the decision call was sent");
+    assert(sent !== undefined, "the decision call was not sent");
     expect(wire.sent).toHaveLength(1);
     expect(decisionCandidatesIn(sent.body).size).toBe(20);
   });
@@ -328,7 +328,7 @@ describe("ask with a decision model", () => {
     expect(reserved).toEqual([32]);
   });
 
-  it("settles a zero out-price at the input's cost alone", async () => {
+  it("charges only for input when the output price is zero", async () => {
     const { workspaceId, asker } = await aDecidingWorkspace();
     await seededIn(workspaceId, [USERS]);
 

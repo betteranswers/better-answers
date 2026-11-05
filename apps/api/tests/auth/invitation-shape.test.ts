@@ -38,43 +38,43 @@ const organisationPlugin = (): OrganisationPlugin | undefined => {
 const invitationFields = (): Readonly<Record<string, Field>> =>
   organisationPlugin()?.schema?.invitation?.fields ?? {};
 
-const TOLD_AN_EXPIRY = z.object({ options: z.object({ invitationExpiresIn: z.number() }) });
+const EXPIRY_OPTIONS = z.object({ options: z.object({ invitationExpiresIn: z.number() }) });
 
-const platformKey = (key: string, field: Field): string =>
+const columnNameOf = (key: string, field: Field): string =>
   typeof field.fieldName === "string" ? field.fieldName : key;
 
 const columns = (): Readonly<Record<string, { notNull: boolean; hasDefault: boolean }>> =>
   getTableColumns(invitation);
 
-describe("the invitation an approved access request mints", () => {
-  it("carries exactly the columns the organisation plugin declares", () => {
+describe("the invitation created when an access request is approved", () => {
+  it("has exactly the columns the organisation plugin declares", () => {
     const declared = Object.entries(invitationFields()).map(([key, field]) =>
-      platformKey(key, field),
+      columnNameOf(key, field),
     );
 
     expect(Object.keys(columns()).toSorted()).toEqual([...declared, "id"].toSorted());
   });
 
-  it("makes each column as optional as the plugin says", () => {
+  it("matches each column's nullability to the plugin's required flag", () => {
     for (const [key, field] of Object.entries(invitationFields())) {
-      const column = columns()[platformKey(key, field)];
+      const column = columns()[columnNameOf(key, field)];
       expect({ key, notNull: column?.notNull }).toEqual({ key, notNull: field.required === true });
     }
   });
 
-  it("starts an invitation at the plugin's default status, pending", () => {
+  it("defaults the status to pending, as the plugin does", () => {
     const status = invitationFields()["status"];
     expect(status?.defaultValue).toBe("pending");
     expect(INVITATION_WAITING_STATUS).toBe("pending");
     expect(columns()["status"]?.hasDefault).toBe(true);
   });
 
-  it("cancels in the plugin's own word, which its reads speak", () => {
+  it("uses the plugin's spelling canceled for a cancelled invitation", () => {
     expect(INVITATION_CANCELLED_STATUS).toBe("canceled");
   });
 
-  it("expires an invitation after seven days, as the plugin says", () => {
+  it("expires after seven days, matching the plugin's setting", () => {
     expect(INVITATION_EXPIRY_SECONDS).toBe(604_800);
-    expect(TOLD_AN_EXPIRY.parse(organisationPlugin()).options.invitationExpiresIn).toBe(604_800);
+    expect(EXPIRY_OPTIONS.parse(organisationPlugin()).options.invitationExpiresIn).toBe(604_800);
   });
 });

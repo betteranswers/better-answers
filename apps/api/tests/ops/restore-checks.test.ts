@@ -12,11 +12,11 @@ import { servedApp } from "../support/suite-app.ts";
 const objects = objectStoreForSuite();
 const { doorsFrom, ops } = opsRunner(objects);
 
-describe("pnpm ops — the restore scripts' commands", () => {
+describe("pnpm ops", () => {
   const served = servedApp();
 
-  describe("smoke — the platform answers through its interface", () => {
-    it("passes against the running api's health, metadata, challenge and shell", async () => {
+  describe("smoke, which checks that the platform answers over HTTP", () => {
+    it("passes health, metadata, challenge, and shell checks on the api", async () => {
       const run = await ops(served(), ["smoke", "--url", PUBLIC_URL, "--find", "--guide", "--ask"]);
 
       expect(run.lines.filter((line) => line.startsWith("FAIL"))).toEqual([]);
@@ -26,7 +26,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.filter((line) => line.startsWith("note "))).toHaveLength(3);
     });
 
-    it("passes on the loopback, sending the app hostname as Host", async () => {
+    it("passes on loopback by sending the app hostname as Host", async () => {
       let listener: ReturnType<typeof serve> | undefined;
       const port = await new Promise<number>((resolve) => {
         listener = serve({ fetch: served().server.fetch, port: 0, hostname: "127.0.0.1" }, (info) =>
@@ -52,14 +52,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       }
     });
 
-    it("fails when the surface does not answer", async () => {
+    it("fails when nothing answers at the URL", async () => {
       const run = await ops(served(), ["smoke", "--url", "https://nowhere.example.test"]);
 
       expect(run.exitCode).toBe(1);
     });
   });
 
-  describe("dump-grep — a token's tables and counts, never its lines", () => {
+  describe("dump-grep, which counts a token per table without printing lines", () => {
     const dump = [
       "SET search_path = public;",
       "COPY public.person (id, email) FROM stdin;",
@@ -76,7 +76,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       "",
     ].join("\n");
 
-    it("names each table holding a token, with counts, or absent", async () => {
+    it("lists each table that holds a token, or says absent", async () => {
       const run = await ops(
         served(),
         ["dump-grep", "--tokens", "jane@example.test,nobody@example.test"],
@@ -94,7 +94,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).not.toContain("other@example.test");
     });
 
-    it("reports a match outside any COPY section as just that", async () => {
+    it("reports a match outside COPY sections without naming a table", async () => {
       const outside = [
         "SET search_path = public;",
         "CREATE FUNCTION greet() RETURNS text AS $$ select 'jane@example.test' $$;",
@@ -110,7 +110,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual(["jane…st: present in 1 line(s) outside any COPY section"]);
     });
 
-    it("names a passage partition as pg_dump heads its section", async () => {
+    it("names a passage partition as its COPY header writes it", async () => {
       const partitioned = [
         'COPY index."passage_01K5ZQ8WJ6T3M4N7P9R2S0V1X" (id, workspace_id, content) FROM stdin;',
         "c1\t01K5ZQ8WJ6T3M4N7P9R2S0V1X\tClaims go to jane@example.test by Friday.",
@@ -125,7 +125,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("counts and reports a token named twice only once", async () => {
+    it("counts a token given twice only once", async () => {
       const run = await ops(
         served(),
         ["dump-grep", "--tokens", "other@example.test,other@example.test"],
@@ -136,7 +136,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual(["othe…st: present in 1 line(s) of table public.person"]);
     });
 
-    it("reports each distinct token once, in the order first named", async () => {
+    it("reports each token once, in the order first given", async () => {
       const run = await ops(
         served(),
         ["dump-grep", "--tokens", "other@example.test,nobody@example.test,other@example.test"],

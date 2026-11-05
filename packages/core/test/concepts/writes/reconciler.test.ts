@@ -241,7 +241,7 @@ const decisionOf = async (suggestionId: string) => {
 };
 
 describe("a commit whose rows were lost", () => {
-  it("is replayed through the live handler, catching the rows up", async () => {
+  it("is replayed through the live handler, which writes the rows", async () => {
     const scenario = await arrange();
     const input = guideline("Travel");
     const history = await writeInTheWindow(scenario, scenario.editor, input);
@@ -249,7 +249,7 @@ describe("a commit whose rows were lost", () => {
     expect(history).toHaveLength(1);
     expect(await recordedChain(scenario.workspaceId)).toEqual([]);
     const [sha] = history;
-    assert(sha !== undefined, "the write committed");
+    assert(sha !== undefined, "the write did not commit");
     const facts = await commitFacts(scenario.git, scenario.workspaceId, sha);
 
     const run = await reconciled(scenario);
@@ -293,10 +293,10 @@ describe("a commit whose rows were lost", () => {
     expect(nodes.rows).toEqual([{ uid: iri }]);
   });
 
-  it("is audited as the platform's; the commit stays the person's", async () => {
+  it("gets a platform audit event, but keeps the person's commit", async () => {
     const scenario = await arrange();
     const [sha] = await writeInTheWindow(scenario, scenario.editor, guideline("Leave"));
-    assert(sha !== undefined, "the write committed");
+    assert(sha !== undefined, "the write did not commit");
 
     await reconciled(scenario);
 
@@ -340,7 +340,7 @@ describe("a commit whose rows were lost", () => {
     expect(booked.rowCount).toBe(0);
   });
 
-  it("is replayed oldest first, along with the writes behind it", async () => {
+  it("is replayed oldest first, with the writes after it", async () => {
     const scenario = await arrange();
     const [orphan = null] = await writeInTheWindow(
       scenario,
@@ -373,7 +373,7 @@ describe("a commit whose rows were lost", () => {
       guideline("Mileage", { expects: { head: first.sha } }),
     );
     const orphan = history[1];
-    assert(orphan !== undefined, "the second write committed");
+    assert(orphan !== undefined, "the second write did not commit");
     await reconciled(scenario);
     const before = await rowsOf(scenario.workspaceId);
 
@@ -392,7 +392,7 @@ describe("a commit whose rows were lost", () => {
     expect(await rowsOf(scenario.workspaceId)).toEqual(before);
   });
 
-  it("leaves no partial rows, and the head ahead of them", async () => {
+  it("leaves no partial rows and the head still ahead", async () => {
     const scenario = await arrange();
     const first = await landed(scenario, scenario.editor, guideline("Pensions"));
     const before = await rowsOf(scenario.workspaceId);
@@ -409,7 +409,7 @@ describe("a commit whose rows were lost", () => {
   });
 });
 
-describe("a commit with lost rows, carrying what the replay reads", () => {
+describe("a commit with lost rows, replayed from its file", () => {
   it("is replayed with the file's title when none was given", async () => {
     const scenario = await arrange();
     const input = guideline("Parking", { frontmatter: { type: "Guideline" } });
@@ -427,7 +427,7 @@ describe("a commit with lost rows, carrying what the replay reads", () => {
     });
   });
 
-  it("is replayed from a non-ASCII file name git would quote", async () => {
+  it("is replayed from a non-ASCII file name that git quotes", async () => {
     const scenario = await arrange();
     const input = guideline("Café", { path: "knowledge/guidelines/café.md" });
     const [sha = ""] = await writeInTheWindow(scenario, scenario.editor, input);
@@ -487,7 +487,7 @@ describe("a manifest commit whose rows were lost", () => {
     content_version: "2026-09-22",
   } as const;
 
-  it("lands its commit row alone, then the concept behind it", async () => {
+  it("lands its commit row alone, then the concept after it", async () => {
     const scenario = await arrange();
     const lost = await inTheWindow(scenario, () =>
       writeManifest(scenario.admin, doorsOf(scenario), {
@@ -577,7 +577,7 @@ const A_SKELETON = {
 } as const;
 
 describe("a skeleton commit whose rows were lost", () => {
-  it("replays a projection commit its rows never reached", async () => {
+  it("replays a projection commit that its rows never reached", async () => {
     const scenario = await arrange();
     const sha = await committedByHand(scenario, A_SKELETON, null);
 
@@ -591,7 +591,7 @@ describe("a skeleton commit whose rows were lost", () => {
     ]);
   });
 
-  it("holds a live write back until replayed, then lands it", async () => {
+  it("holds back a live write until the replay, then lands", async () => {
     const scenario = await arrange();
     const first = await landed(scenario, scenario.editor, guideline("Mileage"));
     const stray = await committedByHand(scenario, A_SKELETON, first.sha);
@@ -609,7 +609,7 @@ describe("a skeleton commit whose rows were lost", () => {
     ]);
   });
 
-  it("replays concept commits past a projection commit", async () => {
+  it("replays concept commits after a projection commit", async () => {
     const scenario = await arrange();
     const iri = conceptIriOf(ulid());
     const skeleton = await committedByHand(scenario, A_SKELETON, null);
@@ -752,7 +752,7 @@ describe("a re-write whose rows were lost", () => {
     return { ...cited, history };
   };
 
-  it("lands Restricted, flagged, when its file cites an uncatalogued document", async () => {
+  it("lands flagged and Restricted when citing an uncatalogued document", async () => {
     const scenario = await arrange();
     const { internal, first, history } = await minutedThenUncatalogued(scenario);
 
@@ -774,7 +774,7 @@ describe("a re-write whose rows were lost", () => {
     ]);
   });
 
-  it("refuses an edit widening a concept a replay held Restricted", async () => {
+  it("refuses widening a concept that a replay kept Restricted", async () => {
     const scenario = await arrange();
     const { internal, input, first, history } = await minutedThenUncatalogued(scenario);
     await reconciled(scenario);
@@ -871,7 +871,7 @@ describe("a re-write whose rows were lost", () => {
     ]);
   });
 
-  it("is replayed though its author may no longer read it", async () => {
+  it("is replayed though its author can no longer read it", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
     const input = guideline("Hospitality", {
@@ -1001,7 +1001,7 @@ describe("an acceptance whose rows were lost", () => {
     expect(accepted.rowCount).toBe(0);
   });
 
-  it("lands the commit, keeping a decline made in the meantime", async () => {
+  it("lands the commit and keeps a decline made since", async () => {
     const scenario = await arrange();
     const request = requestFor("Hot desking");
     const item = await raised(scenario, request);
@@ -1052,7 +1052,7 @@ describe("an acceptance whose rows were lost", () => {
     });
   });
 
-  it("a retitle into a taken key keeps its held key", async () => {
+  it("keeps its current key when retitled onto a taken key", async () => {
     const scenario = await arrange();
     const input = guideline("Expenses");
     const standing = await landed(scenario, scenario.editor, input);
@@ -1087,7 +1087,7 @@ describe("an acceptance whose rows were lost", () => {
     expect(await decisionOf(retitle.suggestionId)).toMatchObject({ status: "accepted" });
   });
 
-  it("a create into a taken key lands at its IRI", async () => {
+  it("lands a create onto a taken key at its IRI", async () => {
     const scenario = await arrange();
     const first = await raised(
       scenario,
@@ -1122,11 +1122,11 @@ const outcomesOfAccepting = async (
   const accepted = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
     decisions: [{ suggestionId: item.suggestionId, expectedTarget: item.target }],
   });
-  assert(accepted.ok, "the accept was admitted");
+  assert(accepted.ok, "the accept was refused");
   return accepted.value.map(({ outcome }) => (outcome.ok ? "accepted" : outcome.error));
 };
 
-const neverStopsAfter = async (scenario: Scenario, lost: string) => {
+const replayedOnceThenWritable = async (scenario: Scenario, lost: string) => {
   expect(await reconciled(scenario)).toMatchObject({ replayed: [lost], stopped: undefined });
   expect(await reconciled(scenario)).toMatchObject({ replayed: [], stopped: undefined });
 
@@ -1140,11 +1140,11 @@ const acceptedAgainThenReplayed = async (
 ) => {
   const lost = await acceptInTheWindow(scenario, item);
   const again = await outcomesOfAccepting(scenario, item);
-  await neverStopsAfter(scenario, lost);
+  await replayedOnceThenWritable(scenario, lost);
   return { again, decision: await decisionOf(item.suggestionId) };
 };
 
-describe("an accept before a lost acceptance is replayed", () => {
+describe("an accept made before a lost acceptance is replayed", () => {
   it("is refused, so an edit cannot stop the reconciler", async () => {
     const scenario = await arrange();
     const input = guideline("Expenses");
@@ -1176,7 +1176,7 @@ describe("an accept before a lost acceptance is replayed", () => {
     });
   });
 
-  it("refuses a second create at the lost one's path", async () => {
+  it("refuses a second create at the lost create's path", async () => {
     const scenario = await arrange();
     const request = requestFor("Remote working");
     const lost = await acceptInTheWindow(scenario, await raised(scenario, request));
@@ -1184,14 +1184,14 @@ describe("an accept before a lost acceptance is replayed", () => {
 
     const beforeReplay = await outcomesOfAccepting(scenario, second);
 
-    await neverStopsAfter(scenario, lost);
+    await replayedOnceThenWritable(scenario, lost);
     expect(beforeReplay).toEqual(["unrecorded-head"]);
     expect(await outcomesOfAccepting(scenario, second)).toEqual(["path-taken"]);
     expect(await reconciled(scenario)).toMatchObject({ replayed: [], stopped: undefined });
   });
 });
 
-describe("a concept carrying a __proto__ front-matter key", () => {
+describe("a concept with a __proto__ frontmatter key", () => {
   const withProto = (title: string): Frontmatter =>
     Object.fromEntries<FrontmatterValue>([
       ["title", title],
@@ -1252,7 +1252,7 @@ describe("a concept carrying a __proto__ front-matter key", () => {
     assert(outcomes.ok, inspect(outcomes));
     expect(outcomes.value.map((outcome) => outcome.outcome.ok)).toEqual([true]);
     const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
-    assert(sha !== undefined, "the acceptance committed");
+    assert(sha !== undefined, "the acceptance did not commit");
     const { row, file } = await rowAgainstFile(scenario, sha, request.path);
     expect(file.frontmatter).toEqual({
       ...request.frontmatter,
@@ -1264,7 +1264,7 @@ describe("a concept carrying a __proto__ front-matter key", () => {
 });
 
 describe("what the reconciler refuses", () => {
-  it("refuses a bundle whose recorded history diverged, landing nothing", async () => {
+  it("refuses a bundle whose recorded history diverged, writing nothing", async () => {
     const scenario = await arrange();
     await landed(scenario, scenario.editor, guideline("Uniform"));
     const before = await rowsOf(scenario.workspaceId);
@@ -1289,7 +1289,7 @@ describe("what the reconciler refuses", () => {
     expect(refused).toEqual({ ok: false, error: "no-such-repository" });
   });
 
-  it("hands back the store's own failure from reading the watermark", async () => {
+  it("returns the store's failure from reading the watermark", async () => {
     const scenario = await arrange();
     await landed(scenario, scenario.editor, guideline("Umbrellas"));
     const gone = new pg.Pool(db().runtimePool.options);
@@ -1304,7 +1304,7 @@ describe("what the reconciler refuses", () => {
     expect(refused).toEqual({ ok: false, error: matching.any(Error) });
   });
 
-  it("skips a bundle another process is rewriting, landing nothing", async () => {
+  it("skips a bundle another process is rewriting, writing nothing", async () => {
     const scenario = await arrange();
     await landed(scenario, scenario.editor, guideline("Kettles"));
     const before = await rowsOf(scenario.workspaceId);
@@ -1344,8 +1344,8 @@ describe("what the reconciler refuses", () => {
   });
 });
 
-describe("a commit the rows cannot take", () => {
-  it("stops the replay, its audit event rolled back, landing nothing", async () => {
+describe("a commit the rows cannot accept", () => {
+  it("stops the replay, rolls back the audit event, lands nothing", async () => {
     const scenario = await arrange();
     const first = guideline("Fuel");
     const landing = await landed(scenario, scenario.editor, first);
@@ -1419,7 +1419,7 @@ describe("a commit the rows cannot take", () => {
     expect(await recordedChain(scenario.workspaceId)).toEqual([[landing.sha, null]]);
   });
 
-  it("stops at a hand-made commit rather than guessing its meaning", async () => {
+  it("stops at a hand-made commit instead of guessing its meaning", async () => {
     const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
       path: "knowledge/manifest.yaml",
       content: "name: acme\n",
@@ -1472,8 +1472,8 @@ describe("a commit the rows cannot take", () => {
   });
 });
 
-describe("the fence", () => {
-  it("skips a bundle a live action holds, never waiting", async () => {
+describe("the workspace fence", () => {
+  it("skips a bundle that a live action holds, without waiting", async () => {
     const scenario = await arrange();
     const order: string[] = [];
     const action = withRepositoryLock(scenario.editor, scenario.git, async () => {
@@ -1507,7 +1507,7 @@ const outcomesOfPass = async (
 
 describe("the periodic head check's pass", () => {
   it(
-    "reconciles every workspace, each on its own outcome",
+    "reconciles every workspace, each with its own outcome",
     async () => {
       const behind = await arrange();
       const current = await arrange();
@@ -1532,7 +1532,7 @@ describe("the periodic head check's pass", () => {
   );
 
   it(
-    "keeps one workspace's unwalkable history to that workspace's outcome",
+    "confines one workspace's unwalkable history to that workspace's outcome",
     async () => {
       const broken = await arrange();
       const later = await arrange();
@@ -1558,7 +1558,7 @@ describe("the periodic head check's pass", () => {
 });
 
 describe("reconciler hits", () => {
-  it("are the replay's audit events, oldest first, never a counter", async () => {
+  it("are the replay's audit events, oldest first, not a counter", async () => {
     const scenario = await arrange();
     const [first = ""] = await writeInTheWindow(scenario, scenario.editor, guideline("Bikes"));
     const history = await writeInTheWindow(

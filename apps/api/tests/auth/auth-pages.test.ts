@@ -22,7 +22,7 @@ const variablesDeclared = (sheet: string): ReadonlySet<string> =>
   new Set([...sheet.matchAll(/(--[\w-]+)\s*:/g)].map(([, name]) => name ?? ""));
 
 describe("the api pages' stylesheet", () => {
-  it("inlines every design-system import rather than leaving one", () => {
+  it("inlines every design-system import", () => {
     expect(PAGE_STYLE).not.toContain("@import");
     expect(PAGE_STYLE).toContain("[data-marks]::before");
     expect(PAGE_STYLE).toContain("--surface-page:");
@@ -33,7 +33,7 @@ describe("the api pages' stylesheet", () => {
     expect(variablesRead(PAGE_STYLE).filter((name) => !declared.has(name))).toEqual([]);
   });
 
-  it("points both faces at this tier's font mounts", () => {
+  it("loads both fonts from the API's own font routes", () => {
     expect(PAGE_STYLE).toContain("url(/fonts/geist/geist-latin-wght-normal.woff2)");
     expect(PAGE_STYLE).toContain("url(/fonts/geist-mono/geist-mono-latin-wght-normal.woff2)");
     expect(PAGE_STYLE).not.toContain("url(./files/");
@@ -43,7 +43,7 @@ describe("the api pages' stylesheet", () => {
 describe("the consent page", () => {
   const html = consentPage("?sig=s", CONSENTING);
 
-  it("marks its card and its primary button", () => {
+  it("puts data-marks on its card and its Connect button", () => {
     expect(html).toContain('<div data-slot="card" data-marks>');
     expect(html).toContain(
       '<button type="submit" data-variant="default" data-marks>Connect</button>',
@@ -52,36 +52,36 @@ describe("the consent page", () => {
   });
 });
 
-describe("the theme a person keeps", () => {
+describe("the person's saved theme", () => {
   const pages = {
     consent: consentPage("?sig=s", CONSENTING),
     refused: refusedPage(REFUSAL_PAGES.crossSite),
     signIn: signInPage(REFUSAL_PAGES.sessionEnded, "?sig=s"),
   };
 
-  it.each(Object.entries(pages))("is painted by the web's script on the %s page", (_name, html) => {
+  it.each(Object.entries(pages))("is applied by the web's script on the %s page", (_name, html) => {
     const script = `<script>${FIRST_PAINT}</script>`;
     expect(html.split(script)).toHaveLength(2);
     expect(html.indexOf(script)).toBeLessThan(html.indexOf("<style>"));
     expect(html.indexOf(script)).toBeLessThan(html.indexOf("</head>"));
   });
 
-  it("is read by a script that closes no tag", () => {
+  it("is applied by a script that contains no </ sequence", () => {
     expect(FIRST_PAINT).not.toContain("</");
   });
 });
 
-describe("the font mounts", () => {
+describe("the font routes", () => {
   const server = new Hono();
   serveFaces(server);
 
-  it("serve a face the stylesheet names", async () => {
+  it("serve a font file the stylesheet names", async () => {
     const answered = await server.request("/fonts/geist/geist-latin-wght-normal.woff2");
     expect(answered.status).toBe(200);
     expect(answered.headers.get("content-type")).toBe("font/woff2");
   });
 
-  it("pass a name the package lacks to what follows", async () => {
+  it("answer 404 for a font file the package lacks", async () => {
     const answered = await server.request("/fonts/geist/nothing-here.woff2");
     expect(answered.status).toBe(404);
   });

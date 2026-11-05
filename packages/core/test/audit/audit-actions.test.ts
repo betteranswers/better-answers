@@ -8,8 +8,8 @@ import {
   renderAuditActions,
 } from "../../scripts/audit-actions.ts";
 
-describe("the web's list of declared audit actions", () => {
-  it("is byte-identical to a regeneration, so hand edits fail", async () => {
+describe("the web's generated list of declared audit actions", () => {
+  it("matches a fresh generation exactly, so hand edits fail", async () => {
     expect(readFileSync(AUDIT_ACTIONS_MODULE, "utf8")).toBe(
       renderAuditActions(await declaredDetailKeys()),
     );
@@ -21,7 +21,7 @@ describe("the web's list of declared audit actions", () => {
     );
   });
 
-  it("lists actions in code-unit order, then headlines, then detail keys", () => {
+  it("sorts actions by code unit, then headlines, then detail keys", () => {
     expect(
       renderAuditActions({
         "people.member.role_changed": ["role", "previousRole"],

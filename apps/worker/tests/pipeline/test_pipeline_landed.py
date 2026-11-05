@@ -46,7 +46,7 @@ WORKSPACE = "01M2Q3R4S5T6V7W8X9YZAB0000"
 CONNECTED_SOURCE = "01M2B1ND1NGAAAAAAAAAAAAAAA"
 
 
-THE_SAFE_SET: Mapping[str, bool] = {"default_on": True, "default_off": False}
+DEFAULT_RULES: Mapping[str, bool] = {"default_on": True, "default_off": False}
 
 
 SEED = "b0f3a1d2c4e5"
@@ -77,7 +77,7 @@ A_DELIVERY_NOTE_SUPPRESSED = (
 )
 
 
-HER_ERASURE_REQUEST = suppression_of(
+PRIYA_SUPPRESSION = suppression_of(
     {
         "emails": ("priya.raman@meridianfenland.co.uk",),
         "names": ("Priya Raman",),
@@ -86,7 +86,7 @@ HER_ERASURE_REQUEST = suppression_of(
 )
 
 
-NOTHING_SWITCHABLE: Mapping[str, bool] = {"default_on": False, "default_off": False}
+SWITCHABLE_RULES_OFF: Mapping[str, bool] = {"default_on": False, "default_off": False}
 
 
 A_ROTA_ID = "01M2Q3R4S5T6V7W8X9YZAB0008"
@@ -183,7 +183,7 @@ def fixture_bytes(name: str) -> bytes:
     return (CONVERSION_FIXTURES / name).read_bytes()
 
 
-class ABucket:
+class FakeBucket:
     def __init__(self, objects: Mapping[str, bytes]) -> None:
         self.objects = dict(objects)
         self.reads: list[str] = []
@@ -219,8 +219,8 @@ THE_INVOICE = a_landed_document(AN_INVOICE_ID)
 THE_DELIVERY_NOTE = a_landed_document(A_DELIVERY_NOTE_ID)
 
 
-def a_bucket_holding_both() -> ABucket:
-    return ABucket(
+def bucket_with_invoice_and_note() -> FakeBucket:
+    return FakeBucket(
         {
             THE_INVOICE.original_key: AN_INVOICE.encode(),
             THE_DELIVERY_NOTE.original_key: A_DELIVERY_NOTE.encode(),
@@ -239,18 +239,18 @@ def a_sync(reason: str = "connected") -> Sync:
     )
 
 
-def read_the_copies(
+def redact_copies(
     bootstrap: Bootstrap,
-    bucket: ABucket,
+    bucket: FakeBucket,
     documents: Sequence[LandedDocument],
     *,
-    rules_in_force: Mapping[str, bool] = THE_SAFE_SET,
+    rules_in_force: Mapping[str, bool] = DEFAULT_RULES,
     detection_key: str | None = None,
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> LandedSync:
-    # cocoindex can still hold the app name the last read registered, so each read
-    # opens its own Host.
+    # cocoindex may keep the app name that the previous read registered, so each
+    # read opens its own Host.
     with Host(bootstrap) as host:
         return redact_landed_copies(
             host,
@@ -279,12 +279,12 @@ def text_of(answer: LandedSync, document_id: str) -> str:
     )
 
 
-def test_a_landed_copy_returns_with_its_withheld_spans_written_out(
+def test_reading_a_landed_copy_returns_its_redacted_text(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
 
-    answer = read_the_copies(bootstrap, bucket, (THE_INVOICE,))
+    answer = redact_copies(bootstrap, bucket, (THE_INVOICE,))
 
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
     assert answer.documents[0].redacted.verdict is None
@@ -303,7 +303,7 @@ def bytes_of(bootstrap: Bootstrap, store: str) -> bytes:
         return bytes_under(host.store_directory(a_sync(), store))
 
 
-A_MEMO_THAT_KEEPS_ITS_TEXT = """
+CONTROL_MEMO_SCRIPT = """
 import sys
 
 import cocoindex as coco
@@ -343,13 +343,13 @@ coco.App(
 """
 
 
-def a_control_memo_over(sentence: bytes, store: Path) -> None:
+def run_control_memo(sentence: bytes, store: Path) -> None:
     store.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         (
             sys.executable,
             "-c",
-            A_MEMO_THAT_KEEPS_ITS_TEXT,
+            CONTROL_MEMO_SCRIPT,
             str(store),
             sentence.decode(),
         ),
@@ -363,57 +363,59 @@ def a_control_memo_over(sentence: bytes, store: Path) -> None:
     )
 
 
-A_SENTENCE_OF_THE_INVOICE = b"Invoice 2026-041 is due on receipt."
+AN_INVOICE_SENTENCE = b"Invoice 2026-041 is due on receipt."
 
 
-A_PLACEHOLDER_WORD = b"[withheld]"
+PLACEHOLDER = b"[withheld]"
 
 
-THE_RULE_THE_MEMO_STORES = b"UK_BANK_ACCOUNT"
+BANK_ACCOUNT_RULE = b"UK_BANK_ACCOUNT"
 
 
-HER_NAME = b"Priya Raman"
+PRIYA_NAME = b"Priya Raman"
 
 
-def test_neither_store_holds_any_text_the_seam_withheld(
+def test_neither_store_contains_document_text_or_withheld_values(
     bootstrap: Bootstrap, tmp_path: Path
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
     control = tmp_path / "a-control" / FINDINGS_STORE
 
-    read_the_copies(bootstrap, bucket, (THE_INVOICE,))
-    a_control_memo_over(A_SENTENCE_OF_THE_INVOICE, control)
+    redact_copies(bootstrap, bucket, (THE_INVOICE,))
+    run_control_memo(AN_INVOICE_SENTENCE, control)
 
     findings, passage_store = (
         bytes_of(bootstrap, FINDINGS_STORE),
         bytes_of(bootstrap, CONNECTED_SOURCE_STORE),
     )
 
-    assert THE_RULE_THE_MEMO_STORES in findings, (
-        "the control: the scan finds what each store holds"
+    assert BANK_ACCOUNT_RULE in findings, (
+        "the findings store does not contain the rule id, so the scan is broken"
     )
-    assert A_SENTENCE_OF_THE_INVOICE in bytes_under(control)
+    assert AN_INVOICE_SENTENCE in bytes_under(control), (
+        "the control memo store does not contain the sentence it memoised"
+    )
     for held in (findings, passage_store):
         assert THE_ACCOUNT_NUMBER.encode() not in held
         assert b"00-00-00" not in held
-        assert A_PLACEHOLDER_WORD not in held
-        assert A_SENTENCE_OF_THE_INVOICE not in held
+        assert PLACEHOLDER not in held
+        assert AN_INVOICE_SENTENCE not in held
 
 
-def test_a_wipe_spares_the_memo_and_erases_the_named_person(
+def test_removing_the_source_store_keeps_findings_and_erases_the_name(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
     both = (THE_INVOICE, THE_DELIVERY_NOTE)
     erased = (
         THE_INVOICE,
-        a_landed_document(A_DELIVERY_NOTE_ID, suppressions=(HER_ERASURE_REQUEST,)),
+        a_landed_document(A_DELIVERY_NOTE_ID, suppressions=(PRIYA_SUPPRESSION,)),
     )
 
-    read_the_copies(bootstrap, bucket, both)
+    redact_copies(bootstrap, bucket, both)
     with Host(bootstrap) as opened:
         opened.remove_connected_source_store(a_sync())
-    answer = read_the_copies(bootstrap, bucket, erased)
+    answer = redact_copies(bootstrap, bucket, erased)
 
     assert answer.detected_afresh == ()
     assert text_of(answer, A_DELIVERY_NOTE_ID) == A_DELIVERY_NOTE_SUPPRESSED
@@ -421,19 +423,19 @@ def test_a_wipe_spares_the_memo_and_erases_the_named_person(
         bytes_of(bootstrap, FINDINGS_STORE),
         bytes_of(bootstrap, CONNECTED_SOURCE_STORE),
     )
-    assert THE_RULE_THE_MEMO_STORES in findings
+    assert BANK_ACCOUNT_RULE in findings
     for held in (findings, passage_store):
-        assert HER_NAME not in held
+        assert PRIYA_NAME not in held
 
 
 def test_a_second_sync_over_an_unchanged_document_detects_nothing_afresh(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
     both = (THE_INVOICE, THE_DELIVERY_NOTE)
 
-    first = read_the_copies(bootstrap, bucket, both)
-    again = read_the_copies(bootstrap, bucket, both)
+    first = redact_copies(bootstrap, bucket, both)
+    again = redact_copies(bootstrap, bucket, both)
 
     assert sorted(first.detected_afresh) == [AN_INVOICE_ID, A_DELIVERY_NOTE_ID]
     assert again.detected_afresh == ()
@@ -444,15 +446,15 @@ def test_a_second_sync_over_an_unchanged_document_detects_nothing_afresh(
 def test_a_suppression_withholds_the_name_without_rerunning_the_detector(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
     before = (THE_INVOICE, THE_DELIVERY_NOTE)
     after = (
         THE_INVOICE,
-        a_landed_document(A_DELIVERY_NOTE_ID, suppressions=(HER_ERASURE_REQUEST,)),
+        a_landed_document(A_DELIVERY_NOTE_ID, suppressions=(PRIYA_SUPPRESSION,)),
     )
 
-    read_the_copies(bootstrap, bucket, before)
-    answer = read_the_copies(bootstrap, bucket, after)
+    redact_copies(bootstrap, bucket, before)
+    answer = redact_copies(bootstrap, bucket, after)
 
     assert answer.detected_afresh == ()
     assert text_of(answer, A_DELIVERY_NOTE_ID) == A_DELIVERY_NOTE_SUPPRESSED
@@ -463,14 +465,14 @@ def test_a_later_erasure_withholds_her_work_address_next_sync(
     bootstrap: Bootstrap,
 ) -> None:
     rota = a_landed_document(A_ROTA_ID)
-    bucket = ABucket({rota.original_key: A_ROTA.encode()})
-    erased = a_landed_document(A_ROTA_ID, suppressions=(HER_ERASURE_REQUEST,))
+    bucket = FakeBucket({rota.original_key: A_ROTA.encode()})
+    erased = a_landed_document(A_ROTA_ID, suppressions=(PRIYA_SUPPRESSION,))
 
-    first = read_the_copies(
-        bootstrap, bucket, (rota,), rules_in_force=NOTHING_SWITCHABLE
+    first = redact_copies(
+        bootstrap, bucket, (rota,), rules_in_force=SWITCHABLE_RULES_OFF
     )
-    answer = read_the_copies(
-        bootstrap, bucket, (erased,), rules_in_force=NOTHING_SWITCHABLE
+    answer = redact_copies(
+        bootstrap, bucket, (erased,), rules_in_force=SWITCHABLE_RULES_OFF
     )
 
     assert text_of(first, A_ROTA_ID) == A_ROTA
@@ -479,10 +481,10 @@ def test_a_later_erasure_withholds_her_work_address_next_sync(
     assert answer.documents[0].redacted.findings == first.documents[0].redacted.findings
 
 
-def test_a_keep_restores_the_span_and_detects_nothing_afresh(
+def test_a_restore_returns_the_original_span_and_detects_nothing_afresh(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
     before = (THE_INVOICE, THE_DELIVERY_NOTE)
     after = (
         a_landed_document(
@@ -492,34 +494,34 @@ def test_a_keep_restores_the_span_and_detects_nothing_afresh(
         THE_DELIVERY_NOTE,
     )
 
-    read_the_copies(bootstrap, bucket, before)
-    answer = read_the_copies(bootstrap, bucket, after)
+    redact_copies(bootstrap, bucket, before)
+    answer = redact_copies(bootstrap, bucket, after)
 
     assert answer.detected_afresh == ()
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE
     assert text_of(answer, A_DELIVERY_NOTE_ID) == A_DELIVERY_NOTE
 
 
-AN_INVOICE_KEPT_BUT_ERASED = (
+AN_INVOICE_RESTORED_WITH_ACCOUNT_ERASED = (
     "Invoice 2026-041 is due on receipt.\n\n"
     "The sort code is 00-00-00 and the account number is [withheld].\n\n"
     "Delivery follows within ten working days of a signed order.\n"
 )
 
 
-def test_a_kept_span_keeps_an_erased_identifier_inside_withheld(
+def test_an_erased_identifier_inside_a_restored_span_stays_withheld(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
     kept = Restore(rule_id="UK_BANK_ACCOUNT", start=54, end=97)
     her_account = suppression_of(
         {"emails": (), "names": (), "other": (THE_ACCOUNT_NUMBER,)}
     )
 
-    read_the_copies(
+    redact_copies(
         bootstrap, bucket, (a_landed_document(AN_INVOICE_ID, restores=(kept,)),)
     )
-    answer = read_the_copies(
+    answer = redact_copies(
         bootstrap,
         bucket,
         (
@@ -530,17 +532,17 @@ def test_a_kept_span_keeps_an_erased_identifier_inside_withheld(
     )
 
     assert answer.detected_afresh == ()
-    assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_KEPT_BUT_ERASED
+    assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_RESTORED_WITH_ACCOUNT_ERASED
 
 
-def test_a_moved_detection_key_detects_every_document_afresh(
+def test_a_changed_detection_key_detects_every_document_afresh(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
     both = (THE_INVOICE, THE_DELIVERY_NOTE)
 
-    read_the_copies(bootstrap, bucket, both)
-    answer = read_the_copies(
+    redact_copies(bootstrap, bucket, both)
+    answer = redact_copies(
         bootstrap, bucket, both, detection_key="a-recogniser-nobody-shipped-yet"
     )
 
@@ -550,11 +552,11 @@ def test_a_moved_detection_key_detects_every_document_afresh(
 def test_a_rule_switched_off_on_the_source_detects_nothing_afresh(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
     both = (THE_INVOICE, THE_DELIVERY_NOTE)
 
-    read_the_copies(bootstrap, bucket, both)
-    answer = read_the_copies(
+    redact_copies(bootstrap, bucket, both)
+    answer = redact_copies(
         bootstrap,
         bucket,
         both,
@@ -565,17 +567,17 @@ def test_a_rule_switched_off_on_the_source_detects_nothing_afresh(
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_a_moved_normalised_text_detects_that_document_and_no_other(
+def test_changed_normalised_text_detects_only_that_document_afresh(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
     both = (THE_INVOICE, THE_DELIVERY_NOTE)
 
-    read_the_copies(bootstrap, bucket, both)
+    redact_copies(bootstrap, bucket, both)
     bucket.objects[THE_DELIVERY_NOTE.original_key] = A_DELIVERY_NOTE.replace(
         "The depot opens at seven.", "The depot opens at six."
     ).encode()
-    answer = read_the_copies(bootstrap, bucket, both)
+    answer = redact_copies(bootstrap, bucket, both)
 
     assert answer.detected_afresh == (A_DELIVERY_NOTE_ID,)
 
@@ -583,19 +585,19 @@ def test_a_moved_normalised_text_detects_that_document_and_no_other(
 def test_another_converter_over_the_same_normalised_text_detects_nothing_afresh(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
     as_markdown = a_landed_document(AN_INVOICE_ID, media_type="text/markdown")
     as_plain_text = a_landed_document(AN_INVOICE_ID, media_type="text/plain")
 
-    first = read_the_copies(bootstrap, bucket, (as_markdown,))
-    answer = read_the_copies(bootstrap, bucket, (as_plain_text,))
+    first = redact_copies(bootstrap, bucket, (as_markdown,))
+    answer = redact_copies(bootstrap, bucket, (as_plain_text,))
 
     assert first.detected_afresh == (AN_INVOICE_ID,)
     assert answer.detected_afresh == ()
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_the_memoised_functions_identity_is_six_facts() -> None:
+def test_the_memoised_detector_identity_has_the_expected_six_fields() -> None:
     assert dict(THE_MEMOS_IDENTITY) == {
         "app": "landed",
         "directory": "findings",
@@ -607,13 +609,13 @@ def test_the_memoised_functions_identity_is_six_facts() -> None:
     assert getattr(pipeline, THE_MEMOS_IDENTITY["qualified_name"]) is detected
 
 
-THE_TIERS_SOURCE = WORKER_ROOT / "src"
+WORKER_SOURCE = WORKER_ROOT / "src"
 
 
-def test_the_detector_is_the_only_function_the_estate_memoises() -> None:
+def test_the_detector_is_the_only_memoised_function_in_the_worker() -> None:
     memoised = sorted(
-        (str(path.relative_to(THE_TIERS_SOURCE)), line.strip())
-        for path in THE_TIERS_SOURCE.rglob("*.py")
+        (str(path.relative_to(WORKER_SOURCE)), line.strip())
+        for path in WORKER_SOURCE.rglob("*.py")
         for line in path.read_text(encoding="utf-8").splitlines()
         if "memo=True" in line
     )
@@ -626,18 +628,18 @@ def test_the_detector_is_the_only_function_the_estate_memoises() -> None:
     ]
 
 
-def test_only_the_text_and_detection_key_reach_the_memos_key() -> None:
+def test_the_memo_key_uses_only_the_text_and_detection_key() -> None:
     assert list(signature(raised_by_the_detector).parameters) == [
         "normalised_text",
         "detection_key",
     ]
 
 
-def test_the_normalised_redacted_text_lands_under_the_documents_normalised_key(
+def test_writes_the_redacted_text_under_the_documents_normalised_key(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
-    answer = read_the_copies(bootstrap, bucket, (THE_INVOICE,))
+    bucket = bucket_with_invoice_and_note()
+    answer = redact_copies(bootstrap, bucket, (THE_INVOICE,))
 
     write_normalised_copies(bucket, answer.documents)
 
@@ -649,16 +651,16 @@ def test_the_normalised_redacted_text_lands_under_the_documents_normalised_key(
 def test_reading_the_landed_copies_writes_nothing_to_the_bucket(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
 
-    read_the_copies(bootstrap, bucket, (THE_INVOICE,))
+    redact_copies(bootstrap, bucket, (THE_INVOICE,))
 
     assert bucket.reads == [THE_INVOICE.original_key]
     assert bucket.writes == []
     assert bucket.objects[THE_INVOICE.original_key] == AN_INVOICE.encode()
 
 
-def test_a_landed_copy_is_reached_under_the_workspaces_own_prefix() -> None:
+def test_the_object_key_starts_with_the_workspace_prefix() -> None:
     assert (
         object_key_of(WORKSPACE, "documents/01m2q3r4s5t6v7w8x9yzab0001/original")
         == "workspaces/01M2Q3R4S5T6V7W8X9YZAB0000"
@@ -671,20 +673,20 @@ def test_markdown_and_plain_text_pass_through_as_the_normalised_text(
     bootstrap: Bootstrap, media_type: str
 ) -> None:
     document = a_landed_document(AN_INVOICE_ID, media_type=media_type)
-    bucket = ABucket({document.original_key: AN_INVOICE.encode()})
+    bucket = FakeBucket({document.original_key: AN_INVOICE.encode()})
 
-    answer = read_the_copies(bootstrap, bucket, (document,))
+    answer = redact_copies(bootstrap, bucket, (document,))
 
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_plain_text_lands_redacted_and_cut_into_several_passages(
+def test_plain_text_is_redacted_and_split_into_several_passages(
     bootstrap: Bootstrap,
 ) -> None:
     terms = a_landed_document(A_TERMS_ID, media_type="text/plain")
-    bucket = ABucket({terms.original_key: fixture_bytes("delivery-terms.txt")})
+    bucket = FakeBucket({terms.original_key: fixture_bytes("delivery-terms.txt")})
 
-    answer = read_the_copies(bootstrap, bucket, (terms,))
+    answer = redact_copies(bootstrap, bucket, (terms,))
     passages = answer.documents[0].passages
 
     assert text_of(answer, A_TERMS_ID) == A_TERMS_REDACTED
@@ -702,9 +704,9 @@ def test_redacts_a_docx_converted_to_markdown_with_its_table(
     bootstrap: Bootstrap,
 ) -> None:
     policy = a_landed_document(A_POLICY_ID, media_type=DOCX_MEDIA_TYPE)
-    bucket = ABucket({policy.original_key: fixture_bytes("expenses-policy.docx")})
+    bucket = FakeBucket({policy.original_key: fixture_bytes("expenses-policy.docx")})
 
-    answer = read_the_copies(bootstrap, bucket, (policy,))
+    answer = redact_copies(bootstrap, bucket, (policy,))
 
     assert text_of(answer, A_POLICY_ID) == A_POLICY_REDACTED
     assert "| Hotel | 120 |" in text_of(answer, A_POLICY_ID)
@@ -718,9 +720,9 @@ def test_redacts_a_docx_converted_to_markdown_with_its_table(
 
 def test_a_pdf_converts_to_markdown_with_its_table(bootstrap: Bootstrap) -> None:
     rate_card = a_landed_document(A_RATE_CARD_ID, media_type=PDF_MEDIA_TYPE)
-    bucket = ABucket({rate_card.original_key: fixture_bytes("rate-card.pdf")})
+    bucket = FakeBucket({rate_card.original_key: fixture_bytes("rate-card.pdf")})
 
-    answer = read_the_copies(bootstrap, bucket, (rate_card,))
+    answer = redact_copies(bootstrap, bucket, (rate_card,))
 
     assert text_of(answer, A_RATE_CARD_ID) == A_RATE_CARD_CONVERTED
     assert "|Survey|450|" in text_of(answer, A_RATE_CARD_ID)
@@ -729,18 +731,18 @@ def test_a_pdf_converts_to_markdown_with_its_table(bootstrap: Bootstrap) -> None
     )
 
 
-def test_a_pdf_with_a_textless_page_is_unreadable_whole(
+def test_marks_a_pdf_with_a_textless_page_unreadable(
     bootstrap: Bootstrap,
 ) -> None:
     scan = a_landed_document(A_SCAN_ID, media_type=PDF_MEDIA_TYPE)
-    bucket = ABucket(
+    bucket = FakeBucket(
         {
             scan.original_key: fixture_bytes("scanned-invoice.pdf"),
             THE_DELIVERY_NOTE.original_key: A_DELIVERY_NOTE.encode(),
         }
     )
 
-    answer = read_the_copies(bootstrap, bucket, (scan, THE_DELIVERY_NOTE))
+    answer = redact_copies(bootstrap, bucket, (scan, THE_DELIVERY_NOTE))
 
     assert unreadable_of(answer) == {A_SCAN_ID: "NeedsOcrError"}
     assert [document.source_document_id for document in answer.documents] == [
@@ -748,18 +750,18 @@ def test_a_pdf_with_a_textless_page_is_unreadable_whole(
     ]
 
 
-def test_an_unreadable_document_takes_no_neighbour_with_it(
+def test_an_unreadable_document_does_not_affect_the_other_documents(
     bootstrap: Bootstrap,
 ) -> None:
     truncated = a_landed_document(A_TRUNCATED_ID, media_type=DOCX_MEDIA_TYPE)
-    bucket = ABucket(
+    bucket = FakeBucket(
         {
             truncated.original_key: fixture_bytes("expenses-policy.docx")[:400],
             THE_DELIVERY_NOTE.original_key: A_DELIVERY_NOTE.encode(),
         }
     )
 
-    answer = read_the_copies(bootstrap, bucket, (truncated, THE_DELIVERY_NOTE))
+    answer = redact_copies(bootstrap, bucket, (truncated, THE_DELIVERY_NOTE))
 
     assert list(unreadable_of(answer)) == [A_TRUNCATED_ID]
     assert unreadable_of(answer)[A_TRUNCATED_ID] != ""
@@ -769,19 +771,21 @@ def test_an_unreadable_document_takes_no_neighbour_with_it(
     ]
 
 
-def test_marks_an_unlisted_media_type_unreadable_without_guessing(
+def test_marks_an_unsupported_media_type_unreadable(
     bootstrap: Bootstrap,
 ) -> None:
     spreadsheet = a_landed_document(A_TRUNCATED_ID, media_type="application/zip")
-    bucket = ABucket({spreadsheet.original_key: fixture_bytes("expenses-policy.docx")})
+    bucket = FakeBucket(
+        {spreadsheet.original_key: fixture_bytes("expenses-policy.docx")}
+    )
 
-    answer = read_the_copies(bootstrap, bucket, (spreadsheet,))
+    answer = redact_copies(bootstrap, bucket, (spreadsheet,))
 
     assert unreadable_of(answer) == {A_TRUNCATED_ID: "UnsupportedMediaType"}
     assert answer.documents == ()
 
 
-def test_tells_anydoc_to_reject_ocr_so_nothing_unredacted_leaves(
+def test_converts_with_anydoc_ocr_set_to_reject(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import anydoc
@@ -802,19 +806,19 @@ def test_tells_anydoc_to_reject_ocr_so_nothing_unredacted_leaves(
     assert asked == [("docx", "reject", {})]
 
 
-def test_the_converter_pin_names_both_libraries_outside_the_memos_key() -> None:
+def test_converter_pin_names_both_libraries_and_is_outside_memo_identity() -> None:
     assert converter_pin_of("0.2.4", "1.22.0") == "anydoc-0.2.4+pdf-inspector-1.22.0"
     assert converter_pin_of("0.2.5", "1.22.0") != converter_pin_of("0.2.4", "1.22.0")
     assert converter_pin_of("0.2.4", "1.23.0") != converter_pin_of("0.2.4", "1.22.0")
     assert CONVERTER_PIN not in THE_MEMOS_IDENTITY.values()
 
 
-def test_the_document_row_keeps_the_seams_version_not_the_converters(
+def test_the_redacted_version_names_the_rule_and_detector_not_converter(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
 
-    answer = read_the_copies(bootstrap, bucket, (THE_INVOICE,))
+    answer = redact_copies(bootstrap, bucket, (THE_INVOICE,))
 
     assert answer.documents[0].redacted.version == f"{RULE_VERSION}:{DETECTOR_PIN}"
     assert CONVERTER_PIN not in answer.documents[0].redacted.version
@@ -828,7 +832,7 @@ def test_the_timeout_is_per_page_cost_times_pages_plus_margin() -> None:
     assert timeout_for(12) - timeout_for(11) == timeout_for(1) - timeout_for(0)
 
 
-def test_reads_pdf_pages_and_measures_other_types_by_s0s_page() -> None:
+def test_counts_pdf_pages_and_estimates_other_types_from_their_size() -> None:
     assert pages_of(fixture_bytes("rate-card.pdf"), PDF_MEDIA_TYPE) == 1
     assert pages_of(b"", "text/markdown") == 1
     assert pages_of(b"a" * 3107, "text/markdown") == 1
@@ -837,12 +841,12 @@ def test_reads_pdf_pages_and_measures_other_types_by_s0s_page() -> None:
     assert pages_of(fixture_bytes("expenses-policy.docx"), DOCX_MEDIA_TYPE) == 12
 
 
-def test_marks_a_document_past_its_ceiling_unreadable_and_finishes(
+def test_marks_a_document_that_times_out_unreadable(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
 
-    answer = read_the_copies(
+    answer = redact_copies(
         bootstrap, bucket, (THE_INVOICE,), ms_per_page=0, margin_ms=0
     )
 
@@ -850,23 +854,23 @@ def test_marks_a_document_past_its_ceiling_unreadable_and_finishes(
     assert answer.documents == ()
 
 
-def test_the_same_document_under_the_shipped_ceiling_lands(
+def test_the_same_document_completes_within_the_default_timeout(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
 
-    answer = read_the_copies(bootstrap, bucket, (THE_INVOICE,))
+    answer = redact_copies(bootstrap, bucket, (THE_INVOICE,))
 
     assert answer.unreadable == ()
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_cuts_passages_from_the_redacted_text_never_the_original(
+def test_cuts_passages_from_the_redacted_text_not_the_original(
     bootstrap: Bootstrap,
 ) -> None:
-    bucket = a_bucket_holding_both()
+    bucket = bucket_with_invoice_and_note()
 
-    answer = read_the_copies(bootstrap, bucket, (THE_INVOICE,))
+    answer = redact_copies(bootstrap, bucket, (THE_INVOICE,))
     passages: tuple[Passage, ...] = answer.documents[0].passages
 
     assert "".join(passage.content for passage in passages) == AN_INVOICE_REDACTED
@@ -875,7 +879,7 @@ def test_cuts_passages_from_the_redacted_text_never_the_original(
     assert passages[0].locator.startswith(f"{AN_INVOICE_ID}/chars:0-")
 
 
-def test_a_suppression_holds_sorted_pairs_giving_one_key_per_set() -> None:
+def test_a_suppression_sorts_its_identifiers_so_equal_sets_compare_equal() -> None:
     one = suppression_of({"name": ("Priya Raman",), "email": ("p@example.test",)})
     other = suppression_of({"email": ("p@example.test",), "name": ("Priya Raman",)})
 

@@ -4,7 +4,7 @@ export const holdingAt =
     at === pause ? held : Promise.resolve();
 
 export const abortingAt =
-  (pause: number, leaving: AbortController) =>
+  (pause: number, abortController: AbortController) =>
   async (at: number): Promise<void> => {
-    if (at === pause) leaving.abort();
+    if (at === pause) abortController.abort();
   };

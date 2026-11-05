@@ -50,8 +50,8 @@ type Tree =
   | { readonly kind: "atom"; readonly text: string };
 
 /**
- * The stored tree rather than `pg_get_constraintdef`'s SQL, where a quoted string or a pattern
- * could hide a column's name.
+ * Parses the stored expression tree, not `pg_get_constraintdef`'s SQL, where a quoted string or a
+ * pattern could hide a column name.
  */
 const TOKEN = /"(?:\\.|[^"\\])*"|[{}()[\]]|(?:\\.|[^\s{}()[\]"\\])+/gu;
 
@@ -137,7 +137,7 @@ const guardsAmong = (tree: Extract<Tree, { kind: "node" }>): readonly string[] =
   );
 };
 
-/** A NULL written into a CHECK answers as a NULL column does, so `x IN ('a', NULL)` is a read. */
+/** A NULL literal in a CHECK behaves like a NULL column, so `x IN ('a', NULL)` counts as a read. */
 const WRITTEN_NULL = "NULL";
 
 const readsAt = (
@@ -248,7 +248,7 @@ describe("every CHECK the migrated database holds", () => {
 });
 
 describe("the NULL-safety gate over the CHECKs", () => {
-  it("flags an unreadable CHECK reading its nullable outcome with =", async () => {
+  it("flags the unreadable-reason CHECK reading nullable outcome with =", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query(
         'ALTER TABLE "source_document" DROP CONSTRAINT "source_document_unreadable_reason_check"',
@@ -271,9 +271,10 @@ describe("the NULL-safety gate over the CHECKs", () => {
 
   it.each(NULL_SAFE_IDIOMS)("admits $idiom", async ({ example, why }) => {
     await withRollback(db.pool, async (client) => {
-      expect(await readsOfEach(client, [onTheProbe(example)]), `because ${why}`).toEqual([
-        [onTheProbe(example), []],
-      ]);
+      expect(
+        await readsOfEach(client, [onTheProbe(example)]),
+        `the gate flagged an idiom that is NULL-safe because ${why}`,
+      ).toEqual([[onTheProbe(example), []]]);
     });
   });
 

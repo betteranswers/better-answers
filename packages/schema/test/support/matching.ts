@@ -1,6 +1,6 @@
 import { expect } from "vitest";
 
-/** vitest types each asymmetric matcher as `any`; these hand the same matcher back as `unknown`. */
+/** Vitest types each asymmetric matcher as `any`. These return the same matcher typed as `unknown`. */
 export const matching = {
   any: (type: unknown): unknown => expect.any(type),
   anything: (): unknown => expect.anything(),

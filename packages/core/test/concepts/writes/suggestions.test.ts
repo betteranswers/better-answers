@@ -284,7 +284,7 @@ const trustOf = async (scenario: Scenario, iri: ConceptIri) => {
 };
 
 describe("a suggestion set", () => {
-  it("waits with no target, leaving identity to the acceptance", async () => {
+  it("waits without a target until acceptance resolves its identity", async () => {
     const scenario = await arrange();
 
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
@@ -294,7 +294,7 @@ describe("a suggestion set", () => {
     expect(row).toMatchObject({ status: "waiting", target_iri: null, decider: null });
   });
 
-  it("re-renders its summary against concept_identity every time it is opened", async () => {
+  it("re-renders its summary from `concept_identity` on every open", async () => {
     const scenario = await arrange();
     const request = requestFor();
     const set = await submitted(scenario, scenario.editor, "edit", [request]);
@@ -363,7 +363,7 @@ describe("a suggestion set", () => {
     ]);
   });
 
-  it("shows a member an unminted set as empty, not refused", async () => {
+  it("shows a member an unknown set as empty, not refused", async () => {
     const scenario = await arrange();
 
     const read = await readingAs(db().runtimePool, scenario.editor, (principal, tx) =>
@@ -373,7 +373,7 @@ describe("a suggestion set", () => {
     expect(read).toEqual({ ok: true, value: [] });
   });
 
-  it("hands a caller the store's failure, not an empty set", async () => {
+  it("gives a caller the store's failure, not an empty set", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     let read: Result<unknown, unknown> | undefined;
@@ -388,7 +388,7 @@ describe("a suggestion set", () => {
     expect(read).toEqual({ ok: false, error: matching.any(Error) });
   });
 
-  it("is invisible to another workspace, whoever asks for it", async () => {
+  it("is hidden from another workspace, whoever asks", async () => {
     const here = await arrange();
     const there = await arrange();
     const set = await submitted(there, there.editor, "edit", [requestFor()]);
@@ -402,7 +402,7 @@ describe("a suggestion set", () => {
 });
 
 describe("accepting a suggestion", () => {
-  it("mints the concept, lands rows and commit, and decides together", async () => {
+  it("creates the concept, rows, commit and decision together", async () => {
     const scenario = await arrange();
     const request = requestFor();
     const set = await submitted(scenario, scenario.editor, "edit", [request]);
@@ -445,12 +445,12 @@ describe("accepting a suggestion", () => {
     expect(concept.rows).toEqual([{ iri: accepted.iri, body: request.body }]);
   });
 
-  it("lands the map delta in the acceptance's own transaction", async () => {
+  it("writes the map changes in the acceptance's own transaction", async () => {
     const scenario = await arrange();
 
     const { input: cited, written } = await editorWrote(scenario);
     const filename = cited.path.split("/").at(-1);
-    assert(filename !== undefined, "the cited path names a file");
+    assert(filename !== undefined, "the cited path has no file name");
     const set = await submitted(scenario, scenario.editor, "edit", [
       requestFor({ body: `See [the policy](./${filename}) for the rule.` }),
     ]);
@@ -516,7 +516,7 @@ describe("accepting a suggestion", () => {
     });
   });
 
-  it("decides each batched decision by its own target's owner", async () => {
+  it("decides each batched item by its own target's owner", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.viewer, "edit", [
       requestFor(),
@@ -564,7 +564,7 @@ describe("accepting a suggestion", () => {
     expect(facts.author).toContain(admin.name);
   });
 
-  it("never names another workspace's person as author, whatever is claimed", async () => {
+  it("never names another workspace's person as author, whatever the claim", async () => {
     const here = await arrange();
     const elsewhere = await arrange();
     const stranger = await personOf(elsewhere.editor.userId);
@@ -602,7 +602,7 @@ describe("accepting a suggestion", () => {
     expect([...batches][0]).not.toBeNull();
   });
 
-  it("re-writes the concept its merge key resolves to, minting none", async () => {
+  it("re-writes the concept its merge key resolves to, creating none", async () => {
     const scenario = await arrange();
     const { written, set } = await proposedAgainst(scenario, "edit");
 
@@ -635,7 +635,7 @@ describe("accepting a suggestion", () => {
     expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({ status: "waiting" });
   });
 
-  it("answers another workspace's suggestion as one nobody minted", async () => {
+  it("answers another workspace's suggestion as if it did not exist", async () => {
     const here = await arrange();
     const there = await arrange();
     const theirs = await submitted(there, there.editor, "edit", [requestFor()]);
@@ -683,8 +683,8 @@ describe("an acceptance of a suggestion that changes nothing", () => {
   });
 });
 
-describe("an acceptance whose ground moved", () => {
-  it("is returned to the proposer when its resolution has moved", async () => {
+describe("an acceptance whose basis changed", () => {
+  it("is returned to the proposer when its resolution has changed", async () => {
     const scenario = await arrange();
     const request = requestFor();
     const set = await submitted(scenario, scenario.editor, "edit", [request]);
@@ -708,7 +708,7 @@ describe("an acceptance whose ground moved", () => {
     ).toHaveLength(1);
   });
 
-  it("is refused and returned when the payload's base content moved", async () => {
+  it("is refused and returned when the payload's base content changed", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
 
@@ -742,7 +742,7 @@ describe("an acceptance whose ground moved", () => {
 });
 
 describe("declining a suggestion", () => {
-  it("records the decline with its reason, and commits nothing", async () => {
+  it("records the decline and its reason, and commits nothing", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
 
@@ -773,7 +773,7 @@ describe("declining a suggestion", () => {
     ]);
   });
 
-  it("declines as owner, recording the owner as decider", async () => {
+  it("declines as the owner, recording the owner as decider", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.viewer, "edit", [requestFor()]);
     const suggestionId = suggestionIdOf(set);
@@ -790,7 +790,7 @@ describe("declining a suggestion", () => {
     });
   });
 
-  it("judges a decline by the concept's own path", async () => {
+  it("checks a decline against the concept's own path", async () => {
     const scenario = await arrange();
     const { input, written } = await editorWrote(scenario);
     const set = await submitted(scenario, scenario.viewer, "edit", [
@@ -809,7 +809,7 @@ describe("declining a suggestion", () => {
     expect(declined).toMatchObject({ ok: true, value: { status: "declined" } });
   });
 
-  it("refuses a non-owning Editor, and a blank reason", async () => {
+  it("refuses a non-owning Editor and a blank reason", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = suggestionIdOf(set);
@@ -830,7 +830,7 @@ describe("declining a suggestion", () => {
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
   });
 
-  it("refuses a reason the column would hold as nothing", async () => {
+  it("refuses a null reason, which the nullable column would accept", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = suggestionIdOf(set);
@@ -845,7 +845,7 @@ describe("declining a suggestion", () => {
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
   });
 
-  it("refuses a suggestion nobody minted", async () => {
+  it("refuses a suggestion that does not exist", async () => {
     const scenario = await arrange();
 
     const declined = await declineSuggestion(scenario.admin, doorsOf(scenario), {
@@ -914,7 +914,7 @@ describe("declining a suggestion", () => {
 });
 
 describe("an acceptance at a path another concept holds", () => {
-  it("is refused before a commit, leaving nothing written or decided", async () => {
+  it("is refused before committing, writing and deciding nothing", async () => {
     const scenario = await arrange();
 
     const first = requestFor();
@@ -943,7 +943,7 @@ describe("an acceptance at a path another concept holds", () => {
 });
 
 describe("the platform's citation fix", () => {
-  it("re-hashes moved verifications, so Verified never becomes Changed since verified", async () => {
+  it("re-hashes moved verifications, so none turns Changed since verified", async () => {
     const scenario = await arrange();
 
     const cite = (locator: string) => ({
@@ -1005,7 +1005,7 @@ describe("the platform's citation fix", () => {
     });
   });
 
-  it("is nobody's to raise but the platform's, whatever role asks", async () => {
+  it("can be raised only by the platform, whatever role asks", async () => {
     const scenario = await arrange();
 
     const asked = await Promise.all(
@@ -1032,7 +1032,7 @@ describe("the platform's citation fix", () => {
 });
 
 describe("two actions over one suggestion", () => {
-  it("lets one of an acceptance and a decline through", async () => {
+  it("lets only one of an acceptance and a decline through", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = suggestionIdOf(set);
@@ -1089,7 +1089,7 @@ describe("two actions over one suggestion", () => {
     expect(refusals.filter((refusal) => refusal === "already-decided")).toHaveLength(1);
   });
 
-  it("refuses a write onto a held merge key before committing", async () => {
+  it("refuses a write onto a taken merge key before committing", async () => {
     const scenario = await arrange();
     const { input } = await editorWrote(scenario);
 
@@ -1104,7 +1104,7 @@ describe("two actions over one suggestion", () => {
   });
 });
 
-describe("an acceptance whose ground moved under its own lock", () => {
+describe("an acceptance whose basis changed under its own lock", () => {
   const MOVED = "the concept this suggestion resolves to moved after the set was opened";
 
   const decisionsFor = async (scenario: Scenario, setId: string) =>
@@ -1164,7 +1164,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
     expect(await countOf("concept_index", scenario.workspaceId)).toBe("0");
   });
 
-  it("returns the item when its target leaves the merge key", async () => {
+  it("returns the item when its target loses the merge key", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
     const decisions = await decisionsFor(scenario, set.setId);
@@ -1180,7 +1180,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
   });
 
-  it("throws rather than commits a decision another action made", async () => {
+  it("throws instead of committing a decision another action made", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = suggestionIdOf(set);
@@ -1220,8 +1220,8 @@ describe("an acceptance whose ground moved under its own lock", () => {
   });
 });
 
-describe("what an acceptance answers when it cannot be prepared", () => {
-  it("hands the item the store's failure, not an unminted suggestion", async () => {
+describe("what an acceptance returns when it cannot be prepared", () => {
+  it("gives the item the store's failure, not a missing suggestion", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const gone = new pg.Pool(db().runtimePool.options);
@@ -1267,7 +1267,7 @@ describe("what an acceptance answers when it cannot be prepared", () => {
     expect(facts.author).not.toContain(editor.email);
   });
 
-  it("writes one subject line however the payload's title was spaced", async () => {
+  it("writes a one-line subject however the title was spaced", async () => {
     const scenario = await arrange();
 
     const set = await submitted(scenario, scenario.editor, "edit", [
@@ -1282,7 +1282,7 @@ describe("what an acceptance answers when it cannot be prepared", () => {
 });
 
 describe("who may open a suggestion set", () => {
-  it("shows Admins any set, proposers their own, refusing everyone else", async () => {
+  it("shows Admins any set and proposers their own, refusing others", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const opened = (principal: UserPrincipal) =>
@@ -1315,7 +1315,7 @@ describe("who may open a suggestion set", () => {
     expect(opened.value.map((item) => item.proposer)).toEqual([`human:${scenario.viewer.userId}`]);
   });
 
-  it("hides unreadable resolutions from a proposer, not the deciding Admin", async () => {
+  it("hides unreadable resolutions from the proposer, not the deciding Admin", async () => {
     const scenario = await arrange();
 
     const { input, written } = await editorWrote(scenario, { sensitivity: "Restricted" });
@@ -1346,8 +1346,8 @@ describe("who may open a suggestion set", () => {
   });
 });
 
-describe("what a write may not do with an IRI", () => {
-  it("refuses a write naming an IRI this workspace never minted", async () => {
+describe("what a write cannot do with an IRI", () => {
+  it("refuses a write naming an IRI this workspace never created", async () => {
     const scenario = await arrange();
 
     const refused = await writeConcept(scenario.editor, doorsOf(scenario), {
@@ -1368,7 +1368,7 @@ describe("what a write may not do with an IRI", () => {
   });
 });
 
-describe("an acceptance reached straight through the write path", () => {
+describe("an acceptance sent directly through the write path", () => {
   const acceptanceOf = (
     input: WriteConceptInput,
     written: ConceptWritten,
@@ -1395,7 +1395,7 @@ describe("an acceptance reached straight through the write path", () => {
     expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({ status: "waiting" });
   };
 
-  it("refuses an acceptance written onto another concept", async () => {
+  it("refuses an acceptance written onto a different concept", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
     const other = await editorWrote(scenario, { expects: { head: written.sha } });
@@ -1451,7 +1451,7 @@ describe("an acceptance reached straight through the write path", () => {
     },
   );
 
-  it("refuses a suggestion landed at another collection's path", async () => {
+  it("refuses a suggestion written to another collection's path", async () => {
     const scenario = await arrange();
     const proposal = requestFor();
     const set = await submitted(scenario, scenario.viewer, "edit", [proposal]);
@@ -1479,7 +1479,7 @@ describe("an acceptance reached straight through the write path", () => {
     await leftWaiting(scenario, set, 0);
   });
 
-  it("refuses one whose base is not the suggestion's", async () => {
+  it("refuses an acceptance whose base differs from the suggestion's", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
     const moved = await rewrittenAgainst(scenario, input, written, {
@@ -1497,7 +1497,7 @@ describe("an acceptance reached straight through the write path", () => {
     await leftWaiting(scenario, set, 2);
   });
 
-  it("refuses a non-owner the same, whatever body they send", async () => {
+  it("refuses a non-owner alike, whatever body they send", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
 
@@ -1519,7 +1519,7 @@ describe("an acceptance reached straight through the write path", () => {
     await leftWaiting(scenario, set, 1);
   });
 
-  it("refuses one made against the ref's head, not the base", async () => {
+  it("refuses an acceptance built on the head, not the base", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
 
@@ -1533,7 +1533,7 @@ describe("an acceptance reached straight through the write path", () => {
     await leftWaiting(scenario, set, 1);
   });
 
-  it("refuses one naming an unminted suggestion, making no commit", async () => {
+  it("refuses an acceptance naming an unknown suggestion, committing nothing", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
 
@@ -1546,7 +1546,7 @@ describe("an acceptance reached straight through the write path", () => {
     await leftWaiting(scenario, set, 1);
   });
 
-  it("refuses one whose target no longer holds its merge key", async () => {
+  it("refuses an acceptance whose target lost its merge key", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
 
@@ -1567,7 +1567,7 @@ describe("an acceptance reached straight through the write path", () => {
   });
 });
 
-describe("what a suggestion set refuses before it does any work", () => {
+describe("what a suggestion set refuses before doing any work", () => {
   it("refuses an undeclared kind as malformed", async () => {
     const scenario = await arrange();
 
@@ -1581,7 +1581,7 @@ describe("what a suggestion set refuses before it does any work", () => {
     expect(set).toEqual({ ok: false, error: "malformed" });
   });
 
-  it("refuses a payload whose frontmatter is no mapping, queuing nothing", async () => {
+  it("refuses frontmatter that is not a mapping, queuing nothing", async () => {
     const scenario = await arrange();
 
     const set = await submitSuggestionSet(
@@ -1623,7 +1623,7 @@ describe("what a suggestion set refuses before it does any work", () => {
     ]);
   });
 
-  it("hands a submitter the store's failure, not an empty set", async () => {
+  it("gives a submitter the store's failure, not an empty set", async () => {
     const scenario = await arrange();
     const gone = new pg.Pool(db().runtimePool.options);
     await gone.end();
@@ -1637,7 +1637,7 @@ describe("what a suggestion set refuses before it does any work", () => {
     expect(set).toEqual({ ok: false, error: matching.any(Error) });
   });
 
-  it("refuses a submitter whose credentials ended, and queues nothing", async () => {
+  it("refuses a submitter whose credentials ended and queues nothing", async () => {
     const scenario = await arrange();
     await db().pool.query(
       "UPDATE member SET credentials_revoked_at = $3 WHERE workspace_id = $1 AND user_id = $2",
@@ -1657,7 +1657,7 @@ describe("what a suggestion set refuses before it does any work", () => {
     expect(queued.rowCount).toBe(0);
   });
 
-  it("refuses an acceptance in ids of no known form", async () => {
+  it("refuses an acceptance with ids in no known format", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
 
@@ -1702,7 +1702,7 @@ describe("an accepted edit's identity and state", () => {
     expect(await mergeKeyHeldBy(written.iri)).toBe(mergeKeyOf(foldKind("Policy"), RETITLED));
   });
 
-  it("keeps the key of an accepted edit keeping its title", async () => {
+  it("keeps the key when an accepted edit keeps its title", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
 
@@ -1729,7 +1729,7 @@ describe("an accepted edit's identity and state", () => {
     expect(await mergeKeyHeldBy(written.iri)).toBe(input.mergeKey);
   });
 
-  it("publishes an accepted new concept its proposer can open", async () => {
+  it("publishes an accepted new concept that its proposer can open", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.viewer, "edit", [requestFor()]);
 

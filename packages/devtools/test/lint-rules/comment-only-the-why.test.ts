@@ -17,7 +17,7 @@ const holding = (comment: string, code = "export const keep = 1;\n"): Tree => ({
   [FILE]: `${comment}${code}`,
 });
 
-/** Split so vitest does not read this suite's own environment off the fixture. */
+/** Split so vitest does not read the fixture's docblock as this suite's environment. */
 const ENVIRONMENT_DOCBLOCK = `/** @vitest-${"environment"} happy-dom */\n`;
 
 const TOO_LONG = `// ${wordsOf(29)}\n`;
@@ -32,7 +32,7 @@ batch.control(holding(TOO_LONG), CONFIG, [FILE]);
 
 beforeAll(batch.run);
 
-describe("the comment rule fires on a long or citing comment", () => {
+describe("the comment rule refuses a long or citing comment", () => {
   const longBlock = lint(holding(TOO_LONG));
 
   it("refuses a long block, naming its count and the fix", () => {
@@ -146,7 +146,10 @@ describe("the comment rule fires on a long or citing comment", () => {
         ] as const,
     ),
   )("reads %s named mid-sentence as prose", (_what, found) => {
-    expect(found.flagged(), "prose, never a directive").toEqual([FILE]);
+    expect(
+      found.flagged(),
+      "the rule read a directive named mid-sentence as a directive. Read it as prose.",
+    ).toEqual([FILE]);
   });
 
   it.each(
@@ -196,7 +199,7 @@ describe("the comment rule refuses a comment that counts its callers", () => {
 
   it.each(
     NOT_COUNTED.map(([what, prose]) => [what, lint(holding(commented("//", prose)))] as const),
-  )("walks past %s", (_what, found) => {
+  )("accepts %s", (_what, found) => {
     expect(found.flagged()).toEqual([]);
   });
 
@@ -208,7 +211,7 @@ describe("the comment rule refuses a comment that counts its callers", () => {
 
   const oneCallerDocBlock = lint(holding("/** The one caller hands the trimmed name. */\n"));
 
-  it("walks past a doc block naming the one caller", () => {
+  it("accepts a doc block naming the one caller", () => {
     expect(oneCallerDocBlock.flagged()).toEqual([]);
   });
 
@@ -243,13 +246,13 @@ describe("the comment rule's exemptions", () => {
         ["an enable, which suppresses nothing to explain", "// oxlint-enable no-console\n"],
       ] as const
     ).map(([what, comment]) => [what, lint(holding(comment))] as const),
-  )("walks past %s", (_what, found) => {
+  )("exempts %s", (_what, found) => {
     expect(found.flagged()).toEqual([]);
   });
 
   const hashbang = lint({ [FILE]: "#!/usr/bin/env node\nexport const keep = 1;\n" });
 
-  it("walks past a hashbang, which deleting would break a command", () => {
+  it("exempts a hashbang, because deleting it breaks a command", () => {
     expect(hashbang.flagged()).toEqual([]);
   });
 
@@ -262,7 +265,7 @@ describe("the comment rule's exemptions", () => {
   });
 });
 
-describe("the comment rule holds a directive to a same-line reason", () => {
+describe("the comment rule requires a same-line reason on a directive", () => {
   it.each(
     (
       [
@@ -288,7 +291,7 @@ describe("the comment rule holds a directive to a same-line reason", () => {
         ["a type-checker escape", "// @ts-expect-error the fixture is the wrong shape\n"],
       ] as const
     ).map(([what, directive]) => [what, lint(holding(directive))] as const),
-  )("walks past %s with its reason", (_what, found) => {
+  )("accepts %s with its reason", (_what, found) => {
     expect(found.flagged()).toEqual([]);
   });
 
@@ -317,7 +320,7 @@ describe("the comment rule holds a directive to a same-line reason", () => {
       ([what, directive]) =>
         [what, lint(holding(`// ${directive} no-console -- ${wordsOf(25)}\n`))] as const,
     ),
-  )("walks past %s whose reason is exactly 25 words", (_what, found) => {
+  )("accepts %s whose reason is exactly 25 words", (_what, found) => {
     expect(found.flagged()).toEqual([]);
   });
 
@@ -343,7 +346,7 @@ describe("the comment rule holds a directive to a same-line reason", () => {
   });
 });
 
-describe("the comment rule gives a doc block no longer cap", () => {
+describe("the comment rule gives a doc block the same cap", () => {
   it.each(
     (
       [

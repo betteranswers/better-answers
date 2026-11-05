@@ -99,7 +99,7 @@ const rebuiltByTheWorker = async ({ scenario }: WideMap): Promise<void> => {
               WHERE e.workspace_id = $1 AND e.gen = g.live_gen) AS edges`,
     [workspaceId, queued.jobId],
   );
-  expect(rebuilt.rows[0], "the rebuild the worker ran").toEqual({
+  expect(rebuilt.rows[0], "the job status and live map counts after the rebuild").toEqual({
     status: "done",
     nodes: NODES,
     edges: HUBS * SPOKES_EACH,
@@ -109,16 +109,16 @@ const rebuiltByTheWorker = async ({ scenario }: WideMap): Promise<void> => {
 const irisOf = (answer: AnswerResult): readonly ConceptIri[] =>
   answer.related.map((concept) => concept.iri);
 
-describe("asking over a map the worker has just rebuilt", () => {
+describe("asking a question after the worker rebuilds the map", () => {
   beforeAll(async () => {
     await mapAutovacuumOff(db().pool);
   });
 
   it(
-    "answers with the map live and a walked concept",
+    "answers from the live map and reaches a linked concept",
     async () => {
       const wide = await seedWideMap(await arrange());
-      expect(wide.entries, "the concepts the question matches").toHaveLength(HUBS);
+      expect(wide.entries, "the hub concepts the question matches").toHaveLength(HUBS);
       await rebuiltByTheWorker(wide);
 
       const answer = await askedAsIs(db(), wide.scenario.viewer, { question: QUESTION });

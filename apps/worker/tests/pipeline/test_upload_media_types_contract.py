@@ -16,14 +16,13 @@ def read_upload_media_types() -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(raw))
 
 
-def test_the_dispatch_converts_every_admitted_type_and_no_other() -> None:
+def test_the_converters_match_the_admitted_media_types() -> None:
     admitted = read_upload_media_types()["admitted"]
 
     assert sorted(CONVERTERS) == sorted(admitted)
 
 
-def test_no_type_sits_on_both_sides_of_the_list() -> None:
-
+def test_no_outside_media_type_is_also_admitted() -> None:
     fixture = read_upload_media_types()
 
     assert fixture["outside"]
@@ -35,7 +34,7 @@ def test_no_type_sits_on_both_sides_of_the_list() -> None:
     "media_type",
     [outside["media_type"] for outside in read_upload_media_types()["outside"]],
 )
-def test_a_type_outside_the_list_reaches_no_converter(
+def test_converting_an_unlisted_media_type_raises_unsupported_media_type(
     media_type: str,
 ) -> None:
     with pytest.raises(UnreadableError) as refused:

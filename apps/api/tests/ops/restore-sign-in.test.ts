@@ -16,10 +16,10 @@ import { webClientOf } from "../support/web-client.ts";
 const objects = objectStoreForSuite();
 const { help, opsWith } = opsRunner(objects);
 
-describe("pnpm ops — the restore scripts' commands", () => {
+describe("pnpm ops", () => {
   const served = servedApp();
 
-  describe("restore-sign-in — a person who has lost every factor, restored", () => {
+  describe("restore-sign-in, for a person who lost every sign-in factor", () => {
     const NOTICE = "Your better-answers sign-in was restored";
     const RESTORE_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
     const IDENTITY_ACTOR = "process:better-answers-identity";
@@ -56,7 +56,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return code;
     };
 
-    const heldBy = async (personId: string) =>
+    const factorsOf = async (personId: string) =>
       (
         await served().database.superuser.query<Record<string, unknown>>(
           `SELECT (SELECT count(*)::int FROM passkey WHERE user_id = u.id) AS passkeys,
@@ -86,9 +86,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
         )
       ).rows;
 
-    it("clears the person's factors and codes, and ends their sessions", async () => {
+    it("removes the person's factors and codes and ends their sessions", async () => {
       const { person, client } = await aPersonHoldingEverything(served());
-      const before = await heldBy(person.id);
+      const before = await factorsOf(person.id);
 
       const run = await restoring(person.email, {}, { clock: { now: () => RESTORED_AT } });
 
@@ -101,7 +101,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         authenticatorEnabled: true,
         restoreRequiredAt: null,
       });
-      expect(await heldBy(person.id)).toEqual({
+      expect(await factorsOf(person.id)).toEqual({
         passkeys: 0,
         authenticators: 0,
         recoveryCodes: 0,
@@ -112,7 +112,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await (await client.fetch("/get-session")).json()).toBeNull();
     });
 
-    it("drops the rows kept under the sessions it ends", async () => {
+    it("deletes the challenge rows of the sessions it ends", async () => {
       const { person, client } = await aPersonHoldingEverything(served());
       const { session } = sessionRead.parse(await (await client.fetch("/get-session")).json());
       const asked = await client.json("/second-factor/confirm/passkey-options", {});
@@ -133,7 +133,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await kept()).toEqual([]);
     });
 
-    it("writes one record and sends one notice", async () => {
+    it("writes one identity audit event and sends one notice email", async () => {
       const person = await served().person();
       const before = await identityRowsOf(person.id);
       const { sent, mail } = capturingMail();
@@ -164,7 +164,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(sent[0]?.html).not.toContain("operator");
     });
 
-    it("says it must follow an identity check by another channel", async () => {
+    it("prints the code and says to check identity another way", async () => {
       const person = await served().person();
 
       const run = await restoring(person.email, {}, { clock: { now: () => RESTORED_AT } });
@@ -176,7 +176,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(codeIn(run)).toMatch(RESTORE_CODE);
     });
 
-    it("changes nothing for an unknown address, and says so", async () => {
+    it("refuses an unknown address and changes nothing", async () => {
       const { sent, mail } = capturingMail();
 
       const run = await restoring("nobody@acme.invalid", { mail });
@@ -191,9 +191,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await restoreRowsOf("nobody@acme.invalid")).toEqual([]);
     });
 
-    it("refuses with no email transport, changing nothing", async () => {
+    it("refuses without an email transport and changes nothing", async () => {
       const { person } = await aPersonHoldingEverything(served());
-      const before = await heldBy(person.id);
+      const before = await factorsOf(person.id);
 
       const run = await restoring(person.email, { mail: undefined });
 
@@ -203,11 +203,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "restore-sign-in: REFUSED — no email transport is configured (SMTP_URL on the api service), so the restore notice cannot go; nothing changed",
         ],
       });
-      expect(await heldBy(person.id)).toEqual(before);
+      expect(await factorsOf(person.id)).toEqual(before);
       expect(await restoreRowsOf(person.email)).toEqual([]);
     });
 
-    it("keeps the restore when its notice does not go", async () => {
+    it("keeps the restore when the notice email fails to send", async () => {
       const person = await served().person();
       const { mail } = capturingMail(async () => {
         throw new Error("the relay refused the message");
@@ -220,10 +220,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
         `restore-sign-in: the notice to ${person.email} did not go; tell them of the restore yourself`,
       );
       expect(codeIn(run)).toMatch(RESTORE_CODE);
-      expect((await heldBy(person.id))?.["restoreRequiredAt"]).not.toBeNull();
+      expect((await factorsOf(person.id))?.["restoreRequiredAt"]).not.toBeNull();
     });
 
-    it("sends the next sign-in to setup, which needs the code", async () => {
+    it("makes the next sign-in enter the code before adding factors", async () => {
       const { person } = await aPersonHoldingEverything(served());
       const code = codeIn(await restoring(person.email));
       const client = await signedInClient(served(), person.email);
@@ -245,7 +245,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
     });
 
-    it("accepts the code once, however the address was typed", async () => {
+    it("accepts the code once, whatever the case of the address", async () => {
       const person = await served().person();
       const code = codeIn(await restoring(person.email.toUpperCase()));
       const client = await signedInClient(served(), person.email);
@@ -257,7 +257,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await again.json()).toEqual({ error: "restore-code-wrong" });
     });
 
-    it("refuses the code once a day has passed", async () => {
+    it("refuses the code after 24 hours", async () => {
       const restoredAgo = async (ageMs: number) => {
         const person = await served().person();
         const restoredAt = new Date(Date.now() - ageMs);
@@ -286,7 +286,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("voids an earlier restore code with a new restore", async () => {
+    it("invalidates the earlier restore code when restored again", async () => {
       const person = await served().person();
       const earlier = codeIn(await restoring(person.email));
       const later = codeIn(await restoring(person.email));
@@ -301,7 +301,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await restoreRowsOf(person.email)).toEqual([]);
     });
 
-    it("answers usage without --email, restoring no one", async () => {
+    it("gives a usage error without --email and restores no one", async () => {
       const person = await served().person();
 
       const run = await opsWith(served(), ["restore-sign-in"], {
@@ -315,7 +315,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await restoreRowsOf(person.email)).toEqual([]);
     });
 
-    it("names the command in the usage", async () => {
+    it("lists the command in the help text", async () => {
       expect(await help(served())).toContain("restore-sign-in --email <email>");
     });
   });

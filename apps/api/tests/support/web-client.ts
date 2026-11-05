@@ -99,7 +99,7 @@ export const refusalOfCall = (call: Promise<unknown>): Promise<unknown> =>
 
 const answeredStatus = z.object({ data: z.object({ httpStatus: z.number() }) });
 
-/** An answer with no refusal on it is a success, whose status tRPC does not hand over. */
+/** tRPC exposes no status on a successful call, so a call that was not refused counts as 200. */
 export const statusOf = async (call: Promise<unknown>): Promise<number> => {
   const refused = answeredStatus.safeParse(await refusalOfCall(call));
   return refused.success ? refused.data.data.httpStatus : 200;

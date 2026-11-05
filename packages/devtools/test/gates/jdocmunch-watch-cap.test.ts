@@ -21,7 +21,7 @@ const scratch = scratchRoot("jdocmunch-watch-cap");
 
 const CAP = "<integer>1073741824</integer>";
 
-/** The plist as `jdocmunch-mcp watch-install` writes it: no `SoftResourceLimits`. */
+/** The plist that `jdocmunch-mcp watch-install` writes, with no `SoftResourceLimits`. */
 const INSTALLED = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -64,7 +64,7 @@ const reloads = (log: string): string[] =>
         .filter((line) => line.startsWith("boot"))
     : [];
 
-describe("putting the cap back on the watcher's log", () => {
+describe("restoring the cap on the watcher's log", () => {
   it("adds the 1 GB cap and reloads the watcher", () => {
     const { plistPath, log, env } = machine(INSTALLED);
     const applied = run(script, env);
@@ -90,7 +90,7 @@ describe("putting the cap back on the watcher's log", () => {
     expect(reloads(log)).toHaveLength(2);
   });
 
-  it("loads a capped watcher that a failed reload left down", () => {
+  it("loads a capped watcher that a failed reload left stopped", () => {
     const { plistPath, log, env } = machine(INSTALLED, false);
     run(script, env);
     const again = run(script, env);
@@ -122,7 +122,7 @@ describe("the session-start warning that the cap is gone", () => {
     expect(message).toContain("bash scripts/jdocmunch-watch-cap.sh");
   });
 
-  it("says nothing when the cap is in place", () => {
+  it("prints nothing when the cap is in place", () => {
     const { env } = machine(INSTALLED);
     run(script, env);
     const said = run(hook, env);
@@ -130,14 +130,14 @@ describe("the session-start warning that the cap is gone", () => {
     expect(said.stdout).toBe("");
   });
 
-  it("says nothing when no watcher is installed", () => {
+  it("prints nothing when no watcher is installed", () => {
     const { env } = machine(undefined);
     const said = run(hook, env);
     expect(said.status).toBe(0);
     expect(said.stdout).toBe("");
   });
 
-  it("never touches the plist or the service", () => {
+  it("changes neither the plist nor the service", () => {
     const { plistPath, log, env } = machine(INSTALLED);
     run(hook, env);
     expect(readFileSync(plistPath, "utf8")).toBe(INSTALLED);

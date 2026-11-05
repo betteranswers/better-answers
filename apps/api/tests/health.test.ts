@@ -19,7 +19,7 @@ describe("the api's health endpoint", () => {
     await app.stop();
   });
 
-  it("reports healthy while the platform database answers", async () => {
+  it("reports healthy when the platform database is reachable", async () => {
     const response = await app.server.request("/health");
 
     expect(response.status).toBe(200);
@@ -29,7 +29,7 @@ describe("the api's health endpoint", () => {
     });
   });
 
-  it("names its image, so a release sees the promoted build", async () => {
+  it("reports its image digest for a release to check", async () => {
     const server = serverFor(app.database.pool, { imageDigest: PROMOTED });
 
     const response = await server.request("/health");
@@ -43,7 +43,7 @@ describe("the api's health endpoint", () => {
     });
   });
 
-  it("says no image was named rather than inventing a digest", async () => {
+  it("reports a null image when no digest is configured", async () => {
     const response = await app.server.request("/health");
 
     expect(response.status).toBe(200);
@@ -55,7 +55,7 @@ describe("the api's health endpoint", () => {
     });
   });
 
-  it("reports unhealthy, naming the image, when the database is unreachable", async () => {
+  it("reports unhealthy and its image when the database is unreachable", async () => {
     const unreachable = new Pool({
       connectionString: "postgresql://nobody@127.0.0.1:1/nothing",
       connectionTimeoutMillis: 1_000,
@@ -106,12 +106,12 @@ describe("the api's health endpoint", () => {
   });
 });
 
-describe("two apis starting together over one fresh database", () => {
-  it("both start healthy when each inserts the MCP resource", async () => {
+describe("two apis starting at once on one fresh database", () => {
+  it("both start healthy after racing to insert the MCP resource", async () => {
     const database = await startTestDatabase();
     const holder = await database.superuser.connect();
     try {
-      // SHARE lets each api read the missing row but holds back its insert, so both race.
+      // SHARE mode lets each api read the missing row but blocks its insert, so both inserts race.
       await holder.query("BEGIN");
       await holder.query("LOCK TABLE oauth_resource IN SHARE MODE");
       const servers = [serverFor(database.pool), serverFor(database.pool)];
@@ -137,7 +137,7 @@ describe("two apis starting together over one fresh database", () => {
         matching.objectContaining({ status: "healthy", identity: "ready" }),
       ]);
     } finally {
-      // Destroyed, so a wait that timed out takes its lock with it.
+      // Destroying the connection releases the lock if the wait timed out before COMMIT.
       holder.release(true);
       await database.stop();
     }

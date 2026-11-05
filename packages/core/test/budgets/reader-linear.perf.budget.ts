@@ -9,8 +9,8 @@ const takenBy = (work: () => void): number => {
   return performance.now() - started;
 };
 
-describe("the reader stays linear on a tenant's worst shapes", () => {
-  it("reads a hundred thousand brackets inside a second", () => {
+describe("the concept-file reader on worst-case bodies", () => {
+  it("parses 100,000 open brackets in under a second", () => {
     const brackets = "[".repeat(100_000);
     const sources = [{ resource: "https://example.test/handbook", locator: null, id: "a" }];
 
@@ -18,14 +18,14 @@ describe("the reader stays linear on a tenant's worst shapes", () => {
     expect(takenBy(() => linksAndMarksOf(brackets, sources))).toBeLessThan(1000);
   });
 
-  it("reads the sentence path of a linked body quickly", () => {
+  it("finds a sentence in an 80,000-character body within a second", () => {
     const linked = "[a](b)".repeat(10_000) + "[".repeat(20_000);
     const prose = proseOf(linked);
 
     expect(takenBy(() => sentenceAt(linked, prose, prose.length - 1))).toBeLessThan(1000);
   });
 
-  it("reads a heading of eighty thousand spaces inside a second", () => {
+  it("finds the section of an 80,000-space heading within a second", () => {
     const spaced = `# Mileage${" ".repeat(80_000)}rates\n\nSee [the rates](rates.md).`;
 
     expect(takenBy(() => sectionAt(spaced, spaced.length - 1))).toBeLessThan(1000);

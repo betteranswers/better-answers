@@ -82,7 +82,7 @@ describe("knip over a throwaway tree", () => {
 
   const reachedAll = found({ "src/main.ts": MAIN, "src/reached.ts": REACHED });
 
-  it("stays silent when every file and export is reached", () => {
+  it("reports nothing when every file and export is reached", () => {
     expect(reachedAll.findings()).toEqual([]);
   });
 
@@ -92,7 +92,7 @@ describe("knip over a throwaway tree", () => {
     "src/registry/dialog.ts": "export const dialog = 1;\n",
   });
 
-  it("stays silent about an unreached file under an entry directory", () => {
+  it("ignores an unreached file under an entry directory", () => {
     expect(registry.findings()).toEqual([]);
   });
 });
@@ -120,7 +120,7 @@ describe("knipOver's smoke case", () => {
 describe("knip never reads a directory `.git/info/exclude` names", () => {
   const TREE = { "src/main.ts": MAIN, "src/reached.ts": REACHED, ".gitnexus/probe.ts": ALONE };
 
-  it("stays silent about an unreached file in an excluded directory", () => {
+  it("ignores an unreached file in an excluded directory", () => {
     const findings = knip.findings({ ...TREE, ".git/info/exclude": ".gitnexus/\n" });
 
     expect(findings).toEqual([]);
@@ -148,10 +148,12 @@ describe("a slice's unused barrel export where entry exports are gated", () => {
     "src/slice/index.ts": barrel,
   });
 
-  /** A workspace's own value wins over the top-level one, the order knip reads them in. */
+  /** A workspace's own value overrides the top-level one, as knip reads them. */
   const entryExportsIn = (workspace: string): boolean => {
     if (typeof knipConfig === "function") {
-      throw new Error("the repository's knip config is a plain object, never the function form");
+      throw new Error(
+        "the repository's knip config is a function. This suite reads only the plain object form.",
+      );
     }
     return (
       knipConfig.workspaces?.[workspace]?.includeEntryExports ??
@@ -198,7 +200,7 @@ describe("a slice's unused barrel export where entry exports are gated", () => {
 
   const web = found(manifested(sliceTree(BOTH_NAMES, REACHED_AND_SPARE)), configuredAs("apps/web"));
 
-  it("stays silent in apps/web, whose registry lands before its callers", () => {
+  it("reports nothing in apps/web, whose registry lands before its callers", () => {
     expect(web.findings()).toEqual([]);
   });
 
@@ -212,7 +214,7 @@ describe("a slice's unused barrel export where entry exports are gated", () => {
     configuredAs("packages/core"),
   );
 
-  it("stays silent about one tagged `@public` for a later block", () => {
+  it("ignores one tagged `@public` for a later block", () => {
     expect(tagged.findings()).toEqual([]);
   });
 });

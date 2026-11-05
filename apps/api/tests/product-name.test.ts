@@ -46,13 +46,13 @@ describe("the api's pages", () => {
     );
   });
 
-  it("refuses a cross-site form as sent from elsewhere", () => {
+  it("explains a cross-site form refusal with the product's name", () => {
     expect(REFUSAL_PAGES.crossSite.why).toBe("This form can only be sent from better-answers.");
   });
 });
 
 describe("the api's emails", () => {
-  it("come from better-answers, at the apex's no-reply address", () => {
+  it("come from better-answers at the apex domain's no-reply address", () => {
     expect(senderAt("example.test")).toBe("better-answers <no-reply@example.test>");
   });
 });

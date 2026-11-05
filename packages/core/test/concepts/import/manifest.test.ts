@@ -83,7 +83,7 @@ const nothingWritten = async (scenario: Scenario) => {
   expect(await rowsFor(scenario.workspaceId)).toEqual({ concepts: "0", commits: "0", events: "0" });
 };
 
-describe("the manifest, the bundle's first commit", () => {
+describe("the manifest, which is the bundle's first commit", () => {
   it("lands one commit with its event and row, no concept", async () => {
     const scenario = await arrange();
 
@@ -94,7 +94,7 @@ describe("the manifest, the bundle's first commit", () => {
       sha: matching.any(String),
       auditEventId: matching.any(String),
     });
-    assert(landed.written, "unreachable: asserted above");
+    assert(landed.written, "the manifest was not written");
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([landed.sha]);
     const facts = await commitFacts(scenario.git, scenario.workspaceId, landed.sha);
     expect({
@@ -143,7 +143,7 @@ describe("the manifest, the bundle's first commit", () => {
     });
   });
 
-  it("lands on the head it found when concepts already stand", async () => {
+  it("commits on the current head when concepts already exist", async () => {
     const scenario = await arrange();
     const first = await writeConcept(scenario.admin, doorsOf(scenario), {
       mergeKey: "policy:expenses",
@@ -185,7 +185,7 @@ describe("the manifest, the bundle's first commit", () => {
     await onlyTheStandingManifest(scenario, landed);
   });
 
-  it("refuses another bundle id and leaves the standing manifest alone", async () => {
+  it("refuses another bundle id and keeps the existing manifest", async () => {
     const scenario = await arrange();
     const landed = await written(scenario);
 
@@ -208,7 +208,7 @@ describe("the manifest, the bundle's first commit", () => {
     await nothingWritten(scenario);
   });
 
-  it("refuses an Editor the manifest write, by role", async () => {
+  it("refuses the manifest write to an Editor, by role", async () => {
     const scenario = await arrange();
 
     const refused = await write(scenario, scenario.editor, manifestFor());
@@ -217,7 +217,7 @@ describe("the manifest, the bundle's first commit", () => {
     await nothingWritten(scenario);
   });
 
-  it("refuses a workspace with no bundle rather than making one", async () => {
+  it("refuses a workspace with no bundle instead of creating one", async () => {
     const scenario = await arrange();
     await removeRepository(scenario.git, scenario.workspaceId);
 
@@ -227,7 +227,7 @@ describe("the manifest, the bundle's first commit", () => {
     await nothingWritten(scenario);
   });
 
-  it("refuses a member removed since they signed in, committing nothing", async () => {
+  it("refuses a member removed since signing in, committing nothing", async () => {
     const scenario = await arrange();
     const { workspaceId, admin } = scenario;
     await db().pool.query("DELETE FROM member WHERE user_id = $1 AND workspace_id = $2", [
@@ -242,7 +242,7 @@ describe("the manifest, the bundle's first commit", () => {
     await nothingWritten(scenario);
   });
 
-  it("answers a manifest written when a revocation follows its commit", async () => {
+  it("reports a manifest written when a revocation follows the commit", async () => {
     const scenario = await arrange();
     const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
     await gate.park();

@@ -20,7 +20,7 @@ describe("the face functions that take a person and admit nobody", () => {
     ]);
   });
 
-  it("stays silent on one that passes a declaration to admit", () => {
+  it("accepts one that passes a declaration to admit", () => {
     const source = `export const read = async (principal: UserPrincipal, tx: Tx) => {
   const admitted = admit(readAction, principal, {});
   if (!admitted.ok) return admitted;
@@ -31,7 +31,7 @@ describe("the face functions that take a person and admit nobody", () => {
     expect(namedIn({ [INDEX]: source })).toEqual([]);
   });
 
-  it("stays silent on one that admits inside a callback", () => {
+  it("accepts one that admits inside a callback", () => {
     const source = `export const read = (principal: Principal, door: Door) =>
   door.run((tx) => {
     const admitted = admit(readAction, principal, {});
@@ -98,7 +98,7 @@ describe("the parameters read as a person of any role", () => {
     "PlatformPrincipal | AdminUserPrincipal",
     "(reader: UserPrincipal) => Promise<void>",
     "new (p: UserPrincipal) => R",
-  ])("stays silent on one taking %s", (annotation) => {
+  ])("accepts one taking %s", (annotation) => {
     expect(namedIn({ [INDEX]: taking(annotation) })).toEqual([]);
   });
 
@@ -234,12 +234,12 @@ export { read, write as writeThing };
   });
 });
 
-describe("a tree the reader cannot read", () => {
-  it("throws on a face whose index is no source", () => {
+describe("a tree the scan cannot read", () => {
+  it("throws on a face whose index is not source", () => {
     expect(() => facesAdmittingNobody({}, [FACE])).toThrow("slice/index.ts");
   });
 
-  it("throws on a re-exported file that is no source", () => {
+  it("throws on a re-exported file that is not source", () => {
     const sources = { [INDEX]: `export * from "./thing.ts";\n` };
 
     expect(() => facesAdmittingNobody(sources, [FACE])).toThrow("slice/thing.ts");

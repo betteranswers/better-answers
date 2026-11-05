@@ -28,7 +28,7 @@ const MEMBER = `${TRPC_ENDPOINT}/session.member`;
 
 const MEMBER_WORKSPACE_FK = "member_workspace_id_workspace_id_fk";
 
-const crossed = z.object({
+const errorResponse = z.object({
   error: z.object({
     message: z.string(),
     data: z.object({
@@ -54,7 +54,7 @@ beforeEach(() => {
 
 const member = (client: TestClient): Promise<Response> => client.fetch(MEMBER);
 
-const refusalCrossing = async (response: Response) => crossed.parse(await response.json()).error;
+const errorBodyOf = async (response: Response) => errorResponse.parse(await response.json()).error;
 
 const logsOf = (event: string): readonly LogLine[] =>
   app.logs.filter((line) => line["event"] === event);
@@ -186,9 +186,9 @@ const A_WORD_OF_EACH_CLASS = [
   ],
 ] as const;
 
-describe("a word of every class an action answers, crossing tRPC", () => {
+describe("action refusals over tRPC, one per refusal class", () => {
   it.each(A_WORD_OF_EACH_CLASS)(
-    "sends a %s refusal's own word and status, logged once",
+    "returns a %s refusal's word and status and logs once",
     async (refusalClass, refusal, status, provoke) => {
       const refused = await refusalOfCall(provoke());
 
@@ -202,7 +202,7 @@ describe("a word of every class an action answers, crossing tRPC", () => {
   );
 });
 
-describe("a refusal crossing tRPC", () => {
+describe("refusals and failures over tRPC", () => {
   it.each([
     ["no-session", async () => member(app.client())],
     ["no-active-workspace", async () => member(await memberOfTwoWorkspaces(app))],
@@ -232,16 +232,16 @@ describe("a refusal crossing tRPC", () => {
         return member(client);
       },
     ],
-  ])("sends %s as itself, under the status its class carries", async (word, provoke) => {
+  ])("sends %s as an unauthenticated refusal with status 401", async (word, provoke) => {
     const response = await provoke();
 
     expect(response.status).toBe(401);
-    const { message, data } = await refusalCrossing(response);
+    const { message, data } = await errorBodyOf(response);
     expect(message).toBe(word);
     expect(data.refusal).toEqual({ word, class: "unauthenticated" });
   });
 
-  it("sends the member read's own refusal as an unauthenticated word", async () => {
+  it("refuses a session pointed at a deleted workspace with workspace-gone", async () => {
     const workspace = await app.provision();
     const client = await signedInClient(app, workspace.admin.email);
     const definition = await constraintDefinition(app, MEMBER_WORKSPACE_FK);
@@ -265,7 +265,7 @@ describe("a refusal crossing tRPC", () => {
       const response = await member(client);
 
       expect(response.status).toBe(401);
-      expect((await refusalCrossing(response)).data.refusal).toEqual({
+      expect((await errorBodyOf(response)).data.refusal).toEqual({
         word: "workspace-gone",
         class: "unauthenticated",
       });
@@ -277,7 +277,7 @@ describe("a refusal crossing tRPC", () => {
     }
   });
 
-  it("logs a refusal once, at info, with the word sent", async () => {
+  it("logs a refusal once at info level with its word", async () => {
     await member(app.client());
 
     expect(
@@ -286,7 +286,7 @@ describe("a refusal crossing tRPC", () => {
     expect(logsOf("trpc.failed")).toEqual([]);
   });
 
-  it("sends a failure as internal, naming no fault, logged once", async () => {
+  it("returns 500 naming only the action, and logs it once", async () => {
     const workspace = await app.provision();
     const client = await signedInClient(app, workspace.admin.email);
 
@@ -294,7 +294,7 @@ describe("a refusal crossing tRPC", () => {
       const response = await member(client);
 
       expect(response.status).toBe(500);
-      const { message, data } = await refusalCrossing(response);
+      const { message, data } = await errorBodyOf(response);
       expect(message).toBe("readMember failed");
       expect(data.refusal).toBeUndefined();
     });
@@ -304,7 +304,7 @@ describe("a refusal crossing tRPC", () => {
     ]);
   });
 
-  it("logs once a rejection the resolver throws", async () => {
+  it("logs a failure thrown by withPrincipal once", async () => {
     const workspace = await app.provision();
     const client = await signedInClient(app, workspace.admin.email);
 
@@ -312,7 +312,7 @@ describe("a refusal crossing tRPC", () => {
       const response = await member(client);
 
       expect(response.status).toBe(500);
-      expect((await refusalCrossing(response)).message).toBe("withPrincipal failed");
+      expect((await errorBodyOf(response)).message).toBe("withPrincipal failed");
     });
 
     expect(logsOf("trpc.failed").map((line) => [line["action"], line["level"]])).toEqual([
@@ -321,8 +321,8 @@ describe("a refusal crossing tRPC", () => {
   });
 });
 
-describe("a refusal crossing the MCP surface", () => {
-  it("reaches an agent as its word, class and malformed field", async () => {
+describe("refusals and failures over MCP", () => {
+  it("tells the agent the refusal's word, class and malformed field", async () => {
     const { client, token } = await asAnAgent();
 
     const said = await toolText(client, token, "give_feedback", {
@@ -337,7 +337,7 @@ describe("a refusal crossing the MCP surface", () => {
     ).toEqual([["give_feedback", "malformed", "malformed"]]);
   });
 
-  it("names a failure by its entry, not credentials, logged once", async () => {
+  it("names only the failed tool and logs the failure once", async () => {
     const { client, token } = await asAnAgent();
 
     await withColumnRenamed("concept_index", "title", async () => {
@@ -353,8 +353,8 @@ describe("a refusal crossing the MCP surface", () => {
   });
 });
 
-describe("the classes a word may carry", () => {
-  it("are each driven by a case above, and no others", () => {
+describe("the refusal classes", () => {
+  it("each appear in exactly one case above", () => {
     const driven = ["unauthenticated", ...A_WORD_OF_EACH_CLASS.map(([driving]) => driving)];
 
     expect([...REFUSAL_CLASSES].sort()).toEqual([...new Set(driven)].sort());

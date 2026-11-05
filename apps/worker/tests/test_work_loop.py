@@ -52,11 +52,11 @@ OTHER_IRI = "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
 @pytest.fixture(name="database")
 def a_migrated_database() -> Iterator[psycopg.Connection]:
     with migrated_postgres_at() as (connection, conninfo):
-        _WHERE[connection] = conninfo
+        _CONNINFO[connection] = conninfo
         yield connection
 
 
-_WHERE: dict[psycopg.Connection, str] = {}
+_CONNINFO: dict[psycopg.Connection, str] = {}
 
 
 def seed_expenses(
@@ -76,7 +76,7 @@ def seed_expenses(
 
 def bootstrap_for(database: psycopg.Connection, git_store: Path) -> Bootstrap:
     return Bootstrap(
-        database_url=_WHERE[database],
+        database_url=_CONNINFO[database],
         git_store_dir=str(git_store),
         worker_id=WORKER,
         object_store=ObjectStore(
@@ -90,7 +90,7 @@ def bootstrap_for(database: psycopg.Connection, git_store: Path) -> Bootstrap:
     )
 
 
-def an_empty_store_fails_the_audit(git_store: Path, workspace: str) -> None:
+def create_an_empty_repository(git_store: Path, workspace: str) -> None:
     (git_store / f"{workspace}.git").mkdir()
 
 
@@ -101,7 +101,7 @@ def end_backoffs(database: psycopg.Connection, workspace: str) -> None:
         )
 
 
-def a_workspace_holding_one_job(
+def a_workspace_with_one_job(
     database: psycopg.Connection, *, kind: str, reason: str | None = None
 ) -> str:
     workspace = seed_workspace(database.cursor())["id"]
@@ -111,7 +111,7 @@ def a_workspace_holding_one_job(
     return str(workspace)
 
 
-def test_runs_exactly_the_kinds_its_registry_has_handlers_for() -> None:
+def test_the_kinds_registry_lists_audit_rebuild_and_index() -> None:
     assert tuple(KINDS) == ("nightly-audit", "full-rebuild", "index")
 
 
@@ -170,12 +170,12 @@ def an_index_job_older_than_an_audit(database: psycopg.Connection) -> tuple[str,
     return workspace, connected_source_id
 
 
-def test_a_claim_leaves_unnamed_kinds_queued_and_unpoisoned(
+def test_a_claim_leaves_other_kinds_queued_with_no_attempt(
     database: psycopg.Connection,
 ) -> None:
     workspace, connected_source_id = an_index_job_older_than_an_audit(database)
 
-    with queue.connected(_WHERE[database]) as worker:
+    with queue.connected(_CONNINFO[database]) as worker:
         with scoped(worker, workspace) as cursor:
             auditing = queue.claim(cursor, workspace, WORKER, ["nightly-audit"])
         with database.cursor() as cursor:
@@ -196,12 +196,12 @@ def test_a_claim_leaves_unnamed_kinds_queued_and_unpoisoned(
     assert (indexing.kind, indexing.subject_id) == ("index", connected_source_id)
 
 
-def test_a_claim_hands_the_handler_what_the_job_is_about(
+def test_a_claimed_job_carries_its_reason_and_subject_id(
     database: psycopg.Connection,
 ) -> None:
     workspace, connected_source_id = an_index_job_older_than_an_audit(database)
 
-    with queue.connected(_WHERE[database]) as worker:
+    with queue.connected(_CONNINFO[database]) as worker:
         with scoped(worker, workspace) as cursor:
             indexing = queue.claim(cursor, workspace, WORKER, ["index"])
         with scoped(worker, workspace) as cursor:
@@ -217,13 +217,13 @@ def test_a_claim_hands_the_handler_what_the_job_is_about(
     assert auditing.subject_id is None
 
 
-def a_spent_claim_before_a_newer_job(
+def an_exhausted_claim_and_a_newer_job(
     database: psycopg.Connection,
 ) -> tuple[str, Mapping[str, Any], Mapping[str, Any]]:
     workspace = str(seed_workspace(database.cursor())["id"])
     connected_source_id = ulid()
     with database.cursor() as cursor:
-        spent_older = seed_job(
+        exhausted_older = seed_job(
             cursor,
             workspace_id=workspace,
             kind="index",
@@ -244,10 +244,10 @@ def a_spent_claim_before_a_newer_job(
             subject_id=connected_source_id,
         )
     database.commit()
-    return workspace, spent_older, newer
+    return workspace, exhausted_older, newer
 
 
-def lapse(database: psycopg.Connection, workspace: str, job_id: str) -> None:
+def expire_the_lease(database: psycopg.Connection, workspace: str, job_id: str) -> None:
     with scoped(database, workspace) as cursor:
         cursor.execute(
             "UPDATE job SET lease_expires_at = now() - interval '1 second'"
@@ -257,16 +257,16 @@ def lapse(database: psycopg.Connection, workspace: str, job_id: str) -> None:
         assert cursor.rowcount == 1
 
 
-def test_a_held_lapsed_claim_keeps_its_subjects_newer_job_back(
+def test_a_held_expired_claim_blocks_newer_job_for_its_subject(
     database: psycopg.Connection,
 ) -> None:
-    workspace, spent_older, newer = a_spent_claim_before_a_newer_job(database)
+    workspace, exhausted_older, newer = an_exhausted_claim_and_a_newer_job(database)
 
-    dsn = _WHERE[database]
+    dsn = _CONNINFO[database]
     with queue.connected(dsn) as holding, queue.connected(dsn) as claiming:
         with scoped(holding, workspace) as held:
-            queue.hold_the_claim(held, spent_older["id"], "worker-gone-quiet")
-            lapse(database, workspace, spent_older["id"])
+            queue.hold_the_claim(held, exhausted_older["id"], "worker-gone-quiet")
+            expire_the_lease(database, workspace, exhausted_older["id"])
             with scoped(claiming, workspace) as cursor:
                 while_held = queue.claim(cursor, workspace, WORKER, ["index"])
         with scoped(claiming, workspace) as cursor:
@@ -276,16 +276,16 @@ def test_a_held_lapsed_claim_keeps_its_subjects_newer_job_back(
     assert once_released is not None
     assert once_released.id == newer["id"]
     with scoped(database, workspace) as cursor:
-        cursor.execute("SELECT status FROM job WHERE id = %s", (spent_older["id"],))
+        cursor.execute("SELECT status FROM job WHERE id = %s", (exhausted_older["id"],))
         assert cursor.fetchone() == ("poisoned",)
 
 
-def test_an_idle_fence_lets_its_subjects_newer_job_go(
+def test_an_idle_held_claim_times_out_and_frees_newer_job(
     database: psycopg.Connection,
 ) -> None:
-    workspace, spent_older, newer = a_spent_claim_before_a_newer_job(database)
+    workspace, exhausted_older, newer = an_exhausted_claim_and_a_newer_job(database)
 
-    dsn = _WHERE[database]
+    dsn = _CONNINFO[database]
     freed = None
     with (
         queue.connected(dsn, idle_in_transaction_seconds=1) as hung,
@@ -293,22 +293,24 @@ def test_an_idle_fence_lets_its_subjects_newer_job_go(
         pytest.raises(psycopg.errors.IdleInTransactionSessionTimeout),
         scoped(hung, workspace) as held,
     ):
-        queue.hold_the_claim(held, spent_older["id"], "worker-gone-quiet")
-        lapse(database, workspace, spent_older["id"])
+        queue.hold_the_claim(held, exhausted_older["id"], "worker-gone-quiet")
+        expire_the_lease(database, workspace, exhausted_older["id"])
         deadline = time.monotonic() + 10
         while freed is None and time.monotonic() < deadline:
             with scoped(claiming, workspace) as cursor:
                 freed = queue.claim(cursor, workspace, WORKER, ["index"])
             time.sleep(0.05)
 
-    assert freed is not None, "the idle fence held the newer job back"
+    assert freed is not None, (
+        "the newer job stayed unclaimable after the idle transaction timed out"
+    )
     assert freed.id == newer["id"]
 
 
-def test_a_worker_session_ends_a_fence_idle_for_an_hour(
+def test_worker_sessions_time_out_idle_transactions_after_one_hour(
     database: psycopg.Connection,
 ) -> None:
-    with queue.connected(_WHERE[database]) as worker:
+    with queue.connected(_CONNINFO[database]) as worker:
         shown = worker.execute("SHOW idle_in_transaction_session_timeout").fetchone()
 
     assert shown == ("1h",)
@@ -362,14 +364,12 @@ def test_another_connection_sees_a_claimed_job_commit_and_finish(
             assert cursor.fetchall() == [("done", True)]
 
 
-def test_a_running_jobs_claim_is_visible_and_its_lease_moves(
+def test_other_connections_see_a_running_claim_and_its_lease_renewals(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    workspace = a_workspace_holding_one_job(
-        database, kind="full-rebuild", reason="drill"
-    )
+    workspace = a_workspace_with_one_job(database, kind="full-rebuild", reason="drill")
     bootstrap = bootstrap_for(database, tmp_path)
-    dsn = _WHERE[database]
+    dsn = _CONNINFO[database]
 
     def row() -> tuple[Any, ...] | None:
         with scoped(database, workspace) as cursor:
@@ -397,9 +397,11 @@ def test_a_running_jobs_claim_is_visible_and_its_lease_moves(
         pass_.start()
         try:
             claimed = until(lambda read: read is not None and read[0] == "claimed")
-            assert claimed is not None, "the claim never reached a second connection"
+            assert claimed is not None, (
+                "a second connection never saw the job as claimed"
+            )
             moved = until(lambda read: read is not None and read[1] > claimed[1])
-            assert moved is not None, "the heartbeat never moved the lease"
+            assert moved is not None, "the heartbeat did not extend the lease"
             assert moved[0] == "claimed"
         finally:
             blocker.rollback()
@@ -412,13 +414,13 @@ def test_a_running_jobs_claim_is_visible_and_its_lease_moves(
     assert (finished[0], finished[2]) == ("done", True)
 
 
-def test_a_failed_audit_counts_so_idle_ticks_queue_no_other(
+def test_failing_audit_stops_at_three_attempts_and_queues_no_other(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
     database.commit()
 
-    an_empty_store_fails_the_audit(tmp_path, workspace)
+    create_an_empty_repository(tmp_path, workspace)
     bootstrap = bootstrap_for(database, tmp_path)
 
     assert loop.tick(database, bootstrap) is False
@@ -437,22 +439,26 @@ def test_a_failed_audit_counts_so_idle_ticks_queue_no_other(
             (workspace,),
         )
         assert cursor.fetchall() == [("failed", 3)], (
-            "a failed audit runs to its bound of three"
+            "the audit did not reach failed status after three attempts"
         )
 
 
 def test_a_failed_job_is_not_claimable_until_its_backoff_passes(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
-    an_empty_store_fails_the_audit(tmp_path, workspace)
+    workspace = a_workspace_with_one_job(database, kind="nightly-audit")
+    create_an_empty_repository(tmp_path, workspace)
     bootstrap = bootstrap_for(database, tmp_path)
 
     assert loop.tick(database, bootstrap) is True
-    assert loop.tick(database, bootstrap) is False, "the failed job was claimed at once"
+    assert loop.tick(database, bootstrap) is False, (
+        "the failed job was claimed again before its backoff ended"
+    )
 
     end_backoffs(database, workspace)
-    assert loop.tick(database, bootstrap) is True, "the backoff never let the job go"
+    assert loop.tick(database, bootstrap) is True, (
+        "the job was not claimable after its backoff ended"
+    )
 
 
 def test_a_job_failing_twice_then_succeeding_is_not_poisoned(
@@ -464,7 +470,7 @@ def test_a_job_failing_twice_then_succeeding_is_not_poisoned(
     database.commit()
     with scoped(database, workspace) as cursor:
         seed_job(cursor, workspace_id=workspace, kind="nightly-audit")
-    an_empty_store_fails_the_audit(tmp_path, workspace)
+    create_an_empty_repository(tmp_path, workspace)
     bootstrap = bootstrap_for(database, tmp_path)
 
     for _ in range(2):
@@ -481,7 +487,7 @@ def test_a_job_failing_twice_then_succeeding_is_not_poisoned(
         assert cursor.fetchall() == [("done", 3)]
 
 
-def test_two_claimants_never_run_one_subjects_two_queued_jobs(
+def test_two_workers_cannot_claim_two_jobs_for_the_same_subject(
     database: psycopg.Connection,
 ) -> None:
     workspace = str(seed_workspace(database.cursor())["id"])
@@ -507,8 +513,8 @@ def test_two_claimants_never_run_one_subjects_two_queued_jobs(
         )
 
     with (
-        queue.connected(_WHERE[database]) as first,
-        queue.connected(_WHERE[database]) as second,
+        queue.connected(_CONNINFO[database]) as first,
+        queue.connected(_CONNINFO[database]) as second,
         scoped(first, workspace) as claiming,
     ):
         taken = queue.claim(claiming, workspace, "first", ["index"])
@@ -519,7 +525,7 @@ def test_two_claimants_never_run_one_subjects_two_queued_jobs(
     assert (taken.id, raced) == (retry["id"], None)
 
 
-def test_a_failure_requeues_beside_a_fresh_job_for_its_subject(
+def test_failed_job_requeues_beside_a_queued_job_for_its_subject(
     database: psycopg.Connection,
 ) -> None:
     workspace = str(seed_workspace(database.cursor())["id"])
@@ -552,7 +558,7 @@ def test_a_failure_requeues_beside_a_fresh_job_for_its_subject(
         assert cursor.fetchall() == [("queued", 1), ("queued", 0)]
 
 
-def test_refuses_a_malformed_workspace_id_before_touching_the_store(
+def test_concepts_at_head_rejects_malformed_workspace_ids_and_symlinks(
     tmp_path: Path,
 ) -> None:
 
@@ -584,11 +590,11 @@ def a_workspace_live_at_generation_one(
     return str(workspace), expenses
 
 
-def test_a_rebuild_holds_the_generation_row_first_so_writes_land(
+def test_a_rebuild_locks_the_generation_row_before_reading_concepts(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace, expenses = a_workspace_live_at_generation_one(database)
-    dsn = _WHERE[database]
+    dsn = _CONNINFO[database]
 
     outcomes: list[Any] = []
     with psycopg.connect(dsn) as writer, queue.connected(dsn) as worker:
@@ -628,7 +634,9 @@ def test_a_rebuild_holds_the_generation_row_first_so_writes_land(
                 if waiting is not None:
                     break
                 time.sleep(0.05)
-            assert waiting is not None, "the rebuild never waited on the generation row"
+            assert waiting is not None, (
+                "the rebuild never waited for the lock on the map_generation row"
+            )
         finally:
             writer.commit()
             rebuilding.join(timeout=30)
@@ -645,7 +653,7 @@ def test_a_rebuild_holds_the_generation_row_first_so_writes_land(
         assert cursor.fetchall() == [(IRI,), (OTHER_IRI,)]
 
 
-def test_the_audit_reports_a_mismatch_as_state_not_refusal(
+def test_the_audit_returns_a_hash_mismatch_instead_of_raising(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
 
@@ -669,7 +677,7 @@ def test_the_audit_reports_a_mismatch_as_state_not_refusal(
     assert outcome.unparsed == []
 
 
-def test_the_audit_counts_unparseable_files_and_rows_without_files(
+def test_the_audit_reports_files_without_rows_and_rows_without_files(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -695,7 +703,7 @@ def test_the_audit_counts_unparseable_files_and_rows_without_files(
     assert outcome.missing_file == ["knowledge/gone.md"]
 
 
-def test_an_unparseable_file_with_an_index_row_lands_in_unparsed(
+def test_the_audit_reports_an_unparseable_file_with_an_index_row(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -710,7 +718,7 @@ def test_an_unparseable_file_with_an_index_row_lands_in_unparsed(
     assert (outcome.checked, outcome.unparsed) == (0, ["knowledge/expenses.md"])
 
 
-def test_a_rebuild_writes_the_next_generation_aside_then_flips_it(
+def test_a_rebuild_writes_the_next_generation_then_makes_it_live(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -767,7 +775,7 @@ def test_a_rebuild_writes_the_next_generation_aside_then_flips_it(
         ]
 
 
-def test_a_rebuild_leaves_the_prior_generation_for_the_apis_prune(
+def test_a_rebuild_does_not_delete_the_previous_generation(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace, expenses = a_workspace_live_at_generation_one(database)
@@ -840,7 +848,7 @@ def test_a_rebuild_analyses_the_map_for_the_planner(
     assert planners_row_estimates(database) == {"map_node": 1, "map_edge": 0}
 
 
-def an_analyse_that_gives_up_at_once(database: psycopg.Connection) -> None:
+def make_analyse_map_time_out_on_locks(database: psycopg.Connection) -> None:
     database.execute("ALTER FUNCTION analyse_map() SET lock_timeout = '100ms'")
     database.commit()
 
@@ -849,11 +857,11 @@ def test_a_rebuild_whose_analyse_fails_still_goes_live(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_rebuild_queued_on_an_unanalysed_map(database, tmp_path)
-    an_analyse_that_gives_up_at_once(database)
+    make_analyse_map_time_out_on_locks(database)
     bootstrap = bootstrap_for(database, tmp_path)
 
     with (
-        psycopg.connect(_WHERE[database]) as holder,
+        psycopg.connect(_CONNINFO[database]) as holder,
         queue.connected(bootstrap.database_url) as worker,
         capture_logs() as written,
     ):
@@ -890,7 +898,7 @@ def audit_job(database: psycopg.Connection, workspace: str) -> tuple[Any, ...]:
         return cursor.fetchall()[0]
 
 
-def refusals_in(
+def error_lines_in(
     written: Sequence[Mapping[str, Any]],
 ) -> list[tuple[str, str, str]]:
     return [
@@ -900,7 +908,7 @@ def refusals_in(
     ]
 
 
-REFUSES = "a deploy stamp does not match; claiming nothing"
+STAMP_MISMATCH_EVENT = "a deploy stamp does not match; claiming nothing"
 
 
 def test_a_mismatched_schema_stamp_claims_nothing_and_exits_one(
@@ -919,7 +927,7 @@ def test_a_mismatched_schema_stamp_claims_nothing_and_exits_one(
     with capture_logs() as written:
         assert loop.run(bootstrap_for(database, tmp_path), once=True) == 1
 
-    assert refusals_in(written) == [(REFUSES, "differs", "matches")]
+    assert error_lines_in(written) == [(STAMP_MISMATCH_EVENT, "differs", "matches")]
     assert audit_job(database, workspace) == ("queued", None)
 
 
@@ -934,11 +942,11 @@ def test_a_mismatched_contract_digest_claims_nothing_and_exits_one(
     with capture_logs() as written:
         assert loop.run(bootstrap_for(database, tmp_path), once=True) == 1
 
-    assert refusals_in(written) == [(REFUSES, "matches", "differs")]
+    assert error_lines_in(written) == [(STAMP_MISMATCH_EVENT, "matches", "differs")]
     assert audit_job(database, workspace) == ("queued", None)
 
 
-def test_a_worker_with_matching_stamps_runs_what_is_queued(
+def test_a_worker_with_matching_stamps_runs_the_queued_job(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
@@ -949,28 +957,28 @@ def test_a_worker_with_matching_stamps_runs_what_is_queued(
     with capture_logs() as written:
         assert loop.run(bootstrap_for(database, tmp_path), once=True) == 0
 
-    assert refusals_in(written) == []
+    assert error_lines_in(written) == []
     assert audit_job(database, workspace) == ("done", WORKER)
 
 
-A_TICKING_WORKER = """
+TICK_MODE_WORKER_SOURCE = """
 import sys
 from better_answers_worker import loop
 
 sys.exit(loop.main())
 """
 
-TICK_ANSWER_SECONDS = 60
+TICK_TIMEOUT_SECONDS = 60
 
 
 @contextlib.contextmanager
-def a_ticking_worker(
+def a_tick_mode_worker(
     database: psycopg.Connection, tmp_path: Path
 ) -> Iterator[subprocess.Popen[str]]:
     with (
         (tmp_path / "stderr.txt").open("w") as stderr,
         subprocess.Popen(
-            [sys.executable, "-c", A_TICKING_WORKER, "--ticks"],
+            [sys.executable, "-c", TICK_MODE_WORKER_SOURCE, "--ticks"],
             env=worker_environment(bootstrap_for(database, tmp_path)),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -984,11 +992,11 @@ def a_ticking_worker(
             worker.kill()
 
 
-def its_answer_to_a_tick(worker: subprocess.Popen[str]) -> dict[str, Any]:
+def send_a_tick_and_read_the_result(worker: subprocess.Popen[str]) -> dict[str, Any]:
     assert worker.stdin is not None and worker.stdout is not None
     worker.stdin.write("tick\n")
     worker.stdin.flush()
-    watchdog = threading.Timer(TICK_ANSWER_SECONDS, worker.kill)
+    watchdog = threading.Timer(TICK_TIMEOUT_SECONDS, worker.kill)
     watchdog.start()
     try:
         for line in worker.stdout:
@@ -997,10 +1005,10 @@ def its_answer_to_a_tick(worker: subprocess.Popen[str]) -> dict[str, Any]:
                 return dict(said)
     finally:
         watchdog.cancel()
-    raise AssertionError("the worker ended before it answered the tick")
+    raise AssertionError("the worker exited before it logged the end of the tick")
 
 
-def test_a_ticking_worker_answers_each_tick_then_exits(
+def test_tick_mode_logs_each_tick_and_exits_when_stdin_closes(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
@@ -1008,9 +1016,9 @@ def test_a_ticking_worker_answers_each_tick_then_exits(
         stamp_contract_as_migrate_does(cursor, digest=CONTRACT_DIGEST)
     database.commit()
 
-    with a_ticking_worker(database, tmp_path) as worker:
-        first = its_answer_to_a_tick(worker)
-        second = its_answer_to_a_tick(worker)
+    with a_tick_mode_worker(database, tmp_path) as worker:
+        first = send_a_tick_and_read_the_result(worker)
+        second = send_a_tick_and_read_the_result(worker)
         assert worker.stdin is not None
         worker.stdin.close()
         exit_code = worker.wait(timeout=EXIT_AFTER_STOP_SECONDS)
@@ -1020,67 +1028,67 @@ def test_a_ticking_worker_answers_each_tick_then_exits(
     assert exit_code == 0, (tmp_path / "stderr.txt").read_text()
 
 
-def test_a_ticking_worker_claims_nothing_until_its_stamps_match(
+def test_tick_mode_claims_nothing_until_the_stamps_match(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
-    stamped_as_deploy_leaves_it(database, "a" * 64)
+    stamp_contract_digest(database, "a" * 64)
 
-    def ticks_across_the_deploy_finishing() -> Iterator[str]:
+    def two_ticks_with_a_deploy_between() -> Iterator[str]:
         yield "tick\n"
         assert audit_job(database, workspace) == ("queued", None)
-        stamped_as_deploy_leaves_it(database, CONTRACT_DIGEST)
+        stamp_contract_digest(database, CONTRACT_DIGEST)
         yield "tick\n"
 
     with capture_logs() as written:
         loop.run_ticks(
-            bootstrap_for(database, tmp_path), ticks_across_the_deploy_finishing()
+            bootstrap_for(database, tmp_path), two_ticks_with_a_deploy_between()
         )
 
-    answers = [
+    tick_results = [
         (line["worked"], line["contract_stamp"])
         for line in written
         if line["event"] == "tick done"
     ]
-    assert answers == [(False, loop.DIFFERS), (True, loop.MATCHES)]
+    assert tick_results == [(False, loop.DIFFERS), (True, loop.MATCHES)]
     assert audit_job(database, workspace) == ("done", WORKER)
 
 
-def stamped_as_deploy_leaves_it(database: psycopg.Connection, digest: str) -> None:
+def stamp_contract_digest(database: psycopg.Connection, digest: str) -> None:
     with database.cursor() as cursor:
         stamp_contract_as_migrate_does(cursor, digest=digest)
     database.commit()
 
 
-DAEMON_ANSWERS_WITHIN_SECONDS = 30
+DAEMON_TIMEOUT_SECONDS = 30
 
 
 class SteppedSleep:
     def __init__(self) -> None:
-        self._moved = threading.Condition()
+        self._changed = threading.Condition()
         self._elapsed = 0.0
         self._slept: list[float] = []
 
     def __call__(self, seconds: float) -> None:
-        with self._moved:
+        with self._changed:
             wakes_at = self._elapsed + seconds
             self._slept.append(seconds)
-            self._moved.notify_all()
-            self._moved.wait_for(
-                lambda: self._elapsed >= wakes_at, timeout=DAEMON_ANSWERS_WITHIN_SECONDS
+            self._changed.notify_all()
+            self._changed.wait_for(
+                lambda: self._elapsed >= wakes_at, timeout=DAEMON_TIMEOUT_SECONDS
             )
 
     def step(self, seconds: float) -> None:
-        with self._moved:
+        with self._changed:
             self._elapsed += seconds
-            self._moved.notify_all()
+            self._changed.notify_all()
 
     def slept(self, times: int) -> list[float]:
-        with self._moved:
-            assert self._moved.wait_for(
+        with self._changed:
+            assert self._changed.wait_for(
                 lambda: len(self._slept) >= times,
-                timeout=DAEMON_ANSWERS_WITHIN_SECONDS,
-            ), f"the daemon never slept {times} times"
+                timeout=DAEMON_TIMEOUT_SECONDS,
+            ), f"the daemon called sleep fewer than {times} times"
             return list(self._slept)
 
 
@@ -1102,8 +1110,8 @@ def stop(
         )
     database.commit()
     sleep.step(loop.IDLE_SLEEP_SECONDS)
-    daemon.join(timeout=DAEMON_ANSWERS_WITHIN_SECONDS)
-    assert not daemon.is_alive(), "the daemon outlived its test"
+    daemon.join(timeout=DAEMON_TIMEOUT_SECONDS)
+    assert not daemon.is_alive(), "the daemon thread was still running after the test"
 
 
 def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
@@ -1123,7 +1131,7 @@ def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
         sleep.step(loop.IDLE_SLEEP_SECONDS)
         sleep.slept(2)
         with (
-            psycopg.connect(_WHERE[database], autocommit=True) as deploying,
+            psycopg.connect(_CONNINFO[database], autocommit=True) as deploying,
             deploying.cursor() as cursor,
         ):
             stamp_contract_as_migrate_does(cursor, digest=CONTRACT_DIGEST)
@@ -1133,11 +1141,11 @@ def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
     stop(running, sleep, database)
 
     assert done == ("done", WORKER)
-    assert refusals_in(written) == [(REFUSES, "matches", "differs")]
+    assert error_lines_in(written) == [(STAMP_MISMATCH_EVENT, "matches", "differs")]
     assert slept == [loop.IDLE_SLEEP_SECONDS] * 3
 
 
-def test_healthy_with_a_fresh_lease_unhealthy_with_a_waiting_queue(
+def test_health_fails_on_a_waiting_job_or_an_expired_lease(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -1175,7 +1183,7 @@ def test_healthy_with_a_fresh_lease_unhealthy_with_a_waiting_queue(
     assert health.is_healthy(database, WORKER) is False
 
 
-def test_a_job_in_its_backoff_is_not_a_waiting_queue(
+def test_a_job_in_backoff_does_not_fail_the_health_check(
     database: psycopg.Connection,
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -1200,7 +1208,7 @@ def test_a_job_in_its_backoff_is_not_a_waiting_queue(
 def test_the_worker_role_counts_a_waiting_job_as_unhealthy(
     database: psycopg.Connection,
 ) -> None:
-    worker_dsn = worker_login_dsn(database, _WHERE[database])
+    worker_dsn = worker_login_dsn(database, _CONNINFO[database])
     workspace = seed_workspace(database.cursor())["id"]
     database.commit()
     with scoped(database, workspace) as cursor:
@@ -1216,19 +1224,19 @@ def test_the_worker_role_counts_a_waiting_job_as_unhealthy(
 
 
 def a_claimed_audit(database: psycopg.Connection) -> tuple[str, queue.ClaimedJob]:
-    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
+    workspace = a_workspace_with_one_job(database, kind="nightly-audit")
     with scoped(database, workspace) as cursor:
         claimed = queue.claim(cursor, workspace, WORKER, list(KINDS))
     assert claimed is not None
     return workspace, claimed
 
 
-def test_a_long_run_keeps_its_lease_on_its_own_connection(
+def test_the_heartbeat_renews_the_lease_on_its_own_connection(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace, claimed = a_claimed_audit(database)
 
-    dsn = _WHERE[database]
+    dsn = _CONNINFO[database]
     with psycopg.connect(dsn) as onlooker:
         with scoped(onlooker, workspace) as cursor:
             cursor.execute("SELECT heartbeat_at, lease_expires_at FROM job")
@@ -1250,11 +1258,11 @@ def test_a_long_run_keeps_its_lease_on_its_own_connection(
                     after = read
                     break
 
-    assert after is not None, "the heartbeat never reached a reader outside the job"
-    assert after[1] > before[1], "and the lease moved with it"
+    assert after is not None, "another connection never saw a newer heartbeat_at"
+    assert after[1] > before[1], "the heartbeat did not extend the lease"
 
 
-def _within[T](seconds: float, read: Callable[[], T]) -> T | None:
+def _wait_for[T](seconds: float, read: Callable[[], T]) -> T | None:
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         found = read()
@@ -1284,7 +1292,7 @@ def _lease_of(onlooker: psycopg.Connection, workspace: str) -> tuple[Any, bool]:
 
 
 @dataclass(frozen=True, slots=True)
-class Beating:
+class RunningHeartbeat:
     workspace: str
     job: queue.ClaimedJob
     onlooker: psycopg.Connection
@@ -1293,68 +1301,68 @@ class Beating:
 
 
 @contextlib.contextmanager
-def a_heartbeat_beating(database: psycopg.Connection) -> Iterator[Beating]:
+def a_running_heartbeat(database: psycopg.Connection) -> Iterator[RunningHeartbeat]:
     workspace, claimed = a_claimed_audit(database)
-    dsn = _WHERE[database]
+    dsn = _CONNINFO[database]
     with (
         capture_logs() as written,
         queue.connected(dsn) as onlooker,
         queue.keeping_alive(dsn, claimed, WORKER, every_seconds=0.05),
     ):
-        sessions = _within(10, lambda: _heartbeat_sessions(onlooker, database))
-        assert sessions, "the heartbeat never opened a session"
-        yield Beating(workspace, claimed, onlooker, written, sessions[0])
+        sessions = _wait_for(10, lambda: _heartbeat_sessions(onlooker, database))
+        assert sessions, "the heartbeat never opened a database session"
+        yield RunningHeartbeat(workspace, claimed, onlooker, written, sessions[0])
 
 
-def test_a_heartbeat_outlives_a_dropped_connection(
+def test_the_heartbeat_reconnects_after_its_connection_is_dropped(
     database: psycopg.Connection,
 ) -> None:
-    with a_heartbeat_beating(database) as beating:
-        onlooker = beating.onlooker
-        onlooker.execute("SELECT pg_terminate_backend(%s)", (beating.session,))
-        assert _within(
+    with a_running_heartbeat(database) as heartbeat:
+        onlooker = heartbeat.onlooker
+        onlooker.execute("SELECT pg_terminate_backend(%s)", (heartbeat.session,))
+        assert _wait_for(
             10,
-            lambda: beating.session not in _heartbeat_sessions(onlooker, database),
+            lambda: heartbeat.session not in _heartbeat_sessions(onlooker, database),
+        ), "the terminated heartbeat session was still connected"
+        dropped_at, _ = _lease_of(onlooker, heartbeat.workspace)
+        renewed = _wait_for(
+            10, lambda: _lease_of(onlooker, heartbeat.workspace)[0] > dropped_at
         )
-        dropped_at, _ = _lease_of(onlooker, beating.workspace)
-        renewed = _within(
-            10, lambda: _lease_of(onlooker, beating.workspace)[0] > dropped_at
-        )
-        _, live = _lease_of(onlooker, beating.workspace)
+        _, live = _lease_of(onlooker, heartbeat.workspace)
 
-    assert renewed, "the heartbeat stopped at the dropped connection"
-    assert live, "and the lease lapsed"
+    assert renewed, "the heartbeat stopped after its connection was dropped"
+    assert live, "the lease expired"
     assert {
         line["job_id"]
-        for line in beating.written
+        for line in heartbeat.written
         if line["event"] == "a heartbeat failed" and line["error"]
-    } == {beating.job.id}
+    } == {heartbeat.job.id}
 
 
-def test_a_heartbeat_whose_claim_is_gone_says_so_and_stops(
+def test_the_heartbeat_logs_a_lost_claim_and_stops(
     database: psycopg.Connection,
 ) -> None:
-    with a_heartbeat_beating(database) as beating:
-        with scoped(beating.onlooker, beating.workspace) as cursor:
+    with a_running_heartbeat(database) as heartbeat:
+        with scoped(heartbeat.onlooker, heartbeat.workspace) as cursor:
             cursor.execute("UPDATE job SET claimed_by = 'another-worker'")
-        stopped = _within(
-            10, lambda: not _heartbeat_sessions(beating.onlooker, database)
+        stopped = _wait_for(
+            10, lambda: not _heartbeat_sessions(heartbeat.onlooker, database)
         )
 
-    assert stopped, "the heartbeat kept its session after the claim was gone"
+    assert stopped, "the heartbeat kept its session open after losing the claim"
     assert [
         line["job_id"]
-        for line in beating.written
+        for line in heartbeat.written
         if line["event"] == "the claim was lost"
-    ] == [beating.job.id]
+    ] == [heartbeat.job.id]
 
 
-def test_a_blocked_heartbeat_statement_ends_within_its_bound(
+def test_a_blocked_heartbeat_statement_is_cancelled_at_its_timeout(
     database: psycopg.Connection,
 ) -> None:
     workspace, claimed = a_claimed_audit(database)
 
-    dsn = _WHERE[database]
+    dsn = _CONNINFO[database]
     with (
         capture_logs() as written,
         queue.connected(dsn) as locking,
@@ -1365,7 +1373,7 @@ def test_a_blocked_heartbeat_statement_ends_within_its_bound(
     ):
         with scoped(locking, workspace) as cursor:
             cursor.execute("SELECT 1 FROM job WHERE id = %s FOR UPDATE", (claimed.id,))
-            cancelled = _within(
+            cancelled = _wait_for(
                 10,
                 lambda: [
                     line
@@ -1375,13 +1383,15 @@ def test_a_blocked_heartbeat_statement_ends_within_its_bound(
                 ],
             )
         cancelled_at, _ = _lease_of(onlooker, workspace)
-        renewed = _within(10, lambda: _lease_of(onlooker, workspace)[0] > cancelled_at)
+        renewed = _wait_for(
+            10, lambda: _lease_of(onlooker, workspace)[0] > cancelled_at
+        )
 
     assert cancelled, "the blocked heartbeat statement was never cancelled"
     assert renewed, "the heartbeat stopped after its statement was cancelled"
 
 
-A_WORKER_RUN = """
+ONE_TICK_WORKER_SOURCE = """
 import sys
 from better_answers_worker import loop, queue
 from better_answers_worker.config import read_bootstrap
@@ -1412,25 +1422,25 @@ def worker_environment(bootstrap: Bootstrap) -> dict[str, str]:
     }
 
 
-def a_worker_hung_on_its_audit(
+def run_a_worker_blocked_on_its_audit(
     database: psycopg.Connection,
     tmp_path: Path,
     *,
     deadline_seconds: float = 0.3,
-    while_hung: Callable[[], object] = lambda: None,
+    while_blocked: Callable[[], object] = lambda: None,
 ) -> tuple[list[dict[str, Any]], str]:
     bootstrap = bootstrap_for(database, tmp_path)
     with queue.connected(bootstrap.database_url) as locking, locking.transaction():
         locking.execute("LOCK TABLE concept_index IN ACCESS EXCLUSIVE MODE")
         with subprocess.Popen(
-            [sys.executable, "-c", A_WORKER_RUN, str(deadline_seconds)],
+            [sys.executable, "-c", ONE_TICK_WORKER_SOURCE, str(deadline_seconds)],
             env=worker_environment(bootstrap),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         ) as worker:
             try:
-                while_hung()
+                while_blocked()
                 stdout, stderr = worker.communicate(timeout=30)
             finally:
                 worker.kill()
@@ -1438,30 +1448,34 @@ def a_worker_hung_on_its_audit(
     return [json.loads(line) for line in stdout.splitlines()], stderr
 
 
-A_BEATS_SKEW_SECONDS = (
+HEARTBEAT_SLACK_SECONDS = (
     queue.HEARTBEAT_CONNECT_SECONDS + 2 * queue.HEARTBEAT_STATEMENT_SECONDS
 )
 
 
-def the_lease_lapses(database: psycopg.Connection, workspace: str) -> bool:
+def the_lease_expires(database: psycopg.Connection, workspace: str) -> bool:
     return bool(
-        _within(A_BEATS_SKEW_SECONDS, lambda: not _lease_of(database, workspace)[1])
+        _wait_for(
+            HEARTBEAT_SLACK_SECONDS, lambda: not _lease_of(database, workspace)[1]
+        )
     )
 
 
 def test_a_job_past_its_deadline_ends_the_worker_process(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
+    workspace = a_workspace_with_one_job(database, kind="nightly-audit")
 
-    written, stderr = a_worker_hung_on_its_audit(database, tmp_path)
+    written, stderr = run_a_worker_blocked_on_its_audit(database, tmp_path)
 
-    assert the_lease_lapses(database, workspace), (
-        "the lease outlived the worker process"
+    assert the_lease_expires(database, workspace), (
+        "the lease did not expire after the worker process ended"
     )
     with scoped(database, workspace) as cursor:
         reclaimed = queue.claim(cursor, workspace, WORKER, ["nightly-audit"])
-    assert reclaimed is not None
+    assert reclaimed is not None, (
+        "the job was not claimable after the worker process ended"
+    )
     assert reclaimed.attempts == 2
     events = [line["event"] for line in written]
     assert not {"job finished", "job failed", "the claim was lost"} & set(events)
@@ -1469,10 +1483,12 @@ def test_a_job_past_its_deadline_ends_the_worker_process(
         "the job outlived its deadline",
         reclaimed.id,
     )
-    assert "in nightly_audit" in stderr, "the hung frame went unrecorded"
+    assert "in nightly_audit" in stderr, (
+        "stderr did not show the stack frame in nightly_audit"
+    )
 
 
-def test_a_job_outliving_every_attempt_ends_poisoned(
+def test_a_job_that_times_out_on_every_attempt_is_poisoned(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = str(seed_workspace(database.cursor())["id"])
@@ -1483,8 +1499,10 @@ def test_a_job_outliving_every_attempt_ends_poisoned(
         )
 
     for _ in range(2):
-        a_worker_hung_on_its_audit(database, tmp_path)
-        assert the_lease_lapses(database, workspace), "the lease outlived the worker"
+        run_a_worker_blocked_on_its_audit(database, tmp_path)
+        assert the_lease_expires(database, workspace), (
+            "the lease did not expire after the worker process ended"
+        )
 
     with scoped(database, workspace) as cursor:
         assert queue.claim(cursor, workspace, WORKER, ["nightly-audit"]) is None
@@ -1495,10 +1513,10 @@ def test_a_job_outliving_every_attempt_ends_poisoned(
 def test_a_lost_claim_still_ends_the_worker_at_its_deadline(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
+    workspace = a_workspace_with_one_job(database, kind="nightly-audit")
 
     def take_the_claim() -> None:
-        with queue.connected(_WHERE[database]) as taking:
+        with queue.connected(_CONNINFO[database]) as taking:
 
             def taken() -> int:
                 with scoped(taking, workspace) as cursor:
@@ -1509,17 +1527,17 @@ def test_a_lost_claim_still_ends_the_worker_at_its_deadline(
                     )
                     return cursor.rowcount
 
-            assert _within(10, taken), "the worker never claimed its job"
+            assert _wait_for(10, taken), "the worker never claimed its job"
 
-    written, _ = a_worker_hung_on_its_audit(
-        database, tmp_path, deadline_seconds=1.0, while_hung=take_the_claim
+    written, _ = run_a_worker_blocked_on_its_audit(
+        database, tmp_path, deadline_seconds=1.0, while_blocked=take_the_claim
     )
 
     events = [line["event"] for line in written]
     assert events[-2:] == ["the claim was lost", "the job outlived its deadline"]
 
 
-A_WORKER_PROCESS = """
+LOOPING_WORKER_SOURCE = """
 import sys
 from better_answers_worker import loop
 from better_answers_worker.config import read_bootstrap
@@ -1541,7 +1559,7 @@ def a_worker_process(
         stamp_contract_as_migrate_does(cursor, digest=CONTRACT_DIGEST)
     database.commit()
     with subprocess.Popen(
-        [sys.executable, "-c", A_WORKER_PROCESS, str(finish_within_seconds)],
+        [sys.executable, "-c", LOOPING_WORKER_SOURCE, str(finish_within_seconds)],
         env=worker_environment(bootstrap_for(database, tmp_path)),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -1565,7 +1583,7 @@ def exit_within(
 
 @contextlib.contextmanager
 def concept_index_locked(database: psycopg.Connection) -> Iterator[psycopg.Connection]:
-    with queue.connected(_WHERE[database]) as locking:
+    with queue.connected(_CONNINFO[database]) as locking:
         locking.execute("BEGIN")
         locking.execute("LOCK TABLE concept_index IN ACCESS EXCLUSIVE MODE")
         yield locking
@@ -1573,7 +1591,7 @@ def concept_index_locked(database: psycopg.Connection) -> Iterator[psycopg.Conne
 
 def claimed_by_the_worker(database: psycopg.Connection, workspace: str) -> bool:
     return bool(
-        _within(
+        _wait_for(
             WORKER_STARTS_WITHIN_SECONDS,
             lambda: audit_job(database, workspace)[0] == "claimed",
         )
@@ -1585,13 +1603,13 @@ def test_an_idle_worker_exits_cleanly_on_sigterm(
 ) -> None:
     with (
         a_worker_process(database, tmp_path, finish_within_seconds=10) as worker,
-        queue.connected(_WHERE[database]) as onlooker,
+        queue.connected(_CONNINFO[database]) as onlooker,
     ):
-        connected = _within(
+        connected = _wait_for(
             WORKER_STARTS_WITHIN_SECONDS,
             lambda: _heartbeat_sessions(onlooker, database),
         )
-        assert connected, "the worker never reached its loop"
+        assert connected, "the worker never connected to the database"
 
         worker.send_signal(signal.SIGTERM)
         exit_code, stderr = exit_within(worker, EXIT_AFTER_STOP_SECONDS)
@@ -1599,16 +1617,18 @@ def test_an_idle_worker_exits_cleanly_on_sigterm(
     assert exit_code == 0, stderr
 
 
-def test_a_stop_mid_job_hands_it_back_with_its_attempt(
+def test_sigterm_during_a_job_requeues_it_without_using_an_attempt(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
+    workspace = a_workspace_with_one_job(database, kind="nightly-audit")
 
     with (
         concept_index_locked(database),
         a_worker_process(database, tmp_path, finish_within_seconds=0.5) as worker,
     ):
-        assert claimed_by_the_worker(database, workspace)
+        assert claimed_by_the_worker(database, workspace), (
+            "the worker never claimed the audit"
+        )
         worker.send_signal(signal.SIGTERM)
         exit_code, stderr = exit_within(worker, EXIT_AFTER_STOP_SECONDS)
 
@@ -1616,15 +1636,17 @@ def test_a_stop_mid_job_hands_it_back_with_its_attempt(
     database.commit()
     with scoped(database, workspace) as cursor:
         reclaimed = queue.claim(cursor, workspace, WORKER, ["nightly-audit"])
-    assert reclaimed is not None, "the handed-back job was not claimable at once"
+    assert reclaimed is not None, "the requeued job was not claimable straight away"
     with database.cursor() as cursor:
         cursor.execute("SELECT max_attempts FROM job WHERE id = %s", (reclaimed.id,))
         bound = cursor.fetchone()
     assert bound is not None
-    assert (reclaimed.attempts, bound[0]) == (2, 4), "the stop spent an attempt"
+    assert (reclaimed.attempts, bound[0]) == (2, 4), (
+        "SIGTERM used up one of the job's attempts"
+    )
 
 
-def test_a_stop_lets_a_job_that_ends_within_grace_finish(
+def test_sigterm_lets_a_job_finish_within_the_grace_period(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
@@ -1633,7 +1655,9 @@ def test_a_stop_lets_a_job_that_ends_within_grace_finish(
         concept_index_locked(database) as locking,
         a_worker_process(database, tmp_path, finish_within_seconds=10) as worker,
     ):
-        assert claimed_by_the_worker(database, workspace)
+        assert claimed_by_the_worker(database, workspace), (
+            "the worker never claimed the audit"
+        )
         worker.send_signal(signal.SIGTERM)
         locking.execute("COMMIT")
         exit_code, stderr = exit_within(worker, EXIT_AFTER_STOP_SECONDS)

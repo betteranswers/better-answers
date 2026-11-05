@@ -39,8 +39,8 @@ const bytes = (written: string): Uint8Array => new Uint8Array(Buffer.from(writte
 
 const key = bytes(fixture.key);
 
-describe("credential-envelope, the format a sealed credential is written in", () => {
-  it("names the cipher, version and widths the agreement names", () => {
+describe("the credential-envelope format for sealed credentials", () => {
+  it("matches the contract's cipher, version and byte widths", () => {
     expect({
       aead: ENVELOPE_AEAD,
       version: ENVELOPE_VERSION,
@@ -58,11 +58,11 @@ describe("credential-envelope, the format a sealed credential is written in", ()
     });
   });
 
-  it("uses the fixture's own key, of the agreement's width", () => {
+  it("uses a fixture key of the contract's key length", () => {
     expect(key.length).toBe(fixture.frame.key_bytes);
   });
 
-  it("opens every frame the agreement carries to its exact plaintext", () => {
+  it("opens every valid fixture frame to its exact plaintext", () => {
     expect(fixture.opens.length).toBeGreaterThan(0);
 
     for (const vector of fixture.opens) {
@@ -73,7 +73,7 @@ describe("credential-envelope, the format a sealed credential is written in", ()
     }
   });
 
-  it("refuses every frame the agreement refuses, in the agreement's word", () => {
+  it("refuses every invalid fixture frame with the contract's refusal word", () => {
     expect(fixture.refuses.length).toBeGreaterThan(0);
 
     for (const vector of fixture.refuses) {
@@ -84,13 +84,13 @@ describe("credential-envelope, the format a sealed credential is written in", ()
     }
   });
 
-  it("carries a refused frame for each word and no other", () => {
+  it("has invalid frames for exactly the three refusal words", () => {
     expect(new Set(fixture.refuses.map((vector) => vector.refusal))).toEqual(
       new Set(["envelope-version-unknown", "envelope-malformed", "envelope-not-authentic"]),
     );
   });
 
-  it("writes a frame of the agreement's widths, version first", () => {
+  it("seals a frame of the contract's length, version byte first", () => {
     for (const vector of fixture.opens) {
       const plaintext = bytes(vector.plaintext);
       const sealed = sealEnvelope(key, plaintext);
@@ -107,7 +107,7 @@ describe("credential-envelope, the format a sealed credential is written in", ()
     }
   });
 
-  it("recovers a plaintext it sealed itself, byte for byte", () => {
+  it("opens a frame it sealed to the original plaintext", () => {
     for (const vector of fixture.opens) {
       const plaintext = bytes(vector.plaintext);
 
@@ -118,7 +118,7 @@ describe("credential-envelope, the format a sealed credential is written in", ()
     }
   });
 
-  it("draws a fresh nonce for every seal", () => {
+  it("uses a fresh nonce for every seal", () => {
     for (const vector of fixture.opens) {
       const plaintext = bytes(vector.plaintext);
       const sealed = new Set(
@@ -132,7 +132,7 @@ describe("credential-envelope, the format a sealed credential is written in", ()
     }
   });
 
-  it("throws on a key of another length rather than refusing", () => {
+  it("throws on a wrong-length key instead of refusing", () => {
     const short = key.subarray(1);
 
     expect(() => sealEnvelope(short, key)).toThrow(/envelope: a key is/);

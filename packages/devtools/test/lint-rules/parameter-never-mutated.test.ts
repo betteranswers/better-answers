@@ -84,7 +84,7 @@ describe("the rule that a function never mutates a parameter", () => {
       "`Object.assign` onto a fresh object",
       "export const stamp = (row: object) => Object.assign({}, row, { seen: true });\n",
     ],
-  ])("stays silent on %s", (_shape, source) => {
+  ])("accepts %s", (_shape, source) => {
     expect(lint.flagged(holding(source))).toEqual([]);
   });
 });

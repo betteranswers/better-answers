@@ -43,8 +43,8 @@ import { loadEveryEntryPoint } from "./entry-points.ts";
 
 const db = postgresForSuite();
 
-// Vitest's `isolate: false` keeps modules across a worker's files, so the probe actions leave with
-// this file.
+// Vitest's `isolate: false` keeps modules across a worker's files, so reset them to drop
+// this file's probe actions.
 afterAll(() => {
   vi.resetModules();
 });
@@ -83,8 +83,8 @@ const rowById = async (id: string) => {
   return found.rows[0];
 };
 
-describe("the declared-actions walk", () => {
-  it("holds every slice's actions to the four families by prefix", async () => {
+describe("collecting the declared audit actions", () => {
+  it("prefixes every declared action with one of the four families", async () => {
     await loadEveryEntryPoint();
     const walked = declarations();
     expect(walked.length).toBeGreaterThan(0);
@@ -102,7 +102,7 @@ describe("the declared-actions walk", () => {
   });
 
   it.skipIf(sourceTreeIsInstrumented())(
-    "reaches every action declared in the tree, and no other",
+    "finds every action declared in core's source, and no others",
     async () => {
       await loadEveryEntryPoint();
       const registered = new Set<string>(declaredActionNames());
@@ -119,14 +119,14 @@ describe("the declared-actions walk", () => {
     },
   );
 
-  it("answers the action's name and its rows' detail shape", () => {
+  it("returns the action's name and its detail shape", () => {
     expect(action("platform.probe.shaped", { adminUserId: "id", confirmed: "flag" })).toEqual({
       name: "platform.probe.shaped",
       detail: { adminUserId: "id", confirmed: "flag" },
     });
   });
 
-  it("registers exactly the actions given and hands them back", () => {
+  it("registers the given actions and returns them", () => {
     const registered = declareActions("platform", {
       accepted: action("platform.probe.accepted", { confirmed: "flag" }),
     });
@@ -141,22 +141,22 @@ describe("the declared-actions walk", () => {
     });
   });
 
-  it("refuses an action declared under a family not its prefix", () => {
+  it("rejects an action whose prefix differs from its family", () => {
     expect(() =>
-      // @ts-expect-error — the runtime half of what the type already refuses.
+      // @ts-expect-error the type refuses this too, and the test checks the runtime refusal.
       declareActions("platform", { added: action("people.member.added", {}) }),
     ).toThrow(/not a platform action/);
   });
 
-  it("refuses a fifth family, in the type and at runtime", () => {
+  it("rejects a fifth family, by type and at runtime", () => {
     expectTypeOf<"billing.invoice.sent">().not.toExtend<ActionName>();
     expect(() =>
-      // @ts-expect-error — the family set is the one closed list.
+      // @ts-expect-error billing is not one of the four families.
       declareActions("billing", { sent: action("billing.invoice.sent", {}) }),
     ).toThrow(/not a billing action/);
   });
 
-  it("refuses an action whose subject is never an audit event", () => {
+  it("rejects an action on a subject that is never audited", () => {
     const neverASubject = [
       "run",
       "questions_asked",
@@ -185,14 +185,14 @@ describe("the declared-actions walk", () => {
     expect(declaredActionNames()).not.toContain("platform.probe.atomic");
   });
 
-  it("refuses an action declared twice, so each has one slice", () => {
+  it("rejects an action declared twice, so one slice owns each", () => {
     declareActions("platform", { first: action("platform.probe.twice", {}) });
     expect(() => declareActions("platform", { again: action("platform.probe.twice", {}) })).toThrow(
       /declared twice/,
     );
   });
 
-  it("refuses an action named twice in one declaration, declaring none", () => {
+  it("rejects a declaration that repeats an action, registering none", () => {
     expect(() =>
       declareActions("platform", {
         one: action("platform.probe.doubled", {}),
@@ -207,41 +207,36 @@ describe("the declared-actions walk", () => {
     ).not.toThrow();
   });
 
-  it.skipIf(sourceTreeIsInstrumented())(
-    "finds no door call wrapped in attempt anywhere in core",
-    () => {
-      const wrapped =
-        /attempt\(\s*(?:async\s+)?\(\s*\)\s*=>\s*(?:\{(?:(?!with[A-Z])[^])*?)?(?:return\s+)?(?:await\s+|void\s+)?record(?:For)?\(/;
+  it.skipIf(sourceTreeIsInstrumented())("finds no record call wrapped in attempt in core", () => {
+    const wrapped =
+      /attempt\(\s*(?:async\s+)?\(\s*\)\s*=>\s*(?:\{(?:(?!with[A-Z])[^])*?)?(?:return\s+)?(?:await\s+|void\s+)?record(?:For)?\(/;
 
-      expect(wrapped.test("attempt(() => record(principal, tx, event))")).toBe(true);
-      expect(wrapped.test("attempt(async () => recordFor(platform, tx, event))")).toBe(true);
-      expect(
-        wrapped.test("attempt(async () => {\n  return await record(principal, tx, event);\n})"),
-      ).toBe(true);
-      expect(wrapped.test("attempt(() => {\n  void record(principal, tx, event);\n})")).toBe(true);
-      expect(
-        wrapped.test(
-          "attempt(async () => {\n  const before = prepare();\n  return record(before, tx, event);\n})",
-        ),
-      ).toBe(true);
+    expect(wrapped.test("attempt(() => record(principal, tx, event))")).toBe(true);
+    expect(wrapped.test("attempt(async () => recordFor(platform, tx, event))")).toBe(true);
+    expect(
+      wrapped.test("attempt(async () => {\n  return await record(principal, tx, event);\n})"),
+    ).toBe(true);
+    expect(wrapped.test("attempt(() => {\n  void record(principal, tx, event);\n})")).toBe(true);
+    expect(
+      wrapped.test(
+        "attempt(async () => {\n  const before = prepare();\n  return record(before, tx, event);\n})",
+      ),
+    ).toBe(true);
 
-      expect(
-        wrapped.test(
-          "attempt(() => withScope(platform, door, id, (tx) => record(platform, tx, event)))",
-        ),
-      ).toBe(false);
-      expect(
-        wrapped.test(
-          "attempt(async () => {\n  return withPrincipal(door, claims, (principal, tx) => record(principal, tx, event));\n})",
-        ),
-      ).toBe(false);
+    expect(
+      wrapped.test(
+        "attempt(() => withScope(platform, door, id, (tx) => record(platform, tx, event)))",
+      ),
+    ).toBe(false);
+    expect(
+      wrapped.test(
+        "attempt(async () => {\n  return withPrincipal(door, claims, (principal, tx) => record(principal, tx, event));\n})",
+      ),
+    ).toBe(false);
 
-      const offending = coreSourceFiles().filter((file) =>
-        wrapped.test(readFileSync(file, "utf8")),
-      );
-      expect(offending).toEqual([]);
-    },
-  );
+    const offending = coreSourceFiles().filter((file) => wrapped.test(readFileSync(file, "utf8")));
+    expect(offending).toEqual([]);
+  });
 });
 
 const PROBE = declareActions("platform", {
@@ -269,8 +264,8 @@ const rowsOfSubjects = async (subjectIds: readonly string[]) => {
   return found.rows;
 };
 
-describe("a batch id, for one action written over several subjects", () => {
-  it("names no batch for none or one subject", () => {
+describe("the batch id for one action on several subjects", () => {
+  it("returns no batch id for zero or one subject", () => {
     expect(batchIdFor(0)).toBeUndefined();
     expect(batchIdFor(1)).toBeUndefined();
   });
@@ -282,8 +277,8 @@ describe("a batch id, for one action written over several subjects", () => {
   });
 });
 
-describe("recordEach — one row per subject, batched when several", () => {
-  it("lands a lone subject's row outside any batch", async () => {
+describe("recordEach, which writes one row per subject", () => {
+  it("writes a single subject's row with no batch id", async () => {
     const { door, workspaceId } = await provisioned();
     const subjectId = ulid();
 
@@ -297,7 +292,7 @@ describe("recordEach — one row per subject, batched when several", () => {
     ]);
   });
 
-  it("lands every row in order, under the batch it answers", async () => {
+  it("writes every row in order under the returned batch id", async () => {
     const { door, workspaceId } = await provisioned();
     const [first, second] = [ulid(), ulid()];
 
@@ -316,8 +311,8 @@ describe("recordEach — one row per subject, batched when several", () => {
   });
 });
 
-describe("the first door — record, the actor from the Principal", () => {
-  it("lands a person's row booked to them, the id verbatim", async () => {
+describe("record, which takes the actor from the Principal", () => {
+  it("writes a person's row as their own, keeping the id", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
 
@@ -349,7 +344,7 @@ describe("the first door — record, the actor from the Principal", () => {
     });
   });
 
-  it("lands the platform's batched row in the scoped workspace", async () => {
+  it("writes the platform's batched row to the scoped workspace", async () => {
     const { door, workspaceId } = await provisioned();
     const id = ulid();
     const batchId = ulid();
@@ -373,7 +368,7 @@ describe("the first door — record, the actor from the Principal", () => {
     });
   });
 
-  it("lands nothing for the platform outside a workspace scope", async () => {
+  it("writes nothing for the platform without a workspace scope", async () => {
     const { door } = await provisioned();
     const id = ulid();
 
@@ -390,7 +385,7 @@ describe("the first door — record, the actor from the Principal", () => {
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("writes the person's own workspace, refusing a scope elsewhere", async () => {
+  it("writes to the person's own workspace and refuses another scope", async () => {
     const here = await provisioned();
     const there = await provisionedWorkspace(db(), "Elsewhere");
 
@@ -417,7 +412,7 @@ describe("the first door — record, the actor from the Principal", () => {
     });
   });
 
-  it("lands a row with its optional field and one without", async () => {
+  it("writes rows with and without an optional field", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const named = ulid();
     const left = ulid();
@@ -443,7 +438,7 @@ describe("the first door — record, the actor from the Principal", () => {
     expect(await rowById(left)).toMatchObject({ detail: { confirmed: true } });
   });
 
-  it("rejects missing fields and an email for an optional id", async () => {
+  it("rejects a missing field and an email as optional id", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const write = writingIn(door, workspaceId);
 
@@ -466,7 +461,7 @@ describe("the first door — record, the actor from the Principal", () => {
     ).rejects.toThrow(/adminUserId is not an id, or absent/);
   });
 
-  it("rejects a content hash that is no SHA-256 hex digest", async () => {
+  it("rejects a content hash that is not SHA-256 hex", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
 
     await expect(
@@ -482,7 +477,7 @@ describe("the first door — record, the actor from the Principal", () => {
     ).rejects.toThrow(/contentHash is not a contentHash$/);
   });
 
-  it("lands a flag's closing in one of two words", async () => {
+  it("writes a known flag closing and rejects an unknown one", async () => {
     const { door, workspaceId } = await provisioned();
     const closing = (closedAs: string) =>
       writingIn(
@@ -503,7 +498,7 @@ describe("the first door — record, the actor from the Principal", () => {
     await expect(closing("fixed")).rejects.toThrow(/closedAs is not a flagClosing$/);
   });
 
-  it("rejects a detail naming a field the action does not", async () => {
+  it("rejects a detail field the action does not declare", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
 
@@ -512,7 +507,7 @@ describe("the first door — record, the actor from the Principal", () => {
         record(bootstrap, tx, {
           id,
           action: PROBE.noted,
-          // @ts-expect-error — the action names `confirmed` and nothing else; the runtime half.
+          // @ts-expect-error the action declares only `confirmed`, and the test checks the runtime.
           detail: { confirmed: true, email: "priya@example.invalid" },
           subjectId: adminUserId,
         }),
@@ -565,8 +560,8 @@ describe("the first door — record, the actor from the Principal", () => {
   });
 });
 
-describe("the second door — recordFor, the platform naming the actor", () => {
-  it("books the row to the named actor, not the platform", async () => {
+describe("recordFor, where the platform names the actor", () => {
+  it("records the named actor, not the platform, as actor", async () => {
     const { door, workspaceId } = await provisioned();
     const id = ulid();
 
@@ -586,7 +581,7 @@ describe("the second door — recordFor, the platform naming the actor", () => {
     expect(await rowById(id)).toMatchObject({ actor: requester, workspace_id: workspaceId });
   });
 
-  it("is unreachable from a user principal, by type alone", () => {
+  it("accepts only a platform principal, checked by type", () => {
     expectTypeOf(recordFor).parameter(0).toEqualTypeOf<PlatformPrincipal>();
     expectTypeOf<UserPrincipal>().not.toExtend<PlatformPrincipal>();
   });
@@ -604,8 +599,8 @@ const identityRowById = async (id: string) => {
   return rowsFrom(found)[0];
 };
 
-describe("the identity-set audit log, reached through either door", () => {
-  it("books the platform's row to its named actor, outside workspaces", async () => {
+describe("writing the identity-set audit log through record or recordFor", () => {
+  it("writes the platform's row as its named actor, outside workspaces", async () => {
     const door = openPostgres(db().runtimePool);
     const id = ulid();
     const personId = ulid();
@@ -633,7 +628,7 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("lands a person's row here, outside their workspace's audit log", async () => {
+  it("writes a person's row here, not in their workspace's log", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
 
@@ -656,7 +651,7 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("books the operator's row to the operator's own person", async () => {
+  it("writes the operator's row with the operator as actor", async () => {
     const id = ulid();
 
     const { operatorId } = await asANewOperator(db(), new Date(), (operator, tx) =>
@@ -675,7 +670,7 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("refuses a workspace's action under the operator, who has none", async () => {
+  it("refuses a workspace action from the operator, who has none", async () => {
     const id = ulid();
 
     const writing = asANewOperator(db(), new Date(), (operator, tx) =>
@@ -693,7 +688,7 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("holds the detail to the action's declared shape", async () => {
+  it("rejects a detail field the action does not declare", async () => {
     const door = openPostgres(db().runtimePool);
     const id = ulid();
 
@@ -704,7 +699,7 @@ describe("the identity-set audit log, reached through either door", () => {
           actor: `human:${ulid()}`,
           action: IDENTITY_PROBE.noted,
           subjectId: ulid(),
-          // @ts-expect-error — the action names `confirmed` and nothing else; the runtime half.
+          // @ts-expect-error the action declares only `confirmed`, and the test checks the runtime.
           detail: { confirmed: true, name: "Priya Shah" },
         }),
       ),
@@ -712,7 +707,7 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(await identityRowById(id)).toBeUndefined();
   });
 
-  it("stamps a row as written only where the event asks", async () => {
+  it("uses the write time, not the transaction's, only when asked", async () => {
     const door = openPostgres(db().runtimePool);
     const [unstamped, stamped] = [ulid(), ulid()];
     const event = (id: string) => ({
@@ -740,7 +735,7 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(atOf(stamped)).toBeGreaterThanOrEqual(began.getTime() + 10);
   });
 
-  it("registers an identity-set action once, among the declared actions", () => {
+  it("registers an identity-set action and rejects declaring it twice", () => {
     expect(declarations()).toContainEqual({
       family: "platform",
       actions: ["platform.probe.identity_noted"],
@@ -761,7 +756,7 @@ describe("a detail's list of ended grants", () => {
     issuedAt: "2026-09-26T09:00:00.000Z",
   });
 
-  it("lands each grant as given, with a workspace or none", async () => {
+  it("writes each grant as given, with or without a workspace", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
     const grants = [aGrant(workspaceId), aGrant(null)];
@@ -774,7 +769,7 @@ describe("a detail's list of ended grants", () => {
     expect(await rowById(id)).toMatchObject({ detail: { grants } });
   });
 
-  it("lands an empty list", async () => {
+  it("writes an empty list", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
 
@@ -797,7 +792,7 @@ describe("a detail's list of ended grants", () => {
     ["its workspace's name", { workspaceName: "Acme" }],
     ["no client id", { clientId: null }],
     ["an empty client id", { clientId: "" }],
-    ["a workspace id not minted", { workspaceId: "acme" }],
+    ["a non-ULID workspace id", { workspaceId: "acme" }],
     ["an unreadable issue instant", { issuedAt: "yesterday" }],
     ["an issue instant not in ISO-8601", { issuedAt: "26 September 2026" }],
     ["no issue instant", { issuedAt: null }],
@@ -813,7 +808,7 @@ describe("a detail's list of ended grants", () => {
         id: ulid(),
         action: PROBE.ended,
         subjectId: adminUserId,
-        // @ts-expect-error — each case breaks the grant's shape; the runtime half.
+        // @ts-expect-error each case breaks the grant's shape, and the test checks the runtime.
         detail: { grants: [grant] },
       }),
     ).rejects.toThrow(/grants is not a list of ended grants$/);
@@ -828,7 +823,7 @@ describe("a detail's list of ended grants", () => {
       id: ulid(),
       action: PROBE.ended,
       subjectId: adminUserId,
-      // @ts-expect-error — no list of ended grants; the runtime half.
+      // @ts-expect-error not a list of ended grants, and the test checks the runtime.
       detail: { grants: grants(workspaceId) },
     });
   };
@@ -842,7 +837,7 @@ describe("a detail's list of ended grants", () => {
     await expect(writingGrants(unplaced)).rejects.toThrow(/grants is not a list of ended grants$/);
   });
 
-  it("rejects text where the list belongs", async () => {
+  it("rejects text in place of the list", async () => {
     await expect(writingGrants(() => "Claude")).rejects.toThrow(
       /grants is not a list of ended grants$/,
     );

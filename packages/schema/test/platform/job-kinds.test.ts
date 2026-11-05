@@ -145,7 +145,7 @@ const withWorkspace = async (fn: (client: pg.PoolClient) => Promise<void>): Prom
 };
 
 describe("the job kind descriptors", () => {
-  it("declares nightly-audit, full-rebuild and index, with what each is", () => {
+  it("declares nightly-audit, full-rebuild and index, with each one's fields", () => {
     expect(JOB_KIND_DESCRIPTORS).toEqual([
       {
         kind: "nightly-audit",
@@ -178,11 +178,11 @@ describe("the job kind descriptors", () => {
     ]);
   });
 
-  it("is where the kind list comes from", () => {
+  it("are the source of JOB_KINDS", () => {
     expect([...JOB_KINDS]).toEqual(["nightly-audit", "full-rebuild", "index"]);
   });
 
-  it("names the connected-source-emptying reasons, each an index reason", () => {
+  it("name the index reasons that empty a connected source", () => {
     expect([...REASONS_EMPTYING_THE_CONNECTED_SOURCE]).toEqual(["rule-change", "wiped"]);
     const emptying: readonly string[] = REASONS_EMPTYING_THE_CONNECTED_SOURCE;
     expect(INDEX_REASONS.filter((reason) => emptying.includes(reason))).toEqual([
@@ -193,7 +193,7 @@ describe("the job kind descriptors", () => {
 });
 
 describe("the kind CHECK", () => {
-  it("admits every kind a descriptor declares", async () => {
+  it("accepts every kind a descriptor declares", async () => {
     await withWorkspace(async (client) => {
       const landed: string[] = [];
       for (const descriptor of DESCRIBED) landed.push(await admitted(client, rowFor(descriptor)));
@@ -230,7 +230,7 @@ describe("the subject CHECK", () => {
 });
 
 describe("the reason CHECK", () => {
-  it("admits every reason its own descriptor declares", async () => {
+  it("accepts every reason its own descriptor declares", async () => {
     await withWorkspace(async (client) => {
       const landed: string[] = [];
       for (const descriptor of DESCRIBED) {
@@ -261,7 +261,7 @@ describe("the reason CHECK", () => {
     });
   });
 
-  it("refuses another kind's reason, since the rule is the pair", async () => {
+  it("refuses another kind's reason, checking kind and reason together", async () => {
     await withWorkspace(async (client) => {
       for (const descriptor of DESCRIBED) {
         const alien = everyReason.filter((reason) => !descriptor.reasons.includes(reason));
@@ -278,7 +278,7 @@ describe("the reason CHECK", () => {
     });
   });
 
-  it("refuses the retired word, which no descriptor declares", async () => {
+  it("refuses the retired reason, which no descriptor declares", async () => {
     await withWorkspace(async (client) => {
       expect(
         await refusedBy(client, {
@@ -290,7 +290,7 @@ describe("the reason CHECK", () => {
     });
   });
 
-  it("refuses a reasonless row only where the kind has reasons", async () => {
+  it("refuses a missing reason only for a kind with reasons", async () => {
     await withWorkspace(async (client) => {
       const outcomes: string[] = [];
       for (const descriptor of DESCRIBED) {
@@ -324,7 +324,7 @@ describe("the run key", () => {
     });
   });
 
-  it("admits the next job once the subject's last is over", async () => {
+  it("accepts the next job once the subject's last job finishes", async () => {
     await withWorkspace(async (client) => {
       const first = await seedQueuedJob(client, WS, {
         kind: "index",
@@ -346,7 +346,7 @@ describe("the run key", () => {
     });
   });
 
-  it("leaves subjectless kinds alone, as NULL subjects are distinct", async () => {
+  it("ignores subjectless kinds, since NULL subjects are distinct", async () => {
     await withWorkspace(async (client) => {
       const landed: string[] = [];
       for (const descriptor of DESCRIBED.filter((one) => !one.namesASubject)) {
@@ -362,7 +362,7 @@ describe("the run key", () => {
   });
 });
 
-describe("the claim's sibling check", () => {
+describe("the claim's check for running jobs on one subject", () => {
   it("skips a job whose subject runs under a live lease", async () => {
     await withWorkspace(async (client) => {
       await seedClaimedJob(
@@ -391,7 +391,7 @@ describe("the claim's sibling check", () => {
     });
   });
 
-  it("hands the subject's work out once the lease lapses", async () => {
+  it("hands out the subject's job once the lease expires", async () => {
     await withWorkspace(async (client) => {
       const running = await seedClaimedJob(
         client,
@@ -415,7 +415,7 @@ describe("the claim's sibling check", () => {
     });
   });
 
-  it("leaves subjectless kinds alone, as NULL is nobody's sibling", async () => {
+  it("ignores subjectless kinds, since NULL matches no other subject", async () => {
     await withWorkspace(async (client) => {
       await seedClaimedJob(client, WS, { kind: "nightly-audit", enqueuedAgoSeconds: 60 }, 120);
       const second = await seedQueuedJob(client, WS, {
@@ -445,7 +445,7 @@ const withTheRetiredWordAdmitted = async (
 };
 
 describe("the migration that retired a sync reason", () => {
-  it("deletes every row with the word, any status, any workspace", async () => {
+  it("deletes every retired-reason row, in any status or workspace", async () => {
     await withTheRetiredWordAdmitted(async (client) => {
       await seedQueuedJob(client, WS, { ...RETIRED, subjectId: CONNECTED_SOURCE });
       await seedClaimedJob(client, WS, { ...RETIRED, subjectId: ANOTHER_CONNECTED_SOURCE }, 120);
@@ -475,7 +475,7 @@ describe("the migration that retired a sync reason", () => {
     });
   });
 
-  it("needs its workspace loop: a bare DELETE reaches no row", async () => {
+  it("needs its workspace loop, as a bare DELETE reaches nothing", async () => {
     await withTheRetiredWordAdmitted(async (client) => {
       const inOne = await seedQueuedJob(client, WS, { ...RETIRED, subjectId: CONNECTED_SOURCE });
       const inTheOther = await seedQueuedJob(client, ANOTHER_WS, {
@@ -543,8 +543,8 @@ const reasonsStandingIn = async (
     )
   ).rows.map((row) => row.reason);
 
-describe("the migration that named the model choice", () => {
-  it("moves every workspace's queued old reason to the new one", async () => {
+describe("the migration that introduced the term model choice", () => {
+  it("rewrites the old reason on queued jobs in every workspace", async () => {
     await withTheOldReasonAdmitted(async (client) => {
       const queued = await seedQueuedJob(client, WS, OLD_REBUILD);
       await seedQueuedJob(client, ANOTHER_WS, OLD_REBUILD);
@@ -644,8 +644,8 @@ const destinationsStandingIn = async (
     )
   ).rows.map((row) => row.destination);
 
-describe("the migration that named the map", () => {
-  it("moves every workspace's queued first-sync to first-build", async () => {
+describe("the migration that introduced the term map", () => {
+  it("rewrites queued first-sync reasons to first-build in every workspace", async () => {
     await withTheOldMapValuesAdmitted(async (client) => {
       const queued = await seedQueuedJob(client, WS, OLD_FIRST_REBUILD);
       await seedQueuedJob(client, ANOTHER_WS, OLD_FIRST_REBUILD);
@@ -659,7 +659,7 @@ describe("the migration that named the map", () => {
     });
   });
 
-  it("moves every workspace's 'graph' destination to 'map'", async () => {
+  it("rewrites the 'graph' destination to 'map' in every workspace", async () => {
     await withTheOldMapValuesAdmitted(async (client) => {
       await seedConnectedSourceToAnyDestination(client, WS, CONNECTED_SOURCE, THE_OLD_DESTINATION);
       await seedConnectedSourceToAnyDestination(
@@ -739,8 +739,8 @@ const statesStandingIn = async (
     )
   ).rows.map((row) => row.state);
 
-describe("the migration that named the connected source", () => {
-  it("moves every workspace's bound runs to connected, finished ones too", async () => {
+describe("the migration that introduced the term connected source", () => {
+  it("rewrites the old index reason everywhere, including finished jobs", async () => {
     await withTheOldConnectedSourceValuesAdmitted(async (client) => {
       const queued = await seedQueuedJob(client, WS, {
         ...AN_OLD_RUN,
@@ -760,7 +760,7 @@ describe("the migration that named the connected source", () => {
     });
   });
 
-  it("moves every workspace's landed connected source to received", async () => {
+  it("rewrites the landed state to received in every workspace", async () => {
     await withTheOldConnectedSourceValuesAdmitted(async (client) => {
       await seedConnectedSourceInAnyState(client, WS, CONNECTED_SOURCE, OLD_STATE);
       await seedConnectedSourceInAnyState(client, ANOTHER_WS, CONNECTED_SOURCE, OLD_STATE);
@@ -807,8 +807,8 @@ const withTheDestinationBeforeThePassageAdmitted = (
     );
   });
 
-describe("the migration that named the passage", () => {
-  it("moves every workspace's chunk-index destination to passage-index", async () => {
+describe("the migration that introduced the term passage", () => {
+  it("rewrites the chunk-index destination to passage-index in every workspace", async () => {
     await withTheDestinationBeforeThePassageAdmitted(async (client) => {
       await seedConnectedSourceToAnyDestination(
         client,

@@ -39,7 +39,7 @@ const INVITE = `${TRPC_ENDPOINT}/members.invite`;
 
 const SEND_ROUNDS = 11;
 
-/** Fifty addresses answer in about six one-address sends; twelve fails once each address costs about three times what it does now. */
+/** Fifty addresses now take about six single-address sends. A budget of twelve fails once each address costs three times as much. */
 const SEND_BUDGET_IN_ONE_ADDRESS_SENDS = 12;
 
 const A_DAY_MS = 24 * 60 * 60 * 1000;
@@ -84,7 +84,7 @@ const sentToTheCeiling = async (api: Api, address: string): Promise<readonly num
 };
 
 describe("inviting a person over tRPC", () => {
-  it("invites an address for a week, emailing the accept link", async () => {
+  it("invites an address for seven days, emailing the accept link", async () => {
     const { api } = await anAdmin();
     const address = anAddress("priya");
 
@@ -119,7 +119,7 @@ describe("inviting a person over tRPC", () => {
     expect(await eventsOn(app(), invited.invitationId)).toEqual(["people.invitation.created"]);
   });
 
-  it("answers alike whether or not the address uses better-answers", async () => {
+  it("answers alike for addresses with and without an account", async () => {
     const { api } = await anAdmin();
     const elsewhere = await app().provision();
     const known = await app().person(anAddress("known"));
@@ -142,7 +142,7 @@ describe("inviting a person over tRPC", () => {
     expect(emailsTo(app(), unknown)).toHaveLength(1);
   });
 
-  it("names a member's address by position, emailing nobody", async () => {
+  it("refuses an existing member's address by list position, emailing nobody", async () => {
     const { api, workspace } = await anAdmin();
     const editor = await app().person(anAddress("editor"));
     await app().addMember(workspace.workspaceId, editor.id, "Editor");
@@ -165,7 +165,7 @@ describe("inviting a person over tRPC", () => {
     expect(await api.members.invitations.query()).toEqual([]);
   });
 
-  it("names an address off a marked workspace's domain, emailing nobody", async () => {
+  it("refuses an address off a test workspace's domain, emailing nobody", async () => {
     const { api, workspace } = await anAdmin();
     const testingDomain = `${ulid().toLowerCase()}.testing.invalid`;
     const client = await app().database.superuser.connect();
@@ -198,7 +198,7 @@ describe("inviting a person over tRPC", () => {
 });
 
 describe("inviting several addresses over tRPC", () => {
-  it("sends one email for one address in two cases", async () => {
+  it("sends one email for an address listed in two cases", async () => {
     const { api } = await anAdmin();
     const ana = anAddress("ana");
 
@@ -211,7 +211,7 @@ describe("inviting several addresses over tRPC", () => {
     expect(await api.members.invitations.query()).toHaveLength(1);
   });
 
-  it("replaces a waiting invitation, saying so, emailing its new link", async () => {
+  it("replaces a waiting invitation, reports replaced, and emails its link", async () => {
     const { api } = await anAdmin();
     const ana = anAddress("ana");
     const ben = anAddress("ben");
@@ -236,7 +236,7 @@ describe("inviting several addresses over tRPC", () => {
     ]);
   });
 
-  it("names the address whose email failed, committing every invitation", async () => {
+  it("keeps every invitation and flags the address whose email failed", async () => {
     const { api } = await anAdmin();
     const online = anAddress("online");
     const offline = anAddress("offline");
@@ -254,7 +254,7 @@ describe("inviting several addresses over tRPC", () => {
     expect(emailsTo(app(), online)).toHaveLength(1);
   });
 
-  it("refuses 51 addresses, malformed, emailing nobody", async () => {
+  it("refuses 51 addresses as malformed and emails nobody", async () => {
     const { api } = await anAdmin();
     const addresses = Array.from({ length: 51 }, (_unused, at) => anAddress(`many${at}`));
 
@@ -269,7 +269,7 @@ describe("inviting several addresses over tRPC", () => {
     expect(app().emails.filter((message) => addresses.includes(message.to))).toEqual([]);
   });
 
-  it("answers fifty addresses within the list's budget", async () => {
+  it("invites fifty addresses within the time budget", async () => {
     const rounds: { readonly emailed: readonly number[]; readonly inOneAddressSends: number }[] =
       [];
     for (let round = 0; round < SEND_ROUNDS; round += 1) {
@@ -293,14 +293,14 @@ describe("inviting several addresses over tRPC", () => {
     expect(rounds.map(({ emailed }) => emailed)).toEqual(
       Array.from({ length: SEND_ROUNDS }, () => [1, 50, 1]),
     );
-    expect(median, "fifty addresses, in one-address sends, at the median").toBeLessThan(
+    expect(median, "the median fifty-address send took longer than its budget").toBeLessThan(
       SEND_BUDGET_IN_ONE_ADDRESS_SENDS,
     );
   });
 });
 
-describe("the per-address ceiling over tRPC", () => {
-  it("refuses a send past it whole, minting and emailing nothing", async () => {
+describe("the per-address send limit over tRPC", () => {
+  it("refuses the whole send once one address reaches the limit", async () => {
     const { api, client, workspace } = await anAdmin();
     const ana = anAddress("ana");
     const ben = anAddress("ben");
@@ -326,7 +326,7 @@ describe("the per-address ceiling over tRPC", () => {
     expect((await api.members.invitations.query()).map((row) => row.address)).toEqual([ana]);
   });
 
-  it("refuses a bulk resend past it whole, emailing nobody", async () => {
+  it("refuses a whole bulk resend that reaches the limit", async () => {
     const { api } = await anAdmin();
     const ana = anAddress("ana");
     const toBen = await invitedOne(api, anAddress("ben"));
@@ -347,7 +347,7 @@ describe("the per-address ceiling over tRPC", () => {
     expect(await api.members.invitations.query()).toEqual(before);
   });
 
-  it("lets a resend go after four resends that failed", async () => {
+  it("allows a resend after four resends whose emails failed", async () => {
     const { api } = await anAdmin();
     const ana = anAddress("ana");
     stopTheClock();
@@ -373,7 +373,7 @@ describe("the per-address ceiling over tRPC", () => {
     expect(resent).toBe(200);
   });
 
-  it("counts a partial send's delivered emails, not its failed ones", async () => {
+  it("counts delivered emails toward the limit, not failed ones", async () => {
     const { api } = await anAdmin();
     const online = anAddress("online");
     const offline = anAddress("offline");
@@ -388,7 +388,7 @@ describe("the per-address ceiling over tRPC", () => {
     expect(await statusOf(inviting(api, [offline]))).toBe(200);
   });
 
-  it("answers a stale tab the refusal, never the ceiling", async () => {
+  it("refuses a stale tab with workspace-switched, not the limit", async () => {
     const acme = await app().provision({ name: "Acme" });
     const beta = await app().provision({ name: "Beta" });
     await app().addMember(beta.workspaceId, acme.admin.id, "Admin");
@@ -408,8 +408,8 @@ describe("the per-address ceiling over tRPC", () => {
   });
 });
 
-describe("the invitations by status over tRPC", () => {
-  it("lists each status's rows, with every status's count", async () => {
+describe("listing invitations by status over tRPC", () => {
+  it("lists the invitations in each status and counts every status", async () => {
     const { api, workspace } = await anAdmin();
     const waiting = await invitedOne(api, anAddress("waiting"));
     const seeded = { workspaceId: workspace.workspaceId, inviterId: workspace.admin.id };
@@ -453,7 +453,7 @@ describe("the invitations by status over tRPC", () => {
     });
   });
 
-  it("refuses a status outside the four, malformed", async () => {
+  it("refuses an unknown status as malformed", async () => {
     const { client } = await anAdmin();
 
     const answered = await client.fetch(
@@ -517,7 +517,7 @@ describe("the waiting invitations over tRPC", () => {
     ]);
   });
 
-  it("cancels a waiting invitation, which leaves the list", async () => {
+  it("cancels a waiting invitation and removes it from the list", async () => {
     const { api } = await anAdmin();
     const invited = await invitedOne(api, anAddress("sam"));
 
@@ -541,8 +541,8 @@ describe("the waiting invitations over tRPC", () => {
   });
 });
 
-describe("a set of invitations over tRPC", () => {
-  it("resends two waiting and one expired, emailing each after commit", async () => {
+describe("bulk actions on invitations over tRPC", () => {
+  it("resends two waiting invitations and one expired, emailing each", async () => {
     const { api, workspace } = await anAdmin();
     const sent = await inviting(api, [anAddress("ana"), anAddress("ben")]);
     const old = anAddress("old");
@@ -570,7 +570,7 @@ describe("a set of invitations over tRPC", () => {
     expect(await api.members.invitationCounts.query()).toMatchObject({ waiting: 3, expired: 0 });
   });
 
-  it("cancels a set, skipping one already cancelled", async () => {
+  it("cancels several invitations, skipping one already cancelled", async () => {
     const { api } = await anAdmin();
     const sent = await inviting(api, [anAddress("ana"), anAddress("ben")]);
     const [gone, waiting] = sent.invitations.map((one) => one.invitationId);
@@ -586,7 +586,7 @@ describe("a set of invitations over tRPC", () => {
     expect(await api.members.invitationCounts.query()).toMatchObject({ waiting: 0, cancelled: 2 });
   });
 
-  it("refuses a cancel naming an accepted invitation, by its id", async () => {
+  it("refuses a bulk cancel naming an accepted invitation, by id", async () => {
     const { api, workspace } = await anAdmin();
     const waiting = await invitedOne(api, anAddress("ana"));
     const accepted = await app().invite({
@@ -619,7 +619,7 @@ describe("a set of invitations over tRPC", () => {
 });
 
 describe("the invitation email", () => {
-  it("is sent after the commit, never for a failed invitation", async () => {
+  it("is never sent when the invitation fails to commit", async () => {
     const { api } = await anAdmin();
     const address = anAddress("uncommitted");
 
@@ -633,8 +633,8 @@ describe("the invitation email", () => {
   });
 });
 
-describe("an invitation whose email did not go", () => {
-  it("stands, says its email did not go; a resend recovers", async () => {
+describe("an invitation whose email failed to send", () => {
+  it("is kept with emailSent false, and a resend delivers it", async () => {
     const { api } = await anAdmin();
     const address = anAddress("offline");
     unreachable.add(address);
@@ -688,7 +688,7 @@ const aWaitingInvitation = async () => {
 };
 
 describe("who may act on invitations", () => {
-  it.each(VERBS)("refuses an Editor and a Viewer the %s verb", async (_verb, call) => {
+  it.each(VERBS)("refuses Editors and Viewers the %s action", async (_verb, call) => {
     const { workspace, invitationId, address } = await aWaitingInvitation();
 
     const answered = await answeredBelowAdmin(app(), workspace.workspaceId, (api) =>
@@ -699,7 +699,7 @@ describe("who may act on invitations", () => {
     expect(emailsTo(app(), address)).toHaveLength(1);
   });
 
-  it.each(VERBS)("refuses an Admin elsewhere pointed here the %s verb", async (_verb, call) => {
+  it.each(VERBS)("refuses %s to a non-member whose session points here", async (_verb, call) => {
     const { workspace, invitationId } = await aWaitingInvitation();
 
     const answered = await answeredToAnAdminPointedHere(app(), workspace.workspaceId, (api) =>
@@ -710,7 +710,7 @@ describe("who may act on invitations", () => {
   });
 
   it.each(VERBS.filter(([verb]) => ["resend", "cancel"].includes(verb)))(
-    "refuses an Admin elsewhere the %s verb on this invitation",
+    "answers no-such-invitation when another workspace's Admin tries to %s",
     async (_verb, call) => {
       const { invitationId } = await aWaitingInvitation();
       const elsewhere = await app().provision();
@@ -722,7 +722,7 @@ describe("who may act on invitations", () => {
     },
   );
 
-  it("refuses an Editor a send, minting and emailing nothing", async () => {
+  it("refuses an Editor's and a Viewer's invite, emailing nobody", async () => {
     const { workspace, api } = await anAdmin();
     const address = anAddress("forbidden");
 

@@ -112,7 +112,7 @@ const waitingAmong = async (personIds: readonly string[]) => {
 };
 
 describe("flagging a member's display name", () => {
-  it("raises one flag on both audit logs, holding no name", async () => {
+  it("records one flag in both audit logs without the name", async () => {
     const workspace = await provisionedWorkspace(db(), "Flagged");
     const person = await joined(workspace, await aPerson(), "Viewer");
 
@@ -146,7 +146,7 @@ describe("flagging a member's display name", () => {
     );
   });
 
-  it("leaves the display name as the person gave it", async () => {
+  it("leaves the person's display name unchanged", async () => {
     const workspace = await provisionedWorkspace(db(), "Unrenamed");
     const person = await joined(workspace, await aPerson(), "Editor");
 
@@ -165,8 +165,8 @@ describe("flagging a member's display name", () => {
   });
 });
 
-describe("a flag that already waits", () => {
-  it("answers a second flag the same, writing nothing new", async () => {
+describe("a flag that is already waiting", () => {
+  it("answers a second flag as already waiting, writing nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "Twice");
     const person = await joined(workspace, await aPerson(), "Viewer");
     await flaggedBy(workspace, workspace.adminUserId, person);
@@ -177,7 +177,7 @@ describe("a flag that already waits", () => {
     expect(await flagsOn(workspace, person)).toEqual({ flagged: 1, raised: 1 });
   });
 
-  it("waits per workspace: another workspace's flag raises its own", async () => {
+  it("raises a separate flag for each workspace", async () => {
     const ours = await provisionedWorkspace(db(), "OursFirst");
     const theirs = await provisionedWorkspace(db(), "TheirsNext");
     const person = await aPerson();
@@ -197,7 +197,7 @@ describe("a flag that already waits", () => {
     ]);
   });
 
-  it("a correction ends the wait; the next flag raises again", async () => {
+  it("raises a new flag after the operator corrects the name", async () => {
     const workspace = await provisionedWorkspace(db(), "Corrected");
     const person = await joined(workspace, await aPerson(), "Viewer");
     await flaggedBy(workspace, workspace.adminUserId, person);
@@ -231,7 +231,7 @@ describe("a flag that already waits", () => {
 });
 
 describe("what flagging a display name refuses", () => {
-  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
+  it.each(["Editor", "Viewer"] as const)("refuses the %s role with role-forbids", async (role) => {
     const workspace = await provisionedWorkspace(db(), `Flagger${role}`);
     const actor = await joined(workspace, await aPerson("Not An Admin"), role);
     const person = await joined(workspace, await aPerson(), "Viewer");
@@ -243,7 +243,7 @@ describe("what flagging a display name refuses", () => {
     expect(await raisedFor(person)).toEqual([]);
   });
 
-  it("refuses a person not a member here, no-such-member", async () => {
+  it("refuses a non-member here with no-such-member", async () => {
     const ours = await provisionedWorkspace(db(), "NotOurs");
     const theirs = await provisionedWorkspace(db(), "Theirs");
     const elsewhere = await joined(theirs, await aPerson(), "Viewer");
@@ -255,7 +255,7 @@ describe("what flagging a display name refuses", () => {
     expect(await raisedFor(elsewhere)).toEqual([]);
   });
 
-  it("writes neither flag when the identity set's write fails", async () => {
+  it("writes neither flag when the identity-set write fails", async () => {
     const workspace = await provisionedWorkspace(db(), "Unraised");
     const person = await joined(workspace, await aPerson(), "Viewer");
 
@@ -269,7 +269,7 @@ describe("what flagging a display name refuses", () => {
   });
 });
 
-describe("the names waiting for the operator", () => {
+describe("the flagged names waiting for the operator", () => {
   const flagOn = ({ workspaceId, name }: ProvisionedWorkspace) => ({
     workspace: { id: workspaceId, name },
     raisedAt: matching.stringMatching(ISO_INSTANT),
@@ -295,7 +295,7 @@ describe("the names waiting for the operator", () => {
     ]);
   });
 
-  it("takes a person off once the operator corrects their name", async () => {
+  it("drops a person once the operator corrects their name", async () => {
     const workspace = await provisionedWorkspace(db(), "WaitingCorrected");
     const person = await joined(workspace, await aPerson(), "Viewer");
     await flaggedBy(workspace, workspace.adminUserId, person);
@@ -322,7 +322,7 @@ describe("the names waiting for the operator", () => {
     ]);
   });
 
-  it("keeps a person waiting who renames themself", async () => {
+  it("keeps a person on the list after they rename themself", async () => {
     const workspace = await provisionedWorkspace(db(), "WaitingSelfNamed");
     const person = await joined(workspace, await aPerson(), "Viewer");
     await flaggedBy(workspace, workspace.adminUserId, person);
@@ -341,7 +341,7 @@ describe("the names waiting for the operator", () => {
     );
   });
 
-  it("leaves out a person whose erasure has been carried out", async () => {
+  it("leaves out a person who has been erased", async () => {
     const workspace = await provisionedWorkspace(db(), "WaitingErased");
     const person = await joined(workspace, await aPerson(), "Viewer");
     await flaggedBy(workspace, workspace.adminUserId, person);
@@ -352,7 +352,7 @@ describe("the names waiting for the operator", () => {
     expect(await waitingAmong([person])).toEqual([]);
   });
 
-  it("admits the operator alone, never an Admin or the platform", () => {
+  it("accepts only the operator, not an Admin or the platform", () => {
     type Reader = Parameters<typeof listNamesWaiting>[0];
 
     expectTypeOf<OperatorPrincipal>().toExtend<Reader>();
@@ -362,7 +362,7 @@ describe("the names waiting for the operator", () => {
 });
 
 describe("a flag raised while the operator corrects the name", () => {
-  it("keeps waiting a flag begun first but committed after", async () => {
+  it("keeps a flag that started first but committed after", async () => {
     const workspace = await provisionedWorkspace(db(), "RaceFlagLast");
     const person = await joined(workspace, await aPerson(), "Viewer");
     const flagBegun = Promise.withResolvers<undefined>();
@@ -402,7 +402,7 @@ describe("a flag raised while the operator corrects the name", () => {
     ]);
   });
 
-  it("clears a flag begun last but committed before", async () => {
+  it("clears a flag that started second but committed first", async () => {
     const workspace = await provisionedWorkspace(db(), "RaceFlagFirst");
     const person = await joined(workspace, await aPerson(), "Viewer");
     const correctionBegun = Promise.withResolvers<undefined>();

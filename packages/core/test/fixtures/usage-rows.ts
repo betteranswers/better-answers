@@ -9,7 +9,7 @@ type UsesBefore = {
   readonly to: number;
 };
 
-/** One `copied` use of a concept for each second from `from` to `to` before `before`. */
+/** Inserts one `copied` use of the concept per second, from `from` to `to` seconds before `before`. */
 export const usesOfAConcept = (pool: pg.Pool, uses: UsesBefore): Promise<pg.QueryResult> =>
   pool.query(
     `INSERT INTO usage (workspace_id, id, actor, at, act, iri)

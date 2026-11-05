@@ -110,7 +110,7 @@ describe("actionlint, as `lint:workflows:actionlint` runs it", () => {
 });
 
 describe("zizmor, as `lint:workflows:zizmor` runs it", () => {
-  it("refuses a pull request's title spliced into a script", () => {
+  it("refuses a pull request title inserted into a script", () => {
     const run = ran("lint:workflows:zizmor", {
       ".github/workflows/build.yml": workflowRunning("pull_request", [
         '      - run: echo "${{ github.event.pull_request.title }}"',
@@ -134,7 +134,7 @@ describe("zizmor, as `lint:workflows:zizmor` runs it", () => {
     expect(run.said).toContain("error[unpinned-uses]");
   });
 
-  it("refuses a checkout that keeps its credential", () => {
+  it("refuses a checkout that persists its credential", () => {
     const run = ran("lint:workflows:zizmor", {
       ".github/workflows/build.yml": workflowRunning("push", [
         "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
@@ -145,7 +145,7 @@ describe("zizmor, as `lint:workflows:zizmor` runs it", () => {
     expect(run.said).toContain("warning[artipacked]");
   });
 
-  it("refuses a workflow whose token keeps the default grant", () => {
+  it("refuses a workflow whose token has the default permissions", () => {
     const run = ran("lint:workflows:zizmor", {
       ".github/workflows/build.yml": workflowRunning("push", ["      - run: echo hello"]).replace(
         "permissions:\n  contents: read\n",

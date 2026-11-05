@@ -104,7 +104,7 @@ const seedWideMap = async (scenario: Scenario): Promise<WideMap> => {
     }
     return { uids, lone: (await seed.mapNode({ workspaceId })).uid };
   });
-  // Autovacuum counts a live map's rows; uncounted, the planner joins every node to every step.
+  // Autovacuum has not yet counted the new rows. Without those counts, the planner joins every node to every step.
   await db().pool.query("ANALYZE map_node, map_edge, concept_index");
   return {
     scenario,
@@ -158,7 +158,7 @@ describe("the map under concurrent read load", () => {
   it.each([
     ["a forty-entry walk", "", undefined],
     ["a narrowed walk", ", narrowed to its collection", [WIDE_COLLECTION]],
-  ] as const)("answers %s within budget beside nine concurrent walks", async (...walked) => {
+  ] as const)("answers %s within budget alongside nine other walks", async (...walked) => {
     const [, narrowing, collections] = walked;
     const walks: TimedWalk[] = [];
     for (let round = 0; round < ROUNDS; round += 1) {
@@ -191,21 +191,20 @@ describe("the map under concurrent read load", () => {
       ],
     ]);
 
-    expect(readers().totalCount, "the connections the walks ran on").toBe(IN_FLIGHT);
-    expect(wide.entries, "the entries each walk starts from").toHaveLength(40);
+    expect(readers().totalCount, "the pool connections the walks used").toBe(IN_FLIGHT);
+    expect(wide.entries, "the entry concepts each walk starts from").toHaveLength(40);
     expect(walks.map((walk) => [walk.oneRowSteps, walk.walkSteps])).toEqual(
       Array.from({ length: IN_FLIGHT * ROUNDS }, () => [1, CONCEPTS_UNDER_THE_CAP]),
     );
-    expect(
-      inOneRowWalks,
-      "the walk that fills the cap, in one-row walks, at the median",
-    ).toBeLessThan(WALK_BUDGET_IN_ONE_ROW_WALKS);
+    expect(inOneRowWalks, "the median capped walk, as a multiple of a one-row walk").toBeLessThan(
+      WALK_BUDGET_IN_ONE_ROW_WALKS,
+    );
     expect(percentile(walkMs, 1), "the slowest walk statement, in milliseconds").toBeLessThan(
       WALK_TIMEOUT_MS,
     );
   });
 
-  it("lands every concept and edge of the dense map", async () => {
+  it("seeds every concept and edge of the dense map", async () => {
     const rows = await db().pool.query<{ nodes: string; edges: string }>(
       `SELECT (SELECT count(*) FROM map_node WHERE workspace_id = $1) AS nodes,
               (SELECT count(*) FROM map_edge WHERE workspace_id = $1) AS edges`,
@@ -232,8 +231,8 @@ describe("the map under concurrent read load", () => {
       "SELECT status FROM job WHERE workspace_id = $1 AND id = $2",
       [workspaceId, queued.value.jobId],
     );
-    expect(job.rows[0]?.status, "the rebuild's own row").toBe("done");
-    expect(wallClockMs, "the worker's whole run, in milliseconds").toBeLessThan(REBUILD_BUDGET_MS);
+    expect(job.rows[0]?.status, "the rebuild job's status").toBe("done");
+    expect(wallClockMs, "the worker's run time, in milliseconds").toBeLessThan(REBUILD_BUDGET_MS);
 
     const rebuilt = await db().pool.query<{ live_gen: number; nodes: string; edges: string }>(
       `SELECT g.live_gen,

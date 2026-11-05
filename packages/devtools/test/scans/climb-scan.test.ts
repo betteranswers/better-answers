@@ -89,7 +89,7 @@ describe("the climb scan over a throwaway tree", () => {
     expect(findings(reading(code))).toEqual([climbs(1, written)]);
   });
 
-  it("reads the line a climb sits on", () => {
+  it("reports the line a climb is on", () => {
     const code = 'import os\n\nROOT = Path(__file__).parents[2] / "src"';
 
     expect(findings(reading(code))).toEqual([climbs(3, "Path(__file__).parents[2] / 'src'")]);
@@ -110,7 +110,7 @@ describe("the climb scan over a throwaway tree", () => {
   });
 });
 
-describe("the climb scan walks past a path that stays", () => {
+describe("the climb scan accepts paths that are not climbs", () => {
   it.each([
     ["its own folder", 'HERE = Path(__file__).parent / "fixtures"'],
     ["a folder inside the workspace", 'FIXTURES = Path(__file__).parent.parent / "fixtures"'],
@@ -128,12 +128,12 @@ describe("the climb scan walks past a path that stays", () => {
     ["a search up for a marker", "FOUND = [d for d in Path(__file__).resolve().parents if d]"],
     ["a read below the working directory", 'TEXT = open("fixtures/x.txt")'],
     ["a string that only reads like a climb", 'ESCAPES = ("../escape", "..", "a/../b")'],
-  ])("over %s", (_what, code) => {
+  ])("%s", (_what, code) => {
     expect(findings(reading(code))).toEqual([passed(2)]);
   });
 });
 
-describe("the climb scan refuses to prove nothing", () => {
+describe("the climb scan refuses a run that checks nothing", () => {
   it("stops when no directory is named", () => {
     expect(() => runsOverThrowawayTree({ ...scan, argv: [] })).toThrow(
       refusal("name at least one directory to read"),

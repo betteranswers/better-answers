@@ -203,7 +203,7 @@ const mcpFoundBy = async (person: { readonly email: string }, args: Rpc) => {
 };
 
 describe("knowledge.find over tRPC", () => {
-  it("answers MCP find's first page at the same limit", async () => {
+  it("matches MCP find's first page at the same limit", async () => {
     const { workspace } = await aWorkspaceOfHerons();
     const { api } = await webSignedIn(app(), workspace.admin.email);
 
@@ -213,7 +213,7 @@ describe("knowledge.find over tRPC", () => {
     expect(page).toEqual(await mcpFoundBy(workspace.admin, { query: QUERY, limit: 2 }));
   });
 
-  it("pages through nextCursor to the end, repeating no match", async () => {
+  it("pages with nextCursor to the end without repeating a match", async () => {
     const { workspace, iriOf } = await aWorkspaceOfHerons();
     const { api } = await webSignedIn(app(), workspace.admin.email);
 
@@ -246,7 +246,7 @@ describe("knowledge.find over tRPC", () => {
     expect(refused).toMatchObject(MALFORMED);
   });
 
-  it("refuses a query holding U+0000 as malformed, not failed", async () => {
+  it("refuses a query containing U+0000 as malformed, not failed", async () => {
     const { workspace } = await aWorkspaceOfHerons();
     const { api } = await webSignedIn(app(), workspace.admin.email);
 
@@ -256,7 +256,7 @@ describe("knowledge.find over tRPC", () => {
     expect(refused).toMatchObject(MALFORMED);
   });
 
-  it("answers a Viewer no match for a Restricted concept", async () => {
+  it("hides a Restricted concept from a Viewer's results", async () => {
     const { viewer, iriOf } = await aWorkspaceOfHerons();
     const { api } = await webSignedIn(app(), viewer.email);
 
@@ -345,7 +345,7 @@ const aWorkspaceOfBirds = () =>
   ]);
 
 describe("the knowledge tree over tRPC", () => {
-  it("reads the knowledge tree through the knowledge router", async () => {
+  it("returns the knowledge tree and pages a kind's concepts", async () => {
     const { workspace, viewer } = await aWorkspaceOfBirds();
     await seedConceptIndex(
       app(),
@@ -375,7 +375,7 @@ describe("the knowledge tree over tRPC", () => {
     expect(rest.concepts.map(({ title }) => title)).toContain(FEEDING);
   });
 
-  it("refuses a branch naming a collection with a slash", async () => {
+  it("refuses a collection name containing a slash as malformed", async () => {
     const { viewer } = await aWorkspaceOfHerons();
     const { api } = await webSignedIn(app(), viewer.email);
 
@@ -393,7 +393,7 @@ describe("the knowledge tree over tRPC", () => {
 });
 
 describe("the Curation reads over tRPC", () => {
-  it("reads Kinds through the knowledge router", async () => {
+  it("shows Kinds to owners and Admins, refusing a Viewer", async () => {
     const { workspace, viewer } = await aWorkspaceOfBirds();
     const owner = await app().person();
     await app().addMember(workspace.workspaceId, owner.id, "Editor");
@@ -452,8 +452,8 @@ describe("the Curation reads over tRPC", () => {
   });
 });
 
-describe("a body's links over both transports", () => {
-  it("answers three unanswerable links alike over MCP", async () => {
+describe("a concept body's links over MCP and tRPC", () => {
+  it("answers withheld, missing and out-of-tree links alike over MCP", async () => {
     const { admin, viewer, board, notes } = await threeNotesAskingTheBoard();
 
     const structures: string[] = [];
@@ -464,7 +464,7 @@ describe("a body's links over both transports", () => {
       texts.push(rendered(opened));
     }
     const [first] = notes;
-    assert(first !== undefined, "the board holds notes");
+    assert(first !== undefined, "no notes were written");
     const seen = await mcpOpenedBy(admin, first);
 
     expect(structures[0]).toContain('"bodyLinks":[]');
@@ -490,7 +490,7 @@ describe("a body's links over both transports", () => {
     expect(overMcp).toMatchObject({ concept: { bodyLinks: answered } });
   });
 
-  it("gives the Viewer no IRI they may not read", async () => {
+  it("omits links to concepts the Viewer cannot read", async () => {
     const { workspace, viewer, iriOf } = await aConceptLinkingTwo();
     const { api } = await webSignedIn(app(), viewer.email);
 
@@ -515,7 +515,7 @@ describe("a body's links over both transports", () => {
 });
 
 describe("knowledge.open over tRPC", () => {
-  it("answers the read by IRI, its trust words as text", async () => {
+  it("opens a concept by IRI with trust words as text", async () => {
     const { viewer, iriOf } = await aWorkspaceOfHerons();
     const { api } = await webSignedIn(app(), viewer.email);
 
@@ -542,7 +542,7 @@ describe("knowledge.open over tRPC", () => {
     expect(refused).toMatchObject(MALFORMED);
   });
 
-  it("answers an absent and a withheld concept the same NOT_FOUND", async () => {
+  it("gives missing and withheld concepts the same NOT_FOUND", async () => {
     const { viewer, iriOf } = await aWorkspaceOfHerons();
     const { api } = await webSignedIn(app(), viewer.email);
 
@@ -557,7 +557,7 @@ describe("knowledge.open over tRPC", () => {
     expect(JSON.stringify(withheld)).not.toContain(RINGING);
   });
 
-  it("carries the pane's access, lead and next words beside evidence", async () => {
+  it("returns access, lead and next words for each reader's evidence", async () => {
     const { iri, handbook, minutes, minutesDocumentId, viewer, admin } =
       await aConceptCitingRestrictedMinutes();
 
@@ -591,7 +591,7 @@ describe("knowledge.open over tRPC", () => {
     });
   });
 
-  it("answers a readable passage by its locator", async () => {
+  it("opens a readable passage by its locator", async () => {
     const { handbook, viewer } = await aConceptCitingRestrictedMinutes();
     const { api } = await webSignedIn(app(), viewer.email);
 
@@ -608,7 +608,7 @@ describe("knowledge.open over tRPC", () => {
     });
   });
 
-  it("answers an absent and a withheld passage the same NOT_FOUND", async () => {
+  it("gives missing and withheld passages the same NOT_FOUND", async () => {
     const { minutes, viewer } = await aConceptCitingRestrictedMinutes();
     const { api } = await webSignedIn(app(), viewer.email);
     const absentLocator = "01J6ZZZZZZZZZZZZZZZZZZZZZZ/chars:0-5";
@@ -637,21 +637,24 @@ describe("the knowledge router, signed out", () => {
 const readAt = (procedure: "find" | "open", input: Rpc): string =>
   `${TRPC_ENDPOINT}/knowledge.${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`;
 
-describe("a knowledge read's answer over GET", () => {
+describe("knowledge reads over GET", () => {
   it.each([
     ["a found page", "find", { query: QUERY }, 200],
     ["an absent concept", "open", { iri: ABSENT_IRI }, 404],
-  ] as const)("keeps %s out of every cache", async (_, procedure, input, status) => {
-    const { workspace } = await aWorkspaceOfHerons();
-    const { client } = await webSignedIn(app(), workspace.admin.email);
+  ] as const)(
+    "sends %s with Cache-Control private, no-store",
+    async (_, procedure, input, status) => {
+      const { workspace } = await aWorkspaceOfHerons();
+      const { client } = await webSignedIn(app(), workspace.admin.email);
 
-    const response = await client.fetch(readAt(procedure, input));
+      const response = await client.fetch(readAt(procedure, input));
 
-    expect(response.status).toBe(status);
-    expect(response.headers.get("cache-control")).toBe("private, no-store");
-  });
+      expect(response.status).toBe(status);
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+    },
+  );
 
-  it("keeps a signed-out refusal out of every cache", async () => {
+  it("sends a signed-out refusal with Cache-Control private, no-store", async () => {
     const response = await app()
       .client()
       .fetch(readAt("find", { query: QUERY }));
@@ -671,8 +674,8 @@ const onTheWebAt = async (address: string, email: string) => {
   return { client, ...webClientOf(client) };
 };
 
-describe("the knowledge reads' per-person ceiling", () => {
-  it("refuses a person past it while their neighbour reads on", async () => {
+describe("the per-person rate limit on knowledge reads", () => {
+  it("refuses one person over it, not another sharing their address", async () => {
     const { workspace, viewer } = await aWorkspaceOfHerons();
     const reader = await onTheWebAt(SHARED_ADDRESS, viewer.email);
     const neighbour = await onTheWebAt(SHARED_ADDRESS, workspace.admin.email);
@@ -698,7 +701,7 @@ describe("the knowledge reads' per-person ceiling", () => {
     expect(neighbours).toBe(200);
   });
 
-  it("counts find and open against the one budget", async () => {
+  it("counts find and open against the same limit", async () => {
     const { viewer, iriOf } = await aWorkspaceOfHerons();
     const { api } = await webSignedIn(app(), viewer.email);
     stopTheClock();
@@ -745,8 +748,8 @@ const aPolicyItsEditorOwns = async () => {
   return { iri: written.value.iri, editor, viewer, authorOfHead };
 };
 
-describe("an edit saved over tRPC", () => {
-  it("signs a save as the signed-in person, never the client", async () => {
+describe("saving an edit over tRPC", () => {
+  it("authors a save as the signed-in person, refusing other authors", async () => {
     const { iri, editor, authorOfHead } = await aPolicyItsEditorOwns();
     const { api } = await webSignedIn(app(), editor.email);
     const seed = await api.knowledge.conceptToEdit.query({ iri });
@@ -768,7 +771,7 @@ describe("an edit saved over tRPC", () => {
     expect(authorOfHead()).toBe(`${editor.name} <${editor.email}>`);
   });
 
-  it("answers each reader's standing beside the concept read", async () => {
+  it("returns each reader's standing, commits or suggests, with the concept", async () => {
     const { iri, editor, viewer } = await aPolicyItsEditorOwns();
     const owner = (await webSignedIn(app(), editor.email)).api;
     const outsider = (await webSignedIn(app(), viewer.email)).api;
@@ -812,7 +815,7 @@ const aGuideHeldByAnEditorInFinance = async () => {
 };
 
 describe("a guide over tRPC", () => {
-  it("lists the guide through the knowledge router", async () => {
+  it("lists the guide with needsReview counted for each reader", async () => {
     const { outsider, editor, seeded } = await aGuideHeldByAnEditorInFinance();
     const listed = { guideId: seeded.guideId, kind: "Bid library", collection: "company" };
 
@@ -825,7 +828,7 @@ describe("a guide over tRPC", () => {
     expect(forOutsider).toEqual([{ ...listed, subject: null, sections: 8, needsReview: 0 }]);
   });
 
-  it("reads the guide through the knowledge router", async () => {
+  it("reads the guide, withholding briefs and sources outsiders cannot see", async () => {
     const { workspace, outsider, editor, seeded } = await aGuideHeldByAnEditorInFinance();
     await nameOwners(
       app(),
@@ -859,13 +862,13 @@ describe("a guide over tRPC", () => {
     expect(JSON.stringify(outsiders)).not.toContain(PROFESSIONAL_INDEMNITY);
   });
 
-  it("saves a Brief through the knowledge router", async () => {
+  it("saves a changed Brief once and skips an unchanged one", async () => {
     const { editor, seeded } = await aGuideHeldByAnEditorInFinance();
     const { api } = await webSignedIn(app(), editor.email);
     const { writeUpId } = sectionOf(seeded.sections, "Company overview");
     const read = await api.knowledge.guide.query({ guideId: seeded.guideId });
     const standing = sectionOf(read.sections, "Company overview").brief?.editable?.markdown;
-    assert(standing !== undefined, "an Editor reads the Brief's markdown");
+    assert(standing !== undefined, "the Editor did not get the Brief's markdown");
     const edited = `${standing}\n\nNorthgate answers bids from one library.`;
 
     const unchanged = await api.knowledge.saveBrief.mutate({
@@ -881,7 +884,7 @@ describe("a guide over tRPC", () => {
     expect(again).toEqual({ saved: false, version: 3 });
   });
 
-  it("copies a Brief, then records its usage", async () => {
+  it("records a Brief copy's usage only through recordCopy", async () => {
     const { workspace, outsider, editor, seeded } = await aGuideHeldByAnEditorInFinance();
     const { writeUpId } = sectionOf(seeded.sections, INSURANCE);
     const { workspaceId } = workspace;
@@ -916,7 +919,7 @@ describe("a guide over tRPC", () => {
     );
   });
 
-  it("includes an available concept through the knowledge router", async () => {
+  it("includes an available concept in a Brief once", async () => {
     const { workspace, editor, seeded } = await aGuideHeldByAnEditorInFinance();
     await seedConcepts(
       app(),

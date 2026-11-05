@@ -95,7 +95,7 @@ describe("opening the git door", () => {
   });
 });
 
-describe("what the git door will put a file at", () => {
+describe("the file paths the git door accepts", () => {
   it.each([
     ["escapes the bundle", "../escape.md"],
     ["climbs out part-way along", "knowledge/../../escape.md"],
@@ -116,7 +116,7 @@ describe("what the git door will put a file at", () => {
     expect(await bundleHistory(bundle.door, bundle.workspaceId)).toEqual([]);
   });
 
-  it("writes a relative path inside the bundle, at every depth", async () => {
+  it("writes a relative path at any depth inside the bundle", async () => {
     const bundle = await arrange();
 
     const written = await commit(
@@ -130,7 +130,7 @@ describe("what the git door will put a file at", () => {
   });
 });
 
-describe("one commit's index", () => {
+describe("the index a commit builds", () => {
   it("keeps every file the parent commit held", async () => {
     const bundle = await arrange();
     const first = await commit(bundle.principal, bundle.door, requestFor());
@@ -154,7 +154,7 @@ describe("one commit's index", () => {
     );
   });
 
-  it("starts one rev-parse, then the plumbing, on a parent", async () => {
+  it("runs rev-parse once, then the plumbing commands, on a parent", async () => {
     const bundle = await arrange();
     const expectedHead = shaOf(await commit(bundle.principal, bundle.door, requestFor()));
 
@@ -173,7 +173,7 @@ describe("one commit's index", () => {
     ]);
   });
 
-  it("lands on the standing head when it expects any head", async () => {
+  it("commits on the current head when it expects any head", async () => {
     const bundle = await arrange();
     const first = shaOf(await commit(bundle.principal, bundle.door, requestFor()));
 
@@ -187,7 +187,7 @@ describe("one commit's index", () => {
     expect(await bundleHistory(bundle.door, bundle.workspaceId)).toEqual([first, shaOf(second)]);
   });
 
-  it("lands a first commit when it expects any head", async () => {
+  it("makes the first commit when it expects any head", async () => {
     const bundle = await arrange();
 
     const first = await commit(
@@ -223,7 +223,7 @@ describe("one commit's index", () => {
     expect(await bundleHistory(bundle.door, bundle.workspaceId)).toEqual([first]);
   });
 
-  it("stages in its own index, leaving the repository without one", async () => {
+  it("leaves the repository's own index empty after a commit", async () => {
     const bundle = await arrange();
 
     await commit(bundle.principal, bundle.door, requestFor());
@@ -231,7 +231,7 @@ describe("one commit's index", () => {
     expect(await staged(bundle.door, bundle.workspaceId)).toEqual([]);
   });
 
-  it("leaves no staging directory behind in the temporary directory", async () => {
+  it("leaves no staging directory in the temporary directory", async () => {
     const bundle = await arrange();
     const temporary = await mkdtemp(path.join(tmpdir(), "git-staging-"));
     vi.stubEnv("TMPDIR", temporary);
@@ -247,8 +247,8 @@ describe("one commit's index", () => {
   });
 });
 
-describe("a git failure after the precondition passed", () => {
-  it("reads an unlockable ref as a stale precondition", async () => {
+describe("a git failure after the precondition check passes", () => {
+  it("refuses as stale when the ref's lock file already exists", async () => {
     const bundle = await arrange();
 
     await writeFile(
@@ -261,7 +261,7 @@ describe("a git failure after the precondition passed", () => {
     expect(refused).toEqual({ ok: false, error: "stale-precondition" });
   });
 
-  it("hands back the store's failure for any other refused write", async () => {
+  it("returns git's error for any other refused write", async () => {
     const bundle = await arrange();
 
     const failed = await commit(bundle.principal, bundle.door, requestFor({ path: ".git/config" }));
@@ -280,7 +280,10 @@ const overBudget = {
   }),
 };
 
-const impatient = (bundle: Bundle): GitDoor => ({ ...bundle.door, commitBudgetMs: BUDGET_MS });
+const withShortBudget = (bundle: Bundle): GitDoor => ({
+  ...bundle.door,
+  commitBudgetMs: BUDGET_MS,
+});
 
 const stillRunning = (pid: number): boolean => {
   try {
@@ -291,43 +294,43 @@ const stillRunning = (pid: number): boolean => {
   }
 };
 
-describe("a commit past its budget", () => {
-  it("answers the budget, not a missing repository, while rev-parse hangs", async () => {
+describe("a commit that runs past its time budget", () => {
+  it("reports the overrun, not a missing repository, when rev-parse hangs", async () => {
     const bundle = await arrange();
     let answered: unknown;
 
     await whileGitHangsAt("rev-parse", async () => {
-      answered = await commit(bundle.principal, impatient(bundle), requestFor());
+      answered = await commit(bundle.principal, withShortBudget(bundle), requestFor());
     });
 
     expect(answered).toMatchObject(overBudget);
   });
 
-  it("answers the budget while git ignores a large input", async () => {
+  it("reports the overrun when hash-object hangs on a large input", async () => {
     const bundle = await arrange();
     const large = requestFor({ content: "x".repeat(4 * 1024 * 1024) });
     let answered: unknown;
 
     await whileGitHangsAt("hash-object", async () => {
-      answered = await commit(bundle.principal, impatient(bundle), large);
+      answered = await commit(bundle.principal, withShortBudget(bundle), large);
     });
 
     expect(answered).toMatchObject(overBudget);
   });
 
-  it("answers only once the stopped git has exited", async () => {
+  it("returns only after the stopped git process has exited", async () => {
     const bundle = await arrange();
 
     const hung = await whileGitHangsAt("rev-parse", async () => {
-      await commit(bundle.principal, impatient(bundle), requestFor());
+      await commit(bundle.principal, withShortBudget(bundle), requestFor());
     });
 
     expect(stillRunning(hung)).toBe(false);
   });
 });
 
-describe("the message the git door composes", () => {
-  it("carries all five trailers when an action names them all", async () => {
+describe("the commit message the git door writes", () => {
+  it("includes all five trailers when the action supplies all five", async () => {
     const bundle = await arrange();
     const trailers = {
       actor: `human:${ulid()}` satisfies ActorId,
@@ -373,7 +376,7 @@ const gate = (): { readonly waited: Promise<void>; readonly open: () => void } =
 const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 describe("the per-repository lock", () => {
-  it("queues a third action behind a second still holding it", async () => {
+  it("queues a third action while the second holds the lock", async () => {
     const bundle = await arrange();
     const order: string[] = [];
     const first = gate();
@@ -408,8 +411,8 @@ describe("the per-repository lock", () => {
 
 const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-erasure" };
 
-describe("the commits an empty bundle holds after a watermark", () => {
-  it("answers no head and nothing missed without a watermark", async () => {
+describe("listing commits after a watermark in an empty bundle", () => {
+  it("returns no head and no missed commits without a watermark", async () => {
     const bundle = await arrange();
 
     const scanned = await commitsAfter(PLATFORM, bundle.door, bundle.workspaceId, null);
@@ -417,7 +420,7 @@ describe("the commits an empty bundle holds after a watermark", () => {
     expect(scanned).toEqual({ ok: true, value: { head: null, missed: [] } });
   });
 
-  it("reads a watermark in an empty bundle as diverged", async () => {
+  it("reports diverged history for a watermark in an empty bundle", async () => {
     const bundle = await arrange();
     const watermark = "0123456789abcdef0123456789abcdef01234567";
 
@@ -427,8 +430,8 @@ describe("the commits an empty bundle holds after a watermark", () => {
   });
 });
 
-describe("a bundle whose history behind its head is unreadable", () => {
-  it("hands back the scan's failure rather than throwing it", async () => {
+describe("a bundle with an unreadable commit behind its head", () => {
+  it("returns the scan's error instead of throwing it", async () => {
     const bundle = await arrange();
     const first = shaOf(await commit(bundle.principal, bundle.door, requestFor()));
     shaOf(
@@ -454,7 +457,7 @@ describe("a repository whose refs git cannot read", () => {
     return { ...bundle, sha };
   };
 
-  it("scans it as a bundle with no head", async () => {
+  it("scans the repository as a bundle with no head", async () => {
     const bundle = await unreadableRefs();
 
     expect(await commitsAfter(PLATFORM, bundle.door, bundle.workspaceId, null)).toEqual({
@@ -467,7 +470,7 @@ describe("a repository whose refs git cannot read", () => {
     });
   });
 
-  it("refuses a commit expecting its old head as stale", async () => {
+  it("refuses as stale a commit that expects the old head", async () => {
     const bundle = await unreadableRefs();
 
     const refused = await commit(
@@ -479,7 +482,7 @@ describe("a repository whose refs git cannot read", () => {
     expect(refused).toEqual({ ok: false, error: "stale-precondition" });
   });
 
-  it("hands back the store's failure committing on any head", async () => {
+  it("returns git's error for a commit that expects any head", async () => {
     const bundle = await unreadableRefs();
 
     const failed = await commit(
@@ -507,8 +510,8 @@ const bundleNamingPriya = async (): Promise<{ bundle: Bundle; sha: string }> => 
   return { bundle, sha: shaOf(written) };
 };
 
-describe("what a bundle's history names", () => {
-  it("answers the commit and path whose file carries the needle", async () => {
+describe("searching a bundle's history for an address", () => {
+  it("returns each commit and path whose file holds the address", async () => {
     const { bundle, sha } = await bundleNamingPriya();
 
     const found = await historyNaming(PLATFORM, bundle.door, bundle.workspaceId, [SUBJECT_EMAIL]);
@@ -519,7 +522,7 @@ describe("what a bundle's history names", () => {
     });
   });
 
-  it("answers an author-line match as a commit, not a file", async () => {
+  it("returns an author-line match as a commit, not a file", async () => {
     const { bundle, sha } = await bundleNamingPriya();
 
     const found = await historyNaming(PLATFORM, bundle.door, bundle.workspaceId, [AUTHOR.email]);
@@ -527,7 +530,7 @@ describe("what a bundle's history names", () => {
     expect(found).toEqual({ blobs: [], authors: [sha] });
   });
 
-  it("answers nothing for an empty history or one naming nobody", async () => {
+  it("returns nothing for an empty history or one without matches", async () => {
     const { bundle } = await bundleNamingPriya();
     const empty = await arrange();
 
@@ -540,7 +543,7 @@ describe("what a bundle's history names", () => {
     });
   });
 
-  it("hands back an unreadable object's failure, not an empty answer", async () => {
+  it("throws on an unreadable object instead of returning nothing", async () => {
     const { bundle, sha } = await bundleNamingPriya();
     await objectRemovedFrom(bundle.door, bundle.workspaceId, `${sha}:knowledge/expenses.md`);
 
@@ -550,7 +553,7 @@ describe("what a bundle's history names", () => {
   });
 });
 
-describe("a rewrite of the history by address", () => {
+describe("rewriting the history to erase an address", () => {
   it("leaves a longer address that begins with the erased one", async () => {
     const bundle = await arrange();
     await commit(
@@ -574,8 +577,8 @@ describe("a rewrite of the history by address", () => {
   });
 });
 
-describe("the file this door reads back at a commit", () => {
-  it("answers null for a path the commit's tree lacks", async () => {
+describe("reading a file at a commit", () => {
+  it("returns null for a path missing from the commit's tree", async () => {
     const { bundle, sha } = await bundleNamingPriya();
 
     expect(
@@ -583,7 +586,7 @@ describe("the file this door reads back at a commit", () => {
     ).toBe(null);
   });
 
-  it("refuses a missing commit rather than calling the file absent", async () => {
+  it("throws for a missing commit instead of returning null", async () => {
     const { bundle } = await bundleNamingPriya();
 
     await expect(

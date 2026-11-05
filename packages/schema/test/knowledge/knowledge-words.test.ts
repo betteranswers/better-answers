@@ -153,7 +153,7 @@ const AFTER: Standing = {
 };
 
 describe("migration 0072 over the knowledge words stored before it", () => {
-  it("moves every workspace's stored old words to the new ones", async () => {
+  it("moves the old words to the new in every workspace", async () => {
     await withRollback(db().pool, async (client) => {
       for (const statement of THE_CHECKS_BEFORE) await client.query(statement);
       const here = ulid();
@@ -168,7 +168,7 @@ describe("migration 0072 over the knowledge words stored before it", () => {
     });
   });
 
-  it("refuses each old value afterwards, and guards a decision again", async () => {
+  it("then refuses each old value and keeps decisions final", async () => {
     await withRollback(db().pool, async (client) => {
       for (const statement of THE_CHECKS_BEFORE) await client.query(statement);
       const here = ulid();
@@ -213,8 +213,8 @@ describe("migration 0072 over the knowledge words stored before it", () => {
   });
 });
 
-describe("migration 0072's renamed sensitivity ranking", () => {
-  it("is the name the view and the CHECK now read", async () => {
+describe("narrower_sensitivity, the function migration 0072 renamed", () => {
+  it("is the function the view and the CHECK now call", async () => {
     await withRollback(db().pool, async (client) => {
       const callers = await client.query<{ caller: string; renamed: boolean }>(
         `SELECT 'index.readable_passage' AS caller,

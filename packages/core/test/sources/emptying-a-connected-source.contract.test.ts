@@ -12,14 +12,14 @@ const fixtureSchema = z.object({
 
 const fixture = contractFixture("emptying-a-connected-source", fixtureSchema);
 
-describe("the reasons the emptying-a-connected-source agreement says empty a connected source", () => {
-  it("are this tier's reasons: every named reason and no other", () => {
+describe("the reasons for emptying a connected source", () => {
+  it("match the agreement's reasons exactly", () => {
     expect([...REASONS_EMPTYING_THE_CONNECTED_SOURCE].toSorted()).toEqual(
       fixture.reasons.toSorted(),
     );
   });
 
-  it("are each written once", () => {
+  it("appear once each in the agreement", () => {
     expect(new Set(fixture.reasons).size).toBe(fixture.reasons.length);
   });
 });

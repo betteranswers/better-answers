@@ -12,10 +12,10 @@ from better_answers_worker.redaction.detector import ModelRecogniser
 from better_answers_worker.redaction.engine import build_analyzer
 from better_answers_worker.redaction.pins import GLINER_MODEL_ID
 
-GLINER_FALLS_BACK = "low_cpu_mem_usage=True is not supported for this load"
+GLINER_FALLBACK_WARNING = "low_cpu_mem_usage=True is not supported for this load"
 
 
-THE_WEIGHTS_FILE = "pytorch_model.bin"
+WEIGHTS_FILENAME = "pytorch_model.bin"
 
 
 PROC_MAPS = Path("/proc/self/maps")
@@ -23,11 +23,11 @@ PROC_MAPS = Path("/proc/self/maps")
 
 @pytest.fixture(scope="module")
 def recogniser() -> ModelRecogniser:
-    # gliner only warns when it falls back to the load that holds the weights twice;
-    # as an error, the failure names that cause.
+    # gliner only warns when it falls back to a load that copies the weights, so
+    # the test turns that warning into an error.
     with warnings.catch_warnings():
         warnings.filterwarnings(
-            "error", message=GLINER_FALLS_BACK, category=UserWarning
+            "error", message=GLINER_FALLBACK_WARNING, category=UserWarning
         )
         analyzer = build_analyzer()
     [built] = [
@@ -38,12 +38,12 @@ def recogniser() -> ModelRecogniser:
     return built
 
 
-def the_weights_file() -> Path:
+def gliner_weights_path() -> Path:
     snapshot = Path(snapshot_download(GLINER_MODEL_ID, local_files_only=True))
-    return (snapshot / THE_WEIGHTS_FILE).resolve()
+    return (snapshot / WEIGHTS_FILENAME).resolve()
 
 
-def files_this_process_maps() -> set[Path]:
+def memory_mapped_files() -> set[Path]:
     if PROC_MAPS.exists():
         return {
             Path(fields[5])
@@ -52,8 +52,8 @@ def files_this_process_maps() -> set[Path]:
             )
             if len(fields) == 6
         }
-    # macOS has no /proc: lsof names each file a process has mapped under the
-    # descriptor `txt`.
+    # macOS has no /proc, so this asks lsof, which lists each file the process
+    # has mapped with the descriptor `txt`.
     listed = subprocess.run(
         ["lsof", "-n", "-P", "-p", str(os.getpid()), "-F", "fn"],
         capture_output=True,
@@ -67,13 +67,13 @@ def files_this_process_maps() -> set[Path]:
     }
 
 
-def test_asks_gliner_for_the_load_that_holds_weights_once(
+def test_the_recogniser_asks_gliner_for_low_cpu_memory_usage(
     recogniser: ModelRecogniser,
 ) -> None:
     assert recogniser.gliner.model_kwargs == {"low_cpu_mem_usage": True}
 
 
-def test_the_detectors_weights_are_file_mapped_with_none_on_meta(
+def test_gliner_weights_are_memory_mapped_and_all_tensors_on_cpu(
     recogniser: ModelRecogniser,
 ) -> None:
     gliner_model = recogniser.gliner.gliner
@@ -83,10 +83,12 @@ def test_the_detectors_weights_are_file_mapped_with_none_on_meta(
         tensor.device.type
         for tensor in chain(gliner_model.parameters(), gliner_model.buffers())
     } == {"cpu"}
-    assert the_weights_file() in files_this_process_maps()
+    assert gliner_weights_path() in memory_mapped_files(), (
+        "this process has not memory-mapped the gliner weights file"
+    )
 
 
 @pytest.mark.usefixtures("recogniser")
-def test_torch_maps_a_file_only_for_the_detectors_build() -> None:
-    assert the_weights_file() in files_this_process_maps()
+def test_torch_leaves_global_mmap_loading_off_after_building_the_detector() -> None:
+    assert gliner_weights_path() in memory_mapped_files()
     assert torch.utils.serialization.config.load.mmap is False

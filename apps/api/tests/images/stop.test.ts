@@ -115,16 +115,19 @@ const received = (socket: Socket): Promise<string> =>
     socket.once("close", () => resolve(reply));
   });
 
-it.each(["SIGTERM", "SIGINT"] as const)("exits 0 at once on %s", async (signal) => {
-  const api = await startApi();
+it.each(["SIGTERM", "SIGINT"] as const)(
+  "exits 0 on %s without waiting for the deadline",
+  async (signal) => {
+    const api = await startApi();
 
-  const stop = await stopped(api, signal);
+    const stop = await stopped(api, signal);
 
-  expect(stop).toEqual(exitedWith(0, stop));
-  expect(stop.afterMs).toBeLessThan(DEFAULT_STOP_DEADLINE_MS / 2);
-});
+    expect(stop).toEqual(exitedWith(0, stop));
+    expect(stop.afterMs).toBeLessThan(DEFAULT_STOP_DEADLINE_MS / 2);
+  },
+);
 
-it("answers a request in flight at the stop", async () => {
+it("finishes a request in flight when the stop arrives", async () => {
   const api = await startApi();
   const socket = await heldRequest(api.port);
   const reply = received(socket);
@@ -141,7 +144,7 @@ it("answers a request in flight at the stop", async () => {
   expect(stop.afterMs).toBeLessThan(DEFAULT_STOP_DEADLINE_MS / 2);
 });
 
-it("exits 1 at the deadline, cutting a request still open", async () => {
+it("exits 1 at the deadline and drops an unfinished request", async () => {
   const api = await startApi(SHORT_STOP_DEADLINE_MS);
   const socket = await heldRequest(api.port);
   const reply = received(socket);

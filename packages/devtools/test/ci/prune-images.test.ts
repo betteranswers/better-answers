@@ -155,7 +155,7 @@ describe("the nightly image prune", () => {
     expect(removed(on)).toBe("");
   });
 
-  it("skips the night while a Coolify deployment runs", async () => {
+  it("skips the prune while a Coolify deployment runs", async () => {
     const on = box([...CONTAINERS, HELPER]);
 
     expect(await prune(on)).toEqual({

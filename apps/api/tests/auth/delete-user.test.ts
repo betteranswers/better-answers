@@ -5,8 +5,8 @@ import { appForSuite } from "../support/suite-app.ts";
 
 const app = appForSuite();
 
-describe("the delete-user endpoint, to a person who is signed in", () => {
-  it("refuses them, leaving their user and member rows in place", async () => {
+describe("the delete-user endpoint for a signed-in person", () => {
+  it("answers 404 and keeps the user and member rows", async () => {
     const acme = await app().provision({ name: "Acme" });
     const client = app().client();
     await signIn(app(), client, acme.admin.email);

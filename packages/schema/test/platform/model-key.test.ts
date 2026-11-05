@@ -35,7 +35,7 @@ const workspacesRead = async (client: pg.PoolClient): Promise<readonly string[]>
 };
 
 describe("a workspace's model key", () => {
-  it("is read by the api inside its workspace alone", async () => {
+  it("is read by the api only within its own workspace", async () => {
     await withRollback(db().pool, async (client) => {
       await aKeyInEach(client);
 
@@ -45,7 +45,7 @@ describe("a workspace's model key", () => {
     });
   });
 
-  it("is read by nobody with no workspace in scope", async () => {
+  it("is hidden from the api with no workspace in scope", async () => {
     await withRollback(db().pool, async (client) => {
       await aKeyInEach(client);
 
@@ -66,7 +66,7 @@ describe("a workspace's model key", () => {
     });
   });
 
-  it("gives the worker no privilege at all", async () => {
+  it("gives the worker no privilege on the table", async () => {
     await withRollback(db().pool, async (client) => {
       const held = await privilegesHeld(client, "worker_rt", "model_key");
 
@@ -74,7 +74,7 @@ describe("a workspace's model key", () => {
     });
   });
 
-  it("lets the api set and replace, never remove", async () => {
+  it("lets the api insert and update a key, never delete", async () => {
     await withRollback(db().pool, async (client) => {
       const held = await privilegesHeld(client, "app_rt", "model_key");
 
@@ -118,8 +118,8 @@ describe("a workspace's model key", () => {
   });
 });
 
-describe("what a model key's row holds", () => {
-  it("holds the key sealed, in no readable column", () => {
+describe("the columns of a model key row", () => {
+  it("holds the key only sealed, never in plain text", () => {
     expect(Object.keys(boundarySchemas.modelKey.select.shape).toSorted()).toEqual([
       "provider",
       "sealed",
@@ -128,18 +128,21 @@ describe("what a model key's row holds", () => {
   });
 });
 
-describe("a model's name", () => {
+describe("the MODEL_NAME pattern", () => {
   const KEY_SHAPED = {
     anthropic: `sk-ant-api03-${"Ab3_".repeat(23)}-AA`,
     mistral: "Zq7Lm2Xc".repeat(4),
     cloudflare: "Ab3Cd_Ef5-".repeat(4),
   };
 
-  it.each(Object.entries(KEY_SHAPED))("refuses a key in %s's shape", (_provider, key) => {
-    expect(MODEL_NAME.test(key)).toBe(false);
-  });
+  it.each(Object.entries(KEY_SHAPED))(
+    "rejects a string shaped like a %s API key",
+    (_provider, key) => {
+      expect(MODEL_NAME.test(key)).toBe(false);
+    },
+  );
 
-  it.each(["claude-sonnet-4-5", "mistral-large-2411"])("takes %s", (name) => {
+  it.each(["claude-sonnet-4-5", "mistral-large-2411"])("accepts the model name %s", (name) => {
     expect(MODEL_NAME.test(name)).toBe(true);
   });
 });

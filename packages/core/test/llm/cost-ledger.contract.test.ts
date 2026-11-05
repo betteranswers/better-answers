@@ -34,7 +34,7 @@ const failureOutcomes = new Set(
 );
 const purposesTheRowsUse = [...new Set(fixture.rows.map((row) => row.purpose))].toSorted();
 
-const WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER = [
+const PROMPT_OR_COMPLETION_WORDS = [
   "prompt",
   "completion",
   "message",
@@ -44,14 +44,14 @@ const WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER = [
   "body",
 ];
 
-describe("cost-ledger, golden rows for the cost ledger of model calls", () => {
-  it("gives every row exactly the columns the cost ledger fixes", () => {
+describe("the cost-ledger contract fixture of model call rows", () => {
+  it("gives every fixture row exactly the listed columns", () => {
     expect(fixture.rows.map((row) => Object.keys(row).toSorted())).toEqual(
       fixture.rows.map(() => recordedColumns),
     );
   });
 
-  it("records exactly the columns the migrated table has", async () => {
+  it("lists exactly the columns of the migrated llm_call table", async () => {
     const columns = await db().pool.query<{ column_name: string }>(
       "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'llm_call'",
     );
@@ -59,24 +59,24 @@ describe("cost-ledger, golden rows for the cost ledger of model calls", () => {
     expect(columns.rows.map((row) => row.column_name).toSorted()).toEqual(recordedColumns);
   });
 
-  it("records exactly the outcomes the table admits", () => {
+  it("lists exactly the outcomes in LLM_CALL_OUTCOMES", () => {
     expect([...LLM_CALL_OUTCOMES].toSorted()).toEqual(recordedOutcomes);
   });
 
-  it("records no column a prompt or completion could sit under", () => {
+  it("lists no column named for prompt or completion text", () => {
     expect(
       recordedColumns.filter((column) =>
-        WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER.some((word) => column.includes(word)),
+        PROMPT_OR_COMPLETION_WORDS.some((word) => column.includes(word)),
       ),
     ).toEqual([]);
   });
 
-  it("uses exactly the purposes this tier and the schema speak", () => {
+  it("uses exactly the purposes that core and the schema define", () => {
     expect(purposesTheRowsUse).toEqual([...LLM_PURPOSES].toSorted());
     expect(purposesTheRowsUse).toEqual([...llmPurpose.enumValues].toSorted());
   });
 
-  it("puts a row behind every outcome, a failure among them", () => {
+  it("has a row for every outcome, including a failure", () => {
     const wordsTheRowsUse = [...new Set(fixture.rows.map((row) => row.outcome))].toSorted();
 
     expect(wordsTheRowsUse).toEqual(recordedOutcomes);
@@ -85,7 +85,7 @@ describe("cost-ledger, golden rows for the cost ledger of model calls", () => {
     );
   });
 
-  it("names exactly one of the run or the answer served", () => {
+  it("sets exactly one of run_id and answer_id per row", () => {
     expect(
       fixture.rows.map(
         (row) => [row.run_id, row.answer_id].filter((served) => served !== null).length,

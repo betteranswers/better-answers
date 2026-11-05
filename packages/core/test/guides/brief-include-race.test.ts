@@ -71,8 +71,8 @@ const raced = async (scenario: Scenario, as: UserPrincipal, writeUpId: string): 
   }
 };
 
-describe("a Brief save racing an include on one section", () => {
-  it("keeps the bundle writable after a save beside an include", async () => {
+describe("a Brief save racing an include on the same section", () => {
+  it("keeps the bundle writable when a save races an include", async () => {
     const scenario = await arrange();
     const guide = await seededGuide(db(), scenario);
     const { ng } = guide;

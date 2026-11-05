@@ -64,13 +64,13 @@ describe("runsOverThrowawayTree over a tool that cannot run", () => {
     ).toThrow(/oxlint/);
   });
 
-  it("re-throws an untolerated exit, carrying what the tool wrote", () => {
+  it("rethrows an unexpected exit code with the tool's output", () => {
     expect(() => runsOverThrowawayTree(oxlintTool({ foundSomething: [] }))).toThrow(
       /exit 1[\s\S]*filename-case/,
     );
   });
 
-  it("refuses a time limit that reaches the sweep's hour", () => {
+  it("refuses a time limit of an hour or more", () => {
     expect(() => runsOverThrowawayTree(oxlintTool({ timeoutMs: 60 * MINUTE_MS }))).toThrow(
       /3600000 ms/,
     );
@@ -85,7 +85,7 @@ describe("runsOverThrowawayTree over a tool that ran", () => {
     expect(lint({ [CAMEL_CASE_FILE]: SOURCE })).toContain(CAMEL_CASE_FILE);
   });
 
-  it("returns nothing over a tree the tool finds nothing in", () => {
+  it("returns nothing for a tree with no findings", () => {
     const lint = runsOverThrowawayTree(oxlintTool());
 
     expect(lint({ [KEBAB_CASE_FILE]: SOURCE })).toBe("");
@@ -234,7 +234,7 @@ describe("knipBatchOver", () => {
     expect(both.findings()).toEqual([SPARE]);
   });
 
-  it("keeps a clean case silent beside a flagged one", () => {
+  it("finds nothing in a clean case beside a flagged one", () => {
     expect(clean.findings()).toEqual([]);
   });
 
@@ -246,7 +246,7 @@ describe("knipBatchOver", () => {
   });
 });
 
-/** Resolved because oxlint names a tree by its real path, and macOS's temp directory is a link. */
+/** Resolved because oxlint reports a tree by its real path, and macOS's temp directory is a symlink. */
 const scratch = realpathSync(mkdtempSync(path.join(tmpdir(), "throwaway-tree-test-")));
 
 afterAll(() => {
@@ -257,7 +257,7 @@ const TREES = "better-answers-throwaway-trees";
 
 const ANOTHER_RUNS_TREE = "tree-another-run";
 
-/** `os.tmpdir()` reads `TMPDIR` on every call, so the runner's folder moves into this one. */
+/** `os.tmpdir()` reads `TMPDIR` on every call, so stubbing it moves the runner's trees into this folder. */
 const ownTemp = (): string => {
   const temp = mkdtempSync(path.join(scratch, "temp-"));
   vi.stubEnv("TMPDIR", temp);
@@ -336,7 +336,7 @@ describe("runsOverThrowawayTree's trees", () => {
     expect(treesIn(temp)).toEqual(["tree-59-minutes-old"]);
   });
 
-  it("sweeps once a process, so later stale trees stay", () => {
+  it("sweeps once per process, leaving later stale trees", () => {
     const temp = ownTemp();
     runsOverThrowawayTree(oxlintTool());
     plantTree(temp, "tree-61-minutes-old", 61 * MINUTE_MS);

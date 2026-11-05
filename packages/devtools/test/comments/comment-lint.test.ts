@@ -102,7 +102,7 @@ describe("the one lint config refuses a comment breaking a rule", () => {
   });
 });
 
-describe("the one lint config accepts a comment keeping the rules", () => {
+describe("the one lint config accepts a comment following the rules", () => {
   it.each([
     ["a 25-word line comment", holding(`// ${wordsOf(25)}\n\n`)],
     ["a `/** */` on a declaration", holding("/** Deleting this changes what knip answers. */\n")],

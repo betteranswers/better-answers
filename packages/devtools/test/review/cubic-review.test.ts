@@ -75,7 +75,7 @@ describe("reading the cubic CLI's output", () => {
     );
   });
 
-  it("lets an error outrank findings printed beside it", () => {
+  it("reports an error over findings printed beside it", () => {
     const review = reviewFrom(
       cli({ issues: [finding("P0", "a.ts", "Bug")], error: "Review interrupted" }, 130),
     );
@@ -113,7 +113,7 @@ describe("reading the cubic CLI's output", () => {
     expect(reviewFrom(cli("", null, { spawnError: "ETIMEDOUT" })).kind).toBe("could-not-run");
   });
 
-  it("keeps a clean review and notes a missing context", () => {
+  it("keeps a review clean and notes a missing repository context", () => {
     const review = reviewFrom(
       cli({ issues: [], repository_context: { status: "unavailable", reason: "HTTP 502" } }, 0),
     );

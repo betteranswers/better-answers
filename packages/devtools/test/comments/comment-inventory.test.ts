@@ -151,7 +151,7 @@ describe("comment-inventory inventory", () => {
     const root = treeOf({ [LOADER]: LOADER_SOURCE });
     expect(
       located(inventoryOf(root)),
-      "the comment gate exempts no `@vite-ignore`, so the inventory names it itself",
+      "the inventory did not label `@vite-ignore` a directive. The comment gate does not exempt it, so the inventory labels it.",
     ).toEqual([`${LOADER} 1 1 directive  1`]);
   });
 
@@ -410,14 +410,14 @@ class Shape: ...
     );
   });
 
-  it("cuts a trailing comment, never its twin earlier", () => {
+  it("deletes a trailing comment, not an identical earlier one", () => {
     const root = treeOf({ [MODULE]: 'NOTE = "# note"  # note\n' });
     const tsv = classified(inventoryOf(root), unitOne({ [`${MODULE}:1`]: "narration" }));
     expect(applied(root, tsv, "1").status).toBe(0);
     expect(read(root, MODULE)).toBe('NOTE = "# note"\n');
   });
 
-  it("cuts a docstring, never its twin in a default", () => {
+  it("deletes a docstring, not an identical string in a default", () => {
     const root = treeOf({ [MODULE]: 'def f(x="a"): "a"  # c\n' });
     const tsv = classified(inventoryOf(root), unitOne({ [`${MODULE}:1:doc`]: "narration" }));
     expect(applied(root, tsv, "1").status).toBe(0);
@@ -512,7 +512,7 @@ describe("comment-inventory apply restores every file when a formatter fails", (
   });
 });
 
-describe("comment-inventory apply refuses, changing no file", () => {
+describe("comment-inventory apply refuses and changes no file", () => {
   const refusedOver = (
     files: Tree,
     choices: Readonly<Record<string, Classing>>,

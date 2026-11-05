@@ -124,8 +124,8 @@ const claimsFor = (seeded: Seeded, overrides: Partial<Claims> = {}): Claims => (
   ...overrides,
 });
 
-// Vitest's `isolate: false` keeps modules across a worker's files, so the probe actions leave with
-// this file.
+// Vitest's `isolate: false` keeps modules between a worker's files, so reset them to drop
+// this file's probe actions.
 afterAll(() => {
   vi.resetModules();
 });
@@ -159,7 +159,7 @@ const answeringAfterThreeWrites =
     return answer;
   };
 
-const leftBehindIn = async (workspaceId: string, key: string) => {
+const probeRowsIn = async (workspaceId: string, key: string) => {
   const counted = await db().pool.query<{ rows: number; auditEvents: number; jobs: number }>(
     `SELECT (SELECT count(*)::int FROM workspace_config WHERE workspace_id = $1 AND key = $2) AS rows,
             (SELECT count(*)::int FROM audit_event WHERE workspace_id = $1 AND action = $3) AS "auditEvents",
@@ -177,7 +177,7 @@ const adminOf = async (door: PostgresDoor, claims: Claims): Promise<UserPrincipa
   return admin.value;
 };
 
-const through = async <T>(
+const throughDoor = async <T>(
   door: (typeof DOORS)[number],
   work: (principal: Principal, workspaceId: string, tx: Tx) => Promise<T>,
 ): Promise<{ readonly seeded: Seeded; readonly answered: T }> => {
@@ -199,13 +199,16 @@ const through = async <T>(
   return { seeded, answered: opened.value };
 };
 
-describe("a door whose work answers a refusal after a write", () => {
+describe("a door whose work returns a refusal after writing", () => {
   it.each(DOORS)("rolls back three writes through %s door", async (door) => {
     const key = `probe-${ulid()}`;
 
-    const { seeded, answered } = await through(door, answeringAfterThreeWrites(key, err(PROVOKED)));
+    const { seeded, answered } = await throughDoor(
+      door,
+      answeringAfterThreeWrites(key, err(PROVOKED)),
+    );
 
-    expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({
+    expect(await probeRowsIn(seeded.workspaceId, key)).toEqual({
       rows: 0,
       auditEvents: 0,
       jobs: 0,
@@ -213,12 +216,15 @@ describe("a door whose work answers a refusal after a write", () => {
     expect(answered).toEqual({ ok: false, error: PROVOKED });
   });
 
-  it.each(DOORS)("commits three writes through %s door on a value", async (door) => {
+  it.each(DOORS)("commits three writes through %s door when work succeeds", async (door) => {
     const key = `probe-${ulid()}`;
 
-    const { seeded, answered } = await through(door, answeringAfterThreeWrites(key, ok("landed")));
+    const { seeded, answered } = await throughDoor(
+      door,
+      answeringAfterThreeWrites(key, ok("landed")),
+    );
 
-    expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({
+    expect(await probeRowsIn(seeded.workspaceId, key)).toEqual({
       rows: 1,
       auditEvents: 1,
       jobs: 1,
@@ -229,23 +235,23 @@ describe("a door whose work answers a refusal after a write", () => {
 
 const SETTLED = "the transaction has settled";
 
-describe("a Tx kept past its transaction", () => {
+describe("a Tx used after its transaction ends", () => {
   it.each(DOORS)("refuses a query once %s door commits", async (door) => {
     const key = `probe-${ulid()}`;
 
-    const { seeded, answered } = await through(door, async (_principal, workspaceId, tx) => ({
+    const { seeded, answered } = await throughDoor(door, async (_principal, workspaceId, tx) => ({
       later: () => configProbeWritten(tx, workspaceId, key),
     }));
 
     await expect(answered.later()).rejects.toThrow(SETTLED);
-    expect((await leftBehindIn(seeded.workspaceId, key))?.rows).toBe(0);
+    expect((await probeRowsIn(seeded.workspaceId, key))?.rows).toBe(0);
   });
 
   it.each(DOORS)("refuses a query once %s door rolls back", async (door) => {
     const kept: { tx?: Tx } = {};
 
     await expect(
-      through(door, async (_principal, _workspaceId, tx) => {
+      throughDoor(door, async (_principal, _workspaceId, tx) => {
         kept.tx = tx;
         throw new Error(PROVOKED);
       }),
@@ -264,7 +270,7 @@ describe("a Tx kept past its transaction", () => {
     await expect(answered.later()).rejects.toThrow(SETTLED);
   });
 
-  it("refuses a sibling branch's query after another branch threw", async () => {
+  it("refuses a parallel query issued after another branch threw", async () => {
     const late: { query?: Promise<unknown> } = {};
 
     await expect(
@@ -285,7 +291,7 @@ describe("a Tx kept past its transaction", () => {
   });
 });
 
-describe("a read door", () => {
+describe("a read-only door", () => {
   const aPerson = async () => {
     const client = await db().pool.connect();
     try {
@@ -306,7 +312,7 @@ describe("a read door", () => {
     return "landed";
   };
 
-  it("refuses the identity set's write at its statement", async () => {
+  it("rejects an identity-set write with Postgres's read-only error", async () => {
     const person = await aPerson();
     const door = openPostgres(db().runtimePool);
 
@@ -323,7 +329,7 @@ describe("a read door", () => {
     return "landed";
   };
 
-  it("refuses a member's write at its statement", async () => {
+  it("rejects a member's write with Postgres's read-only error", async () => {
     const seeded = await seedMember({ role: "Admin" });
     const door = openPostgres(db().runtimePool);
     const admin = await adminOf(door, claimsFor(seeded));
@@ -337,7 +343,7 @@ describe("a read door", () => {
     });
   });
 
-  it("refuses a write under resolved claims at its statement", async () => {
+  it("rejects a write under resolved claims with the read-only error", async () => {
     const seeded = await seedMember({ role: "Admin" });
     const door = openPostgres(db().runtimePool);
 
@@ -350,7 +356,7 @@ describe("a read door", () => {
     });
   });
 
-  it("refuses a write in a workspace's scope at its statement", async () => {
+  it("rejects a workspace-scoped write and leaves no row", async () => {
     const { workspaceId } = await seedMember();
     const door = openPostgres(db().runtimePool);
     const key = `probe-${ulid()}`;
@@ -407,11 +413,11 @@ describe("the read-only Principal resolver", () => {
   });
 });
 
-describe("a principal-scoped door's answer", () => {
-  const TOLD_APART = ["the transport's", "the slice's"] as const;
+describe("the result a principal-scoped door returns", () => {
+  const MEMBER_DOORS = ["the transport's", "the slice's"] as const;
 
-  const refusedBothWays = (
-    door: (typeof TOLD_APART)[number],
+  const refusalsFromDoorAndWork = (
+    door: (typeof MEMBER_DOORS)[number],
     seeded: Seeded,
     open: PostgresDoor,
   ) => {
@@ -436,16 +442,20 @@ describe("a principal-scoped door's answer", () => {
         };
   };
 
-  it.each(TOLD_APART)("keeps %s door's own refusal apart from its work's", async (door) => {
+  it.each(MEMBER_DOORS)("tells %s door's refusal apart from the work's refusal", async (door) => {
     const seeded = await seedMember();
 
-    const { byTheDoor, byTheWork } = refusedBothWays(door, seeded, openPostgres(db().runtimePool));
+    const { byTheDoor, byTheWork } = refusalsFromDoorAndWork(
+      door,
+      seeded,
+      openPostgres(db().runtimePool),
+    );
 
     expect(await byTheDoor).toEqual({ ok: false, error: "not-a-member" });
     expect(await byTheWork).toEqual({ ok: true, value: { ok: false, error: "not-a-member" } });
   });
 
-  it("folds the door's refusal and the work's into one answer", async () => {
+  it("folded merges the door's and the work's results into one", async () => {
     const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
 
@@ -462,7 +472,7 @@ describe("a principal-scoped door's answer", () => {
     expect(plain).toEqual({ ok: true, value: "reached" });
   });
 
-  it("hands back a partly-Result answer untouched, with nothing to fold", async () => {
+  it("returns a partly-Result answer unchanged and refuses to fold it", async () => {
     type Partly = Result<number, typeof PROVOKED> | string;
     const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
@@ -475,7 +485,7 @@ describe("a principal-scoped door's answer", () => {
 
     expect(partly).toEqual({ ok: true, value: "reached" });
     expectTypeOf<Answered<Partly>>().toBeNever();
-    // @ts-expect-error — its Result members would reach the caller as values, a refusal among them.
+    // @ts-expect-error — folded would return the union's refusals to the caller as values.
     void (() => folded(partly));
   });
 });
@@ -508,7 +518,7 @@ describe("the Principal resolver", () => {
     expect(resolved.value.scope).toBe(seeded.workspaceId);
   });
 
-  it("carries the session's confirmation, or none", async () => {
+  it("reads the second-factor stamp from the caller's own session only", async () => {
     const seeded = await seedMember({ role: "Editor" });
     const other = await seedMember({ role: "Editor" });
     const door = openPostgres(db().runtimePool);
@@ -602,7 +612,7 @@ describe("the Principal resolver", () => {
     expect(after).toEqual({ ok: true, value: "reached" });
   });
 
-  it("lists the caller's groups here, or none when ungrouped", async () => {
+  it("lists the caller's groups in this workspace, or none", async () => {
     const grouped = await seedMember({ role: "Editor", groupsEach: 2 });
     const alone = await seedMember({ role: "Editor" });
     const door = openPostgres(db().runtimePool);
@@ -668,7 +678,7 @@ describe("the Principal resolver", () => {
     expect(agreeing).toEqual({ ok: true, value: "reached" });
   });
 
-  it("refuses claims that are not a workspace and user id", async () => {
+  it("refuses claims with a malformed workspace and user id", async () => {
     const door = openPostgres(db().runtimePool);
 
     const resolved = await withPrincipal(
@@ -746,10 +756,7 @@ describe("the Principal resolver", () => {
   });
 });
 
-const withRoleOutsideTheThree = async (
-  seeded: Seeded,
-  work: () => Promise<void>,
-): Promise<void> => {
+const withUnknownMemberRole = async (seeded: Seeded, work: () => Promise<void>): Promise<void> => {
   const pool = db().pool;
   const key = [seeded.workspaceId, seeded.userId];
 
@@ -783,12 +790,12 @@ const withRoleOutsideTheThree = async (
   }
 };
 
-describe("a member row carrying a role the platform lacks", () => {
-  it("refuses it rather than building a Principal at that role", async () => {
+describe("a member row whose role is outside Admin, Editor, Viewer", () => {
+  it("refuses the member with role-unknown", async () => {
     const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
 
-    await withRoleOutsideTheThree(seeded, async () => {
+    await withUnknownMemberRole(seeded, async () => {
       const resolved = await withPrincipal(door, claimsFor(seeded), async () => "reached");
 
       expect(resolved).toEqual({ ok: false, error: "role-unknown" });
@@ -797,7 +804,7 @@ describe("a member row carrying a role the platform lacks", () => {
 });
 
 describe("a workspace's config", () => {
-  it("answers nothing for an unset key without failing the transaction", async () => {
+  it("returns undefined for an unset key without failing the transaction", async () => {
     const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
 
@@ -809,8 +816,8 @@ describe("a workspace's config", () => {
   });
 });
 
-describe("the catalogue read the estate's restore commands make", () => {
-  it("names the tables present and omits the absent ones", async () => {
+describe("tablesPresent, which the restore commands call", () => {
+  it("returns only the tables that exist", async () => {
     const door = openPostgres(db().runtimePool);
 
     const present = await tablesPresent(door, ["member", "workspace", "table_nobody_migrated"]);
@@ -818,14 +825,14 @@ describe("the catalogue read the estate's restore commands make", () => {
     expect(present.toSorted()).toEqual(["member", "workspace"]);
   });
 
-  it("answers nothing when asked about nothing", async () => {
+  it("returns an empty list for an empty request", async () => {
     const door = openPostgres(db().runtimePool);
 
     expect(await tablesPresent(door, [])).toEqual([]);
   });
 });
 
-describe("a transaction a caught failure aborted", () => {
+describe("a transaction aborted by a failed statement the work caught", () => {
   it("rejects a person's call at commit instead of reporting success", async () => {
     const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
@@ -851,8 +858,8 @@ describe("a transaction a caught failure aborted", () => {
   });
 });
 
-describe("the counters", () => {
-  it("counts a token's calls per window, refusing past the ceiling", async () => {
+describe("the rate-limit counters", () => {
+  it("counts a token's calls per window, refusing past the maximum", async () => {
     const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
     const rule = { windowMs: 60_000, max: 2 };
@@ -873,7 +880,7 @@ describe("the counters", () => {
     expect(outcomes.value[2]?.retryAfterSeconds).toBe(30);
   });
 
-  it("drops a token's earlier windows, keeping another token's", async () => {
+  it("deletes a token's old windows but keeps other tokens' windows", async () => {
     const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
     const rule = { windowMs: 60_000, max: 2 };
@@ -899,7 +906,7 @@ describe("the counters", () => {
     ]);
   });
 
-  it("counts pre-authentication events per key without any scope", async () => {
+  it("counts pre-authentication events per kind and key, with no workspace", async () => {
     const door = openPostgres(db().runtimePool);
     const rule = { windowMs: 10_000, max: 1 };
     const key = `203.0.113.${Math.floor(Math.random() * 200)}-${ulid()}`;
@@ -912,7 +919,7 @@ describe("the counters", () => {
     expect([first.allowed, second.allowed, otherScope.allowed]).toEqual([true, false, true]);
   });
 
-  it("answers the window's count with each attempt", async () => {
+  it("returns the window's running count with each attempt", async () => {
     const door = openPostgres(db().runtimePool);
     const rule = { windowMs: 60_000, max: 2 };
     const key = `counted-${ulid()}`;
@@ -961,7 +968,7 @@ describe("the operator resolver", () => {
         return { operator, scope: scope.rows[0]?.scope };
       });
 
-    it("resolves a marked person to the operator, in no workspace", async () => {
+    it("resolves a person marked operator, with no workspace scope", async () => {
       const person = await aPerson({ operator: true });
       const issuedAt = new Date("2026-09-25T09:00:00.000Z");
 
@@ -979,7 +986,7 @@ describe("the operator resolver", () => {
       });
     });
 
-    it("carries the named session's confirmation to the operator", async () => {
+    it("gives the operator the second-factor stamp of the named session", async () => {
       const person = await aPerson({ operator: true });
       const sessionId = await sessionFor(db().pool, person.id, {
         createdAt: new Date(),
@@ -1001,7 +1008,7 @@ describe("the operator resolver", () => {
       expect(resolved).toEqual({ ok: true, value: confirmedAt.getTime() });
     });
 
-    it("refuses a person without the mark", async () => {
+    it("refuses a person not marked as operator", async () => {
       const person = await aPerson();
 
       expect(await resolving(person.id)).toEqual({ ok: false, error: "not-the-operator" });
@@ -1019,7 +1026,7 @@ describe("the operator resolver", () => {
       ]).toEqual([{ ok: false, error: "not-the-operator" }, true]);
     });
 
-    it("refuses an id nobody holds, and a malformed one", async () => {
+    it("refuses an unknown user id and a malformed one", async () => {
       expect([await resolving(ulid()), await resolving("not-a-person")]).toEqual([
         { ok: false, error: "not-the-operator" },
         { ok: false, error: "not-the-operator" },
@@ -1048,7 +1055,7 @@ describe("the operator resolver", () => {
       )
     ).rowCount;
 
-  it("rolls a refusal's writes back and commits a value's", async () => {
+  it("rolls back on a refusal and commits on a value", async () => {
     const person = await aPerson({ operator: true });
     const claims = { userId: person.id, issuedAt: new Date() };
     const door = openPostgres(db().runtimePool);
@@ -1065,7 +1072,7 @@ describe("the operator resolver", () => {
     ]);
   });
 
-  it("refuses a write on the read door at its statement", async () => {
+  it("rejects a write through withOperatorRead as read-only", async () => {
     const person = await aPerson({ operator: true });
     const claims = { userId: person.id, issuedAt: new Date() };
     const door = openPostgres(db().runtimePool);

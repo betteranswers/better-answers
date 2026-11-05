@@ -12,8 +12,8 @@ const isPlatformId = (value: string | undefined): boolean =>
 
 const anAddress = () => `${ulid().toLowerCase()}@example.invalid`;
 
-describe("the id a person gets", () => {
-  it("mints a new person's user id in the platform's shape", async () => {
+describe("the ids of a person's rows", () => {
+  it("gives a new person a ULID user id", async () => {
     const email = anAddress();
 
     await signIn(app(), app().client(), email);
@@ -25,7 +25,7 @@ describe("the id a person gets", () => {
     expect(isPlatformId(row.rows[0]?.id)).toBe(true);
   });
 
-  it("gives that person's session an id in the same shape", async () => {
+  it("gives the person's session a ULID id", async () => {
     /* jscpd:ignore-start */
     const email = anAddress();
 
@@ -39,7 +39,7 @@ describe("the id a person gets", () => {
     /* jscpd:ignore-end */
   });
 
-  it("gives a workspace's first Admin member the same id shape", async () => {
+  it("gives a workspace's first Admin member a ULID id", async () => {
     const workspace = await app().provision({ name: "Acme" });
 
     const row = await app().database.superuser.query<{ id: string }>(

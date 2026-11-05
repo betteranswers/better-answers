@@ -23,12 +23,12 @@ const warmObjectsModule = fileURLToPath(new URL("../../support/warm-objects.ts",
 
 const store = objectStoreForSuite();
 
-const wrote = (held: ObjectStore, key: string): Promise<unknown> =>
+const putPage = (held: ObjectStore, key: string): Promise<unknown> =>
   held.door.client.send(
     new PutObjectCommand({ Bucket: held.bucket, Key: key, Body: "a page of evidence" }),
   );
 
-const doorWith = (credentials: ObjectStore, bucket: string): ObjectDoor => {
+const doorForBucket = (credentials: ObjectStore, bucket: string): ObjectDoor => {
   const opened = openObjects({
     endpoint: credentials.endpoint,
     region: credentials.region,
@@ -40,7 +40,7 @@ const doorWith = (credentials: ObjectStore, bucket: string): ObjectDoor => {
   return opened.value;
 };
 
-const readAnswered = async (door: ObjectDoor): Promise<string> => {
+const listingError = async (door: ObjectDoor): Promise<string> => {
   try {
     await keysIn(door);
     return "the read was allowed";
@@ -49,28 +49,28 @@ const readAnswered = async (door: ObjectDoor): Promise<string> => {
   }
 };
 
-const written = (source: string): string => {
+const suiteFileWith = (source: string): string => {
   const file = path.join(mkdtempSync(path.join(tmpdir(), "warm-objects-")), "a-suite.test.ts");
   writeFileSync(file, source, "utf8");
   return file;
 };
 
 describe("the warm object store", () => {
-  it("hands a suite a bucket named for its file", () => {
+  it("gives a suite a bucket named after its file", () => {
     expect(store().bucket).toMatch(/^ba-warm-objects-test-ts-[0-9a-f]{12}$/u);
   });
 
-  it("gives each file its own bucket, refusing a neighbour's key", async () => {
+  it("gives each file its own bucket, denying other files access", async () => {
     const one = await openObjectStore("one-file");
     const another = await openObjectStore("another-file");
-    const trespass = doorWith(one, another.bucket);
+    const trespass = doorForBucket(one, another.bucket);
     try {
-      await wrote(another, "landed/page.txt");
+      await putPage(another, "landed/page.txt");
 
       expect({
         buckets: one.bucket === another.bucket,
         itsOwner: await keysIn(another.door),
-        theNeighbour: await readAnswered(trespass),
+        theNeighbour: await listingError(trespass),
       }).toEqual({
         buckets: false,
         itsOwner: ["landed/page.txt"],
@@ -83,9 +83,9 @@ describe("the warm object store", () => {
     }
   });
 
-  it("re-opens a key onto an emptied bucket", async () => {
+  it("empties the bucket when a key is opened again", async () => {
     const bailed = await openObjectStore("re-run");
-    await wrote(bailed, "landed/page.txt");
+    await putPage(bailed, "landed/page.txt");
     closeObjects(bailed.door);
 
     const reopened = await openObjectStore("re-run");
@@ -99,11 +99,11 @@ describe("the warm object store", () => {
     }
   });
 
-  it("reads only a harness-naming file as asking for a store", () => {
-    const wants = written(
+  it("treats only a file importing objectStoreForSuite as wanting a store", () => {
+    const wants = suiteFileWith(
       'import { objectStoreForSuite } from "../../support/suite-objects.ts";\n',
     );
-    const wantsNot = written(
+    const wantsNot = suiteFileWith(
       'import { postgresForSuite } from "../../support/suite-postgres.ts";\n',
     );
 
@@ -113,7 +113,7 @@ describe("the warm object store", () => {
     });
   });
 
-  it("starts and stops its own Garage where none was warm", async () => {
+  it("starts and stops its own Garage when none is running", async () => {
     const script = [
       `import { keysIn, openObjectStore } from ${JSON.stringify(warmObjectsModule)};`,
       'const store = await openObjectStore("cold");',

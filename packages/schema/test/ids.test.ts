@@ -9,8 +9,8 @@ import {
   type Ulid,
 } from "../src/index.ts";
 
-describe("the branded ids, each its table's own column", () => {
-  it("names each id by the column that defines its brand", () => {
+describe("the branded ids and the columns that define them", () => {
+  it("is the same schema as the column that defines it", () => {
     const defining = [
       ["workspaceId", ids.workspaceId, boundarySchemas.workspace.select.shape.id],
       ["userId", ids.userId, boundarySchemas.user.select.shape.id],
@@ -28,13 +28,13 @@ describe("the branded ids, each its table's own column", () => {
 });
 
 describe("a minted concept IRI", () => {
-  it("is a concept IRI the registry's column accepts", () => {
+  it("passes the schema of the concept index's IRI column", () => {
     const minted = conceptIriOf(ulid());
 
     expect(ids.conceptIri.safeParse(minted)).toEqual({ success: true, data: minted });
   });
 
-  it("mints only from a ULID the type has already checked", () => {
+  it("accepts only a ULID-typed value, never a plain string", () => {
     expectTypeOf(conceptIriOf).parameter(0).toEqualTypeOf<Ulid>();
     expectTypeOf<string>().not.toExtend<Ulid>();
     expectTypeOf(ulid).returns.toEqualTypeOf<Ulid>();

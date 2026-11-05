@@ -54,7 +54,7 @@ import {
 import { suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { inputOf } from "../support/suite-input.ts";
 import { objectStoreForSuite, textOf } from "../support/suite-objects.ts";
-import { answered, leaseLetLapse, readingAs, until } from "../support/suite-postgres.ts";
+import { answered, expireJobLease, readingAs, until } from "../support/suite-postgres.ts";
 import { lmdbRootUnder, workerForSuite } from "../support/worker-process.ts";
 
 const { db, bundles, arrange } = suiteWithBundles();
@@ -237,12 +237,12 @@ const addressOf = (
 
 describe("one uploaded document, read back through both tiers", () => {
   it(
-    "finds and opens the passage, sort code withheld, once published",
+    "finds and opens the passage after publish, sort code withheld",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario);
 
-      await leaseLetLapse(db().pool, { workspaceId: scenario.workspaceId, jobId: bound.jobId });
+      await expireJobLease(db().pool, { workspaceId: scenario.workspaceId, jobId: bound.jobId });
       await runTheWorker();
 
       const landed = await passagesOf(scenario.workspaceId, bound.connectedSourceId);
@@ -326,7 +326,7 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 
   it(
-    "keeps passage rows when reindexed, landing them anew once emptied",
+    "keeps passages on a reindex, rewriting them after a reprocess",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario);
@@ -382,7 +382,7 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 
   it(
-    "serves a kept span until an erasure names it",
+    "shows a kept span until an erasure lists its text",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario, "kept-handbook.md");
@@ -483,13 +483,13 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 
   it(
-    "keeps a mid-sync narrowing, and a later one to groups",
+    "applies a narrowing made mid-sync, and a later group narrowing",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario);
 
       const running = runTheWorker();
-      // BA-298: on a dead worker this still waits out `until` before `running` names the cause.
+      // BA-298: if the worker dies, `until` still waits out its timeout before `running` reports why.
       await until(async () => (await statusOf(scenario.workspaceId, bound.jobId)) === "claimed");
       answered(
         await acting(scenario.admin, (admin, tx) =>
@@ -562,7 +562,7 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 
   it(
-    "spares one source's passages and store when another is wiped",
+    "keeps one source's passages and findings when another is wiped",
     async () => {
       const scenario = await arrange();
       const kept = await boundHandbook(scenario, "the-handbook-that-stays.md");
@@ -677,9 +677,9 @@ const normalisedCopyOf = async (scenario: Scenario, documentId: string): Promise
   return textOf(copy.value);
 };
 
-describe("an erasure over a bound document, read through both tiers", () => {
+describe("an erasure of a connected source's document, through both tiers", () => {
   it(
-    "erases the subject everywhere, and a second sync changes nothing",
+    "erases the subject everywhere, and a second run finds nothing",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario, "claims-handbook.md", THE_HANDBOOK_NAMING_ANN);
@@ -724,9 +724,9 @@ describe("an erasure over a bound document, read through both tiers", () => {
 const A_SICK_NOTE =
   "# Absence\n\nThe team lead is on long-term sick leave after a diabetes diagnosis.\n";
 
-describe("a special-category verdict, followed through both tiers", () => {
+describe("a special-category dismissal, followed through both tiers", () => {
   it(
-    "widens a concept on the tick after a dismissal's sync",
+    "widens the citing concept at the cascade after the sync",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario, "absence.md", A_SICK_NOTE);

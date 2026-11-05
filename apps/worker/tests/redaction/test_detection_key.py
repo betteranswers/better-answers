@@ -15,20 +15,16 @@ from better_answers_worker.redaction.detection_key import (
 )
 from better_answers_worker.redaction.pins import RULE_VERSION
 
-WHAT_THE_DETECTOR_READS_OF_A_CATEGORY = frozenset(
-    {"raised_by", "threshold", "context", "cues"}
-)
+DETECTOR_FIELDS = frozenset({"raised_by", "threshold", "context", "cues"})
 
 
-WHAT_ONLY_THE_RULE_VERSION_STANDS_FOR = frozenset(
-    {"category", "tier", "placeholder", "narrows_to"}
-)
+POLICY_FIELDS = frozenset({"category", "tier", "placeholder", "narrows_to"})
 
 
-THE_ENGINE_S_OWN_IN_THE_KEY = frozenset({"GLINER_LABELS"})
+ENGINE_CONSTANTS_IN_KEY = frozenset({"GLINER_LABELS"})
 
 
-THE_ENGINE_S_OWN_CARRIED_BY_THE_PIN_OR_THE_RULES = frozenset(
+ENGINE_CONSTANTS_COVERED_BY_PIN_OR_RULES = frozenset(
     {
         "ANALYSED_ENTITIES",
         "CATEGORY_BY_ENTITY",
@@ -41,18 +37,18 @@ THE_ENGINE_S_OWN_CARRIED_BY_THE_PIN_OR_THE_RULES = frozenset(
 )
 
 
-THE_ENGINE_S_OWN_READ_AFTER_THE_DETECTOR = frozenset({"ALWAYS_TIER", "TIER_PRECEDENCE"})
+ENGINE_CONSTANTS_READ_AFTER_DETECTION = frozenset({"ALWAYS_TIER", "TIER_PRECEDENCE"})
 
 
-THE_DETECTOR_S_OWN_IN_THE_KEY = frozenset(
+DETECTOR_CONSTANTS_IN_KEY = frozenset(
     {"PHONE_LENIENCY", "PHONE_REGIONS", "WINDOWS_A_RUN_IS_READ_WHOLE_IN"}
 )
 
 
-THE_DETECTOR_S_OWN_OUTSIDE_THE_KEY = frozenset({"MODEL_RULE_NAME", "RECOGNISERS"})
+DETECTOR_CONSTANTS_OUTSIDE_KEY = frozenset({"MODEL_RULE_NAME", "RECOGNISERS"})
 
 
-THE_TYPE_CHECKER_S_OWN = frozenset({"TYPE_CHECKING"})
+TYPE_CHECKING_CONSTANTS = frozenset({"TYPE_CHECKING"})
 
 
 def key_over(
@@ -66,7 +62,7 @@ def category_called(category: str) -> CategoryDescriptor:
     return next(item for item in DESCRIPTORS if item.category == category)
 
 
-def the_table_with(moved: CategoryDescriptor) -> tuple[CategoryDescriptor, ...]:
+def descriptors_with(moved: CategoryDescriptor) -> tuple[CategoryDescriptor, ...]:
     return tuple(
         moved if item.category == moved.category else item for item in DESCRIPTORS
     )
@@ -78,10 +74,10 @@ def constants_of(module: object) -> set[str]:
     }
 
 
-THE_FIRST_CATEGORY = DESCRIPTORS[0]
+FIRST_CATEGORY = DESCRIPTORS[0]
 
 
-def test_pins_the_key_beside_the_rule_version() -> None:
+def test_detection_key_and_rule_version_are_pinned() -> None:
 
     assert detection_key() == (
         "dc180502a0092bddf484da4199800e7c3b0e755af6bc8d8b152e4f3f420c6b8b"
@@ -89,42 +85,38 @@ def test_pins_the_key_beside_the_rule_version() -> None:
     assert RULE_VERSION == "7"
 
 
-def test_each_category_field_belongs_to_the_detector_or_policy_alone() -> None:
+def test_each_category_field_is_detector_input_or_policy_only() -> None:
 
     declared = {field.name for field in fields(CategoryDescriptor)}
 
-    assert declared == (
-        WHAT_THE_DETECTOR_READS_OF_A_CATEGORY | WHAT_ONLY_THE_RULE_VERSION_STANDS_FOR
-    )
-    assert WHAT_THE_DETECTOR_READS_OF_A_CATEGORY.isdisjoint(
-        WHAT_ONLY_THE_RULE_VERSION_STANDS_FOR
-    )
+    assert declared == (DETECTOR_FIELDS | POLICY_FIELDS)
+    assert DETECTOR_FIELDS.isdisjoint(POLICY_FIELDS)
 
 
-def test_moving_a_category_to_default_on_re_reads_no_page() -> None:
+def test_changing_a_category_tier_keeps_the_detection_key() -> None:
 
-    assert THE_FIRST_CATEGORY.tier == "always"
+    assert FIRST_CATEGORY.tier == "always"
 
-    moved = replace(THE_FIRST_CATEGORY, tier="default-on")
+    moved = replace(FIRST_CATEGORY, tier="default-on")
 
-    assert key_over(the_table_with(moved)) == detection_key()
-
-
-def test_rewording_a_placeholder_re_reads_no_page() -> None:
-
-    moved = replace(THE_FIRST_CATEGORY, placeholder="[kept back]")
-
-    assert key_over(the_table_with(moved)) == detection_key()
+    assert key_over(descriptors_with(moved)) == detection_key()
 
 
-def test_changing_a_categorys_narrowing_re_reads_no_page() -> None:
+def test_rewording_a_placeholder_keeps_the_detection_key() -> None:
 
-    moved = replace(THE_FIRST_CATEGORY, narrows_to="Internal")
+    moved = replace(FIRST_CATEGORY, placeholder="[kept back]")
 
-    assert key_over(the_table_with(moved)) == detection_key()
+    assert key_over(descriptors_with(moved)) == detection_key()
 
 
-def test_renaming_every_category_in_the_table_re_reads_no_page() -> None:
+def test_changing_a_category_narrowing_keeps_the_detection_key() -> None:
+
+    moved = replace(FIRST_CATEGORY, narrows_to="Internal")
+
+    assert key_over(descriptors_with(moved)) == detection_key()
+
+
+def test_renaming_every_category_keeps_the_detection_key() -> None:
 
     renamed = tuple(
         replace(descriptor, category=f"a-category-{at}")
@@ -134,35 +126,35 @@ def test_renaming_every_category_in_the_table_re_reads_no_page() -> None:
     assert key_over(renamed) == detection_key()
 
 
-def test_moving_a_threshold_re_reads_every_page() -> None:
+def test_changing_a_threshold_changes_the_detection_key() -> None:
 
-    moved = replace(THE_FIRST_CATEGORY, threshold=0.55)
+    moved = replace(FIRST_CATEGORY, threshold=0.55)
 
-    assert key_over(the_table_with(moved)) != detection_key()
+    assert key_over(descriptors_with(moved)) != detection_key()
 
 
-def test_moving_a_context_lemma_re_reads_every_page() -> None:
+def test_context_lemmas_change_the_key_but_their_order_does_not() -> None:
     bank_details = category_called("bank-details")
     lemmas = bank_details.context
 
     gained = replace(bank_details, context=(*lemmas, "iban"))
     reordered = replace(bank_details, context=lemmas[::-1])
 
-    assert key_over(the_table_with(gained)) != detection_key()
-    assert key_over(the_table_with(reordered)) == detection_key()
+    assert key_over(descriptors_with(gained)) != detection_key()
+    assert key_over(descriptors_with(reordered)) == detection_key()
 
 
-def test_moving_a_cue_re_reads_every_page() -> None:
-    cues = THE_FIRST_CATEGORY.cues
+def test_cues_change_the_key_but_their_order_does_not() -> None:
+    cues = FIRST_CATEGORY.cues
 
-    gained = replace(THE_FIRST_CATEGORY, cues=(*cues, "unwell"))
-    reordered = replace(THE_FIRST_CATEGORY, cues=cues[::-1])
+    gained = replace(FIRST_CATEGORY, cues=(*cues, "unwell"))
+    reordered = replace(FIRST_CATEGORY, cues=cues[::-1])
 
-    assert key_over(the_table_with(gained)) != detection_key()
-    assert key_over(the_table_with(reordered)) == detection_key()
+    assert key_over(descriptors_with(gained)) != detection_key()
+    assert key_over(descriptors_with(reordered)) == detection_key()
 
 
-def test_a_lemma_the_model_never_sees_re_reads_no_page() -> None:
+def test_lemmas_on_a_model_raised_category_keep_the_detection_key() -> None:
     job_title = category_called("job-title")
     raised = {item.rule_id: item for item in what_the_detector_reads().rules}
 
@@ -172,24 +164,24 @@ def test_a_lemma_the_model_never_sees_re_reads_no_page() -> None:
 
     moved = replace(job_title, context=("grade", "rank"))
 
-    assert key_over(the_table_with(moved)) == detection_key()
+    assert key_over(descriptors_with(moved)) == detection_key()
 
 
-def test_moving_the_consumer_domain_list_re_reads_every_page() -> None:
+def test_changing_the_consumer_domains_changes_the_detection_key() -> None:
 
     assert (
         key_over(consumer_domains=CONSUMER_DOMAINS | {"example.com"}) != detection_key()
     )
 
 
-def test_swapping_a_rules_recogniser_re_reads_every_page() -> None:
+def test_changing_what_raises_a_category_changes_the_detection_key() -> None:
 
-    moved = replace(THE_FIRST_CATEGORY, raised_by=("PERSON",))
+    moved = replace(FIRST_CATEGORY, raised_by=("PERSON",))
 
-    assert key_over(the_table_with(moved)) != detection_key()
+    assert key_over(descriptors_with(moved)) != detection_key()
 
 
-def test_a_recogniser_s_own_pattern_and_flags_reach_the_key() -> None:
+def test_recogniser_patterns_and_flags_are_in_the_detection_key() -> None:
     read = dict(what_the_detector_reads().literals)
 
     assert read["A_POSTCODE"] == r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b flags=32"
@@ -199,7 +191,7 @@ def test_a_recogniser_s_own_pattern_and_flags_reach_the_key() -> None:
     assert re.compile("a", re.DOTALL).flags == 48
 
 
-def test_the_window_rule_s_own_numbers_reach_the_key() -> None:
+def test_window_rule_numbers_are_in_the_detection_key() -> None:
     read = dict(what_the_detector_reads().window_rule)
 
     assert read["WINDOWS_A_RUN_IS_READ_WHOLE_IN"] == "2"
@@ -207,7 +199,7 @@ def test_the_window_rule_s_own_numbers_reach_the_key() -> None:
     assert read["chunk_overlap"] == "50"
 
 
-def test_the_converter_pin_is_in_no_detection_key() -> None:
+def test_the_converter_pin_is_not_in_the_detection_key() -> None:
 
     read = canonically(what_the_detector_reads())
 
@@ -216,42 +208,42 @@ def test_the_converter_pin_is_in_no_detection_key() -> None:
     assert "pdf-inspector" not in read
 
 
-def test_reads_every_recogniser_literal_except_the_officers_own() -> None:
+def test_key_includes_every_recogniser_constant_and_no_officer_constant() -> None:
     named = {name for name, _ in DETECTOR_LITERALS}
 
-    held = constants_of(recognisers)
+    defined = constants_of(recognisers)
 
     assert set(RAISED_AFTER_THE_DETECTOR) <= constants_of(officers)
-    assert held == named & held
+    assert defined == named & defined
     assert named.isdisjoint(RAISED_AFTER_THE_DETECTOR)
 
 
-def test_places_every_engine_constant_on_one_side_of_the_key() -> None:
-    held = constants_of(engine)
+def test_every_engine_constant_is_listed_as_inside_or_outside_key() -> None:
+    defined = constants_of(engine)
     in_the_key = {name for name, _ in DETECTOR_LITERALS} | {
         name for name, _ in what_the_detector_reads().window_rule
     }
 
-    assert held == (
-        THE_ENGINE_S_OWN_IN_THE_KEY
-        | THE_ENGINE_S_OWN_CARRIED_BY_THE_PIN_OR_THE_RULES
-        | THE_ENGINE_S_OWN_READ_AFTER_THE_DETECTOR
-        | THE_TYPE_CHECKER_S_OWN
+    assert defined == (
+        ENGINE_CONSTANTS_IN_KEY
+        | ENGINE_CONSTANTS_COVERED_BY_PIN_OR_RULES
+        | ENGINE_CONSTANTS_READ_AFTER_DETECTION
+        | TYPE_CHECKING_CONSTANTS
     )
-    assert held & in_the_key == THE_ENGINE_S_OWN_IN_THE_KEY
+    assert defined & in_the_key == ENGINE_CONSTANTS_IN_KEY
     assert in_the_key.isdisjoint(
-        THE_ENGINE_S_OWN_CARRIED_BY_THE_PIN_OR_THE_RULES
-        | THE_ENGINE_S_OWN_READ_AFTER_THE_DETECTOR
-        | THE_TYPE_CHECKER_S_OWN
+        ENGINE_CONSTANTS_COVERED_BY_PIN_OR_RULES
+        | ENGINE_CONSTANTS_READ_AFTER_DETECTION
+        | TYPE_CHECKING_CONSTANTS
     )
 
 
-def test_places_every_detector_constant_on_one_side_of_the_key() -> None:
-    held = constants_of(detector)
+def test_every_detector_constant_is_listed_as_inside_or_outside_key() -> None:
+    defined = constants_of(detector)
     in_the_key = {name for name, _ in DETECTOR_LITERALS} | {
         name for name, _ in what_the_detector_reads().window_rule
     }
 
-    assert held == THE_DETECTOR_S_OWN_IN_THE_KEY | THE_DETECTOR_S_OWN_OUTSIDE_THE_KEY
-    assert held & in_the_key == THE_DETECTOR_S_OWN_IN_THE_KEY
-    assert in_the_key.isdisjoint(THE_DETECTOR_S_OWN_OUTSIDE_THE_KEY)
+    assert defined == DETECTOR_CONSTANTS_IN_KEY | DETECTOR_CONSTANTS_OUTSIDE_KEY
+    assert defined & in_the_key == DETECTOR_CONSTANTS_IN_KEY
+    assert in_the_key.isdisjoint(DETECTOR_CONSTANTS_OUTSIDE_KEY)

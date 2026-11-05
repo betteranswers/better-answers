@@ -54,7 +54,7 @@ describe("the erasure report", () => {
     );
   });
 
-  it("sets each paragraph apart with one blank line", () => {
+  it("separates paragraphs with one blank line", () => {
     expect(NOTHING_DONE.split("\n\n").map((paragraph) => paragraph.slice(0, 20))).toEqual([
       "Erasure report for s",
       "Every actor identifi",
@@ -70,7 +70,7 @@ describe("the erasure report", () => {
     expect(NOTHING_DONE.endsWith("None have been issued.\n")).toBe(true);
   });
 
-  it("says its anchor is the lock, not the last dump", () => {
+  it("anchors on the erasure lock, not on the last dump", () => {
     expect(NOTHING_DONE).toContain(
       "The anchor above is the instant this routine took the erasure lock, not the stamp of the " +
         "last dump before it: this routine reads no backup record, so the last dump precedes the anchor and " +
@@ -97,7 +97,7 @@ describe("the erasure report", () => {
   it.each([
     ["nothing", NOTHING_DONE],
     ["everything", EVERYTHING_DONE],
-  ])("says the identifiers are withheld from documents, having done %s", (_, report) => {
+  ])("says documents withhold the identifiers when the routine did %s", (_, report) => {
     expect(report).toContain(
       "The original files in the object store are untouched; the identifiers named in this request " +
         "are withheld from the text of every document in this workspace, those held now and those " +
@@ -110,7 +110,7 @@ describe("the erasure report", () => {
   it.each([
     ["nothing", NOTHING_DONE],
     ["everything", EVERYTHING_DONE],
-  ])("says invitations are deleted wherever sent, having done %s", (_, report) => {
+  ])("says invitations are deleted everywhere when the routine did %s", (_, report) => {
     expect(report).toContain(
       "Invitations sent to the address a person signs in with are deleted wherever they were sent, " +
         "by the request that erases them from their last workspace; the invitation line above counts this " +
@@ -121,14 +121,14 @@ describe("the erasure report", () => {
   it.each([
     ["nothing", NOTHING_DONE],
     ["everything", EVERYTHING_DONE],
-  ])("says when a sign-in identity is removed, having done %s", (_, report) => {
+  ])("explains sign-in identity removal when the routine did %s", (_, report) => {
     expect(report).toContain(
       "A person's sign-in identity is removed from the platform by the request that erases " +
         "them from their last workspace.",
     );
   });
 
-  it("says so plainly when no concept body names the person", () => {
+  it("says none when no concept body names the person", () => {
     expect(linesOf(NOTHING_DONE, "Names inside concept bodies, for the owner to edit:")).toEqual([
       "None: no concept body names this person.",
     ]);
@@ -140,7 +140,7 @@ describe("the erasure report", () => {
     );
   });
 
-  it("words each family in map order, its fields sorted", () => {
+  it("lists each family in map order with its counts sorted", () => {
     expect(
       linesOf(EVERYTHING_DONE, "Where this person was held, and what the routine did:"),
     ).toEqual([
@@ -150,7 +150,7 @@ describe("the erasure report", () => {
     ]);
   });
 
-  it("says nothing recorded for a mapped family left untouched", () => {
+  it("reports nothing recorded for a mapped family with no action", () => {
     expect(
       linesOf(
         reportOf({ map: mapOf("concept-file", "bundle-commit"), actions: { "bundle-commit": {} } }),

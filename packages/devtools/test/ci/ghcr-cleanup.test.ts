@@ -242,7 +242,7 @@ const registryOf = (packages: ReadonlyMap<string, Package>) => {
     const found = (group: string): string => groups[group] ?? "";
     const fixture = packages.get(found("tier"));
     if (route === undefined || fixture === undefined)
-      throw new Error(`nothing answers ${method} ${url}`);
+      throw new Error(`the stand-in registry has no route for ${method} ${url}`);
     return route.answer(fixture, found);
   };
 
@@ -436,7 +436,7 @@ describe("the weekly deletion of old BuildKit cache manifests", () => {
     },
     { limit: "a secondary rate limit", answer: { status: 403, headers: { "retry-after": "60" } } },
     { limit: "a 429", answer: { status: 429 } },
-  ])("stops deleting at $limit, failing nothing", async ({ answer }) => {
+  ])("stops deleting at $limit without failing", async ({ answer }) => {
     const run = await runAgainst(onePackage({ listing: EVERY_KIND, deletes: () => answer }));
 
     expect(run.failed).toBe(false);
@@ -458,7 +458,7 @@ describe("the weekly deletion of old BuildKit cache manifests", () => {
     );
   });
 
-  it("names a package it cannot list, and reads the next", async () => {
+  it("reports a package it cannot list, then reads the next", async () => {
     const run = await runAgainst(
       new Map([
         ["api", { listing: [], listed: 403 }],
@@ -513,7 +513,7 @@ const SCRIPT = "scripts/ghcr-cleanup.mjs";
 
 const stepOf = (steps: readonly ImageStep[], holds: (step: ImageStep) => boolean): ImageStep => {
   const found = steps.find(holds);
-  if (found === undefined) throw new Error("no step of ghcr-cleanup.yml's job matches");
+  if (found === undefined) throw new Error("ghcr-cleanup.yml's job has no matching step");
   return found;
 };
 
@@ -533,7 +533,7 @@ const MUTATION_MINUTES = 150;
 const SCAN_MINUTES = 30;
 
 describe("the workflow that deletes the cache manifests", () => {
-  it("reads the tiers from build.yml where scan.yml does", () => {
+  it("reads the tiers from build.yml at scan.yml's path", () => {
     const scanPath = yqPathIn(readWorkflow("scan.yml", scanTiersSchema).jobs.tiers.steps);
     const tiers = stepOf(cleanupSteps(), (step) => step.id === "tiers");
 
@@ -563,7 +563,7 @@ describe("the workflow that deletes the cache manifests", () => {
     expect(cleaning.minute).toBeGreaterThanOrEqual(startOf("scan.yml").minute + SCAN_MINUTES);
   });
 
-  it("grants its job contents read and packages write alone", () => {
+  it("grants its job only contents read and packages write", () => {
     expect(cleanupWorkflow().permissions).toEqual({ contents: "read" });
     expect(cleanupWorkflow().jobs["cache-manifests"].permissions).toEqual({
       contents: "read",
@@ -571,7 +571,7 @@ describe("the workflow that deletes the cache manifests", () => {
     });
   });
 
-  it("checks out the script, which imports Node's built-ins alone", () => {
+  it("checks out the script, which imports only Node's built-ins", () => {
     const checkout = stepOf(
       cleanupSteps(),
       (step) => step.uses?.startsWith("actions/checkout@") === true,

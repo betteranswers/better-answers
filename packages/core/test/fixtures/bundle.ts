@@ -12,7 +12,10 @@ import { removeBundleRoot } from "./bundle-root.ts";
 
 const run = promisify(execFile);
 
-/** Git's one seam inside a commit: a hook that parks a ref update, or refuses it, on a file. */
+/**
+ * Git runs no other hook inside a commit. The hook holds a ref update while `park` exists and
+ * refuses it while `refuse` exists.
+ */
 export const gatingRefUpdates = async (door: GitDoor, workspaceId: string) => {
   const repository = path.join(door.root, `${workspaceId}.git`);
   const gate = path.join(repository, "gate");
@@ -161,8 +164,8 @@ export const divergeHistory = (door: GitDoor, workspaceId: string): Promise<stri
   emptyRootCommit(door, workspaceId, "elsewhere");
 
 /**
- * Leaves the lock a writer in another process holds while it moves `main`, so the next ref move
- * here loses. Hands back the release.
+ * Creates `main.lock` as another process's writer would, so the next ref update here fails. Returns
+ * a function that removes the lock.
  */
 export const holdMainRef = async (
   door: GitDoor,

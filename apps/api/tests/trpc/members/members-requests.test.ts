@@ -61,7 +61,7 @@ describe("the waiting access requests over tRPC", () => {
     ]);
   });
 
-  it("never lists another workspace's requests to its Admin", async () => {
+  it("never lists another workspace's requests", async () => {
     await anAdminWithOneRequest();
     const elsewhere = await app().provision();
     const { api } = await webSignedIn(app(), elsewhere.admin.email);
@@ -71,7 +71,7 @@ describe("the waiting access requests over tRPC", () => {
 });
 
 describe("approving an access request over tRPC", () => {
-  it("emails the requester a week-long invitation at the role", async () => {
+  it("emails the requester a seven-day invitation at the chosen role", async () => {
     const { api, requester, requestId } = await anAdminWithOneRequest();
 
     const approved = await api.members.approveRequest.mutate({ requestId, role: "Editor" });
@@ -106,7 +106,7 @@ describe("approving an access request over tRPC", () => {
     ]);
   });
 
-  it("refuses a role outside the three, inviting nobody", async () => {
+  it("refuses an unknown role with no-such-role, inviting nobody", async () => {
     const { api, requester, requestId } = await anAdminWithOneRequest();
 
     const refused = await refusalOfCall(
@@ -121,7 +121,7 @@ describe("approving an access request over tRPC", () => {
     expect(await api.members.requests.query()).toMatchObject([{ id: requestId }]);
   });
 
-  it("refuses a request decided already, already-decided", async () => {
+  it("refuses a decided request with already-decided", async () => {
     const { api, requester, requestId } = await anAdminWithOneRequest();
     await api.members.declineRequest.mutate({ requestId });
 
@@ -135,7 +135,7 @@ describe("approving an access request over tRPC", () => {
     expect(emailsTo(app(), requester.email)).toEqual([]);
   });
 
-  it("refuses an id no request carries, no-such-request", async () => {
+  it("refuses an unknown request id with no-such-request", async () => {
     const { api } = await anAdminWithOneRequest();
 
     const refused = await refusalOfCall(
@@ -147,7 +147,7 @@ describe("approving an access request over tRPC", () => {
     });
   });
 
-  it("refuses an id of no known form, malformed", async () => {
+  it("refuses an id that is not a ULID as malformed", async () => {
     const { api } = await anAdminWithOneRequest();
 
     const refused = await refusalOfCall(
@@ -161,7 +161,7 @@ describe("approving an access request over tRPC", () => {
 });
 
 describe("declining an access request over tRPC", () => {
-  it("records the decline, which leaves the list, emailing nobody", async () => {
+  it("records the decline and drops the request, emailing nobody", async () => {
     const { api, requester, requestId } = await anAdminWithOneRequest();
 
     const declined = await api.members.declineRequest.mutate({ requestId });
@@ -178,7 +178,7 @@ describe("declining an access request over tRPC", () => {
 });
 
 describe("an approval's invitation email", () => {
-  it("is sent after the commit, never for a failed approval", async () => {
+  it("is not sent when the approval fails to commit", async () => {
     const { api, requester, requestId } = await anAdminWithOneRequest();
 
     const failed = await whileCommitsAreRefused(app(), "invitation", () =>
@@ -192,7 +192,7 @@ describe("an approval's invitation email", () => {
     expect(await eventsOn(app(), requestId)).toEqual(["people.request.asked"]);
   });
 
-  it("stands when it did not go, and a resend recovers", async () => {
+  it("keeps the invitation when its email fails, ready to resend", async () => {
     const { api, requester, requestId } = await anAdminWithOneRequest();
     unreachable.add(requester.email);
 
@@ -214,7 +214,7 @@ describe("an approval's invitation email", () => {
     );
   });
 
-  it("an approval counts nothing, so its failure returns nothing", async () => {
+  it("a failed approval email frees no room under the limit", async () => {
     const { api, requester, requestId } = await anAdminWithOneRequest();
     stopTheClock();
     for (let invite = 0; invite < PER_ADDRESS_CEILING; invite += 1) {
@@ -244,7 +244,7 @@ const VERBS: readonly Verb[] = [
 const DECISIONS = VERBS.filter(([verb]) => verb !== "list");
 
 describe("who may read and decide access requests", () => {
-  it.each(VERBS)("refuses an Editor and a Viewer the %s verb", async (_verb, call) => {
+  it.each(VERBS)("refuses Editors and Viewers the %s action", async (_verb, call) => {
     const { workspace, requestId } = await anAdminWithOneRequest();
 
     const answered = await answeredBelowAdmin(app(), workspace.workspaceId, (api) =>
@@ -259,7 +259,7 @@ describe("who may read and decide access requests", () => {
     expect(await eventsOn(app(), requestId)).toEqual(["people.request.asked"]);
   });
 
-  it.each(VERBS)("refuses an Admin elsewhere pointed here the %s verb", async (_verb, call) => {
+  it.each(VERBS)("refuses %s to a non-member whose session points here", async (_verb, call) => {
     const { workspace, requestId } = await anAdminWithOneRequest();
 
     const answered = await answeredToAnAdminPointedHere(app(), workspace.workspaceId, (api) =>
@@ -273,7 +273,7 @@ describe("who may read and decide access requests", () => {
   });
 
   it.each(DECISIONS)(
-    "refuses an Admin elsewhere the %s verb on this request",
+    "answers no-such-request when another workspace's Admin tries to %s",
     async (_verb, call) => {
       const { requester, requestId } = await anAdminWithOneRequest();
       const elsewhere = await app().provision();

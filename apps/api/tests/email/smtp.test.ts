@@ -45,7 +45,7 @@ const loopbackRelay = async () => {
   const sockets: Socket[] = [];
   const relay = createServer((socket) => {
     sockets.push(socket);
-    // A connection the transport drops at teardown is no fault of the sender's.
+    // Teardown destroys open connections, so a socket error here is expected.
     socket.on("error", () => socket.destroy());
     converse(socket, () => arrivedAtMs.push(performance.now()));
   });
@@ -106,12 +106,12 @@ describe("the SMTP sender", () => {
     ]);
   });
 
-  it("hands a relay's non-error refusal on as an error", async () => {
+  it("rejects with an Error for a relay's string refusal", async () => {
     const transport = createTransport({
       name: "refusing",
       version: "1",
       send: (_mail, callback) => {
-        // @ts-expect-error -- a relay that refuses with a string, which the callback's type forbids
+        // @ts-expect-error -- the callback's type does not allow a string refusal
         callback("550 mailbox unavailable");
       },
     });
@@ -126,7 +126,7 @@ describe("the SMTP sender", () => {
     expect(refused).toMatchObject({ message: "550 mailbox unavailable" });
   });
 
-  it("refuses every send when no transport is configured", async () => {
+  it("rejects and logs every send when no transport is configured", async () => {
     const { logger, logs } = capturingLogger();
     const send = emailSender(undefined, SENDER, logger);
 
@@ -140,7 +140,7 @@ describe("the SMTP sender", () => {
 });
 
 describe("the paced transport", () => {
-  it("sends five emails in a second and holds the sixth", async () => {
+  it("sends five emails within one second and delays the sixth", async () => {
     const { relay, send } = await pacedThroughLoopback();
     const startedMs = performance.now();
 
@@ -151,7 +151,7 @@ describe("the paced transport", () => {
     expect(inFirstSecond).toHaveLength(5);
   });
 
-  it("carries six emails over two connections", async () => {
+  it("sends six emails over two SMTP connections", async () => {
     const { relay, send } = await pacedThroughLoopback();
 
     await Promise.all(sixAddresses.map((to) => send({ to, subject: "S", text: "T" })));
@@ -159,7 +159,7 @@ describe("the paced transport", () => {
     expect(relay.sockets).toHaveLength(2);
   });
 
-  it("still throws a refused email, and sends the next", async () => {
+  it("rejects a refused email and still sends the next one", async () => {
     const { relay, send } = await pacedThroughLoopback();
 
     await expect(send({ to: REFUSED, subject: "S", text: "T" })).rejects.toThrow(/550/);

@@ -37,7 +37,7 @@ export const toolAnswered = async (
 ): Promise<Rpc> => {
   const response = await callMcp(client, token, "tools/call", { name, arguments: args });
   const text = await response.text();
-  /** The surface answers an event stream, and the tool's answer is its last frame. */
+  /** The MCP endpoint answers an event stream. The tool's result is its last `data:` line. */
   const streamed = [...text.matchAll(/^data:(.*)$/gm)].at(-1)?.[1];
   const body = rpcOf(JSON.parse(streamed ?? text));
   expect(body["error"]).toBeUndefined();

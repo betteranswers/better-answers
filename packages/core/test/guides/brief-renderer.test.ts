@@ -29,7 +29,7 @@ describe("rendering a Brief for the page", () => {
     ]);
   });
 
-  it("renumbers markers past a missing footnote, leaving no gap", () => {
+  it("renumbers markers after a missing footnote, leaving no gap", () => {
     const rendered = renderBrief(
       "One[^a] two[^gone] three[^c].",
       [footnote("a", "Alpha"), footnote("c", "Gamma")],
@@ -50,7 +50,7 @@ describe("rendering a Brief for the page", () => {
     expect(rendered.footnotes.map((each) => each.title)).toEqual(["Beta", "Alpha"]);
   });
 
-  it("lists no footnote for an include the prose never places", () => {
+  it("lists no footnote for an include the prose never cites", () => {
     const rendered = renderBrief("No markers here.", FOOTNOTES, "page");
 
     expect(rendered).toEqual({ markdown: "No markers here.", footnotes: [] });
@@ -66,7 +66,7 @@ describe("rendering a Brief for the page", () => {
 describe("rendering a Brief for the clipboard", () => {
   const FOR_PASTE = [sourced("a", "Alpha"), sourced("b", "Beta"), sourced("c", "Gamma")];
 
-  it("the clipboard profile carries no trust word", () => {
+  it("omits trust words from the clipboard output", () => {
     const rendered = renderBrief(
       "We are **insured**[^b] and audited[^a].",
       [
@@ -95,7 +95,7 @@ describe("rendering a Brief for the clipboard", () => {
     expect(rendered.html + rendered.text).not.toMatch(TRUST_WORDS);
   });
 
-  it("every clipboard number has a Sources entry", () => {
+  it("gives every clipboard number a Sources entry", () => {
     const rendered = renderBrief(
       "One[^c] two[^gone] three[^a] four[^c] five[^b].",
       FOR_PASTE,
@@ -114,14 +114,14 @@ describe("rendering a Brief for the clipboard", () => {
     );
   });
 
-  it("drops a forged number with no footnote behind it", () => {
+  it("drops a typed number that has no footnote behind it", () => {
     const rendered = renderBrief("Real[^a] forged&#xE000;9&#xE001; done.", FOR_PASTE, "clipboard");
 
     expect(rendered.html).toContain("Real<sup>1</sup> forged done.");
     expect(rendered.html).not.toContain("<sup>9</sup>");
   });
 
-  it("names a missing source and omits platform addresses", () => {
+  it("names a missing source and leaves out platform addresses", () => {
     const rendered = renderBrief(
       "Claim[^a].",
       [
@@ -146,7 +146,7 @@ describe("rendering a Brief for the clipboard", () => {
     ).toBe("Claim[1].\n\nSources\n[1] Staff headcount. No source recorded.");
   });
 
-  it("keeps lists and safe links, shows raw markup as text", () => {
+  it("keeps lists and safe links, rendering raw markup as text", () => {
     const rendered = renderBrief(
       [
         "- first[^a]",
@@ -190,7 +190,7 @@ describe("rendering a Brief for a snapshot", () => {
     );
   });
 
-  it("drops a marker and title the reader may not read", () => {
+  it("drops a marker and title the reader cannot read", () => {
     const rendered = renderBrief(
       "One[^a] two[^withheld] three[^a].",
       [sourced("a", "Alpha")],

@@ -86,7 +86,7 @@ describe("the mutation summary", () => {
     );
   });
 
-  it("says there are none when every survivor already survived", () => {
+  it("says none when every survivor also survived in the baseline", () => {
     const both = report(SOURCE, [
       mutant("ArithmeticOperator", "n - 1", PLUS, "Killed", 1),
       mutant("StringLiteral", '""', LABEL, "Survived", 1),
@@ -119,7 +119,7 @@ describe("the mutation summary", () => {
     );
   });
 
-  it("pairs two identical spans by position, whatever the report's order", () => {
+  it("pairs two identical spans by position, in any report order", () => {
     const baseline = report(SOURCE_TWICE, [
       mutant("StringLiteral", '""', FIRST_USER, "Killed", 1),
       mutant("StringLiteral", '""', SECOND_USER, "Survived", 1),
@@ -176,7 +176,7 @@ describe("the mutation summary", () => {
     );
   });
 
-  it("calls an untested row a runner fault, not a survivor", () => {
+  it("reports an untested mutant as a runner fault", () => {
     const baseline = report(SOURCE, [
       mutant("StringLiteral", '""', LABEL, "Survived", 0),
       mutant("StringLiteral", '""', OTHER, "Survived", 0),
@@ -212,7 +212,7 @@ describe("the mutation summary", () => {
     expect(fault).toBe(
       "api runner fault: 1 of its 3 covered mutants ran no test — no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again",
     );
-    assert(fault !== undefined, "a runner fault is named");
+    assert(fault !== undefined, "the summary named no runner fault");
     expect(summary.startsWith(`### ${fault}\n### api mutation score: 66.7%`)).toBe(true);
   });
 

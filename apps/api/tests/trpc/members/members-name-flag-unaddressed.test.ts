@@ -13,8 +13,8 @@ afterAll(async () => {
   await app.stop();
 });
 
-describe("a platform where no person carries the operator mark", () => {
-  it("answers alike and keeps the flag, logging the missing operator", async () => {
+describe("a platform where no person is marked as operator", () => {
+  it("records the flag, answers as usual, logs the missing operator", async () => {
     const workspace = await app.provision();
     const flagged = await app.person(undefined, "Rude Name");
     await app.addMember(workspace.workspaceId, flagged.id, "Editor");

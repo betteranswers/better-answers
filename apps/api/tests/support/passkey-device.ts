@@ -8,7 +8,7 @@ const USER_PRESENT = 0x01;
 const USER_VERIFIED = 0x04;
 const CREDENTIAL_ATTACHED = 0x40;
 
-/** COSE's labels for an ES256 key on P-256, the one a platform authenticator makes. */
+/** COSE labels for an ES256 key on P-256, the key type a platform authenticator creates. */
 const COSE = { kty: 1, alg: 3, crv: -1, x: -2, y: -3, ec2: 2, es256: -7, p256: 1 } as const;
 
 const options = z.object({ challenge: z.string() });

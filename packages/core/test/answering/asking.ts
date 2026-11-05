@@ -162,7 +162,7 @@ export const asked = async (
   asking: Asking,
   told: Told = {},
 ): Promise<AnswerResult> => {
-  // Uncounted, the planner joins every node to every step, and the walk nears its timeout.
+  // Without fresh statistics, the Postgres planner joins every map node to every walk step, and the walk nears its timeout.
   await db.pool.query("ANALYZE map_node, map_edge");
   return askedAsIs(db, asker, asking, told);
 };

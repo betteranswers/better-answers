@@ -37,7 +37,7 @@ const signInsOf = async (personId: string): Promise<number> => {
 };
 
 describe("the audit log over tRPC", () => {
-  it("answers an Admin the workspace's events newest first, actors named", async () => {
+  it("lists the workspace's events newest first, naming each actor", async () => {
     const workspace = await app.provision();
     const { workspaceId, admin } = workspace;
     const unnamed = await app.person(undefined, "");
@@ -56,7 +56,7 @@ describe("the audit log over tRPC", () => {
     expect(page.nextCursor).toBeNull();
   });
 
-  it("crosses each instant as ISO-8601 text", async () => {
+  it("sends each event's time as ISO-8601 text", async () => {
     const workspace = await app.provision();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
@@ -66,7 +66,7 @@ describe("the audit log over tRPC", () => {
     expect(provisioned.at).toBe(new Date(provisioned.at).toISOString());
   });
 
-  it("answers no sign-in, which the identity-set audit log keeps", async () => {
+  it("omits sign-ins, which only the identity-set audit log records", async () => {
     const workspace = await app.provision();
     const { api } = await webSignedIn(app, workspace.admin.email);
     await webSignedIn(app, workspace.admin.email);
@@ -77,7 +77,7 @@ describe("the audit log over tRPC", () => {
     expect(page.events.map((event) => event.action)).toEqual(["platform.workspace.provisioned"]);
   });
 
-  it("answers one family, a page at a time", async () => {
+  it("pages through the events of one family", async () => {
     const workspace = await app.provision();
     const { workspaceId, admin } = workspace;
     await makeGroups(app, { workspaceId, userId: admin.id, names: ["One", "Two", "Three"] });
@@ -96,7 +96,7 @@ describe("the audit log over tRPC", () => {
     expect(rest.nextCursor).toBeNull();
   });
 
-  it("never answers an event of another workspace", async () => {
+  it("never lists another workspace's events", async () => {
     const mine = await app.provision();
     const theirs = await app.provision();
     await makeGroups(app, {
@@ -123,8 +123,8 @@ const exportsIn = async (workspaceId: string): Promise<number> => {
   return found.rows[0]?.held ?? 0;
 };
 
-describe("searching and exporting over tRPC", () => {
-  it("answers the events a search finds", async () => {
+describe("searching and exporting the audit log over tRPC", () => {
+  it("lists only the events that match a search", async () => {
     const { workspaceId, admin } = await app.provision();
     await makeGroups(app, { workspaceId, userId: admin.id, names: ["Bid writers", "Site team"] });
     const { api } = await webSignedIn(app, admin.email);
@@ -137,7 +137,7 @@ describe("searching and exporting over tRPC", () => {
     expect(page.searchTooBroad).toBe(false);
   });
 
-  it("answers an Admin the CSV text, and records the export", async () => {
+  it("exports CSV text to an Admin and records the export", async () => {
     const { workspaceId, admin } = await app.provision();
     await makeGroups(app, { workspaceId, userId: admin.id, names: ["Bid writers"] });
     const { api } = await webSignedIn(app, admin.email);
@@ -149,15 +149,18 @@ describe("searching and exporting over tRPC", () => {
     expect(await exportsIn(workspaceId)).toBe(1);
   });
 
-  it.each(["Editor", "Viewer"] as const)("refuses an export at %s, role-forbids", async (role) => {
-    const refused = await refusalToAMemberAt(app, role, (api) =>
-      api.members.exportAuditLog.mutate({}),
-    );
+  it.each(["Editor", "Viewer"] as const)(
+    "refuses an export by %s members with role-forbids",
+    async (role) => {
+      const refused = await refusalToAMemberAt(app, role, (api) =>
+        api.members.exportAuditLog.mutate({}),
+      );
 
-    expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
-  });
+      expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
+    },
+  );
 
-  it("refuses an Admin past the ceiling, recording nothing more", async () => {
+  it("refuses exports past the rate limit and records none", async () => {
     const { workspaceId, admin } = await app.provision();
     const { api } = await webSignedIn(app, admin.email);
     stopped.at = Date.now();
@@ -171,13 +174,13 @@ describe("searching and exporting over tRPC", () => {
 });
 
 describe("what the audit log refuses", () => {
-  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
+  it.each(["Editor", "Viewer"] as const)("refuses %s members with role-forbids", async (role) => {
     const refused = await refusalToAMemberAt(app, role, (api) => api.members.auditLog.query({}));
 
     expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
   });
 
-  it("refuses an Admin of another workspace pointed at this one", async () => {
+  it("refuses another workspace's Admin whose session points at this one", async () => {
     const refused = await refusalToAnotherWorkspacesAdmin(app, (api) =>
       api.members.auditLog.query({}),
     );
@@ -190,7 +193,7 @@ describe("what the audit log refuses", () => {
     ["a page of no events", { limit: 0 }],
     ["a page past fifty events", { limit: 51 }],
     ["a search past 100 characters", { search: "a".repeat(101) }],
-  ])("refuses %s, malformed", async (_asked, input) => {
+  ])("refuses %s as malformed", async (_asked, input) => {
     const refused = await refusalToTheAdmin(app, (api) => api.members.auditLog.query(input));
 
     expect(refused).toMatchObject({

@@ -9,8 +9,8 @@ import { capturingLogger } from "../support/harness/harness.ts";
 const FIRST_ID = "01K6H0A7Q3W9E2R5T8Y1U4I6O0";
 const SECOND_ID = "01K6H0A7Q3W9E2R5T8Y1U4I6O1";
 
-describe("a refusal naming items, crossing the MCP surface", () => {
-  it("answers the set's word and class alone", async () => {
+describe("crossing, given a refusal with per-item words", () => {
+  it("answers and logs only the top-level word and class", async () => {
     const { logger, logs } = capturingLogger();
 
     const answered = await crossing(

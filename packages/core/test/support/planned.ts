@@ -8,8 +8,8 @@ import type { Answered, Tx } from "../../src/store/postgres/index.ts";
 import { answered, readingAs } from "./suite-postgres.ts";
 
 /**
- * auto_explain plans the statement the call itself ran; at test size a sequential scan beats
- * every index, so it is switched off.
+ * auto_explain logs the plan of each statement the call runs. Sequential scans are off because at
+ * test size they beat every index.
  */
 const PLANNED_AS_THE_APP = [
   "-c role=app_rt",
@@ -40,7 +40,7 @@ const nodesOf = (node: PlanNode): readonly PlanNode[] => [
   ...(node.Plans ?? []).flatMap(nodesOf),
 ];
 
-/** auto_explain logs `duration: … plan:` and then the plan as one JSON object. */
+/** auto_explain logs `duration: … plan:` followed by the plan as one JSON object. */
 const nodesIn = (notice: string): readonly PlanNode[] => {
   if (!notice.startsWith("duration:")) return [];
   const logged = loggedPlan.parse(JSON.parse(notice.slice(notice.indexOf("{"))));

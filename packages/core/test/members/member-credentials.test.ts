@@ -12,7 +12,7 @@ import { endedGrants } from "../support/identity-rows.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "../support/platform.ts";
 import { inputOf } from "../support/suite-input.ts";
 import { postgresForSuite, seedingWith, whileWritesAreRefused } from "../support/suite-postgres.ts";
-import { bothHoldingTheirOwnRow, heldAs, membersSuite } from "./members-suite.ts";
+import { actingOnEachOther, heldAs, membersSuite } from "./members-suite.ts";
 
 const db = postgresForSuite();
 
@@ -60,7 +60,7 @@ const resolvedIn = async (workspace: ProvisionedWorkspace, userId: string, issue
 };
 
 describe("ending a member's sign-ins and tokens in this workspace", () => {
-  it("writes the member's instant and records the Admin revoking", async () => {
+  it("stores the revocation time and records the revoking Admin", async () => {
     const workspace = await provisionedWorkspace(db(), "Revoked");
     const viewer = await joining(workspace, "Viewer");
 
@@ -76,7 +76,7 @@ describe("ending a member's sign-ins and tokens in this workspace", () => {
     ]);
   });
 
-  it("writes no identity-set row when it ended no grant", async () => {
+  it("writes no identity-set row when no grant ended", async () => {
     const workspace = await provisionedWorkspace(db(), "NoGrant");
     const viewer = await joining(workspace, "Viewer");
 
@@ -85,7 +85,7 @@ describe("ending a member's sign-ins and tokens in this workspace", () => {
     expect(await grantsEndedAbout(viewer)).toEqual([]);
   });
 
-  it("refuses credentials issued before it here, admitting later ones", async () => {
+  it("refuses only credentials issued here before the revocation", async () => {
     const workspace = await provisionedWorkspace(db(), "RefusedHere");
     const elsewhere = await provisionedWorkspace(db(), "AdmittedThere");
     const editor = await joining(workspace, "Editor");
@@ -105,7 +105,7 @@ describe("ending a member's sign-ins and tokens in this workspace", () => {
     expect(await instantHeld(elsewhere, editor)).toBeNull();
   });
 
-  it("ends this workspace's tokens from before the instant, no other's", async () => {
+  it("ends only this workspace's tokens issued before the revocation", async () => {
     const workspace = await provisionedWorkspace(db(), "TokensHere");
     const elsewhere = await provisionedWorkspace(db(), "TokensThere");
     const editor = await joining(workspace, "Editor");
@@ -144,7 +144,7 @@ describe("ending a member's sign-ins and tokens in this workspace", () => {
     ]);
   });
 
-  it("never moves a later instant back to an earlier one", async () => {
+  it("never moves the revocation time earlier", async () => {
     const workspace = await provisionedWorkspace(db(), "Forward");
     const viewer = await joining(workspace, "Viewer");
     await revokedBy(workspace, workspace.adminUserId, viewer, AFTER);
@@ -159,7 +159,7 @@ describe("ending a member's sign-ins and tokens in this workspace", () => {
     expect(await revocationsIn(workspace)).toHaveLength(2);
   });
 
-  it("revokes the workspace's only Admin, the Admin themself", async () => {
+  it("lets the only Admin revoke their own sign-ins", async () => {
     const workspace = await provisionedWorkspace(db(), "OnlyAdmin");
     const { adminUserId } = workspace;
 
@@ -174,18 +174,21 @@ describe("ending a member's sign-ins and tokens in this workspace", () => {
 });
 
 describe("what ending a member's sign-ins and tokens refuses", () => {
-  it.each(["Editor", "Viewer"] as const)("refuses a revoker at %s, role-forbids", async (role) => {
-    const workspace = await provisionedWorkspace(db(), `Unrevoked${role}`);
-    const revoker = await joining(workspace, role);
+  it.each(["Editor", "Viewer"] as const)(
+    "refuses revocation by the %s role with role-forbids",
+    async (role) => {
+      const workspace = await provisionedWorkspace(db(), `Unrevoked${role}`);
+      const revoker = await joining(workspace, role);
 
-    const refused = await revokedBy(workspace, revoker, workspace.adminUserId);
+      const refused = await revokedBy(workspace, revoker, workspace.adminUserId);
 
-    expect(refused).toEqual({ ok: false, error: "role-forbids" });
-    expect(await instantHeld(workspace, workspace.adminUserId)).toBeNull();
-    expect(await revocationsIn(workspace)).toEqual([]);
-  });
+      expect(refused).toEqual({ ok: false, error: "role-forbids" });
+      expect(await instantHeld(workspace, workspace.adminUserId)).toBeNull();
+      expect(await revocationsIn(workspace)).toEqual([]);
+    },
+  );
 
-  it("refuses a person who is a member elsewhere alone, no-such-member", async () => {
+  it("refuses a member of only another workspace with no-such-member", async () => {
     const ours = await provisionedWorkspace(db(), "OursOnly");
     const theirs = await provisionedWorkspace(db(), "TheirsOnly");
     const elsewhere = await joining(theirs, "Viewer");
@@ -197,7 +200,7 @@ describe("what ending a member's sign-ins and tokens refuses", () => {
     expect([...(await revocationsIn(ours)), ...(await revocationsIn(theirs))]).toEqual([]);
   });
 
-  it("leaves instant and tokens unchanged when its audit event fails", async () => {
+  it("changes nothing when the audit event fails", async () => {
     const workspace = await provisionedWorkspace(db(), "Unrecorded");
     const viewer = await joining(workspace, "Viewer");
     const token = await seedingWith(db().pool, (seed) =>
@@ -221,11 +224,11 @@ describe("what ending a member's sign-ins and tokens refuses", () => {
     expect(held.rows).toEqual([{ revoked: null }]);
   });
 
-  it("answers the deadlock between two Admins revoking each other changed-meanwhile", async () => {
+  it("returns changed-meanwhile when two Admins revoke each other at once", async () => {
     const workspace = await provisionedWorkspace(db(), "RevokedAtOnce");
     const fellowAdmin = await joining(workspace, "Admin");
 
-    const answered = await bothHoldingTheirOwnRow(
+    const answered = await actingOnEachOther(
       workspace,
       [workspace.adminUserId, fellowAdmin],
       revoking,

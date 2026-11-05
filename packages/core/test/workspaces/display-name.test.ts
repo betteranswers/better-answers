@@ -36,26 +36,26 @@ const HUNDRED_ASTRAL = "𝐀".repeat(100);
 describe("the display-name rule", () => {
   it.each([
     ["a name as it is typed", "Priya Shah", "Priya Shah"],
-    ["the space around a name, trimmed", "  Priya Shah \t", "Priya Shah"],
+    ["spaces around a name, which it trims", "  Priya Shah \t", "Priya Shah"],
     ["one character", "Ö", "Ö"],
     ["an apostrophe, a hyphen and an accent", "Siân O'Brien-Smith", "Siân O'Brien-Smith"],
     ["a script other than Latin", "李小龍", "李小龍"],
-    ["a capital V, which no line break is", "Vera Lynn", "Vera Lynn"],
+    ["a capital V, which is not a vertical tab", "Vera Lynn", "Vera Lynn"],
     ["a hundred characters", HUNDRED, HUNDRED],
     ["a hundred characters, once trimmed", `  ${HUNDRED}  `, HUNDRED],
     ["a hundred characters that are two UTF-16 units each", HUNDRED_ASTRAL, HUNDRED_ASTRAL],
-  ])("takes %s", (_case, asked, taken) => {
+  ])("accepts %s", (_case, asked, taken) => {
     expect(applyDisplayNameRule(asked)).toEqual({ ok: true, value: taken });
   });
 
   it.each([
     ["nothing", "", "display-name-empty"],
-    ["spaces alone", "    ", "display-name-empty"],
-    ["line breaks and a tab alone", "\n\t\r\n", "display-name-empty"],
+    ["only spaces", "    ", "display-name-empty"],
+    ["only line breaks and a tab", "\n\t\r\n", "display-name-empty"],
     ["a line feed inside it", "Priya\nShah", "display-name-not-one-line"],
     ["an inner carriage return and line feed", "Priya\r\nShah", "display-name-not-one-line"],
     ["a Unicode line separator inside it", "Priya\u2028Shah", "display-name-not-one-line"],
-    ["a next-line character, which trimming leaves", "\u0085Priya", "display-name-not-one-line"],
+    ["a next-line character, which trimming keeps", "\u0085Priya", "display-name-not-one-line"],
     ["a vertical tab inside it", "Priya\vShah", "display-name-not-one-line"],
     ["a tab inside it", "Priya\tShah", "display-name-control-character"],
     ["a NUL", "Priya\u0000Shah", "display-name-control-character"],
@@ -67,10 +67,10 @@ describe("the display-name rule", () => {
     ["a tag", "<b>Priya</b>", "display-name-angle-bracket"],
     ["a hundred and one characters", `${HUNDRED}a`, "display-name-too-long"],
     ["a hundred and one astral characters", `${HUNDRED_ASTRAL}𝐀`, "display-name-too-long"],
-    ["one letter's hundred marks, counted singly", `e${"́".repeat(100)}`, "display-name-too-long"],
-    ["a break and a bracket, break first", "Priya\n<Shah>", "display-name-not-one-line"],
-    ["a bracket and excess length, bracket first", `<${HUNDRED}`, "display-name-angle-bracket"],
-  ])("refuses %s, naming how", (_case, asked, word) => {
+    ["a letter with a hundred combining marks", `e${"́".repeat(100)}`, "display-name-too-long"],
+    ["a line break before an angle bracket", "Priya\n<Shah>", "display-name-not-one-line"],
+    ["an over-long name with an angle bracket", `<${HUNDRED}`, "display-name-angle-bracket"],
+  ])("refuses %s", (_case, asked, word) => {
     expect(applyDisplayNameRule(asked)).toEqual({ ok: false, error: word });
   });
 });
@@ -91,7 +91,7 @@ const identitySetRowsFor = async (personId: string) => {
   return rowsFrom(found);
 };
 
-const rowsAnywhereCarrying = async (text: string): Promise<number> => {
+const auditRowsContaining = async (text: string): Promise<number> => {
   const found = await db().pool.query(
     `SELECT 1 FROM identity_audit_event WHERE row_to_json(identity_audit_event)::text LIKE $1
      UNION ALL SELECT 1 FROM audit_event WHERE row_to_json(audit_event)::text LIKE $1`,
@@ -100,8 +100,8 @@ const rowsAnywhereCarrying = async (text: string): Promise<number> => {
   return found.rowCount ?? 0;
 };
 
-describe("setting one's own display name", () => {
-  it("writes and answers the name the rule takes", async () => {
+describe("a person setting their own display name", () => {
+  it("stores and returns the name after the rule applies", async () => {
     const personId = await seedPerson(db().pool, { name: "" });
     const door = openPostgres(db().runtimePool);
 
@@ -114,7 +114,7 @@ describe("setting one's own display name", () => {
     expect(await displayNameHeld(personId)).toBe("Priya Shah");
   });
 
-  it("replaces the person's earlier name and touches no one else's", async () => {
+  it("replaces the person's name and leaves others unchanged", async () => {
     const personId = await seedPerson(db().pool, { name: "Priya" });
     const someoneElse = await seedPerson(db().pool, { name: "Sam Okoro" });
     const door = openPostgres(db().runtimePool);
@@ -147,7 +147,7 @@ describe("setting one's own display name", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("refuses person-gone for a person no longer there, recording nothing", async () => {
+  it("refuses a missing person with person-gone, recording nothing", async () => {
     const door = openPostgres(db().runtimePool);
     const personId = ulid();
 
@@ -157,7 +157,7 @@ describe("setting one's own display name", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("refuses malformed for a person id that is not one", async () => {
+  it("refuses an invalid person id as malformed", async () => {
     const door = openPostgres(db().runtimePool);
 
     const set = await setDisplayName(bootstrap, door, {
@@ -168,7 +168,7 @@ describe("setting one's own display name", () => {
     expect(set).toEqual({ ok: false, error: "malformed" });
   });
 
-  it("writes one identity-set row, leaving the workspace's audit log alone", async () => {
+  it("writes one identity-set row and nothing to the workspace's log", async () => {
     const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Named", {
       name: "Held",
     });
@@ -198,7 +198,7 @@ describe("setting one's own display name", () => {
     expect(auditLogAfter.rows).toEqual(auditLogBefore.rows);
   });
 
-  it("carries the name in no row of either audit log", async () => {
+  it("keeps the name out of both audit logs", async () => {
     const personId = await seedPerson(db().pool, { name: "" });
     const door = openPostgres(db().runtimePool);
     const displayName = `Distinct ${ulid()}`;
@@ -207,7 +207,7 @@ describe("setting one's own display name", () => {
 
     expect(set.ok).toBe(true);
     expect(await identitySetRowsFor(personId)).toHaveLength(1);
-    expect(await rowsAnywhereCarrying(displayName)).toBe(0);
+    expect(await auditRowsContaining(displayName)).toBe(0);
   });
 
   it("writes the name and its row together, or neither", async () => {
@@ -223,7 +223,7 @@ describe("setting one's own display name", () => {
   });
 });
 
-describe("correcting a display name, as the operator", () => {
+describe("the operator correcting a display name", () => {
   const AT = new Date("2026-09-26T12:00:00.000Z");
 
   const correcting = (input: { personId: string; displayName: string }, signedInAt = AT) =>
@@ -231,7 +231,7 @@ describe("correcting a display name, as the operator", () => {
       correctDisplayName(operator, tx, { ...inputOf(correctDisplayNameInput, input), at: AT }),
     );
 
-  it("writes the name the rule takes, recorded under the operator", async () => {
+  it("stores the trimmed name as an operator action", async () => {
     const personId = await seedPerson(db().pool, { name: "Rude Name" });
 
     const { operatorId, answered } = await correcting({ personId, displayName: "  Priya Shah " });
@@ -255,18 +255,18 @@ describe("correcting a display name, as the operator", () => {
     ]);
   });
 
-  it("carries neither name in any row of either audit log", async () => {
+  it("keeps both names out of both audit logs", async () => {
     const was = `Rude ${ulid()}`;
     const personId = await seedPerson(db().pool, { name: was });
     const displayName = `Corrected ${ulid()}`;
 
     await correcting({ personId, displayName });
 
-    expect(await rowsAnywhereCarrying(was)).toBe(0);
-    expect(await rowsAnywhereCarrying(displayName)).toBe(0);
+    expect(await auditRowsContaining(was)).toBe(0);
+    expect(await auditRowsContaining(displayName)).toBe(0);
   });
 
-  it("records a correction to the name already held", async () => {
+  it("records a correction even when the name is unchanged", async () => {
     const personId = await seedPerson(db().pool, { name: "Priya Shah" });
 
     const { answered } = await correcting({ personId, displayName: "Priya Shah" });
@@ -277,7 +277,7 @@ describe("correcting a display name, as the operator", () => {
     ]);
   });
 
-  it("refuses what the person's own rule refuses, keeping the name", async () => {
+  it("refuses what the display-name rule refuses, keeping the name", async () => {
     const personId = await seedPerson(db().pool, { name: "Rude Name" });
 
     const answers = [
@@ -295,7 +295,7 @@ describe("correcting a display name, as the operator", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("refuses an id nobody holds as no such user", async () => {
+  it("refuses an unknown id as no such user", async () => {
     const personId = ulid();
 
     const { answered } = await correcting({ personId, displayName: "Priya Shah" });
@@ -304,7 +304,7 @@ describe("correcting a display name, as the operator", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("refuses an erased person as no such user, naming nobody", async () => {
+  it("refuses an erased person as no such user", async () => {
     const workspace = await provisionedWorkspace(db(), "Erased");
     const personId = await seedPerson(db().pool, { name: "Rude Name" });
     await erasedFromTheSet(db(), workspace.workspaceId, personId);
@@ -329,7 +329,7 @@ describe("correcting a display name, as the operator", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("admits a confirmation exactly an hour old", async () => {
+  it("accepts a confirmation exactly an hour old", async () => {
     const personId = await seedPerson(db().pool, { name: "Rude Name" });
 
     const { answered } = await correcting(
@@ -340,7 +340,7 @@ describe("correcting a display name, as the operator", () => {
     expect(answered).toMatchObject({ ok: true, value: { ok: true } });
   });
 
-  it("lands the name and its row together, or neither", async () => {
+  it("writes the name and its row together, or neither", async () => {
     const personId = await seedPerson(db().pool, { name: "Rude Name" });
 
     await expect(
@@ -351,7 +351,7 @@ describe("correcting a display name, as the operator", () => {
     expect(await displayNameHeld(personId)).toBe("Rude Name");
   });
 
-  it("admits the operator alone, never an Admin or the platform", () => {
+  it("accepts only the operator, not an Admin or the platform", () => {
     type Corrector = Parameters<typeof correctDisplayName>[0];
 
     expectTypeOf<OperatorPrincipal>().toExtend<Corrector>();

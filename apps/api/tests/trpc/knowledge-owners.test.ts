@@ -35,8 +35,8 @@ const aWorkspaceHoldingPolicy = async () => {
   return { workspace, editor, viewer, iris: concepts.map(({ iri }) => iri) };
 };
 
-describe("collections and owners through the api", () => {
-  it("carries the owner's collections on the member read", async () => {
+describe("collection owners over tRPC", () => {
+  it("lists the collections an owner owns in session.member", async () => {
     const { workspace, editor } = await aWorkspaceHoldingPolicy();
     await nameOwners(
       app(),
@@ -53,7 +53,7 @@ describe("collections and owners through the api", () => {
     expect(member.owns).toEqual({ collections: ["policy"], concepts: 0 });
   });
 
-  it("refuses an Editor naming an owner, by role", async () => {
+  it("refuses an Editor who names an owner with role-forbids", async () => {
     const { workspace, editor, viewer } = await aWorkspaceHoldingPolicy();
     const asked = { collection: "policy", personId: viewer.id };
     const asTheEditor = await webSignedIn(app(), editor.email);
@@ -68,7 +68,7 @@ describe("collections and owners through the api", () => {
     expect(named).toMatchObject({ personId: viewer.id });
   });
 
-  it("refuses an Editor owning nothing the list and naming", async () => {
+  it("shows collections to an Editor only after they own one", async () => {
     const { workspace, editor } = await aWorkspaceHoldingPolicy();
     const asTheEditor = await webSignedIn(app(), editor.email);
     const asTheAdmin = await webSignedIn(app(), workspace.admin.email);
@@ -92,7 +92,7 @@ describe("collections and owners through the api", () => {
     });
   });
 
-  it("names an owner and answers the new list", async () => {
+  it("names an owner and returns the updated collections list", async () => {
     const { workspace, viewer } = await aWorkspaceHoldingPolicy();
     const { api } = await webSignedIn(app(), workspace.admin.email);
 
@@ -109,8 +109,8 @@ describe("collections and owners through the api", () => {
   });
 });
 
-describe("naming one owner on many concepts through the api", () => {
-  it("names the owner of each concept as an Admin alone", async () => {
+describe("setting one owner on many concepts over tRPC", () => {
+  it("lets only an Admin set the owner of each concept", async () => {
     const { workspace, editor, viewer, iris } = await aWorkspaceHoldingPolicy();
     const asTheEditor = await webSignedIn(app(), editor.email);
     const asTheAdmin = await webSignedIn(app(), workspace.admin.email);
@@ -131,7 +131,7 @@ describe("naming one owner on many concepts through the api", () => {
     ]);
   });
 
-  it("refuses a batch naming a person outside the workspace", async () => {
+  it("refuses an owner who is not a workspace member", async () => {
     const { workspace, iris } = await aWorkspaceHoldingPolicy();
     const { api } = await webSignedIn(app(), workspace.admin.email);
     const stranger = await app().person();

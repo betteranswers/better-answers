@@ -84,7 +84,7 @@ const NEVER_SIGNED_IN: Subject = {
   holdsALogin: false,
 };
 
-const completedInTheRows = async (
+const seedCompletedErasure = async (
   workspaceId: string,
   completedAt: Date,
   named?: { readonly subject?: Subject; readonly erasureRequestId?: string },
@@ -127,7 +127,7 @@ const replaying = async (
   return replayed.value;
 };
 
-const leavingAReplayCopy = async (scenario: Scenario, erased: Erased, at: Date): Promise<void> => {
+const writeReplayCopy = async (scenario: Scenario, erased: Erased, at: Date): Promise<void> => {
   const run = await runErasure(ERASURE, doorsFor(scenario, at), {
     workspaceId: scenario.workspaceId,
     subjectRequestId: erased.subjectRequestId,
@@ -135,7 +135,7 @@ const leavingAReplayCopy = async (scenario: Scenario, erased: Erased, at: Date):
   if (!run.ok) throw new Error(`the arrangement's routine refused: ${String(run.error)}`);
 };
 
-const asIfTheDumpPredatedIt = async (workspaceId: string, erased: Erased): Promise<void> => {
+const deleteSubjectRequest = async (workspaceId: string, erased: Erased): Promise<void> => {
   await db().pool.query("DELETE FROM subject_request WHERE workspace_id = $1 AND id = $2", [
     workspaceId,
     erased.subjectRequestId,
@@ -183,9 +183,9 @@ const idsFor = (
   set.filter((entry) => entry.workspaceId === workspaceId).map((entry) => entry.erasureRequestId);
 
 describe("the set of erasures a restore must replay", () => {
-  it("names and replays none when every completion predates the window", async () => {
+  it("replays nothing when every erasure completed before the window", async () => {
     const scenario = await arrange();
-    await completedInTheRows(scenario.workspaceId, BEHIND_THE_WINDOW);
+    await seedCompletedErasure(scenario.workspaceId, BEHIND_THE_WINDOW);
 
     const set = await replayableErasures(ERASURE, doorsFor(scenario, NOTHING_AFTER), {
       since: NOTHING_AFTER,
@@ -194,20 +194,20 @@ describe("the set of erasures a restore must replay", () => {
       since: NOTHING_AFTER,
     });
 
-    assert(set.ok, "the set refused");
+    assert(set.ok, "listing the replayable erasures failed");
     expect(idsFor(set.value, scenario.workspaceId)).toEqual([]);
     expect(replayed).toEqual({ ok: true, value: [] });
 
     expect(await auditEventRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
   });
 
-  it("replays one the restored rows hold under the platform actor", async () => {
+  it("replays a restored erasure row as the platform actor", async () => {
     const scenario = await arrange();
-    const erased = await completedInTheRows(scenario.workspaceId, FROM_THE_ROWS_AT);
+    const erased = await seedCompletedErasure(scenario.workspaceId, FROM_THE_ROWS_AT);
 
     const replayed = await replaying(scenario, FROM_THE_ROWS_AT, FROM_THE_ROWS_SINCE);
     const [replay] = replayed;
-    assert(replay !== undefined, "one erasure was replayed");
+    assert(replay !== undefined, "no erasure was replayed");
 
     expect(replayed).toEqual([
       {
@@ -237,14 +237,14 @@ describe("the set of erasures a restore must replay", () => {
     ]);
   });
 
-  it("answers oldest completion first, then by id on a tie", async () => {
+  it("lists the oldest completion first, breaking ties by id", async () => {
     const scenario = await arrange();
 
-    await completedInTheRows(scenario.workspaceId, IN_ORDER_SECOND_AT);
-    await completedInTheRows(scenario.workspaceId, IN_ORDER_FIRST_AT, {
+    await seedCompletedErasure(scenario.workspaceId, IN_ORDER_SECOND_AT);
+    await seedCompletedErasure(scenario.workspaceId, IN_ORDER_FIRST_AT, {
       erasureRequestId: SECOND_ID,
     });
-    await completedInTheRows(scenario.workspaceId, IN_ORDER_FIRST_AT, {
+    await seedCompletedErasure(scenario.workspaceId, IN_ORDER_FIRST_AT, {
       erasureRequestId: FIRST_ID,
     });
 
@@ -252,36 +252,36 @@ describe("the set of erasures a restore must replay", () => {
       since: IN_ORDER_SINCE,
     });
 
-    assert(set.ok, "the set refused");
+    assert(set.ok, "listing the replayable erasures failed");
     const named = idsFor(set.value, scenario.workspaceId);
     expect(named.slice(0, 2)).toEqual([FIRST_ID, SECOND_ID]);
     expect(named).toHaveLength(3);
   });
 
-  it("counts once a request both the rows and copies name", async () => {
+  it("lists once an erasure found in both rows and copies", async () => {
     const scenario = await arrange();
-    const erased = await completedInTheRows(scenario.workspaceId, IN_BOTH_AT);
-    await leavingAReplayCopy(scenario, erased, IN_BOTH_AT);
+    const erased = await seedCompletedErasure(scenario.workspaceId, IN_BOTH_AT);
+    await writeReplayCopy(scenario, erased, IN_BOTH_AT);
 
     const copies = await replayCopiesSince(ERASURE, objects().door, IN_BOTH_SINCE);
     const set = await replayableErasures(ERASURE, doorsFor(scenario, IN_BOTH_AT), {
       since: IN_BOTH_SINCE,
     });
 
-    assert(copies.ok, "the copies refused");
-    assert(set.ok, "the set refused");
+    assert(copies.ok, "reading the replay copies failed");
+    assert(set.ok, "listing the replayable erasures failed");
 
     expect(idsFor(copies.value, scenario.workspaceId)).toEqual([erased.erasureRequestId]);
     expect(idsFor(set.value, scenario.workspaceId)).toEqual([erased.erasureRequestId]);
   });
 });
 
-describe("a request whose rows the dump predates", () => {
-  it("is re-created from the copy with its own pseudonym", async () => {
+describe("an erasure completed after the restored dump was taken", () => {
+  it("is re-created from the replay copy with its original pseudonym", async () => {
     const scenario = await arrange();
-    const erased = await completedInTheRows(scenario.workspaceId, FROM_THE_COPY_AT);
-    await leavingAReplayCopy(scenario, erased, FROM_THE_COPY_AT);
-    await asIfTheDumpPredatedIt(scenario.workspaceId, erased);
+    const erased = await seedCompletedErasure(scenario.workspaceId, FROM_THE_COPY_AT);
+    await writeReplayCopy(scenario, erased, FROM_THE_COPY_AT);
+    await deleteSubjectRequest(scenario.workspaceId, erased);
     expect(await erasureRowsIn(scenario.workspaceId)).toEqual([]);
 
     const replayed = await replaying(scenario, FROM_THE_COPY_AT, FROM_THE_COPY_SINCE);
@@ -309,11 +309,11 @@ describe("a request whose rows the dump predates", () => {
 
   it("is re-created with no person id for a never-signed-in subject", async () => {
     const scenario = await arrange();
-    const erased = await completedInTheRows(scenario.workspaceId, NO_LOGIN_AT, {
+    const erased = await seedCompletedErasure(scenario.workspaceId, NO_LOGIN_AT, {
       subject: NEVER_SIGNED_IN,
     });
-    await leavingAReplayCopy(scenario, erased, NO_LOGIN_AT);
-    await asIfTheDumpPredatedIt(scenario.workspaceId, erased);
+    await writeReplayCopy(scenario, erased, NO_LOGIN_AT);
+    await deleteSubjectRequest(scenario.workspaceId, erased);
 
     const replayed = await replaying(scenario, NO_LOGIN_AT, NO_LOGIN_SINCE);
 
@@ -332,10 +332,10 @@ describe("a request whose rows the dump predates", () => {
 });
 
 describe("an object store a restore cannot read", () => {
-  it("refuses rather than answering that no erasure is owed", async () => {
+  it("fails instead of reporting that no erasure needs replaying", async () => {
     const scenario = await arrange();
-    const erased = await completedInTheRows(scenario.workspaceId, UNREACHABLE_AT);
-    await leavingAReplayCopy(scenario, erased, UNREACHABLE_AT);
+    const erased = await seedCompletedErasure(scenario.workspaceId, UNREACHABLE_AT);
+    await writeReplayCopy(scenario, erased, UNREACHABLE_AT);
 
     const unreachable = openObjects({
       endpoint: "http://127.0.0.1:1",
@@ -344,7 +344,7 @@ describe("an object store a restore cannot read", () => {
       accessKeyId: "unreachable",
       secretAccessKey: "unreachable",
     });
-    assert(unreachable.ok, "the door refused its settings");
+    assert(unreachable.ok, "openObjects refused the test settings");
 
     try {
       const copies = await replayCopiesSince(ERASURE, unreachable.value, UNREACHABLE_SINCE);
@@ -363,15 +363,15 @@ describe("an object store a restore cannot read", () => {
     }
 
     const found = await replayCopiesSince(ERASURE, objects().door, UNREACHABLE_SINCE);
-    assert(found.ok, "the copies refused");
+    assert(found.ok, "reading the replay copies failed");
     expect(idsFor(found.value, scenario.workspaceId)).toEqual([erased.erasureRequestId]);
   });
 });
 
 describe("a second replay of the same request", () => {
-  it("changes nothing but the audit log", async () => {
+  it("adds an audit event and changes no other rows", async () => {
     const scenario = await arrange();
-    const erased = await completedInTheRows(scenario.workspaceId, TWICE_AT);
+    const erased = await seedCompletedErasure(scenario.workspaceId, TWICE_AT);
 
     const first = await replaying(scenario, TWICE_AT, TWICE_SINCE);
     const after = await erasureRowsIn(scenario.workspaceId);
@@ -396,13 +396,13 @@ describe("a second replay of the same request", () => {
   });
 });
 
-describe("a request whose routine will not run", () => {
-  it("stops the replay there, not carrying on to those behind", async () => {
+describe("a request whose erasure routine fails", () => {
+  it("stops the whole replay and skips the later requests", async () => {
     const scenario = await arrange();
 
     const stranded = await seedingWith(db().pool, (seed) => seed.workspace());
-    const first = await completedInTheRows(stranded.id, STOPS_AT);
-    const second = await completedInTheRows(scenario.workspaceId, AFTER_THE_STOP_AT);
+    const first = await seedCompletedErasure(stranded.id, STOPS_AT);
+    const second = await seedCompletedErasure(scenario.workspaceId, AFTER_THE_STOP_AT);
 
     const replayed = await replayErasures(ERASURE, doorsFor(scenario, AFTER_THE_STOP_AT), {
       since: STOPS_SINCE,
@@ -422,8 +422,8 @@ describe("a request whose routine will not run", () => {
   });
 });
 
-describe("the replay copy for a request named by address alone", () => {
-  it("carries the person the map found, not the request's null", async () => {
+describe("the replay copy of a request naming only an address", () => {
+  it("holds the person id the erasure map found", async () => {
     const scenario = await arrange();
     const email = addressOf("priya");
     const person = await memberOf(db().pool, scenario.workspaceId, email);
@@ -444,7 +444,7 @@ describe("the replay copy for a request named by address alone", () => {
     assert(run.ok, "the routine refused");
 
     const copies = await replayCopiesSince(ERASURE, objects().door, BY_ADDRESS_SINCE);
-    assert(copies.ok, "the copies did not read back");
+    assert(copies.ok, "reading the replay copies failed");
     expect(
       copies.value
         .filter((copy) => copy.workspaceId === scenario.workspaceId)
@@ -459,7 +459,7 @@ type IndexedConnectedSource = {
   readonly content: string;
 };
 
-const aConnectedSourceIndexing = (
+const seedConnectedSource = (
   workspaceId: string,
   content: string,
 ): Promise<IndexedConnectedSource> =>
@@ -472,7 +472,7 @@ const aConnectedSourceIndexing = (
     return { id: connectedSource.id, documentId: document.id, content };
   });
 
-const theIndexRestored = (
+const restorePassages = (
   workspaceId: string,
   connectedSources: readonly IndexedConnectedSource[],
 ) =>
@@ -491,17 +491,17 @@ const theIndexRestored = (
     }
   });
 
-const asIfRestoredFromADumpOlderThanIt = async (
+const restoreFromDumpBeforeErasure = async (
   workspaceId: string,
   erased: Erased,
   connectedSources: readonly IndexedConnectedSource[],
 ): Promise<void> => {
-  await asIfTheDumpPredatedIt(workspaceId, erased);
+  await deleteSubjectRequest(workspaceId, erased);
   await db().pool.query("DELETE FROM job WHERE workspace_id = $1", [workspaceId]);
-  await theIndexRestored(workspaceId, connectedSources);
+  await restorePassages(workspaceId, connectedSources);
 };
 
-const whatTheReplayLeft = async (workspaceId: string) => ({
+const suppressionsPassagesAndJobs = async (workspaceId: string) => ({
   suppressions: (
     await db().pool.query<{ erasure_request_id: string; identifiers: unknown }>(
       "SELECT erasure_request_id, identifiers FROM suppression WHERE workspace_id = $1",
@@ -526,19 +526,19 @@ describe("a restore from a dump older than the request", () => {
   it("re-creates the suppression, wiping only the source naming the subject", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
-    const naming = await aConnectedSourceIndexing(
+    const naming = await seedConnectedSource(
       workspaceId,
       "Expense claims go to Priya Anand for approval.",
     );
-    const beside = await aConnectedSourceIndexing(
+    const beside = await seedConnectedSource(
       workspaceId,
       "Expenses are claimed within thirty days.",
     );
-    await theIndexRestored(workspaceId, [naming, beside]);
-    const erased = await completedInTheRows(workspaceId, INDEX_RESTORED_AT);
-    await leavingAReplayCopy(scenario, erased, INDEX_RESTORED_AT);
-    await asIfRestoredFromADumpOlderThanIt(workspaceId, erased, [naming]);
-    const restored = await whatTheReplayLeft(workspaceId);
+    await restorePassages(workspaceId, [naming, beside]);
+    const erased = await seedCompletedErasure(workspaceId, INDEX_RESTORED_AT);
+    await writeReplayCopy(scenario, erased, INDEX_RESTORED_AT);
+    await restoreFromDumpBeforeErasure(workspaceId, erased, [naming]);
+    const restored = await suppressionsPassagesAndJobs(workspaceId);
 
     const replayed = await replaying(scenario, INDEX_RESTORED_AT, INDEX_RESTORED_SINCE);
 
@@ -550,7 +550,7 @@ describe("a restore from a dump older than the request", () => {
     expect(replayed.map((one) => [one.erasureRequestId, one.fromReplayCopy])).toEqual([
       [erased.erasureRequestId, true],
     ]);
-    expect(await whatTheReplayLeft(workspaceId)).toEqual({
+    expect(await suppressionsPassagesAndJobs(workspaceId)).toEqual({
       suppressions: [
         {
           erasure_request_id: erased.erasureRequestId,

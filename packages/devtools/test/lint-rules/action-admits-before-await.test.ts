@@ -45,7 +45,7 @@ describe("the rule that a declared action admits before it awaits", () => {
     expect(output).toContain("better-answers(action-admits-before-await)");
   });
 
-  it("stays silent on an action that admits, then awaits", () => {
+  it("accepts an action that admits, then awaits", () => {
     expect(lint.flagged(holding(ADMITS_FIRST))).toEqual([]);
   });
 
@@ -101,7 +101,7 @@ describe("the rule that a declared action admits before it awaits", () => {
       expect(output).toContain(`run \`${shorthand}\` first`);
     });
 
-    it("stays silent on a step that calls it, then awaits", () => {
+    it("accepts a step that calls it, then awaits", () => {
       const first = `export const groups = async (principal, tx) => {
   const admin = ${shorthand}(principal);
   if (!admin.ok) return admin;

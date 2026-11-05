@@ -13,7 +13,7 @@ describe("the concept IRI and its ULID", () => {
     expect(ulidOfConceptIri(iri)).toBe(MINTED);
   });
 
-  it("refuses a lower-case ULID either way", () => {
+  it("refuses a lower-case ULID in either direction", () => {
     expect(WELL_FORMED_ULID.safeParse(MINTED.toLowerCase()).success).toBe(false);
     expect(
       ulidOfConceptIri("https://better-answers.com/c/01j6mmmmmmmmmmmmmmmmmmmmmm"),
@@ -35,7 +35,7 @@ describe("the concept IRI and its ULID", () => {
     }
   });
 
-  it("refuses anything around or after the ULID", () => {
+  it("refuses any text around or after the ULID", () => {
     for (const padded of [
       " https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
       "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM#section",
@@ -48,7 +48,7 @@ describe("the concept IRI and its ULID", () => {
 });
 
 describe("a cited source's id", () => {
-  it("reads a record's id as JavaScript writes it", () => {
+  it("reads a record's id as a string, or null", () => {
     expect(
       citedSourcesOf([
         { resource: "https://example.test/audit-standard", id: "AUD-047" },
@@ -64,7 +64,7 @@ describe("a cited source's id", () => {
     ]);
   });
 
-  it("gives a string-form entry no id", () => {
+  it("gives no id to an entry written as a string", () => {
     expect(citedSourceOf("https://example.test/handbook#4")).toEqual({
       resource: "https://example.test/handbook",
       locator: "4",

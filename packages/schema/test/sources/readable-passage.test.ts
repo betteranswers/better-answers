@@ -92,7 +92,7 @@ const columnsOf = async (relation: string): Promise<readonly string[]> => {
   return read.rows.map((row) => row.column);
 };
 
-const THE_FOLD = [
+const RANKED_PAIRS = [
   { connectedSource: "Restricted", document: "Restricted", narrower: "Restricted" },
   { connectedSource: "Restricted", document: "Internal", narrower: "Restricted" },
   { connectedSource: "Restricted", document: "Public", narrower: "Restricted" },
@@ -118,9 +118,9 @@ const A_WORD_OUTSIDE_THE_SET = [
   { connectedSource: null, document: null, narrower: null },
 ] as const;
 
-const THE_FOLD_AT_ITS_EDGES = [...THE_DOCUMENT_NAMES_NO_SENSITIVITY, ...A_WORD_OUTSIDE_THE_SET];
+const UNRANKED_PAIRS = [...THE_DOCUMENT_NAMES_NO_SENSITIVITY, ...A_WORD_OUTSIDE_THE_SET];
 
-const folded = async (
+const narrowerOfEach = async (
   client: pg.PoolClient,
   pairs: readonly { readonly connectedSource: string | null; readonly document: string | null }[],
 ): Promise<readonly (string | null)[]> => {
@@ -133,23 +133,25 @@ const folded = async (
   return answered.rows.map((row) => row.narrower);
 };
 
-describe("the one SQL statement of the sensitivity ranking", () => {
-  it("answers the narrower sensitivity for every ranked pair, both orders", async () => {
+describe("narrower_sensitivity, the SQL function that ranks sensitivity", () => {
+  it("returns the narrower of every ranked pair, in either order", async () => {
     await withRollback(db().pool, async (client) => {
-      expect(await folded(client, THE_FOLD)).toEqual(THE_FOLD.map((pair) => pair.narrower));
-    });
-  });
-
-  it("answers the source's sensitivity alone, and null for unknown words", async () => {
-    await withRollback(db().pool, async (client) => {
-      expect(await folded(client, THE_FOLD_AT_ITS_EDGES)).toEqual(
-        THE_FOLD_AT_ITS_EDGES.map((pair) => pair.narrower),
+      expect(await narrowerOfEach(client, RANKED_PAIRS)).toEqual(
+        RANKED_PAIRS.map((pair) => pair.narrower),
       );
     });
   });
 
-  it("ranks the three sensitivities this package declares and no fourth", () => {
-    const ranked = new Set(THE_FOLD.flatMap((pair) => [pair.connectedSource, pair.document]));
+  it("returns the source's sensitivity alone, and null for unknown words", async () => {
+    await withRollback(db().pool, async (client) => {
+      expect(await narrowerOfEach(client, UNRANKED_PAIRS)).toEqual(
+        UNRANKED_PAIRS.map((pair) => pair.narrower),
+      );
+    });
+  });
+
+  it("ranks exactly the three sensitivities this package declares", () => {
+    const ranked = new Set(RANKED_PAIRS.flatMap((pair) => [pair.connectedSource, pair.document]));
 
     expect([...ranked].toSorted()).toEqual([...SENSITIVITIES].toSorted());
   });
@@ -175,7 +177,7 @@ describe("the one SQL statement of the sensitivity ranking", () => {
         "SELECT narrower_sensitivity('Public', 'Internal') AS narrower",
       );
       await refusesEach(client, [
-        [THE_VIEW, "worker_rt reading the view the fold answers a sensitivity for"],
+        [THE_VIEW, "worker_rt reading the view that narrower_sensitivity serves"],
       ]);
 
       expect(served.rows).toEqual([{ narrower: "Internal" }]);
@@ -202,8 +204,8 @@ describe("the one SQL statement of the sensitivity ranking", () => {
   });
 });
 
-describe("the shape the view presents", () => {
-  it("presents every passage column plus the four visibility terms", async () => {
+describe("the view's columns", () => {
+  it("has every passage column plus the four visibility terms", async () => {
     const [onThePassage, onTheView] = await Promise.all([
       columnsOf("passage"),
       columnsOf("readable_passage"),
@@ -220,14 +222,14 @@ describe("the shape the view presents", () => {
     }).toEqual({ missing: [], unexpected: [], terms: THE_FOUR_TERMS });
   });
 
-  // From the definition, not a plan: at this suite's row counts a sequential scan is the
-  // right plan whether or not the workspace id prunes.
-  it("joins the source inner and the document left, by workspace", async () => {
+  // Reads the definition, not a plan, because at these row counts the planner picks a sequential
+  // scan whether or not the workspace id prunes.
+  it("inner-joins the source and left-joins the document, by workspace", async () => {
     const read = await db().pool.query<{ definition: string }>(
       `SELECT pg_get_viewdef('"index".readable_passage'::regclass, true) AS definition`,
     );
     const definition = read.rows[0]?.definition;
-    assert(definition !== undefined, "the view has a definition");
+    assert(definition !== undefined, "the view has no definition");
     const written = definition.replaceAll(/\s+/gu, " ");
 
     expect({
@@ -256,7 +258,7 @@ describe("what the view reports for a passage, as app_rt", () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const landed: { readonly id: string; readonly expected: string }[] = [];
-      for (const pair of [...THE_FOLD, ...THE_DOCUMENT_NAMES_NO_SENSITIVITY]) {
+      for (const pair of [...RANKED_PAIRS, ...THE_DOCUMENT_NAMES_NO_SENSITIVITY]) {
         const { passage } = await aPassageUnderAConnectedSource(client, {
           connectedSourceSensitivity: pair.connectedSource,
           documentSensitivity: pair.document,
@@ -303,7 +305,7 @@ describe("what the view reports for a passage, as app_rt", () => {
     });
   });
 
-  it("carries the publish stamp, null for an unpublished connected source", async () => {
+  it("carries the publish time, null when the source is unpublished", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const unpublished = await aPassageUnderAConnectedSource(client, { publishedAt: null });
@@ -323,7 +325,7 @@ describe("what the view reports for a passage, as app_rt", () => {
     });
   });
 
-  it("reads the source live, so later narrowing shows at once", async () => {
+  it("reads the source live, so a later narrowing shows immediately", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const { connectedSource } = await aPassageUnderAConnectedSource(client, {
@@ -398,7 +400,7 @@ describe("what the view withholds", () => {
           passageRowStands: standing.rowCount,
           throughTheView: (await client.query<{ id: string }>(THE_VIEW)).rows.map((row) => row.id),
         },
-        "a passage naming no document outlives its source; the inner join withholds it",
+        "a passage with no document lost its row, or stayed in the view, after its source was deleted",
       ).toEqual({
         passageRowStands: 1,
         throughTheView: [neighbour.passage.id],
@@ -425,7 +427,7 @@ describe("what the view withholds", () => {
 });
 
 describe("who may read the view", () => {
-  it("is selected by app_rt, and worker_rt holds nothing on it", async () => {
+  it("lets app_rt select it, and grants worker_rt nothing", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const { passage } = await aPassageUnderAConnectedSource(client, {
@@ -438,7 +440,7 @@ describe("who may read the view", () => {
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       await refusesEach(client, [
-        [THE_VIEW, "worker_rt selecting the view the api reads a passage through"],
+        [THE_VIEW, "worker_rt selecting the view that the api reads passages through"],
       ]);
       await client.query("RESET ROLE");
 

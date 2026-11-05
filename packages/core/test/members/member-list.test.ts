@@ -108,7 +108,7 @@ describe("the member list", () => {
     });
   });
 
-  it("says when a member's credentials here were revoked, never elsewhere", async () => {
+  it("shows revocations in this workspace and not in others", async () => {
     const ours = await provisionedWorkspace(db(), "RevokedOurs");
     const theirs = await provisionedWorkspace(db(), "RevokedTheirs");
     const revokedHere = new Date("2026-09-25T10:00:00.000Z");
@@ -141,7 +141,7 @@ describe("the member list", () => {
     ]);
   });
 
-  it("orders two members of one display name by their address", async () => {
+  it("orders members with the same display name by address", async () => {
     const workspace = await provisionedWorkspace(db(), "Namesakes");
     const first = await joining(workspace, "Alex Kerr", "Viewer");
     const second = await joining(workspace, "Alex Kerr", "Viewer");
@@ -155,14 +155,14 @@ describe("the member list", () => {
     expect(listed.value.slice(0, 2).map((member) => member.personId)).toEqual(byAddress);
   });
 
-  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
+  it.each(["Editor", "Viewer"] as const)("refuses the %s role with role-forbids", async (role) => {
     const workspace = await provisionedWorkspace(db(), `Refused${role}`);
     const { person } = await joining(workspace, "Una Member", role);
 
     expect(await listedAs(workspace, person.id)).toEqual({ ok: false, error: "role-forbids" });
   });
 
-  it("answers the store's own failure rather than an empty list", async () => {
+  it("returns the store's error instead of an empty list", async () => {
     const workspace = await provisionedWorkspace(db(), "Unlisted");
     const admin = { workspaceId: workspace.workspaceId, userId: workspace.adminUserId };
     let listed: Result<unknown, unknown> | undefined;

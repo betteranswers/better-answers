@@ -14,7 +14,7 @@ const SET_DISPLAY_NAME = `${TRPC_ENDPOINT}/person.setDisplayName`;
 const aPersonWithNoDisplayName = () => app().person(undefined, "");
 
 describe("a signed-in person setting their own display name over tRPC", () => {
-  it("takes it from a person in no workspace, trimmed", async () => {
+  it("saves a trimmed name for a person in no workspace", async () => {
     const person = await aPersonWithNoDisplayName();
     const { api } = await webSignedIn(app(), person.email);
 
@@ -24,7 +24,7 @@ describe("a signed-in person setting their own display name over tRPC", () => {
     expect(await displayNameHeldBy(app(), person.id)).toBe("Priya Shah");
   });
 
-  it("takes it from a two-workspace member who picked neither", async () => {
+  it("saves it for a two-workspace member with neither active", async () => {
     const first = await app().provision();
     const second = await app().provision();
     const person = await aPersonWithNoDisplayName();
@@ -40,7 +40,7 @@ describe("a signed-in person setting their own display name over tRPC", () => {
     expect(await displayNameHeldBy(app(), person.id)).toBe("Sam Okoro");
   });
 
-  it("refuses a bad name with the rule's word, writing nothing", async () => {
+  it("refuses an invalid name with the rule's word, saving nothing", async () => {
     const person = await app().person(undefined, "Priya Shah");
     const { api } = await webSignedIn(app(), person.email);
 
@@ -57,14 +57,14 @@ describe("a signed-in person setting their own display name over tRPC", () => {
     expect(await displayNameHeldBy(app(), person.id)).toBe("Priya Shah");
   });
 
-  it("refuses a sessionless caller, sending them to sign in", async () => {
+  it("refuses a caller with no session with 401", async () => {
     const response = await app().client().json(SET_DISPLAY_NAME, { displayName: "Mallory" });
 
     expect(response.status).toBe(401);
     expect(await response.json()).toMatchObject(NO_SESSION_ANSWERED);
   });
 
-  it("records one identity-set audit event by person id, not name", async () => {
+  it("audits the change by person id, never storing the name", async () => {
     const person = await aPersonWithNoDisplayName();
     const { api } = await webSignedIn(app(), person.email);
     const displayName = `Ada ${person.id.slice(-6)}`;

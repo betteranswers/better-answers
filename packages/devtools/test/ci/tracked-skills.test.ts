@@ -17,7 +17,7 @@ describe("the tracked skills' link and licence files", () => {
     return listed.stdout.split("\n").filter((line) => line !== "");
   };
 
-  it("links the design system's skill, resolving inside the checkout", () => {
+  it("links the design system's skill to packages/design-system", () => {
     const link = path.join(repositoryRoot, ".claude/skills/better-answers-design");
 
     expect(isSymlink(link)).toBe(true);

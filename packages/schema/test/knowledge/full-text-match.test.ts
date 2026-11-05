@@ -35,14 +35,14 @@ const leakproofFunctions = async (client: pg.PoolClient): Promise<readonly strin
   return read.rows.map((row) => row.signature);
 };
 
-describe("the full-text match `find` filters a passage by", () => {
-  it("is leakproof once migrated as a deploy migrates", async () => {
+describe("ts_match_vq, the match `find` filters passages with", () => {
+  it("is leakproof after migrating as a deploy does", async () => {
     await withRollback(db().pool, async (client) => {
       expect(await matchIsLeakproof(client)).toBe(true);
     });
   });
 
-  it("is marked again after a restore, and twice changes nothing", async () => {
+  it("is re-marked after a restore, and marking twice changes nothing", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(UNMARK_THE_MATCH);
       const restored = await matchIsLeakproof(client);
@@ -59,7 +59,7 @@ describe("the full-text match `find` filters a passage by", () => {
     });
   });
 
-  it("is the only function migrate's mark changes", async () => {
+  it("is the only function the leakproof mark changes", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(UNMARK_THE_MATCH);
       const before = await leakproofFunctions(client);
@@ -74,14 +74,19 @@ describe("the full-text match `find` filters a passage by", () => {
     });
   });
 
-  it("is refused to both runtime roles, and the mark stands", async () => {
+  it("cannot be marked or unmarked by either runtime role", async () => {
     await withRollback(db().pool, async (client) => {
       for (const role of ["app_rt", "worker_rt"]) {
         await client.query("RESET ROLE");
         await client.query(`SET LOCAL ROLE ${role}`);
         await refusesEach(client, [
           [MARK_THE_MATCH_LEAKPROOF, `${role} marking the match leakproof`, [], /must be owner/],
-          [UNMARK_THE_MATCH, `${role} taking the mark off the match`, [], /must be owner/],
+          [
+            UNMARK_THE_MATCH,
+            `${role} removing the leakproof mark from the match`,
+            [],
+            /must be owner/,
+          ],
         ]);
       }
       await client.query("RESET ROLE");
@@ -115,8 +120,8 @@ const passageSearchExpression = (): { readonly sql: string; readonly params: unk
   return new PgDialect().sqlToQuery(generated);
 };
 
-describe("the concept search column's index, after the description joined it", () => {
-  it("is valid, ready and over the column", async () => {
+describe("the concept search index, after descriptions joined the column", () => {
+  it("is valid, ready, and built on the search column", async () => {
     const read = await db().pool.query<{ valid: boolean; ready: boolean; definition: string }>(
       `SELECT i.indisvalid AS valid, i.indisready AS ready, pg_get_indexdef(i.indexrelid) AS definition
          FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
@@ -242,7 +247,7 @@ describe("the any-word rule over concept rows", () => {
     expect(counts).toEqual({ size: 4, frequencies: [2, 1] });
   });
 
-  it("weighs by the counts it is given, not the rows", async () => {
+  it("weighs by the frequencies it is given, not the rows", async () => {
     const concepts = [
       ["Audit Logs", UNRELATED],
       ["Retention", UNRELATED],
@@ -306,7 +311,7 @@ describe("the any-word rule over concept rows", () => {
     ]);
   });
 
-  it("holds a strong match to half the words, rounded up", async () => {
+  it("requires half the words, rounded up, for a strong match", async () => {
     const concepts = [
       ["Audit", UNRELATED],
       ["Audit Logs", UNRELATED],
@@ -329,7 +334,7 @@ describe("the any-word rule over concept rows", () => {
     });
   });
 
-  it("continues after a bound by weight, rank, then key", async () => {
+  it("pages after a bound by weight, then rank, then key", async () => {
     const concepts = [
       ["Audit Logs", UNRELATED],
       ["Audit", "audit"],
@@ -339,7 +344,7 @@ describe("the any-word rule over concept rows", () => {
     const ranked = await matchedOver(concepts, "audit log retention");
     const boundAt = (title: string): NonNullable<Narrowed["after"]> => {
       const row = ranked.find((each) => each.title === title);
-      assert(row !== undefined, `${title} matched`);
+      assert(row !== undefined, `${title} did not match`);
       return [row.weight, row.rank, row.title];
     };
 
@@ -377,7 +382,7 @@ describe("the any-word rule over concept rows", () => {
     expect(after.map(({ title }) => title)).toEqual(past);
   });
 
-  it("reads `!`, `:*`, `&`, quotes and parentheses as no syntax", async () => {
+  it("treats `!`, `:*`, `&`, quotes and parentheses as plain text", async () => {
     const matched = await matchedOver(
       [
         ["Audit Logs", UNRELATED],
@@ -404,15 +409,15 @@ describe("the any-word rule over concept rows", () => {
     ]);
   });
 
-  it("matches nothing on stop words alone, and raises nothing", async () => {
+  it("matches nothing and raises no error on stop words alone", async () => {
     const matched = await matchedOver([["The policy", "It is what it is."]], "the and of it is");
 
     expect(matched).toEqual([]);
   });
 });
 
-describe("the language every full-text match is parsed under", () => {
-  it("is chosen in source only by the full-text rule", () => {
+describe("the text search language of every full-text match", () => {
+  it("is set only in the full-text rule's source file", () => {
     const choosing = sourceFiles()
       .filter((file) => file !== THE_RULE)
       .filter((file) =>
@@ -422,7 +427,7 @@ describe("the language every full-text match is parsed under", () => {
     expect(choosing).toEqual([]);
   });
 
-  it("is looked for in the files that match text", () => {
+  it("is checked in the files that run full-text matches", () => {
     const read = sourceFiles();
 
     expect(
@@ -430,25 +435,25 @@ describe("the language every full-text match is parsed under", () => {
     ).toEqual([]);
   });
 
-  it("is refused when a query leaves it to the server", () => {
+  it("is flagged when a query leaves it to the server", () => {
     expect(choosesItsOwnLanguage("CROSS JOIN websearch_to_tsquery($2) AS q")).toBe(true);
   });
 
-  it("is refused however the call's name is spelled", () => {
+  it("is flagged however the function name is cased or spaced", () => {
     expect(
       ["WEBSEARCH_TO_TSQUERY($2)", "to_tsquery ($2)"].filter(choosesItsOwnLanguage),
     ).toHaveLength(2);
   });
 
-  it("is refused when a call names another configuration", () => {
+  it("is flagged when a call names another configuration", () => {
     expect(choosesItsOwnLanguage("to_tsvector('simple', body)")).toBe(true);
   });
 
-  it("is refused when written in quotes in any case", () => {
+  it("is flagged when 'english' is quoted, in any case", () => {
     expect(choosesItsOwnLanguage(`const language = "English";`)).toBe(true);
   });
 
-  it("passes in prose, and in a call that takes it", () => {
+  it("passes in prose and in a call given FULL_TEXT_LANGUAGE", () => {
     expect(
       [
         " * English for the compare-and-swap match below.",

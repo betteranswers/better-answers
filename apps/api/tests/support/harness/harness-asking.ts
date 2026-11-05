@@ -14,7 +14,7 @@ const KEY_PREFIX = "sk-test-browser-";
 
 const keyOf = (workspaceId: string): string => `${KEY_PREFIX}${workspaceId}`;
 
-/** A status the client reads as failed, never as one worth trying again. */
+/** The client treats this status as a failure and does not retry it. */
 const FAILED_STATUS = 418;
 
 const written = z.object({
@@ -129,7 +129,7 @@ export const setUpAsking = async (
 ): Promise<void> => {
   const { workspaceId, judging, drafting, limitGbp } = script;
   models.script(script);
-  // Uncounted, the planner joins every node to every step, and the walk nears its timeout.
+  // Without statistics, the planner joins all nodes to all steps and the walk nears its timeout.
   await app.database.superuser.query("ANALYZE map_node, map_edge");
   if (judging === undefined && drafting === undefined) return;
   await judgingSetUp(app, workspaceId, {

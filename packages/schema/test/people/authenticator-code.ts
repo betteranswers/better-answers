@@ -23,7 +23,7 @@ const bytesOf = (key: string): Buffer => {
   return Buffer.from((whole.match(/.{8}/g) ?? []).map((byte) => Number.parseInt(byte, 2)));
 };
 
-/** The six digits an authenticator holding `key`, base32 as a QR code carries it, shows at `at`. */
+/** The six-digit code an authenticator shows at `at` for `key`, a base32 secret as the QR code carries it. */
 export const authenticatorCodeAt = (key: string, at: Date): string => {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at.getTime() / 1000 / STEP_SECONDS)));
@@ -33,5 +33,5 @@ export const authenticatorCodeAt = (key: string, at: Date): string => {
   return String(truncated % 10 ** DIGITS).padStart(DIGITS, "0");
 };
 
-/** The key an `otpauth://` address carries, as the setup page writes it out. */
+/** The `secret` parameter of an `otpauth://` address, as the setup page writes it. */
 export const keyIn = (uri: string): string => new URL(uri).searchParams.get("secret") ?? "";

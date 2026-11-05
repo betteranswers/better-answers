@@ -71,7 +71,7 @@ const columnOf = async (client: pg.PoolClient, column: string) => {
 };
 
 describe("the concept's search column", () => {
-  it("is computed and stored by the pinned image", async () => {
+  it("is a stored generated tsvector column", async () => {
     await withRollback(db().pool, async (client) => {
       expect(await columnOf(client, "search")).toEqual({
         type: "tsvector",
@@ -81,7 +81,7 @@ describe("the concept's search column", () => {
     });
   });
 
-  it("weighs tags at B, as a list or one string", async () => {
+  it("weights tags at B, whether a list or one string", async () => {
     await withACommit(async (client, seed) => {
       const weighedB = async (frontmatter: Record<string, string | string[]>) => {
         const row = await seed.conceptIndex({ workspaceId: WS_A, frontmatter });
@@ -106,7 +106,7 @@ const ACCEPTED_CANDIDATES = CANDIDATES.filter(([, accepted]) => accepted).map(
   ([candidate]) => candidate,
 );
 
-const WHAT_THE_TYPESCRIPT_IRI_SAYS = CANDIDATES.map(([candidate, accepted]) => ({
+const EXPECTED_OUTCOMES = CANDIDATES.map(([candidate, accepted]) => ({
   candidate,
   typescript: accepted,
   database: accepted ? ADMITTED : "concept_index_iri_check",
@@ -121,7 +121,7 @@ describe("the concept IRI's constraint", () => {
     });
   });
 
-  it("accepts and refuses the strings the TypeScript IRI does", async () => {
+  it("accepts and refuses the same strings as the TypeScript pattern", async () => {
     await withACommit(async (client, seed, sha) => {
       for (const candidate of ACCEPTED_CANDIDATES) {
         await seed.conceptIdentity({ workspaceId: WS_A, iri: candidate });
@@ -135,7 +135,7 @@ describe("the concept IRI's constraint", () => {
         });
       }
 
-      expect(outcomes).toEqual(WHAT_THE_TYPESCRIPT_IRI_SAYS);
+      expect(outcomes).toEqual(EXPECTED_OUTCOMES);
     });
   });
 });

@@ -236,7 +236,7 @@ const agreedOpening = (opened: (typeof fixture.open)[number]) =>
     : NOT_FOUND;
 
 describe("the passage a wire locator opens", () => {
-  it("answers every case the agreement states, the astral character included", async () => {
+  it("matches the agreement for every case, astral character included", async () => {
     const scenario = await arrange();
     await seedTheAgreementsDocument(scenario.workspaceId);
 
@@ -250,7 +250,7 @@ describe("the passage a wire locator opens", () => {
     );
   });
 
-  it("serves a straddle as one passage at its effective class", async () => {
+  it("returns a two-passage span whole, at the document's own class", async () => {
     const scenario = await arrange();
 
     const documentId = await documentWithTwoPassages(scenario.workspaceId, {
@@ -272,7 +272,7 @@ describe("the passage a wire locator opens", () => {
     });
   });
 
-  it("matches each row's locator to the one its columns compose", async () => {
+  it("stores each row's locator as its document id and span", async () => {
     const scenario = await arrange();
     await seedTheAgreementsDocument(scenario.workspaceId);
 
@@ -300,7 +300,7 @@ describe("the passage a wire locator opens", () => {
 });
 
 describe("what a passage read refuses", () => {
-  it("answers withheld, absent, malformed and out-of-range locators alike", async () => {
+  it("returns not found for withheld, absent, malformed and out-of-range locators", async () => {
     const scenario = await arrange();
     await seedTheAgreementsDocument(scenario.workspaceId);
     const board = await documentWithOnePassage(scenario.workspaceId, {
@@ -329,7 +329,7 @@ describe("what a passage read refuses", () => {
     });
   });
 
-  it("refuses a narrowed straddle whole, yet serves it to Admins", async () => {
+  it("withholds a narrowed two-passage span from Viewers but not Admins", async () => {
     const scenario = await arrange();
 
     const narrowedConnectedSource = await documentWithTwoPassages(scenario.workspaceId, {
@@ -378,7 +378,7 @@ describe("what a passage read refuses", () => {
     });
   });
 
-  it("serves an Admin the Restricted passage the Viewer is refused", async () => {
+  it("returns a Restricted passage to an Admin", async () => {
     const scenario = await arrange();
     const board = await documentWithOnePassage(scenario.workspaceId, {
       title: BOARD_TITLE,
@@ -400,7 +400,7 @@ describe("what a passage read refuses", () => {
 });
 
 describe("what a passage read fails on", () => {
-  it("errs on a passage row whose content and span disagree", async () => {
+  it("throws when a passage row's content and span lengths differ", async () => {
     const scenario = await arrange();
     const runsPast = await documentWithOnePassage(scenario.workspaceId, {
       title: BOARD_TITLE,
@@ -441,7 +441,7 @@ const searching = async (
   );
 
 describe("the passages a search finds", () => {
-  it("finds only passages no concept the reader sees rests on", async () => {
+  it("finds only passages that no concept the reader sees cites", async () => {
     const scenario = await arrange();
     const handbook = await documentWithOnePassage(scenario.workspaceId, {
       ...HANDBOOK,
@@ -482,7 +482,7 @@ describe("the passages a search finds", () => {
     expect(inside).toEqual([matchOn(minutes, MINUTES)]);
   });
 
-  it("finds no passage of a source under review for anyone", async () => {
+  it("finds no passage of an unpublished source, for any role", async () => {
     const scenario = await arrange();
     await documentWithOnePassage(scenario.workspaceId, {
       ...DRAFT,
@@ -620,8 +620,8 @@ const previewing = async (
     }),
   );
 
-describe("the review list a connected source is previewed with", () => {
-  it("lists every passage by document and ordinal, to Admins alone", async () => {
+describe("previewing an unpublished connected source's passages", () => {
+  it("lists passages by document and ordinal, for Admins only", async () => {
     const scenario = await arrange();
     await seedTheConnectedSourceUnderReview(scenario.workspaceId);
 
@@ -661,7 +661,7 @@ describe("the review list a connected source is previewed with", () => {
     );
   });
 
-  it("alone reaches the rows; neither search nor open does", async () => {
+  it("reaches unpublished passages that search and open do not return", async () => {
     const scenario = await arrange();
     await seedTheConnectedSourceUnderReview(scenario.workspaceId);
 
@@ -674,7 +674,7 @@ describe("the review list a connected source is previewed with", () => {
     expect(opened).toBe(NOT_FOUND);
   });
 
-  it("applies the class and audience arms all the same", async () => {
+  it("still applies the class and audience rules to an Admin", async () => {
     const scenario = await arrange();
     const board = await groupNamed(db(), scenario, "Board", [scenario.editor]);
     await connectedSourceUnderReview(scenario.workspaceId, ARMS_CONNECTED_SOURCE, [

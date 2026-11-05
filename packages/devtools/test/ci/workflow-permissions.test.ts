@@ -29,7 +29,7 @@ const workflowSchema = z.object({
 type Workflow = z.infer<typeof workflowSchema>;
 type Workflows = ReadonlyMap<string, Workflow>;
 
-/** A map leaves every scope it does not list at `none`; a `-all` shorthand lists none and sets them all. */
+/** A permissions map sets every scope it does not list to `none`. A `-all` shorthand sets every scope. */
 type Grant = { readonly scopes: Readonly<Record<string, Level>>; readonly rest: Level };
 
 const grantOf = (declared: Permissions): Grant => {
@@ -76,7 +76,7 @@ const callsIn = (workflows: Workflows): readonly Call[] =>
 
 type Asker = { readonly who: string; readonly asks: Permissions };
 
-/** Each is checked before the run starts, whatever a job's `if:` says. A job with no block of its own asks for the workflow's. */
+/** GitHub checks every block before the run starts, whatever a job's `if:` says. A job without its own block asks for the workflow's. */
 const askersIn = (file: string, called: Workflow): readonly Asker[] => [
   ...(called.permissions === undefined
     ? []
@@ -118,7 +118,7 @@ describe("what a job calling a reusable workflow grants it", () => {
   it("grants every scope the called workflow asks for", () => {
     expect(
       shortfallsIn(workflowsOnDisk()),
-      "a job calling a reusable workflow grants less than that workflow or one of its jobs asks for, so GitHub fails the whole run at startup (`startup_failure`), whatever the asking job's `if:` says. Give the calling job a `permissions:` block naming every scope listed here at the level asked, with the scopes its workflow's own block already gave. A call whose grant or callee this test cannot read is refused as well: name the grant in the calling file, and call a workflow kept in this directory.",
+      "a job calling a reusable workflow grants less than that workflow or one of its jobs asks for, so GitHub fails the whole run at startup (`startup_failure`), whatever the asking job's `if:` says. Give the calling job a `permissions:` block naming every scope listed here at the level asked, with the scopes its workflow's own block already gave. This test also refuses a call whose grant or called workflow it cannot read. Name the grant in the calling file, and call a workflow in this directory.",
     ).toEqual([]);
   });
 
@@ -224,7 +224,7 @@ describe.each<{
     ],
   },
 ])("a call granting $shape", ({ caller, called, expected }) => {
-  it("names each scope granted short of what is asked", () => {
+  it("lists each scope granted below the level asked", () => {
     expect(
       shortfallsIn(
         new Map([

@@ -38,14 +38,14 @@ const PATH = ["/opt/homebrew/bin", "/usr/bin", "/bin"].join(path.delimiter);
 const onAppleGit = process.platform === "darwin" && existsSync(APPLE_GIT);
 
 describe("the test workers' PATH", () => {
-  it("is PATH as it is off darwin", () => {
+  it("is left unchanged off darwin", () => {
     const machine = aMachine();
 
     expect(pathWithAppleGit({ ...machine, platform: "linux", searchPath: PATH })).toBe(PATH);
     expect(existsSync(machine.linkDirectory)).toBe(false);
   });
 
-  it("is PATH as it is when Apple's git is absent", () => {
+  it("is left unchanged when Apple's git is absent", () => {
     const machine = aMachine();
     rmSync(machine.appleGit);
 
@@ -53,7 +53,7 @@ describe("the test workers' PATH", () => {
     expect(existsSync(machine.linkDirectory)).toBe(false);
   });
 
-  it("starts with a directory whose one entry links Apple's git", () => {
+  it("starts with a directory whose only entry links Apple's git", () => {
     const machine = aMachine();
 
     const first = pathWithAppleGit({ ...machine, platform: "darwin", searchPath: PATH });
@@ -63,7 +63,7 @@ describe("the test workers' PATH", () => {
     expect(readlinkSync(path.join(machine.linkDirectory, "git"))).toBe(machine.appleGit);
   });
 
-  it("names the directory once, however often it is read", () => {
+  it("adds the directory once, however often it is computed", () => {
     const machine = aMachine();
 
     const once = pathWithAppleGit({ ...machine, platform: "darwin", searchPath: PATH });
@@ -72,7 +72,7 @@ describe("the test workers' PATH", () => {
     expect(twice).toBe(once);
   });
 
-  it("relinks a git that points anywhere else", () => {
+  it("replaces a git link that points anywhere else", () => {
     const machine = aMachine();
     mkdirSync(machine.linkDirectory);
     symlinkSync("/usr/bin/git", path.join(machine.linkDirectory, "git"));
@@ -90,7 +90,7 @@ describe("the test workers' PATH", () => {
     expect(execFileSync("git", ["--version"], { encoding: "utf8" })).toContain("Apple Git");
   });
 
-  it.runIf(onAppleGit)("still finds git filter-repo past Apple's git", () => {
+  it.runIf(onAppleGit)("still finds git filter-repo with Apple's git first", () => {
     const run = execFileSync("git", ["filter-repo", "--version"], { encoding: "utf8" });
 
     expect(run.trim()).not.toBe("");

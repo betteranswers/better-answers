@@ -11,11 +11,11 @@ import { servedApp } from "../support/suite-app.ts";
 const objects = objectStoreForSuite();
 const { ops } = opsRunner(objects);
 
-describe("pnpm ops — the restore scripts' commands", () => {
+describe("pnpm ops", () => {
   const served = servedApp();
 
-  describe("unmapped-passage-rate — the records flagged incomplete, as JSON", () => {
-    const flaggedIncomplete = async (
+  describe("unmapped-passage-rate, which counts records flagged incomplete", () => {
+    const seedRecordFlaggedIncomplete = async (
       app: TestApp,
       workspaceId: string,
       unmappedPassages: readonly string[],
@@ -43,12 +43,17 @@ describe("pnpm ops — the restore scripts' commands", () => {
       }
     };
 
-    it("reports two of three mapped records showing unmapped passages", async () => {
+    it("reports that two of three mapped records showed unmapped passages", async () => {
       const { workspaceId } = await served().provision();
-      await flaggedIncomplete(served(), workspaceId, ["documents/handbook.pdf#page=4"]);
-      await flaggedIncomplete(served(), workspaceId, ["documents/handbook.pdf#page=9"]);
-      await flaggedIncomplete(served(), workspaceId, []);
-      await flaggedIncomplete(served(), workspaceId, ["documents/handbook.pdf#page=2"], null);
+      await seedRecordFlaggedIncomplete(served(), workspaceId, ["documents/handbook.pdf#page=4"]);
+      await seedRecordFlaggedIncomplete(served(), workspaceId, ["documents/handbook.pdf#page=9"]);
+      await seedRecordFlaggedIncomplete(served(), workspaceId, []);
+      await seedRecordFlaggedIncomplete(
+        served(),
+        workspaceId,
+        ["documents/handbook.pdf#page=2"],
+        null,
+      );
 
       const run = await ops(served(), ["unmapped-passage-rate", "--workspace", workspaceId]);
 
@@ -64,7 +69,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("answers usage to a non-id workspace before reading anything", async () => {
+    it("exits 2 for a workspace that is not an id", async () => {
       const run = await ops(served(), ["unmapped-passage-rate", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);

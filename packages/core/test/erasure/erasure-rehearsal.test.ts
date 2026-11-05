@@ -103,8 +103,8 @@ const connectedSourcesIn = async (workspaceId: string): Promise<readonly string[
   return read.rows.map((row) => row.id);
 };
 
-describe("the seed", () => {
-  it("writes one synthetic member and answers the tokens to grep", async () => {
+describe("seeding the synthetic subject", () => {
+  it("creates one synthetic member and returns the tokens to find", async () => {
     const scenario = await arrange();
     const [email, named, name] = expectedTokensFor(scenario.workspaceId);
 
@@ -115,7 +115,7 @@ describe("the seed", () => {
     expect(await memberRows(scenario.workspaceId, subject.personId)).toEqual([{ role: "Admin" }]);
   });
 
-  it("connects a document naming the subject, queueing its sync", async () => {
+  it("connects a document naming the subject and queues its sync", async () => {
     const scenario = await arrange();
     const [email, , name] = expectedTokensFor(scenario.workspaceId);
 
@@ -152,7 +152,7 @@ describe("the seed", () => {
     expect(await connectedSourcesIn(scenario.workspaceId)).toHaveLength(2);
   });
 
-  it("names the subject in the concept file in rewritable form", async () => {
+  it("writes the subject's actor id into the concept file", async () => {
     const scenario = await arrange();
     const [, named] = expectedTokensFor(scenario.workspaceId);
 
@@ -160,12 +160,12 @@ describe("the seed", () => {
 
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     const sha = history.at(-1);
-    assert(sha !== undefined, "the seeding committed");
+    assert(sha !== undefined, "the seeding made no commit");
     const file = await fileAtCommit(scenario.git, scenario.workspaceId, sha, CONCEPT_PATH);
     expect(file).toContain(named);
   });
 
-  it("seeds the same subject again, with no second commit", async () => {
+  it("returns the same subject on reseeding, without a second commit", async () => {
     const scenario = await arrange();
 
     const first = await seeding(scenario);
@@ -181,7 +181,7 @@ describe("the seed", () => {
     ]);
   });
 
-  it("refuses where another concept holds the drill's path, head unmoved", async () => {
+  it("refuses when another concept holds the rehearsal's path, committing nothing", async () => {
     const scenario = await arrange();
     const other = await writeConcept(scenario.admin, doorsOf(scenario), {
       mergeKey: "Note:not the drill",
@@ -209,7 +209,7 @@ describe("the seed", () => {
 });
 
 describe("the rehearsal", () => {
-  it("finds the subject the seed left in the rows", async () => {
+  it("finds the tokens of the subject the seed wrote", async () => {
     const scenario = await arrange();
 
     await seedSyntheticSubject(ERASURE, doorsFor(scenario), {
@@ -221,7 +221,7 @@ describe("the rehearsal", () => {
     expect(rehearsed.tokens).toEqual(expectedTokensFor(scenario.workspaceId));
   });
 
-  it("names a refused principal as the subject's, not the request's", async () => {
+  it("says the subject's principal was refused after its sign-ins ended", async () => {
     const scenario = await arrange();
     const subject = await seeding(scenario);
     const { personId } = inputOf(endEverySignInAndTokenInput, { personId: subject.personId });
@@ -230,7 +230,7 @@ describe("the rehearsal", () => {
     );
     assert(answered.ok);
     const revoked = answered.value;
-    assert(revoked.ok, "the revocation refused");
+    assert(revoked.ok, "the revocation was refused");
 
     const rehearsed = await rehearseErasure(ERASURE, doorsFor(scenario), {
       workspaceId: scenario.workspaceId,
@@ -244,7 +244,7 @@ describe("the rehearsal", () => {
     });
   });
 
-  it("refuses a workspace nothing was seeded into", async () => {
+  it("refuses a workspace with no seeded subject", async () => {
     const scenario = await arrange();
 
     const rehearsed = await rehearseErasure(ERASURE, doorsFor(scenario), {
@@ -255,7 +255,7 @@ describe("the rehearsal", () => {
     expect(rehearsed.error).toBe("not-seeded");
   });
 
-  it("answers with the routine's own report, word for word", async () => {
+  it("returns the erasure routine's report unchanged", async () => {
     const scenario = await arrange();
     await seeding(scenario);
 
@@ -282,7 +282,7 @@ describe("the rehearsal", () => {
     expect(report).toContain("Exports already issued are not recalled. None have been issued.");
   });
 
-  it("leaves no token in the bundle and no identity row", async () => {
+  it("removes every token from the bundle and the identity rows", async () => {
     const scenario = await arrange();
     const subject = await seeding(scenario);
 
@@ -297,7 +297,7 @@ describe("the rehearsal", () => {
     expect(await memberRows(scenario.workspaceId, subject.personId)).toEqual([]);
   });
 
-  it("records one action under the platform principal, carrying no token", async () => {
+  it("records one audit event by the platform actor, without tokens", async () => {
     const scenario = await arrange();
     const subject = await seeding(scenario);
 

@@ -85,7 +85,7 @@ const submitFixtureSet = async (client: Parameters<Parameters<typeof withRollbac
   return submitted;
 };
 
-describe("the suggestions agreement", () => {
+describe("the suggestions contract fixture", () => {
   it("submits a set in one call and re-renders its summary", async () => {
     await withRollback(db().pool, async (client) => {
       await seedFixture(client);
@@ -112,7 +112,7 @@ describe("the suggestions agreement", () => {
     });
   });
 
-  it("refuses each closed road with the code the fixture names", async () => {
+  it("refuses each fixture refusal with its expected SQLSTATE", async () => {
     for (const refusal of fixture.refusals) {
       await withRollback(db().pool, async (client) => {
         await seedFixture(client);

@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { authOver } from "../support/auth-instance.ts";
 import { MCP_URL, startApp, type TestApp } from "../support/harness/harness.ts";
 
-describe("the identity adapter's create", () => {
+describe("creating a row through the Better Auth adapter", () => {
   let app: TestApp;
 
   beforeAll(async () => {
@@ -23,7 +23,7 @@ describe("the identity adapter's create", () => {
     );
   };
 
-  it("rejects a unique violation with the store's own error", async () => {
+  it("throws pg's DatabaseError for a unique violation", async () => {
     const now = new Date();
     const refused = await refusalOf("oauthResource", {
       identifier: MCP_URL,
@@ -36,7 +36,7 @@ describe("the identity adapter's create", () => {
     expect(refused).toHaveProperty("code", "23505");
   });
 
-  it("keeps Drizzle's wrapper on a refusal other than uniqueness", async () => {
+  it("keeps Drizzle's error wrapper for a foreign-key violation", async () => {
     const refused = await refusalOf("oauthClientResource", {
       clientId: "no-such-assistant",
       resourceId: MCP_URL,

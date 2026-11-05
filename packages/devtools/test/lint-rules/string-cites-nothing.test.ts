@@ -56,16 +56,16 @@ describe("the string rule refuses a citation a reader cannot open", () => {
   });
 });
 
-describe("the string rule walks past a string citing nothing", () => {
-  it("stays silent over a string saying what to do", () => {
+describe("the string rule accepts a string citing nothing", () => {
+  it("accepts a string saying what to do", () => {
     expect(lint.flagged(saying("Name a workspace this person belongs to."))).toEqual([]);
   });
 
-  it("walks past a value with no prose in it", () => {
+  it("accepts a value with no prose in it", () => {
     expect(lint.flagged({ [FILE]: 'export const profile = "mcp-2026-07-28";\n' })).toEqual([]);
   });
 
-  it("walks past a regular expression, which is not prose", () => {
+  it("ignores a regular expression, which is not prose", () => {
     expect(lint.flagged({ [FILE]: "export const moved = /moved under T-243 here/;\n" })).toEqual(
       [],
     );
@@ -79,7 +79,7 @@ describe("the string rule walks past a string citing nothing", () => {
     expect(lint.flagged(commented)).toEqual([]);
   });
 
-  it("walks past the same string in a test", () => {
+  it("accepts the same string in a test", () => {
     const inATest = {
       "tests/probe.ts": 'export const usage = "The map is Postgres under ADR 0021.";\n',
     };

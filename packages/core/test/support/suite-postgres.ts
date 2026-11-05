@@ -151,10 +151,10 @@ export const overriding = <T extends object>(
   });
 
 /**
- * Postgres can hand a row to a new FOR SHARE read before a woken UPDATE or DELETE, so connect
- * waits for that change.
+ * Postgres can give a row to a new FOR SHARE reader before a woken UPDATE or DELETE applies, so
+ * `connect` waits for `settled` first.
  */
-export const lendingOnceSettled = (pool: pg.Pool, settled: () => Promise<unknown>): pg.Pool =>
+export const poolWaitingFor = (pool: pg.Pool, settled: () => Promise<unknown>): pg.Pool =>
   new Proxy(pool, {
     get: (target, key): unknown => {
       if (key === "connect") {
@@ -168,7 +168,7 @@ export const lendingOnceSettled = (pool: pg.Pool, settled: () => Promise<unknown
     },
   });
 
-export const leaseLetLapse = async (
+export const expireJobLease = async (
   pool: pg.Pool,
   job: { readonly workspaceId: string; readonly jobId: string },
 ): Promise<void> => {
@@ -191,7 +191,7 @@ export const isBlockedOnTable = async (pool: pg.Pool, table: string): Promise<bo
   return (found.rowCount ?? 0) > 0;
 };
 
-/** Those `ask` touches: NOWAIT fails at once on a lock a transaction open across the model's call holds. */
+/** The tables `ask` touches. NOWAIT fails at once if a transaction held open across the model call locks one. */
 const ASKS_TABLES = `member, "user", group_member, question_asked, question_content,
   spend_reservation, llm_call, workspace_config, model_choice, model_key`;
 
@@ -230,8 +230,8 @@ export const abortTheTransaction = async (tx: Tx): Promise<void> => {
   try {
     await tx.query("SELECT 1 / 0");
   } catch {
-    // The failure is the arrangement: Postgres marks the transaction aborted and answers
-    // every later statement on it with that.
+    // The error is deliberate: Postgres then marks the transaction aborted and fails every later
+    // statement on it.
   }
 };
 
@@ -258,7 +258,7 @@ export const whileActionsWaitAt = async <T>(
     await holder.query(`SELECT pg_advisory_unlock(${key}, ${key})`);
   };
   await holder.query(`SELECT pg_advisory_lock(${key}, ${key})`);
-  // A delete has no NEW, and a row trigger that answers null skips its row.
+  // A DELETE trigger has no NEW, and a row trigger that returns null skips the row, so DELETE returns OLD.
   await pool.query(
     `CREATE OR REPLACE FUNCTION test_actions_wait_at() RETURNS trigger LANGUAGE plpgsql AS $$
      BEGIN

@@ -66,7 +66,7 @@ const foundBy = async (person: { readonly email: string }, query: string) =>
   rpcListOf((await calledBy(person, "find", { query }))["hits"]).map((hit) => hit["iri"]);
 
 describe("the browser suite's knowledge harness", () => {
-  it("lands a Restricted concept find returns to Admins, not Viewers", async () => {
+  it("seeds a Restricted concept that `find` shows only to Admins", async () => {
     const { workspace, viewer } = await aWorkspaceWithAViewer();
 
     const [restricted, internal] = await conceptsSeeded({
@@ -96,7 +96,7 @@ describe("the browser suite's knowledge harness", () => {
     expect(seen).not.toContain(restricted?.iri);
   });
 
-  it("lands a concept in the collection its seed names", async () => {
+  it("seeds a concept into the collection the seed names", async () => {
     const workspace = await app().provision();
     await conceptsSeeded({
       workspaceId: workspace.workspaceId,
@@ -121,7 +121,7 @@ describe("the browser suite's knowledge harness", () => {
     });
   });
 
-  it("lands a draft concept that find leaves out", async () => {
+  it("seeds a draft concept that find does not return", async () => {
     const workspace = await app().provision();
     const [draft, stable] = await conceptsSeeded({
       ...seedingBy(workspace),
@@ -137,7 +137,7 @@ describe("the browser suite's knowledge harness", () => {
     expect(found).not.toContain(draft?.iri);
   });
 
-  it("lands one file name in two collections", async () => {
+  it("seeds two concepts with one file name in two collections", async () => {
     const workspace = await app().provision();
 
     const landed = await conceptsSeeded({
@@ -186,7 +186,7 @@ describe("the browser suite's knowledge harness", () => {
     ]);
   });
 
-  it("lands a concept whose cited passage opens for an Admin", async () => {
+  it("seeds a concept whose cited passage an Admin can open", async () => {
     const workspace = await app().provision();
     const [concept] = await conceptsSeeded({
       workspaceId: workspace.workspaceId,
@@ -211,7 +211,7 @@ describe("the browser suite's knowledge harness", () => {
     expect(passage).toMatchObject({ found: true, passage: { text: "Checked at six." } });
   });
 
-  it("lands a readable concept citing a document a Viewer cannot", async () => {
+  it("seeds a concept citing a document a Viewer cannot read", async () => {
     const { workspace, viewer } = await aWorkspaceWithAViewer();
     const [concept] = await conceptsSeeded({
       workspaceId: workspace.workspaceId,
@@ -251,7 +251,7 @@ describe("the browser suite's knowledge harness", () => {
     expect(JSON.stringify(opened)).not.toContain("Synthetic blast licence 2026");
   });
 
-  it("lands a source naming a concept, and a page locator", async () => {
+  it("seeds a source naming a concept, and a page locator", async () => {
     const workspace = await app().provision();
     const [earlier, concept] = await conceptsSeeded({
       workspaceId: workspace.workspaceId,
@@ -305,7 +305,7 @@ describe("the browser suite's knowledge harness", () => {
     });
   });
 
-  it("refuses a document sensitivity that is no sensitivity word", async () => {
+  it("refuses a document sensitivity that is not a sensitivity level", async () => {
     const refused = await seedRefused([
       {
         title: "Quarry blast times",
@@ -336,7 +336,7 @@ describe("the browser suite's knowledge harness", () => {
       "concepts.0.linksTo.0",
     ],
     [
-      "a title two concepts of one seed carry",
+      "a title shared by two concepts in one seed",
       [
         { title: "Quarry speed limits", body: "Synthetic haul roads carry a limit." },
         {
@@ -347,7 +347,7 @@ describe("the browser suite's knowledge harness", () => {
       "concepts.1.title",
     ],
     [
-      "a title two concepts carry in two cases",
+      "two titles that differ only in case and spacing",
       [
         {
           title: "Quarry speed limits",
@@ -371,7 +371,7 @@ describe("the browser suite's knowledge harness", () => {
     });
   });
 
-  it("lands the further frontmatter keys a concept is given", async () => {
+  it("seeds the extra frontmatter keys given for a concept", async () => {
     const workspace = await app().provision();
     const [concept] = await conceptsSeeded({
       workspaceId: workspace.workspaceId,
@@ -459,8 +459,8 @@ const A_PLAIN_SEED = [
   },
 ];
 
-describe("a concepts seed the harness refuses before it writes", () => {
-  it("refuses a held title, and writes none of the seed", async () => {
+describe("concept seeds the harness refuses before writing anything", () => {
+  it("refuses a title already in use and writes nothing", async () => {
     const workspace = await app().provision();
     await conceptsSeeded({
       ...seedingBy(workspace),
@@ -491,7 +491,7 @@ describe("a concepts seed the harness refuses before it writes", () => {
     });
   });
 
-  it("refuses a group member who is no member", async () => {
+  it("refuses a group member who is not in the workspace", async () => {
     const workspace = await app().provision();
     const outsider = await app().person();
 
@@ -522,7 +522,7 @@ describe("a concepts seed the harness refuses before it writes", () => {
   it.each([
     { who: "an Editor", role: "Editor" },
     { who: "a Viewer", role: "Viewer" },
-  ] as const)("refuses $who as a seed's writer", async ({ role }) => {
+  ] as const)("refuses a seed from $who", async ({ role }) => {
     const workspace = await app().provision();
 
     const answered = await askedToSeed({
@@ -534,7 +534,7 @@ describe("a concepts seed the harness refuses before it writes", () => {
     expect(await leftIn(workspace)).toEqual(NOTHING);
   });
 
-  it("refuses a writer who is no member of the workspace", async () => {
+  it("refuses a seed from someone outside the workspace", async () => {
     const workspace = await app().provision();
     const outsider = await app().person();
 
@@ -548,7 +548,7 @@ describe("a concepts seed the harness refuses before it writes", () => {
     expect(await leftIn(workspace)).toEqual(NOTHING);
   });
 
-  it("refuses two titles of one seed that name one file", async () => {
+  it("refuses two titles in one seed that share a file", async () => {
     const workspace = await app().provision();
 
     const answered = await askedToSeed({
@@ -589,7 +589,7 @@ describe("a concepts seed the harness refuses before it writes", () => {
     expect(await leftIn(workspace)).toEqual(NOTHING);
   });
 
-  it("lands the members' refused seed when an Admin writes it", async () => {
+  it("seeds the same concepts when an Admin writes them", async () => {
     const workspace = await app().provision();
 
     const [concept] = await conceptsSeeded({ ...seedingBy(workspace), concepts: A_PLAIN_SEED });
@@ -690,7 +690,7 @@ type GuideSeeded = z.output<typeof seededGuide>;
 
 const sectionOf = (seeded: GuideSeeded, prompt: string) => {
   const found = seeded.sections.find((section) => section.prompt === prompt);
-  assert(found !== undefined, `the guide holds no section ${prompt}`);
+  assert(found !== undefined, `the guide has no section ${prompt}`);
   return found;
 };
 
@@ -755,7 +755,7 @@ describe("the guide the harness seeds", () => {
     expect(Object.keys(seeded.concepts)).toHaveLength(23);
   });
 
-  it("leaves the employers' liability policy unseeded", async () => {
+  it("does not seed the employers' liability policy", async () => {
     const { seeded } = await aGuideSeeded();
     const insurance = sectionOf(seeded, "Insurance and financial standing");
 
@@ -779,7 +779,7 @@ describe("the guide the harness seeds", () => {
     expect(citing.map(({ prompt }) => prompt)).toEqual(["Certifications", "Information security"]);
   });
 
-  it("writes each Brief as version 2 over an empty one", async () => {
+  it("writes each Brief as version 2 after an empty version", async () => {
     const { workspace, seeded } = await aGuideSeeded();
     const stored = await app().database.superuser.query<{
       write_up_id: string;
@@ -802,7 +802,7 @@ describe("the guide the harness seeds", () => {
     }
   });
 
-  it("writes a paragraph of each concept's body, then its marker", async () => {
+  it("writes each concept's body as a paragraph with its footnote", async () => {
     const { workspace, seeded } = await aGuideSeeded();
     const certifications = sectionOf(seeded, "Certifications");
     const [iso, plus] = certifications.includes;
@@ -821,7 +821,7 @@ describe("the guide the harness seeds", () => {
     );
   });
 
-  it("narrows the professional indemnity policy to finance", async () => {
+  it("limits the professional indemnity policy to the finance group", async () => {
     const { workspace, viewer, financier, seeded } = await aGuideSeeded();
     const iri = iriOf(seeded, PROFESSIONAL_INDEMNITY);
     const group = await app().database.superuser.query<{ name: string; members: string[] }>(
@@ -845,7 +845,7 @@ describe("the guide the harness seeds", () => {
     });
   });
 
-  it("verifies four concepts by a person and leaves the rest", async () => {
+  it("marks four concepts human-reviewed and leaves 19 unverified", async () => {
     const { workspace, seeded } = await aGuideSeeded();
     const { api } = await webSignedIn(app(), workspace.admin.email);
 
@@ -858,8 +858,8 @@ describe("the guide the harness seeds", () => {
   });
 });
 
-describe("a guide seed the harness refuses before it writes", () => {
-  it("refuses an Editor as the guide's writer", async () => {
+describe("guide seeds the harness refuses before writing anything", () => {
+  it("refuses a guide seed from an Editor", async () => {
     const workspace = await app().provision();
 
     const answered = await askedToSeedAGuide({
@@ -886,7 +886,7 @@ describe("a guide seed the harness refuses before it writes", () => {
     expect(await guideRowsIn(workspace.workspaceId)).toEqual(before);
   });
 
-  it("refuses a finance member who is no member", async () => {
+  it("refuses a finance member who is not in the workspace", async () => {
     const workspace = await app().provision();
     const outsider = await app().person();
 
@@ -899,7 +899,7 @@ describe("a guide seed the harness refuses before it writes", () => {
     expect(await guideRowsIn(workspace.workspaceId)).toMatchObject({ concepts: 0, groups: 0 });
   });
 
-  it("refuses a workspace that already holds a finance group", async () => {
+  it("refuses a workspace that already has a finance group", async () => {
     const workspace = await app().provision();
     await harnessPosted("/__harness/groups", { ...seedingBy(workspace), names: ["finance"] });
 

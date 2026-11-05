@@ -52,8 +52,8 @@ const NOTHING_BUT_SELECT = {
 type Grants = readonly { readonly object: string; readonly privilege: string }[];
 
 /**
- * A role is the cluster's, not a database's: on the shared warm cluster it would reach every
- * suite that reads the roles.
+ * A role belongs to the whole cluster. On the shared test cluster, this role would reach every suite
+ * that reads roles.
  */
 let db: MigratedPostgres;
 let browse: pg.Pool;
@@ -61,8 +61,8 @@ let workspaces: readonly string[];
 let partition: string;
 
 /**
- * psql runs a file one statement at a time, each committing alone unless the file opens a
- * transaction; one query would hide that.
+ * psql runs and commits each statement on its own. One query would run the file as one transaction
+ * and hide a partial failure.
  */
 const statementsOf = (file: string): readonly string[] => {
   const statements: string[] = [];
@@ -144,8 +144,8 @@ afterAll(async () => {
   await db.stop();
 });
 
-describe("the read-only browsing role, applied over the whole journal", () => {
-  it("logs in and bypasses RLS, holding no other role attribute", async () => {
+describe("the browse_ro role, applied after every migration", () => {
+  it("logs in and bypasses RLS, with no other role attribute", async () => {
     const role = await db.pool.query(
       `SELECT rolcanlogin, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls
          FROM pg_roles WHERE rolname = 'browse_ro'`,
@@ -172,7 +172,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     );
   });
 
-  it("holds SELECT alone on every relation in public and index", async () => {
+  it("has only SELECT on every relation in public and index", async () => {
     const relations = await db.pool.query<{ relation: string }>(
       `SELECT format('%I.%I', n.nspname, c.relname) AS relation
          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -199,7 +199,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     }
   });
 
-  it("answers a read of every view in public and index", async () => {
+  it("can read every view in public and index", async () => {
     const views = await db.pool.query<{ relation: string }>(
       `SELECT format('%I.%I', n.nspname, c.relname) AS relation
          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -215,7 +215,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     expect(refused).toEqual([]);
   });
 
-  it("withholds the identity set's credential columns, serving every other", async () => {
+  it("cannot read credential columns but can read every other column", async () => {
     const columns = await db.pool.query<{ relation: string; column: string; readable: boolean }>(
       `SELECT format('%s.%s', n.nspname, c.relname) AS relation, a.attname AS column,
               has_column_privilege('browse_ro', c.oid, a.attname, 'SELECT') AS readable
@@ -240,7 +240,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     expect(served.rowCount).toEqual(1);
   });
 
-  it("opens sessions read-only, refusing a GUI's write before grant checks", async () => {
+  it("starts each session read-only, so writes fail before grant checks", async () => {
     const shown = await browse.query<{ default_transaction_read_only: string }>(
       "SHOW default_transaction_read_only",
     );
@@ -250,7 +250,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     );
   });
 
-  it("refuses writes, DDL and definer functions in a read-write transaction", async () => {
+  it("cannot write, change schema, or call definers when read-write", async () => {
     const client = await browse.connect();
     try {
       await client.query("BEGIN READ WRITE");
@@ -283,7 +283,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
 
       await client.query("BEGIN READ WRITE");
       const [workspaceId] = workspaces;
-      assert(workspaceId !== undefined, "the suite seeded a workspace");
+      assert(workspaceId !== undefined, "the suite seeded no workspace");
       await expect(configProbeWritten(client, workspaceId, "probe")).rejects.toThrow(
         /permission denied for table workspace_config/,
       );
@@ -293,7 +293,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     }
   });
 
-  it("can execute no definer function in either schema", async () => {
+  it("cannot execute any security-definer function in public or index", async () => {
     const definers = await db.pool.query<{ fn: string; executable: boolean }>(
       `SELECT p.oid::regprocedure::text AS fn,
               has_function_privilege('browse_ro', p.oid, 'EXECUTE') AS executable
@@ -304,13 +304,13 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     expect(definers.rows.filter((row) => row.executable)).toEqual([]);
   });
 
-  it("leaves no credential column readable when psql's run fails partway", async () => {
+  it("grants no credential column when the script fails partway", async () => {
     const client = await db.pool.connect();
     try {
       await client.query('REVOKE ALL ON ALL TABLES IN SCHEMA public, "index" FROM browse_ro');
       await client.query("ALTER TABLE jwks RENAME TO jwks_set_aside");
       const refusal = await firstRefusalOf(client, statementsOf(roleFile));
-      // psql stops at the error and its session ends, taking an open transaction with it.
+      // psql stops at the first error and ends its session, which rolls back an open transaction.
       await client.query("ROLLBACK");
       expect(refusal).toMatch(/relation "public.jwks" does not exist/);
       const readable = await client.query(
@@ -325,7 +325,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     }
   });
 
-  it("is applied again as it was applied first", async () => {
+  it("grants the same privileges when applied a second time", async () => {
     const before = await grantsOf();
     expect(before.length).toBeGreaterThan(40);
     await db.pool.query(roleFile);

@@ -153,8 +153,8 @@ const anAnswer = (overrides: Partial<AnswerResult<string>> = {}): AnswerResult<s
 
 const linesOf = (rendered: string): readonly string[] => rendered.split("\n");
 
-describe("the answer's rendering", () => {
-  it("heads related knowledge with what to do, never as answered", () => {
+describe("renderAnswer", () => {
+  it("starts related knowledge with instructions and never says answered", () => {
     const [first, ...rest] = linesOf(renderAnswer(anAnswer()));
 
     expect(first).toBe(RELATED_LINE);
@@ -170,13 +170,13 @@ describe("the answer's rendering", () => {
   it.each([
     ["ok", "**Answered from the company's knowledge.**"],
     ["warn", "**Answered with a warning for your role.**"],
-    ["refuse", "**Not answered from the company's knowledge.**"],
+    ["refuse", "**We couldn't find an answer in your company's knowledge.**"],
     ["related", RELATED_LINE],
-  ] as const)("heads a %s answer with its own line", (verdict, line) => {
+  ] as const)("starts a %s answer with that verdict's own line", (verdict, line) => {
     expect(linesOf(renderAnswer(anAnswer({ verdict })))[0]).toBe(line);
   });
 
-  it("gives every verdict a record keeps a line", () => {
+  it("has a heading line for every verdict a record stores", () => {
     expect([...QUESTION_VERDICTS]).toEqual(["ok", "warn", "refuse", "related"]);
   });
 
@@ -184,7 +184,7 @@ describe("the answer's rendering", () => {
     ["not-judged", "_Not judged · map as of now_"],
     ["judged", "_Judged · map as of now_"],
     ["judging-failed", "_Judging failed · map as of now_"],
-  ] as const)("says a %s judge in words beside the map", (judgeState, line) => {
+  ] as const)("describes the %s judge state in words beside the map", (judgeState, line) => {
     expect(linesOf(renderAnswer(anAnswer({ judgeState })))[2]).toBe(line);
     expect(JUDGE_STATES).toContain(judgeState);
   });
@@ -226,7 +226,7 @@ describe("the answer's rendering", () => {
     ]);
   });
 
-  it("renders each fit word for word with its verifier", () => {
+  it("renders each fitting `Answer` word for word with its verifier", () => {
     const fit = returned({
       title: "Who reads the audit log?",
       body: "Admins read it.\n",
@@ -248,7 +248,7 @@ describe("the answer's rendering", () => {
     ]);
   });
 
-  it("follows the verdict with the record id and the fits", () => {
+  it("lists the record id and fitting `Answer`s after the verdict", () => {
     const users = returned({ iri: "https://better-answers.com/c/01U", title: "Who exports it?" });
     const unfiled = returned({ title: "Who reads it?", collection: null });
     const rendered = renderAnswer(
@@ -264,7 +264,7 @@ describe("the answer's rendering", () => {
     ]);
   });
 
-  it("never heads a related `Answer` as a fit", () => {
+  it("labels a related `Answer`'s heading as related knowledge", () => {
     const headings = (rendered: string) =>
       linesOf(rendered).filter((line) => line.startsWith("## "));
     const fitted = anAnswer({
@@ -278,7 +278,7 @@ describe("the answer's rendering", () => {
     expect(headings(renderAnswer(anAnswer()))).toEqual(["## Related knowledge · Answer · audits"]);
   });
 
-  it("names each concept in the text by its iri alone", () => {
+  it("names each concept by its iri, not its app URL", () => {
     const policy: PreviewedConcept<string> = {
       iri: "https://better-answers.com/c/01B",
       url: "https://app.example/knowledge/search/01B",
@@ -296,7 +296,7 @@ describe("the answer's rendering", () => {
     expect(rendered.split("https://better-answers.com/c/01B")).toHaveLength(2);
   });
 
-  it("lists any other concept after the `Answer`s, to open", () => {
+  it("lists other concepts after the `Answer`s as lines to open", () => {
     const policy: PreviewedConcept<string> = {
       iri: "https://better-answers.com/c/01B",
       url: "https://app.example/knowledge/search/01B",
@@ -343,7 +343,7 @@ describe("the answer's rendering", () => {
     ]);
   });
 
-  it("renders a refusal as the one sentence plus unmapped passages", () => {
+  it("renders a refusal as the refusal sentence and unmapped passages", () => {
     expect(
       renderAnswer(
         anAnswer({
@@ -369,7 +369,7 @@ describe("the answer's rendering", () => {
       ),
     ).toBe(
       [
-        "**Not answered from the company's knowledge.**",
+        "**We couldn't find an answer in your company's knowledge.**",
         `Record of this question: ${A_RECORD}`,
         "_Not judged · map as of now_",
         "Collections considered: none",
@@ -387,8 +387,8 @@ describe("the answer's rendering", () => {
   });
 });
 
-describe("the preview's rendering", () => {
-  it("says nothing matches when empty, else one line per match", () => {
+describe("renderFind", () => {
+  it("writes one line per match, or says nothing matches", () => {
     expect(renderFind({ query: "expenses", matches: [] })).toBe(
       "Nothing in the company's knowledge matches that.",
     );
@@ -432,7 +432,7 @@ describe("the preview's rendering", () => {
     );
   });
 
-  it("names a concept's collection in its line, or none", () => {
+  it("names each concept's collection, or No collection, in its line", () => {
     const match = {
       layer: "bundles",
       kind: "Answer",
@@ -524,7 +524,7 @@ const flagged = (reason: FeedbackReason, note?: string): string =>
     },
   });
 
-describe("open's and feedback's renderings", () => {
+describe("renderOpen and renderFeedback", () => {
   it("quotes a passage with its source, locator and sensitivity word", () => {
     expect(
       renderOpen({
@@ -593,7 +593,7 @@ describe("open's and feedback's renderings", () => {
     );
   });
 
-  it("renders each source's opening and the concept's relations", () => {
+  it("renders evidence by iri, name or page, and the relations", () => {
     expect(
       renderOpen({
         found: true,
@@ -667,7 +667,7 @@ describe("open's and feedback's renderings", () => {
     );
   });
 
-  it("names what was asked where there is nothing to show", () => {
+  it("names the missing iri or passage when nothing is found", () => {
     expect(renderOpen({ found: false, iri: "https://better-answers.com/c/01C" })).toBe(
       "No concept at https://better-answers.com/c/01C.",
     );
@@ -711,10 +711,10 @@ describe("open's and feedback's renderings", () => {
 
 const CITED = conceptIriOf(WELL_FORMED_ULID.parse("01J6CCCCCCCCCCCCCCCCCCCCCC"));
 
-describe("what the slice's four actions answer", () => {
+describe("the results of find, open, ask and giveFeedback", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");
 
-  it("hands every caller an outcome to read, not to catch", () => {
+  it("returns a Result from each action instead of throwing", () => {
     expectTypeOf(find).returns.resolves.toEqualTypeOf<Result<FindResult, "role-forbids" | Error>>();
     expectTypeOf(open).returns.resolves.toEqualTypeOf<Result<OpenResult, "role-forbids" | Error>>();
     expectTypeOf(ask<"credentials-revoked">).returns.resolves.toEqualTypeOf<
@@ -725,7 +725,7 @@ describe("what the slice's four actions answer", () => {
     >();
   });
 
-  it("answers the query and no matches when neither arm finds", async () => {
+  it("returns no matches when neither concepts nor passages match", async () => {
     const reader = await arrange();
 
     const found = await acting(reader, (principal, tx) =>
@@ -735,12 +735,12 @@ describe("what the slice's four actions answer", () => {
     expect(found).toEqual({ ok: true, value: { query: "expenses", matches: [] } });
   });
 
-  it("refuses feedback and ask a role outside the three", async () => {
+  it("refuses feedback and ask from a role outside the three", async () => {
     const reader = await arrange();
-    // @ts-expect-error — a role no resolver hands out is the value each face must still refuse.
+    // @ts-expect-error Owner is not a role, and both actions must refuse it.
     const stranger = (principal: UserPrincipal): UserPrincipal => ({ ...principal, role: "Owner" });
     const aStepRan = (): never => {
-      throw new Error("a step ran for a person ask never admitted");
+      throw new Error("ask ran a step for a role it must refuse");
     };
     const noStep: AskSteps = {
       openRecord: aStepRan,
@@ -764,7 +764,7 @@ describe("what the slice's four actions answer", () => {
     ]);
   });
 
-  it("answers a locator that is no address as not found", async () => {
+  it("returns not found for a locator that isn't an address", async () => {
     const reader = await arrange();
 
     const opened = await acting(reader, (principal, tx) =>
@@ -774,14 +774,14 @@ describe("what the slice's four actions answer", () => {
     expect(opened).toEqual({ ok: true, value: { found: false, locator: "p.4" } });
   });
 
-  it("answers a failed read as an error, never a concept", async () => {
+  it("returns an error, not a concept, when the read fails", async () => {
     const reader = await arrange();
     let answered: Result<OpenResult> | undefined;
 
     await expect(
       acting(reader, async (principal, tx) => {
         await tx.query("SELECT 1 / 0").catch(() => undefined);
-        // @ts-expect-error a read that fails before any row is read needs no minted iri
+        // @ts-expect-error the read fails before it uses the iri, so a plain string is enough
         answered = await open(principal, tx, { iri: "https://better-answers.com/c/01A" }, now);
       }),
     ).rejects.toThrow("the transaction did not commit");
@@ -789,7 +789,7 @@ describe("what the slice's four actions answer", () => {
     expect(answered?.ok).toBe(false);
   });
 
-  it.each(["Editor", "Viewer"] as const)("admits an %s to find and open", async (role) => {
+  it.each(["Editor", "Viewer"] as const)("lets an %s use find and open", async (role) => {
     const reader = await arrange(role);
 
     const found = await acting(reader, (principal, tx) =>
@@ -851,7 +851,7 @@ describe("feedback given on a record", () => {
     return rowsFrom(read);
   };
 
-  it("stores a flag with its note, sentence and concept", async () => {
+  it("stores a flag with its note, disputed sentence and concept", async () => {
     const asker = await anAsker();
     const recordId = await recordOf(asker);
     const feedback = {
@@ -880,7 +880,7 @@ describe("feedback given on a record", () => {
     expect(receipt).toEqual({ ok: true, value: { outcome: "stored", feedback } });
   });
 
-  it("stores helpful with no reason, note or sentence", async () => {
+  it("stores helpful feedback with no reason, note or sentence", async () => {
     const asker = await anAsker();
     const recordId = await recordOf(asker);
 
@@ -912,7 +912,7 @@ describe("feedback given on a record", () => {
     ["a colleague asked", aColleaguesRecord],
     ["nobody asked", async () => ulid()],
     ["left with no verdict", (giver: UserPrincipal) => recordOf(giver, "open")],
-  ])("answers not-found for a record %s", async (_case, recordFor) => {
+  ])("returns not-found for a record %s", async (_case, recordFor) => {
     const giver = await anAsker();
     const recordId = await recordFor(giver);
 
@@ -952,7 +952,7 @@ describe("feedback given on a record", () => {
     });
   });
 
-  it("answers not-found before comparing a colleague's disputed concept", async () => {
+  it("returns not-found for a colleague's record before checking the concept", async () => {
     const giver = await anAsker();
     const recordId = await aColleaguesRecord(giver);
 
@@ -963,7 +963,7 @@ describe("feedback given on a record", () => {
   });
 });
 
-describe("the boundary feedback is parsed at", () => {
+describe("parsing the feedback input", () => {
   const flagging = (more: Readonly<Record<string, unknown>>) =>
     parse(feedbackInput, { recordId: A_RECORD, verdict: "flag", reason: "wrong", ...more });
 
@@ -972,7 +972,7 @@ describe("the boundary feedback is parsed at", () => {
     error: { word: "malformed", fields },
   });
 
-  it("holds a note and a disputed sentence to 2,000 characters", () => {
+  it("limits a note and a disputed sentence to 2,000 characters", () => {
     const long = "a".repeat(2_000);
 
     expect(flagging({ note: long, disputed: { sentence: long, concept: CITED } })).toEqual({
@@ -1023,7 +1023,7 @@ describe("the boundary feedback is parsed at", () => {
       { disputed: { sentence: A_DISPUTED_SENTENCE, concept: CITED } },
       { disputed: "wrong-type" },
     ],
-  ])("refuses helpful sent with %s", (_case, more, fields) => {
+  ])("refuses helpful feedback sent with %s", (_case, more, fields) => {
     expect(parse(feedbackInput, { recordId: A_RECORD, verdict: "helpful", ...more })).toEqual(
       malformedAt(fields),
     );
@@ -1040,8 +1040,8 @@ describe("the boundary feedback is parsed at", () => {
   });
 });
 
-describe("the boundary find and open are parsed at", () => {
-  it("refuses a query holding a NUL as malformed", () => {
+describe("parsing the find, open and ask inputs", () => {
+  it("refuses a query that contains a NUL as malformed", () => {
     expect(parse(findInput, { query: "audit\u0000logs" })).toEqual({
       ok: false,
       error: { word: "malformed", fields: { query: "refused" } },
@@ -1051,7 +1051,7 @@ describe("the boundary find and open are parsed at", () => {
     ]);
   });
 
-  it("holds a page to 1–20 matches, 5 when unasked", () => {
+  it("limits a page to 1–20 matches and defaults to 5", () => {
     expect(parse(findInput, { query: "audit" })).toEqual({
       ok: true,
       value: { query: "audit", limit: 5 },
@@ -1068,7 +1068,7 @@ describe("the boundary find and open are parsed at", () => {
 
   it.each([
     ["not base64url", "not a cursor!", "bad-format"],
-    ["no position find hands out", "e30", "refused"],
+    ["not a position find returns", "e30", "refused"],
   ])("refuses a cursor that is %s", (_case, cursor, issue) => {
     expect(parse(findInput, { query: "audit", cursor })).toEqual({
       ok: false,
@@ -1076,7 +1076,7 @@ describe("the boundary find and open are parsed at", () => {
     });
   });
 
-  it("reads a cursor back into the position it names", () => {
+  it("parses a cursor into the position it encodes", () => {
     const cursor =
       "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjoxLCJyYW5rIjowLjUsImtleSI6Imh0dHBzOi8vYmV0dGVyLWFuc3dlcnMuY29tL2MvMDFKNlpaWlpaWlpaWlpaWlpaWlpaWlpaWloifSwiY291bnRzIjp7InNpemUiOjEsImZyZXF1ZW5jaWVzIjpbMV19fQ";
 
@@ -1120,7 +1120,7 @@ describe("the boundary find and open are parsed at", () => {
     expect(described(askInput.shape)).toEqual({ question: true, collections: true });
   });
 
-  it("holds a question to 2,000 characters, with no NUL", () => {
+  it("limits a question to 2,000 characters and refuses a NUL", () => {
     expect(parse(askInput, { question: "a".repeat(2_000) })).toEqual({
       ok: true,
       value: { question: "a".repeat(2_000), collections: [] },
@@ -1136,7 +1136,7 @@ describe("the boundary find and open are parsed at", () => {
     ]);
   });
 
-  it("holds the collections to twenty names of 200 characters", () => {
+  it("limits collections to twenty names of 200 characters each", () => {
     const twenty = Array.from({ length: 20 }, (_unused, at) => `collection-${at}`);
     const asking = (collections: readonly string[]) =>
       parse(askInput, { question: "When is the audit?", collections });
@@ -1217,7 +1217,7 @@ const CONSOLE_EXPORTS: SeededConcept = {
   body: "Exports are made in the console.\n",
 };
 
-describe("what ask answers with no model", () => {
+describe("what ask returns with no model", () => {
   const anAsker = async (role: Role = "Viewer") => {
     const reader = await arrange(role);
     return {
@@ -1254,7 +1254,7 @@ describe("what ask answers with no model", () => {
     return read.rows[0]?.map_state;
   };
 
-  it("refuses a question nothing matches, no judge having run", async () => {
+  it("refuses a question nothing matches, without running the judge", async () => {
     const { asker } = await anAsker();
 
     const answer = await asked(db(), asker, { question: "How long do we have to claim expenses?" });
@@ -1323,7 +1323,7 @@ describe("what ask answers with no model", () => {
     );
   });
 
-  it("AE5: answers related knowledge where no `Answer` matches", async () => {
+  it("AE5: returns related knowledge when no `Answer` matches", async () => {
     const { workspaceId, asker } = await anAsker();
     const note = await seededIn(workspaceId, CONSOLE_EXPORTS);
     const policy = await seededIn(workspaceId, {
@@ -1373,7 +1373,7 @@ describe("what ask answers with no model", () => {
     ]);
   });
 
-  it("reaches the concept holding a three-letter acronym", async () => {
+  it("finds a concept by a three-letter acronym in its body", async () => {
     const { workspaceId, asker } = await anAsker();
     const signingIn = await seededIn(workspaceId, {
       collection: null,
@@ -1405,7 +1405,7 @@ describe("what ask answers with no model", () => {
     expect(irisOf(answer)).toEqual([three, one]);
   });
 
-  it("keeps a named collection's concepts and every unmapped passage", async () => {
+  it("keeps only a named collection's concepts, but every unmapped passage", async () => {
     const { workspaceId, asker } = await anAsker();
     const linked = await seededIn(workspaceId, CONSOLE_EXPORTS);
     const audits = await seededIn(workspaceId, { ...RETENTION_ANSWER, linksTo: [linked] });
@@ -1434,7 +1434,7 @@ describe("what ask answers with no model", () => {
     expect(whole.unmappedPassages).toEqual(narrowed.unmappedPassages);
   });
 
-  it("returns the same concepts naming every collection or none", async () => {
+  it("returns the same concepts with every collection named or none", async () => {
     const { workspaceId, asker } = await anAsker();
     const uids = Array.from({ length: 1_002 }, () => conceptIriOf(ulid())).toSorted();
     const sections = uids.slice(0, 1_001);
@@ -1461,7 +1461,7 @@ describe("what ask answers with no model", () => {
     expect(irisOf(named)).toEqual(irisOf(unnamed));
   });
 
-  it("names the collections it considered, a misspelt one echoed", async () => {
+  it("lists the collections considered, echoing a misspelt name back", async () => {
     const { workspaceId, asker } = await anAsker();
     await seededIn(workspaceId, RETENTION_ANSWER);
     await seededIn(workspaceId, CONSOLE_EXPORTS);
@@ -1494,7 +1494,7 @@ describe("what ask answers with no model", () => {
     expect(withoutRecord(emptied)).toEqual(withoutRecord(unnamed));
   });
 
-  it("cuts at the related cap, entry points before the walk", async () => {
+  it("stops at the related cap, entry points before walked concepts", async () => {
     const { workspaceId, asker } = await anAsker();
     const reached = await seededIn(workspaceId, CONSOLE_EXPORTS);
     const three = await seededIn(workspaceId, {
@@ -1516,7 +1516,7 @@ describe("what ask answers with no model", () => {
     expect(irisOf(await capped(3))).toEqual([three, one, reached]);
   });
 
-  it("leaves the walk room beyond its entry points", () => {
+  it("sets the related cap above the entry-point cap", () => {
     expect(ASK_CAPS.related).toBeGreaterThan(ASK_CAPS.entryPoints);
   });
 
@@ -1532,7 +1532,7 @@ describe("what ask answers with no model", () => {
     return { reached, entry, now, stalled, after };
   };
 
-  it("answers from its entry points when the walk times out", async () => {
+  it("returns only the entry points when the walk times out", async () => {
     const { reached, entry, now, stalled, after } = await askedWhileTheWalkStalls();
 
     expect([stalled.verdict, irisOf(stalled), stalled.map]).toEqual([
@@ -1543,7 +1543,7 @@ describe("what ask answers with no model", () => {
     expect([irisOf(after), after.map]).toEqual([[entry, reached], { state: "live" }]);
   });
 
-  it("records the map unavailable when the walk times out", async () => {
+  it("records the map as unavailable when the walk times out", async () => {
     const { now, stalled, after } = await askedWhileTheWalkStalls();
 
     expect([await mapStateOf(stalled.recordId), await mapStateOf(after.recordId)]).toEqual([
@@ -1552,7 +1552,7 @@ describe("what ask answers with no model", () => {
     ]);
   });
 
-  it("keeps the question and what it returned on its record", async () => {
+  it("stores the question and what ask returned on its record", async () => {
     const { workspaceId, asker } = await anAsker();
     const audits = await seededIn(workspaceId, {
       ...RETENTION_ANSWER,
@@ -1589,7 +1589,7 @@ describe("what ask answers with no model", () => {
     ]);
   });
 
-  const stepsKeepingTheirRecords = (asker: UserPrincipal) => {
+  const stepsNotingOpenedRecords = (asker: UserPrincipal) => {
     const steps = stepsFor(db().runtimePool, asker);
     const opened: string[] = [];
     const keeping: typeof steps = {
@@ -1624,15 +1624,15 @@ describe("what ask answers with no model", () => {
 
   const recordOpenedBy = async (opened: readonly string[]) => {
     const [recordId] = opened;
-    assert(recordId !== undefined, "the ask opened a record");
+    assert(recordId !== undefined, "ask opened no record");
     return recordOf(recordId);
   };
 
   const RETENTION_ASKED = { question: RETENTION_QUESTION, collections: [] };
 
-  it("answers what a step refuses, its record left open", async () => {
+  it("returns a step's refusal and leaves the record open", async () => {
     const { asker } = await anAsker();
-    const { steps, opened } = stepsKeepingTheirRecords(asker);
+    const { steps, opened } = stepsNotingOpenedRecords(asker);
 
     const answered = await ask(
       asker,
@@ -1647,10 +1647,10 @@ describe("what ask answers with no model", () => {
     ]);
   });
 
-  it("answers a failed completion, its record left open", async () => {
+  it("returns a failed completion's error and leaves the record open", async () => {
     const { workspaceId, asker } = await anAsker();
     await seededIn(workspaceId, RETENTION_ANSWER);
-    const { steps, opened } = stepsKeepingTheirRecords(asker);
+    const { steps, opened } = stepsNotingOpenedRecords(asker);
 
     const answered = await ask(
       asker,
@@ -1669,7 +1669,7 @@ describe("what ask answers with no model", () => {
     ]);
   });
 
-  it("answers a walk's failure other than a timeout", async () => {
+  it("returns an error when the walk fails without timing out", async () => {
     const { workspaceId, asker } = await anAsker();
     await seededIn(workspaceId, RETENTION_ANSWER);
     const answered = await ask(
@@ -1682,7 +1682,7 @@ describe("what ask answers with no model", () => {
     expect(answered).toMatchObject({ ok: false, error: { code: "25P02" } });
   });
 
-  it("plans the same answer and keeps no record", async () => {
+  it("plannedOn returns the same answer and stores no record", async () => {
     const { workspaceId, asker } = await anAsker();
     await seededIn(workspaceId, RETENTION_ANSWER);
 
@@ -1698,7 +1698,7 @@ describe("what ask answers with no model", () => {
     expect(planned).toEqual({ ok: true, value: withoutRecord(answer) });
   });
 
-  it("keeps an answer whole through ask's output schema", async () => {
+  it("passes an answer through ask's output schema unchanged", async () => {
     const { workspaceId, asker } = await anAsker();
     await seededIn(workspaceId, RETENTION_ANSWER);
     await documentLanded(db().pool, workspaceId, {
@@ -1719,7 +1719,7 @@ const sourceOpenings = (matches: FindResult["matches"]) =>
     ),
   );
 
-describe("the two knowledge layers a search and a fetch reach", () => {
+describe("find and open across concepts and source passages", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");
 
   const QUERY = "kingfisher";
@@ -1734,7 +1734,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
   const documentHolding = (workspaceId: string, shape: DocumentShape): Promise<LandedDocument> =>
     documentLanded(db().pool, workspaceId, shape);
 
-  const conceptResting = async (
+  const conceptCiting = async (
     workspaceId: string,
     document: LandedDocument,
   ): Promise<ConceptIri> => {
@@ -1826,7 +1826,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
   const opening = (reader: Awaited<ReturnType<typeof arrange>>, locator: string) =>
     acting(reader, (principal, tx) => open(principal, tx, { locator }, now));
 
-  const aDocumentEachWay = async (reader: Awaited<ReturnType<typeof arrange>>) => {
+  const citedAndUncitedDocuments = async (reader: Awaited<ReturnType<typeof arrange>>) => {
     const invoice = await documentHolding(reader.workspaceId, {
       title: INVOICE_TITLE,
       text: INVOICE_TEXT,
@@ -1835,12 +1835,12 @@ describe("the two knowledge layers a search and a fetch reach", () => {
       title: HANDBOOK_TITLE,
       text: HANDBOOK_TEXT,
     });
-    return { invoice, handbook, iri: await conceptResting(reader.workspaceId, handbook) };
+    return { invoice, handbook, iri: await conceptCiting(reader.workspaceId, handbook) };
   };
 
-  it("previews a document marked not company knowledge, beside the concept", async () => {
+  it("lists an uncited document as not company knowledge after concepts", async () => {
     const reader = await arrange();
-    const { invoice, iri } = await aDocumentEachWay(reader);
+    const { invoice, iri } = await citedAndUncitedDocuments(reader);
 
     const found = await searching(reader);
 
@@ -1879,7 +1879,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     );
   });
 
-  it("previews a passage by its first worded line, cut short", async () => {
+  it("previews a passage by its first line with words, truncated", async () => {
     const reader = await arrange();
     const brief = `𝔸 The kingfisher brief ${"a".repeat(137)}`;
     const ledger = `The kingfisher ledger ${"runs on ".repeat(30)}to the end.`;
@@ -1934,7 +1934,10 @@ describe("the two knowledge layers a search and a fetch reach", () => {
 
     assert(found.ok);
     const openings = sourceOpenings(found.value.matches);
-    expect(Array.from(brief), "the brief's line is exactly the opening's length").toHaveLength(160);
+    expect(
+      Array.from(brief),
+      "the brief's text is not 160 characters, the opening's limit",
+    ).toHaveLength(160);
     expect(Object.fromEntries(openings)).toEqual(
       Object.fromEntries(documents.map(([title, , documentOpening]) => [title, documentOpening])),
     );
@@ -1942,7 +1945,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
 
   it("caps matches at the limit across both layers, concepts first", async () => {
     const reader = await arrange();
-    const { invoice, iri } = await aDocumentEachWay(reader);
+    const { invoice, iri } = await citedAndUncitedDocuments(reader);
 
     const [ofOne, ofTwo] = await Promise.all([searching(reader, 1), searching(reader, 2)]);
 
@@ -1986,7 +1989,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     );
   });
 
-  it("answers withheld, unpublished, malformed and out-of-range locators as not found", async () => {
+  it("returns not found for withheld, unpublished, malformed and out-of-range locators", async () => {
     const reader = await arrange();
     const visible = await documentHolding(reader.workspaceId, {
       title: INVOICE_TITLE,
@@ -2042,13 +2045,13 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     ]);
   });
 
-  it("renders an opened concept's evidence locators, each opening its passage", async () => {
+  it("renders evidence locators that each open their passage", async () => {
     const reader = await arrange();
     const handbook = await documentHolding(reader.workspaceId, {
       title: HANDBOOK_TITLE,
       text: HANDBOOK_TEXT,
     });
-    const iri = await conceptResting(reader.workspaceId, handbook);
+    const iri = await conceptCiting(reader.workspaceId, handbook);
 
     const concept = await acting(reader, (principal, tx) => open(principal, tx, { iri }, now));
 
@@ -2110,9 +2113,9 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     ]);
   });
 
-  it("keeps a two-layer search whole through find's output schema", async () => {
+  it("passes a two-layer search through find's output schema unchanged", async () => {
     const reader = await arrange();
-    const { invoice, iri } = await aDocumentEachWay(reader);
+    const { invoice, iri } = await citedAndUncitedDocuments(reader);
 
     const found = await searching(reader);
 
@@ -2145,7 +2148,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     });
   });
 
-  it("drops only the pane's words from an opened concept", async () => {
+  it("open's output schema drops only the evidence pane's words", async () => {
     const reader = await arrange();
     const handbook = await documentHolding(reader.workspaceId, {
       title: HANDBOOK_TITLE,
@@ -2197,7 +2200,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     });
   });
 
-  it("keeps an opened passage and both not-found answers whole", async () => {
+  it("passes a passage and both not-found results through unchanged", async () => {
     const reader = await arrange();
     const invoice = await documentHolding(reader.workspaceId, {
       title: INVOICE_TITLE,
@@ -2280,7 +2283,7 @@ describe("the links in an opened concept's body", () => {
     return concept.value;
   };
 
-  it("lists each answered address once, with its concept", async () => {
+  it("lists each resolved link address once, with its concept", async () => {
     const reader = await arrange();
     const travel = await indexed(reader.workspaceId, "knowledge/travel.md", "Internal");
     const board = await indexed(reader.workspaceId, "knowledge/board.md", "Restricted");
@@ -2341,7 +2344,7 @@ describe("the links in an opened concept's body", () => {
     ]);
   });
 
-  it("keeps the links through open's output schema", async () => {
+  it("keeps the body links through open's output schema", async () => {
     const reader = await arrange();
     const travel = await indexed(reader.workspaceId, "knowledge/travel.md", "Internal");
     const expenses = await expensesLinking(
@@ -2363,7 +2366,7 @@ describe("the links in an opened concept's body", () => {
     });
   });
 
-  it("writes one text for a concept withheld and one unwritten", async () => {
+  it("renders a link to a withheld concept as unresolved", async () => {
     const reader = await arrange();
     const admin = await seeded(async (seed) => {
       const member = await seed.member({ workspaceId: reader.workspaceId, role: "Admin" });
@@ -2393,7 +2396,7 @@ describe("the links in an opened concept's body", () => {
     ).toEqual(["Links in the body:", `- ./board.md · ${board}`]);
   });
 
-  it("writes no heading where no link is answered", () => {
+  it("writes no links heading when no link resolves", () => {
     expect(
       renderOpen({
         found: true,

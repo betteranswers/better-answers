@@ -41,7 +41,7 @@ const asksBy = async (personId: string) => {
 };
 
 describe("a signed-in person asking to join a workspace over tRPC", () => {
-  it("books the ask for a known short name to them", async () => {
+  it("records a request and audit event for a known workspace", async () => {
     const workspace = await app().provision();
     const { person, api } = await aSignedInPerson();
 
@@ -61,7 +61,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     expect(booked.rows).toEqual([{ action: "people.request.asked", actor: `human:${person.id}` }]);
   });
 
-  it("answers alike for unknown, joined and already-waiting short names", async () => {
+  it("answers the same for unknown, joined and already-requested workspaces", async () => {
     const joined = await app().provision();
     const waitedOn = await app().provision();
     const fresh = await app().provision();
@@ -85,7 +85,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     ]);
   });
 
-  it("refuses a reason of spaces as malformed, writing nothing", async () => {
+  it("refuses a reason of only spaces as malformed, storing nothing", async () => {
     const workspace = await app().provision();
     const { person, api } = await aSignedInPerson();
 
@@ -99,7 +99,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     expect(await asksBy(person.id)).toEqual([]);
   });
 
-  it("keeps the ask's answer out of every cache", async () => {
+  it("answers with Cache-Control private, no-store", async () => {
     const workspace = await app().provision();
     const { client } = await aSignedInPerson();
 
@@ -112,7 +112,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 
-  it("books the ask to the session's person, never one named", async () => {
+  it("records the request for the session's person, ignoring requesterId", async () => {
     const workspace = await app().provision();
     const { person, client } = await aSignedInPerson();
     const other = await app().person();
@@ -128,7 +128,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     expect(await asksBy(person.id)).toHaveLength(1);
   });
 
-  it("refuses a sessionless caller, sending them to sign in", async () => {
+  it("refuses a caller with no session with 401", async () => {
     const workspace = await app().provision();
 
     const response = await app()
@@ -139,7 +139,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     expect(await response.json()).toMatchObject(NO_SESSION_ANSWERED);
   });
 
-  it("refuses a person past their ceiling, and only them", async () => {
+  it("refuses a person over the rate limit, not another person", async () => {
     const workspace = await app().provision();
     const { person, api, client } = await aSignedInPerson();
     const statuses: number[] = [];
@@ -178,7 +178,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     ).toEqual(ACKNOWLEDGED);
   });
 
-  it("answers known and unknown short names no sooner than 250ms", async () => {
+  it("takes at least 250ms for known and unknown short names", async () => {
     const workspace = await app().provision();
     const { api } = await aSignedInPerson();
     const timed = async (shortName: string): Promise<number> => {

@@ -13,10 +13,10 @@ const UNREACHABLE_OBJECT_STORE = {
   secretAccessKey: "secret",
 } as const;
 
-describe("the api's one composition root", () => {
+describe("the api's composition root", () => {
   const app = appForSuite();
 
-  it("opens a pool sized by one constant operators can read", async () => {
+  it("sizes the Postgres pool by POSTGRES_POOL_MAX, which is 10", async () => {
     const doors = openDoors({ database: UNUSED_DATABASE });
 
     expect(doors.postgres.pool.options.max).toBe(POSTGRES_POOL_MAX);
@@ -24,7 +24,7 @@ describe("the api's one composition root", () => {
     await closeDoors(doors);
   });
 
-  it("opens the configured bundles' root and object store", () => {
+  it("opens the configured git store and object store", () => {
     const doors = openDoors({
       database: app().database.pool,
       gitStoreDir: app().gitStoreDir,
@@ -35,14 +35,14 @@ describe("the api's one composition root", () => {
     expect(doors.objects).toMatchObject({ ok: true, value: { bucket: "better-answers" } });
   });
 
-  it("leaves an unconfigured store absent rather than guessing one", () => {
+  it("leaves both stores undefined when none is configured", () => {
     const doors = openDoors({ database: app().database.pool });
 
     expect(doors.git).toBeUndefined();
     expect(doors.objects).toBeUndefined();
   });
 
-  it("carries a missing repositories' root's refusal rather than stopping", () => {
+  it("returns a missing git store's error and keeps the pool", () => {
     const missing = `${app().gitStoreDir}/does-not-exist`;
 
     const doors = openDoors({ database: app().database.pool, gitStoreDir: missing });
@@ -54,7 +54,7 @@ describe("the api's one composition root", () => {
     expect(doors.postgres.pool).toBe(app().database.pool);
   });
 
-  it("carries a bucketless object store's refusal the same way", () => {
+  it("returns an error for an object store without a bucket", () => {
     const doors = openDoors({
       database: app().database.pool,
       objectStore: { ...UNREACHABLE_OBJECT_STORE, bucket: "" },
@@ -66,7 +66,7 @@ describe("the api's one composition root", () => {
     });
   });
 
-  it("hands every process the same Clock, not the wall's", () => {
+  it("uses the given Clock instead of the system clock", () => {
     const at = new Date("2026-09-22T09:00:00.000Z");
 
     const doors = openDoors({ database: app().database.pool, clock: { now: () => at } });

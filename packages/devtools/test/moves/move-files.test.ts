@@ -390,7 +390,7 @@ describe("the findings a move reports", () => {
     expect(ran.stdout).toContain(`  ${THING}: ./missing.ts\n`);
   });
 
-  it("walks past an unresolved specifier in a file that stays", () => {
+  it("ignores an unresolved specifier in a file that stays", () => {
     const root = repositoryOf({ [USER]: 'import { gone } from "./missing.ts";\n' });
 
     const ran = moved(root, [[THING, GROUPED]]);
@@ -398,7 +398,7 @@ describe("the findings a move reports", () => {
     expect(ran.stdout).not.toContain("resolve to nothing");
   });
 
-  it("walks past an unresolved alias or bare package", () => {
+  it("ignores an unresolved alias or bare package", () => {
     const root = repositoryOf({
       [THING]: 'import { gone } from "@/missing.ts";\nimport { z } from "zod";\n',
     });
@@ -408,7 +408,7 @@ describe("the findings a move reports", () => {
     expect(ran.stdout).not.toContain("resolve to nothing");
   });
 
-  it("lists a workspace-relative mention of an old path left behind", () => {
+  it("lists a workspace-relative mention of an old path", () => {
     const root = repositoryOf({
       "packages/probe/notes.md": "edit src/thing.ts first\n",
       "contracts/note.md": "src/thing.ts is named in a contract\n",
@@ -423,7 +423,7 @@ describe("the findings a move reports", () => {
     expect(ran.stdout).not.toContain("pnpm-lock.yaml");
   });
 
-  it("reports no finding when nothing is left behind", () => {
+  it("reports no finding when no old path remains", () => {
     const root = repositoryOf({});
 
     expect(moved(root, [[THING, GROUPED]]).stdout).toBe("moved 1 files; rewrote 0 files\n");
@@ -496,7 +496,7 @@ describe("the moves it refuses", () => {
     ],
     ["a row of one cell", THING, `bad row: ${THING}`],
     ["a row with an empty destination", `${THING}\t `, `bad row: ${THING}\t `],
-  ])("refuses %s, touching nothing", (_what, rows, message) => {
+  ])("refuses %s, changing nothing", (_what, rows, message) => {
     const root = repositoryOf({ [USER]: IMPORTER });
 
     const ran = runWith(root, rows);

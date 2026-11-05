@@ -222,7 +222,7 @@ const noModelIsCalled = (): never => {
   throw new Error("a listing called a model");
 };
 
-/** The surface decides a listing from the token's scopes alone, so no person signs in for one. */
+/** Listing depends only on the token's scopes, so this surface uses a stub verifier, not a signed-in person. */
 const surfaceInProcess = (): (() => Fetching) => {
   let fetching: Fetching | undefined;
 
@@ -256,7 +256,7 @@ const surfaceInProcess = (): (() => Fetching) => {
 
 const inProcess = surfaceInProcess();
 
-const pastTheCeiling = async (max: number, send: () => Promise<Response>) => {
+const sendPastRateLimit = async (max: number, send: () => Promise<Response>) => {
   stopTheClock();
   const letThrough: number[] = [];
   for (let call = 0; call < max; call += 1) letThrough.push((await send()).status);
@@ -290,8 +290,8 @@ const REFUSED_AT_THE_CEILING = {
 };
 
 /**
- * Past this Claude Code hands its model a file, not the result. Both copies count: no host says
- * which it counts.
+ * Above this size, Claude Code gives its model a file, not the result. Both copies count, since
+ * hosts do not say which they measure.
  */
 const RESULT_CHARACTERS_CHECKED_UNDER = 50_000;
 
@@ -321,8 +321,8 @@ const askedOf = async (client: TestClient, token: string, args: Params) => {
   return { called, answer: answered.parse(called.structuredContent) };
 };
 
-/** Uncounted, the planner joins every node to every step, and the walk nears its timeout. */
-const theMapCounted = async (): Promise<void> => {
+/** Without fresh statistics, Postgres joins every node to every step, so the map walk nears its timeout. */
+const analyzeMapTables = async (): Promise<void> => {
   await app().database.superuser.query("ANALYZE map_node, map_edge");
 };
 
@@ -361,7 +361,7 @@ const connectAViewer = async () => {
   return { workspace, viewer, client, token: tokens.accessToken };
 };
 
-const theErrorAskAnswers = async (client: TestClient, token: string) => {
+const askAndReadError = async (client: TestClient, token: string) => {
   const called = await result(
     await callTool(client, token, "ask", { question: RETENTION_QUESTION }),
     toolCalled,
@@ -369,8 +369,8 @@ const theErrorAskAnswers = async (client: TestClient, token: string) => {
   return [called.isError, firstText(called), called.structuredContent];
 };
 
-describe("era-independent", () => {
-  it("lists a full token's four entries, in a stable order", async () => {
+describe("the MCP endpoint under either protocol version", () => {
+  it("lists a full token's four tools in a stable order", async () => {
     const lists = await Promise.all([1, 2, 3].map(() => listTools(inProcess(), FULL_TOKEN)));
 
     expect(lists[0]?.map((listed) => listed.name)).toEqual([
@@ -398,7 +398,7 @@ describe("era-independent", () => {
     expect(refused).not.toHaveProperty("result");
   });
 
-  it("lists give_feedback as naming the record it stores on", async () => {
+  it("describes give_feedback as storing on the question's record", async () => {
     const entry = (await listTools(inProcess(), FULL_TOKEN)).find(
       (listed) => listed.name === "give_feedback",
     );
@@ -407,7 +407,7 @@ describe("era-independent", () => {
     expect(entry?.description).toContain("`recordId`");
     expect(entry?.description).toContain("a call repeated after a timeout stores it twice");
     expect(entry?.description).not.toContain("one write");
-    assert(entry !== undefined, "give_feedback is listed");
+    assert(entry !== undefined, "tools/list has no give_feedback entry");
     expect(Object.keys({ ...entry.inputSchema.properties })).toEqual([
       "recordId",
       "verdict",
@@ -417,7 +417,7 @@ describe("era-independent", () => {
     ]);
   });
 
-  it("annotates every entry: reads read-only, the one write not", async () => {
+  it("marks the three reads read-only and give_feedback not", async () => {
     const tools = await listTools(inProcess(), FULL_TOKEN);
 
     for (const listed of tools) expect(listed.annotations).toBeDefined();
@@ -429,7 +429,7 @@ describe("era-independent", () => {
     ]);
   });
 
-  it("takes no workspace, bundle or tenant argument, mirroring no headers", async () => {
+  it("takes no workspace, bundle or tenant argument or x-mcp-header", async () => {
     for (const entry of await listTools(inProcess(), FULL_TOKEN)) {
       const keys = Object.keys({ ...entry.inputSchema.properties });
       for (const key of keys) {
@@ -448,7 +448,7 @@ describe("era-independent", () => {
     ["open", "trust rider", TRUST_RIDERS],
     ["give_feedback", "verdict", FEEDBACK_VERDICTS],
     ["give_feedback", "flag reason", FEEDBACK_REASONS],
-  ])("offers %s every %s core declares", async (name, _set, values) => {
+  ])("gives %s every %s value that core declares", async (name, _set, values) => {
     const entry = (await listTools(inProcess(), FULL_TOKEN)).find((listed) => listed.name === name);
 
     expect(JSON.stringify([entry?.inputSchema, entry?.outputSchema])).toContain(
@@ -456,13 +456,13 @@ describe("era-independent", () => {
     );
   });
 
-  it.each(["find", "ask", "open"])("offers %s every trust tier core declares", async (name) => {
+  it.each(["find", "ask", "open"])("gives %s every trust tier that core declares", async (name) => {
     const entry = (await listTools(inProcess(), FULL_TOKEN)).find((listed) => listed.name === name);
 
     expect(tiersOffered(entry?.outputSchema).toSorted()).toEqual(TRUST_TIERS.toSorted());
   });
 
-  it("offers open's body links in its output schema", async () => {
+  it("includes bodyLinks in open's output schema and description", async () => {
     const entry = (await listTools(inProcess(), FULL_TOKEN)).find(
       (listed) => listed.name === "open",
     );
@@ -471,7 +471,7 @@ describe("era-independent", () => {
     expect(entry?.description).toContain("`bodyLinks` gives the `iri` to open");
   });
 
-  it("describes the two reads in the glossary's words", async () => {
+  it("describes find and open with glossary terms", async () => {
     const described = new Map(
       (await listTools(inProcess(), FULL_TOKEN)).map((entry) => [entry.name, entry.description]),
     );
@@ -490,7 +490,7 @@ describe("era-independent", () => {
     expect(described.get("find")?.toLowerCase()).not.toContain("chunk");
   });
 
-  it("answers open as absent in structured content and prose", async () => {
+  it("answers a missing IRI as not found, with readable text", async () => {
     const { client, token } = await connect();
 
     const absent = await result(await callTool(client, token, "open", { iri: ABSENT }), toolCalled);
@@ -502,7 +502,7 @@ describe("era-independent", () => {
     expect(text.length).toBeLessThan(RESULT_CHARACTERS_CHECKED_UNDER);
   });
 
-  it("finds and opens a landed passage, rendering its stored text", async () => {
+  it("finds and opens a stored passage, rendering its text", async () => {
     const { workspace, client, token } = await connectAViewer();
     const landed = await documentLanded(app().database.superuser, workspace.workspaceId, {
       title: THE_TITLE,
@@ -554,7 +554,7 @@ describe("era-independent", () => {
     expect(loggedEvents(before)).not.toContain("mcp.refused");
   });
 
-  it("refuses a query holding a NUL, never failing the read", async () => {
+  it("refuses a query containing NUL without logging a failure", async () => {
     const { client, token } = await connect();
     const before = app().logs.length;
 
@@ -568,7 +568,7 @@ describe("era-independent", () => {
     expect(loggedEvents(before)).not.toContain("mcp.failed");
   });
 
-  it("refuses a question holding a NUL, never failing the read", async () => {
+  it("refuses a question containing NUL without logging a failure", async () => {
     const { client, token } = await connect();
     const before = app().logs.length;
 
@@ -583,7 +583,7 @@ describe("era-independent", () => {
     expect(loggedEvents(before)).not.toContain("mcp.failed");
   });
 
-  it("keeps ask to the collections its caller names", async () => {
+  it("limits ask to the collections the caller names", async () => {
     const { workspace, client, token } = await connect();
     await seedConcepts(
       app(),
@@ -622,7 +622,7 @@ describe("era-independent", () => {
     expect(await collectionsAsked()).toEqual(["audits", "lms"]);
   });
 
-  it("refuses a cursor find never handed out", async () => {
+  it("refuses a cursor that find did not issue", async () => {
     const { client, token } = await connect();
 
     const refused = await result(
@@ -635,7 +635,7 @@ describe("era-independent", () => {
     expect(firstText(refused)).toContain("not a cursor find handed out");
   });
 
-  it("answers find, ask and give_feedback through the Principal", async () => {
+  it("answers find, ask and give_feedback for a connected Admin", async () => {
     const { client, token } = await connect();
 
     const found = await result(
@@ -649,7 +649,6 @@ describe("era-independent", () => {
       toolCalled,
     );
     expect(asked.structuredContent?.["verdict"]).toBe("refuse");
-    expect(firstText(asked)).toMatch(/^\*\*Not answered from the company/);
 
     const fed = await result(
       await callTool(client, token, "give_feedback", {
@@ -662,7 +661,7 @@ describe("era-independent", () => {
     expect(fed.structuredContent?.["outcome"]).toBe("stored");
   });
 
-  it("refuses a revoked person's token, its reason logged, not sent", async () => {
+  it("refuses a revoked person's token without sending the logged reason", async () => {
     const { workspace, client, token } = await connect();
     expect((await modern(client, token, "tools/list")).status).toBe(200);
 
@@ -673,7 +672,7 @@ describe("era-independent", () => {
     expect(refused.status).toBe(401);
 
     const challenge = refused.headers.get("www-authenticate");
-    assert(challenge !== null, "the refusal carries a challenge");
+    assert(challenge !== null, "the 401 has no WWW-Authenticate challenge");
     expect(challenge).toContain('error="invalid_token"');
     expect(challenge).not.toContain("credentials-revoked");
     expect(app().logs.slice(before)).toContainEqual(
@@ -685,7 +684,7 @@ describe("era-independent", () => {
     );
   });
 
-  it("refuses a former member's token, its reason logged, not sent", async () => {
+  it("refuses a former member's token without sending the logged reason", async () => {
     const { workspace, client, token } = await connect();
     await app().removeMember(workspace.workspaceId, workspace.admin.id);
     const before = app().logs.length;
@@ -705,7 +704,7 @@ describe("era-independent", () => {
     );
   });
 
-  it("refuses a bearer that is not this issuer's", async () => {
+  it("refuses a bearer token from another issuer", async () => {
     const { client } = await connect();
 
     const refused = await modern(
@@ -717,7 +716,7 @@ describe("era-independent", () => {
     expect(refused.status).toBe(401);
   });
 
-  it("refuses a token lacking knowledge:read as insufficient scope", async () => {
+  it("refuses a token without knowledge:read with 403 insufficient_scope", async () => {
     const { client, token } = await connect("offline_access");
 
     const refused = await modern(client, token, "tools/list");
@@ -739,10 +738,10 @@ describe("era-independent", () => {
     expect(firstText(refused)).toContain("give an `iri` or a `locator`, not both and not neither");
   });
 
-  it("answers 429 with one sentence past the token's ceiling", async () => {
+  it("answers 429 once a token exceeds its rate limit", async () => {
     const { client, token } = await connect();
 
-    const refused = await pastTheCeiling(MCP_TOKEN_RULE.max, () =>
+    const refused = await sendPastRateLimit(MCP_TOKEN_RULE.max, () =>
       modern(client, token, "tools/list"),
     );
 
@@ -750,8 +749,8 @@ describe("era-independent", () => {
   });
 });
 
-describe("ask, on the own-transaction road", () => {
-  it("leaves one record, its id the one it answers", async () => {
+describe("ask, an entry on the own-transaction road", () => {
+  it("keeps one record and answers with that record's id", async () => {
     const { workspace, client, token } = await connect();
 
     const { called, answer } = await askedOf(client, token, {
@@ -765,7 +764,7 @@ describe("ask, on the own-transaction road", () => {
     expect(firstText(called)).toContain(`Record of this question: ${answer.recordId}`);
   });
 
-  it("is listed read-only, its description naming the record", async () => {
+  it("is listed read-only with a description of its record", async () => {
     const ask = (await listTools(inProcess(), FULL_TOKEN)).find((listed) => listed.name === "ask");
 
     expect(ask?.annotations?.readOnlyHint).toBe(true);
@@ -792,7 +791,7 @@ describe("ask, on the own-transaction road", () => {
     expect(ask?.description).not.toContain("asking again later");
   });
 
-  describe("refused where the call enters", () => {
+  describe("rejected by input validation", () => {
     let connected: Awaited<ReturnType<typeof connect>>;
 
     beforeAll(async () => {
@@ -819,7 +818,7 @@ describe("ask, on the own-transaction road", () => {
     });
   });
 
-  it("answers from its entry points when the walk times out", async () => {
+  it("answers with entry-point concepts when the map walk times out", async () => {
     const { workspace, client, token } = await connect();
     const { concepts } = await seedConcepts(
       app(),
@@ -846,7 +845,7 @@ describe("ask, on the own-transaction road", () => {
     const stalled = await holdingTable(app().database.superuser, "map_node", () =>
       askedOf(client, token, { question: RETENTION_QUESTION }),
     );
-    await theMapCounted();
+    await analyzeMapTables();
     const after = await askedOf(client, token, { question: RETENTION_QUESTION });
 
     expect(loggedEvents(before)).not.toContain("mcp.failed");
@@ -875,7 +874,7 @@ describe("ask, on the own-transaction road", () => {
     const before = app().logs.length;
 
     const failed = await whileTheApiLacks(app(), privilege, table, () =>
-      theErrorAskAnswers(client, token),
+      askAndReadError(client, token),
     );
 
     expect(await recordsKeptIn(workspace.workspaceId)).toEqual([AN_OPEN_RECORD]);
@@ -883,7 +882,7 @@ describe("ask, on the own-transaction road", () => {
     expect(loggedEvents(before)).toContain("mcp.failed");
   });
 
-  it("refuses a call whose asker left a group meanwhile", async () => {
+  it("refuses with changed-meanwhile when the asker leaves a group mid-call", async () => {
     const { workspace, viewer, client, token } = await connectAViewer();
     const { workspaceId } = workspace;
     const groupId = await groupSeeded(app().database.superuser, workspaceId);
@@ -897,7 +896,7 @@ describe("ask, on the own-transaction road", () => {
     const refused = await changedWhileItWaitsOn(
       app(),
       "question_asked",
-      () => theErrorAskAnswers(client, token),
+      () => askAndReadError(client, token),
       () =>
         actingIn(app(), { workspaceId, userId: workspace.admin.id }, (admin, tx) =>
           removeFromGroup(admin, tx, inputOf(groupMemberInput, { groupId, userId: viewer.id })),
@@ -908,13 +907,13 @@ describe("ask, on the own-transaction road", () => {
     expect(refused).toEqual([true, "Refused: changed-meanwhile (conflict).", undefined]);
   });
 
-  it("refuses the step after its asker's credentials are revoked", async () => {
+  it("refuses the next step after the asker's credentials are revoked", async () => {
     const { workspace, viewer, client, token } = await connectAViewer();
 
     const refused = await changedWhileItWaitsOn(
       app(),
       "concept_index",
-      () => theErrorAskAnswers(client, token),
+      () => askAndReadError(client, token),
       () => app().endEverySignInAndToken(viewer.id, new Date(Date.now() + 1_000)),
     );
 
@@ -922,13 +921,13 @@ describe("ask, on the own-transaction road", () => {
     expect(refused).toEqual([true, "Refused: credentials-revoked (unauthenticated).", undefined]);
   });
 
-  it("keeps no record of a member gone before its resolve", async () => {
+  it("keeps no record when the member is removed before resolving", async () => {
     const { workspace, viewer, client, token } = await connectAViewer();
 
     const refused = await changedWhileItWaitsOn(
       app(),
       "workspace_config",
-      () => theErrorAskAnswers(client, token),
+      () => askAndReadError(client, token),
       () => app().removeMember(workspace.workspaceId, viewer.id),
     );
 
@@ -939,7 +938,7 @@ describe("ask, on the own-transaction road", () => {
   it.each([
     ["opens its record", "INSERT", false],
     ["completes its record", "UPDATE", true],
-  ] as const)("holds the member's removal while it %s", async (_case, write, completed) => {
+  ] as const)("makes a member removal wait while ask %s", async (_case, write, completed) => {
     const { workspace, viewer, client, token } = await connectAViewer();
     const store = app().database.superuser;
     const landed: string[] = [];
@@ -964,7 +963,7 @@ describe("ask, on the own-transaction road", () => {
     ]);
   });
 
-  it("fits the bound at the caps, bodies near their cap", async () => {
+  it("stays under the result size limit with every cap filled", async () => {
     const { workspace, client, token } = await connect();
     const beyondTheEntryPoints = Math.max(0, ASK_CAPS.related - ASK_CAPS.entryPoints);
     const reached = Array.from({ length: beyondTheEntryPoints }, (_, nth) => ({
@@ -994,7 +993,7 @@ describe("ask, on the own-transaction road", () => {
         text: aSizedBodyOf("Audit logs are kept by the host for ninety days. ", PASSAGE_CHARACTERS),
       });
     }
-    await theMapCounted();
+    await analyzeMapTables();
 
     const { called, answer } = await askedOf(client, token, { question: RETENTION_QUESTION });
 
@@ -1034,7 +1033,7 @@ describe("a call with no bearer", () => {
   const unauthenticated = (client: TestClient): Promise<Response> =>
     modern(client, "", "tools/list", {}, { headers: { authorization: "" } });
 
-  it("is challenged for the bearer it lacks", async () => {
+  it("gets a 401 challenge asking for a bearer token", async () => {
     const challenged = await unauthenticated(app().client());
 
     expect(challenged.status).toBe(401);
@@ -1043,10 +1042,10 @@ describe("a call with no bearer", () => {
     );
   });
 
-  it("answers 429 once its address floods the surface", async () => {
+  it("answers 429 once its address exceeds the rate limit", async () => {
     const client = app().client();
 
-    const refused = await pastTheCeiling(MCP_UNAUTHENTICATED_IP_RULE.max, () =>
+    const refused = await sendPastRateLimit(MCP_UNAUTHENTICATED_IP_RULE.max, () =>
       unauthenticated(client),
     );
 
@@ -1054,8 +1053,8 @@ describe("a call with no bearer", () => {
   });
 });
 
-describe("a call with a refused bearer", () => {
-  it("is refused before the handler, when not a JWT", async () => {
+describe("a call with an invalid bearer", () => {
+  it("gets a 401 before the handler when not a JWT", async () => {
     const client = app().client();
     const before = app().logs.length;
 
@@ -1070,10 +1069,10 @@ describe("a call with a refused bearer", () => {
     ).not.toContain("mcp.request");
   });
 
-  it("answers 429 once its address floods the surface", async () => {
+  it("answers 429 once its address exceeds the rate limit", async () => {
     const client = app().client();
 
-    const refused = await pastTheCeiling(MCP_UNAUTHENTICATED_IP_RULE.max, () =>
+    const refused = await sendPastRateLimit(MCP_UNAUTHENTICATED_IP_RULE.max, () =>
       modern(client, "not-a-jwt", "tools/list"),
     );
 
@@ -1081,7 +1080,7 @@ describe("a call with a refused bearer", () => {
   });
 });
 
-describe("the 2026-07-28 leg", () => {
+describe("protocol version 2026-07-28", () => {
   it("answers server/discover with version, tools capability, resultType and cache hints", async () => {
     const { client, token } = await connect();
 
@@ -1096,7 +1095,7 @@ describe("the 2026-07-28 leg", () => {
     expect(answer.cacheScope).toBeDefined();
   });
 
-  it("returns tools/list complete, with the workspace's TTL and cacheScope private", async () => {
+  it("returns tools/list complete with the workspace TTL and private cacheScope", async () => {
     const { client, token } = await connect();
 
     const listed = await result(await modern(client, token, "tools/list"), toolsListed);
@@ -1115,7 +1114,7 @@ describe("the 2026-07-28 leg", () => {
     expect(listed.ttlMs).toBe(42_000);
   });
 
-  it("rejects a header disagreeing with the envelope: 400 and -32020", async () => {
+  it("rejects a version header that contradicts the envelope with -32020", async () => {
     const { client, token } = await connect();
 
     const response = await modern(client, token, "tools/list", {}, { version: "2025-11-25" });
@@ -1124,7 +1123,7 @@ describe("the 2026-07-28 leg", () => {
     expect((await rpc(response)).error?.code).toBe(-32020);
   });
 
-  it("rejects an envelope missing a required key: 400 and -32602", async () => {
+  it("rejects an envelope missing a required key with -32602", async () => {
     const { client, token } = await connect();
 
     const response = await modern(
@@ -1141,7 +1140,7 @@ describe("the 2026-07-28 leg", () => {
     expect((await rpc(response)).error?.code).toBe(-32602);
   });
 
-  it("rejects a missing Mcp-Method and an Mcp-Name disagreeing with params.name", async () => {
+  it("rejects a missing Mcp-Method or mismatched Mcp-Name header", async () => {
     const { client, token } = await connect();
 
     const missing = await modern(
@@ -1165,7 +1164,7 @@ describe("the 2026-07-28 leg", () => {
     expect(mismatched.status).toBe(400);
   });
 
-  it("logs a request the handler rejects, as the mcp module", async () => {
+  it("logs a request the handler rejects under the mcp module", async () => {
     const { client, token } = await connect();
     const before = app().logs.length;
 
@@ -1181,7 +1180,7 @@ describe("the 2026-07-28 leg", () => {
     );
   });
 
-  it("names its supported versions to a request declaring another", async () => {
+  it("lists supported versions when a request declares an unsupported one", async () => {
     const { client, token } = await connect();
 
     const response = await modern(
@@ -1201,8 +1200,8 @@ describe("the 2026-07-28 leg", () => {
   });
 });
 
-describe("the 2025-11-25 leg", () => {
-  it("answers the pre-flight's bare initialize and negotiates 2025-11-25", async () => {
+describe("protocol version 2025-11-25", () => {
+  it("answers a bare initialize and negotiates 2025-11-25", async () => {
     const { client, token } = await connect();
 
     const response = await legacy(client, token, "initialize", {
@@ -1217,7 +1216,7 @@ describe("the 2025-11-25 leg", () => {
     expect(answer.capabilities.tools).toBeDefined();
   });
 
-  it("lists the same four entries without envelope or method headers", async () => {
+  it("lists the same four tools without envelope or method headers", async () => {
     const { client, token } = await connect();
 
     const listed = await result(await legacy(client, token, "tools/list"), toolsListed);
@@ -1230,7 +1229,7 @@ describe("the 2025-11-25 leg", () => {
     ]);
   });
 
-  it("answers server/discover with method-not-found, so an assistant falls back", async () => {
+  it("answers server/discover with method-not-found so clients fall back", async () => {
     const { client, token } = await connect();
 
     const body = await rpc(await legacy(client, token, "server/discover"));

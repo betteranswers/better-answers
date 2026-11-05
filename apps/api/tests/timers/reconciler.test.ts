@@ -67,10 +67,10 @@ const syncThatMovedNothing = (client: PoolClient, workspaceId: string, id: strin
   });
 };
 
-describe("the periodic head check", () => {
+describe("the reconciler's periodic tick", () => {
   const app = appForSuite();
 
-  const watched = (
+  const startTestReconciler = (
     options: {
       readonly pingUrl?: string | undefined;
       readonly doors?: Doors | undefined;
@@ -116,7 +116,7 @@ describe("the periodic head check", () => {
     vi.useRealTimers();
   });
 
-  const rewritingElsewhere = async (workspaceId: string) => {
+  const holdBundleLock = async (workspaceId: string) => {
     const holder = await app().database.superuser.connect();
     await holder.query("SELECT pg_advisory_lock(hashtext('bundle'), hashtext($1))", [workspaceId]);
     return async (): Promise<void> => {
@@ -127,22 +127,22 @@ describe("the periodic head check", () => {
     };
   };
 
-  const aTickBesideARewrite = async (): Promise<{
+  const tickWithBundleLocked = async (): Promise<{
     readonly lines: readonly LogLine[];
     readonly heldId: string;
   }> => {
     const held = await app().provision();
     await initRepository(openTestGit(app()), held.workspaceId);
-    const release = await rewritingElsewhere(held.workspaceId);
-    const head = watched({ pingUrl: undefined });
+    const release = await holdBundleLock(held.workspaceId);
+    const reconciler = startTestReconciler({ pingUrl: undefined });
     vi.advanceTimersByTime(RECONCILER_INTERVAL_MS);
-    await head.stop();
+    await reconciler.stop();
     await release();
-    return { lines: ticks(head.logs), heldId: held.workspaceId };
+    return { lines: ticks(reconciler.logs), heldId: held.workspaceId };
   };
 
-  it("logs a bundle held by a rewrite elsewhere at info", async () => {
-    const { lines, heldId } = await aTickBesideARewrite();
+  it("logs a workspace with a held bundle lock at info", async () => {
+    const { lines, heldId } = await tickWithBundleLocked();
 
     expect(lines).toEqual([
       matching.objectContaining({
@@ -153,18 +153,18 @@ describe("the periodic head check", () => {
     ]);
   });
 
-  it("asks every workspace each interval, logs each tick, and stops", async () => {
+  it("checks every workspace once per interval and stops when told", async () => {
     const held = await app().provision();
     const bare = await app().provision();
     await initRepository(openTestGit(app()), held.workspaceId);
-    const head = watched({ pingUrl: undefined });
+    const reconciler = startTestReconciler({ pingUrl: undefined });
 
-    expect(ticks(head.logs)).toEqual([]);
+    expect(ticks(reconciler.logs)).toEqual([]);
     vi.advanceTimersByTime(RECONCILER_INTERVAL_MS);
-    await head.stop();
+    await reconciler.stop();
 
-    expect(ticks(head.logs)).toHaveLength(1);
-    expect(ticks(head.logs)[0]).toMatchObject({
+    expect(ticks(reconciler.logs)).toHaveLength(1);
+    expect(ticks(reconciler.logs)[0]).toMatchObject({
       level: 40,
       replayed: 0,
       already_landed: 0,
@@ -173,13 +173,13 @@ describe("the periodic head check", () => {
     });
 
     vi.advanceTimersByTime(RECONCILER_INTERVAL_MS * 3);
-    expect(ticks(head.logs)).toHaveLength(1);
+    expect(ticks(reconciler.logs)).toHaveLength(1);
   });
 
-  it("still warns of a refusal beside a held bundle", async () => {
+  it("logs at warn when a refusal accompanies a locked bundle", async () => {
     const bare = await app().provision();
 
-    const { lines, heldId } = await aTickBesideARewrite();
+    const { lines, heldId } = await tickWithBundleLocked();
 
     expect(lines[0]).toMatchObject({
       level: 40,
@@ -190,7 +190,7 @@ describe("the periodic head check", () => {
     });
   });
 
-  it("follows a sync even where the reconciler refuses the workspace", async () => {
+  it("runs the sync cascade for a workspace the reconciler refuses", async () => {
     const bare = await app().provision();
     const client = await app().database.superuser.connect();
     try {
@@ -198,23 +198,23 @@ describe("the periodic head check", () => {
     } finally {
       client.release();
     }
-    const head = watched({ pingUrl: undefined });
+    const reconciler = startTestReconciler({ pingUrl: undefined });
 
     vi.advanceTimersByTime(RECONCILER_INTERVAL_MS);
-    await head.stop();
+    await reconciler.stop();
 
-    expect(ticks(head.logs)[0]).toMatchObject({
+    expect(ticks(reconciler.logs)[0]).toMatchObject({
       level: 40,
       refused: matching.arrayContaining([
         { workspace_id: bare.workspaceId, reason: "no-such-repository" },
       ]),
     });
-    expect(saying(head.logs, "sync cascade tick")).toEqual([
+    expect(saying(reconciler.logs, "sync cascade tick")).toEqual([
       matching.objectContaining({ level: 30, followed: 1, concepts: 0, skipped: [], refused: [] }),
     ]);
   });
 
-  it("pings failure for a minute whose step skipped a sync", async () => {
+  it("pings failure when the sync cascade skips a job", async () => {
     const bare = await app().provision();
     const jobId = ulid();
     const name = `refuse_marker_${jobId.toLowerCase()}`;
@@ -231,16 +231,16 @@ describe("the periodic head check", () => {
       await client.query(
         `CREATE TRIGGER ${name} BEFORE INSERT ON audit_event FOR EACH ROW EXECUTE FUNCTION ${name}()`,
       );
-      const head = watched();
+      const reconciler = startTestReconciler();
 
-      await head.tickTimes(2);
-      await head.stop();
+      await reconciler.tickTimes(2);
+      await reconciler.stop();
 
-      expect(saying(head.logs, "sync cascade tick")[0]).toMatchObject({
+      expect(saying(reconciler.logs, "sync cascade tick")[0]).toMatchObject({
         level: 40,
         skipped: [{ workspace_id: bare.workspaceId, job_id: jobId }],
       });
-      expect(head.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);
+      expect(reconciler.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);
     } finally {
       await client.query(`DROP TRIGGER IF EXISTS ${name} ON audit_event`);
       await client.query(`DROP FUNCTION IF EXISTS ${name}()`);
@@ -248,64 +248,66 @@ describe("the periodic head check", () => {
     }
   });
 
-  it("never overlaps a tick, logging the skip and waiting", async () => {
-    const head = watched({ pingUrl: undefined });
+  it("skips and logs a tick while the previous one runs", async () => {
+    const reconciler = startTestReconciler({ pingUrl: undefined });
 
     vi.advanceTimersByTime(RECONCILER_INTERVAL_MS);
     vi.advanceTimersByTime(RECONCILER_INTERVAL_MS);
-    expect(skips(head.logs)).toHaveLength(1);
-    expect(ticks(head.logs)).toHaveLength(0);
+    expect(skips(reconciler.logs)).toHaveLength(1);
+    expect(ticks(reconciler.logs)).toHaveLength(0);
 
-    await head.stop();
+    await reconciler.stop();
 
-    expect(ticks(head.logs)).toHaveLength(1);
-    expect(skips(head.logs)).toHaveLength(1);
+    expect(ticks(reconciler.logs)).toHaveLength(1);
+    expect(skips(reconciler.logs)).toHaveLength(1);
   });
 
-  it("pings the scheduler check every minute, with the outcome alone", async () => {
-    const head = watched();
+  it("pings the scheduler check each minute with only the outcome", async () => {
+    const reconciler = startTestReconciler();
 
-    await head.tickTimes(5);
-    await head.stop();
+    await reconciler.tickTimes(5);
+    await reconciler.stop();
 
-    expect(head.pinged).toEqual([
+    expect(reconciler.pinged).toEqual([
       { url: PING_URL, body: "ok" },
       { url: PING_URL, body: "ok" },
     ]);
   });
 
-  it("consumes every ping's answer, so no connection stays open", async () => {
-    const head = watched();
+  it("reads every ping response body so no connection stays open", async () => {
+    const reconciler = startTestReconciler();
 
-    await head.tickTimes(2);
-    await head.stop();
+    await reconciler.tickTimes(2);
+    await reconciler.stop();
 
-    expect(head.answers.map((answered) => answered.bodyUsed)).toEqual([true]);
+    expect(reconciler.answers.map((answered) => answered.bodyUsed)).toEqual([true]);
   });
 
-  it("pings failure for a failed minute, then success once recovered", async () => {
+  it("pings failure when a tick fails, then success after recovery", async () => {
     const runtimeRole = app().database.pool.options;
     const pool = new Pool({ ...runtimeRole, max: 1 });
     const holder = await pool.connect();
-    // pg-pool reads this per connect; set before the hold, it also bounds the holder's own login on a loaded runner.
+    // pg-pool reads this on each connect. Set it after the holder connects so a slow runner cannot time out that login.
     pool.options.connectionTimeoutMillis = 250;
     const release = releasedOnce(holder);
     try {
-      const head = watched({
+      const reconciler = startTestReconciler({
         doors: openDoors({ database: pool, gitStoreDir: app().gitStoreDir }),
       });
 
-      await head.tick();
-      expect(saying(head.logs, TICK_FAILED)).toEqual([matching.objectContaining({ level: 50 })]);
-      expect(saying(head.logs, FOLLOWING_FAILED)).toEqual([
+      await reconciler.tick();
+      expect(saying(reconciler.logs, TICK_FAILED)).toEqual([
+        matching.objectContaining({ level: 50 }),
+      ]);
+      expect(saying(reconciler.logs, FOLLOWING_FAILED)).toEqual([
         matching.objectContaining({ level: 50 }),
       ]);
       release();
-      await head.tickTimes(3);
-      await head.stop();
+      await reconciler.tickTimes(3);
+      await reconciler.stop();
 
-      expect(ticks(head.logs)).toHaveLength(3);
-      expect(head.pinged).toEqual([
+      expect(ticks(reconciler.logs)).toHaveLength(3);
+      expect(reconciler.pinged).toEqual([
         { url: `${PING_URL}/fail`, body: "fail" },
         { url: PING_URL, body: "ok" },
       ]);
@@ -315,62 +317,62 @@ describe("the periodic head check", () => {
     }
   });
 
-  it("never waits on a slow ping; ticks and pings continue", async () => {
+  it("keeps ticking and pinging while an earlier ping hangs", async () => {
     const hanging = Promise.withResolvers<Response>();
-    const head = watched({ answer: async () => hanging.promise });
+    const reconciler = startTestReconciler({ answer: async () => hanging.promise });
 
-    await head.tickTimes(4);
-    await until(async () => head.pinged.length === 2);
+    await reconciler.tickTimes(4);
+    await until(async () => reconciler.pinged.length === 2);
 
-    expect(skips(head.logs)).toEqual([]);
-    expect(ticks(head.logs)).toHaveLength(4);
+    expect(skips(reconciler.logs)).toEqual([]);
+    expect(ticks(reconciler.logs)).toHaveLength(4);
     hanging.resolve(new Response(null, { status: 200 }));
-    await head.stop();
+    await reconciler.stop();
   });
 
-  it("goes past an unsent ping, logging once without the URL", async () => {
-    const head = watched({
+  it("logs an unsent ping once without the URL and continues", async () => {
+    const reconciler = startTestReconciler({
       answer: firstThenOk(async () => {
         throw new TypeError("fetch failed");
       }),
     });
 
-    await head.tickTimes(4);
-    await head.stop();
+    await reconciler.tickTimes(4);
+    await reconciler.stop();
 
-    expect(head.pinged).toHaveLength(2);
-    expect(saying(head.logs, "a dead-man ping could not be sent")).toEqual([
+    expect(reconciler.pinged).toHaveLength(2);
+    expect(saying(reconciler.logs, "a dead-man ping could not be sent")).toEqual([
       matching.objectContaining({ level: 40, check: "scheduler", reason: "fetch failed" }),
     ]);
-    expect(JSON.stringify(head.logs)).not.toContain(CHECK_UUID);
+    expect(JSON.stringify(reconciler.logs)).not.toContain(CHECK_UUID);
   });
 
-  it("logs a refused ping's status once, so a 404 shows", async () => {
-    const head = watched({
+  it("logs a refused ping's status once, without the URL", async () => {
+    const reconciler = startTestReconciler({
       answer: firstThenOk(async () => new Response("not found", { status: 404 })),
     });
 
-    await head.tickTimes(4);
-    await head.stop();
+    await reconciler.tickTimes(4);
+    await reconciler.stop();
 
-    expect(head.pinged).toHaveLength(2);
-    expect(saying(head.logs, "a dead-man ping was refused")).toEqual([
+    expect(reconciler.pinged).toHaveLength(2);
+    expect(saying(reconciler.logs, "a dead-man ping was refused")).toEqual([
       matching.objectContaining({ level: 40, check: "scheduler", status: 404 }),
     ]);
-    expect(JSON.stringify(head.logs)).not.toContain(CHECK_UUID);
+    expect(JSON.stringify(reconciler.logs)).not.toContain(CHECK_UUID);
   });
 
-  it("still ticks, pinging nothing, when the estate names no check", async () => {
-    const head = watched({ pingUrl: undefined });
+  it("ticks without pinging when no check URL is configured", async () => {
+    const reconciler = startTestReconciler({ pingUrl: undefined });
 
-    await head.tickTimes(2);
-    await head.stop();
+    await reconciler.tickTimes(2);
+    await reconciler.stop();
 
-    expect(ticks(head.logs)).toHaveLength(2);
-    expect(head.pinged).toEqual([]);
+    expect(ticks(reconciler.logs)).toHaveLength(2);
+    expect(reconciler.pinged).toEqual([]);
   });
 
-  it("refuses to start without a repositories' root, logging nothing", () => {
+  it("refuses to start without a bundle store and logs nothing", () => {
     const { logger, logs } = capturingLogger();
 
     const refused = startReconciler({

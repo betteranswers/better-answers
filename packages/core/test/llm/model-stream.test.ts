@@ -96,23 +96,23 @@ const ANSWERED_WHOLE = {
   spent: [{ tokensIn: 2_100, tokensOut: 140, seconds: 0, outcome: "succeeded" }],
 };
 
-const CUT_AT_FULL_SIZE = {
+const BILLED_AT_RESERVATION = {
   outcome: "failed",
   spent: [{ tokensIn: 40_000, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
 };
 
 const NOTHING_SPENT = [{ tokensIn: 0, tokensOut: 0, seconds: 0, outcome: "failed" }];
 
-/** As `fetch` meets an aborted signal; `leaving`, when given, aborts as the request goes out. */
+/** Rejects as `fetch` does on an aborted signal. A given `callerAbort` aborts as the request goes out. */
 const endedOnAbort =
-  (leaving?: AbortController): Answering =>
+  (callerAbort?: AbortController): Answering =>
   async (signal) => {
-    leaving?.abort();
+    callerAbort?.abort();
     if (signal?.aborted === true) throw new DOMException("aborted", "AbortError");
     return new Response("", { status: 500 });
   };
 
-const FAILED_AT_FULL_SIZE = {
+const FAILED_WITH_FULL_OUTPUT = {
   outcome: "failed",
   spent: [{ tokensIn: 2_100, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
 };
@@ -135,8 +135,8 @@ describe("the streamed Messages shape", () => {
       ],
     ]);
     const [sent] = wire.sent;
-    assert(sent !== undefined, "the call was sent");
-    assert(typeof sent.init.body === "string", "the body was sent as text");
+    assert(sent !== undefined, "no request was sent");
+    assert(typeof sent.init.body === "string", "the request body is not a string");
     expect(JSON.parse(sent.init.body)).toEqual({
       model: SONNET,
       max_tokens: 16_000,
@@ -146,7 +146,7 @@ describe("the streamed Messages shape", () => {
     });
   });
 
-  it("yields text as it arrives, then its closing usage", async () => {
+  it("yields text as it arrives, then returns the token usage", async () => {
     const wire = theWire(streaming(streamedEventsOf(PIECES)));
 
     const { texts, ended } = await drained(wire);
@@ -155,7 +155,7 @@ describe("the streamed Messages shape", () => {
     expect(ended).toEqual(ANSWERED_WHOLE);
   });
 
-  it("reads events each split across chunks of the wire", async () => {
+  it("reads events that are split across network chunks", async () => {
     const halves = streamedEventsOf(PIECES).flatMap((event) => {
       const half = Math.floor(event.length / 2);
       return [event.slice(0, half), event.slice(half)];
@@ -168,7 +168,7 @@ describe("the streamed Messages shape", () => {
     expect(ended).toEqual(ANSWERED_WHOLE);
   });
 
-  it("keeps a character whole across a chunk's edge", async () => {
+  it("keeps a character whole when a chunk boundary splits it", async () => {
     const encoded = new TextEncoder().encode(streamedEventsOf(["The supplier’s logs"]).join(""));
     const quote = encoded.findIndex((byte) => byte === 0xe2);
     const wire = theWire(
@@ -190,7 +190,7 @@ describe("the streamed Messages shape", () => {
     expect(texts).toEqual(["The supplier’s logs"]);
   });
 
-  it("fails an error sent with the stop in one chunk", async () => {
+  it("fails on an error event in the stop event's chunk", async () => {
     const events = streamedEventsOf(PIECES);
     const wire = theWire(
       streaming([[...events.slice(0, -2), OVERLOADED_EVENT, ...events.slice(-2)].join("")]),
@@ -201,7 +201,7 @@ describe("the streamed Messages shape", () => {
     expect(ended.outcome).toBe("failed");
   });
 
-  it("bounds each attempt by the call's deadline, in seconds spent", async () => {
+  it("caps attempt timeouts by the deadline and records seconds spent", async () => {
     const wire = theWire(streaming(streamedEventsOf(PIECES)), streaming(streamedEventsOf(PIECES)));
     const timeouts: number[] = [];
     let ticks = 0;
@@ -225,7 +225,7 @@ describe("the streamed Messages shape", () => {
     expect(ended.value.spent.map(({ seconds }) => seconds)).toEqual([2]);
   });
 
-  it("reads its own timeout mid-stream as timed out", async () => {
+  it("logs a timeout that fires mid-stream as timed-out", async () => {
     const timedOut = new AbortController();
     const events = streamedEventsOf(PIECES);
     const wire = theWire((signal) =>
@@ -248,12 +248,12 @@ describe("the streamed Messages shape", () => {
     while (ended.done !== true) ended = await reply.next();
 
     expect([ended.value, lines.map(({ read }) => read)]).toEqual([
-      FAILED_AT_FULL_SIZE,
+      FAILED_WITH_FULL_OUTPUT,
       ["timed-out"],
     ]);
   });
 
-  it("tells a spend cap from a rate limit, unstreamed", async () => {
+  it("reads a non-streamed 429 spend limit as a spend cap", async () => {
     const capped: Answering = () =>
       new Response(
         JSON.stringify({
@@ -272,7 +272,7 @@ describe("the streamed Messages shape", () => {
     expect(ended.outcome).toBe("spend-cap");
   });
 
-  it("sends nothing to a model no streamed form speaks", async () => {
+  it("sends nothing to a provider with no streaming wire shape", async () => {
     const wire = theWire(streaming(streamedEventsOf(PIECES)));
     const reply = openStreamingClient(doorsOn(wire).doors).streamModel(
       { ...TO_SONNET, provider: "cloudflare" },
@@ -287,7 +287,7 @@ describe("the streamed Messages shape", () => {
     ]);
   });
 
-  it("tries an unreachable provider again", async () => {
+  it("retries an unreachable provider", async () => {
     const unreachable: Answering = () => {
       throw new TypeError("fetch failed");
     };
@@ -324,37 +324,37 @@ describe("the streamed Messages shape", () => {
     expect([first, rest]).toEqual([{ done: false, value: PIECES[0] }, [PIECES[1]]]);
   });
 
-  it("fails an error mid-stream, billing what it never counted", async () => {
+  it("fails on a mid-stream error, billing the maximum output tokens", async () => {
     const events = streamedEventsOf(PIECES);
     const wire = theWire(streaming([...events.slice(0, 4), OVERLOADED_EVENT, ...events.slice(4)]));
 
     const { texts, ended, lines } = await drained(wire);
 
     expect(texts).toEqual([PIECES[0]]);
-    expect(ended).toEqual(FAILED_AT_FULL_SIZE);
+    expect(ended).toEqual(FAILED_WITH_FULL_OUTPUT);
     expect(wire.sent).toHaveLength(1);
     expect(lines.map(({ read, status }) => [read, status])).toEqual([["failed", 200]]);
   });
 
-  it("fails a stream that ends before saying it stopped", async () => {
+  it("fails a stream that ends without a message_stop event", async () => {
     const wire = theWire(streaming(streamedEventsOf(PIECES).slice(0, 5)));
 
     const { ended } = await drained(wire);
 
-    expect(ended).toEqual(FAILED_AT_FULL_SIZE);
+    expect(ended).toEqual(FAILED_WITH_FULL_OUTPUT);
   });
 
-  it("fails a reply cut off at its token limit, once", async () => {
+  it("fails once on a reply cut off at max_tokens", async () => {
     const usage = { input_tokens: 2_100, output_tokens: 16_000 };
     const wire = theWire(streaming(streamedEventsOf(PIECES, usage, "max_tokens")));
 
     const { ended, lines } = await drained(wire);
 
-    expect(ended).toEqual(FAILED_AT_FULL_SIZE);
+    expect(ended).toEqual(FAILED_WITH_FULL_OUTPUT);
     expect(lines.map(({ read }) => read)).toEqual(["cut-off"]);
   });
 
-  it("answers a refusal with the tokens it was billed", async () => {
+  it("returns refused with the tokens the refusal was billed", async () => {
     const wire = theWire(streaming(streamedEventsOf([], undefined, "refusal")));
 
     const { ended } = await drained(wire);
@@ -365,7 +365,7 @@ describe("the streamed Messages shape", () => {
     });
   });
 
-  it("tries an overload before any stream again", async () => {
+  it("retries an overload that arrives before the stream starts", async () => {
     const wire = theWire(OVERLOADED, streaming(streamedEventsOf(PIECES)));
     const { doors, waits } = doorsOn(wire);
     const reply = openStreamingClient(doors).streamModel(TO_SONNET, A_CALL);
@@ -384,7 +384,7 @@ describe("the streamed Messages shape", () => {
   });
 });
 
-const judgedUntil = (doors: ReturnType<typeof doorsOn>["doors"], signal: AbortSignal) =>
+const judgeWithSignal = (doors: ReturnType<typeof doorsOn>["doors"], signal: AbortSignal) =>
   openModelClient(doors).callModel(TO_SONNET, {
     system: SYSTEM,
     prompt: PROMPT,
@@ -393,49 +393,49 @@ const judgedUntil = (doors: ReturnType<typeof doorsOn>["doors"], signal: AbortSi
     signal,
   });
 
-describe("a caller's abort", () => {
-  it("ends the streamed request and tries no other", async () => {
-    const leaving = new AbortController();
+describe("a caller aborting a call", () => {
+  it("aborts the streamed request and makes no retry", async () => {
+    const callerAbort = new AbortController();
     const events = streamedEventsOf(PIECES);
     const firstText = events.findIndex((event) => event.includes("text_delta"));
     const wire = theWire((signal) =>
       streamedResponse(events, {
         signal,
-        before: abortingAt(firstText + 1, leaving),
+        before: abortingAt(firstText + 1, callerAbort),
       }),
     );
 
-    const { texts, ended, lines } = await drained(wire, { ...A_CALL, signal: leaving.signal });
+    const { texts, ended, lines } = await drained(wire, { ...A_CALL, signal: callerAbort.signal });
 
     expect(wire.sent[0]?.init.signal?.aborted).toBe(true);
     expect(texts).toEqual([PIECES[0]]);
-    expect(ended).toEqual(FAILED_AT_FULL_SIZE);
+    expect(ended).toEqual(FAILED_WITH_FULL_OUTPUT);
     expect(lines.map(({ read }) => read)).toEqual(["abandoned"]);
   });
 
-  it("settles a judge's request it ended at the reserved size", async () => {
-    const leaving = new AbortController();
-    const wire = theWire(endedOnAbort(leaving));
+  it("bills an aborted judging call at its reserved size", async () => {
+    const callerAbort = new AbortController();
+    const wire = theWire(endedOnAbort(callerAbort));
     const { doors, lines } = doorsOn(wire);
 
-    const ended = await judgedUntil(doors, leaving.signal);
+    const ended = await judgeWithSignal(doors, callerAbort.signal);
 
-    expect(ended).toEqual(CUT_AT_FULL_SIZE);
+    expect(ended).toEqual(BILLED_AT_RESERVATION);
     expect(wire.sent).toHaveLength(1);
     expect(lines.map(({ read }) => read)).toEqual(["abandoned"]);
   });
 
-  it("settles a stream ended before replying at its reserved size", async () => {
-    const leaving = new AbortController();
-    const wire = theWire(endedOnAbort(leaving));
+  it("bills a stream aborted before replying at its reserved size", async () => {
+    const callerAbort = new AbortController();
+    const wire = theWire(endedOnAbort(callerAbort));
 
-    const { ended, lines } = await drained(wire, { ...A_CALL, signal: leaving.signal });
+    const { ended, lines } = await drained(wire, { ...A_CALL, signal: callerAbort.signal });
 
-    expect(ended).toEqual(CUT_AT_FULL_SIZE);
+    expect(ended).toEqual(BILLED_AT_RESERVATION);
     expect(lines.map(({ read }) => read)).toEqual(["abandoned"]);
   });
 
-  it("settles a stream ended before it was sent at nothing", async () => {
+  it("bills nothing for a stream aborted before it was sent", async () => {
     const wire = theWire(endedOnAbort());
 
     const { ended } = await drained(wire, { ...A_CALL, signal: AbortSignal.abort() });
@@ -443,27 +443,27 @@ describe("a caller's abort", () => {
     expect(ended.spent).toEqual(NOTHING_SPENT);
   });
 
-  it("settles a request ended before it was sent at nothing", async () => {
+  it("bills nothing for a judging call aborted before sending", async () => {
     const wire = theWire(endedOnAbort());
     const { doors } = doorsOn(wire);
 
-    const ended = await judgedUntil(doors, AbortSignal.abort());
+    const ended = await judgeWithSignal(doors, AbortSignal.abort());
 
     expect(ended.spent).toEqual(NOTHING_SPENT);
   });
 
-  it("makes no attempt after an abort during its wait", async () => {
-    const leaving = new AbortController();
+  it("makes no attempt after an abort during the retry wait", async () => {
+    const callerAbort = new AbortController();
     const wire = theWire(OVERLOADED, OVERLOADED);
     const { doors } = doorsOn(wire);
     const waited = {
       ...doors,
       wait: async () => {
-        leaving.abort();
+        callerAbort.abort();
       },
     };
 
-    const ended = await judgedUntil(waited, leaving.signal);
+    const ended = await judgeWithSignal(waited, callerAbort.signal);
 
     expect(ended.outcome).toBe("failed");
     expect(wire.sent).toHaveLength(1);
@@ -488,7 +488,7 @@ const START = opening({ input_tokens: 10, output_tokens: 1 });
 const CLOSED = closing({ output_tokens: 7 });
 
 describe("reading a streamed reply's events", () => {
-  it("reads events with CRLF ends, comments and split data", async () => {
+  it("reads events with CRLF line ends, comments, and multi-line data", async () => {
     const split = [
       "event: message\r\n",
       'data: {"type":"content_block_delta","index":0,\r\n',
@@ -501,7 +501,7 @@ describe("reading a streamed reply's events", () => {
     expect([texts, ended.outcome]).toEqual([["Kept."], "answered"]);
   });
 
-  it("yields text alone, passing over thinking and pings", async () => {
+  it("yields only text, skipping thinking deltas and pings", async () => {
     const thinking = sse({
       type: "content_block_delta",
       index: 0,
@@ -533,7 +533,7 @@ describe("reading a streamed reply's events", () => {
     ]);
   });
 
-  it("takes a closing delta's larger input count", async () => {
+  it("uses the closing delta's input count when it is larger", async () => {
     const counted = closing({ input_tokens: 2_100, cache_read_input_tokens: 9, output_tokens: 7 });
     const wire = theWire(streaming([START, text("Kept."), counted, STOP]));
 
@@ -544,7 +544,7 @@ describe("reading a streamed reply's events", () => {
     ]);
   });
 
-  it("fails on data that is no JSON, sending nothing after", async () => {
+  it("fails on non-JSON data and yields no text after it", async () => {
     const broken = sse("{not json");
     const wire = theWire(streaming([START, broken, text("Lost."), CLOSED, STOP]));
 

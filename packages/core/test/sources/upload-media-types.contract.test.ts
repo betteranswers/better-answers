@@ -12,17 +12,17 @@ const fixtureSchema = z.object({
 
 const fixture = contractFixture("upload-media-types", fixtureSchema);
 
-describe("the media types the upload-media-types agreement admits", () => {
-  it("are this tier's allow-list: every admitted type and no other", () => {
+describe("the media types an upload admits", () => {
+  it("match the agreement's admitted types exactly", () => {
     expect([...UPLOAD_MEDIA_TYPES].toSorted()).toEqual(fixture.admitted.toSorted());
   });
 
-  it("are each written once", () => {
+  it("appear once each", () => {
     expect(new Set(fixture.admitted).size).toBe(fixture.admitted.length);
     expect(new Set(UPLOAD_MEDIA_TYPES).size).toBe(UPLOAD_MEDIA_TYPES.length);
   });
 
-  it("places no type on both sides of the list", () => {
+  it("exclude every type the agreement lists as outside", () => {
     expect(fixture.outside.length).toBeGreaterThan(0);
     for (const { media_type: mediaType } of fixture.outside) {
       expect({ mediaType, admitted: fixture.admitted.includes(mediaType) }).toEqual({

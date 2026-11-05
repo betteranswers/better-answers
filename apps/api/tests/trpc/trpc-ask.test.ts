@@ -60,7 +60,10 @@ const A_NOTE = "The period changed in May.";
 
 const READS_A_MINUTE = 120;
 
-const bothWays = async (person: { readonly id: string; readonly email: string }, held: string) => {
+const webAndMcpFor = async (
+  person: { readonly id: string; readonly email: string },
+  held: string,
+) => {
   const client = app().client();
   const tokens = await connectAsHost(app(), client, person, {
     scope: "knowledge:read feedback:write offline_access",
@@ -96,7 +99,7 @@ const anAdminAsking = async ({ limitGbp, drafting = false, chosen = true }: Arra
       concepts: [USERS, SUPPLIER, RETENTION, ...(drafting ? [ACCESS_POLICY] : [])],
     }),
   );
-  // Uncounted, the planner joins every node to every step, and the walk nears its timeout.
+  // Without statistics, the planner joins every node to every step and the map walk nears its timeout.
   await app().database.superuser.query("ANALYZE map_node, map_edge");
   await judgingSetUp(app(), workspace.workspaceId, {
     drafting,
@@ -105,7 +108,7 @@ const anAdminAsking = async ({ limitGbp, drafting = false, chosen = true }: Arra
   });
   return {
     workspace,
-    ...(await bothWays(workspace.admin, workspace.workspaceId)),
+    ...(await webAndMcpFor(workspace.admin, workspace.workspaceId)),
   };
 };
 
@@ -131,7 +134,7 @@ const phasesIn = (events: Streamed) =>
 const isPhase = (phase: string) => (event: Streamed[number]) =>
   event.kind === "phase" && event.phase === phase;
 
-const told = (events: Streamed) =>
+const contentEventsIn = (events: Streamed) =>
   events.filter((event) => event.kind !== "phase" && event.kind !== "keep-alive");
 
 const resultIn = (events: Streamed) => {
@@ -160,7 +163,7 @@ const ANSWERED_IN_FULL = {
 };
 
 describe("ask over tRPC", () => {
-  it("says no judging phase with no judging model chosen", async () => {
+  it("streams no judging phase when no judging model is chosen", async () => {
     const { web } = await anAdminAsking({ chosen: false });
 
     const events = await streamed(web, { question: QUESTION });
@@ -169,7 +172,7 @@ describe("ask over tRPC", () => {
     expect(resultIn(events).judgeState).toBe("not-judged");
   });
 
-  it("opens with its phase, then the whole result", async () => {
+  it("streams the reading and judging phases, then the whole result", async () => {
     const { workspace, web } = await anAdminAsking();
     wire.answerWith(judgeSaying([USERS.title]));
 
@@ -191,7 +194,7 @@ describe("ask over tRPC", () => {
     ]);
   });
 
-  it("refuses a GET, keeping no record and no reservation", async () => {
+  it("refuses a GET with 405, recording and reserving nothing", async () => {
     const { workspace, client } = await anAdminAsking();
     const input = encodeURIComponent(JSON.stringify({ question: QUESTION }));
 
@@ -205,11 +208,11 @@ describe("ask over tRPC", () => {
     });
   });
 
-  it("refuses a person past their knowledge ceiling, answering another", async () => {
+  it("refuses a person over the knowledge rate limit, not others", async () => {
     const { workspace, web, client } = await anAdminAsking();
     const colleague = await app().person();
     await app().addMember(workspace.workspaceId, colleague.id, "Viewer");
-    const theirs = await bothWays(colleague, workspace.workspaceId);
+    const theirs = await webAndMcpFor(colleague, workspace.workspaceId);
     wire.answerWith(judgeSaying([USERS.title]));
     stopTheClock();
 
@@ -242,7 +245,7 @@ describe("ask over tRPC", () => {
     ]);
   });
 
-  it("folds to what MCP answers, apart from prose and record", async () => {
+  it("matches MCP's answer once folded, except prose and record id", async () => {
     const { web, mcp } = await anAdminAsking();
     wire.answerWith(judgeSaying([USERS.title]));
     const asking = { question: QUESTION, collections: ["audits"] };
@@ -259,7 +262,7 @@ describe("ask over tRPC", () => {
     expect(webRecord).not.toBe(mcpRecord);
   });
 
-  it("keeps the map's state on the record over both transports", async () => {
+  it("records the map's state for asks over MCP and tRPC", async () => {
     const { web, mcp } = await anAdminAsking();
     wire.answerWith(judgeSaying([USERS.title]));
 
@@ -273,7 +276,7 @@ describe("ask over tRPC", () => {
     ]);
   });
 
-  it("ends with a refusal, no result and no prose", async () => {
+  it("ends with a refusal at the spending limit, no result", async () => {
     const { workspace, web } = await anAdminAsking({ limitGbp: "0.001" });
     wire.answerWith(judgeSaying([USERS.title]));
     const events: Streamed = [];
@@ -303,7 +306,7 @@ describe("ask over tRPC", () => {
     ]);
   });
 
-  it("ends the judge's request when its client leaves", async () => {
+  it("aborts the judge's model request when the client disconnects", async () => {
     const { workspace, web } = await anAdminAsking();
     const called = Promise.withResolvers<SentToModel>();
     wire.answerWith(async (sent) => {
@@ -312,7 +315,7 @@ describe("ask over tRPC", () => {
     });
     const leaving = new AbortController();
 
-    // In process, an abort never errors the body the client reads, so only the server's side is awaited.
+    // In process, an abort does not error the body the client reads, so the test awaits only the server side.
     void refusalOfCall(web.ask.question.mutate({ question: QUESTION }, { signal: leaving.signal }));
     const sent = await called.promise;
     leaving.abort();
@@ -339,7 +342,7 @@ describe("ask over tRPC", () => {
     });
   });
 
-  it("sends keep-alives while the judge is quiet, unfolded", async () => {
+  it("sends keep-alives while the judge is silent, which folding ignores", async () => {
     const { web } = await anAdminAsking();
     wire.answerWith(async (sent) => {
       await new Promise((resolve) => setTimeout(resolve, QUIET_MS * 3));
@@ -353,7 +356,7 @@ describe("ask over tRPC", () => {
     const between = events.slice(judging + 1, opening);
     expect(between.length).toBeGreaterThanOrEqual(2);
     expect(between.every((event) => event.kind === "keep-alive")).toBe(true);
-    expect(askedFrom(events)).toEqual(askedFrom(told(events)));
+    expect(askedFrom(events)).toEqual(askedFrom(contentEventsIn(events)));
   });
 
   it("never queries through a transaction that has settled", async () => {
@@ -415,7 +418,7 @@ const policyOf = (events: Streamed) =>
   resultIn(events).related.find(({ title }) => title === ACCESS_POLICY.title)?.iri;
 
 describe("prose drafted over tRPC", () => {
-  it("streams cited prose after the result, kept on record", async () => {
+  it("streams cited prose after the result and records it", async () => {
     const { web } = await anAdminAsking({ drafting: true });
     wire.answerWith(
       judgedNoThenDrafting((prompt) => [
@@ -433,14 +436,14 @@ describe("prose drafted over tRPC", () => {
       },
     ];
     expect(phasesIn(events)).toEqual(["reading", "judging", "drafting"]);
-    expect(told(events).map(({ kind }) => kind)).toEqual(["result", "sentence", "part"]);
+    expect(contentEventsIn(events).map(({ kind }) => kind)).toEqual(["result", "sentence", "part"]);
     expect(askedFrom(events)?.prose).toEqual([
       { collection: "audits", sentences, outcome: "drafted" },
     ]);
     expect(await draftedOn(resultIn(events).recordId)).toEqual(sentences);
   });
 
-  it("delivers a long draft whole", async () => {
+  it("delivers all 400 sentences of a long draft", async () => {
     const { web } = await anAdminAsking({ drafting: true });
     const LINES = 400;
     wire.answerWith(
@@ -455,7 +458,7 @@ describe("prose drafted over tRPC", () => {
     const events = await streamed(web, { question: QUESTION });
 
     const asked = askedFrom(events);
-    assert(asked !== undefined, "the stream carried an answer");
+    assert(asked !== undefined, "the stream carried no answer");
     const { prose } = asked;
     expect(prose.map(({ sentences, outcome }) => [sentences.length, outcome])).toEqual([
       [LINES, "drafted"],
@@ -463,7 +466,7 @@ describe("prose drafted over tRPC", () => {
     expect(prose[0]?.sentences.at(-1)?.sentence).toBe(`Buyers use page ${String(LINES)}.`);
   });
 
-  it("ends the drafter's request when its client leaves", async () => {
+  it("aborts the drafter's model request when the client disconnects", async () => {
     const { workspace, web } = await anAdminAsking({ drafting: true });
     const drafting = Promise.withResolvers<SentToModel>();
     wire.answerWith(
@@ -495,7 +498,7 @@ describe("prose drafted over tRPC", () => {
 const answeredRecord = z.object({ recordId: z.string() });
 
 describe("feedback over tRPC", () => {
-  it("stores what give_feedback stores for the same input", async () => {
+  it("stores the same feedback as MCP give_feedback for one input", async () => {
     const { workspace, web, mcp } = await anAdminAsking();
     wire.answerWith(judgeSaying([USERS.title]));
     const overMcp = answeredRecord.parse(await mcp("ask", { question: QUESTION })).recordId;
@@ -553,7 +556,7 @@ const aQuestionEach = async () => {
 };
 
 describe("your questions over tRPC", () => {
-  it("answers a reader only the records they asked", async () => {
+  it("lists only the questions the reader asked", async () => {
     const { member, members } = await aQuestionEach();
     const { api } = await webSignedIn(app(), member.email);
 
@@ -562,7 +565,7 @@ describe("your questions over tRPC", () => {
     expect(records.map(({ id }) => id)).toEqual([members]);
   });
 
-  it("answers another member's record as not found", async () => {
+  it("answers not-found for another member's record", async () => {
     const { member, admins, members } = await aQuestionEach();
     const { api } = await webSignedIn(app(), member.email);
 
@@ -573,7 +576,7 @@ describe("your questions over tRPC", () => {
     expect(other).toMatchObject({ data: { httpStatus: 404, refusal: { word: "not-found" } } });
   });
 
-  it("words a record's trust by the app's clock", async () => {
+  it("computes a record's trust words from the app's clock", async () => {
     const { member } = await aQuestionEach();
     const { api } = await webSignedIn(app(), member.email);
     const read = async () => (await api.ask.yourQuestions.query({})).records;
@@ -613,7 +616,7 @@ const inCoreTerms = (answered: Rpc, origin: string) => {
 };
 
 describe("a streamed mutation through the Hono mount", () => {
-  it("delivers its first event while the next is held", async () => {
+  it("delivers the first event before the second is released", async () => {
     const held = Promise.withResolvers<void>();
     const t = initTRPC.create();
     const streaming = t.router({

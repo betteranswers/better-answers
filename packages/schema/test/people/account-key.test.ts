@@ -8,8 +8,8 @@ const db = postgresForSuite();
 
 const THE_KEY = "account_provider_id_account_id_uidx";
 
-describe("the account's key, a provider and its account id", () => {
-  it("refuses a provider's account id twice, even to its holder", async () => {
+describe("the account key on provider and account id", () => {
+  it("refuses a repeated provider account id, even for its holder", async () => {
     await withRollback(db().pool, async (client) => {
       const seed = testData(client);
       const holder = await seed.account({ providerId: "google", accountId: "google-sub-1" });
@@ -26,7 +26,7 @@ describe("the account's key, a provider and its account id", () => {
     });
   });
 
-  it("admits one id at two providers, two ids at one", async () => {
+  it("accepts one id at two providers, two ids at one", async () => {
     await withRollback(db().pool, async (client) => {
       const seed = testData(client);
       const holder = await seed.account({ providerId: "google", accountId: "google-sub-1" });

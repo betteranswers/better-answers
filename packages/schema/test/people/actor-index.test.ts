@@ -55,7 +55,7 @@ describe("the migration that indexes the audit log by actor", () => {
     ]);
   });
 
-  it("leaves no lock bound on the migrations after it", async () => {
+  it("leaves no lock timeout set for the migrations after it", async () => {
     const after = await withRollback(db.pool, (client) =>
       migratedFromBefore(client, async () => {
         const shown = await client.query<{ lock_timeout: string }>("SHOW lock_timeout");
@@ -66,7 +66,7 @@ describe("the migration that indexes the audit log by actor", () => {
     expect(after).toBe("0");
   });
 
-  it("fails rather than waits behind an open audit write", async () => {
+  it("fails instead of waiting behind an open audit write", async () => {
     await db.pool.query(`DROP INDEX "${THE_INDEX}"`);
     try {
       const blocked = whileAnAuditWriteIsOpen(db.pool, () =>

@@ -70,7 +70,7 @@ const restoreStep = (): ImageStep => {
     (step) => step.env?.[NEWEST_CHECKPOINT_VARIABLE] !== undefined,
   );
   if (found === undefined) {
-    throw new Error(`${BASELINE_ACTION} has no step carrying \`${NEWEST_CHECKPOINT_VARIABLE}\``);
+    throw new Error(`${BASELINE_ACTION} has no step that sets \`${NEWEST_CHECKPOINT_VARIABLE}\``);
   }
   return found;
 };
@@ -81,7 +81,9 @@ const stepsUsing = (steps: readonly ImageStep[], action: string): readonly Image
 const onlyStep = (steps: readonly ImageStep[], action: string, job: string): ImageStep => {
   const [only, ...more] = stepsUsing(steps, action);
   if (only === undefined || more.length > 0) {
-    throw new Error(`mutation.yml's ${job} job must use ${action} once`);
+    throw new Error(
+      `mutation.yml's ${job} job uses ${action} more or less than once. Use it exactly once.`,
+    );
   }
   return only;
 };
@@ -244,14 +246,14 @@ const configSchema = z.object({
   incrementalFile: z.string(),
 });
 
-describe("the nightly mutation baseline, kept as the previous run's artifact", () => {
-  it("restores main's newest checkpoint for this leg, and the baseline", () => {
+describe("the nightly mutation baseline, stored as the previous run's artifact", () => {
+  it("restores main's newest checkpoint and baseline for this leg", () => {
     const restored = restoreAgainst([
       page(EXPIRED_ON_MAIN, A_FORK_CALLING_ITS_BRANCH_MAIN, ANOTHER_BRANCH),
       page(NIGHT_BEFORE_LAST, LAST_NIGHT),
     ]);
 
-    expect(restored.status, `the step went red: ${restored.log}`).toBe(0);
+    expect(restored.status, `the step failed: ${restored.log}`).toBe(0);
     expect(restored.asked).toEqual([BEGAN, LISTED, downloaded(35_970_714_712, restored.reports)]);
     expect(restored.checkpoint).toEqual('{"uploadedBy":35970714712}');
     expect(restored.baseline).toEqual('{"uploadedBy":35970714712}');
@@ -264,10 +266,10 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
       left: "stale or foreign uploads",
       pages: [page(EXPIRED_ON_MAIN, A_FORK_CALLING_ITS_BRANCH_MAIN, ANOTHER_BRANCH)],
     },
-  ])("tests every mutant, staying green, given $left", ({ pages }) => {
+  ])("tests every mutant and passes, given $left", ({ pages }) => {
     const restored = restoreAgainst(pages);
 
-    expect(restored.status, `the step went red: ${restored.log}`).toBe(0);
+    expect(restored.status, `the step failed: ${restored.log}`).toBe(0);
     expect(restored.asked).toEqual([BEGAN, LISTED]);
     expect(restored.checkpoint).toBeUndefined();
     expect(restored.baseline).toBeUndefined();
@@ -296,11 +298,11 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
   it("takes nothing uploaded after this run began", () => {
     const restored = restoreAgainst([page(LAST_NIGHT, AFTER_THIS_RUN_BEGAN)]);
 
-    expect(restored.status, `the step went red: ${restored.log}`).toBe(0);
+    expect(restored.status, `the step failed: ${restored.log}`).toBe(0);
     expect(restored.asked).toEqual([BEGAN, LISTED, downloaded(35_970_714_712, restored.reports)]);
   });
 
-  it("goes red when the runs API hides this run's start", () => {
+  it("fails when the runs API hides this run's start time", () => {
     const restored = restoreAgainst([page(LAST_NIGHT)], "main", "refuses");
 
     expect(restored.status).toBe(1);
@@ -316,7 +318,7 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
       answer: { message: "Not Found", status: "404" },
       says: `something other than a list of ${ARTIFACT}`,
     },
-  ])("goes red when the artifacts API $when", ({ answer, says }) => {
+  ])("fails when the artifacts API $when", ({ answer, says }) => {
     const restored = restoreAgainst(answer);
 
     expect(restored.status).toBe(1);
@@ -325,7 +327,7 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
     expect(restored.log).toContain(says);
   });
 
-  it("reads each leg's checkpoint from the artifact its upload names", () => {
+  it("reads each leg's checkpoint from the artifact it uploads", () => {
     const { stryker, summary } = mutationWorkflow().jobs;
     const restore = restoreStep();
     const shardRestore = onlyStep(stryker.steps, BASELINE_ACTION, "stryker");
@@ -341,7 +343,7 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
     );
   });
 
-  it("hands each shard the leg's results, and gathers its own", () => {
+  it("gives each shard the leg's results, then gathers its own", () => {
     const { stryker } = mutationWorkflow().jobs;
     const gather = stepRunning(stryker.steps, "stryker-incremental.json", "stryker");
     const upload = onlyStep(stryker.steps, "actions/upload-artifact@", "stryker");
@@ -361,7 +363,7 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
 
       expect(
         { incremental: read.incremental, incrementalFile: read.incrementalFile },
-        `${leg} writes its checkpoint somewhere the shard does not gather it from`,
+        `${leg} writes its checkpoint to a path the shard does not gather from. Set incremental to true and incrementalFile to reports/mutation/stryker-incremental.json.`,
       ).toEqual({
         incremental: true,
         incrementalFile: "reports/mutation/stryker-incremental.json",
@@ -429,8 +431,8 @@ const sliceArgv = (leg: string, shard: number, of: number): readonly string[] =>
   path.join(repositoryRoot, "no-previous-run.json"),
 ];
 
-describe("each mutation leg, run as shards and summed once", () => {
-  it("runs shards 1 to N once, summed by one summary", () => {
+describe("each mutation leg, run as shards and summarised once", () => {
+  it("runs shards 1 to N once, with one summary job", () => {
     const { stryker, summary } = mutationWorkflow().jobs;
     const shards = stryker.strategy.matrix.include;
 
@@ -449,10 +451,10 @@ describe("each mutation leg, run as shards and summed once", () => {
     }
   });
 
-  it("cuts each leg into slices that tile its mutate set", async () => {
+  it("cuts each leg into slices covering its mutate set exactly", async () => {
     for (const { name, of } of mutationWorkflow().jobs.summary.strategy.matrix.include) {
       const root = legRoots.get(name);
-      assert(root !== undefined, `${name} is a mutation leg`);
+      assert(root !== undefined, `${name} is not a mutation leg`);
       const config = configSchema.parse(CONFIGS.get(root));
       const printed = await Promise.all(
         Array.from({ length: of }, (_, index) =>
@@ -468,11 +470,14 @@ describe("each mutation leg, run as shards and summed once", () => {
       const whole = wholeFilesOf(slices.flat());
       const cut = cutFilesOf(slices.flat());
 
-      expect(script.stdout, `${name}'s script printed another slice: ${script.stderr}`).toBe(
-        printed.at(-1),
-      );
+      expect(
+        script.stdout,
+        `scripts/mutation-shards.mjs printed a different slice for ${name}: ${script.stderr}`,
+      ).toBe(printed.at(-1));
       expect(slices.map((slice) => slice[0])).not.toContain("");
-      expect(new Set(whole).size, `${name}'s slices share a file`).toBe(whole.length);
+      expect(new Set(whole).size, `two of ${name}'s slices contain the same file`).toBe(
+        whole.length,
+      );
       expect([...whole, ...cut.keys()].toSorted()).toEqual(
         mutateSet(path.join(repositoryRoot, root), config.mutate),
       );
@@ -483,17 +488,17 @@ describe("each mutation leg, run as shards and summed once", () => {
           .map(({ lines }) => lines)
           .toSorted((left, right) => left.from - right.from);
 
-        expect(whole, `${file} is both cut and whole`).not.toContain(file);
+        expect(whole, `${file} is in a slice both whole and cut into pieces`).not.toContain(file);
         expect(
           ranges.map(({ from }) => from),
-          `${name}'s pieces of ${file} leave a gap or overlap`,
+          `${name}'s pieces of ${file} leave a gap or overlap. The line ranges must follow each other with no gap.`,
         ).toEqual([1, ...ranges.slice(0, -1).map(({ to }) => to + 1)]);
         expect(ranges.at(-1)?.to).toBe(last);
       }
     }
   });
 
-  it("gathers each shard's files where the summary downloads them", () => {
+  it("gathers each shard's files where the summary job downloads them", () => {
     const { stryker, summary } = mutationWorkflow().jobs;
     const gather = stepRunning(stryker.steps, "stryker-incremental.json", "stryker");
     const upload = onlyStep(stryker.steps, "actions/upload-artifact@", "stryker");
@@ -514,7 +519,7 @@ describe("each mutation leg, run as shards and summed once", () => {
     );
   });
 
-  it("slices and merges by the one run the restore reads", () => {
+  it("slices and merges against the baseline the restore step reads", () => {
     const { stryker, summary } = mutationWorkflow().jobs;
 
     expect(onlyStep(stryker.steps, BASELINE_ACTION, "stryker").with?.["reports"]).toEqual(
@@ -559,7 +564,7 @@ describe("each mutation leg, run as shards and summed once", () => {
   ])("refuses $shards in a $leg shard: $refused", ({ shards, leg, of, refused }) => {
     const [check] = mutationWorkflow().jobs.stryker.steps;
     const script = check?.run;
-    assert(script !== undefined, "the stryker job opens on a script");
+    assert(script !== undefined, "the stryker job's first step runs no script");
     const run = spawnSync("bash", ["-c", script], {
       encoding: "utf8",
       env: { ...process.env, SHARDS: shards, LEG: leg, OF: String(of) },
@@ -567,7 +572,7 @@ describe("each mutation leg, run as shards and summed once", () => {
 
     expect(
       { refused: run.status !== 0, said: run.stdout.startsWith("::error::") },
-      "a misnamed shard runs nothing, and the run comes back green having tested nothing",
+      "the shard check did not refuse a shard name it should refuse, or refused a valid one. A misnamed shard runs nothing, so the run passes having tested nothing.",
     ).toEqual({ refused, said: refused });
     expect(check?.env).toEqual({
       SHARDS: "${{ inputs.shards }}",
@@ -576,20 +581,20 @@ describe("each mutation leg, run as shards and summed once", () => {
     });
   });
 
-  it("knows a shard's leg by the matrix's own names", () => {
+  it("accepts exactly the leg names the matrix uses", () => {
     const { stryker } = mutationWorkflow().jobs;
     const [check] = stryker.steps;
     const script = check?.run;
-    assert(script !== undefined, "the stryker job opens on a script");
+    assert(script !== undefined, "the stryker job's first step runs no script");
     const checkedLegs = /\^\(([a-z|]+)\)-/u.exec(script)?.[1];
-    assert(checkedLegs !== undefined, "the check names the legs it accepts");
+    assert(checkedLegs !== undefined, "the shard check names no legs it accepts");
 
     expect(checkedLegs.split("|").toSorted()).toEqual(
       [...new Set(stryker.strategy.matrix.include.map((shard) => shard.name))].toSorted(),
     );
   });
 
-  it("leaves room for a run of check.yml", () => {
+  it("leaves enough concurrent jobs for a run of check.yml", () => {
     expect(mutationWorkflow().jobs.stryker.strategy["max-parallel"]).toBeLessThanOrEqual(
       CONCURRENT_JOBS - checkRunJobs(),
     );

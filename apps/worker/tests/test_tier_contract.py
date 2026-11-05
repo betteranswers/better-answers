@@ -11,7 +11,7 @@ from psycopg import Cursor
 
 from support.roots import REPOSITORY_ROOT
 
-SPOKEN_AGREEMENTS = {
+EXPECTED_FORMS = {
     "citation": "fixtured",
     "concept-file": "fixtured",
     "suggestions": "sql-function",
@@ -173,7 +173,7 @@ def materialise_broken_contracts(root: Path) -> None:
     )
 
 
-DIGESTS_WORKED_OUT_OF_BAND: list[tuple[str, dict[str, bytes], str]] = [
+EXPECTED_DIGESTS: list[tuple[str, dict[str, bytes], str]] = [
     (
         "the manifest alone",
         {"manifest.json": b"{}"},
@@ -230,22 +230,20 @@ def materialised(root: Path, tree: dict[str, bytes]) -> Path:
     return root
 
 
-def test_the_digest_answers_the_agreed_hex_for_every_case_tree(
+def test_the_digest_matches_the_expected_hex_for_every_case(
     tmp_path: Path,
 ) -> None:
     from better_answers_worker.contract_digest import contract_digest
 
     answered = [
         (why, contract_digest(materialised(tmp_path / str(index), tree)))
-        for index, (why, tree, _hex) in enumerate(DIGESTS_WORKED_OUT_OF_BAND)
+        for index, (why, tree, _hex) in enumerate(EXPECTED_DIGESTS)
     ]
 
-    assert answered == [
-        (why, expected) for why, _tree, expected in DIGESTS_WORKED_OUT_OF_BAND
-    ]
+    assert answered == [(why, expected) for why, _tree, expected in EXPECTED_DIGESTS]
 
 
-def test_a_symlink_counts_for_nothing_in_the_digest(
+def test_the_digest_ignores_a_symlink(
     tmp_path: Path,
 ) -> None:
     from better_answers_worker.contract_digest import contract_digest
@@ -254,10 +252,10 @@ def test_a_symlink_counts_for_nothing_in_the_digest(
     (root / "queue").mkdir()
     (root / "queue" / "cases.json").symlink_to(root / "manifest.json")
 
-    assert contract_digest(root) == DIGESTS_WORKED_OUT_OF_BAND[0][2]
+    assert contract_digest(root) == EXPECTED_DIGESTS[0][2]
 
 
-def test_no_content_poses_as_a_second_file(tmp_path: Path) -> None:
+def test_one_file_cannot_produce_the_digest_of_two_files(tmp_path: Path) -> None:
     from better_answers_worker.contract_digest import contract_digest
 
     two_files = contract_digest(
@@ -271,13 +269,13 @@ def test_no_content_poses_as_a_second_file(tmp_path: Path) -> None:
         assert contract_digest(one_file) != two_files, forged
 
 
-def test_the_carried_digest_is_whole_never_a_short_form() -> None:
+def test_the_stamped_contract_digest_is_full_length_hex() -> None:
     from better_answers_worker.contract_stamp import CONTRACT_DIGEST
 
     assert re.fullmatch(r"[0-9a-f]{64}", CONTRACT_DIGEST)
 
 
-def test_a_hand_edited_digest_fails_this_tiers_own_check() -> None:
+def test_the_stamp_module_matches_the_rendered_contract_digest() -> None:
     from better_answers_worker.contract_digest import (
         CONTRACT_STAMP_MODULE,
         CONTRACTS_ROOT,
@@ -290,19 +288,19 @@ def test_a_hand_edited_digest_fails_this_tiers_own_check() -> None:
     )
 
 
-def test_names_exactly_the_agreements_spoken_each_in_the_expected_form() -> None:
+def test_the_manifest_lists_the_expected_agreements_and_forms() -> None:
     manifest = read_manifest()
 
-    assert set(manifest["agreements"]) == set(SPOKEN_AGREEMENTS)
-    for agreement_id, form in SPOKEN_AGREEMENTS.items():
+    assert set(manifest["agreements"]) == set(EXPECTED_FORMS)
+    for agreement_id, form in EXPECTED_FORMS.items():
         assert manifest["agreements"][agreement_id]["form"] == form
 
 
-def test_lists_a_fixture_exactly_when_it_exists_under_its_agreement() -> None:
+def test_the_manifest_lists_exactly_the_fixtures_on_disk() -> None:
     manifest = read_manifest()
 
     for fixture in manifest["fixtures"]:
-        assert fixture["agreement"] in SPOKEN_AGREEMENTS
+        assert fixture["agreement"] in EXPECTED_FORMS
         assert (CONTRACTS_DIR / fixture["path"]).exists()
 
     assert fixtures_on_disk(CONTRACTS_DIR) == {
@@ -310,7 +308,7 @@ def test_lists_a_fixture_exactly_when_it_exists_under_its_agreement() -> None:
     }
 
 
-def test_counts_a_fixture_and_never_a_dotfile(tmp_path: Path) -> None:
+def test_fixture_count_skips_dotfiles_manifest_and_readme(tmp_path: Path) -> None:
     (tmp_path / "id-shape").mkdir()
     (tmp_path / "id-shape" / "cases.json").write_text("{}", encoding="utf-8")
     (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
@@ -324,11 +322,11 @@ def test_counts_a_fixture_and_never_a_dotfile(tmp_path: Path) -> None:
     assert fixtures_on_disk(tmp_path) == {"id-shape/cases.json"}
 
 
-def test_the_disk_matches_every_declared_form_and_claimed_directory() -> None:
+def test_the_contracts_directory_matches_every_declared_form() -> None:
     assert form_failures(read_manifest(), CONTRACTS_DIR) == []
 
 
-def test_names_the_agreement_and_form_of_each_denied_entry(
+def test_reports_the_agreement_and_form_of_each_broken_entry(
     tmp_path: Path,
 ) -> None:
     materialise_broken_contracts(tmp_path)
@@ -350,7 +348,7 @@ def read_id_shape() -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(raw))
 
 
-def test_the_id_shape_accepts_and_refuses_as_the_fixture_says() -> None:
+def test_the_id_pattern_accepts_and_rejects_the_fixture_ids() -> None:
     fixture = read_id_shape()
     pattern = re.compile(fixture["pattern"])
 
@@ -360,14 +358,14 @@ def test_the_id_shape_accepts_and_refuses_as_the_fixture_says() -> None:
         assert not pattern.fullmatch(rejected["id"]), rejected["why"]
 
 
-def test_holds_workspace_ids_to_the_fixtures_own_shape() -> None:
+def test_the_worker_id_pattern_equals_the_fixture_pattern() -> None:
 
     from better_answers_worker.ids import ID_SHAPE
 
     assert ID_SHAPE.pattern == read_id_shape()["pattern"]
 
 
-def test_a_minted_id_matches_the_shape_the_other_tier_parses() -> None:
+def test_generated_ids_match_the_fixture_pattern_and_sort_by_time() -> None:
 
     from better_answers_worker.ids import ulid
 
@@ -469,7 +467,7 @@ def _submit_fixture_set(cursor: Cursor[Any], fixture: dict[str, Any]) -> int:
     return submitted
 
 
-def test_one_call_submits_a_set_and_re_renders_its_summary() -> None:
+def test_submitting_a_suggestion_set_returns_the_expected_summary() -> None:
     from support.pg_harness import migrated_postgres
 
     fixture = read_suggestions()
@@ -499,7 +497,7 @@ def test_one_call_submits_a_set_and_re_renders_its_summary() -> None:
         connection.rollback()
 
 
-def test_suggestions_refuse_every_road_the_fixture_says_is_closed() -> None:
+def test_suggestions_reject_every_statement_the_fixture_lists_as_refused() -> None:
     from support.pg_harness import migrated_postgres
 
     fixture = read_suggestions()
@@ -555,7 +553,7 @@ def _seed_queue_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
         )
 
 
-def _enqueue_answer(cursor: Cursor[Any], enqueue: dict[str, Any]) -> str:
+def _enqueue_result(cursor: Cursor[Any], enqueue: dict[str, Any]) -> str:
     from support.factories import enqueue_job
 
     cursor.execute("SAVEPOINT enqueue")
@@ -575,7 +573,7 @@ def _enqueue_answer(cursor: Cursor[Any], enqueue: dict[str, Any]) -> str:
     return "admitted"
 
 
-def _lapse_leases(cursor: Cursor[Any], job_ids: list[str]) -> None:
+def _expire_leases(cursor: Cursor[Any], job_ids: list[str]) -> None:
     if not job_ids:
         return
     cursor.execute(
@@ -592,7 +590,7 @@ def _as_role_in_scope(cursor: Cursor[Any], where: dict[str, Any]) -> None:
     )
 
 
-def test_the_queue_hands_out_and_answers_as_the_fixture_says() -> None:
+def test_the_queue_functions_return_what_the_fixture_expects() -> None:
     from support.pg_harness import migrated_postgres
 
     fixture = read_queue()
@@ -602,7 +600,7 @@ def test_the_queue_hands_out_and_answers_as_the_fixture_says() -> None:
         _seed_queue_fixture(cursor, fixture)
 
         enqueues = [
-            {"why": enqueue["why"], "answer": _enqueue_answer(cursor, enqueue)}
+            {"why": enqueue["why"], "answer": _enqueue_result(cursor, enqueue)}
             for enqueue in fixture["enqueues"]
         ]
         assert enqueues == [
@@ -612,7 +610,7 @@ def test_the_queue_hands_out_and_answers_as_the_fixture_says() -> None:
 
         claimed: list[dict[str, Any]] = []
         for claim in fixture["claims"]:
-            _lapse_leases(cursor, claim.get("lapse_first", []))
+            _expire_leases(cursor, claim.get("lapse_first", []))
             _as_role_in_scope(cursor, claim)
             cursor.execute(
                 "SELECT id FROM claim_job(%s, %s::interval, %s)",
@@ -703,7 +701,7 @@ def test_the_canonical_text_and_hash_match_every_fixture_case() -> None:
         }
 
 
-def test_writes_every_fixture_number_as_both_tiers_write_it() -> None:
+def test_writes_every_fixture_number_in_its_expected_text_form() -> None:
     from better_answers_worker.concepts.concept_file import canonical_frontmatter
 
     for entry in read_concept_file()["numbers"]:
@@ -717,7 +715,7 @@ def read_citation() -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(raw))
 
 
-def _the_gate_over(directory: Path, prose: str) -> str:
+def _run_comment_gate(directory: Path, prose: str) -> str:
     probe = directory / "probe.py"
     probe.write_text(f"# {prose}\nKEEP = 1\n", encoding="utf-8")
     ran = subprocess.run(
@@ -730,14 +728,14 @@ def _the_gate_over(directory: Path, prose: str) -> str:
     return ran.stdout
 
 
-def test_the_comment_gate_refuses_every_sentence_the_fixture_says_cites(
+def test_the_comment_gate_rejects_every_fixture_sentence_that_cites(
     tmp_path: Path,
 ) -> None:
     for pattern in read_citation()["patterns"]:
         for case in pattern["cites"]:
             prose = case["prose"]
             cited = case["cited"]
-            said = _the_gate_over(tmp_path, prose)
+            said = _run_comment_gate(tmp_path, prose)
 
             assert f"cites {pattern['name']} (`{cited}`)" in said, prose
 
@@ -746,4 +744,4 @@ def test_the_comment_gate_passes_every_sentence_that_cites_nothing(
     tmp_path: Path,
 ) -> None:
     for prose in read_citation()["cites_nothing"]:
-        assert _the_gate_over(tmp_path, prose) == "", prose
+        assert _run_comment_gate(tmp_path, prose) == "", prose

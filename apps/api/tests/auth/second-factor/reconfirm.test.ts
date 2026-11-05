@@ -74,7 +74,7 @@ const signedInYesterday = async (personId: string): Promise<void> => {
 };
 
 describe("a stale confirmation before a high-impact act", () => {
-  it("refuses the members' acts until the Admin re-confirms", async () => {
+  it("refuses member management until the Admin confirms again", async () => {
     const workspace = await app.provision();
     const editor = await app.person(undefined, "Priya Shah");
     await app.addMember(workspace.workspaceId, editor.id, "Editor");
@@ -112,7 +112,7 @@ describe("a stale confirmation before a high-impact act", () => {
     expect(invited.invitations[0]).toMatchObject({ address: viewer.email, role: "Viewer" });
   });
 
-  it("refuses the person's own factor changes until re-confirmed", async () => {
+  it("refuses a person's own factor changes until they confirm again", async () => {
     const person = await app.person();
     const setUpIn = await signedInClient(app, person.email);
     const kept = z.object({ passkeyId: z.string() });
@@ -134,7 +134,7 @@ describe("a stale confirmation before a high-impact act", () => {
     expect(replaced.replaced).toBe(false);
   });
 
-  it("adds a first passkey with no confirmation to re-confirm", async () => {
+  it("adds a first passkey without any earlier confirmation", async () => {
     const person = await app.person();
     const client = await signedInClient(app, person.email);
 
@@ -143,7 +143,7 @@ describe("a stale confirmation before a high-impact act", () => {
     expect(answered.status).toBe(200);
   });
 
-  it("reaches no high-impact act from a bearer", async () => {
+  it("answers 401 to high-impact calls made with a bearer token", async () => {
     const workspace = await app.provision();
     const { accessToken } = await connectAsHost(app, app.client(), {
       email: workspace.admin.email,
@@ -197,7 +197,7 @@ describe("a stale confirmation before a high-impact act", () => {
 });
 
 describe("the operator's console writes", () => {
-  it("follow the confirmation, not the sign-in's age", async () => {
+  it("depend on the confirmation's age, not the sign-in's age", async () => {
     const workspace = await app.provision();
     await app.markOperator(workspace.admin.email, "grant");
     const person = await app.person();
@@ -225,7 +225,7 @@ describe("the operator's console writes", () => {
 });
 
 describe("a session's lifetime", () => {
-  it("lives thirty days and renews after a day of use", async () => {
+  it("lasts thirty days and renews when used after a day", async () => {
     const person = await app.person();
     const client = await signedInClient(app, person.email);
     const first = await theSessionOf(person.id);

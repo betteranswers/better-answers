@@ -34,7 +34,7 @@ const isLeftBehind = async (db: MigratedPostgres, name: string): Promise<boolean
 };
 
 describe("the warm harness", () => {
-  it("hands back a cluster with its three durability costs off", async () => {
+  it("returns a cluster with fsync, synchronous_commit and full_page_writes off", async () => {
     const db = await openMigratedPostgres("durability");
     try {
       expect(await durabilityOf(db)).toEqual(DURABILITY_OFF);
@@ -43,7 +43,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("holds the question months of the server's clock", async () => {
+  it("creates the question month partitions for the server's clock", async () => {
     const db = await openMigratedPostgres("question-months");
     try {
       const made = await db.pool.query<{ name: string }>(
@@ -77,7 +77,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("names each key's clone after the key and the run", async () => {
+  it("names each key's clone after the key and run id", async () => {
     const warm = warmOfThisRun();
     const one = await clonedFrom(warm, "one-key-named");
     const another = await clonedFrom(warm, "another-key-named");
@@ -95,7 +95,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("hands the copy back as app_rt, the unscoped read refused", async () => {
+  it("connects its runtime pool as app_rt, which reads nothing unscoped", async () => {
     const db = await openMigratedPostgres();
     try {
       await writeModelChoice(db);
@@ -113,7 +113,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("carries the policies and runtime grants onto the copy", async () => {
+  it("copies the policies and runtime grants into each copy", async () => {
     const db = await openMigratedPostgres("grants");
     try {
       const catalogue = await db.pool.query(
@@ -133,7 +133,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("drops a file's database on stop, leaving the cluster up", async () => {
+  it("drops a file's database on stop, leaving the cluster running", async () => {
     const stopped = await openMigratedPostgres("stopped");
     const name = await databaseNameOf(stopped);
     await stopped.stop();
@@ -152,7 +152,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("drops a file's database despite a stray session on it", async () => {
+  it("drops a file's database even with a stray session open", async () => {
     const held = await openMigratedPostgres("held-open");
     const name = await databaseNameOf(held);
     const stray = new pg.Client({
@@ -197,7 +197,7 @@ describe("the warm harness", () => {
 });
 
 describe("the warm harness under TEST_POSTGRES_URI", () => {
-  it("gives two runs' opens of one key separate databases", async () => {
+  it("gives one key separate databases in two runs", async () => {
     const warm = warmOfThisRun();
     const ours = await clonedFrom(warm, "one-key");
     const theirs = await clonedFrom({ ...warm, runId: process.pid }, "one-key");

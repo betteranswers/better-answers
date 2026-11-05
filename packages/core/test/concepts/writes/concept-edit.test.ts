@@ -167,7 +167,7 @@ const pathOf = async (iri: ConceptIri): Promise<string> => {
   return found.rows[0]?.path ?? "";
 };
 
-describe("a save seeded from the raw file", () => {
+describe("a save that starts from the raw file", () => {
   it("keeps a withheld source's locator through a save", async () => {
     const scenario = await arrange();
     const restricted = await minutesLanded(scenario);
@@ -190,7 +190,7 @@ describe("a save seeded from the raw file", () => {
     expect(file).toContain('"title": "Expenses, retitled"');
   });
 
-  it("refuses a save whose withheld positions have moved", async () => {
+  it("refuses a save after the withheld sources' positions moved", async () => {
     const scenario = await arrange();
     const restricted = await minutesLanded(scenario);
     const concept = await written(scenario, {
@@ -208,7 +208,7 @@ describe("a save seeded from the raw file", () => {
     expect(await historyOf(scenario)).toEqual(before);
   });
 
-  it("refuses a save after two access moves that cancel", async () => {
+  it("refuses a save after two access changes that cancel out", async () => {
     const scenario = await arrange();
     const minutes = await minutesLanded(scenario);
     const handbook = await documentLanded(db().pool, scenario.workspaceId, {
@@ -256,7 +256,7 @@ describe("a save seeded from the raw file", () => {
     ).toEqual(events);
   });
 
-  it("a body whitespace-only change still commits", async () => {
+  it("commits a change of whitespace only to the body", async () => {
     const scenario = await arrange();
     const concept = await written(scenario, {}, "Claim within thirty days.\n\nKeep receipts.");
     const before = await historyOf(scenario);
@@ -287,7 +287,7 @@ describe("a save seeded from the raw file", () => {
     expect(await historyOf(scenario)).toHaveLength(before.length + 1);
   });
 
-  it("writes no commit re-saving an imported file unchanged", async () => {
+  it("writes no commit when an imported file is re-saved unchanged", async () => {
     const scenario = await arrange();
     const imported = await importBundle(
       scenario.admin,
@@ -346,7 +346,7 @@ describe("a save seeded from the raw file", () => {
   });
 });
 
-describe("a save around a source whose document is gone", () => {
+describe("a save of a concept citing a deleted document", () => {
   const replayedCitingAGoneDocument = async (
     scenario: Scenario,
     handbookPublished: Date | null = null,
@@ -414,7 +414,7 @@ describe("a save around a source whose document is gone", () => {
     return sensitivityOf(iri);
   };
 
-  it("saves an edit that carries the gone source in place", async () => {
+  it("saves an edit that keeps the deleted source in place", async () => {
     const scenario = await arrange();
     const { iri, path, goneLocator } = await replayedCitingAGoneDocument(scenario, new Date());
     expect(await sensitivityOf(iri)).toBe("Restricted");
@@ -466,7 +466,7 @@ describe("a save around a source whose document is gone", () => {
       [iri],
     );
     const held = found.rows[0];
-    assert(held !== undefined, "the replayed concept is indexed");
+    assert(held !== undefined, "the replayed concept is not indexed");
     const { iri: _iri, ...frontmatter } = held.frontmatter;
     const set = await submitSuggestionSet(
       scenario.editor,
@@ -514,7 +514,7 @@ describe("a save around a source whose document is gone", () => {
 });
 
 describe("what a save refuses", () => {
-  it("refuses a save newly citing a document not catalogued", async () => {
+  it("refuses a save that newly cites an uncatalogued document", async () => {
     const scenario = await arrange();
     const concept = await written(scenario);
     const before = await historyOf(scenario);
@@ -527,7 +527,7 @@ describe("what a save refuses", () => {
     expect(await historyOf(scenario)).toEqual(before);
   });
 
-  it("refuses a bare wire locator as a string source", async () => {
+  it("refuses a bare passage locator as a string source", async () => {
     const scenario = await arrange();
     const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
     const concept = await written(scenario, { sources: ["Handbook"] });
@@ -589,7 +589,7 @@ describe("what a save refuses", () => {
     return concept;
   };
 
-  it("counts write-up includes and inbound links as places", async () => {
+  it("counts write-up includes and inbound links where it is used", async () => {
     const scenario = await arrange();
     const concept = await usedTwice(scenario);
 
@@ -598,7 +598,7 @@ describe("what a save refuses", () => {
     expect(seed.usedIn).toBe(2);
   });
 
-  it("refuses a reused concept's save until confirmed", async () => {
+  it("refuses saving a reused concept until the editor confirms", async () => {
     const scenario = await arrange();
     const concept = await usedTwice(scenario);
     const seed = await toEdit(scenario, scenario.admin, concept.iri);
@@ -618,7 +618,7 @@ describe("what a save refuses", () => {
   });
 });
 
-describe("who a save commits for", () => {
+describe("the author a save commits as", () => {
   it("commits an owner's save with the owner as author", async () => {
     const scenario = await arrange();
     const concept = await written(scenario);
@@ -665,7 +665,7 @@ describe("who a save commits for", () => {
     ]);
   });
 
-  it("files an outsider's retitle under the key it stands at", async () => {
+  it("files an outsider's retitle under the concept's current key", async () => {
     const scenario = await arrange();
     const concept = await written(scenario);
 
@@ -727,7 +727,7 @@ describe("who a save commits for", () => {
       },
     ]);
   });
-  it("lands a new concept published, re-opened by its author", async () => {
+  it("publishes a new concept that its author can reopen", async () => {
     const scenario = await arrange();
 
     const iri = committedIri(await saved(scenario, scenario.editor, newPolicy("Petty Cash")));
@@ -758,7 +758,7 @@ describe("who a save commits for", () => {
     expect(row.rows).toEqual([{ status: "stable", sensitivity: "Restricted" }]);
   });
 
-  it("falls back to a suggestion when ownership clears mid-save", async () => {
+  it("falls back to a suggestion when ownership is cleared mid-save", async () => {
     const scenario = await arrange();
     const concept = await written(scenario);
     const seed = await toEdit(scenario, scenario.editor, concept.iri);
@@ -832,7 +832,7 @@ describe("a retitle or a rekind", () => {
     expect(taken).toEqual({ ok: false, error: "merge-key-taken" });
   });
 
-  it("keeps an underived key while title and kind stand", async () => {
+  it("keeps a non-derived key while title and kind are unchanged", async () => {
     const scenario = await arrange();
     const concept = await written(scenario);
 
@@ -843,7 +843,7 @@ describe("a retitle or a rekind", () => {
   });
 });
 
-describe("what an outsider's body may name", () => {
+describe("what an outsider's body may mention", () => {
   const citingMinutes = async (scenario: Scenario, body: string) => {
     const minutes = await minutesLanded(scenario);
     const concept = await written(
@@ -855,7 +855,7 @@ describe("what an outsider's body may name", () => {
     return { concept, locator: minutes.locator };
   };
 
-  it("refuses an outsider naming a withheld locator anew", async () => {
+  it("refuses an outsider adding a withheld locator to the body", async () => {
     const scenario = await arrange();
     const { concept, locator } = await citingMinutes(scenario, "Claims close in March.");
 
@@ -866,7 +866,7 @@ describe("what an outsider's body may name", () => {
     expect(answer).toEqual({ ok: false, error: "body-locator-refused" });
   });
 
-  it("lets an outsider keep a withheld locator the body names", async () => {
+  it("lets an outsider keep a withheld locator already cited", async () => {
     const scenario = await arrange();
     const { concept } = await citingMinutes(scenario, "Claims close in March, see MINUTES.");
 

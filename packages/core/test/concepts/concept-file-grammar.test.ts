@@ -10,8 +10,8 @@ import {
   type Frontmatter,
 } from "../../src/concepts/index.ts";
 
-describe("a concept file read back", () => {
-  it("reads a quoted key, and a list of strings", () => {
+describe("parsing a concept file", () => {
+  it("reads a quoted key and a list of strings", () => {
     expect([
       parseConceptFile('---\n"title": "x"\n---\n\nbody\n'),
       parseConceptFile('---\n"tags":\n  - "a"\n---\n\nbody\n'),
@@ -110,8 +110,8 @@ describe("a concept file read back", () => {
 
     assert(read.ok, `the file was refused: ${inspect(read)}`);
     const [entry] = z.array(z.unknown()).parse(read.value.frontmatter["sources"]);
-    assert(typeof entry === "object", "the sources list holds an entry");
-    assert(entry !== null, "the sources entry is an object");
+    assert(typeof entry === "object", "the first sources entry is not an object");
+    assert(entry !== null, "the first sources entry is null");
     expect(Object.entries(entry)).toEqual([
       ["resource", "/s/a.pdf"],
       ["__proto__", "x"],

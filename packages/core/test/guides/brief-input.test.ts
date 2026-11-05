@@ -9,7 +9,7 @@ const input = { writeUpId: ulid(), markdown: "Words.", base: 2 };
 const LIMIT = 20_000;
 
 describe("the input of a Brief save", () => {
-  it("takes a Brief of exactly 20,000 characters", () => {
+  it("accepts a Brief of exactly 20,000 characters", () => {
     expect(saveBriefInput.safeParse({ ...input, markdown: "a".repeat(LIMIT) }).success).toBe(true);
   });
 
@@ -19,15 +19,15 @@ describe("the input of a Brief save", () => {
     );
   });
 
-  it("takes an empty Brief", () => {
+  it("accepts an empty Brief", () => {
     expect(saveBriefInput.safeParse({ ...input, markdown: "" }).success).toBe(true);
   });
 
-  it("refuses a field it does not name", () => {
+  it("refuses an unknown field", () => {
     expect(saveBriefInput.safeParse({ ...input, includes: [] }).success).toBe(false);
   });
 
-  it("refuses a save naming no version to build on", () => {
+  it("refuses a save that names no base version", () => {
     expect(saveBriefInput.safeParse({ ...input, base: 0 }).success).toBe(false);
   });
 

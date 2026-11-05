@@ -50,7 +50,7 @@ const NEWEST_BUILD_VARIABLE = "NEWEST_BUILD";
 
 const carrying = (steps: readonly ImageStep[], variable: string): ImageStep => {
   const found = steps.find((step) => step.env?.[variable] !== undefined);
-  if (found === undefined) throw new Error(`scan.yml has no step carrying \`${variable}\``);
+  if (found === undefined) throw new Error(`scan.yml has no step that sets \`${variable}\``);
   return found;
 };
 
@@ -175,7 +175,7 @@ describe("the nightly scan of the images build.yml pushes", () => {
 
     expect(matrixLegs().length).toBeGreaterThan(2);
     const tiersAt = tiers.env?.[TIERS_VARIABLE];
-    assert(tiersAt !== undefined, `the tiers step sets ${TIERS_VARIABLE}`);
+    assert(tiersAt !== undefined, `the tiers step does not set ${TIERS_VARIABLE}`);
     expect(valuesAt(build, tiersAt)).toEqual(matrixLegs().map((leg) => leg.tier));
     expect(tiers.run).toContain(`\${${TIERS_VARIABLE}}`);
     expect(tiers.run).toContain(".github/workflows/build.yml");
@@ -190,7 +190,7 @@ describe("the nightly scan of the images build.yml pushes", () => {
     const newestFirst = resolveAgainst([[REFERRER, UNTAGGED, IMAGE], [IMAGE_BEFORE]]);
     const oldestFirst = resolveAgainst([[IMAGE_BEFORE], [UNTAGGED, IMAGE, REFERRER]]);
 
-    expect(newestFirst.status, `the step went red: ${newestFirst.log}`).toBe(0);
+    expect(newestFirst.status, `the step failed: ${newestFirst.log}`).toBe(0);
     expect(newestFirst.asked).toEqual(
       "api --paginate --slurp orgs/betteranswers/packages/container/api/versions?per_page=100",
     );
@@ -209,7 +209,7 @@ describe("the nightly scan of the images build.yml pushes", () => {
     expect(resolved.log).toContain("holds no sha- tagged version");
   });
 
-  it("goes red, naming the package, when listing its versions fails", () => {
+  it("fails and names the package when listing its versions fails", () => {
     const resolved = resolveAgainst(undefined);
 
     expect(resolved.status).toBe(1);
@@ -265,7 +265,7 @@ const ALREADY_FIXED = alert(15, "betteranswers/api", "3.5.4-1~deb13u2", "2026-10
 
 const publishWith = (branchExists: boolean): Published => {
   const [step] = scanWorkflow().jobs.alerts.steps;
-  assert(step !== undefined, "the alerts job has a step");
+  assert(step !== undefined, "the alerts job has no steps");
   const directory = mkdtempSync(path.join(tmpdir(), "scan-alerts-"));
   const file = (name: string) => path.join(directory, name);
   try {
@@ -328,7 +328,7 @@ const publishWith = (branchExists: boolean): Published => {
 };
 
 describe("the alerts branch the weekly triage reads", () => {
-  it("runs after every scan leg, able to read code scanning", () => {
+  it("runs after every scan leg, with code scanning read access", () => {
     const job = scanWorkflow().jobs.alerts;
 
     expect(job.needs).toEqual("trivy");
@@ -336,10 +336,10 @@ describe("the alerts branch the weekly triage reads", () => {
     expect(job.permissions).toEqual({ contents: "write", "security-events": "read" });
   });
 
-  it("publishes open alerts and dismissed ones a fix now closes", () => {
+  it("publishes open alerts and dismissed ones that a fix closes", () => {
     const published = publishWith(false);
 
-    expect(published.status, `the step went red: ${published.log}`).toBe(0);
+    expect(published.status, `the step failed: ${published.log}`).toBe(0);
     expect(published.alerts.open.map((each) => each.number)).toEqual([7]);
     expect(published.alerts.open[0]?.severity).toEqual("high");
     expect(published.alerts.open[0]?.message).toContain("Package: openssl");
@@ -359,10 +359,10 @@ describe("the alerts branch the weekly triage reads", () => {
     );
   });
 
-  it("replaces the branch's one commit every night after", () => {
+  it("replaces the branch's single commit on every later night", () => {
     const published = publishWith(true);
 
-    expect(published.status, `the step went red: ${published.log}`).toBe(0);
+    expect(published.status, `the step failed: ${published.log}`).toBe(0);
     expect(published.calls).toContain(
       "api -X PATCH repos/betteranswers/better-answers/git/refs/heads/security/alerts -f sha=commit-sha -F force=true --silent",
     );

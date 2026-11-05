@@ -46,7 +46,7 @@ export type TestData = {
 
   user(overrides?: Partial<InsertInput<"user">>): Promise<Row<"user">>;
 
-  /** As the library writes one. */
+  /** Writes a session as the auth library writes one. */
   session(overrides?: Partial<InsertInput<"session">>): Promise<Row<"session">>;
 
   account(overrides?: Partial<InsertInput<"account">>): Promise<Row<"account">>;
@@ -65,7 +65,7 @@ export type TestData = {
 
   modelChoice(overrides?: Partial<InsertInput<"modelChoice">>): Promise<Row<"modelChoice">>;
 
-  /** Its frame is bytes of a frame's length that seal nothing. */
+  /** Writes a placeholder frame of the right length that seals no key. */
   modelKey(overrides?: Partial<InsertInput<"modelKey">>): Promise<Row<"modelKey">>;
 
   passage(overrides?: Partial<InsertInput<"passage">>): Promise<Row<"passage">>;
@@ -180,7 +180,7 @@ export type TestData = {
     overrides?: Partial<InsertInput<"guideDefinitionVersion">>,
   ): Promise<Row<"guideDefinitionVersion">>;
 
-  /** Homed in a section it seeds, unless given one; a response home names a question instead. */
+  /** Placed in a section it seeds unless given one. A response write-up names a question instead. */
   writeUp(overrides?: InASection<InsertInput<"writeUp">>): Promise<Row<"writeUp">>;
 
   writeUpInclude(
@@ -191,13 +191,13 @@ export type TestData = {
     overrides?: Partial<InsertInput<"writeUpVersion">>,
   ): Promise<Row<"writeUpVersion">>;
 
-  /** Of a write-up version it seeds, unless given an `iri` or a version with its write-up. */
+  /** Records use of a write-up version it seeds, unless given an `iri` or a version and its write-up. */
   usage(overrides?: Partial<InsertInput<"usage">>): Promise<Row<"usage">>;
 
   questionAsked(overrides?: Partial<InsertInput<"questionAsked">>): Promise<Row<"questionAsked">>;
 
   /**
-   * Seeds its record too when given none, asked now. A `recordId` comes with that record's
+   * Seeds a question record, asked now, when given none. A given `recordId` needs that record's
    * `askedAt`.
    */
   questionContent(
@@ -215,7 +215,7 @@ export type TestData = {
   /** Serves a question it seeds, asked now, when given no run and no answer. */
   llmCall(overrides?: Partial<InsertInput<"llmCall">>): Promise<Row<"llmCall">>;
 
-  /** Taken now for ten minutes, serving a question it seeds when given no run and no answer. */
+  /** Reserved now for ten minutes, for a question it seeds when given no run and no answer. */
   spendReservation(
     overrides?: Partial<InsertInput<"spendReservation">>,
   ): Promise<Row<"spendReservation">>;
@@ -301,8 +301,8 @@ const monthsOn = (from: Date, months: number): Date => {
 };
 
 /**
- * Each method writes one row, filling what `overrides` leave out and seeding the parent rows its
- * keys need; `passage` also makes the workspace's partition.
+ * Each method writes one row. It fills what `overrides` leave out and seeds the parent rows its
+ * keys need. `passage` also creates the workspace's partition.
  */
 export const testData = (client: pg.PoolClient): TestData => {
   const workspace: TestData["workspace"] = (overrides = {}) => {

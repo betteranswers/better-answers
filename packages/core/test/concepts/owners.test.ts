@@ -33,7 +33,7 @@ import {
   answered,
   holdingTable,
   isBlockedOnTable,
-  lendingOnceSettled,
+  poolWaitingFor,
   seedingWith,
   statementsWaitingOnALock,
   until,
@@ -122,7 +122,7 @@ const landedByTheGuidanceOwner = async () => {
   return { scenario, input, landed: await landedAs(scenario, scenario.viewer, input) };
 };
 
-describe("a direct write, decided by the concept's owner", () => {
+describe("who may write a concept directly", () => {
   it("commits an owning Editor's direct write with them as author", async () => {
     const scenario = await arrange();
     const input = conceptAt("knowledge/policy/expenses.md");
@@ -136,7 +136,7 @@ describe("a direct write, decided by the concept's owner", () => {
     });
   });
 
-  it("refuses an Editor owning nothing a direct write", async () => {
+  it("refuses a direct write by an Editor who owns nothing", async () => {
     const scenario = await arrange();
     await nameOwnerAs(scenario.admin, scenario.postgres, { collection: "policy", personId: null });
 
@@ -159,7 +159,7 @@ describe("a direct write, decided by the concept's owner", () => {
     expect(facts.trailers["Actor"]).toBe(`human:${scenario.viewer.userId}`);
   });
 
-  it("prefers the concept's own owner to its collection's", async () => {
+  it("uses the concept's own owner over its collection's owner", async () => {
     const { scenario, input, landed } = await ownedByTheViewer();
 
     const owner = await ownerRead(scenario, { iri: landed.iri, path: input.path });
@@ -181,7 +181,7 @@ describe("a direct write, decided by the concept's owner", () => {
     );
   });
 
-  it("leaves a concept nobody owns to Admins", async () => {
+  it("lets only Admins write a concept nobody owns", async () => {
     const scenario = await arrange();
     const input = conceptAt("knowledge/unowned/expenses.md");
 
@@ -192,7 +192,7 @@ describe("a direct write, decided by the concept's owner", () => {
     expect(byAnAdmin).toMatchObject({ ok: true });
   });
 
-  it("owns nothing once the owner leaves the workspace", async () => {
+  it("drops ownership once the owner leaves the workspace", async () => {
     const scenario = await arrange();
     const input = conceptAt("knowledge/policy/expenses.md");
     const landed = await landedAs(scenario, scenario.editor, input);
@@ -206,7 +206,7 @@ describe("a direct write, decided by the concept's owner", () => {
   });
 });
 
-describe("ownership judged at the time of the act", () => {
+describe("ownership checked at the time of the write", () => {
   it("refuses an owner cleared before the write lands", async () => {
     const scenario = await arrange();
     let pending: Promise<Result<ConceptWritten, unknown>> | undefined;
@@ -269,12 +269,12 @@ describe("ownership judged at the time of the act", () => {
     expect(refused).toEqual({ ok: false, error: "owner-forbids" });
   });
 
-  it("refuses a non-owner before saying a path is taken", async () => {
+  it("refuses a non-owner before reporting that the path is taken", async () => {
     const scenario = await arrange();
     const taken = conceptAt("knowledge/policy/expenses.md");
     await landedAs(scenario, scenario.editor, taken);
     const [head] = await bundleHistory(scenario.git, scenario.workspaceId);
-    assert(head !== undefined, "the owner's write committed");
+    assert(head !== undefined, "the owner's write did not commit");
 
     const refused = await writeAs(
       scenario,
@@ -285,7 +285,7 @@ describe("ownership judged at the time of the act", () => {
     expect(refused).toEqual({ ok: false, error: "owner-forbids" });
   });
 
-  it("holds a clear behind the write that read its owner", async () => {
+  it("makes clearing an owner wait for the write reading it", async () => {
     const scenario = await arrange();
     const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
     await gate.park();
@@ -310,8 +310,8 @@ describe("ownership judged at the time of the act", () => {
   });
 });
 
-describe("an override named while a write is in flight", () => {
-  it("holds a new override behind a write already in flight", async () => {
+describe("an override named while a write is running", () => {
+  it("makes a new override wait for a running write", async () => {
     const scenario = await arrange();
     const input = conceptAt("knowledge/policy/expenses.md");
     const landed = await landedAs(scenario, scenario.editor, input);
@@ -366,8 +366,8 @@ const ownersLeft = async (scenario: Scenario) =>
     )
   ).rowCount;
 
-describe("an owner erased while their write is in flight", () => {
-  it("finishes both the erasure and the write, deadlocking neither", async () => {
+describe("an owner erased while their write is running", () => {
+  it("finishes both the erasure and the write without deadlock", async () => {
     const scenario = await arrange();
     const input = conceptAt("knowledge/policy/expenses.md");
     const landed = await landedAs(scenario, scenario.editor, input);
@@ -375,7 +375,7 @@ describe("an owner erased while their write is in flight", () => {
     let erasing: Promise<unknown> = Promise.resolve();
     const postgres = {
       ...scenario.postgres,
-      pool: lendingOnceSettled(scenario.postgres.pool, () => erasing),
+      pool: poolWaitingFor(scenario.postgres.pool, () => erasing),
     };
     let pending: Promise<Result<ConceptWritten, unknown>> | undefined;
     let erased: ReturnType<typeof eraseFromTheIdentitySet> | undefined;
@@ -432,7 +432,7 @@ describe("an owner erased while their write is in flight", () => {
 });
 
 describe("naming an owner", () => {
-  it("names an owner as Admin alone, with its audit event", async () => {
+  it("lets only an Admin name an owner, and audits it", async () => {
     const scenario = await arrange();
     const asked = { collection: "guidance", personId: scenario.viewer.userId } as const;
 
@@ -470,7 +470,7 @@ describe("naming an owner", () => {
     expect(named).toEqual({ ok: true, value: { ok: false, error: "no-such-member" } });
   });
 
-  it("refuses a subject naming no collection as malformed", async () => {
+  it("refuses a subject that names no collection as malformed", async () => {
     const scenario = await arrange();
 
     const named = await withMember(scenario.admin, scenario.postgres, (fresh, tx) =>
@@ -481,7 +481,7 @@ describe("naming an owner", () => {
     expect(named).toEqual({ ok: true, value: { ok: false, error: "malformed" } });
   });
 
-  it("refuses an owner for a concept that does not stand", async () => {
+  it("refuses an owner for a concept that does not exist", async () => {
     const scenario = await arrange();
 
     const named = await withMember(scenario.admin, scenario.postgres, (fresh, tx) =>
@@ -547,8 +547,8 @@ const shelvedPolicies = (scenario: Scenario, count: number): Promise<readonly Co
     Array.from({ length: count }, (_unused, at) => ({ path: `knowledge/policy/rule-${at}.md` })),
   );
 
-describe("naming one owner on many concepts", () => {
-  it("names one owner of many under one batch id", async () => {
+describe("naming one owner for many concepts", () => {
+  it("names one owner for many concepts under one batch id", async () => {
     const scenario = await arrange();
     const iris = await shelvedPolicies(scenario, 3);
 
@@ -574,7 +574,7 @@ describe("naming one owner on many concepts", () => {
     );
   });
 
-  it("lets the new override beat the collection's owner", async () => {
+  it("lets the new override take precedence over the collection's owner", async () => {
     const scenario = await arrange();
     const iri = await shelveOne(db().pool, scenario.workspaceId, {
       path: "knowledge/policy/rule-0.md",
@@ -590,7 +590,7 @@ describe("naming one owner on many concepts", () => {
     );
   });
 
-  it("writes one concept's event with no batch id", async () => {
+  it("writes the event for one concept without a batch id", async () => {
     const scenario = await arrange();
     const iri = await shelveOne(db().pool, scenario.workspaceId, {
       path: "knowledge/policy/rule-0.md",
@@ -677,7 +677,7 @@ describe("naming one owner on many concepts", () => {
     expect(await nothingNamed(scenario)).toEqual({ overrides: [], events: 0 });
   });
 
-  it("names a Restricted concept for an Admin", async () => {
+  it("names an owner for a Restricted concept as an Admin", async () => {
     const scenario = await arrange();
     const iri = await shelveOne(db().pool, scenario.workspaceId, {
       path: "knowledge/held/salaries.md",
@@ -692,7 +692,7 @@ describe("naming one owner on many concepts", () => {
     expect(named).toMatchObject({ ok: true, value: { ok: true } });
   });
 
-  it("refuses anyone but an Admin, writing nothing", async () => {
+  it("refuses anyone but an Admin and writes nothing", async () => {
     const scenario = await arrange();
     const iris = await shelvedPolicies(scenario, 2);
     const asked = { iris: [...iris], personId: scenario.viewer.userId };
@@ -705,7 +705,7 @@ describe("naming one owner on many concepts", () => {
     expect(await nothingNamed(scenario)).toEqual({ overrides: [], events: 0 });
   });
 
-  it("refuses a person outside the workspace, writing nothing", async () => {
+  it("refuses a person outside the workspace and writes nothing", async () => {
     const scenario = await arrange();
     const iris = await shelvedPolicies(scenario, 2);
 
@@ -734,7 +734,7 @@ describe("naming one owner on many concepts", () => {
     expect(named).toEqual({ ok: true, value: { ok: false, error: "malformed" } });
   });
 
-  it("takes up to two hundred concepts at the input", () => {
+  it("accepts up to two hundred concepts in the input", () => {
     const iris = Array.from({ length: 200 }, () => conceptIriOf(ulid()));
     const personId = ulid();
 
@@ -747,7 +747,7 @@ describe("naming one owner on many concepts", () => {
     expect([atTheLimit.success, pastIt.success]).toEqual([true, false]);
   });
 
-  it("waits for a write holding one of its concepts", async () => {
+  it("waits for a write that holds one of its concepts", async () => {
     const scenario = await arrange();
     const iris = await shelvedPolicies(scenario, 2);
     const writer = await db().pool.connect();
@@ -793,8 +793,8 @@ const collectionsReadBy = (scenario: Scenario, reader: UserPrincipal) =>
 const ownedRead = (scenario: Scenario, reader: UserPrincipal) =>
   withMember(reader, scenario.postgres, (fresh, tx) => ownedBy(fresh, tx));
 
-describe("the owner-visible reads", () => {
-  it("answers the member's owned collections and concept count", async () => {
+describe("reads that show a member what they own", () => {
+  it("returns the member's owned collections and concept count", async () => {
     const { scenario } = await ownedByTheViewer();
     await nameOwnerAs(scenario.admin, scenario.postgres, {
       collection: "guidance",
@@ -814,7 +814,7 @@ describe("the owner-visible reads", () => {
     });
   });
 
-  it("counts no owned concept its owner cannot read", async () => {
+  it("counts no owned concept that its owner cannot read", async () => {
     const { scenario, landed } = await ownedByTheViewer();
     const held = await landedAs(
       scenario,
@@ -879,7 +879,7 @@ describe("the owner-visible reads", () => {
     });
   });
 
-  it("refuses an Editor owning nothing the collections read", async () => {
+  it("refuses the collections read to an Editor who owns nothing", async () => {
     const scenario = await arrange();
     await landedAs(scenario, scenario.admin, conceptAt("knowledge/policy/expenses.md"));
 
@@ -890,7 +890,7 @@ describe("the owner-visible reads", () => {
     expect(owningNothing).toEqual({ ok: true, value: { ok: false, error: "owner-forbids" } });
   });
 
-  it("refuses a concept's own owner the collections read", async () => {
+  it("refuses the collections read to a concept's own owner", async () => {
     const { scenario } = await ownedByTheViewer();
 
     const conceptsOwner = await collectionsReadBy(scenario, scenario.viewer);

@@ -81,7 +81,7 @@ describe("the auth seam's declarations", () => {
     expect(scan(tree)).toMatch(/^src\/auth-hooks\.ts:5: TypeScript refused the file \(TS2883:/);
   });
 
-  it("reads past a refusal in a file the seam imports", () => {
+  it("ignores a type error in a file the seam imports", () => {
     const tree = seamed(`${MAPPED_SOURCE}\nexport { count } from "./beside";\n`, {
       "src/beside.ts": 'export const count: number = "one";\n',
     });
@@ -89,7 +89,7 @@ describe("the auth seam's declarations", () => {
     expect(scan(tree)).toBe(`${SEAM}: its declarations name no Better Auth type\n`);
   });
 
-  it("stops when no declaration is written", () => {
+  it("throws when tsc writes no declaration", () => {
     expect(() => scan({ ...WORKSPACE, "src/elsewhere.ts": "export {};\n" })).toThrow(
       /tsc wrote no declaration for src\/auth-hooks\.ts/,
     );

@@ -40,8 +40,8 @@ const workspacesIn = async (client: pg.PoolClient, table: string): Promise<reado
   return read.rows.map((row) => row.workspace_id);
 };
 
-describe("spend", () => {
-  it("is kept from every other workspace", async () => {
+describe("the spend and pricing tables", () => {
+  it("hide each workspace's spend from every other workspace", async () => {
     await withRollback(db().pool, async (client) => {
       await spendInEach(client);
 
@@ -54,7 +54,7 @@ describe("spend", () => {
     });
   });
 
-  it("lets the api write a call's row, never change it", async () => {
+  it("let the api insert a call's row, never update it", async () => {
     await withRollback(db().pool, async (client) => {
       const held = await privilegesHeld(client, "app_rt", "llm_call");
 
@@ -62,7 +62,7 @@ describe("spend", () => {
     });
   });
 
-  it("leaves a reservation removable, never changeable, by the api", async () => {
+  it("let the api delete a reservation, never update it", async () => {
     await withRollback(db().pool, async (client) => {
       const held = await privilegesHeld(client, "app_rt", "spend_reservation");
 
@@ -70,7 +70,7 @@ describe("spend", () => {
     });
   });
 
-  it("gives the worker no privilege on any table", async () => {
+  it("give the worker no privilege on any table", async () => {
     await withRollback(db().pool, async (client) => {
       const held = await Promise.all(
         ["llm_call", "spend_reservation", "model_price", "decision_threshold"].map(async (table) =>
@@ -82,7 +82,7 @@ describe("spend", () => {
     });
   });
 
-  it("lets the api read prices with no workspace in scope", async () => {
+  it("let the api read prices with no workspace in scope", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(A_PRICE_FROM_OCTOBER, ["anthropic"]);
 
@@ -93,7 +93,7 @@ describe("spend", () => {
     });
   });
 
-  it("names exactly one of the run or the answer", async () => {
+  it("require a call to name exactly one run or answer", async () => {
     await withRollback(db().pool, async (client) => {
       await spendInEach(client);
       const call = (runId: string | null, answerId: string | null) =>
@@ -119,7 +119,7 @@ describe("spend", () => {
     });
   });
 
-  it("refuses an outcome the cost ledger does not name", async () => {
+  it("refuse a call outcome the cost ledger does not name", async () => {
     await withRollback(db().pool, async (client) => {
       await spendInEach(client);
 
@@ -137,7 +137,7 @@ describe("spend", () => {
     });
   });
 
-  it("refuses spend for a question never recorded", async () => {
+  it("refuse spend for a question that was never recorded", async () => {
     await withRollback(db().pool, async (client) => {
       await spendInEach(client);
       const unrecorded = "01J6QQQQQQQQQQQQQQQQQQQQQ9";
@@ -159,7 +159,7 @@ describe("spend", () => {
     });
   });
 
-  it("holds one price for a model from each day", async () => {
+  it("hold one price per model and effective date", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(A_PRICE_FROM_OCTOBER, ["anthropic"]);
 
@@ -173,7 +173,7 @@ describe("spend", () => {
     });
   });
 
-  it("holds a threshold strictly between nought and one", async () => {
+  it("hold a threshold strictly between zero and one", async () => {
     await withRollback(db().pool, async (client) => {
       const threshold = (provider: string, value: number) =>
         refusalOf(client, () => client.query(A_THRESHOLD_OF, [provider, value]));
@@ -192,7 +192,7 @@ describe("spend", () => {
     });
   });
 
-  it("lets the api replace a threshold, never remove it", async () => {
+  it("let the api update a threshold, never delete it", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(A_THRESHOLD_OF, ["cloudflare", 0.7]);
 

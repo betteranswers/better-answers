@@ -27,7 +27,7 @@ import {
   type ReuseSet,
 } from "./reuse-set.ts";
 
-/** List prices in US dollars per million tokens in; Clef charges nothing out. Check the price page before a run. */
+/** List prices in US dollars per million input tokens. Clef charges nothing for output. Check the price page before a run. */
 const MODELS = [
   { name: "Clef-flash", model: "clef-flash", usdIn: 0.038 },
   { name: "Clef", model: "clef", usdIn: 0.24 },
@@ -64,7 +64,7 @@ const toldByTheOwner = (): Told => {
 
 const { db, arrange, reading } = visibilitySuite();
 
-describe("the owner's decision reading on reuse", () => {
+describe("the owner's decision reading over the reuse set", () => {
   let set: ReuseSet;
   let told: Told;
 
@@ -131,7 +131,7 @@ const entryPointsFor =
     }));
   };
 
-describe("the owner's decision reading at the entry step", () => {
+describe("the owner's decision reading that reorders the entry step", () => {
   let set: RecallSet;
   let landed: ReadonlyMap<string, string>;
   let viewer: UserPrincipal;
@@ -146,7 +146,7 @@ describe("the owner's decision reading at the entry step", () => {
   }, 300_000);
 
   for (const { name, model, usdIn } of MODELS) {
-    it(`reads ${name} reordering the entry step's points`, async () => {
+    it(`reads ${name} as it reorders the entry points`, async () => {
       const to: ModelToCall = {
         purpose: "judging",
         modelChoiceId: "the-owner's-reading",

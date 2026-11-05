@@ -28,7 +28,7 @@ const standing = async (pool: pg.Pool) => {
   return read.rows[0];
 };
 
-describe("0080 over concepts stored before it", () => {
+describe("migration 0080 over concepts stored before it", () => {
   let container: StartedPostgreSqlContainer;
   let pool: pg.Pool;
 
@@ -63,7 +63,7 @@ describe("0080 over concepts stored before it", () => {
     await container.stop();
   });
 
-  it("keeps every row, indexes descriptions, leaves the index valid", async () => {
+  it("keeps every row and leaves a valid index on descriptions", async () => {
     const before = await standing(pool);
 
     await migrate(drizzle(pool), { migrationsFolder });

@@ -48,7 +48,7 @@ const severityOf = (name: string): (typeof config.rules)[string] => {
   const correctness = config.categories["correctness"];
   if (correctness === undefined)
     throw new Error(
-      `\`${name}\` is named in neither the rules block nor a \`correctness\` category of .oxlintrc.json, so there is no setting to run it under.`,
+      `\`${name}\` is in neither the rules block nor the \`correctness\` category of .oxlintrc.json, so this test has no severity to run it at.`,
     );
   return correctness;
 };
@@ -58,7 +58,7 @@ const ruleLint = (name: string): ((tree: Tree) => PlannedLint) => {
   const relaxed = config.overrides.filter((override) => override.rules?.[name] !== undefined);
   if (relaxed.length > 0)
     throw new Error(
-      `\`${name}\` is re-set by an override over ${relaxed.map((o) => o.files?.join(", ")).join("; ")}, which this runner does not carry — so these cases would prove the rule somewhere it no longer holds.`,
+      `\`${name}\` is changed by an override for ${relaxed.map((o) => o.files?.join(", ")).join("; ")}. This runner applies no overrides, so these cases would test a setting those files do not use.`,
     );
   const ruleConfig = JSON.stringify({ plugins: config.plugins, rules: { [name]: setting } });
   return (tree) => linted(tree, ruleConfig);
@@ -82,18 +82,18 @@ describe("no two tests in one block share a title", () => {
     "test/two.test.ts": suiteOf("refuses a stranger"),
   });
 
-  it("fires when a copied test keeps its original's title", () => {
+  it("reports two tests with the same title in one block", () => {
     const output = copied.output();
 
     expect(output).toContain("test/copied.test.ts");
     expect(output).toContain("no-identical-title");
   });
 
-  it("stays silent when the two titles differ", () => {
+  it("reports nothing when the two titles differ", () => {
     expect(distinct.output()).not.toContain("test/distinct.test.ts");
   });
 
-  it("stays silent when two files share a title", () => {
+  it("reports nothing when two files share a title", () => {
     const output = shared.output();
 
     expect(output).not.toContain("test/one.test.ts");
@@ -104,7 +104,7 @@ describe("no two tests in one block share a title", () => {
 const swallow = (body: string): string =>
   `export const rollbackQuietly = async (client: Client): Promise<void> => {\n  try {\n    await client.query("ROLLBACK");\n  } catch {${body}}\n};\n`;
 
-describe("no empty block; a swallowed error carries its comment", () => {
+describe("no-empty rejects empty blocks except a commented catch", () => {
   const lintBlocks = ruleLint("no-empty");
   const silent = lintBlocks({ "src/silent.ts": swallow("") });
   const reasoned = lintBlocks({
@@ -116,18 +116,18 @@ describe("no empty block; a swallowed error carries its comment", () => {
     "src/branch.ts": `export const guard = (revoked: boolean): void => {\n  if (revoked) {\n  }\n};\n`,
   });
 
-  it("fires on an empty catch, with `allowEmptyCatch` off", () => {
+  it("reports an empty catch, because `allowEmptyCatch` is off", () => {
     const output = silent.output();
 
     expect(output).toContain("src/silent.ts");
     expect(output).toContain("no-empty");
   });
 
-  it("stays silent on a catch holding a comment", () => {
+  it("reports nothing for a catch that contains a comment", () => {
     expect(reasoned.output()).not.toContain("src/reasoned.ts");
   });
 
-  it("fires on an empty block that is no catch", () => {
+  it("reports an empty block that is not a catch", () => {
     const output = branch.output();
 
     expect(output).toContain("src/branch.ts");
@@ -138,7 +138,7 @@ describe("no empty block; a swallowed error carries its comment", () => {
 const renames = (body: string): string =>
   `type Member = { name: string };\n\nexport const rename = (member: Member, name: string): Member => {\n  ${body}\n};\n`;
 
-describe("no parameter mutated: a function returns a new value", () => {
+describe("no-param-reassign rejects writes to a parameter", () => {
   const lintParameters = ruleLint("no-param-reassign");
   const written = lintParameters({
     "src/written.ts": renames("member.name = name;\n  return member;"),
@@ -148,28 +148,28 @@ describe("no parameter mutated: a function returns a new value", () => {
   });
   const copied = lintParameters({ "src/copied.ts": renames("return { ...member, name };") });
 
-  it("fires on a write to a parameter's property", () => {
+  it("reports a write to a parameter's property", () => {
     const output = written.output();
 
     expect(output).toContain("src/written.ts");
     expect(output).toContain("no-param-reassign");
   });
 
-  it("fires on a parameter assigned a new value", () => {
+  it("reports a parameter assigned a new value", () => {
     const output = rebound.output();
 
     expect(output).toContain("src/rebound.ts");
     expect(output).toContain("no-param-reassign");
   });
 
-  it("stays silent on a copy that carries the change", () => {
+  it("reports nothing for a function that returns a changed copy", () => {
     expect(copied.output()).not.toContain("src/copied.ts");
   });
 });
 
 /**
- * tsgolint types what it lints from this tsconfig; without one a type-aware rule is silent and
- * every case asserting silence passes.
+ * tsgolint needs a tsconfig to type the files. Without one, a type-aware rule reports nothing, and
+ * every case that expects no report passes.
  */
 const typedTree = (files: Tree, include: readonly string[] = ["src"]): Tree => ({
   "tsconfig.json": JSON.stringify({
@@ -182,7 +182,7 @@ const typedTree = (files: Tree, include: readonly string[] = ["src"]): Tree => (
 const callsRevoke = (call: string): string =>
   `const revoke = async (): Promise<void> => {};\n\nexport const action = async (): Promise<void> => {\n  ${call}\n};\n`;
 
-describe("no promise floats: a call is awaited or `void`", () => {
+describe("no-floating-promises requires each promise to be awaited or voided", () => {
   const lintPromises = ruleLint("typescript/no-floating-promises");
   const forgotten = lintPromises(typedTree({ "src/forgotten.ts": callsRevoke("revoke();") }));
   const sanctioned = lintPromises(
@@ -190,18 +190,18 @@ describe("no promise floats: a call is awaited or `void`", () => {
   );
   const awaited = lintPromises(typedTree({ "src/awaited.ts": callsRevoke("await revoke();") }));
 
-  it("fires on a call whose promise nobody takes", () => {
+  it("reports a call whose promise is neither awaited nor voided", () => {
     const output = forgotten.output();
 
     expect(output).toContain("src/forgotten.ts");
     expect(output).toContain("no-floating-promises");
   });
 
-  it("stays silent on a `void`-prefixed call, the sanctioned fire-and-forget", () => {
+  it("reports nothing for a call prefixed with `void`", () => {
     expect(sanctioned.output()).not.toContain("src/sanctioned.ts");
   });
 
-  it("stays silent on an awaited call", () => {
+  it("reports nothing for an awaited call", () => {
     expect(awaited.output()).not.toContain("src/awaited.ts");
   });
 });
@@ -221,7 +221,7 @@ const registryZone = (): OxlintConfig["overrides"][number] => {
   };
 };
 
-describe("one guard per condition, never re-refusing what the type refused", () => {
+describe("no-unnecessary-condition rejects a check the type already rules out", () => {
   const guardsConfig = JSON.stringify({
     plugins: config.plugins,
     rules: { [UNNECESSARY_CONDITION]: severityOf(UNNECESSARY_CONDITION) },
@@ -246,18 +246,18 @@ describe("one guard per condition, never re-refusing what the type refused", () 
     ),
   );
 
-  it("fires on a guard the type makes unreachable", () => {
+  it("reports an `=== undefined` check the type rules out", () => {
     const output = twice.output();
 
     expect(output).toContain("src/twice.ts");
     expect(output).toContain("no-unnecessary-condition");
   });
 
-  it("stays silent on the one guard the type leaves reachable", () => {
+  it("reports nothing for a null check on a nullable value", () => {
     expect(once.output()).not.toContain("src/once.ts");
   });
 
-  it("leaves registry source alone but fires on a copy outside", () => {
+  it("skips apps/web/src/shared/ui but reports the same code elsewhere", () => {
     const output = registry.output();
 
     expect(output).toContain("apps/web/src/features/twice.ts");
@@ -277,7 +277,7 @@ const sortCompareOverrides = config.overrides.flatMap((override) => {
 const sortingModule = (call: string): string =>
   `export const ordered = (names: readonly string[]): readonly string[] => [...names].${call};\n`;
 
-describe("every sort in source names its comparator", () => {
+describe("every sort in source code passes a comparator", () => {
   const sortsConfig = JSON.stringify({
     plugins: config.plugins,
     rules: { [SORT_COMPARE]: severityOf(SORT_COMPARE) },
@@ -299,18 +299,18 @@ describe("every sort in source names its comparator", () => {
     ),
   );
 
-  it.each(bare)("fires on a string array's bare `%s`", (_call, found) => {
+  it.each(bare)("reports `%s` with no comparator on a string array", (_call, found) => {
     const output = found.output();
 
     expect(output).toContain("src/bare.ts");
     expect(output).toContain("require-array-sort-compare");
   });
 
-  it("stays silent on a sort given a comparator", () => {
+  it("reports nothing for a sort with a comparator", () => {
     expect(compared.output()).not.toContain("src/compared.ts");
   });
 
-  it("stays silent on a bare sort in a test", () => {
+  it("reports nothing for a sort without a comparator in tests", () => {
     const output = inTest.output();
 
     expect(output).not.toContain("bare.test.ts");
@@ -369,13 +369,13 @@ const ADOPTED = [
   },
   {
     rule: "typescript/no-redundant-type-constituents",
-    refuses: "a union constituent another constituent already covers",
+    refuses: "a union member that another member already covers",
     fires: `export type Word = string | "member";\n`,
     silent: `export type Word = "admin" | "member";\n`,
   },
   {
     rule: "typescript/no-unsafe-unary-minus",
-    refuses: "a unary minus on something that is no number",
+    refuses: "a unary minus on a value that is not a number",
     fires: `export const negated = (word: string): number => -word;\n`,
     silent: `export const negated = (count: number): number => -count;\n`,
   },
@@ -387,7 +387,7 @@ const ADOPTED = [
   },
   {
     rule: "typescript/unbound-method",
-    refuses: "a method taken off its instance, which loses the this it was written against",
+    refuses: "a method detached from its instance, which loses its `this`",
     fires: `class Door {\n  open(): void {}\n}\n\nexport const opener = new Door().open;\n`,
     silent: `class Door {\n  open(): void {}\n}\n\nconst door = new Door();\n\nexport const opener = (): void => {\n  door.open();\n};\n`,
   },
@@ -411,24 +411,26 @@ describe.each(ADOPTED)("$rule", ({ rule, refuses, fires, silent }) => {
   const asked = lintRule(typedTree({ "src/asked.ts": silent }));
   const categorised = lintUnderCategories(firing);
 
-  it("names the file holding the source it refuses", () => {
+  it("reports the file that breaks the rule", () => {
     const output = refused.output();
 
-    expect(output, `refuses ${refuses}`).toContain("src/fires.ts");
+    expect(output, `the rule did not report ${refuses}`).toContain("src/fires.ts");
     expect(output).toContain(reportedName(rule));
   });
 
-  it("stays silent on the same work done as it asks", () => {
-    expect(asked.output(), `refuses only ${refuses}`).not.toContain("src/asked.ts");
+  it("reports nothing for the fixed version of the code", () => {
+    expect(asked.output(), `the rule reported the fixed version of ${refuses}`).not.toContain(
+      "src/asked.ts",
+    );
   });
 
-  it("runs under the categories, never named in the rules block", () => {
+  it("runs through a category, not the rules block", () => {
     expect(config.rules).not.toHaveProperty(rule);
     expect(categorised.output()).toContain(reportedName(rule));
   });
 });
 
-describe("the identity provider stays behind its seam", () => {
+describe("better-auth imports stay inside the auth module", () => {
   const seam = lint({
     "apps/api/src/mcp/probe.ts": probe("better-auth"),
     "apps/api/src/auth/probe.ts": probe("better-auth"),
@@ -436,7 +438,7 @@ describe("the identity provider stays behind its seam", () => {
     "packages/core/src/probe.ts": probe("@better-auth/oauth-provider"),
   });
 
-  it("refuses better-auth outside the auth module and allows it inside", () => {
+  it("reports better-auth imports outside the auth module and its lift", () => {
     const output = seam.output();
 
     expect(output).toContain("apps/api/src/mcp/probe.ts");
@@ -446,14 +448,14 @@ describe("the identity provider stays behind its seam", () => {
   });
 });
 
-describe("no MCP library type crosses into packages/core", () => {
+describe("packages/core cannot import the MCP library", () => {
   const crossing = lint({
     "packages/core/package.json": JSON.stringify({ name: "@better-answers/core" }),
     "packages/core/src/probe.ts": probe("@modelcontextprotocol/server"),
     "apps/api/src/mcp/probe.ts": probe("@modelcontextprotocol/server"),
   });
 
-  it("refuses @modelcontextprotocol/server inside packages/core and allows it in apps/api", () => {
+  it("reports the MCP server import in packages/core, not apps/api", () => {
     const output = crossing.output();
 
     expect(output).toContain("packages/core/src/probe.ts");
@@ -462,7 +464,7 @@ describe("no MCP library type crosses into packages/core", () => {
   });
 });
 
-describe("every MCP entry carries its annotations", () => {
+describe("every MCP entry declares its annotations", () => {
   const annotated = lint({
     "apps/api/src/mcp/entries/without.ts": `defineEntry({ name: "find", input: z.object({ query: z.string() }) });\n`,
     "apps/api/src/mcp/entries/with.ts": `defineEntry({ name: "find", input: z.object({ query: z.string() }), annotations: { readOnlyHint: true } });\n`,
@@ -474,7 +476,7 @@ describe("every MCP entry carries its annotations", () => {
     "apps/api/src/mcp/entries/hinted.ts": `defineEntry({ name: "find", input: z.object({}), annotations: { readOnlyHint: false } });\n`,
   });
 
-  it("refuses defineEntry and registerTool without annotations, and allows both with", () => {
+  it("reports defineEntry and registerTool calls that lack annotations", () => {
     const output = annotated.output();
 
     expect(output).toContain("entries/without.ts");
@@ -484,7 +486,7 @@ describe("every MCP entry carries its annotations", () => {
     expect(output).not.toContain("registered-with.ts");
   });
 
-  it("refuses annotations with no readOnlyHint, the host's read-write split", () => {
+  it("reports annotations that lack readOnlyHint", () => {
     const output = hinted.output();
 
     expect(output).toContain("entries/no-hint.ts");
@@ -504,7 +506,7 @@ describe("no MCP entry takes a workspace argument", () => {
           }),
         ] as const,
     ),
-  )("refuses an input named %s", (name, found) => {
+  )("reports an input named %s", (name, found) => {
     const output = found.output();
 
     expect(output).toContain("mcp-entry-no-workspace-argument");
@@ -517,7 +519,7 @@ describe("no MCP entry takes a workspace argument", () => {
     "apps/api/src/mcp/raw.ts": `server.registerTool("find", { annotations: { readOnlyHint: true }, inputSchema: { query: z.string() } }, async () => ({}));\n`,
   });
 
-  it("allows other inputs in either form, and unwraps a refine", () => {
+  it("reports nothing for other input names, even inside a refine", () => {
     expect(allowed.output()).not.toContain("mcp-entry-no-workspace-argument");
   });
 
@@ -526,7 +528,7 @@ describe("no MCP entry takes a workspace argument", () => {
     "apps/api/src/mcp/entries/spread.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ ...base, query: z.string() }) });\n`,
   });
 
-  it("fails closed on an opaque input and a spread key", () => {
+  it("reports an input variable or a spread it cannot inspect", () => {
     const output = closed.output();
 
     expect(output).toContain("entries/opaque.ts");
@@ -538,7 +540,7 @@ describe("no MCP entry takes a workspace argument", () => {
     "apps/api/src/mcp/mount.ts": `server.registerTool(entry.name, { annotations: entry.annotations, inputSchema: entry.input }, entry.run);\n`,
   });
 
-  it("fails closed on a registerTool whose inputSchema is a variable", () => {
+  it("reports a registerTool whose inputSchema is a variable", () => {
     expect(variable.output()).toContain("mcp-entry-no-workspace-argument");
   });
 });

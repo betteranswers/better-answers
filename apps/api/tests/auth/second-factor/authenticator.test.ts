@@ -20,22 +20,22 @@ import {
 import { appForSuite, aStoppableClock } from "../../support/suite-app.ts";
 import { webClientOf, webSignedIn, webTabOf } from "../../support/web-client.ts";
 
-let mailHeld: { readonly to: string; readonly until: Promise<void> } | undefined;
+let delayedMail: { readonly to: string; readonly until: Promise<void> } | undefined;
 
 const { clock, stopTheClock } = aStoppableClock();
 
 const app = appForSuite({
   clock,
   onEmail: async (message) => {
-    if (message.to === mailHeld?.to) await mailHeld.until;
+    if (message.to === delayedMail?.to) await delayedMail.until;
   },
 });
 
-const mailHeldFor = (to: string): void => {
+const delayMailTo = (to: string): void => {
   const held = Promise.withResolvers<void>();
-  mailHeld = { to, until: held.promise };
+  delayedMail = { to, until: held.promise };
   onTestFinished(() => {
-    mailHeld = undefined;
+    delayedMail = undefined;
     held.resolve();
   });
 };
@@ -120,20 +120,20 @@ describe("setting up an authenticator", () => {
     expect(noticesTo(person.email)).toEqual([]);
   });
 
-  it("enables it on a working code and answers ten codes", async () => {
+  it("enables it on a correct code and returns ten codes", async () => {
     const { person, client } = await aSignedInPerson();
 
     const { answered } = await setUpOn(client);
 
     expect(answered.status).toBe(200);
     const { recoveryCodes } = finished.parse(await answered.json());
-    assert(recoveryCodes !== null, "the setup answered its recovery codes");
+    assert(recoveryCodes !== null, "the setup returned no recovery codes");
     expect(recoveryCodes).toHaveLength(10);
     for (const code of recoveryCodes) expect(code).toMatch(RECOVERY_CODE);
     expect(await factorOf(person.id)).toEqual({ enabled: true, verified: true });
   });
 
-  it("leaves one stamped session and refuses the old token", async () => {
+  it("leaves one confirmed session and invalidates the old cookie", async () => {
     const { person, client } = await aSignedInPerson();
     const before = client.cookies();
 
@@ -145,7 +145,7 @@ describe("setting up an authenticator", () => {
     expect(await sessionIdOf(before)).toBeUndefined();
   });
 
-  it("keeps the chosen workspace across the session swap", async () => {
+  it("keeps the chosen workspace when the session is replaced", async () => {
     const [one, other] = [await app().provision(), await app().provision()];
     const person = await app().person();
     await app().addMember(one.workspaceId, person.id, "Viewer");
@@ -163,7 +163,7 @@ describe("setting up an authenticator", () => {
     expect(held.rows).toEqual([{ workspace: other.workspaceId }]);
   });
 
-  it("keeps the old session's age across the session swap", async () => {
+  it("gives the new session the old one's creation and expiry", async () => {
     const { person, client } = await aSignedInPerson();
     const [before] = await agesOf(person.id);
 
@@ -176,7 +176,7 @@ describe("setting up an authenticator", () => {
     expect(after[0]?.id).not.toBe(before?.id);
   });
 
-  it("refuses a revoked member's workspace after the session swap", async () => {
+  it("keeps a revoked member revoked after the session is replaced", async () => {
     const workspace = await app().provision();
     const person = await app().person();
     await app().addMember(workspace.workspaceId, person.id, "Editor");
@@ -190,7 +190,7 @@ describe("setting up an authenticator", () => {
     await expectTheMembersReadRevoked(api);
   });
 
-  it("refuses the swapped-in session a revocation predates", async () => {
+  it("revokes the replacement session, which keeps the original sign-in time", async () => {
     const workspace = await app().provision();
     const client = await signedInByEmailOnly(app(), workspace.admin.email);
     await sessionsAgedUnderTheApi(app(), workspace.admin.id);
@@ -207,7 +207,7 @@ describe("setting up an authenticator", () => {
     await expectTheMembersReadRevoked(api);
   });
 
-  it("sends one notice holding neither the key nor a code", async () => {
+  it("sends one notice containing neither the key nor a code", async () => {
     const { person, client } = await aSignedInPerson();
 
     const { setupAddress, answered } = await setUpOn(client);
@@ -216,14 +216,14 @@ describe("setting up an authenticator", () => {
     expect(subjectsTo(person.email)).toEqual([ADDED]);
     const sent = JSON.stringify(noticesTo(person.email));
     expect(sent).not.toContain(keyIn(setupAddress));
-    assert(recoveryCodes !== null, "the setup answered its recovery codes");
+    assert(recoveryCodes !== null, "the setup returned no recovery codes");
     expect(recoveryCodes).toHaveLength(10);
     for (const code of recoveryCodes) expect(sent).not.toContain(code);
   });
 
-  it("answers the codes while the notice is still sending", async () => {
+  it("returns the codes before the notice email is sent", async () => {
     const { person, client } = await aSignedInPerson();
-    mailHeldFor(person.email);
+    delayMailTo(person.email);
 
     const { answered } = await setUpOn(client);
 
@@ -231,7 +231,7 @@ describe("setting up an authenticator", () => {
     expect(finished.parse(await answered.json()).recoveryCodes).toHaveLength(10);
   });
 
-  it("answers unanswered when the setup cannot be recorded", async () => {
+  it("answers 502 when the audit event cannot be committed", async () => {
     const { person, client } = await aSignedInPerson();
     const setupAddress = await startOn(client);
 
@@ -246,7 +246,7 @@ describe("setting up an authenticator", () => {
     expect(noticesTo(person.email)).toEqual([]);
   });
 
-  it("answers the key only to the call starting the setup", async () => {
+  it("reveals the key only in the setup's start response", async () => {
     const { client } = await aSignedInPerson();
 
     const { setupAddress, answered } = await setUpOn(client);
@@ -256,7 +256,7 @@ describe("setting up an authenticator", () => {
     expect(JSON.stringify(read)).not.toContain(keyIn(setupAddress));
   });
 
-  it("refuses to check a code once the setup is done", async () => {
+  it("answers 409 to any code after the setup finishes", async () => {
     const { client } = await aSignedInPerson();
     const { setupAddress } = await setUpOn(client);
 
@@ -267,7 +267,7 @@ describe("setting up an authenticator", () => {
     expect(await right.json()).toEqual({ error: "no-setup-waiting" });
   });
 
-  it("refuses a second setup while one is held", async () => {
+  it("refuses a second setup while an authenticator exists", async () => {
     const { client } = await aSignedInPerson();
     await setUpOn(client);
 
@@ -277,7 +277,7 @@ describe("setting up an authenticator", () => {
     expect(await again.json()).toEqual({ error: "authenticator-held" });
   });
 
-  it("keeps held recovery codes through an abandoned setup", async () => {
+  it("keeps existing recovery codes while a setup awaits its code", async () => {
     const { client } = await aSignedInPerson();
     const { api } = webClientOf(client);
     const { recoveryCodes } = await api.person.replaceRecoveryCodes.mutate({ replacing: false });
@@ -312,7 +312,7 @@ describe("setting up an authenticator", () => {
     expect(await factorOf(person.id)).toEqual({ enabled: false, verified: null });
   });
 
-  it("answers 429 past ten codes in ten minutes", async () => {
+  it("answers 429 to the 11th wrong code in ten minutes", async () => {
     const { client } = await aSignedInPerson();
     const wrong = aWrongCode(codeNow(await startOn(client)));
     const answers: number[] = [];
@@ -340,7 +340,7 @@ describe("removing an authenticator", () => {
     ]);
   });
 
-  it("refuses an Admin's last second factor", async () => {
+  it("refuses to remove an Admin's last second factor", async () => {
     const { admin, client } = await anAdminSignedIn();
     await setUpOn(client);
 
@@ -355,7 +355,7 @@ describe("removing an authenticator", () => {
 });
 
 describe("replacing recovery codes", () => {
-  it("answers ten new codes and sends one notice", async () => {
+  it("returns ten new codes and sends one notice", async () => {
     const { person, client } = await aSignedInPerson();
     await setUpOn(client);
 
@@ -370,10 +370,10 @@ describe("replacing recovery codes", () => {
     ]);
   });
 
-  it("answers the codes while the notice is still sending", async () => {
+  it("returns the codes before the notice email is sent", async () => {
     const { person, client } = await aSignedInPerson();
     await setUpOn(client);
-    mailHeldFor(person.email);
+    delayMailTo(person.email);
 
     const { recoveryCodes } = await webClientOf(client).api.person.replaceRecoveryCodes.mutate({
       replacing: true,
@@ -382,7 +382,7 @@ describe("replacing recovery codes", () => {
     expect(recoveryCodes).toHaveLength(10);
   });
 
-  it("sends one notice for a first set", async () => {
+  it("sends one notice for the first set of codes", async () => {
     const { person, client } = await aSignedInPerson();
 
     await webClientOf(client).api.person.replaceRecoveryCodes.mutate({ replacing: false });
@@ -392,7 +392,7 @@ describe("replacing recovery codes", () => {
     ]);
   });
 
-  it("refuses a first set while one is held", async () => {
+  it("refuses a first set when the person already has codes", async () => {
     const { person, client } = await aSignedInPerson();
     const { api } = webClientOf(client);
     await api.person.replaceRecoveryCodes.mutate({ replacing: false });
@@ -407,7 +407,7 @@ describe("replacing recovery codes", () => {
     ]);
   });
 
-  it("marks the set saved once acknowledged", async () => {
+  it("marks the codes saved once the person acknowledges them", async () => {
     const { person, client } = await aSignedInPerson();
     const { api } = webClientOf(client);
     const { madeAt } = await api.person.replaceRecoveryCodes.mutate({ replacing: false });

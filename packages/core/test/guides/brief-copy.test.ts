@@ -128,7 +128,7 @@ const viewerIn = async (section: Section, group: string): Promise<UserPrincipal>
 };
 
 describe("copying a section's Brief", () => {
-  it("a recorded copy writes one usage row naming the version", async () => {
+  it("records a copy as one usage row naming the version", async () => {
     const section = await briefedSection(OVERVIEW);
     const { editor } = section.guide.ng;
 
@@ -144,7 +144,7 @@ describe("copying a section's Brief", () => {
     ).toEqual([{ act: "copied", version: section.version, actor: `human:${editor.userId}` }]);
   });
 
-  it("a usage row holds no copied text", async () => {
+  it("stores no copied text in the usage row", async () => {
     const section = await briefedSection(SUPPORT);
     await copiedAndRecorded(section, section.guide.ng.editor);
 
@@ -155,7 +155,7 @@ describe("copying a section's Brief", () => {
     ]);
   });
 
-  it("a copy below the role's threshold is refused", async () => {
+  it("refuses a copy below the role's threshold", async () => {
     const section = await briefedSection(OVERVIEW);
     const { editor, viewer } = section.guide.ng;
     const before = (await usageRows(section.writeUpId)).length;
@@ -173,7 +173,7 @@ describe("copying a section's Brief", () => {
     expect((await usageRows(section.writeUpId)).length).toBe(before);
   });
 
-  it("a recorded copy writes no audit event", async () => {
+  it("writes no audit event for a recorded copy", async () => {
     const section = await briefedSection(OVERVIEW);
     const { editor } = section.guide.ng;
     const before = await auditEvents(section);
@@ -188,7 +188,7 @@ describe("copying a section's Brief", () => {
     expect(await auditEvents(section)).toBe(before);
   });
 
-  it("a Viewer in the audience copies a verified section", async () => {
+  it("lets a Viewer in the audience copy a verified section", async () => {
     const section = await briefedSection(INSURANCE);
     const inFinance = await viewerIn(section, section.guide.ng.finance);
 
@@ -199,7 +199,7 @@ describe("copying a section's Brief", () => {
     expect(copy.html).toContain("<sup>4</sup>");
   });
 
-  it("an outside Viewer finds no such section to copy", async () => {
+  it("finds no section to copy for an outside Viewer", async () => {
     const section = await briefedSection(INSURANCE);
 
     const copying = await copyingAs(section.guide.ng.viewer, section.writeUpId);
@@ -207,7 +207,7 @@ describe("copying a section's Brief", () => {
     expect(copying).toEqual({ ok: false, error: "not-found" });
   });
 
-  it("a section under a hidden one cannot be copied", async () => {
+  it("refuses to copy a section under a hidden section", async () => {
     const section = await briefedSection(TESTING);
     const { editor, admin } = section.guide.ng;
     const hide = (hidden: boolean) =>
@@ -222,7 +222,7 @@ describe("copying a section's Brief", () => {
     expect(shownToAdmin.ok).toBe(true);
   });
 
-  it("a Brief with no text is not found to copy", async () => {
+  it("finds no Brief to copy when it has no text", async () => {
     const guide = await seededOnce();
     const writeUpId = await writeUpOf(db(), guide, "Data protection");
 
@@ -231,7 +231,7 @@ describe("copying a section's Brief", () => {
     expect(copying).toEqual({ ok: false, error: "not-found" });
   });
 
-  it("a copy records the version it copied, not the latest", async () => {
+  it("records the copied version, not the latest", async () => {
     const section = await briefedSection(OFFER);
     const { editor } = section.guide.ng;
     const copied = answered(await copyingAs(editor, section.writeUpId)).version;

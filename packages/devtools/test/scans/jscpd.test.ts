@@ -50,7 +50,7 @@ describe("the copy-paste gate over a throwaway tree", () => {
     expect([clones[0]?.left, clones[0]?.right].sort()).toEqual(["left.ts", "right.ts"]);
   });
 
-  it("stays silent when one half is fenced as an exception", () => {
+  it("reports nothing when one copy is fenced as an exception", () => {
     const clones = jscpd({
       "left.ts": CLONE,
       "right.ts": `/* jscpd:ignore-start */\n${CLONE}/* jscpd:ignore-end */\n`,
@@ -59,7 +59,7 @@ describe("the copy-paste gate over a throwaway tree", () => {
     expect(clones).toEqual([]);
   });
 
-  it("stays silent on a tree whose files share nothing", () => {
+  it("reports nothing for a tree whose files share nothing", () => {
     expect(jscpd({ "left.ts": CLONE, "right.ts": NOT_A_CLONE })).toEqual([]);
   });
 
@@ -83,7 +83,7 @@ describe("the copy-paste gate over a throwaway tree", () => {
 });
 
 describe("the gate's configuration, as the root script runs it", () => {
-  it("refuses any five-line clone over both halves of the tree", () => {
+  it("refuses any five-line clone across apps and packages", () => {
     const argv = jscpdArgv(jscpdConfig).join(" ");
 
     expect(argv).toContain("--threshold 0");
@@ -93,7 +93,7 @@ describe("the gate's configuration, as the root script runs it", () => {
     expect(argv.endsWith("apps packages")).toBe(true);
   });
 
-  it("walks past files this repository did not write", () => {
+  it("ignores files this repository did not write", () => {
     expect(jscpdConfig.ignore).toContain("apps/web/src/shared/ui/**");
     expect(jscpdConfig.ignore).toContain("**/lifts/**");
     expect(jscpdConfig.ignore).toContain("apps/worker/src/better_answers_worker/schema_view.py");

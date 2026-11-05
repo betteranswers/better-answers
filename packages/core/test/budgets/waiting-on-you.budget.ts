@@ -34,8 +34,8 @@ const listedFor = async (reader: UserPrincipal): Promise<Listed> =>
     }),
   );
 
-describe("Waiting on you at volume", () => {
-  it("answers 50 waiting suggestions within its budget", async () => {
+describe("Waiting on you with 50 waiting suggestions", () => {
+  it("lists 50 waiting suggestions within budget", async () => {
     const scenario = await arrange();
     const standing = [];
     for (const collection of BUDGET_COLLECTIONS) {
@@ -91,9 +91,9 @@ describe("Waiting on you at volume", () => {
 
     expect(
       reads.map((read) => [read.oneItem.items, read.fifty.items]),
-      "the suggestions each owner's list holds",
+      "the suggestions on each owner's list",
     ).toEqual(Array.from({ length: RUNS }, () => [1, WAITING_SETS]));
-    expect(inOneItemLists, "the list of 50, in one-item lists, at the median").toBeLessThan(
+    expect(inOneItemLists, "the median list of 50, as a multiple of a one-item list").toBeLessThan(
       ONE_STATEMENT_BUDGET_IN_ONE_ITEM_LISTS,
     );
     expect(percentile(fiftyMs, 0.5), "the list of 50 at the median, in ms").toBeLessThan(

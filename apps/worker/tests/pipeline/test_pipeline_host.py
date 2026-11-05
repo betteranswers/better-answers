@@ -99,7 +99,7 @@ def passage_indexes(connection: psycopg.Connection, workspace_id: str) -> list[s
         return [str(row[0]) for row in cursor.fetchall()]
 
 
-def test_lands_a_passage_row_only_through_a_scoped_pool(
+def test_lands_passage_rows_only_through_a_workspace_scoped_pool(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -110,7 +110,7 @@ def test_lands_a_passage_row_only_through_a_scoped_pool(
         passage_id="passage-one",
     )
 
-    async def served() -> None:
+    async def land_through_scoped_pool() -> None:
         pool = await open_pool(dsn, workspace_id, max_size=1)
         try:
             async with pool.acquire() as held:
@@ -121,7 +121,7 @@ def test_lands_a_passage_row_only_through_a_scoped_pool(
         finally:
             await pool.close()
 
-    async def refused() -> None:
+    async def land_through_unscoped_pool() -> None:
         pool = await asyncpg.create_pool(dsn, min_size=0, max_size=2)
         assert pool is not None
         try:
@@ -130,14 +130,14 @@ def test_lands_a_passage_row_only_through_a_scoped_pool(
         finally:
             await pool.close()
 
-    asyncio.run(served())
+    asyncio.run(land_through_scoped_pool())
     assert passage_ids(connection, workspace_id) == ["passage-one", "passage-two"]
 
     with pytest.raises(asyncpg.InsufficientPrivilegeError):
-        asyncio.run(refused())
+        asyncio.run(land_through_unscoped_pool())
 
 
-def test_dropping_a_sources_state_keeps_the_table_indexes_and_rows(
+def test_dropping_a_connected_source_keeps_passage_table_indexes_and_rows(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -180,8 +180,8 @@ def test_dropping_a_sources_state_keeps_the_table_indexes_and_rows(
         indexes_before = passage_indexes(connection, workspace_id)
         assert indexes_before != []
 
-    # cocoindex can still hold the app name the landing Host registered, so this
-    # opens its own Host.
+    # cocoindex may still have the app name that the first Host registered, so the
+    # drop uses a new Host.
     with Host(bootstrap_for(dsn, tmp_path)) as host:
         host.drop_connected_source(first)
 
@@ -189,7 +189,7 @@ def test_dropping_a_sources_state_keeps_the_table_indexes_and_rows(
     assert passage_indexes(connection, workspace_id) == indexes_before
 
 
-def a_sync_on(connected_source_id: str) -> Sync:
+def sync_for(connected_source_id: str) -> Sync:
     return Sync(
         workspace_id="01M2Q3R4S5T6V7W8X9YZAB0000",
         connected_source_id=connected_source_id,
@@ -197,7 +197,7 @@ def a_sync_on(connected_source_id: str) -> Sync:
     )
 
 
-def test_the_environment_cache_drops_the_oldest_source_at_its_bound(
+def test_the_environment_cache_evicts_the_least_recently_used_source(
     tmp_path: Path,
 ) -> None:
     touched = (
@@ -212,7 +212,7 @@ def test_the_environment_cache_drops_the_oldest_source_at_its_bound(
         environments_held=4,
     ) as host:
         for connected_source_id in touched:
-            host.open_connected_source(a_sync_on(connected_source_id))
+            host.open_connected_source(sync_for(connected_source_id))
 
         assert host.held_connected_sources() == (
             "connected-source-one",
@@ -220,20 +220,20 @@ def test_the_environment_cache_drops_the_oldest_source_at_its_bound(
         )
 
 
-def test_the_default_bound_holds_eight_handles_and_sheds_whole_sources(
+def test_the_default_cache_keeps_eight_handles_and_evicts_whole_sources(
     tmp_path: Path,
 ) -> None:
     whole = bootstrap_for("postgresql://unreached/unreached", tmp_path / "whole")
     with Host(whole) as host:
         for n in range(1, 5):
-            host.open_connected_source(a_sync_on(f"connected-source-{n}"))
-        host.app_config(a_sync_on("connected-source-5"), PASSAGES_APP)
+            host.open_connected_source(sync_for(f"connected-source-{n}"))
+        host.app_config(sync_for("connected-source-5"), PASSAGES_APP)
         held_whole = host.held_connected_sources()
 
     half_open = bootstrap_for("postgresql://unreached/unreached", tmp_path / "half")
     with Host(half_open) as host:
         for n in range(1, 10):
-            host.app_config(a_sync_on(f"connected-source-{n}"), PASSAGES_APP)
+            host.app_config(sync_for(f"connected-source-{n}"), PASSAGES_APP)
         held_half_open = host.held_connected_sources()
 
     assert ENVIRONMENTS_HELD == 8
@@ -255,7 +255,7 @@ def test_the_default_bound_holds_eight_handles_and_sheds_whole_sources(
     )
 
 
-def test_refuses_a_bound_below_one_connected_sources_two_handles(
+def test_rejects_a_cache_size_below_two_handles(
     tmp_path: Path,
 ) -> None:
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
@@ -266,12 +266,12 @@ def test_refuses_a_bound_below_one_connected_sources_two_handles(
         Host(bootstrap, environments_held=1)
 
     with Host(bootstrap, environments_held=2) as host:
-        host.open_connected_source(a_sync_on("connected-source-one"))
+        host.open_connected_source(sync_for("connected-source-one"))
 
         assert host.held_connected_sources() == ("connected-source-one",)
 
 
-def test_the_seam_answers_plain_numbers_and_opens_the_passage_store(
+def test_indexing_returns_a_plain_row_and_creates_the_store(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -306,7 +306,7 @@ def test_the_seam_answers_plain_numbers_and_opens_the_passage_store(
     assert (tmp_path / workspace_id / "connected-source-one").is_dir()
 
 
-def test_a_connected_sources_two_stores_share_the_operators_cap(
+def test_a_connected_source_stores_split_the_configured_lmdb_map_size(
     tmp_path: Path,
 ) -> None:
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
@@ -320,7 +320,7 @@ def test_a_connected_sources_two_stores_share_the_operators_cap(
     assert len(STORES_A_CONNECTED_SOURCE_HOLDS) == 2
 
 
-def test_a_sources_stores_sit_at_sibling_paths_in_its_directory(
+def test_a_connected_source_stores_are_sibling_directories(
     tmp_path: Path,
 ) -> None:
     sync = Sync(
@@ -342,8 +342,8 @@ def test_a_sources_stores_sit_at_sibling_paths_in_its_directory(
     assert passage_store.is_dir() and findings.is_dir()
 
 
-def test_removing_a_store_never_made_passes_quietly(tmp_path: Path) -> None:
-    sync = a_sync_on("connected-source-never-opened")
+def test_removing_a_store_that_does_not_exist_succeeds(tmp_path: Path) -> None:
+    sync = sync_for("connected-source-never-opened")
 
     with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
         host.remove_connected_source_store(sync)
@@ -355,8 +355,8 @@ def bytes_on_disk_under(directory: Path) -> int:
     return sum(item.stat().st_size for item in directory.rglob("*") if item.is_file())
 
 
-def test_a_sources_lmdb_size_counts_both_its_stores(tmp_path: Path) -> None:
-    sync = a_sync_on("connected-source-one")
+def test_a_connected_source_lmdb_size_counts_both_stores(tmp_path: Path) -> None:
+    sync = sync_for("connected-source-one")
 
     with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
         host.open_connected_source(sync)
@@ -370,7 +370,7 @@ def test_a_sources_lmdb_size_counts_both_its_stores(tmp_path: Path) -> None:
 
 
 def test_a_removed_store_reopens_on_disk(tmp_path: Path) -> None:
-    sync = a_sync_on("connected-source-one")
+    sync = sync_for("connected-source-one")
 
     with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
         host.open_connected_source(sync)
@@ -383,18 +383,18 @@ def test_a_removed_store_reopens_on_disk(tmp_path: Path) -> None:
         assert passage_store.is_dir()
 
 
-def test_a_store_that_cannot_be_removed_fails_the_removal(
+def test_a_removal_error_propagates_and_keeps_the_store(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    sync = a_sync_on("connected-source-on-a-locked-volume")
+    sync = sync_for("connected-source-on-a-locked-volume")
 
-    def refuse(*_: object, **__: object) -> None:
+    def refuse_rmdir(*_: object, **__: object) -> None:
         raise PermissionError("the volume refuses the removal")
 
     with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
         passage_store = host.store_directory(sync, CONNECTED_SOURCE_STORE)
         passage_store.mkdir(parents=True)
-        monkeypatch.setattr(os, "rmdir", refuse)
+        monkeypatch.setattr(os, "rmdir", refuse_rmdir)
 
         with pytest.raises(PermissionError):
             host.remove_connected_source_store(sync)
@@ -402,7 +402,7 @@ def test_a_store_that_cannot_be_removed_fails_the_removal(
     assert passage_store.is_dir()
 
 
-def test_a_connected_sources_lmdb_size_is_readable_after_its_run(
+def test_lmdb_size_grows_after_landing_rows(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -432,11 +432,11 @@ def test_a_connected_sources_lmdb_size_is_readable_after_its_run(
     assert Path(host.connected_source_directory(sync)).is_dir()
 
 
-def test_a_closed_hosts_store_reopens_while_its_config_is_held(
+def test_a_new_host_reopens_a_store_whose_config_is_held(
     tmp_path: Path,
 ) -> None:
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
-    sync = a_sync_on("connected-source-one")
+    sync = sync_for("connected-source-one")
 
     with Host(bootstrap) as first:
         _held = first.app_config(sync, PASSAGES_APP)
@@ -447,17 +447,17 @@ def test_a_closed_hosts_store_reopens_while_its_config_is_held(
     assert opened == ("connected-source-one",)
 
 
-def test_a_store_closed_for_the_cache_bound_reopens_while_held(
+def test_an_evicted_store_reopens_while_its_config_is_held(
     tmp_path: Path,
 ) -> None:
-    one = a_sync_on("connected-source-one")
+    one = sync_for("connected-source-one")
 
     with Host(
         bootstrap_for("postgresql://unreached/unreached", tmp_path),
         environments_held=2,
     ) as host:
         _held = host.app_config(one, PASSAGES_APP)
-        host.open_connected_source(a_sync_on("connected-source-two"))
+        host.open_connected_source(sync_for("connected-source-two"))
         host.app_config(one, PASSAGES_APP)
         opened = host.held_connected_sources()
 
@@ -465,7 +465,7 @@ def test_a_store_closed_for_the_cache_bound_reopens_while_held(
 
 
 def test_a_removed_store_reopens_while_its_config_is_held(tmp_path: Path) -> None:
-    sync = a_sync_on("connected-source-one")
+    sync = sync_for("connected-source-one")
 
     with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
         _held = host.app_config(sync, PASSAGES_APP)
@@ -477,7 +477,7 @@ def test_a_removed_store_reopens_while_its_config_is_held(tmp_path: Path) -> Non
 
 
 def test_an_unreadable_store_raises_the_engines_error(tmp_path: Path) -> None:
-    sync = a_sync_on("connected-source-one")
+    sync = sync_for("connected-source-one")
 
     with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
         directory = host.store_directory(sync, CONNECTED_SOURCE_STORE)

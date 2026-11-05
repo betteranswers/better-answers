@@ -137,11 +137,11 @@ describe.skipIf(nothingToProbeHere)("the backup image", () => {
     );
   }, IMAGE_PROBE_ALLOWANCE);
 
-  it("carries a `pg_dump` of the database's own major version", () => {
+  it("has a `pg_dump` matching the database's major version", () => {
     expect(clientMajor(contents.pgDump)).toEqual(serverMajor());
   });
 
-  it("resolves every non-base tool the jobs, check and restore call", () => {
+  it("has every extra tool the jobs, check, and restore call", () => {
     const missing = Object.entries(contents.resolved)
       .filter(([, where]) => where === "")
       .map(([tool]) => tool);
@@ -150,7 +150,7 @@ describe.skipIf(nothingToProbeHere)("the backup image", () => {
     expect(missing).toEqual([]);
   });
 
-  it("carries the backup script, executable, where its schedule looks", () => {
+  it("has the backup script, executable, at the path cron runs", () => {
     expect(contents.scriptIsThere).toBe(true);
     expect(contents.scriptIsExecutable).toBe(true);
 
@@ -158,7 +158,7 @@ describe.skipIf(nothingToProbeHere)("the backup image", () => {
     expect(contents.cronEntries.every((entry) => entry.includes(scriptPath()))).toBe(true);
   });
 
-  it("schedules exactly the script's jobs, each once", () => {
+  it("schedules each of the script's modes exactly once", () => {
     const scheduled = contents.cronEntries.map(jobScheduledBy).sort();
 
     expect(contents.cronIsThere).toBe(true);
@@ -173,14 +173,14 @@ const composeSchema = z.object({
   }),
 });
 
-const handedToTheBackup = (): readonly string[] =>
+const backupServiceVariables = (): readonly string[] =>
   Object.keys(
     composeSchema.parse(parse(read("deploy/stores.compose.yaml"))).services.backup.environment,
   ).sort();
 
 /**
- * The orchestrator hands a stack's containers every variable of its resource, and the resource's
- * variables are the ones the compose file interpolates.
+ * The orchestrator passes every variable of a resource to each container in its stack. A resource's
+ * variables are the ones its compose file interpolates.
  */
 const storesResourceVariables = (): readonly string[] =>
   [
@@ -241,7 +241,8 @@ const everyMinuteThroughTheProbe = (crontab: string, script: string, probeScript
     .split("\n")
     .map((line) => {
       if (!SCHEDULE.test(line)) return line;
-      if (!line.includes(script)) throw new Error(`a scheduled line starts no ${script}: ${line}`);
+      if (!line.includes(script))
+        throw new Error(`a scheduled line does not run ${script}: ${line}`);
       return line.replace(SCHEDULE, "* * * * * ").replace(script, probeScript);
     })
     .join("\n");
@@ -252,7 +253,7 @@ const wrapperIn = (crontab: string, script: string): readonly string[] => {
     .trim()
     .split(/\s+/);
   const at = words.indexOf(script);
-  if (at === -1) throw new Error(`no scheduled line starts ${script}`);
+  if (at === -1) throw new Error(`no scheduled line runs ${script}`);
   return words.slice(1, at);
 };
 
@@ -296,7 +297,7 @@ const jobVariables = (): readonly string[] => {
     read("deploy/backup-env.sh"),
   )?.[1];
   if (list === undefined) {
-    throw new Error("deploy/backup-env.sh no longer has a JOB_VARIABLES list this can read");
+    throw new Error("deploy/backup-env.sh has no readonly JOB_VARIABLES list");
   }
   return list
     .split("\n")
@@ -311,11 +312,11 @@ const pick = (
 ): Record<string, string | undefined> =>
   Object.fromEntries(names.map((name) => [name, from[name]]));
 
-describe.skipIf(nothingToProbeHere)("the backup image, started as compose starts it", () => {
-  const handed = handedToTheBackup();
-  const restOfTheResource = storesResourceVariables().filter((name) => !handed.includes(name));
+describe.skipIf(nothingToProbeHere)("the backup image, started with compose's environment", () => {
+  const handed = backupServiceVariables();
+  const otherResourceVariables = storesResourceVariables().filter((name) => !handed.includes(name));
   const standIns: Readonly<Record<string, string>> = Object.fromEntries(
-    [...handed, ...restOfTheResource].map((name) => [name, randomUUID()]),
+    [...handed, ...otherResourceVariables].map((name) => [name, randomUUID()]),
   );
   let container: StartedContainer | undefined;
   let seen: ReadonlyMap<string, WhatAJobSaw> = new Map();
@@ -358,7 +359,7 @@ describe.skipIf(nothingToProbeHere)("the backup image, started as compose starts
     expect([...seen.keys()].sort()).toEqual(scriptModes());
   });
 
-  it("gives each cron job compose's variables and a tool-finding PATH", () => {
+  it("gives each cron job compose's variables and a working PATH", () => {
     for (const [mode, saw] of seen) {
       expect({ mode, handed: pick(saw.environment, handed) }).toEqual({
         mode,
@@ -375,14 +376,14 @@ describe.skipIf(nothingToProbeHere)("the backup image, started as compose starts
     }
   });
 
-  it("keeps the stores resource's other variables from every job", () => {
-    expect(restOfTheResource).toEqual(
+  it("hides the stores resource's other variables from every job", () => {
+    expect(otherResourceVariables).toEqual(
       expect.arrayContaining(["TUNNEL_TOKEN", "GARAGE_ADMIN_TOKEN", "GARAGE_RPC_SECRET"]),
     );
     for (const [mode, saw] of seen) {
       expect({
         mode,
-        reached: restOfTheResource.filter((name) => name in saw.environment),
+        reached: otherResourceVariables.filter((name) => name in saw.environment),
       }).toEqual({
         mode,
         reached: [],
@@ -390,20 +391,20 @@ describe.skipIf(nothingToProbeHere)("the backup image, started as compose starts
     }
   });
 
-  it("gives a manual wrapper run the jobs' variables alone", () => {
+  it("gives a manual wrapper run only the jobs' variables", () => {
     expect(pick(byHand, handed)).toEqual(pick(standIns, handed));
-    expect(restOfTheResource.filter((name) => name in byHand)).toEqual([]);
+    expect(otherResourceVariables.filter((name) => name in byHand)).toEqual([]);
   });
 
-  it("leaves no variable's value in a file or the log", () => {
+  it("writes no variable's value to a file or the log", () => {
     expect(copies).toEqual([]);
     expect(Object.values(standIns).filter((value) => logged.includes(value))).toEqual([]);
   });
 });
 
-describe("the backup jobs' allow-list", () => {
-  it("passes exactly compose's backup variables, with PATH and HOME", () => {
-    expect(jobVariables()).toEqual([...handedToTheBackup(), "HOME", "PATH"].sort());
+describe("JOB_VARIABLES in deploy/backup-env.sh", () => {
+  it("lists compose's backup variables plus PATH and HOME", () => {
+    expect(jobVariables()).toEqual([...backupServiceVariables(), "HOME", "PATH"].sort());
   });
 });
 
@@ -546,7 +547,7 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
     copies = ran.copies;
   }, IMAGE_PROBE_ALLOWANCE);
 
-  it("mirrors every object the platform's store holds", () => {
+  it("mirrors every object in the platform's object store", () => {
     const mirror = files.filter((file) => file.startsWith("/buckets/mirror/"));
 
     expect({ mirror, log }).toMatchObject({
@@ -554,7 +555,7 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
     });
   });
 
-  it("bundles each api-owned repository with a ref, skipping one without", () => {
+  it("bundles each repository that has a ref, skipping empty ones", () => {
     const bundles = files.filter((file) => file.startsWith("/buckets/dumps/git/")).sort();
 
     expect({ bundles, log }).toMatchObject({
@@ -562,17 +563,17 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
     });
   });
 
-  it("mirrors each repository with a ref, not only the first", () => {
+  it("mirrors every repository that has a ref", () => {
     expect({ mirrored, log }).toMatchObject({
       mirrored: [`${WORKSPACE} refs/heads/main`, `${SECOND_WORKSPACE} refs/heads/main`],
     });
   });
 
-  it("clears what an earlier failed run left in staging", () => {
+  it("deletes files an earlier failed run left in staging", () => {
     expect(files.filter((file) => file.startsWith("/staging/"))).toEqual([]);
   });
 
-  it("logs nothing of the workspaces when their copies pass", () => {
+  it("logs no workspace names when every copy succeeds", () => {
     const workspaces = [WORKSPACE, SECOND_WORKSPACE, UNWRITTEN_WORKSPACE];
 
     expect(log.filter((line) => workspaces.some((workspace) => line.includes(workspace)))).toEqual(
@@ -580,7 +581,7 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
     );
   });
 
-  it("ends its log with the ok its ping carries", () => {
+  it("ends its log with the ok line its ping sends", () => {
     expect(log.at(-1)).toMatch(/^backup\.sh nightly: ok bytes=0 took=\d+$/);
   });
 
@@ -620,7 +621,7 @@ describe.skipIf(nothingToProbeHere)(
       copies = ran.copies;
     }, IMAGE_PROBE_ALLOWANCE);
 
-    it("ends its log with the fail its ping carries", () => {
+    it("ends its log with the fail line its ping sends", () => {
       expect(log.at(-1)).toBe("backup.sh nightly: fail bytes=0 took=0");
     });
 
@@ -661,7 +662,7 @@ describe.skipIf(nothingToProbeHere)("the backup image's hourly job", () => {
 
   it("records its dump's size, location and expiry", () => {
     const [dump] = dumps;
-    assert(dump !== undefined, "the run took a dump");
+    assert(dump !== undefined, "the run wrote no dump");
     const [location, size] = dump.split(" ");
 
     expect({ dumps, log }).toMatchObject({
@@ -684,7 +685,7 @@ const jobScheduledBy = (cronEntry: string): string =>
 
 const fenced = (script: string, step: string): string => {
   const body = read(script).split(`# >>> ${step}\n`)[1]?.split(`# <<< ${step}`)[0];
-  if (body === undefined) throw new Error(`${script} no longer fences the lines that ${step}`);
+  if (body === undefined) throw new Error(`${script} has no \`# >>> ${step}\` block`);
   return body;
 };
 
@@ -739,13 +740,13 @@ interface Seeded {
   readonly neverWritten: string;
 }
 
-const theApisUid = (script: string): string => {
+const apiUidLine = (script: string): string => {
   const line = /^API_UID=\S+$/m.exec(read(script))?.[0];
-  if (line === undefined) throw new Error(`${script} no longer names the api's uid as API_UID`);
+  if (line === undefined) throw new Error(`${script} has no API_UID= line`);
   return line;
 };
 
-const AS_THE_HOSTS_RUN_IT = [
+const HOST_COMMAND_STUBS = [
   `sudo() { [ "$1 $2" = "-u #${API_UID}" ] || return 2; shift 2; HOME=/tmp setpriv --reuid=${API_UID} --regid=${API_UID} --clear-groups "$@"; }`,
   'git() { printf "%s\\n" "$*" >> /tmp/root-ran-git; command git "$@"; }',
 ];
@@ -764,16 +765,16 @@ const restoreEnvironment = (
   PRODUCTION_STEP: [
     "set -euo pipefail",
     "WORK=/work BUNDLES=/bundles",
-    theApisUid("deploy/restore-production.sh"),
+    apiUidLine("deploy/restore-production.sh"),
     'tool() { "$@"; }',
-    ...AS_THE_HOSTS_RUN_IT,
+    ...HOST_COMMAND_STUBS,
     fenced("deploy/restore-production.sh", "the git store"),
   ].join("\n"),
   DRILL_STEP: [
     "set -euo pipefail",
     "WORK=/work BUNDLES=/bundles BACKUP_AGE_IDENTITY_FILE=/run/age.key",
-    theApisUid("deploy/restore-drill.sh"),
-    ...AS_THE_HOSTS_RUN_IT,
+    apiUidLine("deploy/restore-drill.sh"),
+    ...HOST_COMMAND_STUBS,
     fenced("deploy/restore-drill.sh", "the git store"),
   ].join("\n"),
 });
@@ -788,7 +789,7 @@ const seedTwoWorkspaces = async (database: MigratedPostgres): Promise<Seeded> =>
   }
 };
 
-describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
+describe.skipIf(nothingToProbeHere)("the git store step of both restore scripts", () => {
   const dumps = objectStoreForSuite();
   let database: MigratedPostgres | undefined;
   let seeded: Seeded = { bundled: "", neverWritten: "" };
@@ -820,25 +821,22 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
     };
   };
 
-  it.each(["production", "drill"])(
-    "%s: clones each bundle as the api, keeping WORK closed",
-    (restore) => {
-      expect(stateAfter(restore)).toMatchObject({
-        state: [
-          "ran 0",
-          "work 700",
-          "decrypted bundles left 0",
-          "root ran git 0",
-          "owned by another uid 0",
-          `${seeded.bundled} refs/heads/main refs/heads/main`,
-          expect.any(String),
-        ],
-      });
-    },
-  );
+  it.each(["production", "drill"])("%s: clones each bundle as the api, WORK at 700", (restore) => {
+    expect(stateAfter(restore)).toMatchObject({
+      state: [
+        "ran 0",
+        "work 700",
+        "decrypted bundles left 0",
+        "root ran git 0",
+        "owned by another uid 0",
+        `${seeded.bundled} refs/heads/main refs/heads/main`,
+        expect.any(String),
+      ],
+    });
+  });
 
   it.each(["production", "drill"])(
-    "%s: inits an empty repository for an unbundled workspace",
+    "%s: creates an empty repository for an unbundled workspace",
     (restore) => {
       expect(stateAfter(restore).state.at(-1)).toBe(
         `${seeded.neverWritten} refs/heads/main no ref`,
@@ -847,7 +845,7 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
   );
 
   it.each(["production", "drill"])(
-    "%s: inits every workspace empty before any bundle exists",
+    "%s: creates every repository empty when no bundle exists yet",
     (restore) => {
       expect(stateAfter(`${restore}-unbundled`)).toMatchObject({
         state: [
@@ -864,7 +862,7 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
   );
 
   it.each(["production", "drill"])(
-    "%s: stops at a failed bundle listing, making no repository",
+    "%s: creates no repository when listing the bundles fails",
     (restore) => {
       expect(stateAfter(`${restore}-unlisted`)).toMatchObject({
         state: [
@@ -881,7 +879,7 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
   );
 
   it.each(["production", "drill"])(
-    "%s: stops at a failed workspace read, initing no repository",
+    "%s: creates no empty repository when reading workspaces fails",
     (restore) => {
       expect(stateAfter(`${restore}-unread`)).toMatchObject({
         state: [
@@ -899,7 +897,7 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
 });
 
 describe("the backup leg of the image job", () => {
-  it("names this file as its probe", () => {
+  it("lists this file as its probe", () => {
     const backup = legFor("backup");
 
     expect(backup.probe).toContain("@better-answers/api");

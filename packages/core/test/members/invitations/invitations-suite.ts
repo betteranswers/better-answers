@@ -46,7 +46,7 @@ export const answeredValue = <T>(answer: Result<T, unknown>): T => {
 export const ceilingOf = (answer: Result<unknown, unknown>): number | undefined =>
   !answer.ok && answer.error instanceof CeilingMet ? answer.error.retryAfterSeconds : undefined;
 
-/** `db` answers the suite's database once its hooks have run, so it is read at each call. */
+/** `db` returns the suite's database only after its hooks run, so call it inside each helper. */
 export const invitationsSuite = (db: () => MigratedPostgres) => {
   const as = async <T>(
     workspace: ProvisionedWorkspace,
@@ -137,7 +137,7 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
       return person;
     });
 
-  const invitationLeft = (
+  const invitationSeeded = (
     workspace: ProvisionedWorkspace,
     row: { readonly email: string; readonly status: string; readonly expiresAt?: Date },
   ) =>
@@ -212,7 +212,7 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
     invitedMany,
     cancelledInvitation,
     memberAt,
-    invitationLeft,
+    invitationSeeded,
     invitationsOf,
     invitationEvents,
     emailsCountedTo,

@@ -170,10 +170,10 @@ const NOT_AN_ANSWER: SeededConcept = {
   body: "Buyers ask support.\n",
 };
 
-describe("the judge's call", () => {
+describe("judgeCall", () => {
   const candidate = A_CANDIDATE;
 
-  it("holds each candidate apart, numbered, with its collection", () => {
+  it("numbers each candidate in its own block with its collection", () => {
     const call = judgeCall("How long are audit logs kept?", [
       candidate,
       {
@@ -219,7 +219,7 @@ describe("the judge's call", () => {
     );
   });
 
-  it("asks one verdict of yes or no under every number", () => {
+  it("expects one yes or no verdict for each candidate number", () => {
     const call = judgeCall("Who?", [candidate]);
 
     expect(call.answer.safeParse({ "1": "yes" }).success).toBe(true);
@@ -228,17 +228,17 @@ describe("the judge's call", () => {
     expect(call.answer.safeParse({ "1": "yes", "2": "no" }).success).toBe(false);
   });
 
-  it("reserves every byte sent and room to think", () => {
+  it("reserves every input byte and 16,000 output tokens for thinking", () => {
     const call = judgeCall("Who pays the £50 fee?", [candidate]);
 
     expect(call.most).toEqual({ tokensIn: 2_941, tokensOut: 16_000 });
   });
 
-  it("gives the whole call 150 seconds, under a host's 240", () => {
+  it("allows the call 150 seconds, within a host's 240-second limit", () => {
     expect(judgeCall("Who?", [candidate]).withinMs).toBe(150_000);
   });
 
-  it("AE11: sends a placeholder for a National Insurance number", () => {
+  it("AE11: withholds a National Insurance number from the prompt", () => {
     const call = judgeCall("Is my National Insurance number AB 12 34 56 C on file?", [candidate]);
 
     expect(call.prompt).toContain("Is my National Insurance number [withheld] on file?");
@@ -247,7 +247,7 @@ describe("the judge's call", () => {
 });
 
 describe("ask with a judge", () => {
-  it("AE1: returns two fits word for word, the third related", async () => {
+  it("AE1: returns two fitting `Answer`s verbatim, the third as related", async () => {
     const { asker, wire } = await arranged(
       [USERS, SUPPLIER, RETENTION],
       [USERS.title, SUPPLIER.title],
@@ -264,7 +264,7 @@ describe("ask with a judge", () => {
     expect(wire.sent[0]?.headers).toMatchObject({ "x-api-key": A_KEY });
   });
 
-  it("AE3: returns Standard and Advanced fits side by side", async () => {
+  it("AE3: returns the Standard and the Advanced `Answer` as fits", async () => {
     const standard = anAnswer(
       "How do Standard buyers export audit information?",
       "Standard buyers export it as CSV.\n",
@@ -286,7 +286,7 @@ describe("ask with a judge", () => {
     expect(answer.related).toEqual([]);
   });
 
-  it("answers related, judged, when the judge says no to all", async () => {
+  it("returns related, judged, when the judge rejects every candidate", async () => {
     const { asker, wire } = await arranged([USERS, SUPPLIER]);
 
     const answer = await askedWith(asker, { question: QUESTION }, wire);
@@ -295,7 +295,7 @@ describe("ask with a judge", () => {
     expect(titlesOf(answer.related)).toEqual([USERS.title, SUPPLIER.title].toSorted());
   });
 
-  it("answers related, judging failed, settling a timed-out call", async () => {
+  it("settles a timed-out judge call and marks judging failed", async () => {
     const { workspaceId, asker } = await arranged([USERS]);
 
     const answer = await askedWith(asker, { question: QUESTION }, judgeTimingOut());
@@ -312,7 +312,7 @@ describe("ask with a judge", () => {
     });
   });
 
-  it("settles a judged call as one succeeded llm_call row", async () => {
+  it("records a judge call as one succeeded llm_call row", async () => {
     const { workspaceId, asker, wire } = await arranged([USERS], [USERS.title]);
 
     const answer = await askedWith(asker, { question: QUESTION }, wire);
@@ -325,7 +325,7 @@ describe("ask with a judge", () => {
     });
   });
 
-  it("AE9: refuses at the limit, calls nothing, keeps the question", async () => {
+  it("AE9: refuses at the limit without calling, storing the question", async () => {
     const { workspaceId, asker, wire } = await arranged([USERS], [USERS.title], {
       limitGbp: "0.01",
     });
@@ -343,7 +343,7 @@ describe("ask with a judge", () => {
     expect(kept.rows).toEqual([{ question: QUESTION, completed: false }]);
   });
 
-  it("answers at the limit where no `Answer` is a candidate", async () => {
+  it("answers at the spending limit when no `Answer` needs judging", async () => {
     const { asker, wire } = await arranged([NOT_AN_ANSWER], [], { limitGbp: "0.01" });
 
     const answer = await askedWith(asker, { question: QUESTION }, wire);
@@ -374,7 +374,7 @@ describe("ask with a judge", () => {
     await expectNoCall(workspaceId, wire);
   });
 
-  it("answers an error where the model key will not open", async () => {
+  it("returns an error when the model key cannot be decrypted", async () => {
     const { workspaceId, asker, wire } = await arranged([USERS], [USERS.title], {
       sealedUnder: ANOTHER_ENVELOPE_KEY,
     });
@@ -389,7 +389,7 @@ describe("ask with a judge", () => {
     await expectNoCall(workspaceId, wire);
   });
 
-  it("leaves the record open when the sweep settled first", async () => {
+  it("leaves the record open when the expiry sweep settles first", async () => {
     const { workspaceId, asker } = await arranged([USERS]);
     const sweptMeanwhile = async () => {
       answered(
@@ -415,7 +415,7 @@ describe("ask with a judge", () => {
     ]);
   });
 
-  it("shows an `Answer` past the cap as an unsent preview", async () => {
+  it("previews an `Answer` beyond the candidate cap without judging it", async () => {
     const { asker, wire } = await arranged([USERS, SUPPLIER], [USERS.title, SUPPLIER.title]);
 
     const answer = await askedWith(asker, { question: QUESTION }, wire, {
@@ -424,7 +424,7 @@ describe("ask with a judge", () => {
     });
 
     const [request] = wire.sent;
-    assert(request !== undefined, "the judge was called");
+    assert(request !== undefined, "the judge was not called");
     const sentFor = [...candidatesIn(promptOf(request.body))];
     expect(sentFor).toHaveLength(1);
     expect(titlesOf(answer.answers)).toEqual(sentFor.map(([title]) => title));
@@ -454,7 +454,7 @@ describe("ask with a judge", () => {
     ).toEqual([{ iri: copy, trustWords: "Deprecated", inFull: false }]);
   });
 
-  it("never reads an unpublished Draft Answer for the judge", async () => {
+  it("omits an unpublished Draft Answer from the answer", async () => {
     const { answer } = await askedBesideACopy("draft");
 
     expect(answer.related).toEqual([]);
@@ -474,7 +474,7 @@ describe("ask with a judge", () => {
     expect(iris.map((iri) => judged.get(iri))).toEqual(["yes", "no", undefined]);
   });
 
-  it("sends as max_tokens the tokens out it reserved", async () => {
+  it("sends the reserved output tokens as max_tokens", async () => {
     const { workspaceId, asker } = await arranged([USERS]);
     const { reserved, read } = reservationsRead(db(), workspaceId);
     const wire = judgeSaying([USERS.title], read);
@@ -482,13 +482,13 @@ describe("ask with a judge", () => {
     await askedWith(asker, { question: QUESTION }, wire);
 
     const [request] = wire.sent;
-    assert(request !== undefined, "the judge was called");
+    assert(request !== undefined, "the judge was not called");
     const sent = z.object({ max_tokens: z.number() }).parse(JSON.parse(request.body));
     expect(reserved).toEqual([16_000]);
     expect(sent.max_tokens).toBe(16_000);
   });
 
-  it("holds no connection while the judge is called", async () => {
+  it("holds no database connection while the judge is called", async () => {
     const { asker } = await arranged([USERS]);
     const contended: string[] = [];
     const contender = async () => {

@@ -82,8 +82,8 @@ const operatorsOnly = declareAction({
   refuses: ["not-the-operator"],
 });
 
-describe("what an action admits, from the principal and input alone", () => {
-  it("admits only an Admin where the level is Admin", () => {
+describe("admit, deciding from the principal and input alone", () => {
+  it("admits only an Admin to an Admin-level action", () => {
     const answered = (["Admin", "Editor", "Viewer"] as const).map(
       (role) => admit(adminsOnly, person(role), {}).ok,
     );
@@ -91,7 +91,7 @@ describe("what an action admits, from the principal and input alone", () => {
     expect(answered).toEqual([true, false, false]);
   });
 
-  it("reads a role as a level admitting every role above", () => {
+  it("admits every role at or above the action's level", () => {
     const answered = (["Admin", "Editor", "Viewer"] as const).map(
       (role) => admit(everyone, person(role), {}).ok,
     );
@@ -99,7 +99,7 @@ describe("what an action admits, from the principal and input alone", () => {
     expect(answered).toEqual([true, true, true]);
   });
 
-  it("keys a platform principal off its actor id's purpose", () => {
+  it("admits a platform principal by its actor id's purpose", () => {
     expect([
       admit(erasureOnly, processActor("erasure"), {}).ok,
       admit(erasureOnly, processActor("reconciler"), {}).ok,
@@ -107,11 +107,11 @@ describe("what an action admits, from the principal and input alone", () => {
     ]).toEqual([true, false, true]);
   });
 
-  it("refuses a platform principal where an action names no purpose", () => {
+  it("refuses a platform principal when the action lists no purposes", () => {
     expect(admit(adminsOnly, processActor("erasure"), {}).ok).toBe(false);
   });
 
-  it("hands back the principal narrowed to the admitted role", () => {
+  it("returns the principal typed at the admitted role", () => {
     const admitted = admit(adminsOnly, person("Admin"), {});
 
     assert(admitted.ok, "an Admin was refused");
@@ -119,8 +119,8 @@ describe("what an action admits, from the principal and input alone", () => {
     expectTypeOf(admitted.value).toExtend<UserPrincipal & { role: "Admin" }>();
   });
 
-  it("refuses a role outside the three, whatever level is asked", () => {
-    // @ts-expect-error — a role no resolver hands out is the value the gate must still refuse.
+  it("refuses an unknown role at every action level", () => {
+    // @ts-expect-error — "Owner" is not a Role, but admit must still refuse it at runtime.
     const stranger: UserPrincipal = { ...person("Admin"), role: "Owner" };
 
     expect([admit(adminsOnly, stranger, {}), admit(everyone, stranger, {})]).toEqual([
@@ -129,7 +129,7 @@ describe("what an action admits, from the principal and input alone", () => {
     ]);
   });
 
-  it("refuses in role-forbids, a word of the forbidden class", () => {
+  it("refuses a Viewer with role-forbids, in the forbidden class", () => {
     const refused = admit(adminsOnly, person("Viewer"), {});
 
     expect(refused).toEqual({ ok: false, error: "role-forbids" });
@@ -137,7 +137,7 @@ describe("what an action admits, from the principal and input alone", () => {
     expectTypeOf<"role-forbids">().toExtend<AdmissionRefusal>();
   });
 
-  it("holds an admission's word to the forbidden and unauthenticated classes", () => {
+  it("limits admission refusals to forbidden and unauthenticated words", () => {
     expectTypeOf<"role-forbids">().toExtend<AdmissionRefusal>();
     expectTypeOf<"credentials-revoked">().toExtend<AdmissionRefusal>();
     expectTypeOf<"malformed">().not.toExtend<AdmissionRefusal>();
@@ -147,8 +147,8 @@ describe("what an action admits, from the principal and input alone", () => {
   });
 });
 
-describe("what an action admits of the operator", () => {
-  it("admits the operator alone to an operator's action", () => {
+describe("admit for the operator", () => {
+  it("admits only the operator to an operator-only action", () => {
     const operator = theOperator();
 
     expect([
@@ -162,7 +162,7 @@ describe("what an action admits of the operator", () => {
     ]);
   });
 
-  it("refuses the operator every action a role or purpose admits", () => {
+  it("refuses the operator any action admitted by role or purpose", () => {
     expect([
       admit(everyone, theOperator(), {}),
       admit(adminsOnly, theOperator(), {}),
@@ -174,7 +174,7 @@ describe("what an action admits of the operator", () => {
     ]);
   });
 
-  it("hands back the operator, and refuses in a forbidden word", () => {
+  it("types the admitted operator and its forbidden-class refusal", () => {
     expectTypeOf<AdmittedOf<typeof operatorsOnly>>().toEqualTypeOf<OperatorPrincipal>();
     expectTypeOf<OperatorPrincipal>().not.toExtend<AdmittedOf<typeof everyone>>();
     expectTypeOf<ReturnType<typeof admit<typeof operatorsOnly>>>().toEqualTypeOf<
@@ -184,7 +184,7 @@ describe("what an action admits of the operator", () => {
   });
 });
 
-describe("the concept write, which ownership decides", () => {
+describe("the concept write, admitted by ownership rather than role", () => {
   it("types a concept's writer as a person of any role", () => {
     type Writer = AdmittedOf<typeof writeConceptAction>;
 
@@ -199,8 +199,8 @@ const viewerWhenOpenElseEditor = (input: { readonly open: boolean }) =>
 const editorWhenOpenElseAdmin = (input: { readonly open: boolean }) =>
   ({ role: input.open ? "Editor" : "Admin", purposes: [] }) as const;
 
-describe("an action whose level is read from its input", () => {
-  it("types the enqueue's person at any role", () => {
+describe("an action whose role level depends on its input", () => {
+  it("types the enqueue's admitted person at any role", () => {
     type Enqueuer = AdmittedOf<typeof enqueueJobAction>;
 
     expectTypeOf<Extract<Enqueuer, UserPrincipal>["role"]>().toEqualTypeOf<Role>();
@@ -208,7 +208,7 @@ describe("an action whose level is read from its input", () => {
     expectTypeOf<PlatformPrincipal>().toExtend<Enqueuer>();
   });
 
-  it("types a union of roles by the lowest it names", () => {
+  it("types a union of levels by its lowest role", () => {
     const lowerTwo = declareAction({
       admits: viewerWhenOpenElseEditor,
       input: z.custom<{ readonly open: boolean }>(),
@@ -229,8 +229,8 @@ describe("an action whose level is read from its input", () => {
   });
 });
 
-describe("what a declaration will not let an action say", () => {
-  it("refuses an action declaring one word twice", () => {
+describe("declareAction's checks on a declaration", () => {
+  it("throws when an action lists one refusal word twice", () => {
     expect(() =>
       declareAction({
         admits: { role: "Admin", purposes: [] },
@@ -245,7 +245,7 @@ describe("what a declaration will not let an action say", () => {
     expectTypeOf<"erasrue">().not.toExtend<ProcessPurpose>();
 
     const misspelt = declareAction({
-      // @ts-expect-error — a misspelt purpose would admit no process and refuse none by name.
+      // @ts-expect-error — "erasrue" is not a ProcessPurpose.
       admits: { role: "Admin", purposes: ["erasrue"] },
       input: nothing,
       refuses: ["role-forbids"],
@@ -255,8 +255,8 @@ describe("what a declaration will not let an action say", () => {
   });
 });
 
-describe("what two declared actions state, read from outside their slices", () => {
-  it("states what reprocessing a source admits and answers", () => {
+describe("the reprocess and enqueue declarations, read from outside their slices", () => {
+  it("declares reprocess's admitted role, purposes and refusal words", () => {
     expect({
       admits: reprocessConnectedSourceAction.admits,
       refuses: reprocessConnectedSourceAction.refuses,
@@ -266,7 +266,7 @@ describe("what two declared actions state, read from outside their slices", () =
     });
   });
 
-  it("admits an Admin, erasure and reindex to reprocess, nobody else", () => {
+  it("admits only an Admin, erasure and reindex to reprocess", () => {
     const wipe = reprocessConnectedSourceInput.parse({
       workspaceId: "01JQ0000000000000000000WSP",
       connectedSourceId: "01J6NNNNNNNNNNNNNNNNNNNNN1",
@@ -314,21 +314,21 @@ describe("what two declared actions state, read from outside their slices", () =
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof adminOnConnectedSource>[0]>();
   });
 
-  it("reads the enqueue's level off the kind's descriptor", () => {
+  it("takes the enqueue's level from the job kind's descriptor", () => {
     const audit = enqueueJobInput.parse({
       workspaceId: "01JQ0000000000000000000WSP",
       kind: "nightly-audit",
     });
     const asked = enqueueJobAction.admits;
 
-    assert(typeof asked === "function", "the enqueue reads its level from the input");
+    assert(typeof asked === "function", "enqueueJobAction.admits is not a function of the input");
     expect(asked(audit)).toEqual({
       role: "Admin",
       purposes: EVERY_PURPOSE,
     });
   });
 
-  it("admits the platform to the enqueue for any purpose", () => {
+  it("lets a platform process and an Admin enqueue an audit", () => {
     const audit = enqueueJobInput.parse({
       workspaceId: "01JQ0000000000000000000WSP",
       kind: "nightly-audit",

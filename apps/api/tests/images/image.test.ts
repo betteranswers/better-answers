@@ -45,9 +45,7 @@ const pinnedFilterRepoVersion = (): string => {
     "version"
   ];
   if (version === undefined) {
-    throw new Error(
-      "apps/api/Dockerfile no longer pins the rewrite tool in an `ARG GIT_FILTER_REPO_VERSION=` line this can read",
-    );
+    throw new Error("apps/api/Dockerfile has no `ARG GIT_FILTER_REPO_VERSION=<version>` line");
   }
   return version;
 };
@@ -56,9 +54,7 @@ const pinnedPnpmVersion = (): string => {
   const packageManager = manifest(".").packageManager ?? "";
   const version = /^pnpm@(?<version>[^+\s]+)/.exec(packageManager)?.groups?.["version"];
   if (version === undefined) {
-    throw new Error(
-      `the root manifest's packageManager is "${packageManager}", which names no pnpm version this can read`,
-    );
+    throw new Error(`the root manifest's packageManager "${packageManager}" names no pnpm version`);
   }
   return version;
 };
@@ -84,8 +80,8 @@ const contentsSchema = z.object({
 type ImageContents = z.infer<typeof contentsSchema>;
 
 /**
- * No peer is followed: pnpm links one from anywhere in the workspace's dependency graph, and a peer the api
- * loads is one it declares.
+ * The probe does not follow peer dependencies. pnpm links a peer from anywhere in the workspace graph,
+ * and the api declares every peer it loads.
  */
 const probe = `
 const { createRequire } = require("node:module");
@@ -105,7 +101,7 @@ const answered = (command, args, environment = {}) => {
     return "";
   }
 };
-// What a failed command said, so a red assertion names its cause rather than "".
+// Returns stderr on failure, so a failed assertion shows the cause instead of an empty string.
 const answeredOrWhy = (command, args, environment = {}) => {
   try {
     return execFileSync(command, args, {
@@ -117,10 +113,10 @@ const answeredOrWhy = (command, args, environment = {}) => {
     return String(error.stderr || error.message).trim();
   }
 };
-// pnpm 12 under corepack fetches its native binary on first run unless the cache holds it;
-// with corepack's network refused, a binary the image does not carry is red here, not fetched.
+// Under corepack, pnpm 12 downloads its native binary on first run unless it is cached. With the
+// network off, a binary missing from the image fails here instead of downloading.
 const offline = { COREPACK_ENABLE_NETWORK: "0" };
-// lstat, not existsSync: a link left dangling on PATH still counts as a command shipped.
+// lstat, because existsSync follows links and a dangling link on PATH still counts as shipped.
 const linkOrFileAt = (file) => { try { lstatSync(file); return true; } catch { return false; } };
 const onPath = (name) =>
   (process.env.PATH ?? "").split(":").filter(Boolean).map((dir) => path.join(dir, name)).find(linkOrFileAt);
@@ -187,7 +183,7 @@ process.stdout.write(JSON.stringify({
   hasNpmPackage: existsSync("/usr/local/lib/node_modules/npm"),
   pnpmTarget: pnpm === undefined ? "" : realTarget(pnpm),
   pnpmVersion: answeredOrWhy("pnpm", ["--version"], offline),
-  // ops.ts will not start without a database URL; help answers before any connection is made.
+  // ops.ts needs a database URL to start, but help answers before it connects.
   opsAnswer: answeredOrWhy("pnpm", ["--silent", "ops", "help"], {
     ...offline,
     DATABASE_URL: "postgres://probe@127.0.0.1:9/probe",
@@ -221,47 +217,47 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
     contents = contentsSchema.parse(JSON.parse(stdout));
   }, IMAGE_PROBE_ALLOWANCE);
 
-  it("gives the api no development dependency it could load", () => {
+  it("contains no development-only dependency the api can resolve", () => {
     expect(developmentOnly.length).toBeGreaterThan(0);
     expect(contents.resolvable).toEqual([]);
   });
 
-  it("carries the three workspace libraries the api reads", () => {
+  it("contains the three workspace libraries the api imports", () => {
     expect(contents.missing).toEqual([]);
   });
 
-  it("carries no package the api's own dependencies do not reach", () => {
+  it("contains only packages reachable from the api's dependencies", () => {
     expect(contents.storedCount).toBeGreaterThan(0);
     expect(contents.unreached).toEqual([]);
   });
 
-  it("keeps every dependency a package it carries declares", () => {
+  it("contains every dependency that each installed package declares", () => {
     expect(contents.broken).toEqual([]);
   });
 
-  it("loads every module `main.ts`, `migrate` and `pnpm ops` import", () => {
-    // Each entry reads its bootstrap first, and refuses it only once every static import has
-    // resolved.
+  it("resolves every static import of main.ts, migrate.ts, and ops.ts", () => {
+    // An entry rejects its bootstrap configuration only after every static import resolves, so that
+    // rejection proves the imports loaded.
     expect(contents.loaded).toEqual(["main.ts", "migrate.ts", "ops.ts"]);
   });
 
-  it("leaves the tier contract's fixtures out of the runtime", () => {
+  it("leaves out the tier contract fixtures in /app/contracts", () => {
     expect(contents.hasContracts).toBe(false);
   });
 
-  it("carries the single-page app's build where the api reads it", () => {
+  it("contains the web build at the path the api serves", () => {
     expect(contents.hasSpaBuild).toBe(true);
   });
 
-  it("carries the history-rewrite tool at the version the Dockerfile pins", () => {
+  it("contains git-filter-repo at the version the Dockerfile pins", () => {
     expect(contents.filterRepoVersion).toBe(pinnedFilterRepoVersion());
   });
 
-  it("installs the rewrite tool as a git subcommand", () => {
+  it("runs git-filter-repo as `git filter-repo`", () => {
     expect(contents.gitRanFilterRepo).toBe(true);
   });
 
-  it("ships no npm or npx, and keeps corepack for pnpm", () => {
+  it("has corepack and pnpm on PATH, not npm or npx", () => {
     expect(contents.commandsOnPath).toEqual(["corepack", "pnpm"]);
     expect(contents.hasNpmPackage).toBe(false);
   });
@@ -271,13 +267,13 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
     expect(contents.pnpmVersion).toBe(pinnedPnpmVersion());
   });
 
-  it("reaches the operator's commands through pnpm", () => {
+  it("answers `pnpm ops help` with the usage text", () => {
     expect(contents.opsAnswer).toContain("usage: pnpm ops <command> [options]");
   });
 });
 
 describe("the api leg of the image job", () => {
-  it("names this file as its probe", () => {
+  it("lists this file as its probe", () => {
     const api = legFor("api");
 
     expect(matrixLegs().length).toBeGreaterThan(1);

@@ -135,7 +135,7 @@ def _pinned_digest() -> str:
     image = pinned_postgres_image()
     found = re.search(r"@sha256:([0-9a-f]{64})$", image)
     if found is None:
-        msg = f"{_IMAGE_SOURCE} pins {image}, which carries no sha256 digest"
+        msg = f"{_IMAGE_SOURCE} pins {image}, which has no sha256 digest"
         raise RuntimeError(msg)
     return found.group(1)
 
@@ -175,7 +175,7 @@ def _server_month(maintenance: str) -> str:
             "SELECT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM')"
         ).fetchone()
     if row is None:
-        message = "the server named no month"
+        message = "the server returned no row for its current month"
         raise RuntimeError(message)
     return str(row[0])
 
@@ -189,7 +189,10 @@ def _server_facts(maintenance: str) -> tuple[bool, str | None]:
             ).fetchone()
     except (psycopg.OperationalError, psycopg.ProgrammingError) as error:
         reason = (str(error).splitlines() or [""])[0]
-        message = f"{LOCATOR} reaches no Postgres ({reason}): run `{UP_COMMAND}`"
+        message = (
+            f"cannot connect to the Postgres at {LOCATOR} ({reason})."
+            f" Run `{UP_COMMAND}`"
+        )
         raise RuntimeError(message) from None
     return (False, None) if row is None else (bool(row[0]), row[1])
 
@@ -198,19 +201,18 @@ def _refuse_unless_fit(maintenance: str, *, shared: bool) -> None:
     superuser, stamp = _server_facts(maintenance)
     if not superuser:
         message = (
-            f"{LOCATOR} signs in as no superuser: export the URI `{UP_COMMAND}` prints"
+            f"the {LOCATOR} user is not a superuser."
+            f" Export the URI that `{UP_COMMAND}` prints"
         )
         raise RuntimeError(message)
     pinned = pinned_postgres_image()
     if stamp is None and shared:
-        message = (
-            f"{LOCATOR} reaches a Postgres with no image stamp: run `{UP_COMMAND}`"
-        )
+        message = f"the Postgres at {LOCATOR} has no image stamp. Run `{UP_COMMAND}`"
         raise RuntimeError(message)
     if stamp is not None and stamp != pinned:
         message = (
-            f"{LOCATOR} reaches a Postgres stamped {stamp} but this checkout pins"
-            f" {pinned}: run `{UP_COMMAND}`"
+            f"the Postgres at {LOCATOR} is stamped {stamp}, but this checkout pins"
+            f" {pinned}. Run `{UP_COMMAND}`"
         )
         raise RuntimeError(message)
 
@@ -219,7 +221,7 @@ _TEMPLATE_PREFIX = "tpl_py_"
 
 
 def template_name(month: str) -> str:
-    """`month` is the server's UTC YYYY-MM, the clock a migration reads."""
+    """`month` is the server's UTC YYYY-MM, because migrations read its clock."""
     digest = hashlib.sha256()
     files = sorted(
         (path.relative_to(MIGRATIONS_DIR).as_posix(), path)
@@ -248,7 +250,9 @@ def _until_sessions_gone(admin: psycopg.Connection, database: str) -> None:
     deadline = time.monotonic() + _SESSIONS_GONE_WITHIN_SECONDS
     while _exists_session_on(admin, database):
         if time.monotonic() > deadline:
-            message = f"a session stayed on {database} after its build returned"
+            message = (
+                f"a session was still connected to {database} after its build returned"
+            )
             raise RuntimeError(message)
         time.sleep(0.05)
 
@@ -303,8 +307,8 @@ FROM pg_database WHERE datistemplate AND starts_with(datname, %s)
 """
 
 
-# DROP DATABASE waits on a CREATE DATABASE cloning it, so a run still cloning keeps
-# its template until the clone ends.
+# DROP DATABASE waits for any CREATE DATABASE that is cloning the template, so a
+# template stays until every running clone of it ends.
 def _hold_the_tmpfs_to_a_days_templates(admin: psycopg.Connection) -> None:
     for database, stale in admin.execute(_AGES, (_TEMPLATE_PREFIX,)).fetchall():
         if stale is None:
@@ -391,8 +395,8 @@ def migrated_postgres_at() -> Iterator[tuple[psycopg.Connection, str]]:
             )
 
 
-# Roles span the server, and two concurrent creates of one raise unique_violation,
-# not duplicate_object.
+# Roles belong to the whole server. Two concurrent CREATE ROLE statements for one
+# role raise unique_violation, not duplicate_object.
 def login_in_role(
     connection: psycopg.Connection, *, login: str, password: str, role: str
 ) -> None:

@@ -75,23 +75,23 @@ const wellFormed = (command: string): readonly string[] => [
   ...(WELL_FORMED_FLAGS[command] ?? []),
 ];
 
-describe("pnpm ops — the restore scripts' commands", () => {
+describe("pnpm ops", () => {
   const served = servedApp();
 
-  it("reads a dump stamp and an ISO instant alike", () => {
+  it("parseSince reads a dump timestamp and an ISO instant", () => {
     expect(parseSince("20260903T020500Z")?.toISOString()).toBe("2026-09-03T02:05:00.000Z");
     expect(parseSince("2026-09-03T02:05:00Z")?.toISOString()).toBe("2026-09-03T02:05:00.000Z");
     expect(parseSince("yesterday")).toBeUndefined();
   });
 
-  it("prints a refusal's word and exits with its class's code", async () => {
+  it("prints the refusal word and exits with its class's code", async () => {
     const run = await ops(served(), ["map-counts", "--workspace", "not-a-workspace-id"]);
 
     expect(run.exitCode).toBe(2);
     expect(run.lines.join("\n")).toContain("REFUSED — malformed");
   });
 
-  it("says which runs exit 1 whatever word they name", async () => {
+  it("help lists the runs that always exit 1", async () => {
     const run = await ops(served(), ["help"]);
 
     expect(run.lines.join("\n")).toContain(
@@ -102,7 +102,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     );
   });
 
-  it("gives each class its own code, telling refusals apart", () => {
+  it("gives each refusal class a distinct nonzero exit code", () => {
     const codes = Object.values(EXIT_OF_CLASS);
 
     expect(EXIT_OF_CLASS).toEqual({
@@ -118,7 +118,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     expect(codes).not.toContain(0);
   });
 
-  it("skips pnpm's -- separator, which is not a command", async () => {
+  it("skips the -- separator that pnpm passes before the command", async () => {
     const run = await opsBeforeTheJournal(served(), [
       "--",
       "replay-erasures",
@@ -130,9 +130,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     expect(run.lines.join("\n")).toContain("replayed 0 erasures");
   });
 
-  describe("the slice-owned commands", () => {
+  describe("commands whose tables a slice owns", () => {
     it.each(["erasure-rehearsal", "object-store-orphans", "import-bundle"])(
-      "%s says `not built`, exit 3, without its slice's tables",
+      "%s exits 3 with `not built` without its tables",
       async (command) => {
         const run = await opsBeforeTheJournal(served(), wellFormed(command));
 
@@ -141,7 +141,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       },
     );
 
-    it("names absent exactly the tables the schema's objects name", async () => {
+    it("names exactly the missing tables of each command's slice", async () => {
       expect([...SLICE_COMMANDS].toSorted()).toEqual(Object.keys(SLICE_TABLES).toSorted());
 
       for (const [command, tables] of Object.entries(SLICE_TABLES)) {
@@ -158,7 +158,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       }
     });
 
-    it("answers in its own name, never another command's", async () => {
+    it("prints no other command's name in its output", async () => {
       const { workspaceId } = await served().provision();
 
       for (const command of SLICE_COMMANDS) {
@@ -171,7 +171,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       }
     });
 
-    describe("on the synthetic fixture's workspace, as the drill leaves it", () => {
+    describe("on the synthetic workspace the restore drill leaves", () => {
       const synthetic = "01M2SYNTHET1CAAAAAAAAAAAAA";
 
       beforeAll(async () => {
@@ -225,7 +225,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
             "erasure-rehearsal: REFUSED — no synthetic subject stands in this workspace — phase one (--seed) has not been run here, or its subject has already been erased",
         },
       ])(
-        "$command, run as the drill does, takes the synthetic id",
+        "$command accepts the synthetic workspace id from the drill",
         async ({ command, flags, exitCode, first }) => {
           const run = await ops(served(), [command, "--workspace", synthetic, ...flags]);
 

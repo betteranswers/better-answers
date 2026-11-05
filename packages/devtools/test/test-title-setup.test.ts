@@ -37,8 +37,8 @@ const WORKSPACES = workspacePackages().filter((workspace) =>
 );
 
 /**
- * `globals`, so a tree outside the repository imports nothing it cannot resolve; `stdout`, or
- * the JSON reporter writes a file the tree takes with it.
+ * `globals` means a tree outside the repository needs no vitest import it cannot resolve.
+ * `stdout` keeps the JSON report out of the throwaway tree.
  */
 const CONFIG = `export default {
   test: {
@@ -110,7 +110,7 @@ const statusesOf = (count: number): Readonly<Record<string, string | undefined>>
   );
 };
 
-describe("the rendered test-title hold", () => {
+describe("the test-title check on rendered titles", () => {
   it("fails each 11-word rendered title under its own name", () => {
     expect(statusesOf(11)).toEqual({ each: "failed", template: "failed", loop: "failed" });
   });
@@ -125,18 +125,18 @@ describe("the rendered test-title hold", () => {
     expect(outcomes.get(ELEVEN)?.message).toContain(`never "should": "${ELEVEN}"`);
   });
 
-  it("fails a short title holding the forbidden word", () => {
+  it("fails a short title containing the forbidden word", () => {
     const outcomes = outcomesIn(vitest(suite(`it("should refuse a name", () => {});\n`)));
 
     expect(outcomes.get("should refuse a name")?.status).toBe("failed");
   });
 
-  it.each(WORKSPACES)("is named in the setup files of %s", async (workspace) => {
+  it.each(WORKSPACES)("is in the setup files of %s", async (workspace) => {
     expect((await testOptionsOf(workspace)).setupFiles).toContain(SPECIFIER);
   });
 });
 
-describe("the workers' apple git", () => {
+describe("the workers' Apple git PATH", () => {
   it.each(WORKSPACES)("sets the worker PATH of %s through pathWithAppleGit", async (workspace) => {
     expect((await testOptionsOf(workspace)).env["PATH"]).toBe(pathWithAppleGit());
   });

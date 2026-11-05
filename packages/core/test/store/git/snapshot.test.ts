@@ -52,7 +52,7 @@ const filesOf = (snapshot: Snapshot | undefined) => {
 const file = (path: string, content: string | Uint8Array) => [path, Buffer.from(content)];
 
 describe("a snapshot of the bundle", () => {
-  it("keeps the manifest and readable files, never a guides/ file", async () => {
+  it("includes the manifest and readable files but no guides/ file", async () => {
     const { door, principal, head } = await bundleHolding(
       new Map([
         [MANIFEST, "owner: Acme\n"],
@@ -70,7 +70,7 @@ describe("a snapshot of the bundle", () => {
     ]);
   });
 
-  it("carries a file's bytes unchanged, whatever they are", async () => {
+  it("copies any file's bytes unchanged", async () => {
     const { door, principal, head } = await bundleHolding(new Map([[OPEN, NOT_UTF8]]));
 
     const snapshot = await bundleSnapshot(principal, door, head, new Set([OPEN]));
@@ -78,7 +78,7 @@ describe("a snapshot of the bundle", () => {
     expect(filesOf(snapshot)).toEqual([file(OPEN, NOT_UTF8)]);
   });
 
-  it("starts no blob read when it keeps no file", async () => {
+  it("reads no blob when no readable file is kept", async () => {
     const { door, principal, head } = await bundleHolding(
       new Map([
         [WITHHELD, "Pay bands.\n"],
@@ -104,7 +104,7 @@ describe("a snapshot of the bundle", () => {
     expect(filesOf(snapshot)).toEqual([file(OPEN, "Thirty days.\n")]);
   });
 
-  it("refuses past its byte cap before reading a file", async () => {
+  it("refuses a snapshot over its byte cap before reading files", async () => {
     const files = new Map([
       [MANIFEST, "owner: Acme\n"],
       [OPEN, "Claim within thirty days.\n"],

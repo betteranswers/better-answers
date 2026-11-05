@@ -20,7 +20,10 @@ const LOCK_PREFIX = "revoke-unproven-account-access:";
 
 const MINUTE_MS = 60_000;
 
-/** The library's reservation id: the lock's primary key, so a row left behind blocks the next. */
+/**
+ * Better Auth's reservation id. It is the lock row's primary key, so a leftover row blocks the
+ * next lock.
+ */
 const reservationIdOf = (identifier: string): string =>
   createHash("sha256").update(`reserve:${identifier}`).digest("base64url");
 
@@ -43,7 +46,10 @@ const lockFor = (personId: string, expiresAt: Date) =>
     }),
   );
 
-/** Left by a sign-in that died, expired a minute ago on the process clock the library judges by. */
+/**
+ * A lock left by a sign-in that failed midway. It expired a minute ago by the process clock, which
+ * Better Auth compares against.
+ */
 const orphanedLockFor = (personId: string) => lockFor(personId, new Date(Date.now() - MINUTE_MS));
 
 const anUnprovenPerson = async () => {
@@ -88,8 +94,8 @@ const linesSince = (before: number, event: string) =>
     .filter((line) => line["event"] === event);
 
 /**
- * Refuses the hook's clear alone, so the library's own clear after it lands. A sequence outlives
- * the refused statement's rollback.
+ * Fails only the first lock delete, the API hook's, so Better Auth's later delete succeeds.
+ * nextval survives the failed statement's rollback.
  */
 const whileTheFirstLockDeleteIsRefused = async <T>(work: () => Promise<T>): Promise<T> => {
   const superuser = app().database.superuser;
@@ -141,13 +147,13 @@ const whileLockDeletesAreRefused = async <T>(work: () => Promise<T>): Promise<T>
   }
 };
 
-const locksHeldFor = (personId: string) =>
+const lockRowsFor = (personId: string) =>
   app().database.superuser.query<{ identifier: string }>(
     "SELECT identifier FROM verification WHERE value = $1",
     [personId],
   );
 
-const askedThenLeftALock = async (person: { readonly id: string; readonly email: string }) => {
+const codeWithAnExpiredLock = async (person: { readonly id: string; readonly email: string }) => {
   const asking = app().client();
   const asked = await asking.json("/email-otp/send-verification-otp", {
     email: person.email,
@@ -161,10 +167,10 @@ const askedThenLeftALock = async (person: { readonly id: string; readonly email:
 const signInByCode = (client: ReturnType<TestApp["client"]>, email: string) =>
   client.json("/sign-in/email-otp", { email, otp: app().codeSentTo(email) });
 
-describe("a sign-in after a promotion left its lock behind", () => {
-  it("by code, still ends earlier access and proves the address", async () => {
+describe("a sign-in with a promotion lock left in place", () => {
+  it("by code removes old sessions and accounts, verifying the email", async () => {
     const person = await anUnprovenPersonWithAccess();
-    const asking = await askedThenLeftALock(person);
+    const asking = await codeWithAnExpiredLock(person);
 
     const signedIn = await signInByCode(asking, person.email);
 
@@ -172,9 +178,9 @@ describe("a sign-in after a promotion left its lock behind", () => {
     expect(await accessOf(person.id)).toEqual({ verified: true, sessions: 1, accounts: 0 });
   });
 
-  it("by link, does the same", async () => {
+  it("by link removes old sessions and accounts, verifying the email", async () => {
     const person = await anUnprovenPersonWithAccess();
-    const asking = await askedThenLeftALock(person);
+    const asking = await codeWithAnExpiredLock(person);
 
     const signedIn = await asking.json("/sign-in-link/sign-in", {
       token: app().linkSentTo(person.email),
@@ -184,9 +190,9 @@ describe("a sign-in after a promotion left its lock behind", () => {
     expect(await accessOf(person.id)).toEqual({ verified: true, sessions: 1, accounts: 0 });
   });
 
-  it("still signs in when the clear is refused, logging it", async () => {
+  it("signs in, logging a warning, when deleting the lock fails", async () => {
     const person = await anUnprovenPersonWithAccess();
-    const asking = await askedThenLeftALock(person);
+    const asking = await codeWithAnExpiredLock(person);
     const before = app().logs.length;
 
     const signedIn = await whileTheFirstLockDeleteIsRefused(() =>
@@ -204,10 +210,10 @@ describe("a sign-in after a promotion left its lock behind", () => {
     expect(await accessOf(person.id)).toEqual({ verified: false, sessions: 2, accounts: 1 });
   });
 
-  it("clears a lock the library itself left behind", async () => {
+  it("clears an expired lock left by Better Auth's own sign-in", async () => {
     const person = await anUnprovenPerson();
     await whileLockDeletesAreRefused(() => signIn(app(), app().client(), person.email));
-    expect((await locksHeldFor(person.id)).rows).toEqual([
+    expect((await lockRowsFor(person.id)).rows).toEqual([
       { identifier: `${LOCK_PREFIX}${person.id}` },
     ]);
     await app().setEmailVerified(person.email, false);
@@ -222,7 +228,7 @@ describe("a sign-in after a promotion left its lock behind", () => {
     expect(await accessOf(person.id)).toEqual({ verified: true, sessions: 1, accounts: 0 });
   });
 
-  it("leaves a live lock for the library to wait on", async () => {
+  it("keeps an unexpired lock, so old sessions and accounts remain", async () => {
     const person = await anUnprovenPersonWithAccess();
     const asking = app().client();
     const asked = await asking.json("/email-otp/send-verification-otp", {
@@ -239,7 +245,7 @@ describe("a sign-in after a promotion left its lock behind", () => {
     expect(await accessOf(person.id)).toEqual({ verified: false, sessions: 2, accounts: 1 });
   });
 
-  it("leaves the lock when only a code is asked for", async () => {
+  it("leaves the lock when only a code is requested", async () => {
     const person = await anUnprovenPerson();
     await orphanedLockFor(person.id);
 
@@ -252,7 +258,7 @@ describe("a sign-in after a promotion left its lock behind", () => {
     expect(await rowsNamed(`${LOCK_PREFIX}${person.id}`)).toBe(1);
   });
 
-  it("with no address, meets the library's own refusal", async () => {
+  it("answers 400 when the request has no email", async () => {
     const refused = await app().client().json("/sign-in/email-otp", { otp: "123456" });
 
     expect(refused.status).toBe(400);
@@ -262,7 +268,7 @@ describe("a sign-in after a promotion left its lock behind", () => {
 describe("dropping an expired promotion lock", () => {
   const door = () => app().doors.postgres;
 
-  it("takes a lock that expires at the moment given", async () => {
+  it("drops a lock that expires at exactly the given time", async () => {
     const person = await anUnprovenPerson();
     const now = new Date();
     await lockFor(person.id, now);
@@ -299,7 +305,7 @@ describe("dropping an expired promotion lock", () => {
     expect(await rowsNamed(`${LOCK_PREFIX}${other.id}`)).toBe(1);
   });
 
-  it("finds the person by an address given in another case", async () => {
+  it("finds the person when the email's letter case differs", async () => {
     const person = await anUnprovenPerson();
     await orphanedLockFor(person.id);
 
@@ -308,7 +314,7 @@ describe("dropping an expired promotion lock", () => {
     );
   });
 
-  it("leaves the person's other expired rows", async () => {
+  it("leaves the person's other expired verification rows", async () => {
     const person = await anUnprovenPerson();
     await orphanedLockFor(person.id);
     const code = `sign-in-otp-${person.email}`;
@@ -321,18 +327,18 @@ describe("dropping an expired promotion lock", () => {
   });
 });
 
-describe("the library this clears behind", () => {
+describe("the Better Auth internals the lock cleanup depends on", () => {
   const distFile = (name: string) =>
     readFileSync(new URL(name, import.meta.resolve("better-auth")), "utf8");
 
-  it("still names its lock the api's prefix and an id", () => {
+  it("names its lock with the API's prefix and user id", () => {
     expect(PROMOTION_LOCK_PREFIX).toBe(LOCK_PREFIX);
     expect(distFile("db/revoke-unproven-account-access.mjs")).toContain(
       `\`${PROMOTION_LOCK_PREFIX}\${userId}\``,
     );
   });
 
-  it("still keys a reservation on its identifier", () => {
+  it("still derives the reservation id from the identifier", () => {
     expect(distFile("db/internal-adapter.mjs")).toContain('"reserve:" + data.identifier');
   });
 });

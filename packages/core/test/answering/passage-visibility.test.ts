@@ -84,7 +84,8 @@ type Landing = {
   readonly text: string;
 };
 
-const wireOf = (documentId: string, text: string): string => `${documentId}/chars:0-${text.length}`;
+const locatorOf = (documentId: string, text: string): string =>
+  `${documentId}/chars:0-${text.length}`;
 
 const landed = (workspaceId: string, where: Landing): Promise<void> =>
   seededBy(db(), async (seed) => {
@@ -93,14 +94,14 @@ const landed = (workspaceId: string, where: Landing): Promise<void> =>
       connectedSourceId: where.connectedSourceId,
       sourceDocumentId: where.documentId,
       content: where.text,
-      locator: wireOf(where.documentId, where.text),
+      locator: locatorOf(where.documentId, where.text),
       ordinal: 0,
       charStart: 0,
       charEnd: where.text.length,
     });
   });
 
-const landedBeside = (
+const secondPassageRowLanded = (
   workspaceId: string,
   first: Landing,
   connectedSourceId: string,
@@ -136,7 +137,7 @@ const aFinishedSync = (workspaceId: string, connectedSourceId: string): Promise<
     });
   });
 
-const theConnectedSourceRowNowSays = async (
+const setConnectedSourceRow = async (
   workspaceId: string,
   connectedSourceId: string,
   said: Partial<Visibility>,
@@ -157,7 +158,7 @@ const theConnectedSourceRowNowSays = async (
   );
 };
 
-const theDocumentRowNowSays = async (
+const setDocumentSensitivity = async (
   workspaceId: string,
   documentId: string,
   sensitivity: Sensitivity | null,
@@ -212,7 +213,7 @@ const rowsFound = async (person: UserPrincipal, documentId: string): Promise<num
   (await sourceMatches(person)).filter((locator) => locator.startsWith(`${documentId}/`)).length;
 
 const reaches = async (person: UserPrincipal, where: Landing): Promise<Reach> => {
-  const wire = wireOf(where.documentId, where.text);
+  const wire = locatorOf(where.documentId, where.text);
   const found = (await sourceMatches(person)).includes(wire);
   const opened = answered(
     await reading(person, async (reader, tx) => {
@@ -306,8 +307,8 @@ const publishingTheConnectedSource = (scenario: Scenario, connectedSourceId: str
     }),
   );
 
-describe("a reader's answer as the Admin's actions move source rows", () => {
-  it("withholds a source's passages when narrowed, restoring them once widened", async () => {
+describe("what a Viewer can reach as an Admin changes sources", () => {
+  it("withholds a narrowed source's passages and restores them when widened", async () => {
     const scenario = await arrange();
     const where = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -319,7 +320,7 @@ describe("a reader's answer as the Admin's actions move source rows", () => {
     const before = await reaches(scenario.viewer, where);
     answered(await narrowingTheConnectedSource(scenario, connectedSourceId, "Restricted"));
     const after = await reaches(scenario.viewer, where);
-    await theConnectedSourceRowNowSays(scenario.workspaceId, connectedSourceId, {
+    await setConnectedSourceRow(scenario.workspaceId, connectedSourceId, {
       sensitivity: "Internal",
     });
     const widened = await reaches(scenario.viewer, where);
@@ -331,7 +332,7 @@ describe("a reader's answer as the Admin's actions move source rows", () => {
     });
   });
 
-  it("withholds a narrowed document's passages, sparing its sibling, both ways", async () => {
+  it("withholds only a narrowed document's passages, then restores them", async () => {
     const scenario = await arrange();
     const theOne = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -342,14 +343,19 @@ describe("a reader's answer as the Admin's actions move source rows", () => {
       text: ANNEX,
     });
     await landed(scenario.workspaceId, theOne);
-    await landedBeside(scenario.workspaceId, theOne, theOne.connectedSourceId, SECOND_ROW);
+    await secondPassageRowLanded(
+      scenario.workspaceId,
+      theOne,
+      theOne.connectedSourceId,
+      SECOND_ROW,
+    );
     await landed(scenario.workspaceId, theOther);
 
     const before = await rowsFound(scenario.viewer, theOne.documentId);
     answered(await narrowingTheDocument(scenario, theOne.connectedSourceId, theOne.documentId));
     const after = await rowsFound(scenario.viewer, theOne.documentId);
     const siblingAfter = await reaches(scenario.viewer, theOther);
-    await theDocumentRowNowSays(scenario.workspaceId, theOne.documentId, null);
+    await setDocumentSensitivity(scenario.workspaceId, theOne.documentId, null);
     const widened = await rowsFound(scenario.viewer, theOne.documentId);
 
     expect({
@@ -367,7 +373,7 @@ describe("a reader's answer as the Admin's actions move source rows", () => {
     });
   });
 
-  it("reveals a source's passages when published, withholding them once unpublished", async () => {
+  it("shows a published source's passages and withholds them when unpublished", async () => {
     const scenario = await arrange();
     const where = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The board's minutes",
@@ -381,7 +387,7 @@ describe("a reader's answer as the Admin's actions move source rows", () => {
     const before = await reaches(scenario.viewer, where);
     answered(await publishingTheConnectedSource(scenario, connectedSourceId));
     const after = await reaches(scenario.viewer, where);
-    await theConnectedSourceRowNowSays(scenario.workspaceId, connectedSourceId, {
+    await setConnectedSourceRow(scenario.workspaceId, connectedSourceId, {
       publishedAt: null,
     });
     const unpublished = await reaches(scenario.viewer, where);
@@ -409,7 +415,7 @@ const jobsOf = async (workspaceId: string): Promise<readonly JobRow[]> =>
     )
   ).rows;
 
-describe("a narrowing queues no sync", () => {
+describe("narrowing a source or document", () => {
   it("adds no job when an Admin narrows sources or documents", async () => {
     const scenario = await arrange();
     const theConnectedSource = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
@@ -476,8 +482,8 @@ const aNarrowingHeldUncommitted = async (
   };
 };
 
-describe("the race with a narrowing in flight", () => {
-  it("reads rows landed under an open narrowing until it commits", async () => {
+describe("rows that land while a narrowing is uncommitted", () => {
+  it("shows rows landed during an uncommitted narrowing until it commits", async () => {
     const scenario = await arrange();
     const where = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -498,7 +504,7 @@ describe("the race with a narrowing in flight", () => {
     });
   });
 
-  it("withholds rows landed during a narrowing as those landed before", async () => {
+  it("withholds rows landed before and during a narrowing", async () => {
     const scenario = await arrange();
     const theOld = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -521,8 +527,8 @@ describe("the race with a narrowing in flight", () => {
   });
 });
 
-describe("a passage whose rows do not all name one source", () => {
-  it("is opened at the narrower source, withheld whole from Viewers", async () => {
+describe("a passage whose rows belong to two sources", () => {
+  it("takes the narrower sensitivity and is withheld whole from Viewers", async () => {
     const scenario = await arrange();
     const wide = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -530,7 +536,7 @@ describe("a passage whose rows do not all name one source", () => {
     });
     const narrow = await aConnectedSource(scenario.workspaceId, { sensitivity: "Restricted" });
     await landed(scenario.workspaceId, wide);
-    await landedBeside(scenario.workspaceId, wide, narrow, TRAILING);
+    await secondPassageRowLanded(scenario.workspaceId, wide, narrow, TRAILING);
     const wire = `${wide.documentId}/chars:0-${LEADING.length + TRAILING.length}`;
 
     expect({
@@ -549,7 +555,7 @@ describe("a passage whose rows do not all name one source", () => {
 });
 
 describe("a passage whose connected source row is absent", () => {
-  it("is read and listed by nobody, unlike a live neighbour", async () => {
+  it("is hidden from every search and preview, unlike its neighbour", async () => {
     const scenario = await arrange();
     const absent = ulid();
     const neighbour = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
@@ -573,7 +579,7 @@ describe("a passage whose connected source row is absent", () => {
       neighbourReach: await reaches(scenario.viewer, neighbour),
     }).toEqual({
       orphanedPreview: [],
-      neighbourPreview: [wireOf(neighbour.documentId, neighbour.text)],
+      neighbourPreview: [locatorOf(neighbour.documentId, neighbour.text)],
       orphanedReach: WITHHELD,
       neighbourReach: REACHED,
     });

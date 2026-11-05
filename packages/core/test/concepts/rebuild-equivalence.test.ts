@@ -230,7 +230,7 @@ const buildTheMap = async (scenario: Scenario) => {
 
 const EQUIVALENCE_ALLOWANCE_MS = 120_000;
 
-describe("the worker's rebuild against the api's own map", () => {
+describe("the worker's rebuild compared with the api's map", () => {
   it(
     "reproduces the live generation exactly from the bundle and records",
     async () => {
@@ -238,7 +238,7 @@ describe("the worker's rebuild against the api's own map", () => {
       const { linker, group, neverPath } = await buildTheMap(scenario);
 
       const live = await liveGenerationOf(scenario.workspaceId);
-      expect(live, "the api's actions wrote a live generation").toBe(1);
+      expect(live, "the live generation after the api's actions is not 1").toBe(1);
       const liveNodes = await nodesAt(scenario.workspaceId, 1);
       const liveEdges = await edgesAt(scenario.workspaceId, 1);
       const liveUnresolved = await unresolvedAt(scenario.workspaceId, 1);
@@ -251,7 +251,7 @@ describe("the worker's rebuild against the api's own map", () => {
         kind: "full-rebuild",
         reason: "drill",
       });
-      expect(queued.ok, "the rebuild was queued through the runs slice").toBe(true);
+      expect(queued.ok, "the runs slice did not queue the rebuild").toBe(true);
 
       const audit = await enqueueJob(scenario.admin, scenario.postgres, {
         workspaceId: scenario.workspaceId,
@@ -266,7 +266,7 @@ describe("the worker's rebuild against the api's own map", () => {
       expect(await nodesAt(scenario.workspaceId, 2)).toEqual(liveNodes);
       expect(await edgesAt(scenario.workspaceId, 2)).toEqual(liveEdges);
       expect(await unresolvedAt(scenario.workspaceId, 2)).toEqual(liveUnresolved);
-      expect(liveUnresolved, "a source label is evidence, never a path").toEqual([
+      expect(liveUnresolved, "a source label became an unresolved link path").toEqual([
         { from_uid: linker.iri, relation: "link", ordinal: 12, target_path: neverPath },
       ]);
 
@@ -293,7 +293,7 @@ describe("the worker's rebuild against the api's own map", () => {
     EQUIVALENCE_ALLOWANCE_MS,
   );
 
-  it("finds no parser mismatch over the bundle those actions wrote", async () => {
+  it("finds no parser mismatch in the bundle the actions wrote", async () => {
     const scenario = await arrange();
     await buildTheMap(scenario);
 

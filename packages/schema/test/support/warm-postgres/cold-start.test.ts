@@ -5,7 +5,7 @@ import { run, warmPostgresModule } from "./child.ts";
 import { DURABILITY_OFF } from "./server.ts";
 
 describe("the warm harness", () => {
-  it("starts a database of its own without a warm cluster", async () => {
+  it("starts its own database when no warm cluster exists", async () => {
     const script = [
       `import { openMigratedPostgres } from ${JSON.stringify(warmPostgresModule)};`,
       "const db = await openMigratedPostgres();",

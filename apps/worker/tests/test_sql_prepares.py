@@ -16,7 +16,7 @@ from support.roots import WORKER_ROOT
 
 WORKER_PACKAGE = WORKER_ROOT / "src" / "better_answers_worker"
 
-# The psycopg and asyncpg methods whose first argument is a statement.
+# The psycopg and asyncpg methods whose first argument is an SQL statement.
 SENDS = frozenset(
     (
         "execute",
@@ -43,7 +43,7 @@ PLACEHOLDER = re.compile(r"%\((\w+)\)s|%s|%%")
 
 UNPREPARABLE: Mapping[str, str] = {}
 
-# cocoindex writes these from the worker's own table and column names.
+# cocoindex builds the SQL for these tables from their table and column names.
 TARGET_TABLES: Mapping[str, Table] = {"pipeline.rows:PASSAGE_TABLE": PASSAGE_TABLE}
 
 SENDING_MODULES = {
@@ -266,7 +266,7 @@ def _is_called(module: Module, node: ast.Attribute) -> bool:
     return isinstance(parent, ast.Call) and parent.func is node
 
 
-def _aliases_in(module: Module) -> list[str]:
+def _uncalled_sends_in(module: Module) -> list[str]:
     return [
         f"{_site(module, node)}: `{node.attr}` is taken without a call,"
         " so its statement cannot be read"
@@ -277,7 +277,7 @@ def _aliases_in(module: Module) -> list[str]:
     ]
 
 
-def _orphans_in(module: Module, seen: set[ast.AST]) -> list[str]:
+def _unsent_statements_in(module: Module, seen: set[ast.AST]) -> list[str]:
     return [
         f"{_site(module, node)}: a statement no send reaches"
         for node in ast.walk(module.tree)
@@ -345,7 +345,7 @@ def _check_tables(found: Survey, built: list[str], tables: Mapping[str, Table]) 
             found.problems.append(f"TARGET_TABLES names {key}, which nothing builds")
 
 
-def _set_aside_unpreparable(found: Survey, unpreparable: Mapping[str, str]) -> None:
+def _split_off_unpreparable(found: Survey, unpreparable: Mapping[str, str]) -> None:
     prepared: list[Statement] = []
     refused: list[Statement] = []
     for statement in found.statements:
@@ -376,16 +376,19 @@ def survey(
         for node in ast.walk(module.tree):
             if _is_send(node):
                 _read_send(module, node, found, seen)
-        found.problems += _aliases_in(module)
-        found.problems += _orphans_in(module, seen)
+        found.problems += _uncalled_sends_in(module)
+        found.problems += _unsent_statements_in(module, seen)
         built += _tables_in(module, found)
     _check_tables(found, built, tables)
-    _set_aside_unpreparable(found, unpreparable)
+    _split_off_unpreparable(found, unpreparable)
     return found
 
 
 def numbered(text: str) -> str:
-    """psycopg's placeholders as Postgres numbers them; a named one keeps one number."""
+    """Rewrite psycopg placeholders as numbered Postgres parameters.
+
+    A named placeholder keeps the same number each time it appears.
+    """
     numbers: dict[str, int] = {}
 
     def number_of(match: re.Match[str]) -> str:
@@ -403,8 +406,8 @@ def failures_preparing(
     failures: list[str] = []
     with connection.transaction():
         for number, statement in enumerate(statements):
-            # An error aborts a Postgres transaction, so a savepoint each keeps
-            # the rest preparable.
+            # An error aborts the whole Postgres transaction, so each statement
+            # is prepared in its own savepoint.
             try:
                 with connection.transaction():
                     connection.execute(
@@ -442,18 +445,20 @@ def test_every_statement_the_worker_sends_prepares() -> None:
     assert failures == []
 
 
-A_MODULE_NAMING_WHAT_IS_GONE = """def read(cursor):
+MODULE_WITH_MISSING_TABLE_AND_COLUMN = """def read(cursor):
     cursor.execute("SELECT id FROM no_such_table")
     cursor.execute("SELECT id FROM workspace WHERE id = %s", ("one",))
     cursor.execute("SELECT no_such_column FROM workspace")
 """
 
 
-def test_names_each_statement_naming_a_missing_table_or_column(
+def test_reports_each_statement_that_names_a_missing_table_or_column(
     tmp_path: Path,
 ) -> None:
     planted = survey(
-        plant(tmp_path, A_MODULE_NAMING_WHAT_IS_GONE), tables={}, unpreparable={}
+        plant(tmp_path, MODULE_WITH_MISSING_TABLE_AND_COLUMN),
+        tables={},
+        unpreparable={},
     )
 
     with migrated_postgres() as connection:
@@ -523,7 +528,7 @@ def test_numbers_named_and_positional_placeholders_as_postgres_does() -> None:
         ),
     ],
 )
-def test_refuses_a_statement_it_cannot_read_or_prepare(
+def test_reports_a_statement_it_cannot_read_or_prepare(
     tmp_path: Path, why: str, source: str, problems: list[str]
 ) -> None:
     planted = survey(plant(tmp_path, source), tables={}, unpreparable={})
@@ -531,7 +536,7 @@ def test_refuses_a_statement_it_cannot_read_or_prepare(
     assert planted.problems == problems, why
 
 
-def test_prose_opening_with_select_is_never_taken_for_sql(tmp_path: Path) -> None:
+def test_prose_starting_with_select_is_not_read_as_sql(tmp_path: Path) -> None:
     source = 'HINT = "Select a file"\nNOTE = "Set aside"\nORPHAN = "SELECT 1"\n'
 
     planted = survey(plant(tmp_path, source), tables={}, unpreparable={})
@@ -539,7 +544,7 @@ def test_prose_opening_with_select_is_never_taken_for_sql(tmp_path: Path) -> Non
     assert planted.problems == ["planted:<module> line 3: a statement no send reaches"]
 
 
-def test_sets_aside_an_unpreparable_statement_named_with_its_reason(
+def test_skips_a_statement_listed_in_unpreparable(
     tmp_path: Path,
 ) -> None:
     source = "def tune(cursor):\n    cursor.execute('SET statement_timeout = 0')\n"
@@ -553,7 +558,9 @@ def test_sets_aside_an_unpreparable_statement_named_with_its_reason(
     assert (planted.problems, planted.statements) == ([], [])
 
 
-def test_refuses_an_exclusion_or_table_that_names_nothing(tmp_path: Path) -> None:
+def test_reports_unpreparable_or_target_table_entries_that_match_nothing(
+    tmp_path: Path,
+) -> None:
     planted = survey(
         plant(tmp_path, "VALUE = 1\n"),
         tables={"planted:GONE": PASSAGE_TABLE},

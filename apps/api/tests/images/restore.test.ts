@@ -131,9 +131,9 @@ const rowCounts = async (pool: pg.Pool): Promise<Readonly<Record<string, number>
 
 const GRANTEE = "CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END";
 
-const surfaceSchema = z.array(z.object({ line: z.string() }));
+const rlsAndGrantsSchema = z.array(z.object({ line: z.string() }));
 
-const securitySurface = async (pool: pg.Pool): Promise<readonly string[]> => {
+const rlsAndGrants = async (pool: pg.Pool): Promise<readonly string[]> => {
   const read = await pool.query(
     `WITH relation AS (
        SELECT c.relkind, c.relowner, c.relacl, c.relrowsecurity, c.relforcerowsecurity,
@@ -186,7 +186,7 @@ const securitySurface = async (pool: pg.Pool): Promise<readonly string[]> => {
      ) lines
      ORDER BY line`,
   );
-  return surfaceSchema.parse(read.rows).map((row) => row.line);
+  return rlsAndGrantsSchema.parse(read.rows).map((row) => row.line);
 };
 
 const seedAWorkspace = async (pool: pg.Pool): Promise<void> => {
@@ -268,8 +268,8 @@ beforeAll(async () => {
   recorded = new pg.Pool({ connectionString: uriFor("recorded"), max: 2 });
   for (const pool of [production, fresh, untouched, staging]) await seedAWorkspace(pool);
 
-  // Piped, as the backup pipes it into age: an archive written to a pipe records no offsets, so
-  // restores read it whole.
+  // Pipe the dump as backup.sh pipes it into age. A custom archive written to a pipe has no offsets,
+  // so pg_restore must read it whole.
   mustSucceed(
     inTheContainer(
       'mkdir -p /work && pg_dump --format=custom --no-owner "$DATABASE_URL" | cat > /work/whole.dump',
@@ -285,7 +285,7 @@ afterAll(async () => {
   if (container !== "") docker(["rm", "--force", container]);
 });
 
-describe("the production restore, given a dump it cannot read whole", () => {
+describe("the production restore, given a truncated dump", () => {
   let before: Readonly<Record<string, number>>;
   let replaced: Ran;
 
@@ -299,7 +299,7 @@ describe("the production restore, given a dump it cannot read whole", () => {
     replaced = replacing("untouched");
   });
 
-  it("refuses before dropping anything, so every table keeps its rows", async () => {
+  it("refuses before it drops anything, leaving every row in place", async () => {
     expect(replaced).toMatchObject({ code: 1, said: matching.stringContaining("REFUSED") });
     const after = await rowCounts(untouched);
     expect(after).toEqual(before);
@@ -307,7 +307,7 @@ describe("the production restore, given a dump it cannot read whole", () => {
   });
 });
 
-describe("the production restore, given a whole dump that fails part-way", () => {
+describe("the production restore, given a dump that fails partway through", () => {
   const GONE = "gone_before_the_restore";
   let before: Readonly<Record<string, number>>;
   let replaced: Ran;
@@ -327,7 +327,7 @@ describe("the production restore, given a whole dump that fails part-way", () =>
     replaced = replacing("untouched");
   });
 
-  it("rolls the whole replacement back, keeping every table's rows", async () => {
+  it("rolls back the whole restore and keeps every table's rows", async () => {
     expect(replaced).toMatchObject({
       code: 3,
       said: matching.stringContaining(`role "${GONE}" does not exist`),
@@ -342,7 +342,7 @@ describe("the production restore, given a whole dump that fails part-way", () =>
   });
 });
 
-describe("the production restore, over a database holding schema and rows", () => {
+describe("the production restore over a database with schema and rows", () => {
   let replaced: Ran;
   let counted: Readonly<Record<string, number>>;
   let migratedAfter: Ran;
@@ -364,17 +364,17 @@ describe("the production restore, over a database holding schema and rows", () =
     expect(Object.keys(counted)).not.toContain("public.written_after_the_dump");
   });
 
-  it("leaves a journal `migrate` runs over clean", () => {
+  it("lets `migrate` run cleanly afterwards", () => {
     expect(migratedAfter).toMatchObject({
       code: 0,
       said: matching.stringContaining('"msg":"migrations applied"'),
     });
   });
 
-  it("leaves row-level security and grants as fresh `migrate` makes them", async () => {
-    const restored = await securitySurface(production);
+  it("matches a freshly migrated database's row-level security and grants", async () => {
+    const restored = await rlsAndGrants(production);
 
-    expect(restored).toEqual(await securitySurface(fresh));
+    expect(restored).toEqual(await rlsAndGrants(fresh));
     expect(restored).toContain("public.connected_source: row security true, forced true");
     expect(restored).toContain(
       "schema public, owned by pg_database_owner: USAGE to PUBLIC, granted by pg_database_owner",
@@ -382,7 +382,7 @@ describe("the production restore, over a database holding schema and rows", () =
   });
 });
 
-describe("the drill's restore, over staging left migrated and seeded", () => {
+describe("the drill's restore over a migrated, seeded staging database", () => {
   let drilled: Ran;
   let counted: Readonly<Record<string, number>>;
 
@@ -392,16 +392,16 @@ describe("the drill's restore, over staging left migrated and seeded", () => {
     counted = await rowCounts(staging);
   }, 120_000);
 
-  it("completes with the dump's rows and none of staging's own", () => {
+  it("ends with the dump's rows and none of staging's rows", () => {
     expect(drilled).toEqual({ code: 0, said: "" });
     expect(counted).toEqual(atTheDump);
     expect(counted).toMatchObject({ "public.workspace": 1, "public.oauth_refresh_token": 1 });
   });
 
-  it("leaves row-level security and grants as fresh `migrate` makes them", async () => {
-    const restored = await securitySurface(staging);
+  it("matches a freshly migrated database's row-level security and grants", async () => {
+    const restored = await rlsAndGrants(staging);
 
-    expect(restored).toEqual(await securitySurface(fresh));
+    expect(restored).toEqual(await rlsAndGrants(fresh));
     expect(restored).toContain("public.connected_source: row security true, forced true");
     expect(restored).toContain(
       "schema public, owned by pg_database_owner: USAGE to PUBLIC, granted by pg_database_owner",
@@ -429,8 +429,8 @@ const recordingACopy = (calls: string, database: string): Ran =>
     { DATABASE_URL: database },
   );
 
-describe("backup.sh's record of a copy", () => {
-  it("writes the hourly dump's size, location and expiry after finish", async () => {
+describe("backup.sh recording a copy", () => {
+  it("writes the size, location, and expiry of an hourly dump", async () => {
     const started = "2026-10-21T10:00:00Z";
     mustSucceed(
       recordingACopy(
@@ -454,7 +454,7 @@ describe("backup.sh's record of a copy", () => {
     ]);
   });
 
-  it("writes a failed copy with no location, size or expiry", async () => {
+  it("writes a failed copy without location, size, or expiry", async () => {
     const started = "2026-10-21T11:00:00Z";
     mustSucceed(recordingACopy(`record postgres ${started} failed`, insideUriFor("recorded")));
 
@@ -463,7 +463,7 @@ describe("backup.sh's record of a copy", () => {
     ]);
   });
 
-  it("logs an unwritten row and returns success", () => {
+  it("returns 0 and logs it when the database is unreachable", () => {
     const ran = recordingACopy(
       'record postgres 2026-10-21T09:00:00Z failed; echo "returned $?"',
       NOTHING_LISTENS,
@@ -487,7 +487,7 @@ const recordingADrill = (started: string, prodPsql: string): Ran =>
     { PROD_PSQL: prodPsql },
   );
 
-describe("the drill's record", () => {
+describe("restore-drill.sh recording a drill", () => {
   it("writes one drill row to production through PROD_PSQL", async () => {
     const started = "2026-10-01T03:00:00Z";
     mustSucceed(recordingADrill(started, `psql ${insideUriFor("recorded")}`));
@@ -507,7 +507,7 @@ describe("the drill's record", () => {
     ]);
   });
 
-  it("logs an unwritten row and carries on", () => {
+  it("logs it and carries on when production is unreachable", () => {
     const ran = recordingADrill("2026-10-01T04:00:00Z", `psql ${NOTHING_LISTENS}`);
 
     expect(ran.code).toBe(0);
@@ -541,7 +541,7 @@ const A_RESTORED_STORE = {
   rto_minutes: 40,
 };
 
-describe("the production restore's record", () => {
+describe("restore-production.sh recording a restore", () => {
   it("writes one row per store it restored", async () => {
     const everyStore = "2026-10-21T12:00:00Z";
     const theDatabaseAlone = "2026-10-21T13:00:00Z";
@@ -566,7 +566,7 @@ describe("the production restore's record", () => {
     ]);
   });
 
-  it("logs a statement that, rerun, records the restore once", async () => {
+  it("logs a statement that records the restore once, even rerun", async () => {
     const started = "2026-10-21T14:00:00Z";
     const ran = recordingARestore(started, { objectstore: "yes", git: "yes" }, NOTHING_LISTENS);
     const logged = new RegExp(`^${UNWRITTEN}; once the database answers, run: (.+)$`, "m").exec(
@@ -574,7 +574,7 @@ describe("the production restore's record", () => {
     )?.[1];
 
     expect({ code: ran.code, logged }).toEqual({ code: 0, logged: matching.any(String) });
-    assert(logged !== undefined, "the restore logged the statement to run");
+    assert(logged !== undefined, "the restore logged no statement to run");
     await recorded.query(logged);
     await recorded.query(logged);
     expect((await rowsStartedAt(started)).map((row) => row["store"])).toEqual([

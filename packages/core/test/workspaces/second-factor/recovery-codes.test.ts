@@ -98,7 +98,7 @@ describe("replacing recovery codes", () => {
     );
   });
 
-  it("answers the one instant its ten rows were made", async () => {
+  it("returns the single creation time of its ten rows", async () => {
     const personId = await seedPerson(db().pool);
 
     const { madeAt } = await issuedTo(personId);
@@ -121,7 +121,7 @@ describe("replacing recovery codes", () => {
     expect(await acknowledged(personId)).toBe(false);
   });
 
-  it("refuses a first set while one is held, writing nothing", async () => {
+  it("refuses a first set when codes already exist, writing nothing", async () => {
     const personId = await seedPerson(db().pool);
     const held = await codesFor(personId);
 
@@ -138,7 +138,7 @@ describe("replacing recovery codes", () => {
     expect(await spending(personId, firstOf(held))).toEqual(NINE_LEFT);
   });
 
-  it("refuses a person nobody holds", async () => {
+  it("refuses an unknown person", async () => {
     const replaced = await replaceRecoveryCodes(bootstrap, door(), {
       personId: "01J00000000000000000000000",
       replacing: false,
@@ -148,7 +148,7 @@ describe("replacing recovery codes", () => {
     expect(replaced).toEqual({ ok: false, error: "person-gone" });
   });
 
-  it("makes none for a person the operator restored", async () => {
+  it("makes no codes for a person the operator restored", async () => {
     const personId = await seedPerson(db().pool, { restoreRequiredAt: MADE_EARLIER });
 
     const made = await replaceRecoveryCodes(bootstrap, door(), {
@@ -195,7 +195,7 @@ describe("each recovery-code action", () => {
     expect(await asked()).toEqual({ ok: false, error: "malformed" });
   });
 
-  it("answers the store's failure when replacing", async () => {
+  it("returns the store's error when replacing", async () => {
     const personId = await seedPerson(db().pool);
 
     const answered = await whileWritesAreRefused(db().pool, "recovery_code", () =>
@@ -205,7 +205,7 @@ describe("each recovery-code action", () => {
     expect(answered).toEqual({ ok: false, error: matching.any(Error) });
   });
 
-  it("answers the store's failure when spending", async () => {
+  it("returns the store's error when spending", async () => {
     const personId = await seedPerson(db().pool);
     const code = firstOf(await codesFor(personId));
 
@@ -216,7 +216,7 @@ describe("each recovery-code action", () => {
     expect(answered).toEqual({ ok: false, error: matching.any(Error) });
   });
 
-  it("answers the store's failure when acknowledging", async () => {
+  it("returns the store's error when acknowledging", async () => {
     const personId = await seedPerson(db().pool);
     const { madeAt } = await issuedTo(personId);
 
@@ -229,7 +229,7 @@ describe("each recovery-code action", () => {
 });
 
 describe("spending a recovery code", () => {
-  it("works once, leaving nine", async () => {
+  it("works once and leaves nine codes", async () => {
     const personId = await seedPerson(db().pool);
     const code = firstOf(await codesFor(personId));
 
@@ -292,7 +292,7 @@ describe("spending a recovery code", () => {
 });
 
 describe("acknowledging recovery codes", () => {
-  it("refuses a person nobody holds", async () => {
+  it("refuses an unknown person", async () => {
     const answered = await acknowledgeRecoveryCodes(bootstrap, door(), {
       personId: "01J00000000000000000000000",
       madeAt: "2026-10-02T12:00:00.000Z",
@@ -311,7 +311,7 @@ describe("acknowledging recovery codes", () => {
     expect(await acknowledged(personId)).toBe(true);
   });
 
-  it("refuses a set since replaced, marking nothing", async () => {
+  it("refuses a replaced set, marking nothing", async () => {
     const personId = await seedPerson(db().pool);
     await issuedTo(personId, false, MADE_EARLIER);
     await issuedTo(personId, true, MADE_AT);
@@ -325,7 +325,7 @@ describe("acknowledging recovery codes", () => {
     expect(await acknowledged(personId)).toBe(false);
   });
 
-  it("refuses a malformed instant, marking nothing", async () => {
+  it("refuses a malformed time, marking nothing", async () => {
     const personId = await seedPerson(db().pool);
     await codesFor(personId);
 

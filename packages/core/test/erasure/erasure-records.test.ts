@@ -69,7 +69,7 @@ describe("a sensitivity override the person set", () => {
       )
     ).rows;
 
-  it("names the pseudonym as who set it, not the person", async () => {
+  it("records the pseudonym as the override's actor", async () => {
     const { scenario, email, person, actor } = await aMemberToErase();
     const theirs = await seedingWith(db().pool, (seed) =>
       seed.conceptSensitivityOverride({ workspaceId: scenario.workspaceId, actor }),
@@ -103,7 +103,7 @@ describe("a finding the person reviewed or restored", () => {
       )
     ).rows[0];
 
-  it("names the pseudonym and clears the reasons the person typed", async () => {
+  it("replaces the person with the pseudonym and clears their reasons", async () => {
     const { scenario, email, person, actor } = await aMemberToErase();
     const at = new Date("2026-05-01T09:00:00.000Z");
     const restored = await seedingWith(db().pool, (seed) =>
@@ -174,7 +174,7 @@ describe("a suggestion the person proposed or decided", () => {
     reason,
   });
 
-  it("names the pseudonym and replaces only the person's reasons", async () => {
+  it("swaps in the pseudonym and replaces only the person's reasons", async () => {
     const { scenario, email, person, actor } = await aMemberToErase();
     const another = actorIdOfPerson(scenario.admin.userId);
     const workspaceId = scenario.workspaceId;
@@ -234,7 +234,7 @@ describe("a write request that names the person", () => {
       )
     ).rows[0];
 
-  it("names the pseudonym wherever the request named the person", async () => {
+  it("replaces every mention of the person with the pseudonym", async () => {
     const { scenario, email, person, actor } = await aMemberToErase();
     const workspaceId = scenario.workspaceId;
     const shouted = `human:${email.toUpperCase()}`;
@@ -341,7 +341,7 @@ describe("an edit the person proposed", () => {
       )
     ).rows;
 
-  it("rewrites the proposer's author line once their edit was accepted", async () => {
+  it("rewrites the author line of the proposer's accepted edit", async () => {
     const scenario = await arrange();
     const { author, email } = await theProposer(scenario);
     await accepted(scenario, await proposed(scenario, scenario.editor));
@@ -358,7 +358,7 @@ describe("an edit the person proposed", () => {
     ]);
   });
 
-  it("writes no trace of the person when accepted after erasure", async () => {
+  it("leaves no trace of the person when accepted after erasure", async () => {
     const scenario = await arrange();
     const { email } = await theProposer(scenario);
     const actor = actorIdOfPerson(scenario.editor.userId);

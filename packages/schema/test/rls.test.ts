@@ -145,8 +145,8 @@ const rlsFlags = async (qualified: string) => {
   return flags.rows[0];
 };
 
-describe("the seam function", () => {
-  it("returns NULL on no scope and on an empty one", async () => {
+describe("current_workspace_id, the seam function", () => {
+  it("returns NULL when the scope is unset or empty", async () => {
     await withRollback(db.pool, async (client) => {
       const unset = await client.query<{ ws: string | null }>(
         "SELECT current_workspace_id() AS ws",
@@ -171,7 +171,7 @@ describe("the seam function", () => {
 });
 
 describe("the exemption list", () => {
-  it("names the two source arrays' tables, each with a reason", () => {
+  it("names the tables in EXEMPT_TABLE_NAMES, each with a reason", () => {
     expect(Object.keys(RLS_EXEMPTIONS).toSorted()).toEqual([...EXEMPT_TABLE_NAMES].toSorted());
     for (const [table, reason] of Object.entries(RLS_EXEMPTIONS)) {
       expect({ table, reasoned: reason.trim().length > 0 }).toEqual({ table, reasoned: true });
@@ -179,8 +179,8 @@ describe("the exemption list", () => {
   });
 });
 
-describe("every tenant table, a partitioned one by its declared parent", () => {
-  it("carries RLS and FORCE ROW LEVEL SECURITY in the catalogue", async () => {
+describe("every tenant table, with partitioned tables checked at the parent", () => {
+  it("has RLS enabled and forced in the catalogue", async () => {
     for (const qualified of tenantTableNames()) {
       expect({ table: qualified, ...(await rlsFlags(qualified)) }).toEqual({
         table: qualified,
@@ -190,7 +190,7 @@ describe("every tenant table, a partitioned one by its declared parent", () => {
     }
   });
 
-  it("carries exactly one policy — the workspace-isolation one", async () => {
+  it("has exactly one policy, the workspace-isolation one", async () => {
     for (const qualified of tenantTableNames()) {
       const [schema, table] = qualified.split(".");
       const policies = await db.pool.query(
@@ -234,7 +234,7 @@ describe("the identity set", () => {
     expect(unpolicied.toSorted()).toEqual([...EXEMPT].toSorted());
   });
 
-  it("carries a workspace column only where its exemption says why", async () => {
+  it("has a workspace column only where its exemption explains why", async () => {
     const carrying = new Set(
       Object.entries(RLS_EXEMPTIONS)
         .filter(([, reason]) => reason.startsWith("Carries workspace_id on purpose"))
@@ -284,10 +284,10 @@ describe("the identity set", () => {
       await refusesEach(client, [
         [
           `DELETE FROM "user" WHERE id = $1`,
-          "erasure keeps the row and its id for the audit events naming it",
+          "app_rt deleting a person, whose row and id erasure keeps for the audit events that name them",
           [person.id],
         ],
-        [`TRUNCATE "user"`, "nor may it empty the table of every person"],
+        [`TRUNCATE "user"`, "app_rt truncating the user table"],
       ]);
     });
   });
@@ -303,7 +303,7 @@ describe("the identity set", () => {
     ]);
   });
 
-  it("refuses the worker role on every identity-set table and counter", async () => {
+  it("refuses the worker every identity-set table and counter", async () => {
     const refused = [
       ...IDENTITY_SET.filter((name) => name !== "public.workspace"),
       "public.ingress_counter",
@@ -325,7 +325,7 @@ describe("the identity set", () => {
     });
   });
 
-  it("lets the worker only read workspace, and never reach config", async () => {
+  it("lets the worker read workspace only, never workspace config", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.workspaceConfig({ workspaceId: WS_A });
@@ -348,12 +348,12 @@ describe("the identity set", () => {
 });
 
 describe("the role CHECK on the identity set", () => {
-  it("holds member_role_check to exactly the boundary's three words", async () => {
+  it("limits member_role_check to exactly the boundary's three roles", async () => {
     const constraint = await db.pool.query<{ definition: string }>(
       "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'member_role_check'",
     );
     const definition = constraint.rows[0]?.definition;
-    assert(definition !== undefined, "member_role_check exists");
+    assert(definition !== undefined, "member_role_check is missing");
     const inCheck = [...definition.matchAll(/'([A-Za-z]+)'/g)].map((match) => match[1]);
     expect(inCheck.toSorted()).toEqual([...ROLES].toSorted());
     const role = boundarySchemas.member.select.shape.role;
@@ -390,7 +390,7 @@ const auditEventRowAsApp = async (client: pg.PoolClient) => {
 };
 
 describe("the audit log under app_rt", () => {
-  it("returns none unscoped and only the scoped tenant's rows", async () => {
+  it("returns nothing unscoped, and only the scoped tenant's rows", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const inA = await seed.auditEvent({ workspaceId: WS_A });
@@ -468,7 +468,7 @@ describe("the audit log under app_rt", () => {
     });
   });
 
-  it("refuses the worker the audit log, reading and writing alike", async () => {
+  it("refuses the worker reads and writes on the audit log", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.auditEvent({ workspaceId: WS_A });
@@ -492,7 +492,7 @@ describe("the audit log under app_rt", () => {
     });
   });
 
-  it("refuses an action outside the four families or family.subject.verb", async () => {
+  it("refuses an action outside the four families or family.subject.verb shape", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       for (const action of ["billing.invoice.sent", "people.member", "People.Member.Added"]) {
@@ -511,12 +511,12 @@ describe("the audit log under app_rt", () => {
     });
   });
 
-  it("holds the family CHECK to exactly the boundary's four words", async () => {
+  it("limits the family CHECK to exactly the boundary's four families", async () => {
     const constraint = await db.pool.query<{ definition: string }>(
       "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'audit_event_family_check'",
     );
     const definition = constraint.rows[0]?.definition;
-    assert(definition !== undefined, "audit_event_family_check exists");
+    assert(definition !== undefined, "audit_event_family_check is missing");
     const inCheck = [...definition.matchAll(/'([a-z]+)'/g)].map((match) => match[1]);
     expect(inCheck.toSorted()).toEqual([...FAMILIES].toSorted());
 
@@ -529,7 +529,7 @@ describe("the audit log under app_rt", () => {
 describe("the identity-set audit log", () => {
   const PERSON_NAMED = "people.person.named";
 
-  it("lets the api record and read unscoped actions, nothing more", async () => {
+  it("lets the api role record and read unscoped actions only", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query("SET LOCAL ROLE app_rt");
       const id = ulid();
@@ -546,21 +546,21 @@ describe("the identity-set audit log", () => {
       await refusesEach(client, [
         [
           "UPDATE identity_audit_event SET actor = 'process:better-answers-test'",
-          "a row the api could rewrite could book a person's action to someone else",
+          "app_rt updating an identity audit event, which could assign a person's action to someone else",
         ],
         [
           `${AN_IDENTITY_SET_AUDIT_EVENT_ROW} ${THE_DETAIL_EDITED}`,
-          "and an upsert is a rewrite by another road",
+          "app_rt upserting an identity audit event, which rewrites it as an UPDATE would",
           [id, PERSON_NAMED, `human:${personId}`, personId],
         ],
         [
           "DELETE FROM identity_audit_event",
-          "and one it could remove could make an action look as if it never happened",
+          "app_rt deleting an identity audit event, which could hide that an action happened",
         ],
-        ["TRUNCATE identity_audit_event", "nor empty the whole record at once"],
+        ["TRUNCATE identity_audit_event", "app_rt truncating the identity audit log"],
         [
           AN_IDENTITY_SET_AUDIT_EVENT_ROW_WITH_ITS_FAMILY,
-          "nor write the family the action already names",
+          "app_rt writing the family column, which the action already determines",
           [ulid(), PERSON_NAMED, "platform", `human:${personId}`, personId],
           /generated|non-DEFAULT/,
         ],
@@ -568,7 +568,7 @@ describe("the identity-set audit log", () => {
     });
   });
 
-  it("refuses the worker reading or recording a person's action", async () => {
+  it("refuses the worker reads and writes of a person's actions", async () => {
     await withRollback(db.pool, async (client) => {
       const personId = ulid();
       await client.query(AN_IDENTITY_SET_AUDIT_EVENT_ROW, [
@@ -583,19 +583,25 @@ describe("the identity-set audit log", () => {
       await client.query("SET LOCAL ROLE worker_rt");
 
       await refusesEach(client, [
-        ["SELECT id FROM identity_audit_event", "the worker touches no person's identity"],
+        [
+          "SELECT id FROM identity_audit_event",
+          "the worker reading the identity audit log, which holds people's identities",
+        ],
         [
           AN_IDENTITY_SET_AUDIT_EVENT_ROW,
-          "so it has no action of one to record",
+          "the worker recording an identity action, which it never performs",
           [ulid(), PERSON_NAMED, "process:better-answers-worker", personId],
         ],
-        ["UPDATE identity_audit_event SET detail = '{}'", "or rewrite"],
-        ["DELETE FROM identity_audit_event", "or remove"],
+        [
+          "UPDATE identity_audit_event SET detail = '{}'",
+          "the worker updating an identity audit event",
+        ],
+        ["DELETE FROM identity_audit_event", "the worker deleting an identity audit event"],
       ]);
     });
   });
 
-  it("takes only actions of the four families in family.subject.verb shape", async () => {
+  it("accepts only family.subject.verb actions in the four families", async () => {
     await withRollback(db.pool, async (client) => {
       const personId = ulid();
       const landed = await client.query(AN_IDENTITY_SET_AUDIT_EVENT_ROW, [
@@ -610,7 +616,7 @@ describe("the identity-set audit log", () => {
         client,
         ["billing.person.named", "people.person", "People.Person.Named"].map((action) => [
           AN_IDENTITY_SET_AUDIT_EVENT_ROW,
-          `${action} is no action the audit logs name`,
+          `${action}, which is not a valid audit action`,
           [ulid(), action, "process:better-answers-test", ulid()],
           /identity_audit_event_action_check|identity_audit_event_family_check/,
         ]),
@@ -644,7 +650,7 @@ const groupIdsHeldBy = async (client: pg.PoolClient, userId: string): Promise<st
 };
 
 describe("the group tables under app_rt", () => {
-  it("returns none unscoped and only the scoped tenant's groups", async () => {
+  it("returns nothing unscoped, and only the scoped tenant's groups", async () => {
     await withRollback(db.pool, async (client) => {
       const { hr, sales, theirs } = await groupsAsApp(client);
 
@@ -662,7 +668,7 @@ describe("the group tables under app_rt", () => {
     });
   });
 
-  it("refuses a group or group member reaching into another tenant", async () => {
+  it("refuses a group or member written into another tenant", async () => {
     await withRollback(db.pool, async (client) => {
       const { theirs, person } = await groupsAsApp(client);
 
@@ -684,7 +690,7 @@ describe("the group tables under app_rt", () => {
     });
   });
 
-  it("drops a person from every group once they leave", async () => {
+  it("removes a person from every group when they leave", async () => {
     await withRollback(db.pool, async (client) => {
       const { person, hr, sales } = await groupsAsApp(client);
       expect(await groupIdsHeldBy(client, person.id)).toEqual([hr.id, sales.id].toSorted());
@@ -711,7 +717,7 @@ describe("the group tables under app_rt", () => {
     });
   });
 
-  it("refuses the worker both group tables, reading and writing alike", async () => {
+  it("refuses the worker reads and writes on both group tables", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.group({ workspaceId: WS_A });
@@ -733,8 +739,8 @@ describe("the group tables under app_rt", () => {
   });
 });
 
-describe("last activity under app_rt", () => {
-  it("returns none unscoped and only the scoped tenant's rows", async () => {
+describe("workspace_last_active under app_rt", () => {
+  it("returns nothing unscoped, and only the scoped tenant's rows", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const inA = await seed.workspaceLastActive({ workspaceId: WS_A });
@@ -765,7 +771,7 @@ describe("last activity under app_rt", () => {
 });
 
 describe("the test workspace's mark under app_rt", () => {
-  it("returns none unscoped and only the scoped tenant's mark", async () => {
+  it("returns nothing unscoped, and only the scoped tenant's mark", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.testWorkspaceMark({ workspaceId: WS_A, testingDomain: "a.testing.invalid" });
@@ -783,7 +789,7 @@ describe("the test workspace's mark under app_rt", () => {
     });
   });
 
-  it("changes and writes none of another tenant's mark", async () => {
+  it("neither changes nor inserts another tenant's mark", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.testWorkspaceMark({ workspaceId: WS_A, testingDomain: "a.testing.invalid" });
@@ -804,7 +810,7 @@ describe("the test workspace's mark under app_rt", () => {
     });
   });
 
-  it("lets the api write its own mark, never remove it", async () => {
+  it("lets the api write its own mark, never delete it", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       expect(await privilegesHeld(client, "app_rt", "test_workspace_mark")).toEqual({
@@ -830,9 +836,9 @@ describe("the test workspace's mark under app_rt", () => {
       await refusesEach(client, [
         [
           "DELETE FROM test_workspace_mark",
-          "a mark the api could remove would reopen the workspace's invitations to any address",
+          "app_rt deleting a test workspace mark, which would open its invitations to any address",
         ],
-        ["TRUNCATE test_workspace_mark", "nor may it empty the table of every workspace's mark"],
+        ["TRUNCATE test_workspace_mark", "app_rt truncating every workspace's test mark"],
       ]);
     });
   });
@@ -852,7 +858,7 @@ describe("the test workspace's mark under app_rt", () => {
 });
 
 describe("access requests under app_rt", () => {
-  it("returns none unscoped and only the scoped tenant's rows", async () => {
+  it("returns nothing unscoped, and only the scoped tenant's rows", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const inA = await seed.accessRequest({ workspaceId: WS_A });
@@ -868,7 +874,7 @@ describe("access requests under app_rt", () => {
     });
   });
 
-  it("refuses the worker the access-request queue, reading and writing alike", async () => {
+  it("refuses the worker reads and writes on the access-request queue", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const person = await seed.user();
@@ -909,7 +915,7 @@ describe("access requests under app_rt", () => {
     });
   });
 
-  it("refuses a fourth status and a half-made decision", async () => {
+  it("refuses a fourth status and a partly recorded decision", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const person = await seed.user();
@@ -958,7 +964,7 @@ describe("the concept write path under app_rt", () => {
   const A_PARENT_SHA = "e".repeat(40);
   const A_COMMIT_NOBODY_RECORDED = "f".repeat(40);
 
-  it("returns none unscoped and only the tenant's, on all five", async () => {
+  it("returns nothing unscoped and only the tenant's, in all five", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
 
@@ -983,7 +989,7 @@ describe("the concept write path under app_rt", () => {
     });
   });
 
-  it("refuses the worker four of five, reading and writing alike", async () => {
+  it("refuses the worker all but the concept index", async () => {
     const OUT_OF_REACH = CONCEPT_TABLES.filter((table) => table !== "concept_index");
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
@@ -1006,7 +1012,7 @@ describe("the concept write path under app_rt", () => {
     });
   });
 
-  it("lets the worker only read the concept index in scope", async () => {
+  it("lets the worker only read the concept index, within scope", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.conceptIndex({ workspaceId });
@@ -1023,21 +1029,21 @@ describe("the concept write path under app_rt", () => {
       await refusesEach(client, [
         [
           "UPDATE concept_index SET title = 'renamed'",
-          "the row is derived from a commit the api made, and the worker makes no commits",
+          "the worker updating a concept index row, which only an api commit derives",
         ],
         [
           "UPDATE concept_index SET sensitivity = 'Public'",
-          "the derived visibility is the api's; a worker that could write it would be a second opinion about who may read a concept",
+          "the worker changing a concept's derived visibility, which only the api sets",
         ],
         [
           "DELETE FROM concept_index",
-          "a concept leaves the bundle by an action, never by a reader of it",
+          "the worker deleting a concept index row, which only an api action removes",
         ],
       ]);
     });
   });
 
-  it("refuses a concept or check reaching into another tenant", async () => {
+  it("refuses a concept or check written into another tenant", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const theirs = await seed.conceptIdentity({ workspaceId: WS_B });
@@ -1173,7 +1179,7 @@ describe("the map tables under app_rt", () => {
     "map_unresolved_reference",
   ] as const;
 
-  it("returns none unscoped and only the tenant's, on all four", async () => {
+  it("returns nothing unscoped and only the tenant's, in all four", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) {
@@ -1198,7 +1204,7 @@ describe("the map tables under app_rt", () => {
     });
   });
 
-  it("refuses the worker an update or delete of references", async () => {
+  it("refuses the worker updates and deletes of references", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const citing = await seed.mapNode({ workspaceId: WS_A });
@@ -1223,11 +1229,11 @@ describe("the map tables under app_rt", () => {
       await refusesEach(client, [
         [
           "UPDATE map_unresolved_reference SET target_path = 'knowledge/elsewhere.md'",
-          "a rebuild writes a generation's references and never rewrites one",
+          "the worker updating a generation's references, which a rebuild never rewrites",
         ],
         [
           "DELETE FROM map_unresolved_reference",
-          "sweeping a retired generation's references is the api's, not this",
+          "the worker deleting references, which only the api sweeps from retired generations",
         ],
       ]);
     });
@@ -1266,7 +1272,7 @@ describe("the map tables under app_rt", () => {
         [WS_A],
       );
       const [current] = generation.rows;
-      assert(current !== undefined, "workspace A has a map generation");
+      assert(current !== undefined, "workspace A has no map generation");
       const next = current.live_gen + 1;
       await client.query(A_MAP_NODE_OF_KIND, [WS_A, next, live.uid, "Concept", "Policy"]);
       await client.query(AN_EDGE, [
@@ -1290,23 +1296,29 @@ describe("the map tables under app_rt", () => {
       await refusesEach(client, [
         [
           "UPDATE map_node SET kind = 'Product'",
-          "a rebuild that could edit a node could edit the live generation's",
+          "the worker updating a node, which could change the live generation",
         ],
-        ["DELETE FROM map_node", "sweeping a retired generation is the api's, not this"],
+        [
+          "DELETE FROM map_node",
+          "the worker deleting nodes, which only the api sweeps from retired generations",
+        ],
         [
           "UPDATE map_edge SET section = 'elsewhere'",
-          "the same for an edge, whose section and sentence are a concept's own content",
+          "the worker updating an edge, whose section and sentence are a concept's content",
         ],
-        ["DELETE FROM map_edge", "and the same for the sweep"],
+        [
+          "DELETE FROM map_edge",
+          "the worker deleting edges, which only the api sweeps from retired generations",
+        ],
         [
           "DELETE FROM map_generation",
-          "the row that says which generation is live is flipped, never removed",
+          "the worker deleting the row that names the live generation",
         ],
       ]);
     });
   });
 
-  it("refuses an out-of-turn generation for a flip or a row", async () => {
+  it("refuses an out-of-sequence generation for a flip or a row", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.mapNode({ workspaceId: WS_A });
@@ -1329,31 +1341,31 @@ describe("the map tables under app_rt", () => {
       await refusesEach(client, [
         [
           "UPDATE map_generation SET live_gen = 4 WHERE workspace_id = $1",
-          "a flip past the generation being built exposes a map nobody wrote",
+          "a flip past the generation being built, which would serve an unbuilt map",
           [WS_A],
           /flips only to the next/,
         ],
         [
           "UPDATE map_generation SET live_gen = 1 WHERE workspace_id = $1",
-          "a flip back is a swept generation served as the map",
+          "a flip back to a swept generation, which would serve it as the map",
           [WS_A],
           /flips only to the next/,
         ],
         [
           A_MAP_NODE,
-          "a node into the retired generation, now that 2 is live",
+          "a node in the retired generation, now that generation 2 is live",
           [WS_A, 1, "retired", "Concept"],
           /lands in the live generation or the next/,
         ],
         [
           A_MAP_NODE,
-          "a node into a generation nobody is building",
+          "a node in a generation that nobody is building",
           [WS_A, 4, "far", "Concept"],
           /lands in the live generation or the next/,
         ],
         [
           AN_EDGE,
-          "and an edge the same",
+          "an edge in a generation that nobody is building",
           [WS_A, 4, "e-far", "LINKS_TO", "next", "live"],
           /lands in the live generation or the next/,
         ],
@@ -1370,7 +1382,7 @@ describe("the map tables under app_rt", () => {
     });
   });
 
-  it("refuses a node written into another tenant from this scope", async () => {
+  it("refuses a node written into another tenant", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.mapGeneration({ workspaceId: WS_B });
@@ -1436,7 +1448,7 @@ describe("the map tables under app_rt", () => {
         await client.query("ROLLBACK TO SAVEPOINT map_row");
       }
 
-      assert(node.gen !== null, "the seeded node sits in a generation");
+      assert(node.gen !== null, "the seeded node has no generation");
       await client.query(A_MAP_NODE, [WS_A, node.gen + 1, node.uid, "Concept"]);
     });
   });
@@ -1478,7 +1490,7 @@ const submitSet = (
   );
 
 describe("the suggestions under app_rt", () => {
-  it("returns none unscoped and only the scoped tenant's suggestions", async () => {
+  it("returns nothing unscoped, and only the scoped tenant's suggestions", async () => {
     await withRollback(db.pool, async (client) => {
       const { here } = await suggestionsAsApp(client);
 
@@ -1523,7 +1535,7 @@ describe("the suggestions under app_rt", () => {
     });
   });
 
-  it("withholds a decided suggestion's payload, and another tenant's always", async () => {
+  it("hides a payload once decided, and always hides another tenant's", async () => {
     await withRollback(db.pool, async (client) => {
       const { here, there } = await suggestionsAsApp(client);
 
@@ -1553,7 +1565,7 @@ describe("the suggestions under app_rt", () => {
     });
   });
 
-  it("decides a waiting suggestion once, and refuses undoing it", async () => {
+  it("decides a waiting suggestion once and refuses to undo it", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const decided = await seed.suggestion({ workspaceId: WS_A });
@@ -1607,7 +1619,7 @@ describe("the suggestions under app_rt", () => {
     });
   });
 
-  it("refuses a first decision a transaction never declared", async () => {
+  it("refuses a first decision the transaction did not declare", async () => {
     await withRollback(db.pool, async (client) => {
       const { here } = await suggestionsAsApp(client);
       const decline = (id: string) =>
@@ -1687,7 +1699,7 @@ describe("the suggestions under app_rt", () => {
     });
   });
 
-  it("refuses each half-decided suggestion at its own constraint", async () => {
+  it("refuses each partly decided suggestion at its own constraint", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
@@ -1711,19 +1723,19 @@ describe("the suggestions under app_rt", () => {
         ],
         [
           A_DECIDED_SUGGESTION,
-          "a merge nobody raises",
+          "a merge, a kind that nobody raises",
           decided("merge", "waiting", null, null, null, null),
           /suggestion_kind_check/,
         ],
         [
           A_DECIDED_SUGGESTION,
-          "a decision with nobody behind it",
+          "a decision with no decider",
           decided("edit", "declined", null, decidedAt, "why", null),
           /suggestion_decision_check/,
         ],
         [
           A_DECIDED_SUGGESTION,
-          "a decision with no moment",
+          "a decision with no time",
           decided("edit", "declined", PROPOSER, null, "why", null),
           /suggestion_decision_check/,
         ],
@@ -1759,7 +1771,7 @@ describe("the suggestions under app_rt", () => {
         ],
         [
           A_DECIDED_SUGGESTION,
-          "a decider who is a name",
+          "a decider given as a plain name",
           decided("edit", "declined", "Ada Editor", decidedAt, "why", null),
           /suggestion_decider_check/,
         ],
@@ -1794,7 +1806,7 @@ describe("the suggestions under app_rt", () => {
     });
   });
 
-  it("refuses a body larger than a concept could be", async () => {
+  it("refuses a body larger than a concept allows", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const here = await seed.suggestion({ workspaceId: WS_A });
@@ -1805,7 +1817,7 @@ describe("the suggestions under app_rt", () => {
     });
   });
 
-  it("bounds a frontmatter by the characters its caller wrote", async () => {
+  it("limits frontmatter by the characters its caller wrote", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE worker_rt");
@@ -1954,7 +1966,7 @@ const refusedAt = async (
   await client.query("ROLLBACK TO SAVEPOINT refused");
 };
 
-describe("the erasure of the suggestions", () => {
+describe("erasing a person from the suggestions", () => {
   const twoProposals = async (client: pg.PoolClient) => {
     const seed = await seedTwoWorkspaces(client);
     await seed.erasureRequest({ workspaceId: WS_A, pseudonym: PSEUDONYM });
@@ -2008,7 +2020,7 @@ describe("the erasure of the suggestions", () => {
     return here;
   };
 
-  it("serves the api only, and only in its own workspace", async () => {
+  it("serves only the api, and only in its own workspace", async () => {
     await withRollback(db.pool, async (client) => {
       const { here, there } = await twoProposals(client);
       await asTheApiIn(client, WS_A);
@@ -2051,7 +2063,7 @@ describe("the erasure of the suggestions", () => {
     });
   });
 
-  it("refuses a person named by anything but a person id", async () => {
+  it("refuses a person identified by anything but a person id", async () => {
     await withRollback(db.pool, async (client) => {
       const { here } = await twoProposals(client);
       await asTheApiIn(client, WS_A);
@@ -2083,7 +2095,7 @@ describe("the erasure of the suggestions", () => {
     });
   });
 
-  it("refuses a pseudonym no erasure in the workspace minted", async () => {
+  it("refuses a pseudonym no erasure in this workspace minted", async () => {
     await withRollback(db.pool, async (client) => {
       const { here } = await twoProposals(client);
       await asTheApiIn(client, WS_A);
@@ -2099,7 +2111,7 @@ describe("the erasure of the suggestions", () => {
     });
   });
 
-  it("leaves a longer address that begins with the needle", async () => {
+  it("keeps a longer address that starts with the searched address", async () => {
     await withRollback(db.pool, async (client) => {
       const { seed } = await twoProposals(client);
       const longer = await seed.suggestion({ workspaceId: WS_A, proposer: PROPOSER });
@@ -2200,11 +2212,11 @@ describe("the erasure of the suggestions", () => {
   });
 });
 
-const whatTheConstantsSay = (mayRaise: readonly string[], kind: string): string =>
+const expectedOutcome = (mayRaise: readonly string[], kind: string): string =>
   mayRaise.some((named) => named === kind) ? ADMITTED : INSUFFICIENT_PRIVILEGE;
 
-describe("the kinds a caller may raise, asked of the function", () => {
-  it("lands a set only of kinds its caller's tier names", async () => {
+describe("the suggestion kinds each tier may submit", () => {
+  it("accepts a set only of kinds its caller's tier allows", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
@@ -2214,26 +2226,26 @@ describe("the kinds a caller may raise, asked of the function", () => {
       );
       expect(
         owner.rows[0]?.holds,
-        "the migrator owns the function, so only the CASE's silence refuses it",
+        "the session user cannot EXECUTE the function, so this test cannot reach the CASE's refusal",
       ).toBe(true);
 
       const answered: Record<string, string> = {};
-      const theConstantsSay: Record<string, string> = {};
+      const expectedOutcomes: Record<string, string> = {};
       for (const { caller, mayRaise, role } of THE_CALLERS) {
         await client.query(`SET LOCAL ROLE ${role}`);
         for (const kind of SUGGESTION_KINDS) {
           answered[`${caller} raising ${kind}`] = await submittingOneRequest(client, kind);
-          theConstantsSay[`${caller} raising ${kind}`] = whatTheConstantsSay(mayRaise, kind);
+          expectedOutcomes[`${caller} raising ${kind}`] = expectedOutcome(mayRaise, kind);
         }
       }
 
-      expect(answered).toEqual(theConstantsSay);
+      expect(answered).toEqual(expectedOutcomes);
     });
   });
 });
 
 describe("a tenant table under app_rt", () => {
-  it("returns zero rows on a missing scope, never another tenant's", async () => {
+  it("returns no rows unscoped, never another tenant's", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.workspaceConfig({ workspaceId: WS_A });
@@ -2302,7 +2314,7 @@ describe("a tenant table under app_rt", () => {
     });
   });
 
-  it("hides and holds a tenant's invitation email counts from another", async () => {
+  it("another tenant can neither see nor change invitation email counts", async () => {
     await withRollback(db.pool, async (client) => {
       /* jscpd:ignore-start */
       await seedTwoWorkspaces(client);
@@ -2329,7 +2341,7 @@ describe("a tenant table under app_rt", () => {
     });
   });
 
-  it("refuses an invitation email count into another tenant's scope", async () => {
+  it("refuses an invitation email count written into another tenant's scope", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -2342,7 +2354,7 @@ describe("a tenant table under app_rt", () => {
   });
 });
 
-describe("the workspace-lifecycle function", () => {
+describe("create_workspace_partition, the workspace-lifecycle function", () => {
   it("creates the passage partition and full-text index in one transaction", async () => {
     await withRollback(db.pool, async (client) => {
       /* jscpd:ignore-start */
@@ -2376,7 +2388,7 @@ describe("the workspace-lifecycle function", () => {
     expect(afterRollback.rowCount).toBe(0);
   });
 
-  it("is refused to any role but app_rt", async () => {
+  it("is refused to every role except app_rt", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query("SET LOCAL ROLE worker_rt");
       await expect(client.query("SELECT create_workspace_partition($1)", [WS_A])).rejects.toThrow(
@@ -2385,7 +2397,7 @@ describe("the workspace-lifecycle function", () => {
     });
   });
 
-  it("refuses a workspace outside the scope, and an unknown one", async () => {
+  it("refuses an out-of-scope or unknown workspace", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -2462,7 +2474,7 @@ describe("the workspace-lifecycle function", () => {
 });
 
 describe("the passage index under worker_rt", () => {
-  it("holds only four verbs on the parent, nothing on partitions", async () => {
+  it("holds four privileges on the parent and none on partitions", async () => {
     await withRollback(db.pool, async (client) => {
       /* jscpd:ignore-start */
       await seedTwoWorkspaces(client);
@@ -2559,7 +2571,7 @@ describe("the audience pair on every readable unit", () => {
     await seeder({ workspaceId: WS_A });
   };
 
-  it("refuses each half-shape wherever the pair lives, landing whole ones", async () => {
+  it("refuses a half-filled pair in every table, accepting whole pairs", async () => {
     const tables = (
       await db.pool.query<{ schema: string; table: string; constraint: string | null }>(
         AUDIENCE_TABLES,
@@ -2608,7 +2620,7 @@ describe("the audience pair on every readable unit", () => {
 });
 
 describe("the rules in force on a connected source", () => {
-  it("starts sources on the safe set, which one flip changes", async () => {
+  it("starts sources on the safe set, which an update changes", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -2632,7 +2644,7 @@ describe("the rules in force on a connected source", () => {
     });
   });
 
-  it("refuses rules the seam could not read as tiers", async () => {
+  it("refuses rules the seam cannot read as tiers", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const connectedSource = await seed.connectedSource({ workspaceId: WS_A });
@@ -2690,7 +2702,7 @@ describe("the derivation's tables under app_rt", () => {
     return { connectedSource, document, identity, cited, composed };
   };
 
-  it("returns none unscoped and only the tenant's, on all six", async () => {
+  it("returns nothing unscoped and only the tenant's, in all six", async () => {
     expect(await seenUnscopedThenAsTenantA(DERIVATION_TABLES, seedOneOfEach)).toEqual(
       noneThenOneEach(DERIVATION_TABLES),
     );
@@ -2713,7 +2725,7 @@ describe("the derivation's tables under app_rt", () => {
       for (const table of REFUSED_TO_THE_WORKER) {
         await refusesEach(client, [
           [`SELECT 1 FROM "${table}" LIMIT 1`, `the worker reading ${table}`],
-          [`DELETE FROM "${table}"`, `the worker taking a row off ${table}`],
+          [`DELETE FROM "${table}"`, `the worker deleting a row from ${table}`],
         ]);
       }
 
@@ -2761,39 +2773,39 @@ describe("the derivation's tables under app_rt", () => {
       await refusesEach(client, [
         [
           "UPDATE source_document SET narrowed_to = NULL",
-          "an Admin's narrowing is an action with an audit event, and a sync that could clear it could widen a document at nobody's word",
+          "the worker clearing an Admin's narrowing, which only an audited Admin action may change",
         ],
         [
           "UPDATE source_document SET title = 'Retitled by a sync'",
-          "what an upload catalogued is the upload's, and a sync writes back only what it read",
+          "the worker retitling a document, when a sync writes back only what it read",
         ],
         [
           "UPDATE connected_source SET name = 'renamed by a sync'",
-          "a connected source is what an Admin made, and the tier that indexes it has no say in what it is",
+          "the worker renaming a connected source, which only an Admin defines",
         ],
         [
           A_CONNECTED_SOURCE_CLASSED,
-          "a worker that could insert a connected source could connect a source no Admin ever connected",
+          "the worker inserting a connected source that no Admin connected",
           [WS_A, ulid(), "A connected source nobody made"],
         ],
         [
           "DELETE FROM connected_source",
-          "and one that could remove a connected source could take a published source away without a record",
+          "the worker deleting a connected source, which would remove a published source without a record",
         ],
         [
           A_SOURCE_DOCUMENT,
-          "a worker that could insert a document row could catalogue a document nobody uploaded",
+          "the worker inserting a document that nobody uploaded",
           [WS_A, ulid(), seeded.connectedSource.id, "invented.md", "Invented", 1],
         ],
         [
           "DELETE FROM source_document",
-          "the withdrawal of a document is an action with an audit event, so the sync marks one gone and never removes it",
+          "the worker deleting a document, which a sync instead marks gone under an audit event",
         ],
       ]);
     });
   });
 
-  it("refuses another tenant's connected source or concept and unrecorded evidence", async () => {
+  it("refuses another tenant's source or concept, and unrecorded evidence", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const ours = await seedOneOfEach(seed, WS_A);
@@ -2908,7 +2920,7 @@ describe("the guide records under app_rt", () => {
     await seed.usage({ workspaceId, writeUpId, writeUpVersion: version });
   };
 
-  it("returns none unscoped and only the tenant's, on all seven", async () => {
+  it("returns nothing unscoped and only the tenant's, in all seven", async () => {
     expect(await seenUnscopedThenAsTenantA(GUIDE_RECORDS, seedOneOfEach)).toEqual(
       noneThenOneEach(GUIDE_RECORDS),
     );
@@ -2919,7 +2931,7 @@ describe("the concept owners under app_rt", () => {
   const memberOf = async (seed: TestData, workspaceId: string) =>
     (await seed.member({ workspaceId, userId: (await seed.user()).id })).userId;
 
-  it("returns none unscoped and only the tenant's owners", async () => {
+  it("returns nothing unscoped, and only the tenant's owners", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const ours = await seed.conceptOwner({ workspaceId: WS_A });
@@ -2980,7 +2992,7 @@ describe("the concept owners under app_rt", () => {
     });
   });
 
-  it("holds an owner row to one collection or one concept", async () => {
+  it("limits an owner row to one collection or one concept", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
@@ -3043,7 +3055,7 @@ describe("the concept owners under app_rt", () => {
 });
 
 describe("the finding under both runtime roles", () => {
-  it("returns none unscoped and only the scoped tenant's findings", async () => {
+  it("returns nothing unscoped, and only the scoped tenant's findings", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.finding({ workspaceId });
@@ -3056,7 +3068,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("lets the worker record findings, never touching an Admin's mark", async () => {
+  it("lets the worker record findings without changing an Admin's mark", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -3080,72 +3092,75 @@ describe("the finding under both runtime roles", () => {
       await refusesEach(client, [
         [
           "SELECT restore_reason FROM finding",
-          "a reason is a sentence an Admin typed and may name a person, and the sync needs only that the span was restored",
+          "the worker reading a restore reason, which an Admin typed and may name a person",
         ],
         [
           "SELECT restored_by FROM finding",
-          "who restored a span is the review's business and the audit log's, never the sync's",
+          "the worker reading who restored a span, which only the review and audit log need",
         ],
         [
           "SELECT reviewed_by FROM finding",
-          "who reviewed a span is the review's business and the audit log's, never the sync's",
+          "the worker reading who reviewed a span, which only the review and audit log need",
         ],
         [
           "SELECT reviewed_at FROM finding",
-          "the sync needs only that a span was dismissed, never when",
+          "the worker reading when a span was dismissed, which the sync does not need",
         ],
         [
           "SELECT review_reason FROM finding",
-          "a reason is a sentence an Admin typed and may name a person",
+          "the worker reading a review reason, which an Admin typed and may name a person",
         ],
         [
           "SELECT id FROM finding",
-          "a finding's id is the audit log's subject and nothing a sync names",
+          "the worker reading a finding's id, which is the audit log's subject",
         ],
-        ["SELECT * FROM finding", "every column is more than the twelve the grants name"],
+        [
+          "SELECT * FROM finding",
+          "the worker selecting every column, beyond the twelve its grants name",
+        ],
 
         [
           "UPDATE finding SET restored_at = NULL, restored_by = NULL, restore_reason = NULL",
-          "a worker that could clear a restore could withhold again a span an Admin let back, at nobody's word",
+          "the worker clearing a restore, which would withhold a span an Admin released",
         ],
         [
           "UPDATE finding SET char_start = 0, char_end = 1",
-          "the offsets are what a finding is, and a row moved to another span is another finding wearing this one's review",
+          "the worker moving a finding's offsets, which would attach its review to another span",
         ],
         [
           "UPDATE finding SET document_id = document_id, rule_id = rule_id",
-          "the document and the rule are what a finding is as well",
+          "the worker rewriting a finding's document or rule, which identify the finding",
         ],
-        ["UPDATE finding SET id = id", "the id is the audit log's subject, minted once"],
+        [
+          "UPDATE finding SET id = id",
+          "the worker rewriting a finding's id, which is the audit log's subject",
+        ],
         [
           "UPDATE finding SET workspace_id = workspace_id",
-          "the tenant a row belongs to is the first part of what a finding is",
+          "the worker rewriting a finding's workspace, which identifies the finding",
         ],
         [
           "UPDATE finding SET review_reason = NULL",
-          "a reason is an Admin's sentence, and a worker that could write one could put words in their mouth",
+          "the worker clearing a review reason, which an Admin wrote",
         ],
         [
           "UPDATE finding SET review_state = 'narrowed'",
-          "the review is an Admin's action, and a worker that could stamp one could mark a special-category span reviewed",
+          "the worker setting a review state, which only an Admin's review sets",
         ],
         [
           "UPDATE finding SET review_state = 'dismissed'",
-          "a worker that could dismiss a finding could lift a document's verdict at nobody's word",
+          "the worker dismissing a finding, which would lift a document's verdict with no Admin action",
         ],
-        [
-          "DELETE FROM finding",
-          "a finding is the record of what was withheld, and nothing the worker holds takes one away",
-        ],
+        ["DELETE FROM finding", "the worker deleting a finding, which records what was withheld"],
 
         [
           A_FINDING_BORN_REVIEWED,
-          "a finding is born unreviewed, and one inserted already reviewed is a special-category span a connected source may widen over at nobody's word",
+          "the worker inserting an already reviewed finding, which skips an Admin's review of a special-category span",
           [WS_A, ulid(), document.id],
         ],
         [
           A_FINDING_BORN_RESTORED,
-          "the restore is an Admin's action as well, and a span born restored is one the seam withheld and nobody put back",
+          "the worker inserting an already restored finding, which releases a span no Admin restored",
           [WS_A, ulid(), document.id],
         ],
       ]);
@@ -3160,7 +3175,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("serves the worker a document's restored spans, its tenant's only", async () => {
+  it("serves the worker only its own tenant's restored spans", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -3212,7 +3227,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("serves the worker a document's dismissed spans, its tenant's only", async () => {
+  it("serves the worker only its own tenant's dismissed spans", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -3299,7 +3314,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("holds one row per span, so a rerun lands nothing", async () => {
+  it("holds one row per span, so a rerun inserts nothing", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -3338,7 +3353,7 @@ describe("the finding under both runtime roles", () => {
       await refusesEach(client, [
         [
           A_FINDING,
-          "the same span under the same rule is the same finding, and a bare insert of it is a sync that would double the connected source's rows",
+          "a second insert of the same span and rule, which would double a rerun's rows",
           theSameSpanAgain(),
           /finding_span_key/,
         ],
@@ -3357,7 +3372,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("lets a rerun refresh its own reading, never an Admin's", async () => {
+  it("lets a rerun refresh its findings but not an Admin's", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -3422,7 +3437,7 @@ describe("the finding under both runtime roles", () => {
           `${A_FINDING}
            ON CONFLICT (workspace_id, document_id, rule_id, char_start, char_end) DO UPDATE
              SET review_state = 'unreviewed', reviewed_by = NULL, reviewed_at = NULL`,
-          "a refresh that named a review column would be the UPDATE migration 0024 revoked, arriving through an insert",
+          "a rerun upsert that sets a review column, which is the UPDATE migration 0024 revoked",
           aNameRead("always", 12, 20),
         ],
       ]);
@@ -3457,7 +3472,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("refuses a finding naming another tenant's document, at its key", async () => {
+  it("refuses a finding on another tenant's document, by foreign key", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const theirs = await seed.sourceDocument({ workspaceId: WS_B });
@@ -3537,7 +3552,7 @@ describe("the finding under both runtime roles", () => {
 });
 
 describe("the subject request under both runtime roles", () => {
-  it("returns none unscoped and only the scoped tenant's requests", async () => {
+  it("returns nothing unscoped, and only the scoped tenant's requests", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.subjectRequest({ workspaceId });
@@ -3554,7 +3569,7 @@ describe("the subject request under both runtime roles", () => {
     });
   });
 
-  it("refuses the worker every road to a subject request", async () => {
+  it("refuses the worker every access to a subject request", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.subjectRequest({ workspaceId: WS_A });
@@ -3565,20 +3580,20 @@ describe("the subject request under both runtime roles", () => {
       await refusesEach(client, [
         [
           "SELECT 1 FROM subject_request LIMIT 1",
-          "the identifier set is restricted personal data, and a worker that could read it would hold the platform's list of who has asked to be erased",
+          "the worker reading subject requests, whose identifiers are restricted personal data",
         ],
         [
           A_SUBJECT_REQUEST,
-          "recording a request is an Admin's action, so a worker that could insert one could start a clock nobody set",
+          "the worker inserting a subject request, which only an Admin records",
           [WS_A, ulid()],
         ],
         [
           "UPDATE subject_request SET answered_at = now(), answer = 'nothing found'",
-          "and one that could stamp an answer could close a request nobody answered",
+          "the worker answering a subject request that nobody answered",
         ],
         [
           "DELETE FROM subject_request",
-          "a request a tier can remove is a clock that stops without a record",
+          "the worker deleting a subject request, which would stop its clock without a record",
         ],
       ]);
 
@@ -3667,7 +3682,7 @@ describe("the subject request under both runtime roles", () => {
 });
 
 describe("the erasure request under both runtime roles", () => {
-  it("returns none unscoped and only the scoped tenant's routines", async () => {
+  it("returns nothing unscoped, and only the scoped tenant's requests", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.erasureRequest({ workspaceId });
@@ -3684,7 +3699,7 @@ describe("the erasure request under both runtime roles", () => {
     });
   });
 
-  it("refuses the worker every road to an erasure request", async () => {
+  it("refuses the worker every access to an erasure request", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const request = await seed.erasureRequest({ workspaceId: WS_A });
@@ -3695,20 +3710,20 @@ describe("the erasure request under both runtime roles", () => {
       await refusesEach(client, [
         [
           "SELECT 1 FROM erasure_request LIMIT 1",
-          "the pseudonym is what a rewritten history was rewritten to, and a worker that could read it could join the history back to the request that caused it",
+          "the worker reading erasure requests, whose pseudonym links rewritten history to its request",
         ],
         [
           AN_ERASURE_ROUTINE,
-          "the routine runs under the platform principal in the api, so a worker that could insert one could claim an erasure that never ran",
+          "the worker inserting an erasure routine, which only the api runs",
           [WS_A, ulid(), request.subjectRequestId, ulid()],
         ],
         [
           "UPDATE erasure_request SET completed_at = now(), report = 'done'",
-          "and one that could complete a request could close a routine that had touched no store",
+          "the worker completing an erasure request that touched no store",
         ],
         [
           "DELETE FROM erasure_request",
-          "this row is what a restore replays from, so a tier that could remove one could make an erasure un-replayable",
+          "the worker deleting an erasure request, which a restore replays from",
         ],
       ]);
 
@@ -3722,7 +3737,7 @@ describe("the erasure request under both runtime roles", () => {
     });
   });
 
-  it("refuses a completion, pseudonym or dates the routine forbids", async () => {
+  it("refuses a completion, pseudonym or dates the erasure rules forbid", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const request = await seed.erasureRequest({ workspaceId: WS_A });
@@ -3768,7 +3783,7 @@ describe("the erasure request under both runtime roles", () => {
     });
   });
 
-  it("refuses a second routine per request, and a cross-tenant one", async () => {
+  it("refuses a second erasure per request, and a cross-tenant one", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const mine = await seed.erasureRequest({ workspaceId: WS_A });
@@ -3792,7 +3807,7 @@ describe("the erasure request under both runtime roles", () => {
 });
 
 describe("the suppression under both runtime roles", () => {
-  it("returns none unscoped and only the scoped tenant's suppressions", async () => {
+  it("returns nothing unscoped, and only the scoped tenant's suppressions", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.suppression({ workspaceId });
@@ -3832,16 +3847,16 @@ describe("the suppression under both runtime roles", () => {
       await refusesEach(client, [
         [
           A_SUPPRESSION,
-          "the routine writes suppressions under the platform principal, so a worker that could insert one could withhold a person nobody asked about",
+          "the worker inserting a suppression, which only the erasure routine writes",
           [WS_A, ulid(), '{"emails": ["x@y.invalid"], "names": [], "other": []}'],
         ],
         [
           `UPDATE suppression SET identifiers = '{"emails": [], "names": [], "other": []}'::jsonb`,
-          "and one that could edit the set could empty it, which is an erasure quietly undone at the next reprocess",
+          "the worker emptying a suppression, which would undo an erasure at the next reprocess",
         ],
         [
           "DELETE FROM suppression",
-          "a suppression a tier can remove is a person's data back in the derived stores the next time the document is converted",
+          "the worker deleting a suppression, which would restore a person's data at the next conversion",
         ],
       ]);
 
@@ -3855,7 +3870,7 @@ describe("the suppression under both runtime roles", () => {
     });
   });
 
-  it("refuses an empty, a duplicate or a cross-tenant suppression", async () => {
+  it("refuses an empty, duplicate or cross-tenant suppression", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const mine = await seed.suppression({ workspaceId: WS_A });
@@ -3892,8 +3907,8 @@ describe("the suppression under both runtime roles", () => {
   });
 });
 
-describe("the queue under both runtime roles", () => {
-  it("returns none unscoped and only the scoped tenant's jobs", async () => {
+describe("the job queue under both runtime roles", () => {
+  it("returns nothing unscoped, and only the scoped tenant's jobs", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.job({ workspaceId });
@@ -3937,14 +3952,14 @@ describe("the queue under both runtime roles", () => {
     });
   });
 
-  it("refuses both roles a DELETE, while claims still move rows", async () => {
+  it("refuses both roles a DELETE, while claims still update rows", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const job = await seed.job({ workspaceId: WS_A });
       for (const role of ["app_rt", "worker_rt"]) {
         await client.query(`SET LOCAL ROLE ${role}`);
         await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-        await refusesEach(client, [["DELETE FROM job", `${role} removing the record of a job`]]);
+        await refusesEach(client, [["DELETE FROM job", `${role} deleting a job`]]);
         await client.query("RESET ROLE");
       }
 
@@ -3958,7 +3973,7 @@ describe("the queue under both runtime roles", () => {
     });
   });
 
-  it("refuses every caller but the two runtime roles", async () => {
+  it("refuses every role except the two runtime roles", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("CREATE ROLE queue_probe NOLOGIN");
@@ -3995,15 +4010,15 @@ describe("the migration stamp under worker_rt", () => {
       await refusesEach(client, [
         [
           A_MIGRATION_STAMP,
-          "the api is the only migration owner, so a worker that could stamp one could tell itself the schema had moved",
+          "the worker inserting a migration stamp, which only the migrator writes",
         ],
         [
           "UPDATE drizzle.__drizzle_migrations SET created_at = 1",
-          "and one that could move the stamp could make its own check pass",
+          "the worker moving the migration stamp, which would make its own check pass",
         ],
         [
           "DELETE FROM drizzle.__drizzle_migrations",
-          "a journal a reader can empty is a check that stops asking",
+          "the worker emptying the migration journal, which would disable its check",
         ],
       ]);
     });
@@ -4033,23 +4048,23 @@ describe("the contract stamp", () => {
       await refusesEach(client, [
         [
           A_CONTRACT_STAMP,
-          "a worker that could stamp a contract could tell itself the api had caught up",
+          "the worker inserting a contract stamp, which would claim the api has caught up",
         ],
         [
           "UPDATE contract_stamp SET digest = 'x'",
-          "and one that could move the stamp could make its own check pass",
+          "the worker moving the contract stamp, which would make its own check pass",
         ],
         [
           "DELETE FROM contract_stamp",
-          "a stamp a reader can remove is a refusal that stops firing",
+          "the worker deleting the contract stamp, which would stop the refusal firing",
         ],
       ]);
     });
   });
 });
 
-describe("the sweep pass", () => {
-  it("lets the api record and read passes, nothing more", async () => {
+describe("the sweep_pass table", () => {
+  it("lets the api role record and read passes only", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query("SET LOCAL ROLE app_rt");
       const id = ulid();
@@ -4061,17 +4076,14 @@ describe("the sweep pass", () => {
       await refusesEach(client, [
         [
           "UPDATE sweep_pass SET removed = 0",
-          "a pass the api could rewrite could say a last pass removed nothing when it removed much",
+          "app_rt updating a pass, which could hide what an earlier pass removed",
         ],
-        [
-          "DELETE FROM sweep_pass",
-          "and one it could remove could make a missed day look like no day at all",
-        ],
+        ["DELETE FROM sweep_pass", "app_rt deleting a pass, which could hide a missed day"],
       ]);
     });
   });
 
-  it("refuses the worker reading or recording a pass", async () => {
+  it("refuses the worker reads and writes of passes", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query(A_SWEEP_PASS, [ulid()]);
       expect(Object.values(await privilegesHeld(client, "worker_rt", "sweep_pass"))).not.toContain(
@@ -4080,15 +4092,15 @@ describe("the sweep pass", () => {
       await client.query("SET LOCAL ROLE worker_rt");
 
       await refusesEach(client, [
-        ["SELECT id FROM sweep_pass", "the worker sweeps nothing, so it has no pass to read"],
-        [A_SWEEP_PASS, "and a worker that could record one could stand in for a pass", [ulid()]],
-        ["UPDATE sweep_pass SET removed = 0", "or rewrite what a pass removed"],
-        ["DELETE FROM sweep_pass", "or remove the last pass an operator reads"],
+        ["SELECT id FROM sweep_pass", "the worker reading sweep passes, which it never makes"],
+        [A_SWEEP_PASS, "the worker recording a sweep pass", [ulid()]],
+        ["UPDATE sweep_pass SET removed = 0", "the worker updating what a pass removed"],
+        ["DELETE FROM sweep_pass", "the worker deleting the last pass an operator reads"],
       ]);
     });
   });
 
-  it("refuses a row whose counts no pass could have made", async () => {
+  it("refuses a row with counts no pass could produce", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query(A_SWEEP_PASS_COUNTING, [ulid(), "remove", 2, 1, 3, 3]);
       const standing = await client.query("SELECT refused, found, removed FROM sweep_pass");
@@ -4097,25 +4109,25 @@ describe("the sweep pass", () => {
       await refusesEach(client, [
         [
           A_SWEEP_PASS_COUNTING,
-          "a list-only pass removes nothing",
+          "a list-only pass that removed something",
           [ulid(), "list", 1, 0, 2, 1],
           /sweep_pass_counts_check/,
         ],
         [
           A_SWEEP_PASS_COUNTING,
-          "a pass removes no more than it found",
+          "a pass that removed more than it found",
           [ulid(), "remove", 1, 0, 1, 2],
           /sweep_pass_counts_check/,
         ],
         [
           A_SWEEP_PASS_COUNTING,
-          "a pass passes over no more workspaces than it read",
+          "a pass that passed over more workspaces than it read",
           [ulid(), "remove", 1, 2, 0, 0],
           /sweep_pass_counts_check/,
         ],
         [
           A_SWEEP_PASS_COUNTING,
-          "the upload sweep lists or removes, and nothing else",
+          "an upload sweep other than list or remove",
           [ulid(), "delete", 1, 0, 0, 0],
           /sweep_pass_upload_sweep_check/,
         ],
@@ -4205,7 +4217,7 @@ const A_RESTORE: BackupRow = {
 };
 
 describe("the backup table", () => {
-  it("admits each row its scripts write", async () => {
+  it("accepts every row its scripts write", async () => {
     await withRollback(db.pool, async (client) => {
       for (const row of [AN_HOURLY_DUMP, A_FAILED_DUMP, A_DRILL, A_RESTORE]) {
         await client.query(A_BACKUP_ROW, backupParameters(row));
@@ -4230,19 +4242,19 @@ describe("the backup table", () => {
       await client.query(`SET LOCAL ROLE ${role}`);
 
       await refusesEach(client, [
-        ["SELECT kind FROM backup", `${role} reads no copy's whereabouts`],
+        ["SELECT kind FROM backup", `${role} reading where a backup copy is`],
         [
           A_BACKUP_ROW,
-          `${role} could record a copy nobody made`,
+          `${role} recording a backup copy that nobody made`,
           backupParameters({ ...AN_HOURLY_DUMP, startedAt: "2026-10-21T13:00:00Z" }),
         ],
-        ["UPDATE backup SET outcome = 'ok'", "or turn a failed copy into a good one"],
-        ["DELETE FROM backup", "or remove the row a missed copy is read from"],
+        ["UPDATE backup SET outcome = 'ok'", "a runtime role marking a failed copy as good"],
+        ["DELETE FROM backup", "a runtime role deleting the row that records a missed copy"],
       ]);
     });
   });
 
-  it("refuses each row no run could make", async () => {
+  it("refuses each row no backup run could make", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query(A_BACKUP_ROW, backupParameters(AN_HOURLY_DUMP));
       const standing = await client.query("SELECT bytes, location FROM backup");

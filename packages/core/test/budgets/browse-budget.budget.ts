@@ -124,7 +124,7 @@ describe("the knowledge base at 3,000 concepts", () => {
       ],
     ]);
 
-    expect(counted, "the concepts the tree counts").toBe(CONCEPTS);
+    expect(counted, "the concepts counted across the tree").toBe(CONCEPTS);
     expect(listed, "the concepts on a kind's first page").toBe(50);
     expect(percentile(treeMs, 1), "the slowest tree read, in milliseconds").toBeLessThan(
       READ_BUDGET_MS,

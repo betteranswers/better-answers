@@ -26,10 +26,10 @@ import { servedApp } from "../support/suite-app.ts";
 const objects = objectStoreForSuite();
 const { ops, help, opsWith } = opsRunner(objects);
 
-describe("pnpm ops — the restore scripts' commands", () => {
+describe("pnpm ops", () => {
   const served = servedApp();
 
-  describe("set-model-key — the platform sets a workspace's model key", () => {
+  describe("set-model-key, which stores a workspace's model key", () => {
     const ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => index);
     const KEK = Buffer.from(ENVELOPE_KEY).toString("hex");
     const credentials = openCredentials(ENVELOPE_KEY);
@@ -79,7 +79,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const MALFORMED =
       "set-model-key: REFUSED — malformed: give --workspace a workspace id, --provider one of anthropic · mistral · cloudflare, and on standard input one key with no space or line break in it, for cloudflare the account id, a colon, then the API token";
 
-    it("seals the key typed on standard input, recording the provider", async () => {
+    it("encrypts the key from standard input and audits the provider", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await setting(served(), workspaceId, `${A_KEY}\n`);
@@ -94,7 +94,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("replaces the key on a second run, keeping one", async () => {
+    it("replaces the key on a second run, keeping one row", async () => {
       const { workspaceId } = await served().provision();
 
       await setting(served(), workspaceId, A_KEY, ["--provider", "mistral"]);
@@ -112,7 +112,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("says the key in no line, log or row", async () => {
+    it("never prints, logs, or stores the key in plain text", async () => {
       const { workspaceId } = await served().provision();
 
       const set = await setting(served(), workspaceId, A_KEY);
@@ -126,7 +126,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
         modelKeySetting: err("KEK must be set to the envelope key"),
       });
 
-      expect(await keyHeld(served(), workspaceId, "anthropic"), "the key was stored").toBe(A_KEY);
+      expect(
+        await keyHeld(served(), workspaceId, "anthropic"),
+        "a refused run changed the stored key",
+      ).toBe(A_KEY);
       expect([set, refusedByTheStore, malformed, unsealed].map((run) => run.exitCode)).toEqual([
         0, 1, 2, 1,
       ]);
@@ -139,7 +142,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(secrets.filter((secret) => everythingSaid.includes(secret))).toEqual([]);
     });
 
-    it("refuses without an envelope key, sealing nothing", async () => {
+    it("refuses without the KEK envelope key and stores nothing", async () => {
       const { workspaceId } = await served().provision();
 
       const refused = await setting(served(), workspaceId, A_KEY, ANTHROPIC, {
@@ -153,7 +156,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await rowsHeld(served(), workspaceId)).toEqual([]);
     });
 
-    it("refuses a Workers AI key lacking its account id, unsaid", async () => {
+    it("refuses a Cloudflare token without its account id, unprinted", async () => {
       const { workspaceId } = await served().provision();
       const tokenAlone = "invented_Token-u15";
 
@@ -198,25 +201,29 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return { status: finished.status, printed: `${finished.stdout}${finished.stderr}` };
     };
 
-    it("seals through the entrypoint, printing neither key", { timeout: 60_000 }, async () => {
-      const { workspaceId } = await served().provision();
+    it(
+      "stores the key through src/ops.ts and prints neither key",
+      { timeout: 60_000 },
+      async () => {
+        const { workspaceId } = await served().provision();
 
-      const run = throughTheEntrypoint(workspaceId, A_KEY, KEK);
+        const run = throughTheEntrypoint(workspaceId, A_KEY, KEK);
 
-      expect(run).toEqual({
-        status: 0,
-        printed: matching.stringContaining(
-          `set-model-key: done — workspace ${workspaceId} holds a new key for anthropic`,
-        ),
-      });
-      expect(await keyHeld(served(), workspaceId, "anthropic")).toBe(A_KEY);
-      expect([A_KEY, KEK].filter((secret) => run.printed.includes(secret))).toEqual([]);
-    });
+        expect(run).toEqual({
+          status: 0,
+          printed: matching.stringContaining(
+            `set-model-key: done — workspace ${workspaceId} holds a new key for anthropic`,
+          ),
+        });
+        expect(await keyHeld(served(), workspaceId, "anthropic")).toBe(A_KEY);
+        expect([A_KEY, KEK].filter((secret) => run.printed.includes(secret))).toEqual([]);
+      },
+    );
 
     it.each([
       ["no `KEK`", undefined],
       ["a malformed `KEK`", "not-an-envelope-key-u9"],
-    ])("refuses at the entrypoint with %s", { timeout: 60_000 }, async (_shape, kek) => {
+    ])("refuses through src/ops.ts with %s", { timeout: 60_000 }, async (_shape, kek) => {
       const { workspaceId } = await served().provision();
 
       const run = throughTheEntrypoint(workspaceId, A_KEY, kek);
@@ -238,7 +245,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ["a key holding a space", "sk-test u9", ["--provider", "anthropic"]],
       ["a key over two lines", "sk-test\nu9", ["--provider", "anthropic"]],
       ["an unknown model provider", A_KEY, ["--provider", "openai"]],
-    ])("refuses malformed for %s, changing nothing", async (_shape, typed, flags) => {
+    ])("refuses %s as malformed, changing nothing", async (_shape, typed, flags) => {
       const { workspaceId } = await served().provision();
 
       const run = await setting(served(), workspaceId, typed, flags);
@@ -251,7 +258,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await rowsOfAction(served(), workspaceId, ACTION)).toEqual([]);
     });
 
-    it("refuses no-such-workspace for an unknown id, writing nothing", async () => {
+    it("refuses an unknown workspace id as no-such-workspace", async () => {
       const nowhere = ulid();
 
       const run = await setting(served(), nowhere, A_KEY);
@@ -263,7 +270,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await auditLogOf(served(), nowhere)).toEqual([]);
     });
 
-    it("answers usage with no --provider, reading nothing", async () => {
+    it("gives a usage error without --provider and stores nothing", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await setting(served(), workspaceId, A_KEY, []);
@@ -275,7 +282,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await rowsHeld(served(), workspaceId)).toEqual([]);
     });
 
-    it("names the command in the usage", async () => {
+    it("lists the command in the help text", async () => {
       const run = await ops(served(), ["help"]);
 
       expect(run.lines.join("\n")).toContain(
@@ -284,7 +291,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("set-spending-limit — the platform caps a workspace's monthly spend", () => {
+  describe("set-spending-limit, which caps a workspace's monthly model spend", () => {
     const limitHeld = async (app: TestApp, workspaceId: string) => {
       const held = await app.database.superuser.query<{ value: string }>(
         "SELECT value FROM workspace_config WHERE workspace_id = $1 AND key = 'llm.spending_limit_gbp'",
@@ -316,7 +323,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ).toEqual([set, set]);
     });
 
-    it("refuses malformed for a sum that is not pounds", async () => {
+    it("refuses a sum that is not in pounds as malformed", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await limiting(served(), workspaceId, "fifty");
@@ -330,7 +337,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await limitHeld(served(), workspaceId)).toEqual([]);
     });
 
-    it("refuses no-such-workspace for an unknown id", async () => {
+    it("refuses an unknown workspace id as no-such-workspace", async () => {
       const nowhere = ulid();
 
       const run = await limiting(served(), nowhere, "50");
@@ -342,7 +349,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("set-model-price — the platform prices a model by day", () => {
+  describe("set-model-price, which prices a model from a given day", () => {
     const SONNET = "claude-sonnet-5-5";
 
     const pricing = (app: TestApp, from: string, gbpIn = "3", gbpOut = "15"): Promise<Run> =>
@@ -383,7 +390,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses malformed for a day the calendar lacks", async () => {
+    it("refuses a date that does not exist as malformed", async () => {
       const before = await pricesHeld(served());
 
       const run = await pricing(served(), "2026-02-30");
@@ -395,7 +402,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await pricesHeld(served())).toEqual(before);
     });
 
-    it("answers usage with a rate missing, writing nothing", async () => {
+    it("gives a usage error for missing flags and writes nothing", async () => {
       const before = await pricesHeld(served());
 
       const run = await ops(served(), [
@@ -410,7 +417,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await pricesHeld(served())).toEqual(before);
     });
 
-    it("names both spend commands in the usage", async () => {
+    it("lists both spending commands in the help text", async () => {
       const run = await ops(served(), ["help"]);
 
       expect(run.lines.join("\n")).toContain("set-spending-limit --workspace <id> --gbp <pounds>");
@@ -420,7 +427,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("set-decision-threshold — the platform sets a decision model's threshold", () => {
+  describe("set-decision-threshold, which sets a decision model's threshold", () => {
     const thresholding = (
       app: TestApp,
       provider: string,
@@ -468,7 +475,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses a threshold outside nought and one, writing nothing", async () => {
+    it("refuses a threshold outside the open range 0 to 1", async () => {
       const model = aModel();
 
       const run = await thresholding(served(), "cloudflare", model, "1");
@@ -482,7 +489,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await thresholdsHeld(served(), model)).toEqual([]);
     });
 
-    it("refuses anthropic as not a decision model", async () => {
+    it("refuses anthropic as not-a-decision-model", async () => {
       const model = aModel();
 
       const run = await thresholding(served(), "anthropic", model, "0.7");
@@ -496,7 +503,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await thresholdsHeld(served(), model)).toEqual([]);
     });
 
-    it("answers usage with the threshold missing, writing nothing", async () => {
+    it("gives a usage error without --threshold and writes nothing", async () => {
       const model = aModel();
 
       const run = await ops(served(), [
@@ -516,14 +523,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await thresholdsHeld(served(), model)).toEqual([]);
     });
 
-    it("names the command in the usage", async () => {
+    it("lists the command in the help text", async () => {
       expect(await help(served())).toContain(
         "set-decision-threshold --provider <cloudflare> --model <model> --threshold <probability>",
       );
     });
   });
 
-  describe("set-model-choice — the platform chooses a workspace's model", () => {
+  describe("set-model-choice, which sets a workspace's model for a purpose", () => {
     const HAIKU = "claude-haiku-5-5";
 
     const choosing = (
@@ -567,7 +574,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "0.4",
       ]);
 
-    it("stores a priced model of a named sub-processor", async () => {
+    it("stores a priced model from a sub-processor the DPIA names", async () => {
       const { workspaceId } = await served().provision();
       expect((await priced(served())).exitCode).toBe(0);
 
@@ -593,7 +600,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses a provider with no sub-processor entry", async () => {
+    it("refuses a provider the DPIA does not name as no-sub-processor", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await choosing(served(), workspaceId, "openai");
@@ -607,7 +614,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await choicesHeld(served(), workspaceId)).toEqual([]);
     });
 
-    it("refuses local, which no price can name", async () => {
+    it("refuses the local provider as no-sub-processor", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await choosing(served(), workspaceId, "local");
@@ -621,7 +628,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await choicesHeld(served(), workspaceId)).toEqual([]);
     });
 
-    it("refuses cloudflare with no threshold, naming the command", async () => {
+    it("refuses cloudflare without a threshold and names set-decision-threshold", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await choosing(served(), workspaceId, "cloudflare");
@@ -635,7 +642,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await choicesHeld(served(), workspaceId)).toEqual([]);
     });
 
-    it("refuses a model with no price in effect", async () => {
+    it("refuses a model with no price in effect as no-model-price", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await choosing(served(), workspaceId, "mistral");
@@ -661,7 +668,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("refuses malformed and no-such-workspace", async () => {
+    it("refuses an unknown purpose and an unknown workspace id", async () => {
       const nowhere = ulid();
       const { workspaceId } = await served().provision();
       expect((await priced(served())).exitCode).toBe(0);
@@ -678,7 +685,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("answers usage with the model missing, writing nothing", async () => {
+    it("gives a usage error without --purpose, --provider, or --model", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await ops(served(), ["set-model-choice", "--workspace", workspaceId]);
@@ -692,7 +699,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await choicesHeld(served(), workspaceId)).toEqual([]);
     });
 
-    it("names the command in the usage", async () => {
+    it("lists the command in the help text", async () => {
       expect(await help(served())).toContain(
         "set-model-choice --workspace <id> --purpose <extraction|enrichment|answering|judging> --provider <anthropic|mistral> --model <model>",
       );

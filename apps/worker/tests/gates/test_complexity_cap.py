@@ -16,7 +16,7 @@ RULE = "C901"
 PROBE = "src/better_answers_worker/probe.py"
 
 
-def of_complexity(complexity: int) -> str:
+def function_with_complexity(complexity: int) -> str:
     branches = "".join(
         f"    if value == {index}:\n        return {index}\n"
         for index in range(complexity - 1)
@@ -30,7 +30,7 @@ def paths_exempt_from_the_cap() -> list[str]:
     return sorted(pattern for pattern, rules in ignores.items() if RULE in rules)
 
 
-def rules_fired_over(
+def ruff_codes_for(
     tree: Path, config: Path, files: dict[str, str]
 ) -> dict[str, list[str]]:
     root = tree.resolve()
@@ -64,10 +64,10 @@ def rules_fired_over(
         (DEVTOOLS_CONFIG, "probe.py"),
     ],
 )
-def test_ruff_refuses_a_function_of_nine(
+def test_ruff_refuses_a_function_with_complexity_nine(
     tmp_path: Path, config: Path, file: str
 ) -> None:
-    fired = rules_fired_over(tmp_path, config, {file: of_complexity(9)})
+    fired = ruff_codes_for(tmp_path, config, {file: function_with_complexity(9)})
 
     assert fired[file] == [RULE]
 
@@ -76,15 +76,16 @@ def test_ruff_refuses_a_function_of_nine(
     ("config", "file"),
     [(WORKER_CONFIG, PROBE), (DEVTOOLS_CONFIG, "probe.py")],
 )
-def test_ruff_accepts_a_function_of_eight(
+def test_ruff_accepts_a_function_with_complexity_eight(
     tmp_path: Path, config: Path, file: str
 ) -> None:
-    fired = rules_fired_over(tmp_path, config, {file: of_complexity(8)})
+    fired = ruff_codes_for(tmp_path, config, {file: function_with_complexity(8)})
 
     assert fired[file] == []
 
 
 def test_no_file_is_exempt_from_the_cap() -> None:
     assert paths_exempt_from_the_cap() == [], (
-        "a file is exempt from C901: split its function over 8"
+        "pyproject.toml exempts a file from C901. Remove the exemption and split "
+        "each function with complexity over 8"
     )

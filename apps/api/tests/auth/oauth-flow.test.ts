@@ -60,7 +60,7 @@ afterAll(async () => {
   await app.stop();
 });
 
-/** RFC 8414's fields the surface's discovery is held to. */
+/** The RFC 8414 authorization server metadata fields the tests read. */
 const authorizationServerMetadata = z.object({
   issuer: z.string(),
   client_id_metadata_document_supported: z.boolean().optional(),
@@ -71,7 +71,7 @@ const authorizationServerMetadata = z.object({
   registration_endpoint: z.string().optional(),
 });
 
-/** RFC 9728's fields the protected-resource document is held to. */
+/** The RFC 9728 protected resource metadata fields the tests read. */
 const protectedResourceMetadata = z.object({
   resource: z.string(),
   authorization_servers: z.array(z.string()),
@@ -95,7 +95,7 @@ const readOf = (html: string): string =>
     .replaceAll("&amp;", "&")
     .trim();
 
-const linkOn = (html: string): { readonly href: string; readonly label: string } => {
+const firstLink = (html: string): { readonly href: string; readonly label: string } => {
   const [, href = "", label = ""] = /<a href="([^"]*)">([^<]*)<\/a>/.exec(html) ?? [];
   return { href: href.replaceAll("&amp;", "&"), label };
 };
@@ -112,7 +112,7 @@ const expectRefusalPage = (html: string, said: RefusalWords): void => {
 
 const redirectedTo = (response: Response): URL => {
   const next = response.headers.get("location");
-  assert(next !== null, "the answer redirected");
+  assert(next !== null, "the answer did not redirect");
   return new URL(next, PUBLIC_URL);
 };
 
@@ -126,7 +126,7 @@ const backThroughSignIn = async (
 };
 
 describe("discovery", () => {
-  it("advertises CIMD, public token endpoint, iss, S256 and no openid", async () => {
+  it("advertises CIMD, public clients, iss, S256 and no openid scope", async () => {
     const metadata = await json(
       await app.client().fetch("/.well-known/oauth-authorization-server"),
       authorizationServerMetadata,
@@ -147,7 +147,7 @@ describe("discovery", () => {
     expect(metadata.registration_endpoint).toBeUndefined();
   });
 
-  it("serves both protected-resource paths with resource exactly the MCP URL", async () => {
+  it("serves both protected-resource paths naming the MCP URL as resource", async () => {
     for (const path of [
       "/.well-known/oauth-protected-resource",
       "/.well-known/oauth-protected-resource/mcp",
@@ -161,7 +161,7 @@ describe("discovery", () => {
     }
   });
 
-  it("answers an unauthenticated call 401, challenging for every scope", async () => {
+  it("answers 401 to an unauthenticated MCP call, naming every scope", async () => {
     const response = await app.client().fetch("/mcp", {
       method: "POST",
       headers: {
@@ -178,7 +178,7 @@ describe("discovery", () => {
 
     expect(response.status).toBe(401);
     const challenge = response.headers.get("www-authenticate");
-    assert(challenge !== null, "the refusal carries a challenge");
+    assert(challenge !== null, "the 401 has no WWW-Authenticate challenge");
     expect(challenge).toContain('error="invalid_token"');
     expect(challenge).toContain('scope="knowledge:read feedback:write"');
     expect(challenge).toContain(
@@ -188,7 +188,7 @@ describe("discovery", () => {
 });
 
 describe("the flow, as claude.ai drives it", () => {
-  it("mints a {workspace, user} token bound to the MCP URL", async () => {
+  it("issues a workspace and user token for the MCP URL", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const started = Date.now();
@@ -211,7 +211,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(Date.now() - started).toBeLessThan(10_000);
   });
 
-  it("puts a two-workspace person's picked workspace in the token", async () => {
+  it("puts the workspace a two-workspace person picks in the token", async () => {
     const one = await app.provision({ name: "One" });
     const two = await app.provision({ name: "Two" });
     await app.addMember(two.workspaceId, one.admin.id, "Viewer");
@@ -241,7 +241,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(`${resumed.origin}${resumed.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
   });
 
-  it("holds an unnamed member until named, then goes to consent", async () => {
+  it("sends an unnamed member to consent only once named", async () => {
     const acme = await app.provision({ name: "Unnamed" });
     const unnamed = await app.person(undefined, "");
     await app.addMember(acme.workspaceId, unnamed.id, "Editor");
@@ -273,7 +273,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(`${resumed.origin}${resumed.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
   });
 
-  it("activates the workspace on an older session, moving its updated_at", async () => {
+  it("sets an existing session's active workspace and updates updated_at", async () => {
     const person = await app.person();
     const client = app.client();
 
@@ -284,7 +284,7 @@ describe("the flow, as claude.ai drives it", () => {
         [person.id],
       )
     ).rows;
-    assert(before !== undefined, "the person holds a session");
+    assert(before !== undefined, "the person has no session");
 
     const solo = await app.provision({ name: "Solo" });
     await app.addMember(solo.workspaceId, person.id, "Viewer");
@@ -301,12 +301,12 @@ describe("the flow, as claude.ai drives it", () => {
       updated_at: Date;
     }>("SELECT active_workspace_id, updated_at FROM session WHERE user_id = $1", [person.id]);
     const [now] = after.rows;
-    assert(now !== undefined, "the session is still there");
+    assert(now !== undefined, "the session is gone");
     expect(now.active_workspace_id).toBe(solo.workspaceId);
     expect(now.updated_at.getTime()).toBeGreaterThan(before.updated_at.getTime());
   });
 
-  it("asks consent again only when the host asks for it", async () => {
+  it("asks for consent again only when the host sends prompt=consent", async () => {
     const acme = await app.provision({ name: "Returning" });
     const client = app.client();
     const { challenge } = pkce();
@@ -335,7 +335,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(skipped.searchParams.get("code")).not.toBeNull();
   });
 
-  it("redirects an unoffered scope back to the host with iss", async () => {
+  it("redirects an unsupported scope back to the host with iss", async () => {
     const { challenge } = pkce();
 
     const response = await app
@@ -346,14 +346,14 @@ describe("the flow, as claude.ai drives it", () => {
 
     expect(response.status).toBe(302);
     const location = response.headers.get("location");
-    assert(location !== null, "the refusal redirected");
+    assert(location !== null, "the refusal did not redirect");
     const target = new URL(location);
     expect(target.origin + target.pathname).toBe("https://claude.ai/api/mcp/auth_callback");
     expect(target.searchParams.get("error")).toBe("invalid_scope");
     expect(target.searchParams.get("iss")).toBe(PUBLIC_URL);
   });
 
-  it("refuses a non-claude.ai metadata document without ever fetching it", async () => {
+  it("refuses a non-claude.ai client metadata URL without fetching it", async () => {
     const { challenge } = pkce();
     const asked = app.metadataFetches.length;
 
@@ -405,7 +405,7 @@ describe("the flow, as claude.ai drives it", () => {
 
     expect(response.status).toBe(302);
     const location = response.headers.get("location");
-    assert(location !== null, "the refusal redirected");
+    assert(location !== null, "the refusal did not redirect");
     const target = new URL(location);
     expect(target.searchParams.get("error")).toBe("invalid_target");
   });
@@ -434,14 +434,14 @@ describe("the flow, as claude.ai drives it", () => {
   });
 });
 
-describe("the pages, as a person walks them", () => {
+describe("the pages, as a person uses them", () => {
   const consentPostedAfter = async (
-    endTheirStanding: (workspace: Awaited<ReturnType<typeof app.provision>>) => Promise<void>,
+    endTheirAccess: (workspace: Awaited<ReturnType<typeof app.provision>>) => Promise<void>,
   ): Promise<Response> => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
-    await endTheirStanding(acme);
+    await endTheirAccess(acme);
     return client.form(`/consent${consent.search}`, connectIn(acme.workspaceId));
   };
 
@@ -456,7 +456,7 @@ describe("the pages, as a person walks them", () => {
     expect(me).toMatchObject({ workspaceId: acme.workspaceId, role: "Admin" });
   });
 
-  it("names every scope in the person's words, staying connected included", async () => {
+  it("lists every requested scope in plain words, including offline_access", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(
@@ -472,7 +472,7 @@ describe("the pages, as a person walks them", () => {
     expect(page).toContain(CONSENT_WORDS.asYou("Claude", "Acme"));
   });
 
-  it("shows the assistant's real address and where Connect goes", async () => {
+  it("shows the assistant's hostname and where Connect redirects", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
@@ -483,7 +483,7 @@ describe("the pages, as a person walks them", () => {
     expect(page).toContain(CONSENT_WORDS.goesNext(new URL(CLAUDE_REDIRECT_URI).hostname));
   });
 
-  it("refuses consent after credentials are revoked, minting no code", async () => {
+  it("refuses consent after credentials are revoked, issuing no code", async () => {
     const decided = await consentPostedAfter((acme) =>
       app.endEverySignInAndToken(acme.admin.id, new Date(Date.now() + 1_000)),
     );
@@ -493,7 +493,7 @@ describe("the pages, as a person walks them", () => {
     expectRefusalPage(await decided.text(), REFUSAL_PAGES.sessionEnded);
   });
 
-  it("returns an ended session through sign-in to the connection", async () => {
+  it("sends a person whose session ended through sign-in to connect", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
@@ -503,7 +503,7 @@ describe("the pages, as a person walks them", () => {
 
     expect(refused.status).toBe(401);
     const page = await refused.text();
-    const link = linkOn(page);
+    const link = firstLink(page);
     expect(link).toEqual({
       href: `/sign-in${consent.search}`,
       label: REFUSAL_PAGES.sessionEnded.signIn,
@@ -512,13 +512,13 @@ describe("the pages, as a person walks them", () => {
     expect(`${back.origin}${back.pathname}`).toBe(`${PUBLIC_URL}/consent`);
     const connected = await client.form(`/consent${back.search}`, connectIn(acme.workspaceId));
     const location = connected.headers.get("location");
-    assert(location !== null, "the consent redirected");
+    assert(location !== null, "the consent did not redirect");
     const callback = new URL(location, PUBLIC_URL);
     expect(`${callback.origin}${callback.pathname}`).toBe(CLAUDE_REDIRECT_URI);
     expect(callback.searchParams.get("code")).not.toBeNull();
   });
 
-  it("returns a signed-out person through sign-in to consent", async () => {
+  it("sends a signed-out person through sign-in back to consent", async () => {
     const acme = await app.provision({ name: "Acme" });
     const consent = await driveToPage(app, app.client(), acme.admin);
     const signedOut = app.client();
@@ -528,7 +528,7 @@ describe("the pages, as a person walks them", () => {
     expect(refused.status).toBe(401);
     const page = await refused.text();
     expectRefusalPage(page, REFUSAL_PAGES.signInFirst);
-    const link = linkOn(page);
+    const link = firstLink(page);
     expect(link).toEqual({
       href: `/sign-in${consent.search}`,
       label: REFUSAL_PAGES.signInFirst.signIn,
@@ -537,7 +537,7 @@ describe("the pages, as a person walks them", () => {
     expect(`${back.origin}${back.pathname}`).toBe(`${PUBLIC_URL}/consent`);
   });
 
-  it("tells a person whose connection failed to start again", async () => {
+  it("answers 400 with a start-again page to a forged signature", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
@@ -551,7 +551,7 @@ describe("the pages, as a person walks them", () => {
     expectRefusalPage(await failed.text(), REFUSAL_PAGES.notCompleted);
   });
 
-  it("mints no code when the member ends before consenting", async () => {
+  it("issues no code when the member is removed before consenting", async () => {
     const decided = await consentPostedAfter((acme) =>
       app.removeMember(acme.workspaceId, acme.admin.id),
     );
@@ -560,7 +560,7 @@ describe("the pages, as a person walks them", () => {
     expect(decided.headers.get("location")).toBeNull();
   });
 
-  const drawnThenMoved = async () => {
+  const consentThenSwitchWorkspace = async () => {
     const acme = await app.provision({ name: "Acme" });
     const zenith = await app.provision({ name: "Zenith" });
     const client = app.client();
@@ -574,8 +574,8 @@ describe("the pages, as a person walks them", () => {
   const consentsGiven = async (): Promise<unknown> =>
     (await app.database.superuser.query("SELECT count(*)::int AS n FROM oauth_consent")).rows[0];
 
-  it("refuses a grant once the session moved, minting no code", async () => {
-    const { acme, client, consent } = await drawnThenMoved();
+  it("refuses a grant once the session changed workspace", async () => {
+    const { acme, client, consent } = await consentThenSwitchWorkspace();
     const before = await consentsGiven();
 
     const refused = await client.form(`/consent${consent.search}`, connectIn(acme.workspaceId));
@@ -586,8 +586,8 @@ describe("the pages, as a person walks them", () => {
     expect(await consentsGiven()).toEqual(before);
   });
 
-  it("refuses a grant when a switch lands after the check", async () => {
-    const { acme, client, consent } = await drawnThenMoved();
+  it("refuses a grant when the workspace switches after the check", async () => {
+    const { acme, client, consent } = await consentThenSwitchWorkspace();
     const before = await consentsGiven();
 
     const grant = await grantingFor(acme.workspaceId, () =>
@@ -604,7 +604,7 @@ describe("the pages, as a person walks them", () => {
     expect(await consentsGiven()).toEqual(before);
   });
 
-  it("refuses a consent posted straight to the library", async () => {
+  it("answers 404 to a consent posted to Better Auth's endpoint", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
@@ -619,7 +619,7 @@ describe("the pages, as a person walks them", () => {
     expect(await consentsGiven()).toEqual(before);
   });
 
-  it("refuses a client's key rotation posted to the library", async () => {
+  it("answers 404 to a key rotation posted to Better Auth", async () => {
     const posted = await app.client().json("/oauth2/client/rotate-keys", {
       client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
       client_assertion: "a.b.c",
@@ -641,8 +641,8 @@ describe("the pages, as a person walks them", () => {
     expectRefusalPage(await refused.text(), REFUSAL_PAGES.workspaceMoved);
   });
 
-  it("takes a cancel after the session moved as a cancel", async () => {
-    const { client, consent } = await drawnThenMoved();
+  it("redirects access_denied for a cancel after the session moved", async () => {
+    const { client, consent } = await consentThenSwitchWorkspace();
     const before = await consentsGiven();
 
     const cancelled = await client.form(`/consent${consent.search}`, { accept: "false" });
@@ -652,7 +652,7 @@ describe("the pages, as a person walks them", () => {
     expect(await consentsGiven()).toEqual(before);
   });
 
-  it("refuses to be framed by another site", async () => {
+  it("forbids other sites from framing the consent page", async () => {
     const consentClient = app.client();
     const consent = await driveToPage(
       app,
@@ -669,7 +669,7 @@ describe("the pages, as a person walks them", () => {
 });
 
 describe("the pages refuse a cross-site form", () => {
-  it("refuses cross-origin consent despite the person's cookie, minting no code", async () => {
+  it("refuses cross-site consent carrying the person's cookie, issuing no code", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
@@ -690,7 +690,7 @@ describe("the pages refuse a cross-site form", () => {
     expectRefusalPage(await crossSite.text(), REFUSAL_PAGES.crossSite);
   });
 
-  it("refuses consent posted by a same-origin fetch, minting no code", async () => {
+  it("refuses consent posted by a same-origin fetch, issuing no code", async () => {
     /* jscpd:ignore-start */
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
@@ -727,11 +727,11 @@ describe("the pages refuse a cross-site form", () => {
     );
     expect(navigated.status).toBe(302);
     const location = navigated.headers.get("location");
-    assert(location !== null, "the authorization redirected");
+    assert(location !== null, "the authorization did not redirect");
     expect(new URL(location).searchParams.get("code")).not.toBeNull();
   });
 
-  it("refuses consent posted without Fetch Metadata, unlike any browser navigation", async () => {
+  it("refuses consent posted without the Fetch Metadata headers browsers send", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
@@ -746,7 +746,7 @@ describe("the pages refuse a cross-site form", () => {
     expect(bare.headers.get("location")).toBeNull();
   });
 
-  it("refuses a cross-origin code request, so sites cannot start sign-ins", async () => {
+  it("refuses a cross-origin email code request and sends no email", async () => {
     const response = await app.client().fetch("/email-otp/send-verification-otp", {
       method: "POST",
       headers: {
@@ -762,8 +762,8 @@ describe("the pages refuse a cross-site form", () => {
   });
 });
 
-describe("one origin, one session", () => {
-  it("sets a host-only, Secure-prefixed session cookie, never an apex one", async () => {
+describe("the session cookie and its origin", () => {
+  it("sets a host-only __Secure- session cookie with no Domain attribute", async () => {
     const acme = await app.provision({ name: "Host-only" });
     const client = app.client();
 
@@ -784,7 +784,7 @@ describe("one origin, one session", () => {
     expect(me.status).toBe(200);
   });
 
-  it("keeps a new session signed in over an ended one", async () => {
+  it("signs in again after the previous session was deleted", async () => {
     const acme = await app.provision({ name: "Ended" });
     const client = app.client();
     await signIn(app, client, acme.admin.email);
@@ -796,7 +796,7 @@ describe("one origin, one session", () => {
     expect(me.status).toBe(200);
   });
 
-  it("sends a sessionless person to sign-in, carrying the signed query", async () => {
+  it("sends a signed-out person to sign-in with the signed query", async () => {
     const { challenge } = pkce();
 
     const start = await app
@@ -804,7 +804,7 @@ describe("one origin, one session", () => {
       .fetch(authorizeUrl({ challenge, scope: "knowledge:read" }), { redirect: "manual" });
 
     const location = start.headers.get("location");
-    assert(location !== null, "the authorization redirected");
+    assert(location !== null, "the authorization did not redirect");
     const sent = new URL(location, PUBLIC_URL);
     expect(`${sent.origin}${sent.pathname}`).toBe(`${PUBLIC_URL}/sign-in`);
 
@@ -812,7 +812,7 @@ describe("one origin, one session", () => {
     expect(sent.searchParams.get("client_id")).toBe(CLAUDE_CLIENT_ID);
   });
 
-  it("answers the resume with an absolute address on the origin", async () => {
+  it("continues to consent on the app's origin after a pick", async () => {
     const two = await app.provision({ name: "Second" });
     const one = await app.provision({ name: "First" });
     await app.addMember(two.workspaceId, one.admin.id, "Viewer");
@@ -825,7 +825,7 @@ describe("one origin, one session", () => {
     expect(`${next.origin}${next.pathname}`).toBe(`${PUBLIC_URL}/consent`);
   });
 
-  it("refuses a cross-origin post that carries the person's cookie", async () => {
+  it("answers 403 to cross-origin posts carrying the person's cookie", async () => {
     const acme = await app.provision({ name: "Cross" });
     const client = app.client();
     await signIn(app, client, acme.admin.email);
@@ -845,7 +845,7 @@ describe("one origin, one session", () => {
   });
 });
 
-describe("the cookie session, through the same resolver", () => {
+describe("/me with a cookie session", () => {
   it("answers /me with the member row's workspace, person and role", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
@@ -856,7 +856,7 @@ describe("the cookie session, through the same resolver", () => {
     expect(me).toEqual({ workspaceId: acme.workspaceId, userId: acme.admin.id, role: "Admin" });
   });
 
-  it("refuses /me without a session and after credentials are revoked", async () => {
+  it("answers 401 to /me with no session or revoked credentials", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     expect((await client.fetch("/me")).status).toBe(401);
@@ -879,7 +879,7 @@ describe("refresh and revocation", () => {
     const client = app.client();
     const connected = await connectAsHost(app, client, acme.admin);
     const first = connected.refreshToken;
-    assert(first !== undefined, "the connection issued a refresh token");
+    assert(first !== undefined, "the connection issued no refresh token");
 
     const refreshed = await refresh(client, first);
     expect(refreshed.status).toBe(200);
@@ -891,7 +891,7 @@ describe("refresh and revocation", () => {
       [acme.admin.id],
     );
     const [current] = rows.rows;
-    assert(current !== undefined, "the refresh left a live token");
+    assert(current !== undefined, "the refresh left no unrevoked token");
     const lifetimeSeconds = current.expires_at.getTime() / 1000 - Date.now() / 1000;
     expect(Math.abs(lifetimeSeconds - REFRESH_TOKEN_LIFETIME_SECONDS)).toBeLessThan(120);
 
@@ -902,12 +902,12 @@ describe("refresh and revocation", () => {
     expect(family.status).toBe(400);
   });
 
-  it("revokes a refresh token, which then cannot be exchanged", async () => {
+  it("answers 400 to a refresh with a revoked refresh token", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const connected = await connectAsHost(app, client, acme.admin);
     const token = connected.refreshToken;
-    assert(token !== undefined, "the connection issued a refresh token");
+    assert(token !== undefined, "the connection issued no refresh token");
 
     const revoked = await client.fetch("/oauth2/revoke", {
       method: "POST",
@@ -933,14 +933,14 @@ describe("the audit logs", () => {
 
   const REFUSED_LINE = { client_id: CLAUDE_CLIENT_ID, workspace: null, token_id: null };
 
-  it("logs picks and token events, not sign-ins or secrets", async () => {
+  it("logs workspace picks and token events, never sign-ins or secrets", async () => {
     const one = await app.provision({ name: "Logged" });
     const two = await app.provision({ name: "Logged too" });
     await app.addMember(two.workspaceId, one.admin.id, "Viewer");
     const client = app.client();
     const before = app.logs.length;
     const connected = await connectAsHost(app, client, one.admin, { pick: two.workspaceId });
-    assert(connected.refreshToken !== undefined, "the connection issued a refresh token");
+    assert(connected.refreshToken !== undefined, "the connection issued no refresh token");
     const rotated = await json(await refresh(client, connected.refreshToken), rotatedTokens);
     const current = rotated.refresh_token;
     await client.fetch("/oauth2/revoke", {
@@ -978,7 +978,7 @@ describe("the audit logs", () => {
     expect(everything).not.toContain(app.codeSentTo(one.admin.email));
   });
 
-  const refreshTokensHeldBy = async (personId: string): Promise<number | undefined> => {
+  const countRefreshTokens = async (personId: string): Promise<number | undefined> => {
     const held = await app.database.superuser.query<{ held: number }>(
       "SELECT count(*)::int AS held FROM oauth_refresh_token WHERE user_id = $1",
       [personId],
@@ -986,7 +986,7 @@ describe("the audit logs", () => {
     return held.rows[0]?.held;
   };
 
-  /** One person each, because a refused replay ends every token its person holds for the assistant. */
+  /** Each call makes a new person, because a refused replay revokes every token that person has for the assistant. */
   const aConnectedMember = async (workspaceId: string) => {
     const person = await app.person();
     await app.addMember(workspaceId, person.id, "Viewer");
@@ -996,7 +996,7 @@ describe("the audit logs", () => {
     return { person, client, refreshToken: tokens.refreshToken ?? "" };
   };
 
-  it("logs a refused refresh as a refresh, whatever refused it", async () => {
+  it("logs every refused refresh as token_refresh, whatever the cause", async () => {
     const acme = await app.provision({ name: "Refreshed" });
     const replaying = await aConnectedMember(acme.workspaceId);
     expect((await refresh(replaying.client, replaying.refreshToken)).status).toBe(200);
@@ -1005,7 +1005,7 @@ describe("the audit logs", () => {
     const removed = await aConnectedMember(acme.workspaceId);
     const { api } = await webSignedIn(app, acme.admin.email);
     await api.members.remove.mutate({ personId: removed.person.id });
-    expect(await refreshTokensHeldBy(removed.person.id)).toBe(0);
+    expect(await countRefreshTokens(removed.person.id)).toBe(0);
     const before = app.logs.length;
 
     const statuses = [
@@ -1022,7 +1022,7 @@ describe("the audit logs", () => {
     );
   });
 
-  it("logs a refused code exchange as an issue", async () => {
+  it("logs a refused code exchange as token_issue", async () => {
     const acme = await app.provision({ name: "Reused" });
     const client = app.client();
     const connected = await connectAsHost(app, client, acme.admin);
@@ -1037,14 +1037,14 @@ describe("the audit logs", () => {
   });
 });
 
-describe("the limits", () => {
-  const onePast = async (send: () => Promise<Response>, max: number): Promise<number[]> => {
+describe("the rate limits", () => {
+  const exceed = async (send: () => Promise<Response>, max: number): Promise<number[]> => {
     const statuses: number[] = [];
     for (let attempt = 0; attempt <= max; attempt += 1) statuses.push((await send()).status);
     return statuses;
   };
 
-  const refusedOnlyAtTheLast = (statuses: readonly number[]): void => {
+  const expect429OnlyOnLast = (statuses: readonly number[]): void => {
     expect(statuses.slice(0, -1)).not.toContain(429);
     expect(statuses.at(-1)).toBe(429);
   };
@@ -1069,39 +1069,39 @@ describe("the limits", () => {
     });
 
   const COUNTS = {
-    trpc: { name: "tRPC", max: 120, ask: (client) => client.fetch("/trpc/session.member") },
-    "email-code-send": { name: "a code's send", max: 5, windowMs: TEN_MINUTES_MS, ask: aSend },
+    trpc: { name: "tRPC calls", max: 120, ask: (client) => client.fetch("/trpc/session.member") },
+    "email-code-send": { name: "email code sends", max: 5, windowMs: TEN_MINUTES_MS, ask: aSend },
     "email-code-sign-in": {
-      name: "a sign-in by code",
+      name: "email code sign-ins",
       max: 10,
       windowMs: TEN_MINUTES_MS,
       ask: (client) =>
         client.json("/sign-in/email-otp", { email: "nobody@example.invalid", otp: "000000" }),
     },
     identity: {
-      name: "Better Auth's own endpoints",
+      name: "Better Auth's endpoints",
       max: 120,
       ask: (client) => client.fetch("/get-session"),
     },
-    oauth: { name: "the OAuth paths", max: 60, ask: (client) => client.fetch("/oauth2/authorize") },
+    oauth: { name: "OAuth endpoints", max: 60, ask: (client) => client.fetch("/oauth2/authorize") },
     mcp: {
-      name: "a call with no bearer",
+      name: "unauthenticated MCP calls",
       max: 60,
       ask: (client) => client.json("/mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }),
     },
-    consent: { name: "consent", max: 30, ask: (client) => client.fetch("/consent") },
+    consent: { name: "the consent page", max: 30, ask: (client) => client.fetch("/consent") },
     "sign-in-link-read": {
-      name: "a sign-in link's read",
+      name: "sign-in link reads",
       max: 30,
       ask: (client) => client.json("/sign-in-link/describe", {}),
     },
     "sign-in-link-sign-in": {
-      name: "a sign-in by link",
+      name: "sign-ins by link",
       max: 10,
       ask: (client) => client.json("/sign-in-link/sign-in", {}),
     },
     "passkey-sign-in": {
-      name: "the passkey sign-in",
+      name: "passkey sign-ins",
       max: 30,
       ask: (client) => client.json("/passkeys/sign-in-options", {}),
     },
@@ -1110,14 +1110,14 @@ describe("the limits", () => {
   const ROUTES: readonly (Counted & { readonly group: string; readonly windowMs: number })[] =
     Object.entries(COUNTS).map(([group, counted]) => ({ group, windowMs: MINUTE_MS, ...counted }));
 
-  const ceilingsMetSince = (from: number) =>
+  const limitLinesSince = (from: number) =>
     app.logs.slice(from).filter((line) => line["event"] === "ingress.address_ceiling_met");
 
-  it.each(ROUTES)("counts $name apart from every other", async (flooded) => {
+  it.each(ROUTES)("rate-limits $name separately from every other route", async (flooded) => {
     const client = app.client();
     stopTheClock();
 
-    refusedOnlyAtTheLast(await onePast(() => flooded.ask(client), flooded.max));
+    expect429OnlyOnLast(await exceed(() => flooded.ask(client), flooded.max));
 
     const others: number[] = [];
     for (const route of ROUTES.filter((candidate) => candidate !== flooded)) {
@@ -1127,54 +1127,54 @@ describe("the limits", () => {
     expect((await client.fetch("/.well-known/oauth-protected-resource/mcp")).status).toBe(200);
   });
 
-  const atAWindowsStart = (windowMs: number): void => {
+  const moveToWindowStart = (windowMs: number): void => {
     stopTheClock();
     moveTheClock(windowMs - (clock.now().getTime() % windowMs));
   };
 
-  it.each(ROUTES)("logs once a window for $name", async (counted) => {
+  it.each(ROUTES)("logs the limit once per window for $name", async (counted) => {
     const client = app.client();
     const from = app.logs.length;
     const { windowMs } = counted;
-    atAWindowsStart(windowMs);
+    moveToWindowStart(windowMs);
 
-    await onePast(() => counted.ask(client), counted.max - 1);
-    const under = ceilingsMetSince(from).length;
+    await exceed(() => counted.ask(client), counted.max - 1);
+    const under = limitLinesSince(from).length;
     await counted.ask(client);
-    const atTheFirst = ceilingsMetSince(from).length;
+    const atTheFirst = limitLinesSince(from).length;
     for (let later = 0; later < 10; later += 1) await counted.ask(client);
     moveTheClock(windowMs - 1000);
     const inItsLastSecond = (await counted.ask(client)).status;
-    const afterEleven = ceilingsMetSince(from).length;
+    const afterEleven = limitLinesSince(from).length;
     moveTheClock(1000);
-    await onePast(() => counted.ask(client), counted.max);
+    await exceed(() => counted.ask(client), counted.max);
 
     expect([under, atTheFirst, afterEleven]).toEqual([0, 1, 1]);
     expect(inItsLastSecond).toBe(429);
-    expect(ceilingsMetSince(from).map((line) => line["group"])).toEqual([
+    expect(limitLinesSince(from).map((line) => line["group"])).toEqual([
       counted.group,
       counted.group,
     ]);
   });
 
-  it("logs whether the address is Anthropic's, and never the address", async () => {
+  it("logs whether the IP is Anthropic's, but never the IP", async () => {
     const theirs = app.client("160.79.104.1");
     const another = app.client("160.79.112.1");
     const from = app.logs.length;
     stopTheClock();
 
-    await onePast(() => theirs.fetch("/oauth2/token", { method: "POST" }), 60);
-    await onePast(() => another.fetch("/oauth2/token", { method: "POST" }), 60);
-    await onePast(() => theirs.json("/mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }), 60);
+    await exceed(() => theirs.fetch("/oauth2/token", { method: "POST" }), 60);
+    await exceed(() => another.fetch("/oauth2/token", { method: "POST" }), 60);
+    await exceed(() => theirs.json("/mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }), 60);
 
-    const lines = ceilingsMetSince(from);
+    const lines = limitLinesSince(from);
     expect(lines.map(({ group, anthropicRange }) => ({ group, anthropicRange }))).toEqual([
       { group: "oauth", anthropicRange: true },
       { group: "oauth", anthropicRange: false },
       { group: "mcp", anthropicRange: true },
     ]);
     const [line] = lines;
-    assert(line !== undefined, "the ceiling was logged");
+    assert(line !== undefined, "no rate-limit line was logged");
     expect(Object.keys(line).toSorted()).toEqual([
       "anthropicRange",
       "event",
@@ -1191,29 +1191,29 @@ describe("the limits", () => {
     expect(everyLine).not.toContain(another.ip);
   });
 
-  it("leaves a link's ten sign-ins after its thirty reads", async () => {
+  it("allows a link's ten sign-ins after its thirty reads", async () => {
     const client = app.client();
     stopTheClock();
 
-    const reads = await onePast(() => client.json("/sign-in-link/describe", {}), 29);
-    const signIns = await onePast(() => client.json("/sign-in-link/sign-in", {}), 10);
+    const reads = await exceed(() => client.json("/sign-in-link/describe", {}), 29);
+    const signIns = await exceed(() => client.json("/sign-in-link/sign-in", {}), 10);
 
     expect(reads).not.toContain(429);
-    refusedOnlyAtTheLast(signIns);
+    expect429OnlyOnLast(signIns);
   });
 
-  it("keys the page limit on CF-Connecting-IP alone, ignoring spoofed X-Forwarded-For", async () => {
+  it("counts the consent page limit by CF-Connecting-IP, not X-Forwarded-For", async () => {
     const client = app.client("203.0.113.10");
     let spoof = 0;
     stopTheClock();
 
-    const statuses = await onePast(
+    const statuses = await exceed(
       () =>
         client.fetch("/consent", { headers: { "x-forwarded-for": `203.0.113.${(spoof += 1)}` } }),
       30,
     );
 
-    refusedOnlyAtTheLast(statuses);
+    expect429OnlyOnLast(statuses);
 
     const other = await app
       .client("203.0.113.11")
@@ -1221,12 +1221,12 @@ describe("the limits", () => {
     expect(other.status).not.toBe(429);
   });
 
-  it("throttles codes per email across addresses", async () => {
+  it("limits email codes per email address across IP addresses", async () => {
     const email = `throttled-${Date.now()}@example.invalid`;
     let address = 20;
     stopTheClock();
 
-    const statuses = await onePast(
+    const statuses = await exceed(
       () =>
         app
           .client(`203.0.113.${(address += 1)}`)
@@ -1234,11 +1234,11 @@ describe("the limits", () => {
       5,
     );
 
-    refusedOnlyAtTheLast(statuses);
+    expect429OnlyOnLast(statuses);
     expect(app.emails.filter((message) => message.to === email).length).toBeLessThanOrEqual(5);
   });
 
-  it("leaves a malformed code request to Better Auth's refusal", async () => {
+  it("lets Better Auth answer 400 to a malformed code request", async () => {
     const client = app.client();
 
     const unparsed = await client.fetch(SEND_EMAIL_CODE_PATH, {
@@ -1255,7 +1255,7 @@ describe("the limits", () => {
     "/.well-known/oauth-protected-resource",
     "/.well-known/oauth-protected-resource/mcp",
     "/.well-known/oauth-authorization-server",
-  ])("never refuses %s, served to be kept", async (path) => {
+  ])("never rate-limits %s and lets caches keep it five minutes", async (path) => {
     const client = app.client();
     stopTheClock();
 
@@ -1270,7 +1270,7 @@ describe("the limits", () => {
     );
   });
 
-  it("serves no OpenID document, counted or kept", async () => {
+  it("answers 404 for the OpenID document every time, uncached", async () => {
     const client = app.client();
 
     const reads: { status: number; kept: string | null }[] = [];
@@ -1283,27 +1283,27 @@ describe("the limits", () => {
     expect(reads.map((read) => read.kept)).not.toContain("public, max-age=300");
   });
 
-  it("tells nobody to keep a discovery path's refusal", async () => {
+  it("sends no cache-control header with a discovery path's 404", async () => {
     const refused = await app.client().json("/.well-known/oauth-protected-resource/mcp", {});
 
     expect(refused.status).toBe(404);
     expect(refused.headers.get("cache-control")).toBeNull();
   });
 
-  /** Each answers a 4xx of the library's own until the ceiling: none carries what it asks for. */
+  /** Better Auth answers each request with its own 4xx until the limit, because none sends the parameters the path needs. */
   const OAUTH_PATHS = [
     { path: "/oauth2/authorize", method: "GET" },
     { path: "/oauth2/token", method: "POST" },
     { path: "/jwks", method: "GET" },
   ] as const;
 
-  const isOursAlone = async (past: Response): Promise<void> => {
+  const expectOur429 = async (past: Response): Promise<void> => {
     expect(past.status).toBe(429);
     expect(Number(past.headers.get("retry-after"))).toBeGreaterThan(0);
     expect(await past.json()).toMatchObject({ error: "too_many_requests" });
   };
 
-  it.each(OAUTH_PATHS)("refuses $path in our words at the 61st only", async ({ path, method }) => {
+  it.each(OAUTH_PATHS)("answers our 429 to the 61st call to $path", async ({ path, method }) => {
     const client = app.client();
     stopTheClock();
 
@@ -1314,10 +1314,10 @@ describe("the limits", () => {
     const past = await client.fetch(path, { method });
 
     expect(statuses).not.toContain(429);
-    await isOursAlone(past);
+    await expectOur429(past);
   });
 
-  it("refuses a client registration outright", async () => {
+  it("answers 403 to a dynamic client registration", async () => {
     const client = app.client();
 
     const refused = await client.json("/oauth2/register", { redirect_uris: [CLAUDE_REDIRECT_URI] });
@@ -1326,7 +1326,7 @@ describe("the limits", () => {
     expect(await refused.json()).toMatchObject({ error: "access_denied" });
   });
 
-  const countedByTheApi = async (ip: string): Promise<string[]> => {
+  const countersFor = async (ip: string): Promise<string[]> => {
     const held = await app.database.superuser.query<{ key: string }>(
       "SELECT key FROM ingress_counter WHERE scope = 'ip' AND key LIKE $1 ORDER BY key",
       [`%:${ip}`],
@@ -1334,35 +1334,35 @@ describe("the limits", () => {
     return held.rows.map((row) => row.key.slice(0, -(ip.length + 1)));
   };
 
-  it("refuses a steady session read at its ceiling only", async () => {
+  it("answers 429 to session reads only past 120 a minute", async () => {
     const client = app.client();
     const read = (): Promise<Response> => client.fetch("/get-session");
     stopTheClock();
 
-    const first = await onePast(read, 109);
+    const first = await exceed(read, 109);
     moveTheClock(MINUTE_MS);
-    const second = await onePast(read, 119);
+    const second = await exceed(read, 119);
     const past = await read();
 
     expect([...first, ...second]).not.toContain(429);
-    await isOursAlone(past);
+    await expectOur429(past);
   });
 
-  it("refuses no page, however often it is loaded", async () => {
+  it("never rate-limits or counts a page load", async () => {
     const client = app.client();
 
-    const signInPage = await onePast(() => client.fetch("/sign-in"), 4);
-    const another = await onePast(() => client.fetch("/sources"), 100);
+    const signInPage = await exceed(() => client.fetch("/sign-in"), 4);
+    const another = await exceed(() => client.fetch("/sources"), 100);
     const besideAnEndpoint = [
       await client.fetch("/email-otp/no-such-path"),
       await client.fetch("/forget-password/no-such-path"),
     ].map((answer) => answer.status);
 
     expect([...signInPage, ...another, ...besideAnEndpoint]).not.toContain(429);
-    expect(await countedByTheApi(client.ip)).toEqual([]);
+    expect(await countersFor(client.ip)).toEqual([]);
   });
 
-  /** Every endpoint that takes or sends an emailed code, as the installed release mounts them. */
+  /** Every endpoint that takes or sends an emailed code, at the paths the installed Better Auth version mounts. */
   const EMAIL_CODE_PATHS = [
     "/email-otp/change-email",
     "/email-otp/check-verification-otp",
@@ -1382,13 +1382,13 @@ describe("the limits", () => {
     return path.startsWith("/oauth2/") || path === "/jwks" ? ["oauth"] : ["identity"];
   };
 
-  it("gives each path Better Auth mounts its one count", async () => {
+  it("counts each Better Auth path under its expected limit", async () => {
     const counts: { path: string; counters: readonly string[] }[] = [];
 
     for (const path of mountedPaths(authOver(app))) {
       const client = app.client();
       await client.fetch(path.replaceAll(/:[a-z_]+/g, "any"), { method: "POST" });
-      counts.push({ path, counters: await countedByTheApi(client.ip) });
+      counts.push({ path, counters: await countersFor(client.ip) });
     }
 
     expect(counts).toEqual(
@@ -1405,15 +1405,15 @@ describe("the limits", () => {
     type: "sign-in",
   });
 
-  /** A post as a form or a script elsewhere sends it: a foreign origin, or a sandboxed frame's. */
-  const postedFrom = (client: Client, path: string, origin: string): Promise<Response> =>
+  /** Posts the way a form or script on another site does. A sandboxed frame sends the origin "null". */
+  const postCrossSite = (client: Client, path: string, origin: string): Promise<Response> =>
     client.fetch(path, {
       method: "POST",
       headers: { origin, "sec-fetch-site": "cross-site", "content-type": "text/plain" },
       body: A_POST_BODY,
     });
 
-  const postedNamingNoOrigin = async (client: Client, path: string): Promise<Response> =>
+  const postWithoutOrigin = async (client: Client, path: string): Promise<Response> =>
     app.server.request(
       new Request(`${PUBLIC_URL}${path}`, {
         method: "POST",
@@ -1422,14 +1422,14 @@ describe("the limits", () => {
       }),
     );
 
-  const askedFromAnotherSite = async (client: Client, path: string): Promise<number[]> => {
+  const requestFromAnotherSite = async (client: Client, path: string): Promise<number[]> => {
     const statuses: number[] = [];
     for (let asked = 0; asked < 11; asked += 1) {
       const answers = [
         await client.fetch(path, { headers: { "sec-fetch-site": "cross-site" } }),
-        await postedFrom(client, path, "https://elsewhere.example"),
-        await postedFrom(client, path, "null"),
-        await postedNamingNoOrigin(client, path),
+        await postCrossSite(client, path, "https://elsewhere.example"),
+        await postCrossSite(client, path, "null"),
+        await postWithoutOrigin(client, path),
       ];
       statuses.push(...answers.map((answer) => answer.status));
     }
@@ -1444,47 +1444,47 @@ describe("the limits", () => {
   ] as const satisfies readonly (readonly [string, AddressScope])[];
 
   it.each([...EMAIL_CODE_PATHS, ...SIGN_IN_PATHS.map(([path]) => path)])(
-    "spends no count on another site's asks of %s",
+    "counts nothing for another site's requests to %s",
     async (path) => {
       const client = app.client();
 
-      const statuses = await askedFromAnotherSite(client, path);
+      const statuses = await requestFromAnotherSite(client, path);
 
       expect(statuses).toEqual(Array.from({ length: 11 }, () => [404, 403, 403, 403]).flat());
-      expect(await countedByTheApi(client.ip)).toEqual([]);
+      expect(await countersFor(client.ip)).toEqual([]);
     },
   );
 
   it.each([...new Set(SIGN_IN_PATHS.map(([, group]) => group))])(
-    "counts %s from its own page after another site's flood",
+    "counts only same-site %s requests after a cross-site flood",
     async (group) => {
       const client = app.client();
       stopTheClock();
       for (const [path] of SIGN_IN_PATHS.filter(([, counted]) => counted === group)) {
-        await askedFromAnotherSite(client, path);
+        await requestFromAnotherSite(client, path);
       }
 
-      refusedOnlyAtTheLast(await onePast(() => COUNTS[group].ask(client), COUNTS[group].max));
-      expect(await countedByTheApi(client.ip)).toEqual([group]);
+      expect429OnlyOnLast(await exceed(() => COUNTS[group].ask(client), COUNTS[group].max));
+      expect(await countersFor(client.ip)).toEqual([group]);
     },
   );
 
-  it("counts its own page's asks after another site's flood", async () => {
+  it("counts only same-site email code requests after a cross-site flood", async () => {
     const client = app.client();
     stopTheClock();
-    await askedFromAnotherSite(client, SEND_EMAIL_CODE_PATH);
-    await askedFromAnotherSite(client, "/sign-in/email-otp");
+    await requestFromAnotherSite(client, SEND_EMAIL_CODE_PATH);
+    await requestFromAnotherSite(client, "/sign-in/email-otp");
 
-    const sent = await onePast(() => aSend(client), 5);
-    const tried = await onePast(() => COUNTS["email-code-sign-in"].ask(client), 10);
+    const sent = await exceed(() => aSend(client), 5);
+    const tried = await exceed(() => COUNTS["email-code-sign-in"].ask(client), 10);
 
     expect(sent).toEqual([200, 200, 200, 200, 200, 429]);
-    refusedOnlyAtTheLast(tried);
-    expect(await countedByTheApi(client.ip)).toEqual(["email-code-send", "email-code-sign-in"]);
+    expect429OnlyOnLast(tried);
+    expect(await countersFor(client.ip)).toEqual(["email-code-send", "email-code-sign-in"]);
     expect(app.emails.filter((message) => message.to === "nobody@example.invalid")).toEqual([]);
   });
 
-  it("answers no endpoint under a spelling it does not count", async () => {
+  it("answers 404 to uncounted spellings of an endpoint path", async () => {
     const client = app.client();
 
     const spelt = [
@@ -1492,7 +1492,7 @@ describe("the limits", () => {
       await client.fetch("//get-session"),
       await client.fetch("/GET-SESSION"),
     ].map((answer) => answer.status);
-    const counted = await countedByTheApi(client.ip);
+    const counted = await countersFor(client.ip);
     const asMounted = await client.fetch("/get-session");
 
     expect(spelt).toEqual([404, 404, 404]);
@@ -1500,27 +1500,27 @@ describe("the limits", () => {
     expect(asMounted.status).toBe(200);
   });
 
-  it("refuses a sixth code in one window, in our words", async () => {
+  it("answers our 429 to a sixth code in one window", async () => {
     const client = app.client();
     stopTheClock();
 
-    const statuses = await onePast(() => aSend(client), 4);
+    const statuses = await exceed(() => aSend(client), 4);
     const past = await aSend(client);
 
     expect(statuses).toEqual([200, 200, 200, 200, 200]);
-    await isOursAlone(past);
+    await expectOur429(past);
   });
 
-  it("refuses by email before it counts the address", async () => {
+  it("refuses by email address before counting the IP address", async () => {
     const [filling, asking] = [app.client(), app.client()];
     const email = `one-address-${Date.now()}@example.invalid`;
     const sendTo = (client: Client): Promise<Response> =>
       client.json(SEND_EMAIL_CODE_PATH, { email, type: "sign-in" });
     stopTheClock();
 
-    await onePast(() => sendTo(filling), 4);
+    await exceed(() => sendTo(filling), 4);
     const refused = await sendTo(asking);
-    const others = await onePast(() => aSend(asking), 4);
+    const others = await exceed(() => aSend(asking), 4);
 
     expect(await refused.json()).toMatchObject({
       error_description: "Too many codes requested for this address; try again later.",
@@ -1528,7 +1528,7 @@ describe("the limits", () => {
     expect(others).toEqual([200, 200, 200, 200, 200]);
   });
 
-  it("answers a sixth code once the first window passes", async () => {
+  it("allows a sixth code after the first leaves the window", async () => {
     const client = app.client();
     stopTheClock();
 

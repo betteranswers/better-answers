@@ -7,7 +7,7 @@ from support.roots import REPOSITORY_ROOT
 
 CONTRACTS_DIR = REPOSITORY_ROOT / "contracts"
 
-WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER = (
+PROMPT_OR_COMPLETION_WORDS = (
     "prompt",
     "completion",
     "message",
@@ -17,7 +17,7 @@ WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER = (
     "body",
 )
 
-PURPOSE_CARRYING_DIMENSIONS = "embedding"
+EMBEDDING_PURPOSE = "embedding"
 
 
 def read_cost_ledger() -> dict[str, Any]:
@@ -29,7 +29,7 @@ def recorded_columns() -> list[str]:
     return sorted(field["field"] for field in read_cost_ledger()["fields"])
 
 
-def purposes_the_rows_use() -> list[str]:
+def purposes_in_rows() -> list[str]:
     return sorted({row["purpose"] for row in read_cost_ledger()["rows"]})
 
 
@@ -40,11 +40,11 @@ def test_every_row_carries_exactly_the_recorded_columns() -> None:
         assert sorted(row) == columns, row
 
 
-def test_records_exactly_the_columns_the_table_has() -> None:
+def test_recorded_columns_match_the_llm_call_table() -> None:
     assert sorted(TABLES["public.llm_call"]) == recorded_columns()
 
 
-def test_records_exactly_the_outcomes_the_table_admits() -> None:
+def test_recorded_outcomes_match_the_llm_call_outcome_check() -> None:
     from support.pg_harness import migrated_postgres
 
     fixture = read_cost_ledger()
@@ -55,18 +55,18 @@ def test_records_exactly_the_outcomes_the_table_admits() -> None:
             " WHERE conname = 'llm_call_outcome_check'"
         )
         found = cursor.fetchone()
-        assert found is not None
-        admitted = sorted(re.findall(r"'([^']+)'::text", str(found[0])))
-        assert admitted == sorted(entry["outcome"] for entry in fixture["outcomes"])
+        assert found is not None, "the llm_call_outcome_check constraint is missing"
+        allowed = sorted(re.findall(r"'([^']+)'::text", str(found[0])))
+        assert allowed == sorted(entry["outcome"] for entry in fixture["outcomes"])
 
 
-def test_records_no_column_a_prompt_or_completion_sits_under() -> None:
+def test_no_column_name_suggests_prompt_or_completion_text() -> None:
     for column in recorded_columns():
-        for word in WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER:
+        for word in PROMPT_OR_COMPLETION_WORDS:
             assert word not in column, column
 
 
-def test_resolves_a_model_choice_for_every_purpose_and_no_other() -> None:
+def test_model_choice_for_resolves_every_llm_purpose() -> None:
     from support.factories import (
         EMBEDDING_DIMENSIONS,
         seed_model_choice,
@@ -74,11 +74,11 @@ def test_resolves_a_model_choice_for_every_purpose_and_no_other() -> None:
     )
     from support.pg_harness import migrated_postgres
 
-    purposes = purposes_the_rows_use()
+    purposes = purposes_in_rows()
 
     with migrated_postgres() as connection, connection.cursor() as cursor:
         cursor.execute("SELECT unnest(enum_range(NULL::llm_purpose))::text")
-        assert sorted(spoken for (spoken,) in cursor.fetchall()) == purposes
+        assert sorted(name for (name,) in cursor.fetchall()) == purposes
 
         workspace = seed_workspace(cursor)
         seeded = {
@@ -87,9 +87,7 @@ def test_resolves_a_model_choice_for_every_purpose_and_no_other() -> None:
                 workspace_id=workspace["id"],
                 purpose=purpose,
                 dimensions=(
-                    EMBEDDING_DIMENSIONS
-                    if purpose == PURPOSE_CARRYING_DIMENSIONS
-                    else None
+                    EMBEDDING_DIMENSIONS if purpose == EMBEDDING_PURPOSE else None
                 ),
             )["id"]
             for purpose in purposes
@@ -111,7 +109,7 @@ def test_resolves_a_model_choice_for_every_purpose_and_no_other() -> None:
         connection.rollback()
 
 
-def test_every_outcome_has_a_row_and_one_is_a_failure() -> None:
+def test_every_outcome_has_a_row_and_a_failure_row_exists() -> None:
     fixture = read_cost_ledger()
 
     assert sorted({row["outcome"] for row in fixture["rows"]}) == sorted(
@@ -121,17 +119,23 @@ def test_every_outcome_has_a_row_and_one_is_a_failure() -> None:
     failures = {
         outcome["outcome"] for outcome in fixture["outcomes"] if outcome["failure"]
     }
-    assert [row for row in fixture["rows"] if row["outcome"] in failures]
+    assert [row for row in fixture["rows"] if row["outcome"] in failures], (
+        "no row in rows.json has a failure outcome"
+    )
 
 
-def test_every_row_serves_exactly_one_run_or_answer() -> None:
+def test_every_row_belongs_to_exactly_one_run_or_answer() -> None:
     rows = read_cost_ledger()["rows"]
 
     for row in rows:
-        served = [
-            named for named in (row["run_id"], row["answer_id"]) if named is not None
+        owners = [
+            owner for owner in (row["run_id"], row["answer_id"]) if owner is not None
         ]
-        assert len(served) == 1, row
+        assert len(owners) == 1, row
 
-    assert [row for row in rows if row["run_id"] is not None]
-    assert [row for row in rows if row["answer_id"] is not None]
+    assert [row for row in rows if row["run_id"] is not None], (
+        "no row in rows.json has a run_id"
+    )
+    assert [row for row in rows if row["answer_id"] is not None], (
+        "no row in rows.json has an answer_id"
+    )

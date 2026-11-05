@@ -149,7 +149,7 @@ const asked = async (workspace: ProvisionedWorkspace) => {
 };
 
 describe("a person's activity", () => {
-  it("marks a role change by Hannah, to Priya", async () => {
+  it("shows Hannah's role change as by her and to Priya", async () => {
     const workspace = await provisionedWorkspace(db(), "Hannahs", {
       name: "Hannah Reid",
       email: "hannah.reid@example.invalid",
@@ -184,7 +184,7 @@ describe("a person's activity", () => {
     expect(onPriyas.events[0]?.id).toBe(onHannahs.events[0]?.id);
   });
 
-  it("marks a self-demotion once, as both", async () => {
+  it("lists a self-demotion once, as both by and to", async () => {
     const workspace = await provisionedWorkspace(db(), "Demoted");
     const sam = await memberAt(workspace, "Admin", "Sam Okoro");
     answered(await roleChanged(workspace, workspace.adminUserId, workspace.adminUserId, "Editor"));
@@ -197,7 +197,7 @@ describe("a person's activity", () => {
     ]);
   });
 
-  it("shows a declined request through the requester's id", async () => {
+  it("shows a declined request in the requester's activity", async () => {
     const workspace = await provisionedWorkspace(db(), "Declined");
     const { priya, requestId } = await asked(workspace);
     answered(
@@ -229,7 +229,7 @@ describe("a person's activity", () => {
     ]);
   });
 
-  it("shows a rejoined member's earlier stint beneath the later one", async () => {
+  it("lists a rejoined member's earlier membership below the later one", async () => {
     const workspace = await provisionedWorkspace(db(), "Rejoined");
     const priya = await aPerson("Priya Shah");
     await accepted(priya, await invited(workspace, priya));
@@ -252,7 +252,7 @@ describe("a person's activity", () => {
     ]);
   });
 
-  it("shows group changes through the member's id", async () => {
+  it("shows group changes in the member's activity", async () => {
     const workspace = await provisionedWorkspace(db(), "Grouped");
     const priya = await memberAt(workspace, "Viewer", "Priya Shah");
     const { groupId } = answered(
@@ -277,7 +277,7 @@ describe("a person's activity", () => {
     ]);
   });
 
-  it("shows the platform adding Priya as done to her", async () => {
+  it("shows the platform adding Priya as an action to her", async () => {
     const workspace = await provisionedWorkspace(db(), "PlatformAdded");
     const email = addressOf("priya.shah");
     const priya = await seedPerson(db().pool, { email, emailVerified: true, name: "Priya Shah" });
@@ -292,7 +292,7 @@ describe("a person's activity", () => {
     expect(await linesOf(workspace, priya)).toEqual([["people.member.added", "to"]]);
   });
 
-  it("shows the first Admin's provisioning as done to them", async () => {
+  it("shows provisioning as an action to the first Admin", async () => {
     const workspace = await provisionedWorkspace(db(), "Provisioned");
 
     expect(await linesOf(workspace, workspace.adminUserId)).toEqual([
@@ -320,7 +320,7 @@ describe("a person's activity", () => {
     expect(await linesOf(workspace, priya)).toEqual([["people.member.joined", "both"]]);
   });
 
-  it("never shows another workspace's events, even by its cursor", async () => {
+  it("never shows another workspace's events, even with its cursor", async () => {
     const ours = await provisionedWorkspace(db(), "OurActivity");
     const theirs = await provisionedWorkspace(db(), "TheirActivity");
     const priya = await memberAt(ours, "Viewer", "Priya Shah");
@@ -341,13 +341,13 @@ describe("a person's activity", () => {
     expect(byTheirCursor).toEqual({ events: [], nextCursor: null });
   });
 
-  it("answers an unknown person an empty stream", async () => {
+  it("returns no events for an unknown person", async () => {
     const workspace = await provisionedWorkspace(db(), "Nobody");
 
     expect(pageOf(await activityOf(workspace, ulid()))).toEqual({ events: [], nextCursor: null });
   });
 
-  it("finds every action naming the person in its detail alone", async () => {
+  it("finds actions that name the person only in their detail", async () => {
     const workspace = await provisionedWorkspace(db(), "NamedInDetail");
     const priya = await aPerson("Priya Shah");
     const namings = [
@@ -409,7 +409,7 @@ const newestFirst = (events: readonly { id: string; at: Date }[]) =>
   events.toSorted((a, b) => b.at.getTime() - a.at.getTime() || (a.id < b.id ? 1 : -1));
 
 describe("paging a person's activity", () => {
-  it("pages sixty events as fifty then ten, none repeated", async () => {
+  it("pages sixty events as fifty then ten, with no repeats", async () => {
     const workspace = await provisionedWorkspace(db(), "Paged");
     const priya = await memberAt(workspace, "Viewer", "Priya Shah");
     const expected = newestFirst(await sixtyEventsOf(workspace, priya)).map(({ id }) => id);
@@ -423,7 +423,7 @@ describe("paging a person's activity", () => {
     expect(rest.nextCursor).toBeNull();
   });
 
-  it("pages events sharing an instant across the page's end", async () => {
+  it("pages events with the same timestamp across a page boundary", async () => {
     const workspace = await provisionedWorkspace(db(), "PagedTies");
     const priya = await memberAt(workspace, "Viewer", "Priya Shah");
     const fourAnInstant = (index: number) => Math.floor(index / 4);
@@ -456,7 +456,7 @@ const readAfterTheStoreFailed = async (workspace: ProvisionedWorkspace, reader: 
 };
 
 describe("who may read a person's activity", () => {
-  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
+  it.each(["Editor", "Viewer"] as const)("refuses the %s role with role-forbids", async (role) => {
     const workspace = await provisionedWorkspace(db(), `Refused${role}`);
     const reader = await memberAt(workspace, role, "Una Member");
 
@@ -466,7 +466,7 @@ describe("who may read a person's activity", () => {
     });
   });
 
-  it("refuses before reading anything, on an aborted transaction too", async () => {
+  it("refuses before any read, even in an aborted transaction", async () => {
     const workspace = await provisionedWorkspace(db(), "RefusedFirst");
     const reader = await memberAt(workspace, "Viewer", "Una Member");
 
@@ -476,7 +476,7 @@ describe("who may read a person's activity", () => {
     });
   });
 
-  it("answers the store's own failure rather than an empty page", async () => {
+  it("returns the store's error instead of an empty page", async () => {
     const workspace = await provisionedWorkspace(db(), "ActivityUnread");
 
     expect(await readAfterTheStoreFailed(workspace, workspace.adminUserId)).toEqual({
@@ -527,7 +527,7 @@ const planOfTheRead = (workspace: ProvisionedWorkspace, priya: string) =>
         await readActivity(principal, spied, inputOf(readActivityInput, { personId: priya })),
       );
       const read = sent.find(({ statement }) => statement.includes("UNION ALL"));
-      if (read === undefined) throw new Error("the read sent no statement over its arms");
+      if (read === undefined) throw new Error("readActivity sent no UNION ALL statement");
       const plan = await tx.query<{ "QUERY PLAN": string }>(
         `EXPLAIN (ANALYZE, COSTS OFF) ${read.statement}`,
         read.values,
@@ -537,7 +537,7 @@ const planOfTheRead = (workspace: ProvisionedWorkspace, priya: string) =>
   );
 
 describe("reading a busy audit log", () => {
-  it("reads each arm through an index, own actions by actor", async () => {
+  it("reads by index, using the actor index for own actions", async () => {
     const workspace = await provisionedWorkspace(db(), "Busy");
     const priya = await memberAt(workspace, "Admin", "Priya Shah");
     await aBusyLog(workspace, priya);

@@ -14,13 +14,13 @@ DOCKERFILE = WORKER_ROOT / "Dockerfile"
 
 A_NAMESPACE = "publicsuffix.org-tlds"
 AN_ENTRY = f"de84b5ca2167d4c83e38fb162f2e8738{CACHE_ENTRY_SUFFIX}"
-WHAT_IT_HELD = '[["co.uk"], []]'
+ENTRY_CONTENT = '[["co.uk"], []]'
 
 
-def _a_warmed_cache(at: Path) -> Path:
+def _write_a_warmed_cache(at: Path) -> Path:
     entry = at / A_NAMESPACE / AN_ENTRY
     entry.parent.mkdir(parents=True)
-    entry.write_text(WHAT_IT_HELD, "utf-8")
+    entry.write_text(ENTRY_CONTENT, "utf-8")
 
     Path(f"{entry}.lock").write_text("", "utf-8")
     (at / "another-build-was-here").write_text("", "utf-8")
@@ -32,38 +32,38 @@ def test_copies_the_cached_suffix_list_without_its_locks(
 ) -> None:
 
     cache = tmp_path / "mount"
-    _a_warmed_cache(cache)
+    _write_a_warmed_cache(cache)
     monkeypatch.setenv("TLDEXTRACT_CACHE", str(cache))
-    carried_to = tmp_path / "image"
+    destination = tmp_path / "image"
 
-    copy_out(carried_to)
+    copy_out(destination)
 
-    landed = sorted(
-        found.relative_to(carried_to).as_posix()
-        for found in carried_to.rglob("*")
+    copied = sorted(
+        found.relative_to(destination).as_posix()
+        for found in destination.rglob("*")
         if found.is_file()
     )
-    assert landed == [f"{A_NAMESPACE}/{AN_ENTRY}"]
-    assert (carried_to / A_NAMESPACE / AN_ENTRY).read_text("utf-8") == WHAT_IT_HELD
+    assert copied == [f"{A_NAMESPACE}/{AN_ENTRY}"]
+    assert (destination / A_NAMESPACE / AN_ENTRY).read_text("utf-8") == ENTRY_CONTENT
     assert [found.name for found in warmed_entries()] == [AN_ENTRY]
 
 
-def test_a_build_that_warmed_nothing_refuses_to_ship_a_fetch(
+def test_copy_out_raises_when_the_suffix_cache_is_empty(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
 
     cache = tmp_path / "mount"
     cache.mkdir()
     monkeypatch.setenv("TLDEXTRACT_CACHE", str(cache))
-    carried_to = tmp_path / "image"
+    destination = tmp_path / "image"
 
     with pytest.raises(RuntimeError):
-        copy_out(carried_to)
+        copy_out(destination)
 
-    assert not carried_to.exists()
+    assert not destination.exists()
 
 
-def test_the_build_warms_the_suffix_list_through_its_own_module() -> None:
+def test_the_dockerfile_warms_the_suffix_list_with_the_suffixes_module() -> None:
 
     dockerfile = DOCKERFILE.read_text("utf-8")
 

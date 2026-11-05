@@ -111,7 +111,7 @@ const groupSeeded = (workspace: ProvisionedWorkspace, name: string) =>
     });
   });
 
-describe("the audit log's export", () => {
+describe("exporting the audit log", () => {
   it("writes the events as CSV, newest first, one per line", async () => {
     const workspace = await provisionedWorkspace(db(), "Exported", { name: "Hannah Wright" });
     await groupMade(workspace, workspace.adminUserId, "Bid writers");
@@ -135,7 +135,7 @@ describe("the audit log's export", () => {
     expect(file).toMatchObject({ count: 2, capped: false });
   });
 
-  it("writes the family and search's events alone", async () => {
+  it("writes only the events matching the family and search", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportedNarrow");
     await groupMade(workspace, workspace.adminUserId, "Bid writers");
     await groupMade(workspace, workspace.adminUserId, "Site team");
@@ -148,7 +148,7 @@ describe("the audit log's export", () => {
     expect(file.count).toBe(1);
   });
 
-  it("records the Admin, family and person matched", async () => {
+  it("records the export with its Admin, family and matched person", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportRecorded");
     const address = `priya.${workspace.workspaceId.toLowerCase()}@example.com`;
     const priya = await memberAt(workspace, "Viewer", { name: "Priya Shah", email: address });
@@ -174,7 +174,7 @@ describe("the audit log's export", () => {
     expect(JSON.stringify(events)).not.toContain("@");
   });
 
-  it("records the groups a search matched, and no family unasked", async () => {
+  it("records matched groups, and no family when none was given", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportGroups");
     const group = await groupMade(workspace, workspace.adminUserId, "Bid writers");
 
@@ -188,7 +188,7 @@ describe("the audit log's export", () => {
     });
   });
 
-  it("flags and records a search naming over 100 groups", async () => {
+  it("flags and records a search matching over 100 groups", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportTooBroad");
     await seedingWith(db().pool, async (seed) => {
       for (let crew = 1; crew <= 101; crew += 1) {
@@ -207,7 +207,7 @@ describe("the audit log's export", () => {
     expect(recorded?.detail["matched"]).toHaveLength(100);
   });
 
-  it("matches no one known only to another workspace", async () => {
+  it("matches no one who belongs only to another workspace", async () => {
     const ours = await provisionedWorkspace(db(), "OurExport");
     const address = `una.${ours.workspaceId.toLowerCase()}@example.com`;
     await provisionedWorkspace(db(), "TheirExport", { name: "Una Elsewhere", email: address });
@@ -286,7 +286,7 @@ describe("the audit log's export", () => {
     expect(linesOf(file)[2]).toContain(`,"a connected source (removed)",`);
   });
 
-  it("writes no title of a concept outside the Admin's audience", async () => {
+  it("hides the title of a concept outside the Admin's audience", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportWithheld");
     const { workspaceId } = workspace;
     await seedingWith(db().pool, async (seed) => {
@@ -314,7 +314,7 @@ describe("the audit log's export", () => {
     expect(file.csv).not.toContain("Board Pay Secret");
   });
 
-  it("writes a display name starting with = after an apostrophe", async () => {
+  it("prefixes a display name starting with = with an apostrophe", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportFormula", { name: "=Priya" });
     await groupMade(workspace, workspace.adminUserId, "Bid writers");
 
@@ -334,7 +334,7 @@ describe("the audit log's export", () => {
     [",=1+1", `",=1+1"`],
     [`","=HYPERLINK("x")`, `""",""=HYPERLINK(""x"")"`],
     ["Site = team", `"Site = team"`],
-  ])("writes the group %j inert", async (name, cell) => {
+  ])("escapes the group name %j for spreadsheets", async (name, cell) => {
     const workspace = await provisionedWorkspace(db(), "ExportInert");
     await groupSeeded(workspace, name);
 
@@ -343,7 +343,7 @@ describe("the audit log's export", () => {
     expect(file.csv).toContain(`,${cell},"`);
   });
 
-  it("stops at 10,000 rows, saying so on a line", async () => {
+  it("stops at 10,000 rows and adds a line saying so", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportCapped");
     await auditEventsIn(db().pool, {
       workspaceId: workspace.workspaceId,
@@ -366,18 +366,15 @@ describe("the audit log's export", () => {
     });
   });
 
-  it.each(["Editor", "Viewer"] as const)(
-    "refuses a member at %s, recording nothing",
-    async (role) => {
-      const workspace = await provisionedWorkspace(db(), `ExportRefused${role}`);
-      const member = await memberAt(workspace, role, { name: "Una Member" });
+  it.each(["Editor", "Viewer"] as const)("refuses the %s role, recording nothing", async (role) => {
+    const workspace = await provisionedWorkspace(db(), `ExportRefused${role}`);
+    const member = await memberAt(workspace, role, { name: "Una Member" });
 
-      expect(await exportAs(workspace, member)).toEqual({ ok: false, error: "role-forbids" });
-      expect(await exportEvents(workspace)).toEqual([]);
-    },
-  );
+    expect(await exportAs(workspace, member)).toEqual({ ok: false, error: "role-forbids" });
+    expect(await exportEvents(workspace)).toEqual([]);
+  });
 
-  it("refuses an Admin demoted since, recording nothing", async () => {
+  it("refuses an Admin demoted after signing in, recording nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportDemoted");
     const principal = await principalOf(workspace, workspace.adminUserId);
     await memberAt(workspace, "Admin", { name: "Bea Admin" });
@@ -437,8 +434,8 @@ const exportThrough = async (workspace: ProvisionedWorkspace, door: PostgresDoor
     at: new Date(),
   });
 
-describe("an export under way", () => {
-  it.each([1, 2])("answers the store failing on connection %i", async (failing) => {
+describe("an export in progress", () => {
+  it.each([1, 2])("returns an error when connection %i to the store fails", async (failing) => {
     const workspace = await provisionedWorkspace(db(), `ExportFailed${failing}`);
     const door = doorWith(workspace, failing, async () => {
       throw new Error("the store is gone");
@@ -448,7 +445,7 @@ describe("an export under way", () => {
     expect(await exportEvents(workspace)).toEqual([]);
   });
 
-  it("refuses an Admin demoted while it reads, recording nothing", async () => {
+  it("refuses an Admin demoted during the export, recording nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportDemotedMidway");
     await memberAt(workspace, "Admin", { name: "Bea Admin" });
     const door = doorWith(workspace, 2, async () => {
@@ -462,7 +459,7 @@ describe("an export under way", () => {
     expect(await exportEvents(workspace)).toEqual([]);
   });
 
-  it("lets another Admin change a role meanwhile", async () => {
+  it("lets another Admin change a role during the export", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportConcurrent");
     const bea = await memberAt(workspace, "Admin", { name: "Bea Admin" });
     const cal = await memberAt(workspace, "Admin", { name: "Cal Admin" });

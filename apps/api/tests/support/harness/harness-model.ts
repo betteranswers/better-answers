@@ -159,7 +159,7 @@ export const anAdminAsking = async (app: TestApp, concepts: readonly Rpc[]) => {
       concepts,
     }),
   );
-  // Uncounted, the planner joins every node to every step, and the walk nears its timeout.
+  // Without statistics, the planner joins all nodes to all steps and the walk nears its timeout.
   await app.database.superuser.query("ANALYZE map_node, map_edge");
   const client = app.client();
   const tokens = await connectAsHost(app, client, workspace.admin, {

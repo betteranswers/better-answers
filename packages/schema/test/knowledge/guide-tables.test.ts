@@ -79,15 +79,21 @@ describe("the version tables", () => {
       const nextVersions: { table: string; next: string; parent: string }[] = [];
       for (const table of tables) {
         const shape = NEXT_VERSION_OF[table];
-        assert(shape !== undefined, `a next version is written for ${table}`);
+        assert(shape !== undefined, `no next-version statement for ${table}`);
         nextVersions.push({ table, next: shape.next, parent: await shape.seeded(seed) });
       }
       await scopedAs(client, "app_rt", WS_A);
 
       for (const table of tables) {
         await refusesEach(client, [
-          [`UPDATE "${table}" SET note = 'x'`, `a version of ${table} is never rewritten`],
-          [`DELETE FROM "${table}"`, `a version of ${table} is kept for good`],
+          [
+            `UPDATE "${table}" SET note = 'x'`,
+            `app_rt updating a version of ${table}, which must stay unchanged`,
+          ],
+          [
+            `DELETE FROM "${table}"`,
+            `app_rt deleting a version of ${table}, which is kept permanently`,
+          ],
         ]);
       }
       for (const { table, next, parent } of nextVersions) {
@@ -98,7 +104,7 @@ describe("the version tables", () => {
   });
 });
 
-describe("the write-up's home and marks", () => {
+describe("the write-up's home, review reason and wording", () => {
   const placed = async (client: pg.PoolClient) => {
     const seed = await seedTwoWorkspaces(client);
     const section = await seed.guideSection({ workspaceId: WS_A });
@@ -106,7 +112,7 @@ describe("the write-up's home and marks", () => {
     return section;
   };
 
-  it("refuses a section home without its section", async () => {
+  it("refuses a section home with no section id", async () => {
     await withRollback(db().pool, async (client) => {
       const section = await placed(client);
       const id = ulid();
@@ -127,7 +133,7 @@ describe("the write-up's home and marks", () => {
     });
   });
 
-  it("refuses a response home carrying a guide", async () => {
+  it("refuses a response home that names a guide", async () => {
     await withRollback(db().pool, async (client) => {
       const section = await placed(client);
       const [id, question] = [ulid(), ulid()];
@@ -150,7 +156,7 @@ describe("the write-up's home and marks", () => {
     });
   });
 
-  it("refuses a needs review reason outside the four", async () => {
+  it("refuses a needs-review reason outside the four listed", async () => {
     await withRollback(db().pool, async (client) => {
       const section = await placed(client);
       const id = ulid();
@@ -216,7 +222,7 @@ describe("the usage record", () => {
 });
 
 describe("the guide's roles", () => {
-  it("refuses a second row for one guide role", async () => {
+  it("refuses a second row for the same guide and role", async () => {
     await withRollback(db().pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const guide = await seed.guideDefinition({ workspaceId: WS_A });
@@ -235,11 +241,11 @@ describe("the guide's roles", () => {
   });
 });
 
-describe("the actor definer", () => {
+describe("pseudonymise_record_actors, the actor definer", () => {
   const PSEUDONYMISE =
     "SELECT pseudonymise_record_actors($1, 'write_up_version', $2, $3) AS rewritten";
 
-  it("refuses the actor definer another workspace's rows", async () => {
+  it("rewrites actors only in the caller's workspace and version tables", async () => {
     await withRollback(db().pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const actor = `human:${PERSON}`;
@@ -252,25 +258,25 @@ describe("the actor definer", () => {
       await refusesEach(client, [
         [
           PSEUDONYMISE,
-          "the definer rewrites the transaction's own workspace and no other",
+          "the definer rewriting a workspace other than the transaction's",
           [WS_B, [PERSON], pseudonym],
           /the transaction is scoped to another workspace/,
         ],
         [
           PSEUDONYMISE,
-          "the definer takes a person by their person id alone",
+          "the definer taking a person by anything but their person id",
           [WS_A, ["priya@example.invalid"], pseudonym],
           /a person is named by their person id/,
         ],
         [
           PSEUDONYMISE,
-          "the definer writes only a pseudonym an erasure here minted",
+          "the definer writing a pseudonym no erasure in this workspace minted",
           [WS_A, [PERSON], ulid()],
           /no erasure in this workspace minted that pseudonym/,
         ],
         [
           "SELECT pseudonymise_record_actors($1, 'usage', $2, $3)",
-          "the definer rewrites the two version tables and no other",
+          "the definer rewriting a table other than the two version tables",
           [WS_A, [PERSON], pseudonym],
           /names no version table/,
         ],
@@ -295,13 +301,13 @@ describe("the actor definer", () => {
 
       await scopedAs(client, "worker_rt", WS_A);
       await refusesEach(client, [
-        [PSEUDONYMISE, "the worker never rewrites a version", [WS_A, [PERSON], pseudonym]],
+        [PSEUDONYMISE, "the worker rewriting the actors of a version", [WS_A, [PERSON], pseudonym]],
       ]);
     });
   });
 });
 
-describe("the worker", () => {
+describe("worker_rt on the guide records", () => {
   const sqlstateAnswering = async (client: pg.PoolClient, statement: string): Promise<string> => {
     await client.query("SAVEPOINT worker_probe");
     const answered = await client.query(statement).then(() => "allowed", sqlstateOf);
@@ -309,7 +315,7 @@ describe("the worker", () => {
     return answered;
   };
 
-  it("refuses the worker every guide record", async () => {
+  it("is refused every select, insert and delete", async () => {
     await withRollback(db().pool, async (client) => {
       await seedTwoWorkspaces(client);
       await scopedAs(client, "worker_rt", WS_A);
@@ -347,7 +353,7 @@ describe("the migration over stored write-ups", () => {
       }),
     );
 
-  it("stops before adding columns over a stored write-up", async () => {
+  it("stops before adding columns when a write-up is stored", async () => {
     const empty = await withRollback(db().pool, guarded);
     const held = await withRollback(db().pool, async (client) => {
       await testData(client).writeUp();

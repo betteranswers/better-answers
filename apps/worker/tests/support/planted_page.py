@@ -131,8 +131,8 @@ def typed_placeholders_under(rules: Mapping[str, bool]) -> Mapping[str, int]:
     )
     if uncounted:
         message = (
-            f"{', '.join(uncounted)}: raised at a tier these rules have in force, and "
-            f"{FIXTURE_PAGE.name} declares no count"
+            f"these rules turn on the tier of {', '.join(uncounted)}, but "
+            f"FINDINGS_BY_CATEGORY has no count for it in {FIXTURE_PAGE.name}"
         )
         raise RuntimeError(message)
     written = {
@@ -142,7 +142,7 @@ def typed_placeholders_under(rules: Mapping[str, bool]) -> Mapping[str, int]:
     if len(written) != len(taken):
         message = (
             f"{TIER_AGREEMENT.name} gives two of {', '.join(sorted(taken))} the same "
-            "word at a tier these rules have in force, so one total would hide another"
+            "placeholder at a tier these rules turn on, so their counts would merge"
         )
         raise RuntimeError(message)
     return written

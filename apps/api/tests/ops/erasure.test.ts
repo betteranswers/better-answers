@@ -86,7 +86,7 @@ const theSyncFailed = async (app: TestApp, workspaceId: string): Promise<void> =
   await theIndexJobEnded(app, workspaceId, run.id, "failed");
 };
 
-const completedBeforeTheFinder = async (
+const seedCompletedErasure = async (
   app: TestApp,
   workspaceId: string,
   at: Date,
@@ -135,11 +135,11 @@ const indexJobsIn = async (app: TestApp, workspaceId: string) => {
   return found.rows;
 };
 
-describe("pnpm ops — the restore scripts' commands", () => {
+describe("pnpm ops", () => {
   const served = servedApp();
 
-  describe("replay-erasures — mandatory in every restore, never quietly a no-op", () => {
-    it("proves there is nothing to replay on a pre-journal database", async () => {
+  describe("replay-erasures, which re-applies erasures after every restore", () => {
+    it("reports zero erasures on a database without the erasure table", async () => {
       const run = await opsBeforeTheJournal(served(), [
         "replay-erasures",
         "--since",
@@ -151,7 +151,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).toContain("no erasure_request table");
     });
 
-    it("is done, replaying nothing, when no erasure followed the dump", async () => {
+    it("replays nothing when no erasure completed after --since", async () => {
       const run = await opsWith(
         served(),
         ["replay-erasures", "--since", "2026-12-01T00:00:00Z"],
@@ -164,7 +164,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("re-applies an erasure the dump undid, from the restored rows", async () => {
+    it("re-applies an erasure found in the restored rows", async () => {
       const erased = await erasedAt(served(), FROM_THE_ROWS_AT);
 
       const run = await opsWith(served(), ["replay-erasures", "--since", FROM_THE_ROWS_SINCE], {});
@@ -183,7 +183,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("re-applies an erasure the rows lack, from its replay copy", async () => {
+    it("re-creates a missing erasure from its replay copy", async () => {
       const erased = await erasedAt(served(), FROM_THE_COPY_AT);
 
       await served().database.superuser.query(
@@ -216,7 +216,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("wipes and requeues the subject's source; a rerun only logs", async () => {
+    it("wipes and requeues the source, and a rerun only audits", async () => {
       const { workspaceId, admin } = await served().provision();
       await initRepository(openTestGit(served()), workspaceId);
       const identifiers: SubjectIdentifiers = {
@@ -231,7 +231,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "Expense claims go to Sam Okafor at sam.okafor@meridianfenland.co.uk by Friday.\n",
       );
       const indexedBefore = await whatAReplayReaches(served(), workspaceId);
-      const erasureRequestId = await completedBeforeTheFinder(
+      const erasureRequestId = await seedCompletedErasure(
         served(),
         workspaceId,
         BEFORE_THE_FINDER_AT,
@@ -281,7 +281,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ).toHaveLength(2);
     });
 
-    it("refuses without a repositories' root, which the rewrite needs", async () => {
+    it("refuses without GIT_STORE_DIR, which the history rewrite needs", async () => {
       const run = await opsWith(served(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
         doors: { git: undefined },
       });
@@ -291,7 +291,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).toContain("do not start api");
     });
 
-    it("refuses when the image names no object store", async () => {
+    it("refuses when no object store is configured", async () => {
       const run = await opsWith(served(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
         doors: { objects: undefined },
       });
@@ -301,7 +301,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).toContain("do not start api");
     });
 
-    it("refuses an unreachable object store, not assuming nothing is owed", async () => {
+    it("refuses an unreachable object store, since erasures may be owed", async () => {
       const unreachable = doorsFor(served().database.pool, {
         objectStore: {
           endpoint: "http://127.0.0.1:1",
@@ -322,7 +322,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("erasure-rehearsal — the drill's proof that an erasure erases", () => {
+  describe("erasure-rehearsal, which the drill uses to prove erasure works", () => {
     const pinned = { doors: { clock: { now: () => REHEARSED_AT } } };
 
     const aWorkspaceToDrillIn = async () => {
@@ -346,7 +346,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const seeded = (workspaceId: string, readerId: string) =>
       seededBeside(workspaceId, () => theSyncLanded(served(), workspaceId, readerId));
 
-    it("seeds the subject, answers once indexed, prints their tokens last", async () => {
+    it("seeds the subject, waits for indexing, then prints their tokens", async () => {
       const { workspaceId, admin } = await aWorkspaceToDrillIn();
 
       const run = await seeded(workspaceId, admin.id);
@@ -365,14 +365,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(seededRow.rowCount).toBe(1);
     });
 
-    it("wipes the subject's passages in phase two, requeueing the source", async () => {
+    it("phase two deletes the subject's passages and requeues the source", async () => {
       const { workspaceId, admin } = await aWorkspaceToDrillIn();
       const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
       const name = `Rehearsal subject ${workspaceId}`;
 
       const seed = await seeded(workspaceId, admin.id);
       const printed = seed.lines.at(-1);
-      assert(printed !== undefined, "the seed printed its tokens");
+      assert(printed !== undefined, "the seed printed no tokens");
       const tokens = printed.split(",");
       const indexedBefore = await tokensThePassagesHold(served(), workspaceId, tokens);
       const run = await opsWith(
@@ -405,7 +405,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const [sync] = await indexJobsIn(served(), workspaceId);
       const [queued] = await jobsOf(served(), workspaceId);
-      assert(queued !== undefined, "the subject's document was queued");
+      assert(queued !== undefined, "the subject's document was never queued");
       expect(run.exitCode).toBe(1);
       expect(sync).toEqual({ reason: "connected", status: "failed" });
       expect(run.lines).toEqual([
@@ -431,14 +431,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
 
       const [queued] = await jobsOf(served(), workspaceId);
-      assert(queued !== undefined, "the subject's document was queued");
+      assert(queued !== undefined, "the subject's document was never queued");
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([
         `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${queued.id} is still queued after 1 second, so no worker has indexed it`,
       ]);
     });
 
-    it("answers usage to a wait not in seconds, queueing nothing", async () => {
+    it("gives a usage error for a non-numeric wait, queueing nothing", async () => {
       const { workspaceId } = await aWorkspaceToDrillIn();
 
       const run = await opsWith(
@@ -463,7 +463,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await indexJobsIn(served(), workspaceId)).toEqual([]);
     });
 
-    it("erases the subject, writes the routine's report, reprints the tokens", async () => {
+    it("erases the subject, writes the report, and reprints the tokens", async () => {
       const { workspaceId, admin } = await aWorkspaceToDrillIn();
       const file = await reportPath();
 
@@ -484,7 +484,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const written = await readFile(file, "utf8");
       const [requested] = request.rows;
-      assert(requested !== undefined, "the erasure request was recorded");
+      assert(requested !== undefined, "no erasure request was recorded");
       expect(written).toContain(`Erasure report for subject request ${requested.id}.`);
       expect(written).toContain(
         "Backup copies taken before 2026-08-01T12:00:00.000Z are beyond use: restored only in a " +
@@ -499,7 +499,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("logs the erasure's request, arm and deletions, and no address", async () => {
+    it("logs the request, arm, and deletions but no email address", async () => {
       const { workspaceId, admin } = await aWorkspaceToDrillIn();
       await seeded(workspaceId, admin.id);
 
@@ -540,7 +540,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(JSON.stringify(run.logs)).not.toContain("@");
     });
 
-    it("refuses phase two where phase one never ran, erasing nobody", async () => {
+    it("refuses phase two when phase one never ran", async () => {
       const { workspaceId } = await served().provision();
       await initRepository(openTestGit(served()), workspaceId);
       const file = await reportPath();

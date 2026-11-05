@@ -122,7 +122,7 @@ const withOneWaitingRequest = async (name: string, asker?: { readonly email: str
 };
 
 describe("asking to join a workspace", () => {
-  it("records the ask and its reason, booked to the asker", async () => {
+  it("records the request and its reason as the asker's action", async () => {
     const workspace = await provision("Acme");
     const requester = await outsider();
 
@@ -158,7 +158,7 @@ describe("asking to join a workspace", () => {
     ]);
   });
 
-  it("acknowledges real and unknown short names, members and repeats alike", async () => {
+  it("answers every ask the same, whatever the workspace or asker", async () => {
     const workspace = await provision("Neutral");
     const requester = await outsider();
     const ask = (shortName: string, requesterId: string) =>
@@ -193,7 +193,7 @@ describe("asking to join a workspace", () => {
     expect(await requestRows(workspace.id)).toEqual([]);
   });
 
-  it("leaves nothing for an asker with no identity row, silently", async () => {
+  it("acknowledges an asker with no identity row but records nothing", async () => {
     const workspace = await provision("Ghost");
     const nobody = ulid();
     const ask = (shortName: string) =>
@@ -215,7 +215,7 @@ describe("asking to join a workspace", () => {
     expect(events.rowCount).toBe(0);
   });
 
-  it("hands back the store's own failure, not an actionable refusal", async () => {
+  it("returns the store's error when the database is unreachable", async () => {
     const gone = new pg.Pool(db().runtimePool.options);
     await gone.end();
 
@@ -228,7 +228,7 @@ describe("asking to join a workspace", () => {
     expect(asked).toEqual({ ok: false, error: matching.any(Error) });
   });
 
-  it("hands back the insert's failure rather than the acknowledgement", async () => {
+  it("returns the store's error when the insert fails", async () => {
     const workspace = await provision("Unsaved");
     const requester = await outsider();
 
@@ -251,7 +251,7 @@ describe("asking to join a workspace", () => {
 });
 
 describe("approving a request", () => {
-  it("mints and records the requester's invitation at the chosen role", async () => {
+  it("creates and records an invitation at the chosen role", async () => {
     const { workspace, requester, requestId } = await withOneWaitingRequest("Approve", {
       email: "Priya.Shah@Calder.example",
     });
@@ -324,7 +324,7 @@ describe("approving a request", () => {
     ]);
   });
 
-  it("lets an Admin who names no role approve at Viewer", async () => {
+  it("approves at Viewer when the Admin names no role", async () => {
     const { workspace, requestId } = await withOneWaitingRequest("Default");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
@@ -335,7 +335,7 @@ describe("approving a request", () => {
     expect(REQUEST_ROLE_DEFAULT).toBe("Viewer");
   });
 
-  it("refuses a role outside the three, minting no invitation", async () => {
+  it("refuses an unknown role and creates no invitation", async () => {
     const { workspace, requestId } = await withOneWaitingRequest("Foreign");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
@@ -350,7 +350,7 @@ describe("approving a request", () => {
     expect(invitations.rowCount).toBe(0);
   });
 
-  it("refuses an already-decided request, minting no second invitation", async () => {
+  it("refuses a decided request and creates no second invitation", async () => {
     const { workspace, requestId } = await withOneWaitingRequest("Twice");
     const approve = () =>
       as(workspace.id, workspace.adminUserId, (principal, tx) =>
@@ -365,7 +365,7 @@ describe("approving a request", () => {
     expect(invitations.rowCount).toBe(1);
   });
 
-  it("refuses an id no request of this workspace carries", async () => {
+  it("refuses a request id unknown to this workspace", async () => {
     const workspace = await provision("Missing");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
@@ -375,7 +375,7 @@ describe("approving a request", () => {
     expect(approved).toEqual({ ok: false, error: "no-such-request" });
   });
 
-  it("hands the Admin the store's failure when minting fails", async () => {
+  it("returns the store's error when creating the invitation fails", async () => {
     const { workspace, requestId } = await withOneWaitingRequest("Unminted");
     let approved: unknown;
 
@@ -392,7 +392,7 @@ describe("approving a request", () => {
   });
 });
 
-describe("what a decision refuses and what it passes on", () => {
+describe("errors from approving and declining", () => {
   type Decision = (
     principal: UserPrincipal,
     tx: Tx,
@@ -407,7 +407,7 @@ describe("what a decision refuses and what it passes on", () => {
     ["declining", (principal, tx, requestId) => declineRequest(principal, tx, { requestId })],
   ];
 
-  it.each(DECISIONS)("refuses %s a request id of no known form", async (verb, decide) => {
+  it.each(DECISIONS)("refuses %s a malformed request id", async (verb, decide) => {
     const { workspace } = await withOneWaitingRequest(`Shapeless${verb}`);
 
     const refused = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
@@ -419,7 +419,7 @@ describe("what a decision refuses and what it passes on", () => {
   });
 
   it.each(DECISIONS)(
-    "hands the Admin the store's failure when %s cannot land",
+    "returns the store's error when %s cannot be written",
     async (verb, decide) => {
       const { workspace, requestId } = await withOneWaitingRequest(`Unlandable${verb}`);
       let decided: unknown;
@@ -442,7 +442,7 @@ describe("what a decision refuses and what it passes on", () => {
 });
 
 describe("declining a request", () => {
-  it("records who declined, leaving the person free to ask again", async () => {
+  it("records who declined and lets the person ask again", async () => {
     const { workspace, requester, requestId } = await withOneWaitingRequest("Decline");
 
     const declined = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
@@ -485,7 +485,7 @@ describe("declining a request", () => {
     expect(await decline()).toEqual({ ok: false, error: "already-decided" });
   });
 
-  it("never commits a decision whose transaction met a failed statement", async () => {
+  it("commits no decision after a failed statement in its transaction", async () => {
     const { workspace, requestId } = await withOneWaitingRequest("Aborted");
     let declined: Awaited<ReturnType<typeof declineRequest>> | undefined;
 
@@ -505,8 +505,8 @@ describe("declining a request", () => {
   });
 });
 
-describe("the Admin's queue", () => {
-  it("lists waiting requests oldest first, with who asked, when, why", async () => {
+describe("the Admin's queue of waiting requests", () => {
+  it("lists waiting requests oldest first with requester, time and reason", async () => {
     const workspace = await provision("Queue");
     const first = await outsider();
     const second = await outsider();
@@ -556,7 +556,7 @@ describe("the Admin's queue", () => {
     });
   });
 
-  it("hands the Admin the store's failure, not an empty queue", async () => {
+  it("returns the store's error instead of an empty queue", async () => {
     const { workspace } = await withOneWaitingRequest("Unqueued");
     let listed: Result<unknown, unknown> | undefined;
 
@@ -589,7 +589,7 @@ describe("the Admin's queue", () => {
   });
 });
 
-describe("who may decide", () => {
+describe("who may decide a request", () => {
   type Verb = (
     principal: UserPrincipal,
     tx: Tx,
@@ -613,7 +613,7 @@ describe("who may decide", () => {
   ];
 
   for (const [name, verb, outsiderReaches] of verbs) {
-    it(`refuses Editors and Viewers the ${name} verb with one word`, async () => {
+    it(`refuses ${name} to Editors and Viewers with role-forbids`, async () => {
       const { workspace, requestId } = await withOneWaitingRequest(`Role${name}`);
 
       for (const role of ["Editor", "Viewer"] as const) {
@@ -626,7 +626,7 @@ describe("who may decide", () => {
       expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
     });
 
-    it(`keeps another workspace's Admin out of the ${name} verb`, async () => {
+    it(`keeps another workspace's Admin from using ${name}`, async () => {
       const { workspace, requestId } = await withOneWaitingRequest(`Tenant${name}`);
       const elsewhere = await provision(`Other${name}`);
 
@@ -640,7 +640,7 @@ describe("who may decide", () => {
   }
 });
 
-describe("the actor-naming door", () => {
+describe("recordFor, which names the actor", () => {
   it.skipIf(sourceTreeIsInstrumented())(
     "is called only by the auth-boundary actions the ADRs name",
     async () => {

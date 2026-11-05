@@ -22,7 +22,7 @@ import {
   until,
   whileWritesAreRefused,
 } from "../support/suite-postgres.ts";
-import { bothHoldingTheirOwnRow, heldAs, membersSuite } from "./members-suite.ts";
+import { actingOnEachOther, heldAs, membersSuite } from "./members-suite.ts";
 
 const db = postgresForSuite();
 
@@ -74,7 +74,7 @@ const grantsTo = async (
   });
 
 describe("removing a member", () => {
-  it("ends the member and its groups, recording the removal", async () => {
+  it("removes the member and their groups, recording the removal", async () => {
     const workspace = await provisionedWorkspace(db(), "Removed");
     const viewer = await joining(workspace, "Viewer");
     await seedingWith(db().pool, async (seed) => {
@@ -101,7 +101,7 @@ describe("removing a member", () => {
     expect(await grantsEndedAbout(viewer)).toEqual([]);
   });
 
-  it("ends this workspace's tokens and keeps the person's other workspace", async () => {
+  it("ends only the removed person's tokens in this workspace", async () => {
     const here = await provisionedWorkspace(db(), "TokensHere");
     const there = await provisionedWorkspace(db(), "TokensThere");
     const person = await joining(here, "Editor");
@@ -156,7 +156,7 @@ describe("removing a member", () => {
 });
 
 describe("what removing a member refuses", () => {
-  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (held) => {
+  it.each(["Editor", "Viewer"] as const)("refuses the %s role with role-forbids", async (held) => {
     const workspace = await provisionedWorkspace(db(), `RemovalForbidden${held}`);
     const actor = await joining(workspace, held);
     const viewer = await joining(workspace, "Viewer");
@@ -168,7 +168,7 @@ describe("what removing a member refuses", () => {
     expect(await removalsIn(workspace)).toEqual([]);
   });
 
-  it("refuses a person not a member here, no-such-member", async () => {
+  it("refuses a non-member here with no-such-member", async () => {
     const ours = await provisionedWorkspace(db(), "RemovalOurs");
     const theirs = await provisionedWorkspace(db(), "RemovalTheirs");
     const elsewhere = await joining(theirs, "Viewer");
@@ -182,7 +182,7 @@ describe("what removing a member refuses", () => {
     expect(await removalsIn(ours)).toEqual([]);
   });
 
-  it("leaves the member and tokens when its audit event fails", async () => {
+  it("keeps the member and tokens when the audit event fails", async () => {
     const workspace = await provisionedWorkspace(db(), "RemovalUnrecorded");
     const viewer = await joining(workspace, "Viewer");
     const issued = await grantsTo(viewer, { here: { workspaceId: workspace.workspaceId } });
@@ -197,8 +197,8 @@ describe("what removing a member refuses", () => {
   });
 });
 
-describe("the last Admin, removed", () => {
-  it("refuses removing the workspace's only Admin, last-admin", async () => {
+describe("removing the last Admin", () => {
+  it("refuses removing the only Admin with last-admin", async () => {
     const workspace = await provisionedWorkspace(db(), "RemovalOnlyAdmin");
     const { adminUserId } = workspace;
 
@@ -209,7 +209,7 @@ describe("the last Admin, removed", () => {
     expect(await removalsIn(workspace)).toEqual([]);
   });
 
-  it("counts the Admins an uncommitted removal leaves, not those found", async () => {
+  it("counts the Admins left after a concurrent uncommitted removal", async () => {
     const workspace = await provisionedWorkspace(db(), "RemovalCounted");
     const { adminUserId } = workspace;
     const other = await joining(workspace, "Admin");
@@ -248,15 +248,11 @@ describe("the last Admin, removed", () => {
     expect(answers.filter((answer) => answer.ok)).toHaveLength(1);
   });
 
-  it("answers the deadlock between two removals changed-meanwhile, never a failure", async () => {
+  it("returns changed-meanwhile, not an error, when two removals deadlock", async () => {
     const workspace = await provisionedWorkspace(db(), "RemovalDeadlocked");
     const second = await joining(workspace, "Admin");
 
-    const answers = await bothHoldingTheirOwnRow(
-      workspace,
-      [workspace.adminUserId, second],
-      removing,
-    );
+    const answers = await actingOnEachOther(workspace, [workspace.adminUserId, second], removing);
 
     expect(answers.filter((answer) => !answer.ok)).toEqual([
       { ok: false, error: "changed-meanwhile" },

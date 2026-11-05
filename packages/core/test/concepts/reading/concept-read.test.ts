@@ -192,7 +192,7 @@ const readFailingAt = (reader: UserPrincipal, iri: ConceptIri, marker: string, f
   );
 
 describe("the evidence pane", () => {
-  it("answers a withheld concept exactly as one nobody minted", async () => {
+  it("answers a withheld concept the same as a missing one", async () => {
     const scenario = await arrange();
     const restricted = await connectedSourceHolding(db(), scenario.workspaceId, {
       sensitivity: "Restricted",
@@ -210,7 +210,7 @@ describe("the evidence pane", () => {
     expect(absent).toEqual(withheld);
   });
 
-  it("leads with the reader's access and opens every readable source", async () => {
+  it("states the reader's access first and opens every readable source", async () => {
     const scenario = await arrange();
     const { internal, restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
     const { written, locators } = await sourcedNote(scenario, scenario.editor, [
@@ -271,7 +271,7 @@ describe("the evidence pane", () => {
     });
   });
 
-  it("names no Admin when nothing is withheld, sourced or not", async () => {
+  it("names no Admin when nothing is withheld, cited or not", async () => {
     const scenario = await arrange();
     const unsourced = await conceptCiting(scenario, scenario.editor, [], {
       sensitivity: "Internal",
@@ -297,7 +297,7 @@ describe("the evidence pane", () => {
     });
   });
 
-  it("withholds a source under an unpublished connected source, naming nobody", async () => {
+  it("withholds a source from an unpublished connected source, naming nobody", async () => {
     const scenario = await arrange();
     const unpublished = await connectedSourceHolding(db(), scenario.workspaceId, {
       publishedAt: null,
@@ -316,7 +316,7 @@ describe("the evidence pane", () => {
     });
   });
 
-  it("lists locator-less sources by title, unlinked, and counts them", async () => {
+  it("lists sources without locators by title, unlinked, with a count", async () => {
     const scenario = await arrange();
     const written = await noteNaming(scenario, [
       { id: "AUD-047", title: "Audit policy", resource: "https://intranet.example/audit.docx" },
@@ -337,7 +337,7 @@ describe("the evidence pane", () => {
     });
   });
 
-  it("opens a readable concept; withheld and unwritten ones read alike", async () => {
+  it("opens a readable concept, reading withheld and unwritten ones alike", async () => {
     const scenario = await arrange();
     const { readable, withheld } = await readableAndWithheld(scenario);
     const written = await noteNaming(scenario, [
@@ -363,7 +363,7 @@ describe("the evidence pane", () => {
     ]);
   });
 
-  it("finds each citation mark's source at the mark's index", async () => {
+  it("finds each citation mark's source by the mark's index", async () => {
     const scenario = await arrange();
     const { locator } = await restrictedPassage(scenario);
     const written = await noteNaming(
@@ -376,7 +376,7 @@ describe("the evidence pane", () => {
     );
 
     const read = await readFor(scenario.viewer, written.iri);
-    assert(read !== undefined, "the viewer reads the concept");
+    assert(read !== undefined, "the viewer cannot read the concept");
     const projected = citedSourcesOf(read.frontmatter["sources"]);
 
     expect(linksAndMarksOf(read.body, projected).marks).toEqual([
@@ -385,14 +385,14 @@ describe("the evidence pane", () => {
     expect(read.pane.evidence[1]).toEqual({ id: "B-2", source: "The minutes" });
   });
 
-  it("lists the sources its concept read found, across a re-write", async () => {
+  it("lists the sources its read found, even after a re-write", async () => {
     const scenario = await arrange();
     const kept = await connectedSourceHolding(db(), scenario.workspaceId);
     const added = await connectedSourceHolding(db(), scenario.workspaceId);
     const { written, locators } = await sourcedNote(scenario, scenario.editor, [kept]);
     const addedAt = await passageIn(scenario, added);
     const [keptAt] = locators;
-    assert(keptAt !== undefined, "the note cites the kept source");
+    assert(keptAt !== undefined, "the note does not cite the kept source");
 
     const { read, wrote } = await readAcross(scenario.admin, written.iri, () =>
       rewrittenWith(scenario, scenario.editor, written, [kept, added], {
@@ -428,7 +428,7 @@ describe("the evidence pane", () => {
     expect(await readFor(scenario.viewer, written.iri)).toBeUndefined();
   });
 
-  it("names the override that stood when the concept was read", async () => {
+  it("names the override in force when the concept was read", async () => {
     const scenario = await arrange();
     const { internal, restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
     const { written } = await sourcedNote(scenario, scenario.editor, [internal, restricted]);
@@ -510,7 +510,7 @@ describe("what a concept read cannot open", () => {
     expect(read?.frontmatter["sources"]).toEqual([{ title: "Minutes", resource: "Minutes" }]);
   });
 
-  it("keeps a page beside a withheld concept, never its iri", async () => {
+  it("keeps a withheld concept's page, never its IRI", async () => {
     const scenario = await arrange();
     const { withheld } = await readableAndWithheld(scenario);
     const cited = { title: "Board note", resource: withheld.iri, locator: "p.4" };
@@ -538,7 +538,7 @@ describe("what a concept read cannot open", () => {
     expect(JSON.stringify(viewer)).not.toContain(withheld.iri);
   });
 
-  it("names no sharer when only an unwritten concept is unopened", async () => {
+  it("names no sharer when the only unopened source is unwritten", async () => {
     const scenario = await arrange();
     const written = await noteNaming(scenario, [
       { title: "A note not yet written", resource: conceptIriOf(ulid()) },
@@ -581,7 +581,7 @@ describe("what a concept read cannot open", () => {
     expect(read?.frontmatter["sources"]).toEqual([{ resource: "minutes" }]);
   });
 
-  it("leaves out a sources value that is no list", async () => {
+  it("leaves out a `sources` value that is not a list", async () => {
     const scenario = await arrange();
     const { locator } = await restrictedPassage(scenario);
     const scalar = await seededBy(db(), (seed) =>
@@ -597,7 +597,7 @@ describe("what a concept read cannot open", () => {
     expect(read?.pane.evidence).toEqual([]);
   });
 
-  it("answers a failed passage read as an error", async () => {
+  it("returns a failed passage read as an error", async () => {
     const scenario = await arrange();
     const { locator } = await restrictedPassage(scenario);
     const written = await noteNaming(scenario, [
@@ -632,7 +632,7 @@ describe("a concept's projected frontmatter", () => {
     expect(admin?.frontmatter["sources"]).toEqual(sourcesAt(locators));
   });
 
-  it("cuts a string source to its resource, closing any #", async () => {
+  it("cuts the locator off a string source, keeping its resource", async () => {
     const scenario = await arrange();
     const { locator } = await restrictedPassage(scenario);
     const written = await noteNaming(scenario, [`minutes#${locator}`, `a#b#${locator}`, "plain"]);
@@ -662,7 +662,7 @@ const byTarget = (one: { readonly target: string }, other: { readonly target: st
   one.target.localeCompare(other.target);
 
 describe("a concept's relations", () => {
-  it("lists no lineage edge a cited concept leaves", async () => {
+  it("lists no lineage edge to a cited concept", async () => {
     const scenario = await arrange();
     const { readable } = await readableAndWithheld(scenario);
     const written = await noteNaming(scenario, [
@@ -696,7 +696,7 @@ describe("a concept's relations", () => {
     );
   });
 
-  it("lists the map's named edges, never a SAME_AS one", async () => {
+  it("lists the map's named edges, never a SAME_AS edge", async () => {
     const scenario = await arrange();
     const { readable, withheld } = await readableAndWithheld(scenario);
     const entry = await noteNaming(scenario, []);
@@ -721,7 +721,7 @@ describe("a concept's relations", () => {
     ]);
   });
 
-  it("answers a failed relations read as an error", async () => {
+  it("returns a failed relations read as an error", async () => {
     const scenario = await arrange();
     const entry = await noteNaming(scenario, []);
     const failure = new Error("the relations read failed");
@@ -749,7 +749,7 @@ describe("a concept's relations", () => {
     ]);
   });
 
-  it("cuts relations past twenty-five, with no count", async () => {
+  it("cuts relations after twenty-five, without a count", async () => {
     const scenario = await arrange();
     const titles = Array.from(
       { length: 26 },
@@ -763,7 +763,7 @@ describe("a concept's relations", () => {
 
     const read = await readFor(scenario.admin, entry.iri);
 
-    assert(read !== undefined, "the admin reads the entry");
+    assert(read !== undefined, "the admin cannot read the entry");
     expect(read.relations.map(({ title }) => title)).toEqual(titles.slice(0, 25));
     expect(Object.keys(read).toSorted()).toEqual(
       [
@@ -831,7 +831,7 @@ const linksFor = async (person: UserPrincipal, iri: ConceptIri) =>
   (await readFor(person, iri))?.bodyLinks;
 
 describe("a body's links", () => {
-  it("answers a readable relative link at its ordinal", async () => {
+  it("returns a readable relative link at its ordinal", async () => {
     const scenario = await arrange();
     const committee = await noteAt(scenario, AUDIT_COMMITTEE);
     const expenses = await noteAt(scenario, EXPENSES, {
@@ -843,7 +843,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers nothing for a concept the reader may not read", async () => {
+  it("returns nothing for a concept the reader may not read", async () => {
     const scenario = await arrange();
     const { restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
     const committee = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
@@ -857,7 +857,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("reads a withheld, an unwritten and a nameless link alike", async () => {
+  it("reads withheld, unwritten and nameless links alike", async () => {
     const scenario = await arrange();
     const { restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
     const board = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
@@ -885,7 +885,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers a group's concept to its members alone", async () => {
+  it("returns a group's concept only to its members", async () => {
     const scenario = await arrange();
     const members = await groupNamed(db(), scenario, "Board", [scenario.editor]);
     const { expenses, board: forTheBoard } = await expensesNamingTheBoard(scenario, {
@@ -901,7 +901,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers an unpublished concept to nobody", async () => {
+  it("returns an unpublished concept to nobody", async () => {
     const scenario = await arrange();
     const expenses = await noteAt(scenario, "knowledge/expenses.md", {
       body: "See [the draft](./draft.md) and [the board](./board.md).",
@@ -919,7 +919,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("stops answering a concept once an Admin restricts it", async () => {
+  it("stops returning a concept once an Admin restricts it", async () => {
     const scenario = await arrange();
     const committee = await noteAt(scenario, AUDIT_COMMITTEE);
     const expenses = await noteAt(scenario, EXPENSES, { body: TO_THE_COMMITTEE });
@@ -934,7 +934,7 @@ describe("a body's links", () => {
     expect(after).toEqual([]);
   });
 
-  it("answers a link whose concept was written after it", async () => {
+  it("returns a link whose concept was written after it", async () => {
     const scenario = await arrange();
     const expenses = await noteAt(scenario, EXPENSES, { body: TO_THE_COMMITTEE });
 
@@ -948,7 +948,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers an encoded link whose concept was written after it", async () => {
+  it("returns an encoded link whose concept was written after it", async () => {
     const scenario = await arrange();
     const expenses = await noteAt(scenario, EXPENSES, {
       body: "See [the team](../roles/%c3%a9quipe.md).",
@@ -961,7 +961,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers every link past twenty-five", async () => {
+  it("returns every link past twenty-five", async () => {
     const scenario = await arrange();
     const files = Array.from(
       { length: 26 },
@@ -986,7 +986,7 @@ describe("a body's links", () => {
     expect(read?.relations).toHaveLength(25);
   });
 
-  it("answers nothing for an address that names no concept", async () => {
+  it("returns nothing for an address that names no concept", async () => {
     const scenario = await arrange();
     const committee = await noteAt(scenario, AUDIT_COMMITTEE);
     const expenses = await noteAt(scenario, EXPENSES, {
@@ -1004,7 +1004,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers a footnote defined as a relative path", async () => {
+  it("returns a footnote defined as a relative path", async () => {
     const scenario = await arrange();
     const committee = await noteAt(scenario, AUDIT_COMMITTEE);
     const expenses = await noteAt(scenario, EXPENSES, {
@@ -1016,7 +1016,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers a percent-encoded spelling as the file it decodes to", async () => {
+  it("returns a percent-encoded address as the file it decodes to", async () => {
     const scenario = await arrange();
     const team = await noteAt(scenario, "knowledge/roles/équipe.md");
     const expenses = await noteAt(scenario, EXPENSES, {
@@ -1029,7 +1029,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers a repeated address twice, and an IRI as itself", async () => {
+  it("returns a repeated address twice, and an IRI as itself", async () => {
     const scenario = await arrange();
     const committee = await noteAt(scenario, AUDIT_COMMITTEE);
     const expenses = await noteAt(scenario, EXPENSES, {
@@ -1063,7 +1063,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers nothing for an edge the link does not name", async () => {
+  it("returns nothing for an edge the link does not name", async () => {
     const scenario = await arrange();
     const expenses = await noteAt(scenario, "knowledge/expenses.md", {
       body: "See [travel](./travel.md) and [the board](./board.md).",
@@ -1078,7 +1078,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers nothing from another concept's edge", async () => {
+  it("returns nothing from another concept's edge", async () => {
     const scenario = await arrange();
     const { expenses, board } = await expensesNamingTheBoard(scenario);
     const travel = await noteAt(scenario, "knowledge/travel.md");
@@ -1092,7 +1092,7 @@ describe("a body's links", () => {
     expect(after).toEqual([{ ordinal: 0, address: "./board.md", target: board }]);
   });
 
-  it("answers nothing from an edge that is no link", async () => {
+  it("returns nothing from an edge that is not a link", async () => {
     const scenario = await arrange();
     const { expenses, board } = await expensesNamingTheBoard(scenario);
     await edgeSeeded(scenario, expenses.iri, board, { label: "DERIVED_FROM" });
@@ -1100,7 +1100,7 @@ describe("a body's links", () => {
     expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([]);
   });
 
-  it("answers nothing from an edge outside the live generation", async () => {
+  it("returns nothing from an edge outside the live generation", async () => {
     const scenario = await arrange();
     const expenses = await noteAt(scenario, "knowledge/expenses.md", {
       body: "See [the board](./board.md), [travel](./travel.md) and [pay](./pay.md).",
@@ -1117,7 +1117,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers nothing from an edge the reader may not read", async () => {
+  it("returns nothing from an edge the reader may not read", async () => {
     const scenario = await arrange();
     const { expenses, board } = await expensesNamingTheBoard(scenario);
     await edgeSeeded(scenario, expenses.iri, board, { sensitivity: "Restricted" });
@@ -1128,7 +1128,7 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("answers a failed read of the edges as an error", async () => {
+  it("returns a failed edges read as an error", async () => {
     const scenario = await arrange();
     const expenses = await noteAt(scenario, EXPENSES, { body: TO_THE_COMMITTEE });
     const failure = new Error("the links read failed");

@@ -13,7 +13,7 @@ describe("the authenticator code generator", () => {
     [1_234_567_890, "005924"],
     [2_000_000_000, "279037"],
     [20_000_000_000, "353130"],
-  ])("answers RFC 6238's code at %i seconds", (seconds, code) => {
+  ])("returns RFC 6238's test code at %i seconds", (seconds, code) => {
     expect(authenticatorCodeAt(RFC_KEY, new Date(seconds * 1000))).toBe(code);
   });
 

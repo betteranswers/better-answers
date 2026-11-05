@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readlinkSync, renameSync, rmSync, symlinkSync } 
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-/** macOS starts it without queueing at `syspolicyd`; `/usr/bin/git` is an `xcrun` shim, which starts more. */
+/** macOS starts this git without a `syspolicyd` check. `/usr/bin/git` is an `xcrun` shim that starts more processes. */
 export const APPLE_GIT = "/Library/Developer/CommandLineTools/usr/bin/git";
 
 interface Machine {
@@ -37,7 +37,7 @@ const linkGitAtomicallyAcrossSuites = (linkDirectory: string, target: string): v
   renameSync(staged, git);
 };
 
-/** Homebrew's `git` queues at `syspolicyd` on every start, which a suite of many commits pays in minutes. */
+/** Homebrew's `git` waits on `syspolicyd` at every start, which costs a suite of many commits minutes. */
 export const pathWithAppleGit = (machine: Machine = thisMachine()): string => {
   if (machine.platform !== "darwin" || !existsSync(machine.appleGit)) return machine.searchPath;
   linkGitAtomicallyAcrossSuites(machine.linkDirectory, machine.appleGit);

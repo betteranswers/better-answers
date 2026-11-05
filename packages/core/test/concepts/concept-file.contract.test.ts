@@ -26,8 +26,8 @@ const fixtureSchema = z.object({
 
 const fixture = contractFixture("concept-file", fixtureSchema);
 
-describe("the concept-file agreement", () => {
-  it("writes and hashes every case as the fixture says", () => {
+describe("the concept-file contract fixture", () => {
+  it("renders and hashes every case as the fixture expects", () => {
     for (const { why, path, frontmatter, body, canonical, sha256 } of fixture.cases) {
       expect({
         why,
@@ -37,7 +37,7 @@ describe("the concept-file agreement", () => {
     }
   });
 
-  it("writes each fixture number as the text both tiers write", () => {
+  it("renders each fixture number as the text both tiers write", () => {
     for (const { value, text } of fixture.numbers) {
       expect({ value, canonical: canonicalFrontmatter({ n: value }, "knowledge/x.md") }).toEqual({
         value,

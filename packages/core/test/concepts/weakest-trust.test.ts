@@ -66,7 +66,7 @@ describe("the trust a section shows", () => {
     expect(weakestTrust([draft, deprecated])).toEqual(deprecated);
   });
 
-  it("names the longest ago verification among equals", () => {
+  it("names the oldest verification among equals", () => {
     const earlier = verifiedBy("2026-03-01T09:00:00Z");
     const later = verifiedBy("2026-05-12T09:00:00Z");
 

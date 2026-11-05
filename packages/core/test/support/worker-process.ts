@@ -13,7 +13,7 @@ import { repositoryRoot } from "./roots/roots.ts";
 
 const run = promisify(execFile);
 
-/** What `execFile` hangs on its rejection: the spawn's streams and the error's own line. */
+/** The fields `execFile` attaches to its rejection: the child's output and the error message. */
 const execFailure = z.object({
   stderr: z.string().optional(),
   stdout: z.string().optional(),
@@ -134,7 +134,7 @@ export const runWorkerOnce = async (
   }
 };
 
-/** The engine logs a component's exception on stdout and carries on, so the pass exits 0. */
+/** The engine logs a component's exception on stdout and continues, so the run still exits 0. */
 const errorLine = z.object({ level: z.literal("error"), event: z.string() });
 
 const jsonOrNothing = (line: string): unknown => {
@@ -186,12 +186,12 @@ type Where = {
   readonly objects: WorkerObjectStore;
 };
 
-/** macOS answers EPERM, not ESRCH, while a killed group's last member is still exiting. */
+/** macOS returns EPERM, not ESRCH, while the last member of a killed group is still exiting. */
 const A_GONE_GROUPS_ANSWERS = ["ESRCH", "EPERM"] as const;
 
 const aGroupAlreadyGone = z.object({ code: z.enum(A_GONE_GROUPS_ANSWERS) });
 
-/** `uv run` keeps the worker as its child, so a kill must reach the process group. */
+/** `uv run` keeps the worker as its child, so the kill targets the whole process group. */
 const killTheGroup = (child: ChildProcess): void => {
   if (child.pid === undefined) return;
   try {
@@ -220,7 +220,7 @@ const startTickingWorker = (workerId: string, where: Where) => {
 
   const ended = new Promise<void>((resolve) => {
     child.once("exit", (code, signal) => {
-      // The last of its stderr is still in the pipe when the exit arrives.
+      // Some stderr is still in the pipe when the exit event fires.
       setImmediate(() => {
         try {
           end(`exited (code ${String(code)}, signal ${String(signal)})`);

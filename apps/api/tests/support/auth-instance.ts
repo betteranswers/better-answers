@@ -25,8 +25,8 @@ const authOverDoor = (door: TestApp["doors"]["postgres"], publicUrl = PUBLIC_URL
   });
 
 /**
- * Over the TestApp's database, secret and origin, whose cookies it reads: an endpoint the router
- * refuses is still a server function.
+ * Shares the TestApp's database, secret and origin, so the TestApp's cookies work here. Its `api`
+ * reaches endpoints that the HTTP router refuses.
  */
 export const authOver = (app: TestApp): Auth => authOverDoor(app.doors.postgres, app.publicUrl);
 

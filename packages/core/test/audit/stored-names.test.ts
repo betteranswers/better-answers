@@ -13,22 +13,22 @@ const declaredDetailKeys = (): ReadonlySet<string> =>
 
 const sorted = (names: Iterable<string>): readonly string[] => [...names].toSorted(byCodeUnit);
 
-describe("the stored-names register", () => {
-  it("pins every declared action name, and no other", async () => {
+describe("the stored audit names in stored-names.ts", () => {
+  it("lists exactly the declared action names", async () => {
     await loadEveryEntryPoint();
 
     expect(
       sorted(STORED_ACT_NAMES),
-      "an audit row keeps the action name it was written with. Declare the action under the name packages/core/src/audit/stored-names.ts pins, or append a new action's name there.",
+      "STORED_ACT_NAMES differs from the declared action names. An audit row keeps the action name it was written with, so declare the action under the name packages/core/src/audit/stored-names.ts pins, or append the new action's name there.",
     ).toEqual(sorted(declaredActionNames()));
   });
 
-  it("pins every declared detail key, and no other", async () => {
+  it("lists exactly the declared detail keys", async () => {
     await loadEveryEntryPoint();
 
     expect(
       sorted(Object.values(STORED_DETAIL_KEYS)),
-      "an audit row keeps the detail keys it was written with. Write each key through its name in STORED_DETAIL_KEYS, or append a new key there.",
+      "STORED_DETAIL_KEYS differs from the declared detail keys. An audit row keeps the detail keys it was written with, so write each key through its name in STORED_DETAIL_KEYS, or append the new key there.",
     ).toEqual(sorted(declaredDetailKeys()));
   });
 });

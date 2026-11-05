@@ -116,7 +116,7 @@ const contentOf = async (recordId: string) => {
 };
 
 describe("opening a record", () => {
-  it("reads back with its id, its skeleton and its content", async () => {
+  it("stores the record's skeleton and content under a new id", async () => {
     const asker = await anAsker();
     const askedAt = new Date();
 
@@ -144,7 +144,7 @@ describe("opening a record", () => {
     ]);
   });
 
-  it("records the groups the asker read under", async () => {
+  it("records the groups the asker belonged to when asking", async () => {
     const asker = await anAsker();
     const group = await seedingWith(db().pool, (seed) =>
       seed.group({ workspaceId: asker.workspaceId }),
@@ -165,7 +165,7 @@ describe("opening a record", () => {
     ]);
   });
 
-  it("is refused in a month no sweep has made", async () => {
+  it("fails in a month that has no content partition yet", async () => {
     const asker = await anAsker();
 
     const opened = await opening(asker, new Date("2032-07-01T00:00:00.000Z"));
@@ -194,7 +194,7 @@ describe("opening a record", () => {
     expect(stored).toEqual([{ asked_at: firstOfTheMonth, question: QUESTION, drafted: null }]);
   });
 
-  it("is stored in a month a restore left unmade", async () => {
+  it("is stored in a month whose partition a restore dropped", async () => {
     const now = new Date();
     await db().pool.query(`DROP TABLE "${contentPartitionOf(now)}"`);
 
@@ -203,7 +203,7 @@ describe("opening a record", () => {
     expect(stored).toEqual([{ asked_at: now, question: QUESTION, drafted: null }]);
   });
 
-  it("is made a month once, however many sweeps pass", async () => {
+  it("creates each month's partition once across repeated sweeps", async () => {
     const door = openPostgres(db().runtimePool);
     const days = [26, 27, 28].map((day) => inTheMonth(1, day));
 
@@ -299,7 +299,7 @@ describe("completing a record", () => {
     expect(await contentOf(recordId)).toEqual([matching.objectContaining({ drafted: null })]);
   });
 
-  it("keeps an unmapped passage's locator and none of its text", async () => {
+  it("stores an unmapped passage's locator, not its text or source", async () => {
     const asker = await anAsker();
     const { recordId } = answered(await opening(asker));
     const shown = {
@@ -317,7 +317,7 @@ describe("completing a record", () => {
     expect([shown.text, shown.source].filter((words) => kept.includes(words))).toEqual([]);
   });
 
-  it("keeps its row and citations once a concept goes", async () => {
+  it("keeps the record's citations after a cited concept is deleted", async () => {
     const asker = await anAsker();
     const { workspaceId } = asker;
     const [gone, staying] = await seedingWith(db().pool, async (seed) => [
@@ -349,7 +349,7 @@ describe("completing a record", () => {
     ]);
   });
 
-  it("answers an error for a record already completed", async () => {
+  it("returns an error when the record is already completed", async () => {
     const asker = await anAsker();
     const { recordId } = answered(await opening(asker));
     answered(await completing(asker, recordId, REFUSED));
@@ -541,7 +541,7 @@ const eventsOn = async (feedbackId: string) => {
 };
 
 describe("reading the questions asked", () => {
-  it.each(["Editor", "Viewer"] as const)("refuses an %s the read", async (role) => {
+  it.each(["Editor", "Viewer"] as const)("refuses the read to an %s", async (role) => {
     const admin = await anAsker();
     await aRecord(admin);
 
@@ -562,7 +562,7 @@ describe("reading the questions asked", () => {
     ]);
   });
 
-  it("names the next page only when another follows", async () => {
+  it("returns a cursor only when another page follows", async () => {
     const admin = await anAsker();
     const older = await aRecord(admin, { askedAt: new Date(Date.now() - 60_000) });
     const newer = await aRecord(admin);
@@ -575,7 +575,7 @@ describe("reading the questions asked", () => {
     ]);
   });
 
-  it("pages from the last flagged record into the unflagged", async () => {
+  it("pages from the last flagged record to the unflagged ones", async () => {
     const admin = await anAsker();
     const unflagged = await aRecord(admin);
     const flagged = await aRecord(admin, { askedAt: new Date(Date.now() - 60_000) });
@@ -589,7 +589,7 @@ describe("reading the questions asked", () => {
     ]);
   });
 
-  it("keeps its place when the cut record's flag closes", async () => {
+  it("keeps its place when the cursor record's flag closes", async () => {
     const admin = await anAsker();
     const [earlier, later] = [
       await aRecord(admin, { askedAt: new Date(Date.now() - 60_000) }),
@@ -600,7 +600,7 @@ describe("reading the questions asked", () => {
     const first = answered(await asked(admin, { limit: 1 }));
     answered(await closing(admin, laterFlag.id, "no-fault-in-the-knowledge"));
 
-    assert(first.nextCursor !== null, "the first page names a cursor");
+    assert(first.nextCursor !== null, "the first page returned no cursor");
     const next = answered(await asked(admin, { limit: 1, cursor: first.nextCursor }));
 
     expect([first, next].map((page) => page.records.map(({ id }) => id))).toEqual([
@@ -643,7 +643,7 @@ describe("reading the questions asked", () => {
     ]);
   });
 
-  it("reads the map's state the record kept", async () => {
+  it("reads the map state stored on the record", async () => {
     const admin = await anAsker();
     const { recordId } = answered(await opening(admin));
     const map = { state: "unavailable_since", since: "2026-10-21T09:00:00.000Z" } as const;
@@ -654,7 +654,7 @@ describe("reading the questions asked", () => {
     expect(records.map((record) => record.map)).toEqual([map]);
   });
 
-  it("reads a record kept before the map's state as unknown", async () => {
+  it("reports unknown map state for a record stored without one", async () => {
     const admin = await anAsker();
     await aRecord(admin);
 
@@ -663,14 +663,14 @@ describe("reading the questions asked", () => {
     expect(records.map((record) => record.map)).toEqual([{ state: "unknown" }]);
   });
 
-  it("words trust at the moment the Admin's read is given", async () => {
+  it("words trust as of the time the Admin reads", async () => {
     const read = async (reader: UserPrincipal, now: Date) =>
       answered(await asked(reader, {}, now)).records;
 
     expect(await staleWordsOf(read)).toEqual(["Unverified", "Out of date"]);
   });
 
-  it("leaves out an unreadable concept, with no hint", async () => {
+  it("omits an unreadable concept and its sentences, leaving no trace", async () => {
     const admin = await anAsker();
     const readable = await aConceptIn(admin, "audits");
     const narrowed = await aConceptNarrowedIn(admin, "board");
@@ -692,7 +692,7 @@ describe("reading the questions asked", () => {
     expect(JSON.stringify(record)).not.toContain(narrowed.iri);
   });
 
-  it("shows a flag without its sentence on an unreadable concept", async () => {
+  it("hides a flag's disputed sentence about an unreadable concept", async () => {
     const admin = await anAsker();
     const narrowed = await aConceptNarrowedIn(admin, "board");
     const record = await aRecord(admin, { cited: [narrowed] });
@@ -736,7 +736,7 @@ describe("reading your questions", () => {
     const newer = await aRecord(admin);
 
     const first = answered(await yours(admin, { limit: 1 }));
-    assert(first.nextCursor !== null, "the first page names a cursor");
+    assert(first.nextCursor !== null, "the first page returned no cursor");
     const next = answered(await yours(admin, { limit: 1, cursor: first.nextCursor }));
 
     expect(
@@ -747,7 +747,7 @@ describe("reading your questions", () => {
     ]);
   });
 
-  it("pages nothing from a cursor at another person's record", async () => {
+  it("returns nothing for a cursor at another person's record", async () => {
     const admin = await anAsker();
     const editor = await aMemberOf(admin, "Editor");
     await aRecord(admin, { by: editor, askedAt: new Date(Date.now() - 60_000) });
@@ -756,7 +756,7 @@ describe("reading your questions", () => {
     expect(await idsOf(editor, { cursor: theirs.id })).toEqual([]);
   });
 
-  it("reads another person's record as not found", async () => {
+  it("returns not-found for another person's record", async () => {
     const admin = await anAsker();
     const editor = await aMemberOf(admin, "Editor");
     const record = await aRecord(admin, { by: editor });
@@ -779,7 +779,7 @@ describe("reading your questions", () => {
     expect(JSON.stringify(read)).not.toContain(narrowed.iri);
   });
 
-  it("drops a sentence citing an unreadable concept, keeping its neighbours", async () => {
+  it("drops a sentence citing an unreadable concept, keeping the others", async () => {
     const admin = await anAsker();
     const readable = await aConceptIn(admin, "audits");
     const narrowed = await aConceptNarrowedIn(admin, "board");
@@ -817,14 +817,14 @@ describe("reading your questions", () => {
     expect(await idsOf(editor)).toEqual([record.id]);
   });
 
-  it("words trust at the moment the reader's read is given", async () => {
+  it("words trust as of the time the reader reads", async () => {
     const read = async (reader: UserPrincipal, now: Date) =>
       answered(await yours(reader, {}, now)).records;
 
     expect(await staleWordsOf(read)).toEqual(["Unverified", "Out of date"]);
   });
 
-  it("carries the body only of concepts the judge passed", async () => {
+  it("includes the body only of concepts the judge accepted", async () => {
     const admin = await anAsker();
     const [answer, rejected, related] = [
       await aConceptIn(admin, "audits"),
@@ -849,7 +849,7 @@ describe("reading your questions", () => {
 });
 
 describe("closing a flag", () => {
-  it("stores no fault, audits it once, and unflags the record", async () => {
+  it("stores no-fault, records one audit event and unflags the record", async () => {
     const { admin, record, flag } = await anOpenFlag();
 
     const closed = await closing(admin, flag.id, "no-fault-in-the-knowledge");
@@ -873,7 +873,7 @@ describe("closing a flag", () => {
     expect(read?.flagged).toBe(false);
   });
 
-  it("stores fixed in the knowledge as its outcome", async () => {
+  it("stores fixed-in-the-knowledge as the flag's outcome", async () => {
     const { admin, flag } = await anOpenFlag();
 
     answered(await closing(admin, flag.id, "fixed-in-the-knowledge"));
@@ -883,7 +883,7 @@ describe("closing a flag", () => {
     ]);
   });
 
-  it("refuses a flag already closed, changing nothing", async () => {
+  it("refuses to close a flag twice and changes nothing", async () => {
     const { admin, flag } = await anOpenFlag();
     answered(await closing(admin, flag.id, "fixed-in-the-knowledge"));
 
@@ -896,7 +896,7 @@ describe("closing a flag", () => {
     expect(await eventsOn(flag.id)).toHaveLength(1);
   });
 
-  it("answers not-found for helpful feedback and an unknown id", async () => {
+  it("returns not-found for helpful feedback and an unknown id", async () => {
     const admin = await anAsker();
     const record = await aRecord(admin);
     const helpful = await seedingWith(db().pool, (seed) =>
@@ -914,7 +914,7 @@ describe("closing a flag", () => {
     ]);
   });
 
-  it.each(["Editor", "Viewer"] as const)("refuses an %s the closing", async (role) => {
+  it.each(["Editor", "Viewer"] as const)("refuses to let an %s close a flag", async (role) => {
     const { admin, flag } = await anOpenFlag();
 
     const refused = await closing(await aMemberOf(admin, role), flag.id, "fixed-in-the-knowledge");

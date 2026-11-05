@@ -86,7 +86,10 @@ describe("the tables a source names", () => {
       "one.ts",
       `// one\n\nconst q = \`\n  SELECT '\\u{1F600}\\u{1F600}'\nFROM job\`;\n`,
     );
-    expect(found?.line, "an escape before the table moved the offsets off the file's").toBe(5);
+    expect(
+      found?.line,
+      "the line is wrong. An escape sequence before the table shifted the offsets away from the file's.",
+    ).toBe(5);
   });
 
   it("leaves out a CTE, but never the qualified table", () => {
@@ -115,7 +118,7 @@ describe("the tables a source names", () => {
   it.each([
     ["a comment", "// SELECT 1 FROM job\nexport const one = 1;\n"],
     ["an import", 'import { job } from "job";\n'],
-  ])("walks past %s", (_what, source) => {
+  ])("ignores %s", (_what, source) => {
     expect(tablesIn(source)).toEqual([]);
   });
 
@@ -185,7 +188,7 @@ describe("the scan over a throwaway tree, slice to map", () => {
     ]);
   });
 
-  it("walks past a suite, which may read any table", () => {
+  it("ignores a suite, which may read any table", () => {
     const tree = {
       ...CLEAN,
       "packages/core/src/workspaces/one.test.ts": statement("SELECT 1 FROM job"),
@@ -236,14 +239,14 @@ describe("the scan over a throwaway tree, map to slice", () => {
     expect(findings(tree)).toEqual([]);
   });
 
-  it("passes a write-only entry, which a read scan cannot hold", () => {
+  it("passes a write-only entry, which a read scan cannot check", () => {
     expect(findings(declaring({ table: "public.job", by: "workspaces", access: "write" }))).toEqual(
       [],
     );
   });
 });
 
-describe("a scan that proves nothing", () => {
+describe("a scan that checks nothing", () => {
   it("refuses a run that read no source file", () => {
     const tree = {
       [WHERE_THE_MAP_LIVES]: mapOf([]),

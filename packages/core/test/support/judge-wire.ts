@@ -158,7 +158,7 @@ export const streamedEventsOf = (
   sse("message_stop", { type: "message_stop" }),
 ];
 
-/** An error the provider sends inside a stream it has begun. */
+/** An error event the provider sends after a stream has started. */
 export const OVERLOADED_EVENT = sse("error", {
   type: "error",
   error: { type: "overloaded_error", message: "Overloaded" },
@@ -166,7 +166,7 @@ export const OVERLOADED_EVENT = sse("error", {
 
 type Streaming = {
   readonly before?: (at: number) => Promise<void>;
-  /** As `fetch`'s own: once aborted, the body errors as a cut connection's does. */
+  /** Like `fetch`'s own signal: after an abort, reading the body fails as on a dropped connection. */
   readonly signal?: AbortSignal | null | undefined;
 };
 

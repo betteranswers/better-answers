@@ -24,7 +24,7 @@ COMPLETE = {
 }
 
 
-def test_the_bootstrap_carries_the_object_store_both_tiers_share() -> None:
+def test_bootstrap_reads_the_object_store_settings() -> None:
     read = read_bootstrap(COMPLETE)
 
     assert read.object_store.endpoint == "http://objectstore:3900"
@@ -34,7 +34,7 @@ def test_the_bootstrap_carries_the_object_store_both_tiers_share() -> None:
     assert read.object_store.region == "garage"
 
 
-def test_engine_defaults_come_from_the_box_not_the_engine() -> None:
+def test_bootstrap_reads_the_engine_settings_with_the_worker_defaults() -> None:
     read = read_bootstrap(
         {**COMPLETE, "LMDB_MAX_BYTES_PER_CONNECTED_SOURCE": "4294967296"}
     )
@@ -45,13 +45,13 @@ def test_engine_defaults_come_from_the_box_not_the_engine() -> None:
     assert read.engine.concurrent_runs == 1
 
 
-def test_the_constants_are_the_numbers_this_tier_settled_on() -> None:
+def test_the_engine_limit_constants_have_their_chosen_values() -> None:
     assert LMDB_MAP_BYTES == 4_294_967_296
     assert MAX_INFLIGHT_COMPONENTS == 4
     assert CONCURRENT_RUNS == 1
 
 
-def test_refuses_two_concurrent_runs_rather_than_quietly_reducing() -> None:
+def test_bootstrap_refuses_max_concurrent_runs_above_one() -> None:
     with pytest.raises(BootstrapError) as refusal:
         read_bootstrap({**COMPLETE, "MAX_CONCURRENT_RUNS": "2"})
 
@@ -62,12 +62,12 @@ def test_refuses_two_concurrent_runs_rather_than_quietly_reducing() -> None:
     )
 
 
-def test_a_missing_bootstrap_value_is_named_rather_than_implied() -> None:
+def test_the_bootstrap_error_names_each_missing_variable() -> None:
     with pytest.raises(BootstrapError) as refusal:
         read_bootstrap({"DATABASE_URL": "postgresql://worker_rt@db/better_answers"})
 
-    named = str(refusal.value)
-    for owed in (
+    message = str(refusal.value)
+    for variable in (
         "GIT_STORE_DIR",
         "LMDB_DIR",
         "S3_ENDPOINT",
@@ -76,7 +76,7 @@ def test_a_missing_bootstrap_value_is_named_rather_than_implied() -> None:
         "S3_BUCKET",
         "S3_REGION",
     ):
-        assert owed in named
+        assert variable in message
 
 
 def test_the_compose_file_gives_the_worker_its_lmdb_directory() -> None:

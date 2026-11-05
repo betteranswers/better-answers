@@ -17,13 +17,13 @@ const digestIn = (relative: string): string => {
   const found = WHOLE_HASH.exec(source);
   if (found?.[1] === undefined) {
     throw new Error(
-      `${relative} carries no 64-character lowercase hex digest — regenerate it, and never by hand`,
+      `${relative} has no 64-character lowercase hex digest. Regenerate the stamp with its generator. Do not edit it by hand.`,
     );
   }
   return found[1];
 };
 
-describe("the contract's digest, across the two tiers", () => {
+describe("the contract's digest in the two tiers", () => {
   it("is the same hash in both tiers", () => {
     const read = Object.entries(TIER_STAMPS_READ_AS_TEXT).map(([tier, relative]) => ({
       tier,

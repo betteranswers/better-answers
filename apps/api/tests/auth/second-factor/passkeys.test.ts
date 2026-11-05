@@ -34,7 +34,7 @@ const aSignedInPerson = () => aPersonSignedIn(app());
 
 const askToAdd = async (client: TestClient): Promise<unknown> => {
   const asked = await client.json(ADD_OPTIONS, { name: "Chrome on macOS" });
-  expect(asked.status, "the add was not asked").toBe(200);
+  expect(asked.status, "the add-options request failed").toBe(200);
   return asked.json();
 };
 
@@ -58,7 +58,7 @@ const aPersonWithAPasskey = async () => {
 
 const signInOn = async (client: TestClient, device: PasskeyDevice, verified = true) => {
   const asked = await client.json(SIGN_IN_OPTIONS, {});
-  expect(asked.status, "the sign-in was not asked").toBe(200);
+  expect(asked.status, "the sign-in-options request failed").toBe(200);
   return client.json(SIGN_IN, { response: device.get(await asked.json(), { verified }) });
 };
 
@@ -107,7 +107,7 @@ const emailsTo = (email: string): number =>
   app().emails.filter((message) => message.to === email).length;
 
 describe("adding a passkey", () => {
-  it("keeps it by name, confirming the session, with one notice", async () => {
+  it("stores the trimmed name, confirms the session, sends one notice", async () => {
     const { person, client } = await aSignedInPerson();
 
     const answered = await addOn(client, aPasskeyDevice(client.origin), { name: " Work laptop " });
@@ -122,7 +122,7 @@ describe("adding a passkey", () => {
     expect(subjectsTo(person.email)).toEqual([ADDED]);
   });
 
-  it("answers ten recovery codes to an Admin holding none", async () => {
+  it("returns ten recovery codes to an Admin without any", async () => {
     const { client } = await anAdminSignedIn(app());
 
     const answered = await addOn(client, aPasskeyDevice(client.origin));
@@ -141,7 +141,7 @@ describe("adding a passkey", () => {
     expect(subjectsTo(person.email)).toEqual([]);
   });
 
-  it("refuses a blank name before the device is asked", async () => {
+  it("refuses a blank name at the add-options step", async () => {
     const { client } = await aSignedInPerson();
 
     const asked = await client.json(ADD_OPTIONS, { name: "   " });
@@ -150,7 +150,7 @@ describe("adding a passkey", () => {
     expect(await asked.json()).toEqual({ error: "passkey-name-empty" });
   });
 
-  it("refuses a blank name at the add as well", async () => {
+  it("refuses a blank name at the add step", async () => {
     const { person, client } = await aSignedInPerson();
 
     const answered = await addOn(client, aPasskeyDevice(client.origin), { name: "   " });
@@ -160,7 +160,7 @@ describe("adding a passkey", () => {
     expect(await passkeysOf(person.id)).toEqual([]);
   });
 
-  it("refuses an add nobody asked for", async () => {
+  it("refuses an add whose challenge was never issued", async () => {
     const { person, client } = await aSignedInPerson();
     const device = aPasskeyDevice(client.origin);
 
@@ -206,7 +206,7 @@ describe("adding a passkey", () => {
     expect(refused.status).toBe(403);
   });
 
-  it.each([ADD_OPTIONS, ADD])("answers 429 at %s past ten in ten minutes", async (path) => {
+  it.each([ADD_OPTIONS, ADD])("answers 429 at %s after ten calls in ten minutes", async (path) => {
     const { client } = await aSignedInPerson();
     const answers: number[] = [];
     stopTheClock();
@@ -221,7 +221,7 @@ describe("adding a passkey", () => {
 });
 
 describe("signing in with a passkey", () => {
-  it("signs in in one step, sending no email", async () => {
+  it("signs in in one step and sends no email", async () => {
     const { person, device } = await aPersonWithAPasskey();
     const emailsBefore = emailsTo(person.email);
     const browser = app().client();
@@ -234,7 +234,7 @@ describe("signing in with a passkey", () => {
     expect(emailsTo(person.email)).toBe(emailsBefore);
   });
 
-  it("confirms the session it makes and records the method", async () => {
+  it("confirms the new session and records the sign-in method", async () => {
     const { person, device } = await aPersonWithAPasskey();
 
     await signInOn(app().client(), device);
@@ -243,7 +243,7 @@ describe("signing in with a passkey", () => {
     expect((await signInsOf(person.id)).at(-1)).toEqual({ method: "passkey" });
   });
 
-  it("keeps when the passkey was last used", async () => {
+  it("records when the passkey was last used", async () => {
     const { device, passkeyId } = await aPersonWithAPasskey();
 
     await signInOn(app().client(), device);
@@ -251,7 +251,7 @@ describe("signing in with a passkey", () => {
     expect(await lastUseOf(passkeyId)).toBeInstanceOf(Date);
   });
 
-  it("refuses an assertion without user verification, making no session", async () => {
+  it("refuses an assertion without user verification and makes no session", async () => {
     const { person, device } = await aPersonWithAPasskey();
     const before = await sessionsOf(person.id);
     const browser = app().client();
@@ -264,7 +264,7 @@ describe("signing in with a passkey", () => {
     expect(await sessionsOf(person.id)).toEqual(before);
   });
 
-  it("refuses a passkey the platform does not hold", async () => {
+  it("refuses a passkey that was never added", async () => {
     const browser = app().client();
 
     const answered = await signInOn(browser, aPasskeyDevice(browser.origin));
@@ -273,7 +273,7 @@ describe("signing in with a passkey", () => {
     expect(await answered.json()).toEqual({ error: "passkey-unknown" });
   });
 
-  it("refuses a passkey once removed", async () => {
+  it("refuses a passkey after it is removed", async () => {
     const { client, device, passkeyId } = await aPersonWithAPasskey();
     await webClientOf(client).api.person.removePasskey.mutate({ passkeyId });
 
@@ -283,7 +283,7 @@ describe("signing in with a passkey", () => {
     expect(await answered.json()).toEqual({ error: "passkey-unknown" });
   });
 
-  it("asks for user verification and names no passkey", async () => {
+  it("requires user verification and lists no allowed passkeys", async () => {
     const { client } = await aPersonWithAPasskey();
 
     const asked = await client.json(SIGN_IN_OPTIONS, {});
@@ -294,7 +294,7 @@ describe("signing in with a passkey", () => {
     expect(options).toEqual({ userVerification: "required" });
   });
 
-  it.each([SIGN_IN_OPTIONS, SIGN_IN])("answers 429 at %s past thirty a minute", async (path) => {
+  it.each([SIGN_IN_OPTIONS, SIGN_IN])("answers 429 at %s past thirty in a minute", async (path) => {
     const browser = app().client();
     const answers: number[] = [];
     stopTheClock();
@@ -307,7 +307,7 @@ describe("signing in with a passkey", () => {
     expect(answers.at(-1)).toBe(429);
   });
 
-  it("spends none of the address's link sign-ins", async () => {
+  it("does not count toward the sign-in link's rate limit", async () => {
     const browser = app().client();
     for (let asked = 0; asked < 11; asked += 1) await browser.json(SIGN_IN_OPTIONS, {});
 
@@ -318,7 +318,7 @@ describe("signing in with a passkey", () => {
 });
 
 describe("renaming and removing a passkey", () => {
-  it("renames it, sending no notice", async () => {
+  it("renames it and sends no notice", async () => {
     const { person, client, passkeyId } = await aPersonWithAPasskey();
 
     const renamed = await webClientOf(client).api.person.renamePasskey.mutate({
@@ -339,7 +339,7 @@ describe("renaming and removing a passkey", () => {
     expect(subjectsTo(person.email)).toEqual([ADDED, REMOVED]);
   });
 
-  it("refuses an Admin's last second factor, sending no notice", async () => {
+  it("keeps an Admin's last second factor and sends no notice", async () => {
     const { admin: person, client } = await anAdminSignedIn(app());
     const answered = await addOn(client, aPasskeyDevice(client.origin));
     const { passkeyId } = addedAnswer.parse(await answered.json());
@@ -357,7 +357,7 @@ describe("renaming and removing a passkey", () => {
     expect(subjectsTo(person.email)).toEqual([ADDED]);
   });
 
-  it("keeps the dismissed offer for the person", async () => {
+  it("records that the person dismissed the passkey offer", async () => {
     const { client } = await aSignedInPerson();
     const { api } = webClientOf(client);
 

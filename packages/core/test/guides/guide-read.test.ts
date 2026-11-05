@@ -77,7 +77,7 @@ describe("reading a guide", () => {
     expect(guide).toMatchObject({ kind: "Bid library", collection: "company", subject: null });
   });
 
-  it("coverage names each expected fact not yet included", async () => {
+  it("lists each expected fact not yet included in coverage", async () => {
     const seeded = await freshGuide();
     const before = await guideAs(seeded, seeded.ng.editor);
     expect(sectionOf(before, INSURANCE).coverage).toMatchObject({
@@ -137,7 +137,7 @@ describe("reading a guide", () => {
     ).toEqual(direct?.sections.map((section) => section.facts));
   });
 
-  it("a hidden section counts toward coverage", async () => {
+  it("counts a hidden section toward coverage", async () => {
     const seeded = await freshGuide();
     await db().pool.query(
       "UPDATE guide_section SET hidden = true WHERE guide_id = $1 AND prompt = 'Security testing'",
@@ -153,7 +153,7 @@ describe("reading a guide", () => {
     expect(admin.sections).toHaveLength(8);
   });
 
-  it("a reader never sees a hidden section", async () => {
+  it("never shows a hidden section to a reader", async () => {
     const seeded = await freshGuide();
     await db().pool.query(
       "UPDATE guide_section SET hidden = true WHERE guide_id = $1 AND prompt = 'Information security'",
@@ -182,7 +182,7 @@ describe("reading a guide", () => {
     expect(admin.sections.map((section) => section.number)).toContain("6.1");
   });
 
-  it("a reader outside the write-up's audience gets no Brief", async () => {
+  it("gives no Brief to a reader outside the write-up's audience", async () => {
     const seeded = await freshGuide();
 
     const viewer = await guideAs(seeded, seeded.ng.viewer);

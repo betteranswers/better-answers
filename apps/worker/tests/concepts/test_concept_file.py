@@ -74,7 +74,7 @@ def test_reads_back_every_shape_the_renderer_writes() -> None:
         ),
     ],
 )
-def test_refuses_a_file_the_renderer_never_wrote(why: str, content: str) -> None:
+def test_rejects_a_file_not_in_the_renderers_format(why: str, content: str) -> None:
 
     with pytest.raises(MalformedConceptFileError):
         parse_concept_file(content)
@@ -115,7 +115,7 @@ def test_reduces_a_citation_to_its_resolved_resource_and_locator() -> None:
     ) == canonical_frontmatter(relative, "knowledge/expenses.md")
 
 
-def test_writes_a_numeric_locator_as_the_other_tier_does() -> None:
+def test_writes_a_numeric_locator_as_javascript_would() -> None:
 
     page_four: list[SourceEntry] = [{"resource": "/a.md", "locator": 4}]
     numeric: Frontmatter = {"sources": page_four}
@@ -125,7 +125,7 @@ def test_writes_a_numeric_locator_as_the_other_tier_does() -> None:
     )
 
 
-def test_hashes_listed_objects_whatever_their_key_order() -> None:
+def test_hash_ignores_key_order_inside_listed_objects() -> None:
 
     body = "Expenses are claimed within thirty days."
     as_written: list[SourceEntry] = [
@@ -154,5 +154,5 @@ def test_sorts_keys_and_writes_them_without_insignificant_whitespace() -> None:
     )
 
 
-def test_normalises_the_body_the_way_the_hash_reads_it() -> None:
+def test_normalised_body_drops_carriage_returns_and_trailing_whitespace() -> None:
     assert normalised_body("one \r\ntwo\t\n\n\n") == "one\ntwo\n"

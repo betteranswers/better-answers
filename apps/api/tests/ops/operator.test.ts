@@ -70,7 +70,7 @@ const answeredUser = z.object({ user: z.looseObject({ id: z.string() }) });
 
 const PROCEDURE_TYPES = ["query", "mutation"] as const;
 
-/** The router's flattened record types its entries as routers, though each is a procedure. */
+/** The router's flattened record types each entry as a router, but each one is a procedure. */
 const procedureDef = z.object({ type: z.enum(PROCEDURE_TYPES) });
 
 type Run = { readonly exitCode: number; readonly lines: readonly string[] };
@@ -105,7 +105,7 @@ const operatorRowCount = async (): Promise<number> => {
   return found.rows[0]?.rows ?? 0;
 };
 
-const markHeldBy = async (personId: string): Promise<boolean | undefined> => {
+const operatorFlagOf = async (personId: string): Promise<boolean | undefined> => {
   const found = await app().database.superuser.query<{ operator: boolean }>(
     'SELECT operator FROM "user" WHERE id = $1',
     [personId],
@@ -145,8 +145,8 @@ const theOperatorsBearerAt = async (path: string, init: RequestInit = {}) => {
   return { status: response.status, answer: await response.json() };
 };
 
-describe("operator — the mark an ops command sets and clears", () => {
-  it("grants the mark, recorded under the platform's identity actor", async () => {
+describe("operator, which grants or revokes the operator flag", () => {
+  it("grants the flag and audits it as the identity process", async () => {
     const person = await app().person();
 
     const run = await ops(["operator", "--email", person.email, "--grant"]);
@@ -155,7 +155,7 @@ describe("operator — the mark an ops command sets and clears", () => {
       exitCode: 0,
       lines: [`operator: done — ${person.email} is the operator`],
     });
-    expect(await markHeldBy(person.id)).toBe(true);
+    expect(await operatorFlagOf(person.id)).toBe(true);
     expect(await operatorRowsOf(person.id)).toEqual([
       {
         action: "people.operator.granted",
@@ -166,7 +166,7 @@ describe("operator — the mark an ops command sets and clears", () => {
     ]);
   });
 
-  it("revokes the mark, recording the revocation as its own row", async () => {
+  it("revokes the flag and audits the revocation separately", async () => {
     const person = await app().person();
     await ops(["operator", "--email", person.email, "--grant"]);
 
@@ -176,14 +176,14 @@ describe("operator — the mark an ops command sets and clears", () => {
       exitCode: 0,
       lines: [`operator: done — ${person.email.toUpperCase()} is no longer the operator`],
     });
-    expect(await markHeldBy(person.id)).toBe(false);
+    expect(await operatorFlagOf(person.id)).toBe(false);
     expect((await operatorRowsOf(person.id)).map((row) => [row["action"], row["actor"]])).toEqual([
       ["people.operator.granted", IDENTITY_ACTOR],
       ["people.operator.revoked", IDENTITY_ACTOR],
     ]);
   });
 
-  it("writes nothing for a person already standing as asked", async () => {
+  it("writes nothing when the person already has the asked state", async () => {
     const person = await app().person();
     await ops(["operator", "--email", person.email, "--grant"]);
 
@@ -205,7 +205,7 @@ describe("operator — the mark an ops command sets and clears", () => {
     expect(await operatorRowsOf(someoneElse.id)).toEqual([]);
   });
 
-  it("refuses an address nobody has signed in with, writing nothing", async () => {
+  it("refuses an unknown address as no-such-user and writes nothing", async () => {
     const before = await operatorRowCount();
 
     const run = await ops(["operator", "--email", "nobody@acme.invalid", "--grant"]);
@@ -219,7 +219,7 @@ describe("operator — the mark an ops command sets and clears", () => {
     expect(await operatorRowCount()).toBe(before);
   });
 
-  it("answers usage to a --grant with a --revoke, writing nothing", async () => {
+  it("gives a usage error for --grant with --revoke", async () => {
     const person = await app().person();
     const before = await operatorRowCount();
 
@@ -233,15 +233,15 @@ describe("operator — the mark an ops command sets and clears", () => {
     expect(await operatorRowsOf(person.id)).toEqual([]);
   });
 
-  it("names the command in the usage", async () => {
+  it("lists the command in the help text", async () => {
     const run = await ops(["help"]);
 
     expect(run.lines.join("\n")).toContain("operator --email <email> --grant|--revoke");
   });
 });
 
-describe("the mark the identity provider never takes or returns", () => {
-  it("refuses a first sign-in whose body sets the mark", async () => {
+describe("the operator flag in the identity provider's sign-in and session", () => {
+  it("refuses a first sign-in whose body sets the operator flag", async () => {
     const email = `mallory-${Date.now()}@acme.invalid`;
     const client = app().client();
     const asked = await client.json("/email-otp/send-verification-otp", {
@@ -264,7 +264,7 @@ describe("the mark the identity provider never takes or returns", () => {
     expect(marked.rowCount).toBe(0);
   });
 
-  it("leaves the mark out of the session the library answers", async () => {
+  it("leaves the flag out of sign-in and session responses", async () => {
     const person = await app().person();
     await app().markOperator(person.email, "grant");
     const client = app().client();
@@ -290,7 +290,7 @@ const sessionsHeldBy = async (personId: string): Promise<number | undefined> => 
   return found.rows[0]?.held;
 };
 
-describe("the console, the operator's alone", () => {
+describe("the console, which only the operator can use", () => {
   const auditRowsHeld = async () =>
     (
       await app().database.superuser.query<Record<string, unknown>>(
@@ -299,7 +299,7 @@ describe("the console, the operator's alone", () => {
       )
     ).rows;
 
-  it("hands a console procedure the operator, never a Principal", () => {
+  it("gives console procedures an OperatorPrincipal, never a Principal", () => {
     expectTypeOf<OperatorContext["operator"]>().toEqualTypeOf<OperatorPrincipal>();
     expectTypeOf<OperatorContext["tx"]>().toEqualTypeOf<Tx>();
     expectTypeOf<OperatorContext["doors"]>().toEqualTypeOf<undefined>();
@@ -308,7 +308,7 @@ describe("the console, the operator's alone", () => {
     expectTypeOf<OperatorPrincipal>().not.toExtend<Principal>();
   });
 
-  it("lists each workspace with its short name, members and creation", async () => {
+  it("lists each workspace's short name, member count, and creation time", async () => {
     const { api } = await theOperatorOnTheWeb();
     const acme = await app().provision({ name: "Acme Holdings" });
     const colleague = await app().person();
@@ -325,7 +325,7 @@ describe("the console, the operator's alone", () => {
     });
   });
 
-  it("refuses every console procedure the router serves, none left out", () => {
+  it("lists every console procedure in the refusal cases", () => {
     const consoleProcedures = Object.keys(appRouter._def.procedures)
       .filter((path) => path.startsWith("console."))
       .sort();
@@ -377,7 +377,7 @@ describe("the console, the operator's alone", () => {
     expect(await auditRowsHeld()).toEqual(before);
   });
 
-  it("refuses the operator from the moment the mark is cleared", async () => {
+  it("refuses the operator as soon as the flag is revoked", async () => {
     const { workspace, api } = await theOperatorOnTheWeb();
     expect(Array.isArray(await api.console.workspaces.list.query())).toBe(true);
 
@@ -389,7 +389,7 @@ describe("the console, the operator's alone", () => {
   });
 });
 
-describe("ending every sign-in and token everywhere, from the console", () => {
+describe("signing a person out everywhere from the console", () => {
   const revocationRowsOf = async (personId: string) => {
     const found = await app().database.superuser.query<Record<string, unknown>>(
       `SELECT action, actor, subject_id, detail FROM identity_audit_event
@@ -438,8 +438,8 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     });
     expect(await sessionsHeldBy(person.id)).toBe(0);
     expect(await refreshTokensOf(person.id)).toEqual([]);
-    assert(inAcme.refreshToken !== undefined, "Acme's connection issued a refresh token");
-    assert(inBeta.refreshToken !== undefined, "Beta's connection issued a refresh token");
+    assert(inAcme.refreshToken !== undefined, "Acme's connection issued no refresh token");
+    assert(inBeta.refreshToken !== undefined, "Beta's connection issued no refresh token");
     expect([
       (await callMcp(host, inAcme.accessToken, "tools/list")).status,
       (await callMcp(host, inBeta.accessToken, "tools/list")).status,
@@ -478,7 +478,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     return { earlier, later, host: app().client() };
   };
 
-  it("keeps the later grant when an earlier token is replayed", async () => {
+  it("keeps the new grant when a pre-revocation token is replayed", async () => {
     const { earlier, later, host } = await connectedAgainAfterRevocation();
 
     const replayed = await refresh(host, earlier);
@@ -487,7 +487,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     expect((await refresh(host, later)).status).toBe(200);
   });
 
-  it("keeps the later grant when an earlier token is revoked", async () => {
+  it("keeps the new grant when a pre-revocation token is revoked", async () => {
     const { earlier, later, host } = await connectedAgainAfterRevocation();
 
     const revoking = await revokeAtEndpoint(host, earlier);
@@ -496,7 +496,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     expect((await refresh(host, later)).status).toBe(200);
   });
 
-  it("admits the person's fresh sign-in once the revocation lands", async () => {
+  it("lets the person sign in again after the revocation", async () => {
     const { api } = await theOperatorOnTheWeb();
     const acme = await app().provision();
     const before = await webSignedIn(app(), acme.admin.email);
@@ -514,7 +514,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     });
   });
 
-  it("refuses the operator's hour-old confirmation, writing nothing", async () => {
+  it("refuses a confirmation over an hour old and writes nothing", async () => {
     const { workspace, api } = await theOperatorOnTheWeb();
     const person = await app().person();
     await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
@@ -530,7 +530,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     expect(await revocationRowsOf(person.id)).toEqual([]);
   });
 
-  it("admits the operator again after a fresh sign-in's confirmation", async () => {
+  it("accepts the operator again after a fresh sign-in", async () => {
     const { workspace } = await theOperatorOnTheWeb();
     const person = await app().person();
     await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
@@ -542,7 +542,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     expect(await revocationRowsOf(person.id)).toHaveLength(1);
   });
 
-  it("refuses a person nobody holds, writing nothing", async () => {
+  it("refuses an unknown person id as no-such-user", async () => {
     const { api } = await theOperatorOnTheWeb();
     const nobody = ulid();
 
@@ -573,7 +573,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
   });
 });
 
-describe("correcting a flagged display name, from the console", () => {
+describe("correcting a flagged display name from the console", () => {
   const RUDE_NAME = "Rude Name";
 
   const correctionRowsOf = async (personId: string) => {
@@ -600,7 +600,7 @@ describe("correcting a flagged display name, from the console", () => {
       (waiting) => waiting.personId === personId,
     );
 
-  it("corrects the name, taking the person off the names waiting", async () => {
+  it("corrects the name and removes the person from Names Waiting", async () => {
     const { api, workspace, acme, person } = await theOperatorAndAFlaggedPerson();
     expect(await waitingFor(api, person.id)).toEqual([
       {
@@ -633,7 +633,7 @@ describe("correcting a flagged display name, from the console", () => {
     ]);
   });
 
-  it("refuses a name the person's own rule refuses, still waiting", async () => {
+  it("refuses a name the display-name rules reject, keeping it waiting", async () => {
     const { api, person } = await theOperatorAndAFlaggedPerson();
 
     const refused = await refusalOfCall(
@@ -648,7 +648,7 @@ describe("correcting a flagged display name, from the console", () => {
     expect(await correctionRowsOf(person.id)).toEqual([]);
   });
 
-  it("refuses the operator's hour-old confirmation, writing nothing", async () => {
+  it("refuses a confirmation over an hour old and writes nothing", async () => {
     const { api, workspace, person } = await theOperatorAndAFlaggedPerson();
     await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
 
@@ -663,7 +663,7 @@ describe("correcting a flagged display name, from the console", () => {
     expect(await correctionRowsOf(person.id)).toEqual([]);
   });
 
-  it("admits the operator again after a fresh sign-in's confirmation", async () => {
+  it("accepts the operator again after a fresh sign-in", async () => {
     const { workspace, person } = await theOperatorAndAFlaggedPerson();
     await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
 
@@ -677,7 +677,7 @@ describe("correcting a flagged display name, from the console", () => {
     expect(await waitingFor(api, person.id)).toEqual([]);
   });
 
-  it("refuses a person nobody holds, writing nothing", async () => {
+  it("refuses an unknown person id as no-such-user", async () => {
     const { api } = await theOperatorOnTheWeb();
     const nobody = ulid();
 
@@ -711,8 +711,8 @@ describe("correcting a flagged display name, from the console", () => {
   });
 });
 
-describe("the session's read of whether its person is the operator", () => {
-  it("names the operator, who needs no workspace for it", async () => {
+describe("session.operator, which says whether the person is the operator", () => {
+  it("returns true and the operator's name, needing no workspace", async () => {
     const person = await app().person();
     await app().markOperator(person.email, "grant");
     const { api } = await webSignedIn(app(), person.email);
@@ -720,7 +720,7 @@ describe("the session's read of whether its person is the operator", () => {
     expect(await api.session.operator.query()).toEqual({ operator: true, name: person.name });
   });
 
-  it("answers no to an Admin, an Editor and a Viewer", async () => {
+  it("returns false for an Admin, an Editor, and a Viewer", async () => {
     const answers: unknown[] = [];
     for (const { api } of await everyRoleOnTheWeb()) {
       answers.push(await api.session.operator.query());
@@ -729,14 +729,14 @@ describe("the session's read of whether its person is the operator", () => {
     expect(answers).toEqual([{ operator: false }, { operator: false }, { operator: false }]);
   });
 
-  it("answers no from the moment the mark is cleared", async () => {
+  it("returns false as soon as the flag is revoked", async () => {
     const { workspace, api } = await theOperatorOnTheWeb();
     await app().markOperator(workspace.admin.email, "revoke");
 
     expect(await api.session.operator.query()).toEqual({ operator: false });
   });
 
-  it("refuses a caller with no session, the operator's bearer included", async () => {
+  it("refuses a caller without a session, including the operator's bearer", async () => {
     expect(await theOperatorsBearerAt("session.operator")).toMatchObject({
       status: 401,
       answer: { error: { data: { refusal: { word: "no-session", class: "unauthenticated" } } } },
@@ -744,7 +744,7 @@ describe("the session's read of whether its person is the operator", () => {
   });
 });
 
-describe("the console's list and inspection of people", () => {
+describe("the console's people list and person details", () => {
   const signInsOf = async (personId: string): Promise<readonly string[]> => {
     const found = await app().database.superuser.query<{ at: Date }>(
       `SELECT at FROM identity_audit_event
@@ -802,7 +802,7 @@ describe("the console's list and inspection of people", () => {
     ]);
   });
 
-  it("answers a page of the matches, counting every match", async () => {
+  it("returns one page of matches with the total match count", async () => {
     const { api } = await theOperatorOnTheWeb();
     const tag = ulid().toLowerCase();
     await app().person(undefined, `${tag} Ada`);
@@ -816,11 +816,11 @@ describe("the console's list and inspection of people", () => {
     });
   });
 
-  it("shows a person's session and their assistant's standing grant", async () => {
+  it("shows a person's session and their assistant's active grant", async () => {
     const { api } = await theOperatorOnTheWeb();
     const workspace = await app().provision({ name: "Acme" });
     const connected = await connectAsHost(app(), app().client(), workspace.admin);
-    assert(connected.refreshToken !== undefined, "the connection issued a refresh token");
+    assert(connected.refreshToken !== undefined, "the connection issued no refresh token");
     const refreshed = await refresh(app().client(), connected.refreshToken);
     expect(refreshed.status).toBe(200);
 
@@ -883,8 +883,8 @@ describe("the console's list and inspection of people", () => {
       ],
     });
     const [everywhere, here] = inspected.ended;
-    assert(everywhere !== undefined, "the sign-out everywhere is listed");
-    assert(here !== undefined, "the sign-out here is listed");
+    assert(everywhere !== undefined, "the sign-out everywhere is not listed");
+    assert(here !== undefined, "the workspace sign-out is not listed");
     expect(Date.parse(everywhere.endedAt)).toBeGreaterThanOrEqual(Date.parse(here.endedAt));
   });
 
@@ -913,7 +913,7 @@ describe("the console's list and inspection of people", () => {
     return { api, acme };
   };
 
-  it("shows an assistant's own revocation as the authorization server's ending", async () => {
+  it("attributes an assistant's own revocation to the authorization server", async () => {
     const { api, acme } = await revokedByItsAssistant();
 
     const inspected = await api.console.people.inspect.query({ personId: acme.admin.id });
@@ -921,9 +921,9 @@ describe("the console's list and inspection of people", () => {
     expect(inspected).toMatchObject({ grants: [], ended: endedByTheServer(acme.workspaceId) });
   });
 
-  // Sign-out marks only a refresh token without `offline_access`, which Claude's grant holds
-  // until a refresh narrows its scopes.
-  it("shows a sign-out's revocation as the authorization server's ending", async () => {
+  // Sign-out ends only a refresh token that lacks `offline_access`. Claude's grant has that scope
+  // until a refresh narrows it.
+  it("attributes a revocation by sign-out to the authorization server", async () => {
     const { api, acme, host, refreshToken } = await acmeConnected();
     const narrowed = await refresh(host, refreshToken, "knowledge:read");
     expect(narrowed.status).toBe(200);
@@ -938,7 +938,7 @@ describe("the console's list and inspection of people", () => {
     });
   });
 
-  it("leaves a grant its assistant revoked out of revoking everywhere", async () => {
+  it("omits an assistant-revoked grant when ending every sign-in", async () => {
     const { api, acme } = await revokedByItsAssistant();
 
     await api.console.people.endEverySignInAndToken.mutate({ personId: acme.admin.id });
@@ -953,7 +953,7 @@ describe("the console's list and inspection of people", () => {
     expect(inspected.ended).toEqual([]);
   });
 
-  it("refuses a malformed ask, naming the field", async () => {
+  it("refuses malformed input and names the field", async () => {
     const { api } = await theOperatorOnTheWeb();
 
     const refusals = [
@@ -977,7 +977,7 @@ describe("the console's list and inspection of people", () => {
     ]);
   });
 
-  it("refuses to inspect an id no person holds", async () => {
+  it("refuses to inspect an unknown person id", async () => {
     const { api } = await theOperatorOnTheWeb();
 
     const refused = await refusalOfCall(api.console.people.inspect.query({ personId: ulid() }));

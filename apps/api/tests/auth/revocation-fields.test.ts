@@ -6,13 +6,13 @@ const { auth } = authAsServerBuildsIt();
 
 type Declared = { type?: unknown; required?: unknown; input?: unknown; returned?: unknown };
 
-const platformWritten = (field: Declared | undefined): Readonly<Record<string, unknown>> => ({
+const writeRulesOf = (field: Declared | undefined): Readonly<Record<string, unknown>> => ({
   type: field?.type,
   required: field?.required,
   input: field?.input,
 });
 
-const PLATFORM_DATE = { type: "date", required: false, input: false };
+const SERVER_SET_DATE = { type: "date", required: false, input: false };
 
 const memberSchema = (): { additionalFields?: Record<string, Declared> } | undefined => {
   const plugins: readonly unknown[] = auth.options.plugins;
@@ -30,29 +30,29 @@ const memberSchema = (): { additionalFields?: Record<string, Declared> } | undef
   return organisation?.options.schema?.member;
 };
 
-describe("the revocation instants the identity provider carries", () => {
-  it("gives a person one user-row instant the person cannot set", () => {
+describe("the credential revocation timestamps Better Auth declares", () => {
+  it("declares a user-row timestamp the person cannot set", () => {
     const fields: Record<string, Declared> = auth.options.user.additionalFields;
 
-    expect(platformWritten(fields["credentialsRevokedAt"])).toEqual(PLATFORM_DATE);
+    expect(writeRulesOf(fields["credentialsRevokedAt"])).toEqual(SERVER_SET_DATE);
   });
 
-  it("gives a member its own instant, kept to one workspace", () => {
+  it("declares a separate member-row timestamp for each workspace", () => {
     const schema = memberSchema();
     assert(
       schema?.additionalFields !== undefined,
-      "the organisation plugin declares member fields",
+      "the organisation plugin declares no member fields",
     );
     const fields = schema.additionalFields;
 
-    expect(platformWritten(fields["credentialsRevokedAt"])).toEqual(PLATFORM_DATE);
+    expect(writeRulesOf(fields["credentialsRevokedAt"])).toEqual(SERVER_SET_DATE);
   });
 
-  it("keeps the member's instant from what a colleague sees", () => {
+  it("omits the member's timestamp from what the API returns", () => {
     const schema = memberSchema();
     assert(
       schema?.additionalFields !== undefined,
-      "the organisation plugin declares member fields",
+      "the organisation plugin declares no member fields",
     );
     const fields = schema.additionalFields;
 

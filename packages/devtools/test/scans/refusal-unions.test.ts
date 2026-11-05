@@ -10,7 +10,7 @@ const wordsIn = (source: string): readonly string[] =>
 const REGEX_THE_WALK_REPLACED = /\b(?:Kernel|Member|Source|Workspace|Erasure)Refusal</;
 
 describe("the words a refusal union is built from", () => {
-  it("names a word in a union the regex never read", () => {
+  it("names a word in a union the old regex missed", () => {
     const union = `RoleRefusal | "invented-word"`;
 
     expect(wordsIn(`export type ReadThingRefusal = ${union};\n`)).toEqual(["invented-word"]);

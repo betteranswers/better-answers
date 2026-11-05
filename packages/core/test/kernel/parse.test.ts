@@ -65,8 +65,8 @@ const EVERY_ISSUE: ReadonlyArray<readonly [IssueWord, string, z.ZodType, unknown
   ["refused", "field", z.object({ field: z.string().refine(() => false) }), { field: "a" }],
 ];
 
-describe("what a kernel parse answers", () => {
-  it("hands back the branded value a schema admits", () => {
+describe("the kernel's parse", () => {
+  it("returns the parsed value when the schema accepts the input", () => {
     const read = parse(narrowConnectedSourceInput, {
       connectedSourceId: A_CONNECTED_SOURCE,
       sensitivity: "Restricted",
@@ -82,7 +82,7 @@ describe("what a kernel parse answers", () => {
     });
   });
 
-  it("names the failing field with a word, never its value", () => {
+  it("reports the failing field's issue word without its value", () => {
     const read = parse(connectUploadFields, {
       connectedSourceId: A_CONNECTED_SOURCE,
       name: SECRET,
@@ -99,7 +99,7 @@ describe("what a kernel parse answers", () => {
     expect(JSON.stringify(read)).not.toContain("-1");
   });
 
-  it("carries no offending value when every field is wrong", () => {
+  it("leaves out every bad value when every field fails", () => {
     const read = parse(keepInTextInput, {
       connectedSourceId: SECRET,
       groupsOfFindings: [{ ...ALWAYS_GROUP, tier: SECRET }],
@@ -120,7 +120,7 @@ describe("what a kernel parse answers", () => {
     expect(JSON.stringify(read)).not.toContain("Baker Street");
   });
 
-  it("names a nested field by the path that reaches it", () => {
+  it("names a nested field by its dotted path", () => {
     const { dpiaReferenced: _dropped, ...part } = CONFIRMED;
 
     expect(
@@ -134,7 +134,7 @@ describe("what a kernel parse answers", () => {
     });
   });
 
-  it("reads a nested undefined key as a missing one", () => {
+  it("reports a nested undefined key as missing", () => {
     expect(
       parse(publishConnectedSourceInput, {
         connectedSourceId: A_CONNECTED_SOURCE,
@@ -146,31 +146,28 @@ describe("what a kernel parse answers", () => {
     });
   });
 
-  it("calls the whole value missing when nothing was handed in", () => {
+  it("reports the root as missing when the input is undefined", () => {
     expect(parse(findingsOfInput, undefined)).toEqual({
       ok: false,
       error: { word: "malformed", fields: { [ROOT_PATH]: "missing" } },
     });
   });
 
-  it("names the root when the whole value is mistyped", () => {
+  it("reports the root as wrong-type for a non-object input", () => {
     expect(parse(findingsOfInput, "not an object")).toEqual({
       ok: false,
       error: { word: "malformed", fields: { [ROOT_PATH]: "wrong-type" } },
     });
   });
 
-  it.each(EVERY_ISSUE)(
-    "answers %s for the issue a schema raises with it",
-    (word, path, schema, raw) => {
-      expect(refusalOf(parse(schema, raw))).toEqual({
-        word: "malformed",
-        fields: { [path]: word },
-      });
-    },
-  );
+  it.each(EVERY_ISSUE)("reports %s for the matching schema issue", (word, path, schema, raw) => {
+    expect(refusalOf(parse(schema, raw))).toEqual({
+      word: "malformed",
+      fields: { [path]: word },
+    });
+  });
 
-  it("owns every issue word and reaches each one", () => {
+  it("has a case for every issue word, and no others", () => {
     const reached = EVERY_ISSUE.map(([word]) => word);
 
     expect([...ISSUE_WORDS].filter((word) => !reached.includes(word))).toEqual([]);
@@ -178,8 +175,8 @@ describe("what a kernel parse answers", () => {
   });
 });
 
-describe("the shapes the Sources actions are handed", () => {
-  it("defaults a connect's class, audience and groups to the narrowest", () => {
+describe("the Sources actions' input schemas", () => {
+  it("defaults a connect's visibility to Restricted, everyone, no groups", () => {
     const read = parse(connectUploadFields, {
       connectedSourceId: A_CONNECTED_SOURCE,
       name: "The staff handbook",
@@ -201,7 +198,7 @@ describe("the shapes the Sources actions are handed", () => {
     });
   });
 
-  it("refuses an audience word and group list that disagree", () => {
+  it("refuses an audience that disagrees with its group list", () => {
     const named = parse(narrowConnectedSourceInput, {
       connectedSourceId: A_CONNECTED_SOURCE,
       sensitivity: "Internal",
@@ -233,7 +230,7 @@ describe("the shapes the Sources actions are handed", () => {
     ).toEqual({ word: "malformed", fields: { audienceGroups: "too-small" } });
   });
 
-  it("refuses a fractional preview limit and defaults an absent one", () => {
+  it("defaults a missing preview limit to 20, refusing fractions", () => {
     expect(
       refusalOf(parse(previewPassagesInput, { connectedSourceId: A_CONNECTED_SOURCE, limit: 2.5 })),
     ).toEqual({
@@ -246,7 +243,7 @@ describe("the shapes the Sources actions are handed", () => {
     });
   });
 
-  it("defaults a narrowing to the narrowest class, keeping its groups", () => {
+  it("defaults a document narrowing to Restricted, keeping its finding groups", () => {
     expect(
       parse(narrowDocumentsInput, {
         connectedSourceId: A_CONNECTED_SOURCE,
@@ -262,7 +259,7 @@ describe("the shapes the Sources actions are handed", () => {
     });
   });
 
-  it("refuses a non-reprocess reason and an unknown finding tier", () => {
+  it("refuses an invalid reprocess reason and an unknown finding tier", () => {
     for (const reason of ["spring-clean", "bound", "restored", "narrowed"]) {
       expect(
         refusalOf(
@@ -303,7 +300,7 @@ describe("the shapes the Sources actions are handed", () => {
     }
   });
 
-  it("brands the ids an action is handed", () => {
+  it("accepts ULID ids and refuses a lower-case one", () => {
     const kept = parse(keepInTextInput, {
       connectedSourceId: A_CONNECTED_SOURCE,
       groupsOfFindings: [ALWAYS_GROUP],

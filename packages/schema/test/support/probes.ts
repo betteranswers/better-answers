@@ -97,8 +97,8 @@ export type Refusal = readonly [
 ];
 
 /**
- * A refusal without a pattern must match `permission denied`. Each runs under a savepoint rolled
- * back after.
+ * A refusal with no pattern must match `permission denied`. Each statement runs under a savepoint
+ * that is rolled back afterwards.
  */
 export const refusesEach = async (
   client: pg.PoolClient,
@@ -392,7 +392,7 @@ export const policiesIndexedInBulk = async (
   );
 };
 
-/** Answers `ADMITTED` or the refusal's SQLSTATE, not its constraint; the row never stays. */
+/** Returns `ADMITTED` or the refusal's SQLSTATE, not its constraint name. The row is always rolled back. */
 export const enqueueAttempted = async (
   client: Writer,
   job: {

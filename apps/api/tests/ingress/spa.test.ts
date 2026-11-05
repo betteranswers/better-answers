@@ -8,10 +8,10 @@ import { servedApp } from "../support/suite-app.ts";
 
 const asABrowserNavigates = { headers: { accept: "text/html,application/xhtml+xml" } };
 
-describe("the api serves the shell on app.", () => {
+describe("the api serves the shell on the app hostname", () => {
   const app = servedApp();
 
-  it("answers a page's address with the shell, so bookmarks work", async () => {
+  it("answers a page path with the shell so bookmarks load", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/system", asABrowserNavigates);
@@ -28,7 +28,7 @@ describe("the api serves the shell on app.", () => {
     await expect(response.text()).resolves.toContain(`<div id="root">`);
   });
 
-  it("refuses framing by another site on every page, sign-in included", async () => {
+  it("forbids framing on every page, including sign-in", async () => {
     for (const page of ["/sign-in", "/choose-workspace", "/system", "/"]) {
       const response = await app().client(undefined, APP_HOSTNAME).fetch(page, asABrowserNavigates);
 
@@ -38,7 +38,7 @@ describe("the api serves the shell on app.", () => {
     }
   });
 
-  it("serves a built asset as itself", async () => {
+  it("serves a built asset file, not the shell", async () => {
     const response = await app().client(undefined, APP_HOSTNAME).fetch("/assets/page.js");
 
     expect(response.status).toBe(200);
@@ -46,7 +46,7 @@ describe("the api serves the shell on app.", () => {
     await expect(response.text()).resolves.toContain("the page");
   });
 
-  it("keeps the build's own caching beside the transport's no-store", async () => {
+  it("marks the shell no-cache and leaves asset caching unset", async () => {
     const shell = await app().client(undefined, APP_HOSTNAME).fetch("/", asABrowserNavigates);
     const asset = await app().client(undefined, APP_HOSTNAME).fetch("/assets/page.js");
 
@@ -63,7 +63,7 @@ describe("the api serves the shell on app.", () => {
     await expect(response.text()).resolves.not.toContain(`<div id="root">`);
   });
 
-  it("leaves the health check answering itself, not the shell", async () => {
+  it("answers /health with its JSON, not the shell", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/health", asABrowserNavigates);
@@ -72,13 +72,13 @@ describe("the api serves the shell on app.", () => {
     await expect(response.json()).resolves.toMatchObject({ status: "healthy" });
   });
 
-  it("does not shadow an endpoint the web app fetches", async () => {
+  it("routes /get-session to the auth handler, not the shell", async () => {
     const response = await app().client(undefined, APP_HOSTNAME).fetch("/get-session");
 
     expect(response.headers.get("content-type")).not.toContain("text/html");
   });
 
-  it("gives a browser the auth endpoint's own answer", async () => {
+  it("routes a browser's /get-session to auth, not the shell", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/get-session", asABrowserNavigates);
@@ -87,7 +87,7 @@ describe("the api serves the shell on app.", () => {
     await expect(response.text()).resolves.not.toContain(`<div id="root">`);
   });
 
-  it("leaves the product's transport answering on app., not the shell", async () => {
+  it("routes a browser's tRPC request to tRPC, not the shell", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch(`${TRPC_ENDPOINT}/modelChoices.list`, asABrowserNavigates);
@@ -96,7 +96,7 @@ describe("the api serves the shell on app.", () => {
     await expect(response.text()).resolves.not.toContain(`<div id="root">`);
   });
 
-  it("answers a page's address on a trailing-dot hostname", async () => {
+  it("serves the shell for a page on a trailing-dot hostname", async () => {
     const response = await app().server.request(
       new Request(`https://${APP_HOSTNAME}./system`, asABrowserNavigates),
     );
@@ -105,7 +105,7 @@ describe("the api serves the shell on app.", () => {
     await expect(response.text()).resolves.toContain(`<div id="root">`);
   });
 
-  it("serves the shell on app. only, never agent. or apex", async () => {
+  it("refuses page paths on the agent and apex hostnames", async () => {
     for (const hostname of [AGENT_HOSTNAME, APEX_HOSTNAME]) {
       const response = await app()
         .client(undefined, hostname)
@@ -116,7 +116,7 @@ describe("the api serves the shell on app.", () => {
     }
   });
 
-  it("leaves the protected-resource document answering as itself on app.", async () => {
+  it("serves a browser the protected-resource document, not the shell", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/.well-known/oauth-protected-resource", asABrowserNavigates);
@@ -125,7 +125,7 @@ describe("the api serves the shell on app.", () => {
     await expect(response.json()).resolves.toMatchObject({ resource: matching.any(String) });
   });
 
-  it("keeps the shell under /.well-known/ from being kept as discovery", async () => {
+  it("serves the shell no-cache for an unknown /.well-known/ path", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/.well-known/openid-configuration", asABrowserNavigates);

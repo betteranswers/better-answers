@@ -104,7 +104,7 @@ const VIRTUAL_ROOT = path.resolve(path.sep, "virtual");
 
 const corePackage = corePackageOf(path.join(VIRTUAL_ROOT, CORE), MANIFEST_VALUE);
 if (corePackage === null) {
-  throw new Error("MANIFEST names @better-answers/core, so it reads as the core package.");
+  throw new Error("corePackageOf did not read MANIFEST as @better-answers/core.");
 }
 
 const findingFor = (file: string, specifier: string): Finding | undefined =>
@@ -258,7 +258,7 @@ const BRIDGED: readonly (readonly [string, string, string])[] = [
   ["an unexported finding", SLICE, "../store/objects/index.ts"],
 ];
 
-describe("the rule fires, stating the clause it holds", () => {
+describe("the rule flags a forbidden import and states its clause", () => {
   it.each(REFUSALS)("refuses %s", (_title, clause, file, specifier) => {
     expect(statedBy(file, specifier)).toContain(clause);
   });
@@ -267,7 +267,7 @@ describe("the rule fires, stating the clause it holds", () => {
     expect(statedBy(SLICE, "../store/objects/index.ts")).toContain("`./store/objects`");
   });
 
-  it("names the fix for a test outside its mirror", () => {
+  it("names the fix for a test outside its mirror folder", () => {
     const message = statedBy(ELSEWHERE, "../../src/concepts/file.ts");
 
     expect(message).toContain("never `file.ts`");
@@ -275,19 +275,19 @@ describe("the rule fires, stating the clause it holds", () => {
     expect(message).toContain("mirrors `src/concepts`");
   });
 
-  it("names the mirror folder of a door", () => {
+  it("tells a door's test to move to its mirror folder", () => {
     expect(statedBy(MIRRORED, "../../src/store/postgres/handle.ts")).toContain(
       "move the test to `test/store/postgres/`",
     );
   });
 
-  it("says a test outside its mirror reaches an entry point", () => {
+  it("tells a misplaced test to import an entry point", () => {
     expect(statedBy(MIRRORED, "../../src/sources/index.ts")).toContain(
       "a test outside its mirror folder reaches an entry point",
     );
   });
 
-  it("reads a sibling's nested index.ts as internal, not a face", () => {
+  it("treats a sibling's nested index.ts as internal, not a face", () => {
     const message = statedBy(SLICE, "../guides/internal/index.ts");
 
     expect(message).toContain("never `internal/index.ts`");
@@ -299,7 +299,7 @@ describe("the rule fires, stating the clause it holds", () => {
       [finding, file, specifier, spawnedRule(importing(file, specifier))] as const,
   );
 
-  it("words each finding as the spawned rule does", () => {
+  it("matches each finding's message in a real oxlint run", () => {
     const read = bridged.map(([finding, file, specifier, found]) => {
       const output = found.output();
       return {
@@ -325,7 +325,7 @@ describe("the rule fires, stating the clause it holds", () => {
         ],
       ] as const
     ).map(([form, source]) => [form, spawnedRule(coreTree({ [SLICE]: source }))] as const),
-  )("reads a %s declaration as it reads an import", (_form, found) => {
+  )("checks a %s declaration like an import", (_form, found) => {
     const output = found.output();
 
     expect(output).toContain(SLICE);
@@ -333,7 +333,7 @@ describe("the rule fires, stating the clause it holds", () => {
   });
 });
 
-describe("the rule stays silent where the ADR allows the import", () => {
+describe("the rule allows each import the ADR permits", () => {
   it.each([
     ["a slice importing a sibling's face", SLICE, "../guides/index.ts"],
 
@@ -409,7 +409,7 @@ describe("the rule stays silent where the ADR allows the import", () => {
         ["a transport import", "apps/api/src/probe.ts", "hono"],
       ] as const
     ).map(([title, file, specifier]) => [title, spawnedRule(importing(file, specifier))] as const),
-  )("stays silent outside packages/core for %s", (_title, found) => {
+  )("ignores %s outside packages/core", (_title, found) => {
     expect(found.flagged()).toEqual([]);
   });
 
@@ -423,7 +423,7 @@ describe("the rule stays silent where the ADR allows the import", () => {
     [elsewhere]: importOf("../concepts/index.ts"),
   });
 
-  it("keys on the manifest's name, not on a path segment", () => {
+  it("finds core by its manifest name, not its path", () => {
     expect(otherName.flagged()).toEqual([]);
     expect(movedCore.flagged()).toEqual([elsewhere]);
   });
@@ -454,10 +454,10 @@ const crossZoneSpecifierFrom = (dir: string): string => {
   return specifier.startsWith(".") ? specifier : `./${specifier}`;
 };
 
-describe("the zones and the real tree", () => {
+describe("the zones of the committed src tree", () => {
   const directories = sourceDirectories();
 
-  it("walks a tree with directories in it", () => {
+  it("finds directories under src", () => {
     expect(directories.length).toBeGreaterThan(0);
   });
 
@@ -467,7 +467,7 @@ describe("the zones and the real tree", () => {
     expect(statedBy(file, crossZoneSpecifierFrom(dir))).toContain(`(${zoneOf(dir)})`);
   });
 
-  it.each(["llm", "audit", "erasure"])("names a layer or top slice the tree has: %s", (named) => {
+  it.each(["llm", "audit", "erasure"])("finds the named layer or slice %s in src", (named) => {
     expect(existsSync(path.join(coreRoot, "src", named, "index.ts"))).toBe(true);
   });
 
@@ -490,12 +490,12 @@ describe("the zones and the real tree", () => {
 
   const committed = spawnedRule(committedCore());
 
-  it("lints every committed import in packages/core clean", () => {
+  it("finds no forbidden import in committed packages/core files", () => {
     expect(committed.flagged()).toEqual([]);
   });
 });
 
-describe("the base import bans reach packages/core unrestated", () => {
+describe("the base import bans apply to packages/core without restating", () => {
   it("has no override in .oxlintrc.json setting no-restricted-imports over packages/core", () => {
     const over = config.overrides
       .filter((override) => override.rules?.["no-restricted-imports"] !== undefined)
@@ -512,7 +512,7 @@ describe("the base import bans reach packages/core unrestated", () => {
     ["drizzle-zod", "better-auth", "@better-auth/oauth-provider"].map(
       (specifier) => [specifier, spawned({ [probe]: importOf(specifier) }, baseOverride)] as const,
     ),
-  )("refuses %s in core through the base override alone", (_specifier, found) => {
+  )("flags %s in core with only the base override", (_specifier, found) => {
     expect(found.flagged()).toEqual([probe]);
   });
 });

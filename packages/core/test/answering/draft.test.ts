@@ -174,7 +174,7 @@ const numberOf = (numbers: ReadonlyMap<string, string>, shape: SeededConcept) =>
   numbers.get(shape.title) ?? "none";
 
 describe("the drafter", () => {
-  it("covers AE6: removes an uncited claim, keeping its neighbours", async () => {
+  it("covers AE6: removes an uncited sentence, keeping the cited ones", async () => {
     const { asker, result, iris } = await arranged([RETENTION, EXPORT]);
     const drafter = aDrafter((numbers) => [
       `Audit logs are kept for thirteen months.[^${numberOf(numbers, RETENTION)}]\n`,
@@ -197,7 +197,7 @@ describe("the drafter", () => {
     expect(await draftKept(result.recordId)).toEqual(kept);
   });
 
-  it("covers AE12: drafts each collection's part from its own", async () => {
+  it("covers AE12: drafts each collection's part from its own concepts", async () => {
     const { asker, result } = await arranged([RETENTION, LMS_LOGS]);
     const drafter = aDrafter((numbers) => {
       const own = [...numbers.values()];
@@ -219,7 +219,7 @@ describe("the drafter", () => {
     ]);
   });
 
-  it("ends a draft with every sentence removed in the refusal", async () => {
+  it("refuses a part when every sentence is removed", async () => {
     const { asker, result } = await arranged([RETENTION]);
     const drafter = aDrafter(() => ["Kept a while.\n", "Kept forever.[^7]\n"]);
 
@@ -256,7 +256,7 @@ describe("the drafter", () => {
     expect(first.value).toMatchObject({ kind: "sentence", sentence: "Kept thirteen months." });
   });
 
-  it("leaves the result as it was when its call fails", async () => {
+  it("fails the part when the model call fails", async () => {
     const { workspaceId, asker, result } = await arranged([RETENTION]);
     const drafter = aDrafter(() => [], { status: 500 });
 
@@ -273,7 +273,7 @@ describe("the drafter", () => {
     });
   });
 
-  it("pauses at the spending limit, sending nothing to the model", async () => {
+  it("pauses at the spending limit without calling the model", async () => {
     const { workspaceId, asker, result } = await arranged([RETENTION, LMS_LOGS], {
       limitGbp: "0.0001",
     });
@@ -292,7 +292,7 @@ describe("the drafter", () => {
     expect(completed.rows).toEqual([{ completed: true }]);
   });
 
-  it("never drafts from an unjudged Answer, shown word for word", async () => {
+  it("keeps verbatim unjudged `Answer`s out of the drafting prompt", async () => {
     const { asker, result } = await arranged([USERS_ANSWER, SUPPLIER_ANSWER, RETENTION]);
     const drafter = aDrafter((numbers) => [
       `Kept thirteen months.[^${numberOf(numbers, RETENTION)}]\n`,
@@ -311,7 +311,7 @@ describe("the drafter", () => {
     expect(events).toHaveLength(2);
   });
 
-  it("stops drafting once its asker leaves, settling the call", async () => {
+  it("stops drafting and settles the call when the asker disconnects", async () => {
     const { workspaceId, asker, result } = await arranged([RETENTION, LMS_LOGS]);
     const leaving = new AbortController();
     const drafter = aDrafter(
@@ -354,7 +354,7 @@ describe("what the drafter reads and keeps", () => {
     ]);
   });
 
-  it("drafts nothing where no answering model is chosen", async () => {
+  it("drafts nothing when no answering model is chosen", async () => {
     const { asker, result } = await arranged([RETENTION], { chosen: false });
     const drafter = aDrafter(() => ["Never written.[^1]\n"]);
 
@@ -363,7 +363,7 @@ describe("what the drafter reads and keeps", () => {
     expect([events, drafter.streamed.prompts, ended.ok]).toEqual([[], [], true]);
   });
 
-  it("pauses a later part, keeping the earlier part's prose", async () => {
+  it("pauses a later part at the limit, keeping earlier prose", async () => {
     const { workspaceId, asker, result } = await arranged([RETENTION, LMS_LOGS], {
       limitGbp: "0.40",
     });
@@ -385,7 +385,7 @@ describe("what the drafter reads and keeps", () => {
     expect((await spendOf(workspaceId)).calls).toHaveLength(1);
   });
 
-  it("ends drafting failed when a part's prose cannot be kept", async () => {
+  it("fails drafting when a part's prose cannot be stored", async () => {
     const { asker, result } = await arranged([RETENTION, LMS_LOGS]);
     const drafter = aDrafter((numbers) => [`Kept.[^${[...numbers.values()].join("")}]\n`]);
     const lost = new Error("the record's store is gone");
@@ -398,7 +398,7 @@ describe("what the drafter reads and keeps", () => {
     expect([ended, drafter.streamed.prompts.length]).toEqual([err(lost), 1]);
   });
 
-  it("ends drafting failed when a read or reserve fails", async () => {
+  it("fails drafting when a read or reservation fails", async () => {
     const { asker, result } = await arranged([RETENTION]);
     const drafter = aDrafter(() => ["Never written.[^1]\n"]);
     const lost = new Error("the store is gone");
@@ -437,8 +437,8 @@ const sentOf = async (pieces: (labels: Labels) => readonly string[]) => {
   };
 };
 
-describe("a drafted sentence's check", () => {
-  it("shows a cited sentence without its marks", async () => {
+describe("checking a drafted sentence's citations", () => {
+  it("shows a cited sentence without its footnote marks", async () => {
     const { sent, retention, exported } = await sentOf(({ a, b }) => [
       `Claims close within 30 days.[^${a}]\n`,
       `Receipts are kept.[^${b}][^${a}][^${b}]\n`,
@@ -456,7 +456,7 @@ describe("a drafted sentence's check", () => {
     ]);
   });
 
-  it("removes each sentence citing anything not given to it", async () => {
+  it("removes each sentence without a valid citation to its part", async () => {
     const { sent } = await sentOf(({ a, b, c }) => [
       "Claims close within 30 days.\n",
       `Claims close within 30 days.[^${a}][^${c}]\n`,
@@ -472,7 +472,7 @@ describe("a drafted sentence's check", () => {
 });
 
 describe("where a drafted sentence ends", () => {
-  it("ends a sentence with its line, or after spaced marks", async () => {
+  it("ends a sentence at a newline or after its marks", async () => {
     const { sent, retention, exported } = await sentOf(({ a, b }) => [
       `Claims close.[^${a}] Receipts are kept.[^${b}]\nExports run.[^${b}]\n`,
       `Logs are kept.[^${a}] [^${b}] Then deleted [^${a}]. Done.[^${b}]\n`,
@@ -488,7 +488,7 @@ describe("where a drafted sentence ends", () => {
     ]);
   });
 
-  it("keeps a sentence whole across a mark in its middle", async () => {
+  it("keeps a sentence whole when a mark sits mid-sentence", async () => {
     const { sent, retention, exported } = await sentOf(({ a, b }) => [
       `Logs are kept[^${a}] for a year.[^${b}]\n`,
       `Kept[^${b}], then deleted.[^${a}]\n`,
@@ -500,7 +500,7 @@ describe("where a drafted sentence ends", () => {
     ]);
   });
 
-  it("ends a sentence at a mark spaced after its stop", async () => {
+  it("assigns a mark after a space to the preceding sentence", async () => {
     const { sent, retention, exported } = await sentOf(({ a, b }) => [
       `Claims close. [^${a}] Receipts are kept. [^${b}]\n`,
     ]);
@@ -511,7 +511,7 @@ describe("where a drafted sentence ends", () => {
     ]);
   });
 
-  it("waits across pieces for the marks a sentence ends with", async () => {
+  it("waits for trailing marks that arrive in later stream pieces", async () => {
     const { sent, retention, exported } = await sentOf(({ a, b }) => [
       `Claims close.[^${a}] `,
       `[^${b}]`,
@@ -525,13 +525,13 @@ describe("where a drafted sentence ends", () => {
     ]);
   });
 
-  it("ends a sentence at another part's mark, removing it", async () => {
+  it("removes a sentence that cites another part's concept", async () => {
     const { sent } = await sentOf(({ a, c }) => [`Elsewhere.[^${c}] Here.[^${a}]\n`]);
 
     expect(sent.map(({ sentence }) => sentence)).toEqual(["Here."]);
   });
 
-  it("finishes what is left when the reply ends", async () => {
+  it("checks the trailing text when the reply ends", async () => {
     const { sent } = await sentOf(({ a }) => [`Kept.[^${a}] Trailing words`]);
 
     expect(sent.map(({ sentence }) => sentence)).toEqual(["Kept."]);

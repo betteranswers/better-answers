@@ -96,7 +96,7 @@ const streamed = async (api: Web) => {
 };
 
 describe("the browser suite's scripted model", () => {
-  it("answers each workspace's judge by its own script", async () => {
+  it("answers each workspace's judge call from that workspace's script", async () => {
     const fitting = await anAdminAsking();
     const fittingNone = await anAdminAsking();
     await scripted({ workspaceId: fitting.workspaceId, judging: { fits: [USERS.title] } });
@@ -109,7 +109,7 @@ describe("the browser suite's scripted model", () => {
     expect(other).toMatchObject({ verdict: "related", judgeState: "judged", answers: [] });
   });
 
-  it("drafts the scripted sentence, cited by its concept's number", async () => {
+  it("drafts the scripted sentence, citing the concept it names", async () => {
     const { workspaceId, api } = await anAdminAsking();
     await scripted({ workspaceId, judging: { fits: [] }, drafting: DRAFTING });
 
@@ -126,7 +126,7 @@ describe("the browser suite's scripted model", () => {
     expect(await callsTo(workspaceId)).toEqual({ judge: 1, draft: 1 });
   });
 
-  it("holds the judge's answer until the spec releases it", async () => {
+  it("delays the judge's answer until the test releases it", async () => {
     const { workspaceId, api } = await anAdminAsking();
     await scripted({ workspaceId, judging: { fits: [USERS.title] }, holds: "judge" });
     let answered = false;
@@ -143,7 +143,7 @@ describe("the browser suite's scripted model", () => {
     expect(await asking).toMatchObject({ verdict: "ok" });
   });
 
-  it("holds the draft after its first sentence until released", async () => {
+  it("pauses the draft after its first sentence until released", async () => {
     const { workspaceId, api } = await anAdminAsking();
     await scripted({ workspaceId, judging: { fits: [] }, drafting: DRAFTING, holds: "draft" });
 
@@ -153,7 +153,7 @@ describe("the browser suite's scripted model", () => {
     expect(await draftedOn(recordId)).toHaveLength(1);
   });
 
-  it("ends a held judge's call when its caller leaves", async () => {
+  it("aborts a paused judge call when the caller aborts", async () => {
     const workspaceId = "a-workspace-no-api-asks-in";
     models.script({ workspaceId, judging: { fits: [] }, holds: "judge" });
     const leaving = new AbortController();
@@ -168,7 +168,7 @@ describe("the browser suite's scripted model", () => {
     await expect(call).rejects.toThrow("aborted");
   });
 
-  it("fails a call the script says fails, at once", async () => {
+  it("fails a judge call at once when scripted to fail", async () => {
     const { workspaceId, api } = await anAdminAsking();
     await scripted({ workspaceId, judging: "fails" });
 

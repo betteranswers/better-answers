@@ -206,7 +206,7 @@ const leftBehindBy = async (
 ) => ({ bodyRead: upload.state.read, stored: await storedFor(by) });
 
 describe("an Admin connects an upload", () => {
-  it("lands the source, document, audit event, job and object together", async () => {
+  it("writes the source, document, audit event, job and object", async () => {
     const scenario = await arrange();
     const { input } = handbookOffered();
 
@@ -282,7 +282,7 @@ describe("an Admin connects an upload", () => {
     });
   });
 
-  it("leaves only the object when the queue refuses its job", async () => {
+  it("leaves only the stored object when the job write fails", async () => {
     const scenario = await arrange();
     const { input } = handbookOffered();
 
@@ -304,7 +304,7 @@ describe("an Admin connects an upload", () => {
     expect(left.value.length).toEqual(1);
   });
 
-  it("refuses an Editor the connect and stores no bytes", async () => {
+  it("refuses an Editor and stores no bytes", async () => {
     const scenario = await arrange();
     const { upload, input } = handbookOffered();
 
@@ -320,7 +320,7 @@ describe("an Admin connects an upload", () => {
       { connectedSourceId: "ws_handbook" },
       { connectedSourceId: "bad-format" },
     ],
-    ["a connected source nobody named", { name: "   " }, { name: "too-small" }],
+    ["a blank connected source name", { name: "   " }, { name: "too-small" }],
     ["a blank file name", { fileName: "  " }, { fileName: "too-small" }],
     [
       "a sensitivity outside the glossary",
@@ -329,20 +329,20 @@ describe("an Admin connects an upload", () => {
     ],
     ["an audience outside the glossary", { audience: "the board" }, { audience: "not-in-set" }],
     [
-      "groups under an audience taking none",
+      "groups the audience refuses",
       { audienceGroups: ["01J6NNNNNNNNNNNNNNNNNNNNN2"] },
       { audience: "refused" },
     ],
     ["a fractional byte size", { byteSize: 12.5 }, { byteSize: "wrong-type" }],
     ["a blank media type", { mediaType: "   " }, { mediaType: "too-small" }],
-  ])("names the field of %s", (_case, override, fields) => {
+  ])("reports the malformed field for %s", (_case, override, fields) => {
     expect(parse(connectUploadFields, handbookAsked(override))).toEqual({
       ok: false,
       error: { word: "malformed", fields },
     });
   });
 
-  it("refuses an audience naming a group the workspace lacks", async () => {
+  it("refuses an audience group the workspace does not have", async () => {
     const scenario = await arrange();
     const { upload, input } = handbookOffered({
       audience: "groups",
@@ -355,7 +355,7 @@ describe("an Admin connects an upload", () => {
     expect(await leftBehindBy(scenario.admin, upload)).toEqual({ bodyRead: false, stored: [] });
   });
 
-  it("connects for a held group, the source wearing that audience", async () => {
+  it("connects with an existing group as the source's audience", async () => {
     const scenario = await arrange();
     const groupId = await groupNamed(db(), scenario, "Finance", [scenario.viewer]);
     const { input } = handbookOffered({ audience: "groups", audienceGroups: [groupId] });
@@ -383,7 +383,7 @@ describe("an Admin connects an upload", () => {
       `${outside.media_type}, outside the tiers' agreement`,
       outside.media_type,
     ]),
-  ])("refuses %s, before reading a byte", async (_case, mediaType) => {
+  ])("refuses %s before reading any byte", async (_case, mediaType) => {
     const scenario = await arrange();
     const { upload, input } = handbookOffered({ mediaType });
 
@@ -393,7 +393,7 @@ describe("an Admin connects an upload", () => {
     expect(await leftBehindBy(scenario.admin, upload)).toEqual({ bodyRead: false, stored: [] });
   });
 
-  it("refuses a declared size over the cap, reading no byte", async () => {
+  it("refuses a declared size over the cap before reading", async () => {
     const scenario = await arrange();
     const { upload, input } = handbookOffered({ byteSize: UPLOAD_BYTE_CAP + 1 });
 
@@ -403,7 +403,7 @@ describe("an Admin connects an upload", () => {
     expect(await leftBehindBy(scenario.admin, upload)).toEqual({ bodyRead: false, stored: [] });
   });
 
-  it("takes a file at exactly the cap", async () => {
+  it("accepts a file exactly at the cap", async () => {
     const scenario = await arrange();
     const { input } = handbookOffered({ byteSize: UPLOAD_BYTE_CAP });
 
@@ -415,7 +415,7 @@ describe("an Admin connects an upload", () => {
   it.each([
     ["more", HANDBOOK_BYTES * 1000],
     ["fewer", 1],
-  ])("records the size streamed, not %s bytes declared", async (_case, byteSize) => {
+  ])("records the bytes received, not %s bytes declared", async (_case, byteSize) => {
     const scenario = await arrange();
     const { input } = handbookOffered({ byteSize });
 
@@ -426,7 +426,7 @@ describe("an Admin connects an upload", () => {
     expect(row?.["byte_size"]).toEqual(HANDBOOK_BYTES);
   });
 
-  it("refuses a body past the cap, whatever its declared size", async () => {
+  it("refuses a body over the cap, whatever size it declares", async () => {
     const scenario = await arrange();
     const asked = handbookAsked();
     const input = { ...inputOf(connectUploadFields, asked), body: pastTheCap() };
@@ -441,7 +441,7 @@ describe("an Admin connects an upload", () => {
     });
   });
 
-  it("answers a repeated connected source id with the first outcome", async () => {
+  it("returns the first result for a repeated connected source id", async () => {
     const scenario = await arrange();
     const connectedSourceId = ulid();
 
@@ -467,7 +467,7 @@ describe("an Admin connects an upload", () => {
     });
   });
 
-  it("keeps the first body when a concurrent repeat loses", async () => {
+  it("keeps the winning body when two identical connects race", async () => {
     const scenario = await arrange();
     const connectedSourceId = ulid();
     const asked = inputOf(connectUploadFields, handbookAsked({ connectedSourceId }));
@@ -503,7 +503,7 @@ describe("an Admin connects an upload", () => {
     });
   });
 
-  it("caps one upload below the edge's own limit", () => {
+  it("sets the upload cap below the edge's request size limit", () => {
     expect(UPLOAD_BYTE_CAP).toEqual(67108864);
     expect(UPLOAD_BYTE_CAP).toBeLessThan(104857600);
   });
@@ -537,8 +537,8 @@ const anOlderOriginal = async (scenario: Scenario, connectedSourceId: string) =>
   return key;
 };
 
-describe("the sweep collects what failed connects and lost races left", () => {
-  it("leaves every original standing while the grace holds", async () => {
+describe("the sweep of originals left by failed or lost connects", () => {
+  it("keeps every original during the grace period", async () => {
     const scenario = await arrange();
     const named = await boundHandbook(scenario);
     const orphaned = await aFailedConnect(scenario);
@@ -552,7 +552,7 @@ describe("the sweep collects what failed connects and lost races left", () => {
     });
   });
 
-  it("keeps an unnamed original an hour inside the grace", async () => {
+  it("keeps an unreferenced original one hour before the grace ends", async () => {
     const scenario = await arrange();
     const orphaned = await aFailedConnect(scenario);
 
@@ -563,7 +563,7 @@ describe("the sweep collects what failed connects and lost races left", () => {
     expect(await storedFor(scenario.admin)).toContain(orphaned);
   });
 
-  it("removes an unnamed original after the grace, keeping named ones", async () => {
+  it("removes unreferenced originals after the grace and keeps referenced ones", async () => {
     const scenario = await arrange();
     const named = await boundHandbook(scenario);
     await aFailedConnect(scenario);
@@ -578,7 +578,7 @@ describe("the sweep collects what failed connects and lost races left", () => {
     });
   });
 
-  it("records each removed original's connect, but never its key", async () => {
+  it("audits each removal by connected source, without the object key", async () => {
     const scenario = await arrange();
     const orphaned = await aFailedConnect(scenario);
 
@@ -601,7 +601,7 @@ describe("the sweep collects what failed connects and lost races left", () => {
     expect(JSON.stringify(rows)).not.toContain("uploads/");
   });
 
-  it("sweeps an unnamed older original, keeping a named one", async () => {
+  it("removes unreferenced old-format originals and keeps a referenced one", async () => {
     const scenario = await arrange();
     const named = await boundHandbook(scenario);
     const kept = await anOlderOriginal(scenario, named.connectedSourceId);
@@ -639,7 +639,7 @@ describe("the sweep collects what failed connects and lost races left", () => {
     ],
     ["a key ending past its original", `uploads/${ulid().toLowerCase()}/original-draft`],
     ["a key nesting an older original", `uploads/a-draft/uploads/${ulid().toLowerCase()}/original`],
-  ])("leaves %s", async (_case, stray) => {
+  ])("ignores %s", async (_case, stray) => {
     const scenario = await arrange();
     await putObject(scenario.admin, store().door, stray, uploadOf("not an original").body);
 
@@ -649,7 +649,7 @@ describe("the sweep collects what failed connects and lost races left", () => {
     expect(await storedFor(scenario.admin)).toContain(stray);
   });
 
-  it("counts what a list-only sweep would remove, removing none", async () => {
+  it("counts orphans on a dry run and removes none", async () => {
     const scenario = await arrange();
     await boundHandbook(scenario);
     const orphaned = await aFailedConnect(scenario);
@@ -875,7 +875,7 @@ const dpiaHashOfTheHandbook = (connectedSourceId: string): string =>
     .digest("hex");
 
 describe("an Admin publishes a connected source", () => {
-  it("publishes, recording confirmations, counts, DPIA hash, sensitivity and audience", async () => {
+  it("records the confirmations, finding counts, DPIA hash, sensitivity and audience", async () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId, jobId } = await boundHandbook(scenario, {
       sensitivity: "Internal",
@@ -1038,7 +1038,7 @@ describe("an Admin publishes a connected source", () => {
     expect(published).toEqual({ ok: false, error: "not-indexed" });
   });
 
-  it("refuses a second publish, keeping the first instant", async () => {
+  it("refuses a second publish and keeps the first publish time", async () => {
     const scenario = await arrange();
     const { connectedSourceId, jobId } = await boundHandbook(scenario);
     await syncEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", SYNC_FINISHED_AT);
@@ -1070,7 +1070,7 @@ describe("an Admin publishes a connected source", () => {
     ["lawful basis is recorded", { lawfulBasisRecorded: false }],
     ["privacy information is updated", { privacyInformationUpdated: false }],
     ["the DPIA is referenced", { dpiaReferenced: false }],
-  ])("refuses a publish unless %s, writing nothing", async (_case, override) => {
+  ])("refuses and writes nothing unless %s", async (_case, override) => {
     const scenario = await arrange();
     const { connectedSourceId, jobId } = await boundHandbook(scenario);
     await syncEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", SYNC_FINISHED_AT);
@@ -1091,7 +1091,7 @@ describe("an Admin publishes a connected source", () => {
     ).toEqual([]);
   });
 
-  it("refuses an Editor the publish", async () => {
+  it("refuses a publish by an Editor", async () => {
     const scenario = await arrange();
     const { connectedSourceId, jobId } = await boundHandbook(scenario);
     await syncEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", SYNC_FINISHED_AT);
@@ -1111,7 +1111,7 @@ describe("an Admin publishes a connected source", () => {
     });
   });
 
-  it("refuses to publish a source the workspace does not hold", async () => {
+  it("refuses to publish a source the workspace does not have", async () => {
     const scenario = await arrange();
 
     const published = await publishing(scenario, {
@@ -1123,7 +1123,7 @@ describe("an Admin publishes a connected source", () => {
     expect(published).toEqual({ ok: false, error: "no-such-binding" });
   });
 
-  it("names a connected source id the platform does not mint", () => {
+  it("rejects a connected source id in the wrong format", () => {
     expect(
       parse(publishConnectedSourceInput, { connectedSourceId: "  ", confirmations: CONFIRMED }),
     ).toEqual({
@@ -1150,8 +1150,8 @@ const financeHandbook = async (scenario: Scenario, inTheGroup: readonly UserPrin
   return { ...bound, finance };
 };
 
-describe("a Viewer inside the audience", () => {
-  it("reads the connected source's passages only after the publish", async () => {
+describe("a Viewer in the connected source's audience", () => {
+  it("reads the passages only after the source is published", async () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId } = await financeHandbook(scenario, [scenario.viewer]);
     await passagesOfTheHandbook(scenario.workspaceId, { connectedSourceId, documentId });
@@ -1193,7 +1193,7 @@ const AS_IT_WAS_INDEXED = {
 };
 
 describe("an Admin reprocesses a connected source", () => {
-  it("empties the source and queues one sync carrying the reason", async () => {
+  it("empties the source and queues one sync with the reason", async () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId } = await indexedHandbook(scenario);
 
@@ -1226,7 +1226,7 @@ describe("an Admin reprocesses a connected source", () => {
     });
   });
 
-  it("rejects, keeping the passages, when the queue refuses its sync", async () => {
+  it("keeps the passages when the job queue refuses the sync", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
@@ -1251,7 +1251,7 @@ describe("an Admin reprocesses a connected source", () => {
     );
   });
 
-  it("keeps passages and queues nothing when its action later fails", async () => {
+  it("keeps passages and queues nothing when the transaction later fails", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
@@ -1282,7 +1282,7 @@ describe("an Admin reprocesses a connected source", () => {
     );
   });
 
-  it("rejects a reason no sync carries, keeping the passages", async () => {
+  it("rejects an unknown sync reason and keeps the passages", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
@@ -1294,7 +1294,7 @@ describe("an Admin reprocesses a connected source", () => {
             connectedSourceId,
             reason: "rule-change",
           }),
-          // @ts-expect-error a reason no sync carries, to reach the sync's own refusal
+          // @ts-expect-error an invalid reason, so the sync's own check refuses it
           reason: "spring-clean",
         }),
       ),
@@ -1305,7 +1305,7 @@ describe("an Admin reprocesses a connected source", () => {
     );
   });
 
-  it("refuses Viewers, Editors, foreign sources and bad input, keeping passages", async () => {
+  it("refuses non-Admins, unknown sources and bad input, keeping passages", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
@@ -1367,7 +1367,7 @@ describe("an Admin reprocesses a connected source", () => {
     });
   });
 
-  it("refuses an Admin naming another workspace, reaching no connected source", async () => {
+  it("refuses an Admin who names another workspace, changing no source", async () => {
     const scenario = await arrange();
     const other = await arrange();
     const ours = await indexedHandbook(scenario);
@@ -1412,7 +1412,7 @@ const WIPED_AND_QUEUED = {
 };
 
 describe("the operator's reindex of a workspace's connected sources", () => {
-  it("wipes every source and queues its sync, deleting its passages", async () => {
+  it("deletes every source's passages and queues a wipe sync each", async () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId } = await indexedHandbook(scenario);
 
@@ -1430,7 +1430,7 @@ describe("the operator's reindex of a workspace's connected sources", () => {
     );
   });
 
-  it("refuses a workspace id of the wrong shape", async () => {
+  it("refuses a workspace id in the wrong format", async () => {
     const scenario = await arrange();
 
     expect(
@@ -1450,8 +1450,8 @@ const reprocessingAs = (
     reprocessConnectedSource(platform, tx, inputOf(reprocessConnectedSourceInput, asked)),
   );
 
-describe("the erasure reprocesses a connected source as the platform", () => {
-  it("empties the source and queues its sync for the wipe", async () => {
+describe("the erasure routine reprocessing a connected source as the platform", () => {
+  it("empties the source and queues a sync with reason wiped", async () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId } = await indexedHandbook(scenario);
 
@@ -1469,7 +1469,7 @@ describe("the erasure reprocesses a connected source as the platform", () => {
     );
   });
 
-  it("refuses a platform purpose it does not admit, keeping passages", async () => {
+  it("refuses a platform principal of another purpose, keeping passages", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
@@ -1488,7 +1488,7 @@ describe("the erasure reprocesses a connected source as the platform", () => {
     });
   });
 
-  it("refuses an erasure naming the wrong workspace, touching neither", async () => {
+  it("refuses an erasure that names the wrong workspace, changing neither", async () => {
     const scenario = await arrange();
     const other = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);

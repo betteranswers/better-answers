@@ -40,7 +40,7 @@ const standingOf = async (client: TestClient) =>
 const signedInByPasskey = async (device: PasskeyDevice): Promise<TestClient> => {
   const client = app().client();
   const asked = await client.json("/passkeys/sign-in-options", {});
-  expect(asked.status, "the sign-in was not asked").toBe(200);
+  expect(asked.status, "the passkey sign-in options were not returned").toBe(200);
   const signedIn = await client.json("/passkeys/sign-in", {
     response: device.get(await asked.json()),
   });
@@ -48,7 +48,7 @@ const signedInByPasskey = async (device: PasskeyDevice): Promise<TestClient> => 
   return client;
 };
 
-const anAdminHolding = async () => {
+const anAdminWithAnAuthenticator = async () => {
   const workspace = await app().provision();
   const key = await holdAnAuthenticator(app(), workspace.admin.id);
   return { workspace, admin: workspace.admin, key };
@@ -62,7 +62,7 @@ const sessionRowsOf = async (personId: string) =>
     )
   ).rows;
 
-const madeAnAdminBy = async (adminEmail: string, personId: string): Promise<void> => {
+const promoteToAdminBy = async (adminEmail: string, personId: string): Promise<void> => {
   const adminClient = await signedInByEmailOnly(app(), adminEmail);
   await confirmedByTheHarness(app(), adminClient);
   const { api } = await webTabOf(adminClient);
@@ -70,7 +70,7 @@ const madeAnAdminBy = async (adminEmail: string, personId: string): Promise<void
 };
 
 describe("an Admin's sign-in", () => {
-  it("reaches confirm by email, and lands directly by passkey", async () => {
+  it("needs confirmation by email but not by passkey", async () => {
     const { admin } = await app().provision();
     const { device } = await passkeyAddedOn(await signedInByEmailOnly(app(), admin.email));
 
@@ -82,8 +82,8 @@ describe("an Admin's sign-in", () => {
     expect(await memberOf(byPasskey)).toMatchObject({ role: "Admin" });
   });
 
-  it("confirms first on the way to a workspace they view", async () => {
-    const { admin, key } = await anAdminHolding();
+  it("gets 403 switching workspaces until they confirm their factor", async () => {
+    const { admin, key } = await anAdminWithAnAuthenticator();
     const elsewhere = await app().provision();
     await app().addMember(elsewhere.workspaceId, admin.id, "Viewer");
     const client = await signedInByEmailOnly(app(), admin.email);
@@ -96,7 +96,7 @@ describe("an Admin's sign-in", () => {
     expect(await memberOf(client)).toMatchObject({ role: "Viewer" });
   });
 
-  it("never passes the factor step on an email link alone", async () => {
+  it("stays pending after an email link and a recovery code", async () => {
     const { admin } = await app().provision();
     const { answered } = await setUpOn(await signedInByEmailOnly(app(), admin.email));
     const [recoveryCode] = z
@@ -116,7 +116,7 @@ describe("an Admin's sign-in", () => {
     expect(await memberOf(client)).toMatchObject(PENDING);
   });
 
-  it("never holds a non-Admin's email sign-in pending", async () => {
+  it("requires no second factor from an Editor or Viewer", async () => {
     const workspace = await app().provision();
     const [editor, viewer] = [await app().person(), await app().person()];
     await app().addMember(workspace.workspaceId, editor.id, "Editor");
@@ -132,8 +132,8 @@ describe("an Admin's sign-in", () => {
   });
 });
 
-describe("what a pending session reaches", () => {
-  it("refuses a pending operator the console's people list", async () => {
+describe("what a pending session can reach", () => {
+  it("refuses the console's people list to a pending operator", async () => {
     const operator = await app().person();
     await app().markOperator(operator.email, "grant");
     await holdAnAuthenticator(app(), operator.id);
@@ -144,7 +144,7 @@ describe("what a pending session reaches", () => {
   });
 
   it("refuses a pending session at /me and /consent", async () => {
-    const { admin } = await anAdminHolding();
+    const { admin } = await anAdminWithAnAuthenticator();
     const client = await signedInByEmailOnly(app(), admin.email);
 
     const me = await client.fetch("/me");
@@ -160,8 +160,8 @@ describe("what a pending session reaches", () => {
     ]);
   });
 
-  it("refuses setup to a session holding a factor to confirm", async () => {
-    const { admin } = await anAdminHolding();
+  it("refuses factor setup to a pending session with a factor", async () => {
+    const { admin } = await anAdminWithAnAuthenticator();
     const { admin: holdingNone } = await app().provision();
     const pending = await signedInByEmailOnly(app(), admin.email);
     const withNothing = await signedInByEmailOnly(app(), holdingNone.email);
@@ -178,7 +178,7 @@ describe("what a pending session reaches", () => {
   });
 
   it("answers /get-session for a pending session without renewing it", async () => {
-    const { admin } = await anAdminHolding();
+    const { admin } = await anAdminWithAnAuthenticator();
     const pending = await signedInByEmailOnly(app(), admin.email);
     const confirmed = await signedInByEmailOnly(app(), admin.email);
     await confirmedByTheHarness(app(), confirmed);
@@ -204,17 +204,17 @@ describe("what a pending session reaches", () => {
 });
 
 describe("connecting Claude from a pending session", () => {
-  it("issues no code until the session confirms, then resumes", async () => {
-    const { admin, key } = await anAdminHolding();
+  it("issues an authorization code only after the session confirms", async () => {
+    const { admin, key } = await anAdminWithAnAuthenticator();
     await connectAsHost(app(), app().client(), admin);
     const client = app().client();
     const { challenge } = pkce();
     const asked = new URL(authorizeUrl({ challenge, scope: "knowledge:read" }), PUBLIC_URL);
-    // No prompt: with consent already given, a confirmed session would be handed a code at once.
+    // Remove `prompt` so a confirmed session with earlier consent would get a code immediately.
     asked.searchParams.delete("prompt");
     const start = await client.fetch(asked.href, { redirect: "manual" });
     const sentTo = start.headers.get("location");
-    assert(sentTo !== null, "the authorization redirected");
+    assert(sentTo !== null, "the authorization did not redirect");
     const query = new URL(sentTo, PUBLIC_URL).search;
     await signInByEmailOnly(app(), client, admin.email);
 
@@ -229,7 +229,7 @@ describe("connecting Claude from a pending session", () => {
     const after = await continueAfterPostLogin(client, query);
 
     const resumedAt = resumed.headers.get("location");
-    assert(resumedAt !== null, "the resumed authorization redirected");
+    assert(resumedAt !== null, "the resumed authorization did not redirect");
     const resumedTo = new URL(resumedAt, PUBLIC_URL);
     expect([resumedTo.pathname, resumedTo.searchParams.has("code")]).toEqual([
       "/choose-workspace",
@@ -241,7 +241,7 @@ describe("connecting Claude from a pending session", () => {
 });
 
 describe("becoming an Admin mid-session", () => {
-  it("makes the next page setup after accepting an Admin invitation", async () => {
+  it("requires factor setup after accepting an Admin invitation", async () => {
     const elsewhere = await app().provision();
     const person = await app().person();
     await app().addMember(elsewhere.workspaceId, person.id, "Viewer");
@@ -261,14 +261,14 @@ describe("becoming an Admin mid-session", () => {
     expect(await memberOf(client)).toMatchObject(PENDING);
   });
 
-  it("makes the next request pending and sends the credential list", async () => {
+  it("makes the next request pending and emails the credential list", async () => {
     const workspace = await app().provision();
     const editor = await app().person();
     await app().addMember(workspace.workspaceId, editor.id, "Editor");
     const { device } = await passkeyAddedOn(await signedInByEmailOnly(app(), editor.email));
     const promoted = await signedInByPasskey(device);
     expect(await memberOf(promoted)).toMatchObject({ role: "Editor" });
-    await madeAnAdminBy(workspace.admin.email, editor.id);
+    await promoteToAdminBy(workspace.admin.email, editor.id);
 
     expect(await memberOf(promoted)).toMatchObject(PENDING);
     expect(await standingOf(promoted)).toBe("confirm");
@@ -287,9 +287,9 @@ describe("becoming an Admin mid-session", () => {
   });
 });
 
-describe("a pending session's hour", () => {
-  it("ends a pending session an hour after its first read", async () => {
-    const { admin } = await anAdminHolding();
+describe("a pending session's one-hour limit", () => {
+  it("ends a pending session one hour after its first request", async () => {
+    const { admin } = await anAdminWithAnAuthenticator();
     const client = await signedInByEmailOnly(app(), admin.email);
     expect(await memberOf(client)).toMatchObject(PENDING);
 
@@ -302,8 +302,8 @@ describe("a pending session's hour", () => {
     expect(await sessionRowsOf(admin.id)).toEqual([]);
   });
 
-  it("refuses a held session past its hour at the library", async () => {
-    const { admin } = await anAdminHolding();
+  it("answers 401 past the hour even with the row locked", async () => {
+    const { admin } = await anAdminWithAnAuthenticator();
     const client = await signedInByEmailOnly(app(), admin.email);
     expect(await memberOf(client)).toMatchObject(PENDING);
     const holder = await app().database.superuser.connect();
@@ -324,8 +324,8 @@ describe("a pending session's hour", () => {
     }
   });
 
-  it("keeps an older session an hour from its next request", async () => {
-    const { admin } = await anAdminHolding();
+  it("starts an older session's hour at its next request", async () => {
+    const { admin } = await anAdminWithAnAuthenticator();
     const client = await signedInByEmailOnly(app(), admin.email);
     await app().database.superuser.query(
       "UPDATE session SET created_at = now() - interval '3 days', pending_since = NULL WHERE user_id = $1",
@@ -346,7 +346,7 @@ describe("a pending session's hour", () => {
     }
   });
 
-  it("sends a new Admin's old session to setup, not away", async () => {
+  it("keeps a new Admin's old session and requires setup", async () => {
     const workspace = await app().provision();
     const editor = await app().person();
     await app().addMember(workspace.workspaceId, editor.id, "Editor");
@@ -357,7 +357,7 @@ describe("a pending session's hour", () => {
         WHERE user_id = $1`,
       [editor.id],
     );
-    await madeAnAdminBy(workspace.admin.email, editor.id);
+    await promoteToAdminBy(workspace.admin.email, editor.id);
 
     expect(await memberOf(client)).toMatchObject(PENDING);
     expect(await standingOf(client)).toBe("setup");
@@ -365,8 +365,8 @@ describe("a pending session's hour", () => {
   });
 });
 
-describe("a confirmation and the factor behind it", () => {
-  it("ends on other sessions when a factor is removed", async () => {
+describe("removing a second factor", () => {
+  it("returns other sessions to confirm when a factor is removed", async () => {
     const { admin } = await app().provision();
     const setUpIn = await signedInByEmailOnly(app(), admin.email);
     await passkeyAddedOn(setUpIn);

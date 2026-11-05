@@ -26,7 +26,7 @@ const withShimFirst = async (shim: string, log: string, work: () => Promise<unkn
   }
 };
 
-/** Reads no input and takes a second to exit on SIGTERM, as git does clearing its locks. */
+/** Reads no input and, like git clearing its locks, takes a second to exit on SIGTERM. */
 const HANGING = `#!/bin/sh
 for word in "$@"; do
   if [ "$word" = "$GIT_HANGS_AT" ]; then
@@ -43,8 +43,8 @@ PATH="$GIT_STARTS_PATH" exec git "$@"
 const HANGING_ENVIRONMENT = ["GIT_HANGS_AT", "GIT_HUNG_PID", "GIT_STARTS_PATH"] as const;
 
 /**
- * Runs `work` while every git naming `subcommand` hangs, and answers the hung child's pid. PATH
- * is process-wide, as for gitStarts.
+ * Returns the pid of the hung git. Sets PATH for the whole process, so nothing else may start git
+ * while `work` runs.
  */
 export const whileGitHangsAt = async (
   subcommand: string,
@@ -69,7 +69,7 @@ export const whileGitHangsAt = async (
   }
 };
 
-/** `rm` is atomic, so only the first git naming the subcommand pauses. */
+/** `rm` is atomic, so only the first git call with the subcommand pauses. */
 const PAUSING = `#!/bin/sh
 for word in "$@"; do
   if [ "$word" = "$GIT_PAUSES_AT" ] && rm "$GIT_PAUSE_DIR/armed" 2>/dev/null; then
@@ -96,7 +96,7 @@ const exists = (file: string): Promise<boolean> =>
     () => false,
   );
 
-/** PATH is process-wide, as for gitStarts. */
+/** Sets PATH for the whole process, so nothing else may start git while it runs. */
 export const whileGitPausesAt = async <T>(
   pause: { readonly subcommand: string; readonly after: boolean },
   started: () => Promise<T>,
@@ -132,7 +132,7 @@ export const whileGitPausesAt = async <T>(
   }
 };
 
-/** PATH is process-wide, so `work` must be the only thing starting `git` while it runs. */
+/** Sets PATH for the whole process, so `work` must be the only code that starts git. */
 export const gitStarts = async (work: () => Promise<unknown>): Promise<readonly string[]> => {
   const shim = await mkdtemp(path.join(tmpdir(), "better-answers-git-starts-"));
   try {

@@ -1,7 +1,7 @@
 /** Vitest's own default, in milliseconds. */
 const VITEST_DEFAULT = 300;
 
-/** In Actions, DB-backed tests often pass 300 ms, so only a test over five seconds is listed as slow. */
+/** On GitHub Actions, database tests often take over 300 ms, so only a test over five seconds counts as slow. */
 const ACTIONS_THRESHOLD = 5_000;
 
 export const slowTestThreshold = (env: NodeJS.ProcessEnv = process.env): number =>

@@ -69,7 +69,7 @@ const signedIn = async (personId: string): Promise<void> => {
 const marker = (): string => ulid().toLowerCase();
 
 describe("the operator's list of people", () => {
-  it("names each person's workspaces, roles and latest sign-in", async () => {
+  it("shows each person's workspaces, roles and latest sign-in", async () => {
     const acme = await provisionedWorkspace(db(), "Acme");
     const zenith = await provisionedWorkspace(db(), "Zenith");
     const name = `Pat ${marker()}`;
@@ -111,7 +111,7 @@ describe("the operator's list of people", () => {
     });
   });
 
-  it("answers no sign-in and no workspace for a newcomer", async () => {
+  it("shows a newcomer with no sign-in and no workspace", async () => {
     const email = addressOf("newcomer");
     const personId = await seedPerson(db().pool, { email });
 
@@ -211,7 +211,7 @@ describe("the operator's list of people", () => {
     ]);
   });
 
-  it("hands back the store's Error from both reads", async () => {
+  it("returns the store's Error from both reads", async () => {
     const closed = await db().runtimePool.connect();
     closed.release(true);
     const operator: OperatorPrincipal = {
@@ -269,7 +269,7 @@ describe("inspecting a person", () => {
     });
   });
 
-  it("folds rotated tokens, and ends a grant the server revoked", async () => {
+  it("merges rotated tokens and lists a server-revoked grant as ended", async () => {
     const acme = await provisionedWorkspace(db(), "Acme");
     const zenith = await provisionedWorkspace(db(), "Zenith");
     const personId = await seedPerson(db().pool);
@@ -329,7 +329,7 @@ describe("inspecting a person", () => {
     });
   });
 
-  it("takes the unrotated token when a refresh shares its second", async () => {
+  it("picks the unrotated token when two share a creation second", async () => {
     const personId = await seedPerson(db().pool);
     const second = new Date("2026-09-20T09:00:00.000Z");
     await seedingWith(db().pool, async (seed) => {
@@ -356,7 +356,7 @@ describe("inspecting a person", () => {
     });
   });
 
-  it("answers a grant naming no workspace with none", async () => {
+  it("shows no workspace for a grant that names none", async () => {
     const personId = await seedPerson(db().pool);
     await seedingWith(db().pool, (seed) =>
       seed.oauthRefreshToken({
@@ -372,7 +372,7 @@ describe("inspecting a person", () => {
     });
   });
 
-  it("refuses an id no person holds", async () => {
+  it("refuses an unknown person id", async () => {
     expect(await inspected(ulid())).toEqual({ ok: false, error: "no-such-user" });
   });
 });
@@ -428,7 +428,7 @@ describe("inspecting a person's ended grants", () => {
     expect(everywhere.answered).toMatchObject({ ok: true, value: { ok: true } });
   };
 
-  it("lists each, newest first, with its scope and actor", async () => {
+  it("lists each ended grant newest first, with scope and actor", async () => {
     const acme = await provisionedWorkspace(db(), "Acme", { name: "Ada Okafor" });
     const zenith = await provisionedWorkspace(db(), "Zenith", { name: "Zoe Lin" });
     const { personId, clientId } = await connectedIn(acme, zenith);
@@ -487,7 +487,7 @@ describe("inspecting a person's ended grants", () => {
     });
   });
 
-  it("orders by each action's instant, then newest issued first", async () => {
+  it("orders by action time, then by newest issue time", async () => {
     const acme = await provisionedWorkspace(db(), "Acme");
     const personId = await seedPerson(db().pool);
     const grant = (issuedAt: string) => ({
@@ -538,7 +538,7 @@ describe("inspecting a person's ended grants", () => {
     });
   });
 
-  it("names a workspace gone since by its id", async () => {
+  it("names a since-deleted workspace by its id", async () => {
     const personId = await seedPerson(db().pool);
     const gone = ulid();
     const clientId = await seedingWith(db().pool, async (seed) => {
@@ -590,7 +590,7 @@ describe("inspecting a person's ended grants", () => {
     expect(read.statements.filter((each) => /app\.workspace_id|set_config/.test(each))).toEqual([]);
   });
 
-  it("names a former member who ended one as such", async () => {
+  it("shows a grant ended by a former member as such", async () => {
     const { acme, personId } = await revokedHereByAda();
     await erasedFromTheSet(db(), acme.workspaceId, acme.adminUserId);
 
@@ -612,7 +612,7 @@ describe("inspecting a person's ended grants", () => {
       return client.clientId;
     });
 
-  it("orders the server's ending among the actions' by its instant", async () => {
+  it("orders a server-ended grant among revocations by time", async () => {
     const personId = await seedPerson(db().pool);
     await endedByTheServer(
       personId,

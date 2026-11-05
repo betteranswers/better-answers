@@ -44,7 +44,7 @@ const {
   invitedMany,
   cancelledInvitation,
   memberAt,
-  invitationLeft,
+  invitationSeeded,
   invitationsOf,
   invitationEvents,
   emailsCountedTo,
@@ -77,7 +77,7 @@ const statusesOf = async (workspace: ProvisionedWorkspace) =>
   (await invitationsOf(workspace)).map((row) => [row.email, row.status]);
 
 describe("inviting several addresses at once", () => {
-  it("mints one invitation per address, in the order sent", async () => {
+  it("creates one invitation per address, in the order sent", async () => {
     const workspace = await provisionedWorkspace(db(), "Several");
     const [ben, ana, cai] = [addressOf("ben"), addressOf("ana"), addressOf("cai")];
 
@@ -98,7 +98,7 @@ describe("inviting several addresses at once", () => {
     expect(events.map((event) => event.batch_id)).toEqual([batch, batch, batch]);
   });
 
-  it("folds addresses in any case into one invitation", async () => {
+  it("merges addresses that differ only in case into one invitation", async () => {
     const workspace = await provisionedWorkspace(db(), "Folding");
     const ana = addressOf("ana");
 
@@ -109,7 +109,7 @@ describe("inviting several addresses at once", () => {
     expect(await emailsCountedTo(workspace, ana)).toBe(1);
   });
 
-  it("cancels no invitation it minted itself", async () => {
+  it("does not cancel invitations created in the same send", async () => {
     const workspace = await provisionedWorkspace(db(), "SelfMinted");
     const ana = addressOf("ana");
     const ben = addressOf("ben");
@@ -126,7 +126,7 @@ describe("inviting several addresses at once", () => {
     ]);
   });
 
-  it("replaces a waiting invitation, saying so, in the send's batch", async () => {
+  it("replaces a waiting invitation, reporting it in the send's batch", async () => {
     const workspace = await provisionedWorkspace(db(), "Resending");
     const ana = addressOf("ana");
     const ben = addressOf("ben");
@@ -170,7 +170,7 @@ describe("inviting several addresses at once", () => {
     ]);
   });
 
-  it("refuses members' addresses by position, minting nothing", async () => {
+  it("refuses members' addresses by position and creates nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "MemberNamed");
     const editor = await memberAt(workspace, "Editor");
     const ana = addressOf("ana");
@@ -193,7 +193,7 @@ describe("inviting several addresses at once", () => {
     expect(await emailsCountedTo(workspace, ana)).toBe(0);
   });
 
-  it("refuses an address off a marked workspace's domain, minting nothing", async () => {
+  it("refuses addresses outside a marked workspace's domain, creating nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "MarkedSend");
     const onDomain = await marked(workspace);
     const ana = onDomain("ana");
@@ -212,7 +212,7 @@ describe("inviting several addresses at once", () => {
     ]).toEqual([[], [], 0, 0]);
   });
 
-  it("invites a marked workspace's own testing domain, however cased", async () => {
+  it("accepts a marked workspace's testing domain in any letter case", async () => {
     const workspace = await provisionedWorkspace(db(), "MarkedSendOnDomain");
     const onDomain = await marked(workspace);
 
@@ -228,7 +228,7 @@ describe("inviting several addresses at once", () => {
     ]);
   });
 
-  it("names each malformed address by position, minting nothing", async () => {
+  it("names each malformed address by position and creates nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "MalformedNamed");
 
     const refused = await sending(
@@ -244,7 +244,7 @@ describe("inviting several addresses at once", () => {
     expect(await invitationsOf(workspace)).toEqual([]);
   });
 
-  it("mints for a platform person outside it as for anyone", async () => {
+  it("invites a person from another workspace like any address", async () => {
     const workspace = await provisionedWorkspace(db(), "Strangers");
     const elsewhere = await provisionedWorkspace(db(), "StrangersHome");
     const known = await memberAt(elsewhere, "Admin");
@@ -266,7 +266,7 @@ describe("inviting several addresses at once", () => {
     );
   });
 
-  it("leaves another workspace's waiting invitation to the address waiting", async () => {
+  it("keeps another workspace's waiting invitation to the same address", async () => {
     const workspace = await provisionedWorkspace(db(), "Ours");
     const elsewhere = await provisionedWorkspace(db(), "Theirs");
     const ana = addressOf("ana");
@@ -280,7 +280,7 @@ describe("inviting several addresses at once", () => {
     ]);
   });
 
-  it("refuses a send past one address's ceiling whole", async () => {
+  it("refuses the whole send if one address reached its ceiling", async () => {
     const workspace = await provisionedWorkspace(db(), "SendCeiling");
     const ana = addressOf("ana");
     const ben = addressOf("ben");
@@ -296,7 +296,7 @@ describe("inviting several addresses at once", () => {
     expect(await emailsCountedTo(workspace, ana)).toBe(5);
   });
 
-  it("counts each workspace's emails to an address apart", async () => {
+  it("counts each workspace's emails to an address separately", async () => {
     const workspace = await provisionedWorkspace(db(), "CeilingHere");
     const elsewhere = await provisionedWorkspace(db(), "CeilingThere");
     const ana = addressOf("ana");
@@ -308,7 +308,7 @@ describe("inviting several addresses at once", () => {
     expect(await emailsCountedTo(elsewhere, ana)).toBe(1);
   });
 
-  it("refuses a send past the workspace's 200 an hour whole", async () => {
+  it("refuses the whole send past the workspace's 200 an hour", async () => {
     const workspace = await provisionedWorkspace(db(), "WorkspaceCeiling");
     await invitedMany(workspace, 160);
     const before = await invitationsOf(workspace);
@@ -342,7 +342,7 @@ describe("inviting several addresses at once", () => {
     expect(await emailsCountedFrom(workspace)).toBe(200);
   });
 
-  it("lands both of two crossing sends whole", async () => {
+  it("completes two concurrent sends to the same addresses", async () => {
     const workspace = await provisionedWorkspace(db(), "Crossing");
     const ana = addressOf("ana");
     const ben = addressOf("ben");
@@ -368,7 +368,7 @@ describe("inviting several addresses at once", () => {
     expect(rows.filter((row) => row.status === "canceled")).toHaveLength(2);
   });
 
-  it("takes two crossing sends' counters in one order", async () => {
+  it("locks two concurrent sends' counters in the same order", async () => {
     const workspace = await provisionedWorkspace(db(), "CrossingCounters");
     const ana = addressOf("ana");
     const ben = addressOf("ben");
@@ -387,7 +387,7 @@ describe("inviting several addresses at once", () => {
     expect(await emailsCountedFrom(workspace)).toBe(4);
   });
 
-  it("answers a send caught in a deadlock changed-meanwhile", async () => {
+  it("returns changed-meanwhile to a send caught in a deadlock", async () => {
     const workspace = await provisionedWorkspace(db(), "SendDeadlocked");
     const ana = addressOf("ana");
     const waiting = answeredValue(await invite(workspace, ana, "Viewer"));
@@ -396,7 +396,7 @@ describe("inviting several addresses at once", () => {
       "SELECT pg_advisory_xact_lock(hashtext('invitation'), hashtext($1 || ' ' || $2))";
     try {
       await holder.query("BEGIN");
-      // The holder waits first and checks for a deadlock last, so the send finds the cycle.
+      // A long deadlock_timeout makes Postgres detect the deadlock in the send, not the holder.
       await holder.query("SET LOCAL deadlock_timeout = '30s'");
       await holder.query("SELECT 1 FROM invitation WHERE id = $1 FOR UPDATE", [
         waiting.invitationId,
@@ -415,11 +415,11 @@ describe("inviting several addresses at once", () => {
   });
 });
 
-describe("the addresses asked to invite", () => {
+describe("the list of addresses to invite", () => {
   it.each([
     [51, "too-big"],
     [0, "too-small"],
-  ])("refuses %i addresses, malformed", (count, issue) => {
+  ])("refuses %i addresses as malformed", (count, issue) => {
     const addresses = Array.from({ length: count }, () => addressOf("x"));
 
     expect(parse(inviteMembersInput, { addresses, role: "Viewer" })).toEqual({
@@ -428,7 +428,7 @@ describe("the addresses asked to invite", () => {
     });
   });
 
-  it("takes 50 addresses", () => {
+  it("accepts 50 addresses", () => {
     const addresses = Array.from({ length: 50 }, () => addressOf("x"));
 
     expect(parse(inviteMembersInput, { addresses, role: "Viewer" })).toMatchObject({ ok: true });
@@ -436,7 +436,7 @@ describe("the addresses asked to invite", () => {
 });
 
 describe("resending a set of invitations", () => {
-  it("renews two waiting and one expired, in one batch", async () => {
+  it("renews two waiting and one expired invitation in one batch", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkResend");
     const expired = answeredValue(
       await invite(workspace, addressOf("old"), "Admin", new Date("2031-05-01T08:00:00Z")),
@@ -475,7 +475,7 @@ describe("resending a set of invitations", () => {
     const workspace = await provisionedWorkspace(db(), "BulkResendRefused");
     const waiting = answeredValue(await invite(workspace, addressOf("ana"), "Viewer"));
     const cancelled = await cancelledInvitation(workspace, addressOf("ben"));
-    const accepted = await invitationLeft(workspace, {
+    const accepted = await invitationSeeded(workspace, {
       email: addressOf("cai"),
       status: "accepted",
     });
@@ -504,7 +504,7 @@ describe("resending a set of invitations", () => {
     expect(await emailsCountedTo(workspace, waiting.address)).toBe(1);
   });
 
-  it("refuses a set past one address's ceiling whole", async () => {
+  it("refuses the whole set if one address reached its ceiling", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkResendCeiling");
     const ana = addressOf("ana");
     const ben = addressOf("ben");
@@ -579,7 +579,7 @@ describe("resending a set of invitations", () => {
     expect(resent).toMatchObject({ ok: true, value: [{ invitationId: toAna.invitationId }] });
   });
 
-  it("renews an id ticked twice once", async () => {
+  it("renews an id selected twice only once", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkResendTwice");
     const ana = addressOf("ana");
     const invited = answeredValue(await invite(workspace, ana, "Viewer"));
@@ -625,10 +625,10 @@ describe("cancelling a set of invitations", () => {
     );
   });
 
-  it("refuses a set holding an accepted invitation, naming it", async () => {
+  it("refuses a set that includes an accepted invitation, naming it", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkCancelAccepted");
     const waiting = answeredValue(await invite(workspace, addressOf("ana"), "Viewer"));
-    const accepted = await invitationLeft(workspace, {
+    const accepted = await invitationSeeded(workspace, {
       email: addressOf("ben"),
       status: "accepted",
     });
@@ -645,7 +645,7 @@ describe("cancelling a set of invitations", () => {
     ]);
   });
 
-  it("skips and counts one another Admin already cancelled", async () => {
+  it("skips and counts an invitation another Admin already cancelled", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkCancelSkips");
     const gone = await cancelledInvitation(workspace, addressOf("ana"));
     const waiting = answeredValue(await invite(workspace, addressOf("ben"), "Viewer"));
@@ -666,7 +666,7 @@ describe("cancelling a set of invitations", () => {
     ]);
   });
 
-  it("answers a cancel caught in a deadlock changed-meanwhile", async () => {
+  it("returns changed-meanwhile to a cancel caught in a deadlock", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkCancelDeadlocked");
     const sent = answeredValue(
       await sending(workspace, [addressOf("ana"), addressOf("ben")], "Viewer"),
@@ -678,7 +678,7 @@ describe("cancelling a set of invitations", () => {
     const HOLD = "SELECT 1 FROM invitation WHERE id = $1 FOR UPDATE";
     try {
       await holder.query("BEGIN");
-      // The holder waits first and checks for a deadlock last, so the cancel finds the cycle.
+      // A long deadlock_timeout makes Postgres detect the deadlock in the cancel, not the holder.
       await holder.query("SET LOCAL deadlock_timeout = '30s'");
       await holder.query(HOLD, [second]);
       const cancel = cancellingSet(workspace, [first, second]);
@@ -703,8 +703,8 @@ const EACH_SET_ON_IDS = [
   ["cancel", cancellingSet],
 ] as const;
 
-describe.each(EACH_SET_ON_IDS)("asked to %s another workspace's invitation", (_verb, actionOn) => {
-  it("names it as it names a random id, changing nothing", async () => {
+describe.each(EACH_SET_ON_IDS)("trying to %s another workspace's invitation", (_verb, actionOn) => {
+  it("refuses it like a random id and changes nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "SetOnOurs");
     const elsewhere = await provisionedWorkspace(db(), "SetOnTheirs");
     const theirs = answeredValue(await invite(elsewhere, addressOf("ana"), "Viewer"));
@@ -727,11 +727,11 @@ describe.each(EACH_SET_ON_IDS)("asked to %s another workspace's invitation", (_v
   });
 });
 
-describe("the invitation ids asked to resend or cancel", () => {
+describe("the list of invitation ids to resend or cancel", () => {
   it.each([
     [51, "too-big"],
     [0, "too-small"],
-  ])("refuses %i ids, malformed", (count, issue) => {
+  ])("refuses %i ids as malformed", (count, issue) => {
     const invitationIds = Array.from({ length: count }, () => ulid());
 
     expect(parse(bulkInvitationsInput, { invitationIds })).toEqual({
@@ -740,7 +740,7 @@ describe("the invitation ids asked to resend or cancel", () => {
     });
   });
 
-  it("takes 50 ids", () => {
+  it("accepts 50 ids", () => {
     const invitationIds = Array.from({ length: 50 }, () => ulid());
 
     expect(parse(bulkInvitationsInput, { invitationIds })).toMatchObject({ ok: true });
@@ -783,7 +783,7 @@ const EACH_SET_ACTION: readonly (readonly [string, SetAction])[] = [
 
 describe.each(EACH_SET_ACTION)("who may %s a set of invitations", (_verb, action) => {
   it.each(["Editor", "Viewer"] as const)(
-    "refuses a member at %s, before any read",
+    "refuses the %s role before reading anything",
     async (role) => {
       const workspace = await provisionedWorkspace(db(), `SetForbidden${role}`);
       const invited = answeredValue(await invite(workspace, addressOf("ana"), "Viewer"));
@@ -801,8 +801,8 @@ describe.each(EACH_SET_ACTION)("who may %s a set of invitations", (_verb, action
   );
 });
 
-describe.each(EACH_SET_ACTION)("a set action to %s whose event fails", (_verb, action) => {
-  it("fails, leaving every invitation and count as it was", async () => {
+describe.each(EACH_SET_ACTION)("a bulk %s whose audit event fails", (_verb, action) => {
+  it("fails and leaves every invitation and count unchanged", async () => {
     const workspace = await provisionedWorkspace(db(), "SetUnrecorded");
     const ana = addressOf("ana");
     const invited = answeredValue(await invite(workspace, ana, "Viewer"));

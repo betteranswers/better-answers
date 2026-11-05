@@ -78,7 +78,7 @@ export const secondFactorRowsFor = async (
   return { passkeyId, authenticatorId, recoveryCodeIds };
 };
 
-/** An authenticator as the plugin writes one: `verified` false while its setup waits on a code. */
+/** The authenticator row the two-factor plugin writes. `verified` stays false until setup is confirmed with a code. */
 export const authenticatorFor = async (
   pool: pg.Pool,
   userId: string,
@@ -160,7 +160,7 @@ const verificationRow = async (
   return row.id;
 };
 
-/** A sign-in code's row in the shape Better Auth writes it: keyed by the address, hashed, no tries spent. */
+/** A sign-in code row as Better Auth writes it: keyed by the lower-cased address, hashed, with no attempts used. */
 export const verificationCodeFor = async (
   pool: pg.Pool,
   email: string,
@@ -173,7 +173,7 @@ export const verificationCodeFor = async (
     expiresAt,
   });
 
-/** The rows Better Auth writes for an address asked to verify or reset, though the product never sends either. */
+/** The rows Better Auth writes for email verification and password reset. The product never sends either code. */
 export const otherCodesFor = async (pool: pg.Pool, email: string): Promise<readonly string[]> => [
   await verificationRow(pool, {
     id: ulid(),

@@ -28,7 +28,7 @@ const WORKSPACE = "01K4TEARDOWN000000000000";
 
 const ACTION_PAUSE_MS = 250;
 
-const OBJECTS_NOBODY_WAITS_FOR = 400;
+const UNLOCKED_WRITE_COUNT = 400;
 
 const rootWithBundle = async (): Promise<{
   readonly root: string;
@@ -58,7 +58,7 @@ const isGone = async (root: string): Promise<boolean> => {
   }
 };
 
-describe("a bundle root's teardown", () => {
+describe("removing a bundle root", () => {
   it("waits for an action still writing before removing the root", async () => {
     const { root, door, gitDir } = await rootWithBundle();
     const scratch = await scratchDir();
@@ -93,7 +93,7 @@ describe("a bundle root's teardown", () => {
     let written = 0;
 
     const writing = (async () => {
-      for (let n = 0; n < OBJECTS_NOBODY_WAITS_FOR; n += 1) {
+      for (let n = 0; n < UNLOCKED_WRITE_COUNT; n += 1) {
         await objectWrittenInto(gitDir, scratch, n);
         written = n + 1;
       }
@@ -102,7 +102,7 @@ describe("a bundle root's teardown", () => {
 
     await removeBundleRoot(root);
 
-    expect({ finished: written === OBJECTS_NOBODY_WAITS_FOR, gone: await isGone(root) }).toEqual({
+    expect({ finished: written === UNLOCKED_WRITE_COUNT, gone: await isGone(root) }).toEqual({
       finished: false,
       gone: true,
     });
@@ -110,7 +110,7 @@ describe("a bundle root's teardown", () => {
     await rm(scratch, { recursive: true, force: true });
   });
 
-  it("removes a root that holds no repository at all", async () => {
+  it("removes a root that holds no repository", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "better-answers-bundles-"));
     await writeFile(path.join(root, "not-a-bundle"), "a file no workspace put here\n");
 
@@ -119,7 +119,7 @@ describe("a bundle root's teardown", () => {
     expect(await isGone(root)).toBe(true);
   });
 
-  it("answers for a root that is already gone", async () => {
+  it("succeeds for a root that is already gone", async () => {
     const { root } = await rootWithBundle();
     await rm(root, { recursive: true, force: true });
 

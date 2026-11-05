@@ -79,7 +79,7 @@ const reachedFrom = (workspace: string, run: string): string => {
     names.flatMap((name) => (scripts[name] === undefined ? [] : [scripts[name]]));
 
   const first = bodies(namedIn(run));
-  if (first.length === 0) throw new Error(`\`${run}\` reaches no script ${workspace} declares`);
+  if (first.length === 0) throw new Error(`\`${run}\` runs no script that ${workspace} declares`);
   return [...first, ...bodies(first.flatMap(namedIn))].join("\n");
 };
 
@@ -162,7 +162,7 @@ describe("the hook's typecheck commands refuse a staged type error", () => {
     expect(typecheck({ "broken.ts": TYPE_ERROR_SOURCE })).toContain("error TS");
   });
 
-  it("stays silent over a tree with no type error", () => {
+  it("accepts a tree with no type error", () => {
     expect(typecheck({ "clean.ts": CLEAN_SOURCE })).toBe("");
   });
 });
@@ -203,7 +203,7 @@ describe("the pre-commit hook", () => {
     expect(extensionsOf("oxlint")).toEqual(expect.arrayContaining(["ts", "tsx", "mjs", "js"]));
   });
 
-  it("lets through a commit of only ignored scripts", () => {
+  it("accepts a commit of only ignored scripts", () => {
     expect(runOf("oxlint")).toContain("--no-error-on-unmatched-pattern");
   });
 });
@@ -214,7 +214,7 @@ const PUSHED_SCRIPTS = ["check:gates", "check:docs"] as const;
 const stepsOf = (script: string): readonly string[] => {
   const words = (rootScripts()[script] ?? "").split(/\s+/).filter((word) => word !== "");
   const at = words.indexOf(CHECK_RUNNER);
-  if (at === -1) throw new Error(`\`${script}\` hands ${CHECK_RUNNER} no steps`);
+  if (at === -1) throw new Error(`\`${script}\` passes no steps to ${CHECK_RUNNER}`);
   return words.slice(at + 1);
 };
 
@@ -326,13 +326,14 @@ const originRefs = (pushing: Pushing): readonly string[] =>
     .split("\n")
     .filter((line) => line !== "");
 
-const pushedUnhooked = (pushing: Pushing, ref: string): void => {
+const pushedWithoutHooks = (pushing: Pushing, ref: string): void => {
   const pushed = pushFrom(pushing, pushing.root, ref, { flags: ["--no-verify"] });
-  if (pushed.status !== 0) throw new Error(`pushing ${ref} unhooked failed:\n${pushed.said}`);
+  if (pushed.status !== 0)
+    throw new Error(`pushing ${ref} with --no-verify failed:\n${pushed.said}`);
 };
 
 const seeded = (pushing: Pushing): void => {
-  pushedUnhooked(pushing, "main");
+  pushedWithoutHooks(pushing, "main");
   gitIn(pushing.root, "remote", "set-head", "origin", "main");
 };
 
@@ -355,7 +356,7 @@ const customRefWritten = (pushing: Pushing): void => {
   gitIn(pushing.root, "update-ref", CUSTOM_REF, blob);
 };
 
-type CarriesNothing = {
+type CommitlessPush = {
   readonly push: string;
   readonly directory: string;
   readonly before: (pushing: Pushing) => void;
@@ -363,7 +364,7 @@ type CarriesNothing = {
   readonly left: readonly string[];
 };
 
-const CARRY_NOTHING: readonly CarriesNothing[] = [
+const COMMITLESS_PUSHES: readonly CommitlessPush[] = [
   {
     push: "a tag",
     directory: "tag",
@@ -376,7 +377,7 @@ const CARRY_NOTHING: readonly CarriesNothing[] = [
     directory: "tag-deletion",
     before: (pushing) => {
       tagged(pushing);
-      pushedUnhooked(pushing, "refs/tags/probe");
+      pushedWithoutHooks(pushing, "refs/tags/probe");
     },
     refspec: ":refs/tags/probe",
     left: ["refs/heads/main"],
@@ -392,7 +393,7 @@ const CARRY_NOTHING: readonly CarriesNothing[] = [
     push: "a branch's deletion",
     directory: "branch-deletion",
     before: (pushing) => {
-      pushedUnhooked(pushing, "main:refs/heads/other");
+      pushedWithoutHooks(pushing, "main:refs/heads/other");
     },
     refspec: ":refs/heads/other",
     left: ["refs/heads/main"],
@@ -470,7 +471,7 @@ describe("the pre-push hook over a throwaway repository", () => {
     expect(pushed.said).toContain(runAlone("lint"));
   });
 
-  it("runs when a tag rides with a branch's commits", () => {
+  it("runs when a tag is pushed with a branch's commits", () => {
     const pushing = hookedRepository("tag-and-branch");
     seeded(pushing);
     tagged(pushing);
@@ -484,7 +485,7 @@ describe("the pre-push hook over a throwaway repository", () => {
     expect(pushed.said).toContain(runAlone("lint"));
   });
 
-  it.each(CARRY_NOTHING)(
+  it.each(COMMITLESS_PUSHES)(
     "skips every gate on $push, saying why",
     ({ directory, before, refspec, left }) => {
       const pushing = hookedRepository(directory);
@@ -511,7 +512,7 @@ describe("the pre-push hook over a throwaway repository", () => {
     expect(pushed.said).toContain(runAlone("lint"));
   });
 
-  it("keeps a worktree hook's `GIT_DIR` from every gate", () => {
+  it("hides a worktree hook's `GIT_DIR` from every gate", () => {
     const pushing = hookedRepository("worktree-environment");
     const tree = linkedWorktree(pushing);
 
@@ -521,7 +522,7 @@ describe("the pre-push hook over a throwaway repository", () => {
     expect(ranBy(pushing).filter((line) => !line.endsWith(" GIT_DIR=unset"))).toEqual([]);
   });
 
-  it("hands every gate `GIT_DIR` once `without-git-env` is emptied", () => {
+  it("passes `GIT_DIR` to every gate when `without-git-env` is empty", () => {
     const pushing = hookedRepository("worktree-control");
     const tree = linkedWorktree(pushing);
     writeUnder(tree, "lefthook-local.yml", 'templates:\n  without-git-env: ""\n');

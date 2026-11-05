@@ -26,18 +26,18 @@ describe("the rule that source imports statically", () => {
     expect(output).toContain("Import the module statically");
   });
 
-  it("stays silent on a static import in source", () => {
+  it("accepts a static import in source", () => {
     expect(lint.flagged({ [FILE]: 'export { probe } from "./other.ts";\n' })).toEqual([]);
   });
 
   it.each(["src/probe.test.ts", "test/probe.ts", "e2e/probe.ts", "scripts/probe.mjs"])(
-    "stays silent on a dynamic `import()` in %s",
+    "accepts a dynamic `import()` in %s",
     (file) => {
       expect(lint.flagged(importing(file))).toEqual([]);
     },
   );
 
-  it("is lifted by one override in the real config", () => {
+  it("is turned off by one override in the real config", () => {
     expect(lifting).toHaveLength(1);
   });
 });

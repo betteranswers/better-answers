@@ -28,17 +28,17 @@ const fixtureSchema = z.object({
 
 const fixture = contractFixture("sync-sensitivity-moves", fixtureSchema);
 
-const movedAsTheFixtureSays = (read: z.output<typeof reads>): SyncMoved =>
+const expectedMoved = (read: z.output<typeof reads>): SyncMoved =>
   "whole_source" in read
     ? { kind: "whole-source" }
     : { kind: "documents", documentIds: read.documents };
 
-describe("what the sync-sensitivity-moves agreement says a sync's outcome moved", () => {
-  it("is read under this tier's key", () => {
+describe("whatTheSyncMoved against the sync-sensitivity-moves agreement", () => {
+  it("reads the outcome key the agreement names", () => {
     expect(SENSITIVITY_MOVED_KEY).toBe(fixture.key);
   });
 
-  it("reads each finished first attempt's outcome as the fixture says", () => {
+  it("reads each first-attempt outcome as the fixture expects", () => {
     const read = fixture.readings.map(({ why, outcome }) => ({
       why,
       moved: whatTheSyncMoved({ status: "done", attempts: 1, outcome }),
@@ -47,7 +47,7 @@ describe("what the sync-sensitivity-moves agreement says a sync's outcome moved"
     expect(read).toEqual(
       fixture.readings.map(({ why, reads: said }) => ({
         why,
-        moved: movedAsTheFixtureSays(said),
+        moved: expectedMoved(said),
       })),
     );
   });

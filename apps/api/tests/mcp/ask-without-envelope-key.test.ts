@@ -22,8 +22,8 @@ const RETENTION = {
 
 const judgeState = z.object({ verdict: z.string(), judgeState: z.string() });
 
-describe("ask over MCP, on an api with no envelope key", () => {
-  it("answers unjudged related knowledge and calls no model", async () => {
+describe("ask over MCP when the api has no envelope key", () => {
+  it("returns unjudged related knowledge without calling the model", async () => {
     const { workspaceId, asking } = await anAdminAsking(app(), [RETENTION]);
     await judgingSetUp(app(), workspaceId);
     wire.answerWith(judgeSaying([RETENTION.title]));

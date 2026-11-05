@@ -24,7 +24,7 @@ import { endPool, POSTGRES_COMMAND, withRollback } from "../support/harness.ts";
 import { matching } from "../support/matching.ts";
 import { ADMITTED, refusalOf, sqlstateOf } from "../support/probes.ts";
 
-/** A non-superuser that owns every object, so the forced policies hold it as they hold `migrate`. */
+/** A non-superuser owner of every object, so forced row security applies to it as it does to `migrate`. */
 const THE_OWNER = "the_knowledge_words_owner";
 
 const THE_GUIDE_RECORDS = "0098_the-guide-records";
@@ -260,11 +260,11 @@ const SEEDED_IN_EACH: Standing = {
 const theCauseOf = (error: unknown): string =>
   error instanceof Error && error.cause instanceof Error ? error.cause.message : String(error);
 
-const whatTheConstantsSay = (mayRaise: readonly string[], kind: string): string =>
+const expectedOutcome = (mayRaise: readonly string[], kind: string): string =>
   mayRaise.some((named) => named === kind) ? ADMITTED : "42501";
 
 describe("migration 0072 over a populated 0071 database, as its owner", () => {
-  it("applies 0072 and every later migration before the guide records", async () => {
+  it("applies 0072 and later migrations up to the guide records", async () => {
     const journal = journalMigrationFiles();
     const the0072 = journal.findIndex((file) => file.endsWith("0072_the-knowledge-words.sql"));
     const theGuideRecords = journal.findIndex((file) => file.endsWith(`${THE_GUIDE_RECORDS}.sql`));
@@ -272,7 +272,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
     expect([appliedBefore, (await migrationRows()).length]).toEqual([the0072, theGuideRecords]);
   });
 
-  it("stops at the guide records over its stored write-ups", async () => {
+  it("stops at the guide records migration while write-ups are stored", async () => {
     const applied = (await migrationRows()).length;
     const owner = new pg.Pool({ connectionString: uriAs(container, THE_OWNER), max: 1 });
     const refusal = await migrate(drizzle(owner), { migrationsFolder })
@@ -286,7 +286,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
     });
   });
 
-  it("finds every old word seeded, in both workspaces", () => {
+  it("finds every seeded old word in both workspaces", () => {
     const inBoth = Object.fromEntries(
       ["A", "B"].flatMap((workspace) =>
         Object.entries(SEEDED_IN_EACH).map(([what, n]) => [`${workspace} ${what}`, n]),
@@ -296,7 +296,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
     expect(before).toEqual(inBoth);
   });
 
-  it("keeps every row, each under its new name", () => {
+  it("keeps every row, each under its new table name", () => {
     expect(after).toEqual(renamed(before));
   });
 
@@ -318,7 +318,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
     ]);
   });
 
-  it("leaves both guards on, a decision still final", async () => {
+  it("keeps both guard triggers on, so a decision stays final", async () => {
     const guards = await superuser.query<{ tgname: string; tgenabled: string }>(
       `SELECT tgname, tgenabled FROM pg_trigger
         WHERE tgname IN ('suggestion_decides_once_trigger', 'map_node_generation_guard')
@@ -340,7 +340,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
     });
   });
 
-  it("shows app_rt one workspace's renamed rows, and none unscoped", async () => {
+  it("shows app_rt only the scoped workspace's rows, none unscoped", async () => {
     const seen = (workspaceId: string): Promise<readonly number[]> =>
       withRollback(superuser, async (client) => {
         await client.query("SET LOCAL ROLE app_rt");
@@ -362,7 +362,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
     expect(await seen("")).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
-  it("lets each tier raise its own kinds, no old one", async () => {
+  it("lets each tier raise only its own current kinds", async () => {
     const answered: Record<string, string> = {};
     const expected: Record<string, string> = {};
     const tiers = [
@@ -375,7 +375,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
         await client.query(`SET LOCAL ROLE ${role}`);
         for (const kind of [...SUGGESTION_KINDS, "candidate", "repair"]) {
           const key = `${role} raising ${kind}`;
-          expected[key] = whatTheConstantsSay(mayRaise, kind);
+          expected[key] = expectedOutcome(mayRaise, kind);
           answered[key] = await raisingOne(client, kind);
         }
       }
@@ -415,7 +415,7 @@ const raisingOne = async (client: pg.PoolClient, kind: string): Promise<string> 
 };
 
 describe("the journal after the guide records' guard", () => {
-  it("applies every later migration once the write-ups are cleared", async () => {
+  it("applies every later migration once the write-ups are deleted", async () => {
     await superuser.query("DELETE FROM write_up_include");
     await superuser.query("DELETE FROM write_up");
     const owner = new pg.Pool({ connectionString: uriAs(container, THE_OWNER), max: 1 });

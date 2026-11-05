@@ -18,14 +18,14 @@ const db = postgresForSuite();
 
 const now = new Date();
 
-type Shelf = {
+type Seeded = {
   readonly workspaceId: string;
   readonly postgres: PostgresDoor;
   readonly admin: UserPrincipal;
   readonly viewer: UserPrincipal;
 };
 
-const aShelf = async (): Promise<Shelf> => {
+const seededWorkspace = async (): Promise<Seeded> => {
   const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Acme");
   return {
     workspaceId,
@@ -38,18 +38,20 @@ const aShelf = async (): Promise<Shelf> => {
 const joined = (workspaceId: string, role: Role): Promise<UserPrincipal> =>
   joinedAs(db(), workspaceId, role);
 
-const shelve = (shelf: Shelf, concepts: readonly Shelved[]): Promise<readonly ConceptIri[]> =>
-  shelveInto(db().pool, shelf.workspaceId, concepts);
+const shelve = (seeded: Seeded, concepts: readonly Shelved[]): Promise<readonly ConceptIri[]> =>
+  shelveInto(db().pool, seeded.workspaceId, concepts);
 
-const treeReadBy = async (shelf: Shelf, reader: UserPrincipal) =>
-  answered(
-    answered(await withMember(reader, shelf.postgres, (fresh, tx) => readKnowledgeTree(fresh, tx))),
-  );
-
-const kindReadBy = async (shelf: Shelf, reader: UserPrincipal, input: KindConceptsInput) =>
+const treeReadBy = async (seeded: Seeded, reader: UserPrincipal) =>
   answered(
     answered(
-      await withMember(reader, shelf.postgres, (fresh, tx) =>
+      await withMember(reader, seeded.postgres, (fresh, tx) => readKnowledgeTree(fresh, tx)),
+    ),
+  );
+
+const kindReadBy = async (seeded: Seeded, reader: UserPrincipal, input: KindConceptsInput) =>
+  answered(
+    answered(
+      await withMember(reader, seeded.postgres, (fresh, tx) =>
         readKindConcepts(fresh, tx, input, now),
       ),
     ),
@@ -57,8 +59,8 @@ const kindReadBy = async (shelf: Shelf, reader: UserPrincipal, input: KindConcep
 
 describe("the knowledge tree", () => {
   it("counts only the concepts the reader may read", async () => {
-    const shelf = await aShelf();
-    await shelve(shelf, [
+    const seeded = await seededWorkspace();
+    await shelve(seeded, [
       { path: "knowledge/company/expenses.md" },
       { path: "knowledge/company/travel.md" },
       { path: "knowledge/company/salaries.md", sensitivity: "Restricted" },
@@ -66,8 +68,8 @@ describe("the knowledge tree", () => {
       { path: "knowledge/held/board-minutes.md", sensitivity: "Restricted" },
     ]);
 
-    const viewers = await treeReadBy(shelf, shelf.viewer);
-    const admins = await treeReadBy(shelf, shelf.admin);
+    const viewers = await treeReadBy(seeded, seeded.viewer);
+    const admins = await treeReadBy(seeded, seeded.admin);
 
     expect(viewers).toEqual({
       collections: [
@@ -96,20 +98,20 @@ describe("the knowledge tree", () => {
     });
   });
 
-  it("an outside Viewer never sees a withheld concept", async () => {
-    const shelf = await aShelf();
-    const outside = shelf.viewer;
-    const inside = await joined(shelf.workspaceId, "Viewer");
+  it("never shows a withheld concept to an outside Viewer", async () => {
+    const seeded = await seededWorkspace();
+    const outside = seeded.viewer;
+    const inside = await joined(seeded.workspaceId, "Viewer");
     const hr = await seedingWith(db().pool, async (seed) => {
-      const group = await seed.group({ workspaceId: shelf.workspaceId, name: "HR team" });
+      const group = await seed.group({ workspaceId: seeded.workspaceId, name: "HR team" });
       await seed.groupMember({
-        workspaceId: shelf.workspaceId,
+        workspaceId: seeded.workspaceId,
         groupId: group.id,
         userId: inside.userId,
       });
       return group.id;
     });
-    const [, withheld] = await shelve(shelf, [
+    const [, withheld] = await shelve(seeded, [
       { path: "knowledge/company/expenses.md" },
       { path: "knowledge/people/grievances.md", audienceGroups: [hr] },
       { path: "knowledge/people/salaries.md", sensitivity: "Restricted" },
@@ -118,10 +120,10 @@ describe("the knowledge tree", () => {
     ]);
     const people = { collection: "people", kind: "Policy" };
 
-    const insideTree = await treeReadBy(shelf, inside);
-    const outsideTree = await treeReadBy(shelf, outside);
-    const insideBranch = await kindReadBy(shelf, inside, people);
-    const outsideBranch = await kindReadBy(shelf, outside, people);
+    const insideTree = await treeReadBy(seeded, inside);
+    const outsideTree = await treeReadBy(seeded, outside);
+    const insideBranch = await kindReadBy(seeded, inside, people);
+    const outsideBranch = await kindReadBy(seeded, outside, people);
 
     expect(insideTree.collections.map(({ collection, count }) => [collection, count])).toEqual([
       ["company", 1],
@@ -133,15 +135,15 @@ describe("the knowledge tree", () => {
   });
 
   it("a concept outside every collection falls under No collection", async () => {
-    const shelf = await aShelf();
-    const [loose] = await shelve(shelf, [
+    const seeded = await seededWorkspace();
+    const [loose] = await shelve(seeded, [
       { path: "knowledge/loose.md", title: "Loose" },
       { path: "knowledge/company/expenses.md", title: "Expenses" },
       { path: "knowledge/archive/old.md", title: "Old" },
     ]);
 
-    const tree = await treeReadBy(shelf, shelf.viewer);
-    const outside = await kindReadBy(shelf, shelf.viewer, { collection: null, kind: "Policy" });
+    const tree = await treeReadBy(seeded, seeded.viewer);
+    const outside = await kindReadBy(seeded, seeded.viewer, { collection: null, kind: "Policy" });
 
     expect(tree.collections).toEqual([
       { collection: "archive", count: 1, kinds: [{ kind: "Policy", count: 1 }] },
@@ -168,19 +170,19 @@ const policyAt = (at: number): Shelved => ({
 
 describe("a kind's concepts", () => {
   it("lists a kind's concepts fifty at a time", async () => {
-    const shelf = await aShelf();
-    const iris = await shelve(shelf, [
+    const seeded = await seededWorkspace();
+    const iris = await shelve(seeded, [
       ...Array.from({ length: POLICIES }, (_unused, at) => policyAt(POLICIES - 1 - at)),
       { path: "knowledge/company/lease.md", kind: "Contract" },
     ]);
     const company = { collection: "company", kind: "Policy" };
 
-    const first = await kindReadBy(shelf, shelf.viewer, company);
-    const second = await kindReadBy(shelf, shelf.viewer, {
+    const first = await kindReadBy(seeded, seeded.viewer, company);
+    const second = await kindReadBy(seeded, seeded.viewer, {
       ...company,
       cursor: first.nextCursor,
     });
-    const third = await kindReadBy(shelf, shelf.viewer, {
+    const third = await kindReadBy(seeded, seeded.viewer, {
       ...company,
       cursor: second.nextCursor,
     });

@@ -20,19 +20,19 @@ const rowOf = (row: Partial<CoverageRow> & Pick<CoverageRow, "section_id">): Cov
 const stateOf = (row: CoverageRow) => coverageFrom("guide-1", [row])?.sections[0]?.facts[0];
 
 describe("a guide's coverage", () => {
-  it("reads a fact met once its includes reach the floor", () => {
+  it("marks a fact met once its includes reach the minimum", () => {
     expect(
       stateOf(rowOf({ section_id: "s", at_least: 2, met_by: 2, available: [POLICY] })),
     ).toEqual({ factId: "fact-s", name: "Fact of s", state: "met", available: [] });
   });
 
-  it("reads a fact short of its floor as available", () => {
+  it("marks a fact below its minimum, with matches, as available", () => {
     expect(
       stateOf(rowOf({ section_id: "s", at_least: 2, met_by: 1, available: [POLICY] })),
     ).toEqual({ factId: "fact-s", name: "Fact of s", state: "available", available: [POLICY] });
   });
 
-  it("reads a fact short, with nothing matching, as missing", () => {
+  it("marks a fact below its minimum without matches as missing", () => {
     expect(stateOf(rowOf({ section_id: "s", at_least: 1, met_by: 0 }))).toEqual({
       factId: "fact-s",
       name: "Fact of s",
@@ -41,7 +41,7 @@ describe("a guide's coverage", () => {
     });
   });
 
-  it("lists a section expecting no fact with no facts", () => {
+  it("lists no facts for a section that expects none", () => {
     expect(
       coverageFrom("guide-1", [
         rowOf({ section_id: "s", fact_id: null, name: null, at_least: null }),
@@ -78,7 +78,7 @@ describe("a guide's coverage", () => {
     ]);
   });
 
-  it("finds no guide in no rows", () => {
+  it("finds no guide when there are no rows", () => {
     expect(coverageFrom("guide-1", [])).toBe(undefined);
   });
 });

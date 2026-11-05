@@ -65,7 +65,7 @@ const aWorkspaceOfThree = async () => {
 };
 
 describe("the members list over tRPC", () => {
-  it("lists each member's name, address, role, groups and when joined", async () => {
+  it("lists each member's name, address, role, groups, and join time", async () => {
     const { workspace, editor, viewer, seeded } = await aWorkspaceOfThree();
     const { admin } = workspace;
     const { api } = await webSignedIn(app, admin.email);
@@ -106,7 +106,7 @@ describe("the members list over tRPC", () => {
     ]);
   });
 
-  it("names no member row's own key anywhere in its answer", async () => {
+  it("never exposes a member row's id in its answer", async () => {
     const { workspace, seeded } = await aWorkspaceOfThree();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
@@ -130,13 +130,13 @@ describe("the members list over tRPC", () => {
 });
 
 describe("what the members list refuses", () => {
-  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
+  it.each(["Editor", "Viewer"] as const)("refuses %s members with role-forbids", async (role) => {
     const refused = await refusalToAMemberAt(app, role, (api) => api.members.list.query());
 
     expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
   });
 
-  it("refuses an Admin of another workspace pointed at this one", async () => {
+  it("refuses another workspace's Admin whose session points at this one", async () => {
     const refused = await refusalToAnotherWorkspacesAdmin(app, (api) => api.members.list.query());
 
     expect(refused).toMatchObject(NOT_A_MEMBER_ANSWERED);
@@ -201,7 +201,7 @@ const aWorkspaceOfTwoAdmins = async () => {
 };
 
 describe("changing a member's role over tRPC", () => {
-  it("moves a member to the asked role and records it", async () => {
+  it("changes a member's role and audits the change", async () => {
     const { workspace, viewer } = await aWorkspaceOfThree();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
@@ -218,7 +218,7 @@ describe("changing a member's role over tRPC", () => {
     ]);
   });
 
-  it("holds from the member's next request, as their row says", async () => {
+  it("applies the new role from the member's next request", async () => {
     const { second, api: mine } = await aWorkspaceOfTwoAdmins();
     const { api: theirs } = await webSignedIn(app, second.email);
     expect((await theirs.session.member.query()).role).toBe("Admin");
@@ -231,7 +231,7 @@ describe("changing a member's role over tRPC", () => {
     });
   });
 
-  it("refuses a role outside the three, no-such-role, recording nothing", async () => {
+  it("refuses an unknown role with no-such-role and records nothing", async () => {
     const { workspace, viewer } = await aWorkspaceOfThree();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
@@ -258,7 +258,7 @@ describe("changing a member's role over tRPC", () => {
 
 describe.each(ACTIONS_ON_A_MEMBER)("who may $verb", ({ ask, recorded }) => {
   it.each(["Editor", "Viewer"] as const)(
-    "refuses a member at %s, role-forbids, recording nothing",
+    "refuses %s members with role-forbids and records nothing",
     async (role) => {
       const { workspace, viewer } = await aWorkspaceOfThree();
       const actor = await app.person();
@@ -273,7 +273,7 @@ describe.each(ACTIONS_ON_A_MEMBER)("who may $verb", ({ ask, recorded }) => {
     },
   );
 
-  it("refuses an Admin of another workspace pointed at this one", async () => {
+  it("refuses another workspace's Admin whose session points at this one", async () => {
     const { workspace, viewer } = await aWorkspaceOfThree();
     const api = await anAdminOfElsewherePointedAt(app, workspace.workspaceId);
 
@@ -284,7 +284,7 @@ describe.each(ACTIONS_ON_A_MEMBER)("who may $verb", ({ ask, recorded }) => {
     expect(await eventsIn(workspace.workspaceId, recorded)).toEqual([]);
   });
 
-  it("refuses a member of another workspace as no member here", async () => {
+  it("refuses another workspace's member with no-such-member", async () => {
     const mine = await app.provision();
     const theirs = await app.provision();
     const stranger = await app.person();
@@ -300,7 +300,7 @@ describe.each(ACTIONS_ON_A_MEMBER)("who may $verb", ({ ask, recorded }) => {
     expect(await eventsIn(theirs.workspaceId, recorded)).toEqual([]);
   });
 
-  it("refuses the workspace's only Admin, last-admin, recording nothing", async () => {
+  it("refuses acting on the only Admin with last-admin, recording nothing", async () => {
     const workspace = await app.provision();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
@@ -340,7 +340,7 @@ const aChangeWaitingOnARevocation = async (
 };
 
 describe("a role change that fails partway", () => {
-  it("leaves no rows when its audit event lands none", async () => {
+  it("changes nothing when its audit event fails to write", async () => {
     const { workspace, viewer } = await aWorkspaceOfThree();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
@@ -356,7 +356,7 @@ describe("a role change that fails partway", () => {
     expect(await whatLanded(workspace.workspaceId, viewer.id)).toEqual(NOTHING_LANDED);
   });
 
-  it("answers a failed held member read as failure, not signed-out", async () => {
+  it("answers 500, not signed-out, when the waiting member read fails", async () => {
     const { answered, workspaceId, viewerId } = await aChangeWaitingOnARevocation(async () => {
       await app.database.superuser.query(
         `SELECT pg_cancel_backend(pid) FROM pg_stat_activity
@@ -404,7 +404,7 @@ const sessionsHeldBy = async (personId: string): Promise<number | undefined> => 
   return found.rows[0]?.held;
 };
 
-const aMemberOfTwoOnFourClients = async () => {
+const aMemberOfTwoWorkspacesWithFourSessions = async () => {
   const acme = await app.provision({ name: "Acme" });
   const beta = await app.provision({ name: "Beta" });
   const person = await app.person(undefined, "Priya Shah");
@@ -433,9 +433,9 @@ const aMemberOfTwoOnFourClients = async () => {
 };
 
 describe("removing a member over tRPC", () => {
-  it("refuses every session here, and keeps the person's other workspace", async () => {
+  it("ends the person's sessions here and keeps their other workspace", async () => {
     const { acme, beta, person, sessionsInAcme, sessionInBeta, laptop, inAcme, inBeta } =
-      await aMemberOfTwoOnFourClients();
+      await aMemberOfTwoWorkspacesWithFourSessions();
     const { api } = await webSignedIn(app, acme.admin.email);
     const host = app.client();
     expect(await sessionsHeldBy(person.id)).toBe(4);
@@ -485,8 +485,8 @@ describe("removing a member over tRPC", () => {
     });
   });
 
-  it("refuses this workspace's refresh token, and still refreshes another's", async () => {
-    const { acme, person, inAcme, inBeta } = await aMemberOfTwoOnFourClients();
+  it("rejects this workspace's refresh token but refreshes the other's", async () => {
+    const { acme, person, inAcme, inBeta } = await aMemberOfTwoWorkspacesWithFourSessions();
     const [endedHere, heldInBeta] = [inAcme.refreshToken, inBeta.refreshToken];
     assert(endedHere !== undefined, "Acme's connection issued a refresh token");
     assert(heldInBeta !== undefined, "Beta's connection issued a refresh token");
@@ -503,7 +503,7 @@ describe("removing a member over tRPC", () => {
     expect(answered).toEqual({ revoke: 400, refresh: 400, beta: 200 });
   });
 
-  it("lets one of two Admins remove themself, ending access here", async () => {
+  it("lets one of two Admins remove themself, ending their access", async () => {
     const { workspace, second, api } = await aWorkspaceOfTwoAdmins();
 
     const removed = await api.members.remove.mutate({ personId: workspace.admin.id });
@@ -515,7 +515,7 @@ describe("removing a member over tRPC", () => {
 });
 
 describe("a person's activity over tRPC", () => {
-  it("answers a role change by Hannah, to Priya", async () => {
+  it("shows a role change in the actor's and subject's activity", async () => {
     const workspace = await app.provision();
     const hannah = workspace.admin;
     const priya = await app.person(undefined, "Priya Shah");
@@ -538,7 +538,7 @@ describe("a person's activity over tRPC", () => {
     expect(onPriyas.nextCursor).toBeNull();
   });
 
-  it("answers a person never seen here an empty stream", async () => {
+  it("answers no events for a person with no history here", async () => {
     const workspace = await app.provision();
     const stranger = await app.person();
     const { api } = await webSignedIn(app, workspace.admin.email);
@@ -552,7 +552,7 @@ describe("a person's activity over tRPC", () => {
 const SOMEONE = "01J6WWWWWWWWWWWWWWWWWWWWWW";
 
 describe("what a person's activity refuses", () => {
-  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
+  it.each(["Editor", "Viewer"] as const)("refuses %s members with role-forbids", async (role) => {
     const refused = await refusalToAMemberAt(app, role, (api) =>
       api.members.activity.query({ personId: SOMEONE }),
     );
@@ -560,7 +560,7 @@ describe("what a person's activity refuses", () => {
     expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
   });
 
-  it("refuses an Admin of another workspace pointed at this one", async () => {
+  it("refuses another workspace's Admin whose session points at this one", async () => {
     const refused = await refusalToAnotherWorkspacesAdmin(app, (api) =>
       api.members.activity.query({ personId: SOMEONE }),
     );
@@ -571,7 +571,7 @@ describe("what a person's activity refuses", () => {
   it.each([
     ["a person id that is no id", { personId: "not-an-id" }],
     ["a cursor that is no event's id", { personId: SOMEONE, cursor: "not-an-id" }],
-  ])("refuses %s, malformed", async (_asked, input) => {
+  ])("refuses %s as malformed", async (_asked, input) => {
     const refused = await refusalToTheAdmin(app, (api) => api.members.activity.query(input));
 
     expect(refused).toMatchObject({
@@ -581,7 +581,7 @@ describe("what a person's activity refuses", () => {
 });
 
 describe("a removal that fails partway", () => {
-  it("keeps the member and tokens when no audit row lands", async () => {
+  it("keeps the member and tokens when the audit write fails", async () => {
     const workspace = await app.provision();
     const person = await app.person();
     await app.addMember(workspace.workspaceId, person.id, "Viewer");
@@ -608,7 +608,7 @@ describe("a removal that fails partway", () => {
 const sortedIds = (ids: readonly string[]): readonly string[] => ids.toSorted();
 
 describe("bulk actions on members over tRPC", () => {
-  it("changes each ticked role, counting one already held", async () => {
+  it("changes each selected role, skipping one already held", async () => {
     const { workspace, editor, viewer } = await aWorkspaceOfThree();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
@@ -630,7 +630,7 @@ describe("bulk actions on members over tRPC", () => {
     });
   });
 
-  it("refuses demoting both Admins, naming each as an item", async () => {
+  it("refuses demoting both Admins, naming each with last-admin", async () => {
     const { workspace, second, api } = await aWorkspaceOfTwoAdmins();
     const { admin } = workspace;
 
@@ -653,7 +653,7 @@ describe("bulk actions on members over tRPC", () => {
     expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
   });
 
-  it("refuses 201 ids, malformed, naming the field", async () => {
+  it("refuses 201 ids as malformed, naming the personIds field", async () => {
     const { api } = await webSignedIn(app, (await app.provision()).admin.email);
     const personIds = Array.from({ length: 201 }, () => SOMEONE);
 
@@ -667,7 +667,7 @@ describe("bulk actions on members over tRPC", () => {
     });
   });
 
-  it("removes each ticked member, skipping one no member holds", async () => {
+  it("removes each selected member, skipping an id with no member", async () => {
     const { workspace, editor, viewer } = await aWorkspaceOfThree();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
@@ -683,7 +683,7 @@ describe("bulk actions on members over tRPC", () => {
     );
   });
 
-  it("adds each ticked member to a group, counting one in", async () => {
+  it("adds selected members to a group, skipping one already there", async () => {
     const { workspace, editor, viewer, seeded } = await aWorkspaceOfThree();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
@@ -702,7 +702,7 @@ describe("bulk actions on members over tRPC", () => {
     ]);
   });
 
-  it("refuses an old refresh token after re-invite and accept", async () => {
+  it("rejects an old refresh token after the member rejoins", async () => {
     const { workspace, editor, viewer } = await aWorkspaceOfThree();
     const connected = await connectAsHost(app, app.client(), viewer, {
       pick: workspace.workspaceId,
@@ -737,7 +737,7 @@ describe.each([
     (api: WebApi) => api.members.bulkAddToGroup.mutate({ groupId: SOMEONE, personIds: [SOMEONE] }),
   ],
 ])("who may %s", (_verb, ask) => {
-  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
+  it.each(["Editor", "Viewer"] as const)("refuses %s members with role-forbids", async (role) => {
     expect(await refusalToAMemberAt(app, role, ask)).toMatchObject(ROLE_FORBIDS_ANSWERED);
   });
 });
@@ -769,7 +769,7 @@ const samsRoles = ({ acme, beta, sam }: LeftInAcme) =>
 const countOf = async (sql: string, value: string): Promise<number | undefined> =>
   (await app.database.superuser.query<{ held: number }>(sql, [value])).rows[0]?.held;
 
-describe("an action from a tab left in another workspace", () => {
+describe("an action from a stale tab after a workspace switch", () => {
   it("refuses a removal, keeping the member in both workspaces", async () => {
     const left = await aTabLeftInAcme();
 
@@ -781,7 +781,7 @@ describe("an action from a tab left in another workspace", () => {
     expect(await samsRoles(left)).toEqual(["Viewer", "Viewer"]);
   });
 
-  it("refuses a ticked set's removal, removing nobody", async () => {
+  it("refuses a bulk removal and removes nobody", async () => {
     const left = await aTabLeftInAcme();
 
     const refused = await refusalOfCall(
@@ -792,7 +792,7 @@ describe("an action from a tab left in another workspace", () => {
     expect(await samsRoles(left)).toEqual(["Viewer", "Viewer"]);
   });
 
-  it("refuses a ticked set's role change, every role kept", async () => {
+  it("refuses a bulk role change and keeps every role", async () => {
     const left = await aTabLeftInAcme();
     const priya = await app.person(undefined, "Priya Shah");
     await app.addMember(left.acme.workspaceId, priya.id, "Editor");
@@ -833,7 +833,7 @@ describe("an action from a tab left in another workspace", () => {
     expect(app.emails.filter((message) => message.to === address)).toEqual([]);
   });
 
-  it("refuses a new group, making none in either workspace", async () => {
+  it("refuses to create a group in either workspace", async () => {
     const { stale } = await aTabLeftInAcme();
     const name = `Bid writers ${Date.now()}`;
 
@@ -845,7 +845,7 @@ describe("an action from a tab left in another workspace", () => {
     );
   });
 
-  it("says so before judging the person's role there", async () => {
+  it("answers workspace-switched before checking the caller's role", async () => {
     const left = await aTabLeftInAcme("Editor");
 
     const refused = await refusalOfCall(
@@ -856,7 +856,7 @@ describe("an action from a tab left in another workspace", () => {
     expect(await samsRoles(left)).toEqual(["Viewer", "Viewer"]);
   });
 
-  it("refuses an action that names no workspace", async () => {
+  it("refuses with workspace-unnamed when the request names no workspace", async () => {
     const { workspace, viewer } = await aWorkspaceOfThree();
     const { client } = await webSignedIn(app, workspace.admin.email);
 
@@ -877,7 +877,7 @@ describe("an action from a tab left in another workspace", () => {
     expect(await samsRoles(left)).toEqual(["Viewer", undefined]);
   });
 
-  it("answers a read naming another workspace, or none", async () => {
+  it("answers a read from the session's workspace, ignoring the tab", async () => {
     const { beta, client, stale } = await aTabLeftInAcme();
 
     const read = await Promise.all([

@@ -51,7 +51,10 @@ type Running = {
   readonly stop: () => Promise<void>;
 };
 
-const running = (settings: SweepSettings, overrides: Partial<SweepsDependencies> = {}): Running => {
+const startTestSweeps = (
+  settings: SweepSettings,
+  overrides: Partial<SweepsDependencies> = {},
+): Running => {
   const pinged: Pinged[] = [];
   const { logger, logs } = capturingLogger("debug");
   const started = startSweeps({
@@ -75,7 +78,7 @@ const onePass = async (
   settings: SweepSettings,
   overrides: Partial<SweepsDependencies> = {},
 ): Promise<Running> => {
-  const sweeps = running(settings, overrides);
+  const sweeps = startTestSweeps(settings, overrides);
   await until(async () => sweeps.pinged.length > 0);
   await sweeps.stop();
   return sweeps;
@@ -177,19 +180,19 @@ const verificationsLeft = async (): Promise<readonly string[]> =>
     )
   ).rows.map((row) => row.identifier);
 
-describe("the sweeps' daily pass", () => {
-  it("passes once a day after its first", () => {
+describe("the daily sweep pass", () => {
+  it("runs once a day after the first pass", () => {
     expect(SWEEP_INTERVAL_MS).toBe(86_400_000);
   });
 
-  it("waits ten minutes after a start before its first", () => {
+  it("waits ten minutes after startup before the first pass", () => {
     expect(SWEEP_FIRST_PASS_MS).toBe(600_000);
   });
 
-  it("makes its first pass ten minutes in, and none before", async () => {
+  it("runs the first pass at ten minutes and not before", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
     try {
-      const sweeps = running(
+      const sweeps = startTestSweeps(
         { uploadSweep: "list", pingUrl: PING_URL },
         { firstPassMs: undefined, intervalMs: undefined },
       );
@@ -208,7 +211,7 @@ describe("the sweeps' daily pass", () => {
     }
   });
 
-  it("logs a pass removing nothing, pinging its check with counts", async () => {
+  it("logs an empty pass and pings the check with counts", async () => {
     await provisioned();
 
     const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
@@ -233,7 +236,7 @@ describe("the sweeps' daily pass", () => {
     ]);
   });
 
-  it("reports how many orphaned uploads it removed, never a key", async () => {
+  it("removes orphaned uploads and logs their count, never their keys", async () => {
     const workspace = await withAnOrphan();
 
     const sweeps = await onePass({ uploadSweep: "remove", pingUrl: PING_URL });
@@ -251,7 +254,7 @@ describe("the sweeps' daily pass", () => {
     expect(await listObjects(workspace.admin, objects().door, "")).toEqual({ ok: true, value: [] });
   });
 
-  it("counts orphaned uploads but removes none while list-only", async () => {
+  it("counts orphaned uploads but keeps them in list mode", async () => {
     const workspace = await withAnOrphan();
 
     const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
@@ -265,7 +268,7 @@ describe("the sweeps' daily pass", () => {
     });
   });
 
-  it("deletes codes over a day expired, keeping later ones", async () => {
+  it("deletes codes expired for over a day, keeping newer ones", async () => {
     await codeExpiring(-24 * HOUR_MS - MINUTE_MS);
     const justUnderADay = await codeExpiring(-24 * HOUR_MS + MINUTE_MS);
     const withinTheDay = await codeExpiring(-1 * HOUR_MS);
@@ -279,7 +282,7 @@ describe("the sweeps' daily pass", () => {
     ]);
   });
 
-  it("logs identity-set deletions by count, naming no address", async () => {
+  it("logs identity-set deletions as counts without any email address", async () => {
     const identifier = await codeExpiring(-25 * HOUR_MS);
     const address = identifier.slice("sign-in-otp-".length);
     await consumeIngress(
@@ -304,7 +307,7 @@ describe("the sweeps' daily pass", () => {
     expect(JSON.stringify(sweeps.logs)).not.toContain(address);
   });
 
-  it("names a refused code deletion in the log, pinging failure", async () => {
+  it("logs a refused code deletion and pings failure", async () => {
     await codeExpiring(-25 * HOUR_MS);
 
     const sweeps = await whileWritesAreRefused(db().pool, "verification", () =>
@@ -326,11 +329,11 @@ describe("the sweeps' daily pass", () => {
     ]);
   });
 
-  it("skips its pass under a manual sweep's lock, pinging nothing", async () => {
+  it("skips the pass without pinging while another holds the lock", async () => {
     await withAnOrphan();
 
     const sweeps = await withSweepLock(SWEEPS, openPostgres(db().runtimePool), async () => {
-      const started = running({ uploadSweep: "remove", pingUrl: PING_URL });
+      const started = startTestSweeps({ uploadSweep: "remove", pingUrl: PING_URL });
       await until(async () =>
         started.logs.some(
           (line) => line["msg"] === "a sweep pass was skipped: another holder has the sweeps' lock",
@@ -344,7 +347,7 @@ describe("the sweeps' daily pass", () => {
     expect(sweeps.pinged).toEqual([]);
   });
 
-  it("names an unsweepable workspace in the log alone, pinging failure", async () => {
+  it("logs only the workspace it cannot sweep and pings failure", async () => {
     const stuck = await withMapLeftovers();
     await provisioned();
 
@@ -369,7 +372,7 @@ describe("the sweeps' daily pass", () => {
     ]);
   });
 
-  it("names a workspace whose removals went unrecorded, never the key", async () => {
+  it("names the workspace, not keys, when upload removals go unaudited", async () => {
     const orphaned = await withAnOrphan();
 
     const sweeps = await whileWritesAreRefused(db().pool, "audit_event", () =>
@@ -389,7 +392,7 @@ describe("the sweeps' daily pass", () => {
     expect(JSON.stringify(sweeps.logs)).not.toContain("uploads/");
   });
 
-  it("logs and pings failure when its row cannot be written", async () => {
+  it("logs and pings failure when the sweep_pass row is refused", async () => {
     await provisioned();
 
     const sweeps = await whileWritesAreRefused(db().pool, "sweep_pass", () =>
@@ -430,7 +433,7 @@ describe("the sweeps' daily pass", () => {
     expect(sweeps.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);
   });
 
-  it("makes the next month's partition for questions' content", async () => {
+  it("creates the question content partition for the following month", async () => {
     expect(await contentMonths()).toEqual(monthsOn(0, 1));
 
     const sweeps = await onePassAt(LATE_NEXT_MONTH);
@@ -439,7 +442,7 @@ describe("the sweeps' daily pass", () => {
     expect(passes(sweeps.logs)).toEqual([matching.objectContaining({ level: 30, refusals: [] })]);
   });
 
-  it("names a month it could not make, pinging failure", async () => {
+  it("logs a partition it cannot create and pings failure", async () => {
     await db().pool.query(
       "REVOKE EXECUTE ON FUNCTION create_question_content_partition(date) FROM app_rt",
     );
@@ -456,9 +459,9 @@ describe("the sweeps' daily pass", () => {
     expect(sweeps.pinged.map((ping) => ping.url)).toEqual([`${PING_URL}/fail`]);
   });
 
-  it("still sweeps and logs when the estate names no check", async () => {
+  it("sweeps without pinging when no check URL is configured", async () => {
     await provisioned();
-    const sweeps = running({ uploadSweep: "list", pingUrl: undefined });
+    const sweeps = startTestSweeps({ uploadSweep: "list", pingUrl: undefined });
 
     await until(async () => passes(sweeps.logs).length > 0);
     await sweeps.stop();
@@ -466,8 +469,8 @@ describe("the sweeps' daily pass", () => {
     expect(sweeps.pinged).toEqual([]);
   });
 
-  it("passes again on its interval, and stops when told", async () => {
-    const sweeps = running({ uploadSweep: "list", pingUrl: PING_URL }, { intervalMs: 20 });
+  it("repeats the pass each interval and stops when told", async () => {
+    const sweeps = startTestSweeps({ uploadSweep: "list", pingUrl: PING_URL }, { intervalMs: 20 });
 
     await until(async () => sweeps.pinged.length >= 2);
     await sweeps.stop();
@@ -477,7 +480,7 @@ describe("the sweeps' daily pass", () => {
     expect(sweeps.pinged).toHaveLength(stoppedAt);
   });
 
-  it("refuses to start without an object store, logging nothing", () => {
+  it("refuses to start without an object store and logs nothing", () => {
     const { logger, logs } = capturingLogger();
 
     const refused = startSweeps({
@@ -491,7 +494,7 @@ describe("the sweeps' daily pass", () => {
   });
 });
 
-const aReservationTaken = async (workspaceId: string): Promise<void> => {
+const takeSpendReservation = async (workspaceId: string): Promise<void> => {
   const client = await db().pool.connect();
   try {
     await testData(client).spendReservation({ workspaceId });
@@ -500,10 +503,10 @@ const aReservationTaken = async (workspaceId: string): Promise<void> => {
   }
 };
 
-describe("the sweeps' daily pass and the spend held", () => {
-  it("counts the reservations it settled in its log line", async () => {
+describe("the daily sweep pass and spend reservations", () => {
+  it("logs how many spend reservations it settled", async () => {
     const { workspaceId } = await provisioned();
-    await aReservationTaken(workspaceId);
+    await takeSpendReservation(workspaceId);
 
     const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
 
@@ -512,9 +515,9 @@ describe("the sweeps' daily pass and the spend held", () => {
     ]);
   });
 
-  it("names a refused settling in the log, pinging failure", async () => {
+  it("logs a refused settlement and pings failure", async () => {
     const { workspaceId } = await provisioned();
-    await aReservationTaken(workspaceId);
+    await takeSpendReservation(workspaceId);
 
     const sweeps = await whileWritesAreRefused(db().pool, "llm_call", () =>
       onePass({ uploadSweep: "list", pingUrl: PING_URL }),

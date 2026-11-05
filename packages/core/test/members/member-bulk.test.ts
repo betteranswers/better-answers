@@ -32,7 +32,7 @@ import {
   until,
   whileWritesAreRefused,
 } from "../support/suite-postgres.ts";
-import { bothHoldingTheirOwnRow, heldAs, membersSuite } from "./members-suite.ts";
+import { actingOnEachOther, heldAs, membersSuite } from "./members-suite.ts";
 
 const db = postgresForSuite();
 
@@ -123,7 +123,7 @@ const oneBatchOf = async (workspace: ProvisionedWorkspace, action: string) => {
 };
 
 describe("changing the role of many members", () => {
-  it("changes each ticked role, the events sharing one batch", async () => {
+  it("changes each selected member's role in one audit batch", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkRoles");
     const viewers = await joiningMany(workspace, "Viewer", 3);
 
@@ -147,7 +147,7 @@ describe("changing the role of many members", () => {
     expect(await oneBatchOf(workspace, ROLE_CHANGED)).toBe(3);
   });
 
-  it("writes only the members not already at the role", async () => {
+  it("changes only members not already at the role", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkRolesHeld");
     const viewers = await joiningMany(workspace, "Viewer", 2);
     const editor = await joining(workspace, "Editor");
@@ -164,7 +164,7 @@ describe("changing the role of many members", () => {
   it.each([
     ["ascending", (ids: readonly string[]) => sorted(ids)],
     ["descending", (ids: readonly string[]) => sorted(ids).toReversed()],
-  ])("refuses demoting both Admins, naming both, %s", async (_order, ordered) => {
+  ])("refuses demoting both Admins, naming both, in %s order", async (_order, ordered) => {
     const workspace = await provisionedWorkspace(db(), "BulkRolesBothAdmins");
     const second = await joining(workspace, "Admin");
     const admins = [workspace.adminUserId, second];
@@ -206,7 +206,7 @@ describe("changing the role of many members", () => {
     ]);
   });
 
-  it("lets an Admin demote themself among others, another Admin staying", async () => {
+  it("lets an Admin demote themself with others if another stays", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkRolesSelf");
     const { adminUserId } = workspace;
     const second = await joining(workspace, "Admin");
@@ -240,7 +240,7 @@ describe("changing the role of many members", () => {
     expect(await oneBatchOf(workspace, ROLE_CHANGED)).toBe(2);
   });
 
-  it("refuses an id no member holds, writing nothing", async () => {
+  it("refuses an id that is not a member, writing nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkRolesNobody");
     const viewer = await joining(workspace, "Viewer");
     const nobody = ulid();
@@ -255,7 +255,7 @@ describe("changing the role of many members", () => {
     expect(await auditRowsOf(workspace, ROLE_CHANGED)).toEqual([]);
   });
 
-  it("counts a person ticked twice once", async () => {
+  it("counts a person selected twice only once", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkRolesTwice");
     const viewer = await joining(workspace, "Viewer");
 
@@ -265,7 +265,7 @@ describe("changing the role of many members", () => {
     expect(await subjectsOf(workspace, ROLE_CHANGED)).toEqual([viewer]);
   });
 
-  it("refuses a role outside the three, no-such-role", async () => {
+  it("refuses an unknown role with no-such-role", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkRolesOwner");
     const viewer = await joining(workspace, "Viewer");
 
@@ -278,7 +278,7 @@ describe("changing the role of many members", () => {
   it.each([
     [ABOVE_ANY_PERSON, "last-admin"],
     [BELOW_ANY_PERSON, "no-such-member"],
-  ])("words the set by its first item, beside %s", async (nobody, word) => {
+  ])("takes the set's error word from its first id: %s", async (nobody, word) => {
     const workspace = await provisionedWorkspace(db(), "BulkRolesWord");
     const { adminUserId } = workspace;
 
@@ -292,7 +292,7 @@ describe("changing the role of many members", () => {
 });
 
 describe("removing many members", () => {
-  it("removes two of three Admins, the events sharing one batch", async () => {
+  it("removes two of three Admins in one audit batch", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkRemoved");
     const second = await joining(workspace, "Admin");
     const third = await joining(workspace, "Admin");
@@ -308,7 +308,7 @@ describe("removing many members", () => {
     expect(await oneBatchOf(workspace, REMOVED)).toBe(2);
   });
 
-  it("lets an Admin remove themself among others, Admins staying", async () => {
+  it("lets an Admin remove themself with others if Admins remain", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkRemovedSelf");
     const { workspaceId, adminUserId } = workspace;
     const second = await joining(workspace, "Admin");
@@ -373,7 +373,7 @@ describe("removing many members", () => {
     expect(await auditRowsOf(workspace, REMOVED)).toEqual([]);
   });
 
-  it("skips an id no member holds, counting it", async () => {
+  it("skips and counts an id that is not a member", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkRemovedNobody");
     const viewer = await joining(workspace, "Viewer");
 
@@ -386,7 +386,7 @@ describe("removing many members", () => {
 });
 
 describe("adding many members to a group", () => {
-  it("adds eight of ten, counting two already in", async () => {
+  it("adds eight of ten, counting the two already in", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkAddedEightOfTen");
     const ticked = await joiningMany(workspace, "Viewer", 10);
     const alreadyIn = ticked.slice(0, 2);
@@ -403,7 +403,7 @@ describe("adding many members to a group", () => {
     expect(await oneBatchOf(workspace, MEMBER_ADDED)).toBe(8);
   });
 
-  it("refuses an id no member holds, adding nobody", async () => {
+  it("refuses an id that is not a member, adding nobody", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkAddedNobody");
     const viewer = await joining(workspace, "Viewer");
     const sales = await groupHolding(workspace, []);
@@ -419,7 +419,7 @@ describe("adding many members to a group", () => {
     expect(await auditRowsOf(workspace, MEMBER_ADDED)).toEqual([]);
   });
 
-  it("refuses a group this workspace does not hold, no-such-group", async () => {
+  it("refuses another workspace's group with no-such-group", async () => {
     const ours = await provisionedWorkspace(db(), "BulkAddedOurs");
     const theirs = await provisionedWorkspace(db(), "BulkAddedTheirs");
     const viewer = await joining(ours, "Viewer");
@@ -440,7 +440,7 @@ const EACH_ACTION = [
 
 describe.each(EACH_ACTION)("who may %s in bulk", (_verb, actionOn) => {
   it.each(["Editor", "Viewer"] as const)(
-    "refuses a member at %s, before any read",
+    "refuses the %s role before reading anything",
     async (role) => {
       const workspace = await provisionedWorkspace(db(), `BulkForbidden${role}`);
       const actor = await joining(workspace, role);
@@ -463,11 +463,11 @@ const EACH_SCHEMA = [
   ["add to a group", bulkAddToGroupInput, { groupId: ulid() }],
 ] as const;
 
-describe.each(EACH_SCHEMA)("the set asked to %s", (_verb, schema, rest) => {
+describe.each(EACH_SCHEMA)("the list of ids to %s", (_verb, schema, rest) => {
   it.each([
     [201, "too-big"],
     [0, "too-small"],
-  ])("refuses %i ids, malformed", (count, issue) => {
+  ])("refuses %i ids as malformed", (count, issue) => {
     const personIds = Array.from({ length: count }, () => ulid());
 
     expect(parse(schema, { ...rest, personIds })).toEqual({
@@ -476,14 +476,14 @@ describe.each(EACH_SCHEMA)("the set asked to %s", (_verb, schema, rest) => {
     });
   });
 
-  it("takes 200 ids", () => {
+  it("accepts 200 ids", () => {
     const personIds = Array.from({ length: 200 }, () => ulid());
 
     expect(parse(schema, { ...rest, personIds })).toMatchObject({ ok: true });
   });
 });
 
-describe("a ticked member already gone", () => {
+describe("a selected member who was already removed", () => {
   const removedMeanwhile = async (name: string) => {
     const workspace = await provisionedWorkspace(db(), name);
     const second = await joining(workspace, "Admin");
@@ -498,7 +498,7 @@ describe("a ticked member already gone", () => {
     return { workspace, gone, staying };
   };
 
-  it("skips on Remove a person another Admin removed first", async () => {
+  it("skips a person another Admin already removed", async () => {
     const { workspace, gone, staying } = await removedMeanwhile("BulkGoneRemoved");
 
     const removed = await asAdmin(workspace, removing([gone, staying]));
@@ -507,7 +507,7 @@ describe("a ticked member already gone", () => {
     expect(await subjectsOf(workspace, REMOVED)).toEqual(sorted([gone, staying]));
   });
 
-  it("names them no-such-member on a role change or group add", async () => {
+  it("refuses them as no-such-member for role changes and group adds", async () => {
     const { workspace, gone, staying } = await removedMeanwhile("BulkGoneNamed");
     const sales = await groupHolding(workspace, []);
     const named = {
@@ -522,7 +522,7 @@ describe("a ticked member already gone", () => {
   });
 });
 
-describe("a member of another workspace, ticked here", () => {
+describe("a member of another workspace, selected here", () => {
   const aStranger = async (name: string) => {
     const ours = await provisionedWorkspace(db(), `${name}Ours`);
     const theirs = await provisionedWorkspace(db(), `${name}Theirs`);
@@ -530,7 +530,7 @@ describe("a member of another workspace, ticked here", () => {
     return { ours, theirs, stranger, nobody: ulid() };
   };
 
-  it("skips them on Remove, as it skips a random id", async () => {
+  it("skips them on removal, like a random id", async () => {
     const { ours, theirs, stranger, nobody } = await aStranger("BulkStrangerRemoved");
 
     const answers = [
@@ -545,7 +545,7 @@ describe("a member of another workspace, ticked here", () => {
     expect((await rolesOf(theirs))[stranger]).toBe("Viewer");
   });
 
-  it("names them no-such-member, as it names a random id", async () => {
+  it("refuses them as no-such-member, like a random id", async () => {
     const { ours, theirs, stranger, nobody } = await aStranger("BulkStrangerNamed");
     const sales = await groupHolding(ours, []);
     const namedAs = (personId: string) => ({
@@ -588,7 +588,7 @@ const heldBy = (sets: ReadonlyMap<string, readonly string[]>, userId: string) =>
 
 describe("two bulk actions racing", () => {
   it.each(RACES)(
-    "lands one whole, refusing the other: %s",
+    "completes one and refuses the other: %s",
     async (_race, rows, sharedCount, actionOn, action) => {
       const workspace = await provisionedWorkspace(db(), `BulkRaced${action}${rows}`);
       const second = await joining(workspace, "Admin");
@@ -602,7 +602,7 @@ describe("two bulk actions racing", () => {
         [second, [...shared, ...seconds]],
       ]);
 
-      const answers = await bothHoldingTheirOwnRow(
+      const answers = await actingOnEachOther(
         workspace,
         [workspace.adminUserId, second],
         (principal, tx) => actionOn(heldBy(setOf, principal.userId))(principal, tx),
@@ -652,7 +652,7 @@ describe("two bulk actions racing", () => {
     ).toEqual(sorted([...shared, ...firsts, ...seconds]));
   });
 
-  it("answers an add caught in a deadlock changed-meanwhile", async () => {
+  it("returns changed-meanwhile to an add caught in a deadlock", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkAddDeadlocked");
     const viewer = await joining(workspace, "Viewer");
     const sales = await groupHolding(workspace, []);
@@ -662,7 +662,7 @@ describe("two bulk actions racing", () => {
     const goAhead = Promise.withResolvers<undefined>();
     try {
       await holder.query("BEGIN");
-      // The holder waits first and checks for a deadlock last, so the add finds the cycle.
+      // A long deadlock_timeout makes Postgres detect the deadlock in the add, not the holder.
       await holder.query("SET LOCAL deadlock_timeout = '30s'");
       await holder.query(HOLD, [workspace.workspaceId, viewer]);
       const addingTheViewer = asAdmin(workspace, async (principal, tx) => {
@@ -686,7 +686,7 @@ describe("two bulk actions racing", () => {
 });
 
 describe("a bulk action whose audit event fails", () => {
-  it.each(EACH_ACTION)("leaves every row as it was: %s", async (_verb, actionOn) => {
+  it.each(EACH_ACTION)("leaves every row unchanged: %s", async (_verb, actionOn) => {
     const workspace = await provisionedWorkspace(db(), "BulkUnrecorded");
     const viewer = await joining(workspace, "Viewer");
     const sales = await groupHolding(workspace, []);

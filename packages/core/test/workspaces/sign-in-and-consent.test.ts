@@ -33,7 +33,7 @@ const consentRowsBy = async (personId: string) =>
   );
 
 describe("recording a sign-in", () => {
-  it("writes one identity-set row, the person its actor and subject", async () => {
+  it("writes one identity-set row about the person, by the person", async () => {
     const personId = await seedPerson(db().pool);
     const door = openPostgres(db().runtimePool);
 
@@ -55,7 +55,7 @@ describe("recording a sign-in", () => {
     expect(await consentRowsBy(personId)).toEqual([]);
   });
 
-  it("names a sign-in through the link by its method", async () => {
+  it("records a sign-in by link with its method", async () => {
     const personId = await seedPerson(db().pool);
     const door = openPostgres(db().runtimePool);
 
@@ -77,7 +77,7 @@ describe("recording a sign-in", () => {
 });
 
 describe("recording a consent", () => {
-  it("writes one row to the workspace, the assistant its subject", async () => {
+  it("writes one workspace row with the assistant as subject", async () => {
     const named = await provisionedWorkspace(db(), "Consented");
     const personId = await seedPerson(db().pool);
 

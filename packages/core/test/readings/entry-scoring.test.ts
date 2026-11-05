@@ -41,7 +41,7 @@ const doorsWith = (decide: EntryScoringDoors["decide"]): EntryScoringDoors => ({
 });
 
 describe("the entry step's scoring", () => {
-  it("asks of each entry point apart, numbered in order", () => {
+  it("asks one question per entry point, numbered in order", () => {
     expect(scoringCall("Which one?", ENTRIES)).toEqual({
       state: "Which one?",
       questions: {
@@ -72,7 +72,7 @@ describe("the entry step's scoring", () => {
     ]);
   });
 
-  it("counts recall by find, the entry step and the decision", async () => {
+  it("counts recall for find, the entry step, and the decision", async () => {
     const scoring = await readEntryScoring(
       [{ question: "Which is third?", answers: ["third"] }],
       LANDED,
@@ -92,7 +92,7 @@ describe("the entry step's scoring", () => {
     expect([scoring.unscored, scoring.tokensIn]).toEqual([0, 120]);
   });
 
-  it("keeps the entry step's order where a call fails", async () => {
+  it("keeps the entry step's order when the decision call fails", async () => {
     const scoring = await readEntryScoring(
       [{ question: "Which is first?", answers: ["first"] }],
       LANDED,

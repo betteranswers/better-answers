@@ -112,8 +112,8 @@ const aWriteOfEach = (inA: Record) =>
     [SOME_QUESTION_FEEDBACK, "feedback", [WS_A, ulid(), inA.id, AN_ASKER, ...HELPFUL]],
   ] as const;
 
-describe("the record's three tables under app_rt", () => {
-  it("reads no row of another workspace, and none unscoped", async () => {
+describe("the question record's three tables under app_rt", () => {
+  it("reads no other workspace's rows, and none when unscoped", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspacesEachWithARecord(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -141,7 +141,7 @@ describe("the record's three tables under app_rt", () => {
     });
   });
 
-  it("changes and removes none of another workspace's rows", async () => {
+  it("changes and deletes no other workspace's rows", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspacesEachWithARecord(client);
       await as(client, "app_rt", WS_B);
@@ -158,7 +158,7 @@ describe("the record's three tables under app_rt", () => {
     });
   });
 
-  it("keeps a record and its feedback from the api's delete", async () => {
+  it("refuses the api a delete of a record or feedback", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspacesEachWithARecord(client);
       const kept = { ...NO_PRIVILEGE, SELECT: true, INSERT: true, UPDATE: true };
@@ -171,15 +171,21 @@ describe("the record's three tables under app_rt", () => {
       await as(client, "app_rt", WS_A);
 
       await refusesEach(client, [
-        ["DELETE FROM question_asked", "a record's skeleton is kept for good"],
-        ["DELETE FROM question_feedback", "and so is the feedback it received"],
+        [
+          "DELETE FROM question_asked",
+          "app_rt deleting a question record, which is kept permanently",
+        ],
+        [
+          "DELETE FROM question_feedback",
+          "app_rt deleting question feedback, which is kept permanently",
+        ],
       ]);
     });
   });
 });
 
-describe("the record's three tables under worker_rt", () => {
-  it("refuses the worker a read or a write of each", async () => {
+describe("the question record's three tables under worker_rt", () => {
+  it("refuses the worker any read or write of each", async () => {
     await withRollback(db().pool, async (client) => {
       const { inA } = await twoWorkspacesEachWithARecord(client);
       for (const table of THE_THREE) {
@@ -192,7 +198,7 @@ describe("the record's three tables under worker_rt", () => {
 
       await refusesEach(client, [
         ...THE_THREE.map(
-          (table) => [`SELECT 1 FROM ${table} LIMIT 1`, `a read of ${table}`] as const,
+          (table) => [`SELECT 1 FROM ${table} LIMIT 1`, `the worker reading ${table}`] as const,
         ),
         ...aWriteOfEach(inA),
       ]);
@@ -200,13 +206,13 @@ describe("the record's three tables under worker_rt", () => {
   });
 });
 
-describe("what a record refuses", () => {
+describe("the question record's checks", () => {
   const completedAs = (client: pg.PoolClient, values: readonly unknown[]) =>
     refusalOf(client, () =>
       client.query(A_COMPLETED_QUESTION_RECORD, [WS_A, ulid(), AN_ASKER, ...values]),
     );
 
-  it("takes the four verdicts and the three judge states only", async () => {
+  it("accepts only the four verdicts and three judge states", async () => {
     await withRollback(db().pool, async (client) => {
       const now = new Date();
 
@@ -220,7 +226,7 @@ describe("what a record refuses", () => {
     });
   });
 
-  it("is open with no verdict, or completed with both", async () => {
+  it("is open, or completed with a verdict and judge state", async () => {
     await withRollback(db().pool, async (client) => {
       const halfDone = "question_asked_completion_check";
 
@@ -231,7 +237,7 @@ describe("what a record refuses", () => {
     });
   });
 
-  it("holds its concepts and its drafted sentences as lists", async () => {
+  it("stores its concepts and drafted sentences as JSON arrays", async () => {
     await withRollback(db().pool, async (client) => {
       const record = await testData(client).questionAsked({ workspaceId: WS_A });
       const concepts = (value: string) =>
@@ -252,7 +258,7 @@ describe("what a record refuses", () => {
     });
   });
 
-  it("keeps a listed map state, on a completed record only", async () => {
+  it("accepts a listed map state only on a completed record", async () => {
     await withRollback(db().pool, async (client) => {
       const seed = testData(client);
       const completed = await seed.questionAsked({
@@ -285,7 +291,7 @@ describe("what a record refuses", () => {
     });
   });
 
-  it("takes the asker's role from the three a member holds", async () => {
+  it("limits the asker's role to the three member roles", async () => {
     await withRollback(db().pool, async (client) => {
       const record = await testData(client).questionAsked({ workspaceId: WS_A });
 
@@ -319,7 +325,7 @@ describe("what a record refuses", () => {
     });
   });
 
-  it("holds a question and feedback to a record that exists", async () => {
+  it("refuses a question or feedback for a missing record", async () => {
     await withRollback(db().pool, async (client) => {
       const noSuchRecord = ulid();
 
@@ -335,13 +341,13 @@ describe("what a record refuses", () => {
   });
 });
 
-describe("what feedback refuses", () => {
+describe("the question feedback's checks", () => {
   const given = async (client: pg.PoolClient, recordId: string, values: readonly unknown[]) =>
     refusalOf(client, () =>
       client.query(SOME_QUESTION_FEEDBACK, [WS_A, ulid(), recordId, AN_ASKER, ...values]),
     );
 
-  it("takes a flag with a listed reason, helpful with none", async () => {
+  it("requires a listed reason on a flag, none on helpful", async () => {
     await withRollback(db().pool, async (client) => {
       const { id } = await testData(client).questionAsked({ workspaceId: WS_A });
       const shape = "question_feedback_flag_check";
@@ -362,7 +368,7 @@ describe("what feedback refuses", () => {
     });
   });
 
-  it("pairs a disputed sentence with its concept, on a flag", async () => {
+  it("pairs a disputed sentence with its concept, on flags only", async () => {
     await withRollback(db().pool, async (client) => {
       const { id } = await testData(client).questionAsked({ workspaceId: WS_A });
       const shape = "question_feedback_flag_check";
@@ -376,7 +382,7 @@ describe("what feedback refuses", () => {
     });
   });
 
-  it("keeps a flag's concept once an erasure cleared its sentence", async () => {
+  it("keeps a flag's concept after an erasure clears its sentence", async () => {
     await withRollback(db().pool, async (client) => {
       const { id } = await testData(client).questionAsked({ workspaceId: WS_A });
 
@@ -387,7 +393,7 @@ describe("what feedback refuses", () => {
     });
   });
 
-  it("closes only a flag, with a listed word and instant", async () => {
+  it("closes only a flag, with a listed outcome and time", async () => {
     await withRollback(db().pool, async (client) => {
       const { id } = await testData(client).questionAsked({ workspaceId: WS_A });
       const closed = async (values: readonly unknown[]) =>
@@ -408,14 +414,14 @@ describe("what feedback refuses", () => {
   });
 });
 
-describe("a month's partition of the content", () => {
-  it("stands for the journal's month and the next", async () => {
+describe("a monthly partition of question_content", () => {
+  it("exists for the migration's month and the next", async () => {
     const made = (await contentPartitions(db().pool)).map((partition) => partition.name);
 
     expect(made).toEqual([contentPartitionOf(inTheMonth(0)), contentPartitionOf(inTheMonth(1))]);
   });
 
-  it("refuses a question in an unmade month; inserting makes none", async () => {
+  it("refuses a question in a month with no partition", async () => {
     await withRollback(db().pool, async (client) => {
       const record = await aRecordInAMonthNotMade(client);
 
@@ -425,7 +431,7 @@ describe("a month's partition of the content", () => {
     });
   });
 
-  it("stores a question once the api has made its month", async () => {
+  it("stores a question once the api creates its month's partition", async () => {
     await withRollback(db().pool, async (client) => {
       const record = await aRecordInAMonthNotMade(client);
 
@@ -439,7 +445,7 @@ describe("a month's partition of the content", () => {
     });
   });
 
-  it("is made once, however often its month is asked for", async () => {
+  it("is created once, however often its month is requested", async () => {
     await withRollback(db().pool, async (client) => {
       const before = (await contentPartitions(client)).map((partition) => partition.name);
       await client.query("SET LOCAL ROLE app_rt");
@@ -453,7 +459,7 @@ describe("a month's partition of the content", () => {
     });
   });
 
-  it("is made by the api's role and no other", async () => {
+  it("is created by the api role and no other", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query("SET LOCAL ROLE worker_rt");
 
@@ -463,7 +469,7 @@ describe("a month's partition of the content", () => {
     });
   });
 
-  it("is made only for the months a sweep asks for", async () => {
+  it("is created only for the months a sweep asks for", async () => {
     await withRollback(db().pool, async (client) => {
       const before = await contentPartitions(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -474,7 +480,7 @@ describe("a month's partition of the content", () => {
           (month) =>
             [
               MAKE_THE_MONTH,
-              `no workspace scopes a month, so ${month.toISOString()} is refused by its distance`,
+              `app_rt making the month ${month.toISOString()}, too far from now for a sweep`,
               [month],
               /is not a month a sweep makes/,
             ] as const,
@@ -486,7 +492,7 @@ describe("a month's partition of the content", () => {
     });
   });
 
-  it("is made once by two sessions asking at once", async () => {
+  it("is created once when two sessions ask at once", async () => {
     const month = inTheMonth(-1);
     const first = await db().pool.connect();
     const second = await db().pool.connect();
@@ -515,19 +521,25 @@ describe("a month's partition of the content", () => {
       const seed = testData(client);
       await seed.questionContent({ workspaceId: WS_A });
       const [current] = await contentPartitions(client);
-      assert(current !== undefined, "the seed made this month's partition");
+      assert(current !== undefined, "the seed made no partition for this month");
       await as(client, "app_rt", WS_A);
 
       const throughTheParent = await client.query("SELECT workspace_id FROM question_content");
       expect(throughTheParent.rows).toEqual([{ workspace_id: WS_A }]);
       await refusesEach(client, [
-        [`SELECT 1 FROM "${current.name}"`, "a partition carries no policy to scope a read"],
-        [`DELETE FROM "${current.name}"`, "nor a write"],
+        [
+          `SELECT 1 FROM "${current.name}"`,
+          "app_rt reading a partition directly, which has no policy to scope the read",
+        ],
+        [
+          `DELETE FROM "${current.name}"`,
+          "app_rt deleting from a partition directly, which has no policy to scope the write",
+        ],
       ]);
     });
   });
 
-  it("is forced and granted no runtime role, partition by partition", async () => {
+  it("has forced row security and no runtime grants per partition", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(MAKE_THE_MONTH, [A_MONTH_NOT_MADE]);
 

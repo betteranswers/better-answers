@@ -51,14 +51,14 @@ type OwnTransactionContext = inferProcedureBuilderResolverOptions<
 >["ctx"];
 type AskingContext = inferProcedureBuilderResolverOptions<typeof askingProcedure>["ctx"];
 
-describe("the three roads a procedure takes", () => {
-  it("is three procedures, not one wearing three names", () => {
+describe("the three base procedures", () => {
+  it("are three distinct objects, not one object with three names", () => {
     const roads = new Set([queryProcedure, mutationProcedure, ownTransactionProcedure]);
 
     expect(roads.size).toBe(3);
   });
 
-  it("keeps every door from a procedure inside the resolver's transaction", () => {
+  it("give query and mutation contexts a transaction but no doors", () => {
     expectTypeOf<QueryContext["tx"]>().toEqualTypeOf<Tx>();
     expectTypeOf<QueryContext["doors"]>().toEqualTypeOf<undefined>();
     expectTypeOf<MutationContext["tx"]>().toEqualTypeOf<Tx>();
@@ -66,18 +66,18 @@ describe("the three roads a procedure takes", () => {
     expectTypeOf<QueryContext["modelDoors"]>().toEqualTypeOf<undefined>();
     expectTypeOf<MutationContext["modelDoors"]>().toEqualTypeOf<undefined>();
 
-    // @ts-expect-error — a context holding a transaction reaches no door.
+    // @ts-expect-error -- a context with a transaction has no doors.
     expectTypeOf<QueryContext["doors"]["postgres"]>().toBeUnknown();
   });
 
-  it("hands the doors and no transaction to the own-transaction road", () => {
+  it("give ownTransactionProcedure the doors but no transaction", () => {
     expectTypeOf<OwnTransactionContext["doors"]>().toEqualTypeOf<Doors>();
     expectTypeOf<OwnTransactionContext["modelDoors"]>().toEqualTypeOf<ModelDoors>();
     expectTypeOf<OwnTransactionContext>().not.toHaveProperty("tx");
     expectTypeOf<AskingContext>().toEqualTypeOf<OwnTransactionContext>();
   });
 
-  it("hands every road the Principal its own door re-judges", () => {
+  it("give each base procedure's context a UserPrincipal", () => {
     expectTypeOf<QueryContext["principal"]>().toEqualTypeOf<UserPrincipal>();
     expectTypeOf<MutationContext["principal"]>().toEqualTypeOf<UserPrincipal>();
     expectTypeOf<OwnTransactionContext["principal"]>().toEqualTypeOf<UserPrincipal>();
@@ -87,7 +87,7 @@ describe("the three roads a procedure takes", () => {
 const FIRST_ID = "01K6H0A7Q3W9E2R5T8Y1U4I6O0";
 const SECOND_ID = "01K6H0A7Q3W9E2R5T8Y1U4I6O1";
 
-/** Nothing here queries, and a pool opens no connection until something does. */
+/** The tests that use these doors never query, and a pool opens no connection until a query runs. */
 const NO_DATABASE = doorsFor("postgres://nobody@127.0.0.1:1/none");
 
 const A_SIGNED_IN_PERSON = {
@@ -127,7 +127,7 @@ const contextOf = (
   mail: { send: async () => {}, publicUrl: "https://app.example.test" },
 });
 
-const refusalCrossing = async (
+const refusalOverTrpc = async (
   answered: RefusalAnswer,
   standing: SecondFactorStanding = A_SIGNED_IN_PERSON.standing,
 ) => {
@@ -150,15 +150,15 @@ const refusalCrossing = async (
   return { status: response.status, refusal, logs };
 };
 
-describe("a refusal naming items, crossing tRPC", () => {
-  it("sends each item's word keyed by id, beside the set's", async () => {
-    const crossed = await refusalCrossing({
+describe("a refusal with per-item words over tRPC", () => {
+  it("sends the overall word and each item's word by id", async () => {
+    const answer = await refusalOverTrpc({
       word: "last-admin",
       items: { [FIRST_ID]: "last-admin", [SECOND_ID]: "no-such-member" },
     });
 
-    expect(crossed.status).toBe(412);
-    expect(crossed.refusal).toStrictEqual({
+    expect(answer.status).toBe(412);
+    expect(answer.refusal).toStrictEqual({
       word: "last-admin",
       class: "precondition",
       items: { [FIRST_ID]: "last-admin", [SECOND_ID]: "no-such-member" },
@@ -173,11 +173,11 @@ describe("a refusal naming items, crossing tRPC", () => {
       400,
       { word: "malformed", class: "malformed", fields: { memberIds: "too-big" } },
     ],
-  ] as const)("sends %s exactly as before, with no items", async (_, answered, status, sent) => {
-    const crossed = await refusalCrossing(answered);
+  ] as const)("sends %s with no items field", async (_, answered, status, sent) => {
+    const answer = await refusalOverTrpc(answered);
 
-    expect(crossed.status).toBe(status);
-    expect(crossed.refusal).toStrictEqual(sent);
+    expect(answer.status).toBe(status);
+    expect(answer.refusal).toStrictEqual(sent);
   });
 
   it("types a refusal's detail as fields or items, never both", () => {
@@ -191,8 +191,8 @@ describe("a refusal naming items, crossing tRPC", () => {
     expectTypeOf<Malformed & Fields & Items>().not.toExtend<Refusal>();
   });
 
-  it("logs the set's word and class, never an item id", async () => {
-    const { logs } = await refusalCrossing({
+  it("logs the overall word and class, never an item id", async () => {
+    const { logs } = await refusalOverTrpc({
       word: "last-admin",
       items: { [FIRST_ID]: "last-admin", [SECOND_ID]: "no-such-member" },
     });
@@ -205,22 +205,22 @@ describe("a refusal naming items, crossing tRPC", () => {
   });
 });
 
-describe("a pending session crossing tRPC", () => {
-  it("refuses a procedure outside the pending set before its action", async () => {
+describe("a session with a pending second factor over tRPC", () => {
+  it("refuses a procedure outside the pending set before it runs", async () => {
     for (const standing of ["confirm", "setup"] as const) {
-      const crossed = await refusalCrossing("no-such-member", standing);
+      const answer = await refusalOverTrpc("no-such-member", standing);
 
-      expect([crossed.status, crossed.refusal]).toStrictEqual([
+      expect([answer.status, answer.refusal]).toStrictEqual([
         412,
         { word: "second-factor-pending", class: "precondition" },
       ]);
     }
   });
 
-  it("lets a confirmed session through to the action's own answer", async () => {
-    const crossed = await refusalCrossing("no-such-member", "confirmed");
+  it("lets a confirmed session reach the action's own refusal", async () => {
+    const answer = await refusalOverTrpc("no-such-member", "confirmed");
 
-    expect(crossed.refusal).toStrictEqual({ word: "no-such-member", class: "absent" });
+    expect(answer.refusal).toStrictEqual({ word: "no-such-member", class: "absent" });
   });
 });
 
@@ -331,8 +331,8 @@ const askedAsTheOperator = async (road: Road) => {
 describe.each([
   ["member", askedAsAnAdmin],
   ["operator", askedAsTheOperator],
-] as const)("a write on the %s roads", (_side, asked) => {
-  it("fails at its statement on the query road, leaving nothing", async () => {
+] as const)("a write through the %s query and mutation procedures", (_side, asked) => {
+  it("fails in a query procedure's read-only transaction, writing nothing", async () => {
     const { status, rows, logs } = await asked("queried");
 
     expect([status, rows]).toEqual([500, 0]);
@@ -341,7 +341,7 @@ describe.each([
     ).toEqual([{ action: "probeWrite", err: matching.objectContaining({ code: "25006" }) }]);
   });
 
-  it("lands on the mutation road", async () => {
+  it("succeeds in a mutation procedure", async () => {
     const { status, rows } = await asked("mutated");
 
     expect([status, rows]).toEqual([200, 1]);
@@ -350,11 +350,11 @@ describe.each([
 
 const definitionOf = z.object({ type: z.string().optional(), middlewares: z.array(z.unknown()) });
 
-/** A road and the procedures built on it carry their definitions, typed by tRPC's own internals. */
+/** tRPC keeps a procedure's definition in its internal `_def`, which has no public type. */
 const middlewaresOf = (procedure: object) => definitionOf.parse(Reflect.get(procedure, "_def"));
 
 describe("every query the router serves", () => {
-  it("runs on a road that opens no read-write transaction itself", () => {
+  it("uses a base procedure that opens no read-write transaction", () => {
     const roads = new Set(
       [queryProcedure, knowledgeReadProcedure, personProcedure, operatorQueryProcedure].map(
         (road) => middlewaresOf(road).middlewares[0],
@@ -377,12 +377,17 @@ describe("every query the router serves", () => {
   it.each([
     ["member", mutationProcedure, queryProcedure],
     ["operator", operatorMutationProcedure, operatorQueryProcedure],
-  ] as const)("tells a query on the %s mutation road apart", (_side, mutationRoad, queryRoad) => {
-    const astray = mutationRoad.query(() => "read");
+  ] as const)(
+    "detects a query built on the %s mutation procedure",
+    (_side, mutationRoad, queryRoad) => {
+      const astray = mutationRoad.query(() => "read");
 
-    expect(middlewaresOf(astray).middlewares[0]).toBe(middlewaresOf(mutationRoad).middlewares[0]);
-    expect(middlewaresOf(astray).middlewares[0]).not.toBe(middlewaresOf(queryRoad).middlewares[0]);
-  });
+      expect(middlewaresOf(astray).middlewares[0]).toBe(middlewaresOf(mutationRoad).middlewares[0]);
+      expect(middlewaresOf(astray).middlewares[0]).not.toBe(
+        middlewaresOf(queryRoad).middlewares[0],
+      );
+    },
+  );
 });
 
 const MUTATIONS = Object.entries(appRouter._def.procedures).filter(
@@ -431,8 +436,8 @@ const memberRead = z.object({
   result: z.object({ data: z.object({ workspace: z.object({ id: z.string() }) }) }),
 });
 
-describe("every query the router serves on a workspace road", () => {
-  it("is refused, its tab naming another workspace", async () => {
+describe("every workspace-scoped query the router serves", () => {
+  it("is refused when the tab names another workspace", async () => {
     const { client, left } = await switchedAway();
     const paths = QUERIES.filter(([, procedure]) => !namesNoWorkspace(procedure))
       .filter(([path]) => path !== MEMBER_READ)
@@ -447,7 +452,7 @@ describe("every query the router serves on a workspace road", () => {
     expect(words).toEqual(paths.map((path) => [path, "workspace-switched"]));
   });
 
-  it("answers the member read whatever workspace the tab names", async () => {
+  it("answers session.member whatever workspace the tab names", async () => {
     const { client, left, here } = await switchedAway();
 
     const answered = await queriedFromATab(client, MEMBER_READ, left.workspaceId);
@@ -465,7 +470,7 @@ describe("every query the router serves on a workspace road", () => {
     expect([unnamed.status, named.status]).toEqual([200, 200]);
   });
 
-  it("says which workspace answered a read naming none", async () => {
+  it("sets the answering-workspace header when the tab names none", async () => {
     const { client, here } = await switchedAway();
 
     const unnamed = await queriedFromATab(client, "members.list");
@@ -473,7 +478,7 @@ describe("every query the router serves on a workspace road", () => {
     expect(unnamed.headers.get(ANSWERING_WORKSPACE_HEADER)).toBe(here.workspaceId);
   });
 
-  it("says no workspace answered a read it refused", async () => {
+  it("omits the answering-workspace header from a refused read", async () => {
     const { client, left } = await switchedAway();
 
     const refused = await queriedFromATab(client, "members.list", left.workspaceId);
@@ -482,7 +487,7 @@ describe("every query the router serves on a workspace road", () => {
     expect(refused.headers.get(ANSWERING_WORKSPACE_HEADER)).toBeNull();
   });
 
-  it("says no workspace answered a read on the person's road", async () => {
+  it("omits the answering-workspace header from person-scoped reads", async () => {
     const { client } = await switchedAway();
     const paths = QUERIES.filter(([, procedure]) => namesNoWorkspace(procedure)).map(
       ([path]) => path,
@@ -498,8 +503,8 @@ describe("every query the router serves on a workspace road", () => {
   });
 });
 
-describe("every mutation on an own-transaction road", () => {
-  it("is one this list names", () => {
+describe("every mutation that opens its own transactions", () => {
+  it("appears in this list", () => {
     const roads = new Set(
       [ownTransactionProcedure, askingProcedure].map((road) => middlewaresOf(road).middlewares[0]),
     );
@@ -548,7 +553,7 @@ const wordsOfEach = async (
 };
 
 describe("every mutation the router serves", () => {
-  it("is refused on a workspace road, its tab naming another", async () => {
+  it("is refused if workspace-scoped and the tab names another workspace", async () => {
     const { client, left } = await switchedAway();
 
     const words = await wordsOfEach(WORKSPACE_MUTATIONS, (path) =>
@@ -561,7 +566,7 @@ describe("every mutation the router serves", () => {
     expect(words).toEqual(WORKSPACE_MUTATIONS.map((path) => [path, "workspace-switched"]));
   });
 
-  it("is refused on a workspace road, its tab naming none", async () => {
+  it("is refused if workspace-scoped and the tab names no workspace", async () => {
     const { client } = await switchedAway();
 
     const words = await wordsOfEach(WORKSPACE_MUTATIONS, (path) => client.json(path, {}));
@@ -569,7 +574,7 @@ describe("every mutation the router serves", () => {
     expect(words).toEqual(WORKSPACE_MUTATIONS.map((path) => [path, "workspace-unnamed"]));
   });
 
-  it("never asks the person's or operator's road for a workspace", async () => {
+  it("never needs a workspace if person- or operator-scoped", async () => {
     const { client } = await switchedAway();
     const paths = MUTATIONS.filter(([, procedure]) => namesNoWorkspace(procedure)).map(
       ([path]) => path,

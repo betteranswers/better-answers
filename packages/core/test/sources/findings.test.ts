@@ -61,8 +61,8 @@ const restoreEventsOf = async (pool: pg.Pool, workspaceId: string) => {
   return found.rows.filter((row) => row.action === "sources.finding.restored");
 };
 
-describe("an Admin's restore of one always-set span", () => {
-  it("writes the instant, actor and reason, with an audit event", async () => {
+describe("an Admin restoring one always-set finding", () => {
+  it("records the time, actor and reason, and an audit event", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 
@@ -96,7 +96,7 @@ describe("an Admin's restore of one always-set span", () => {
     ]);
   });
 
-  it("corrects a reason on restoring again, keeping both audit events", async () => {
+  it("updates the reason on a second restore, keeping both events", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
     const corrected = "The account is the company's own; the supplier form prints it in full.";
@@ -114,7 +114,7 @@ describe("an Admin's restore of one always-set span", () => {
     ).toEqual([findingId, findingId]);
   });
 
-  it("restores an always-tier name whatever its category says", async () => {
+  it("restores an always-tier finding whatever its category is", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario, {
       tier: REDACTION_ALWAYS_TIER,
@@ -148,7 +148,7 @@ describe("what the restore action refuses", () => {
       "not-the-always-set",
     ],
   ] as const)(
-    "refuses %s, moving neither row nor audit log",
+    "refuses %s and records no restore",
     async (_who, principalOf, overrides, refusal) => {
       const scenario = await arrange();
       const { findingId } = await findingIn(scenario, overrides);
@@ -161,7 +161,7 @@ describe("what the restore action refuses", () => {
     },
   );
 
-  it("names a blank reason", async () => {
+  it("rejects a blank reason as too small", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 
@@ -173,7 +173,7 @@ describe("what the restore action refuses", () => {
     expect(await restoreEventsOf(db().pool, scenario.workspaceId)).toEqual([]);
   });
 
-  it("names a null or missing reason", async () => {
+  it("rejects a null or missing reason as malformed", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 
@@ -188,14 +188,14 @@ describe("what the restore action refuses", () => {
     expect(await restoreEventsOf(db().pool, scenario.workspaceId)).toEqual([]);
   });
 
-  it("names an id that is not the minter's shape", () => {
+  it("rejects a finding id in the wrong format", () => {
     expect(parse(restoreFindingInput, { findingId: "not-an-id", reason: BUSINESS_FACT })).toEqual({
       ok: false,
       error: { word: "malformed", fields: { findingId: "bad-format" } },
     });
   });
 
-  it("says no-such-finding for another workspace's finding, leaving it unchanged", async () => {
+  it("refuses another workspace's finding and leaves it unchanged", async () => {
     const mine = await arrange();
     const theirs = await arrange();
     const { findingId } = await findingIn(theirs);
@@ -209,8 +209,8 @@ describe("what the restore action refuses", () => {
   });
 });
 
-describe("the restore and its audit event land or fail together", () => {
-  it("leaves the finding unrestored when an audit event is refused", async () => {
+describe("the restore and its audit event commit together", () => {
+  it("leaves the finding unrestored when the audit event write fails", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 

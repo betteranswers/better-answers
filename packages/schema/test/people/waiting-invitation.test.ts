@@ -71,8 +71,8 @@ const statusOf = async (client: pg.PoolClient, ids: readonly string[]) =>
     ).rows.map((row) => [row.id, row.status]),
   );
 
-describe("the migration that holds one waiting invitation per address", () => {
-  it("leaves the newest waiting invitation to each address per workspace", async () => {
+describe("the migration that keeps one waiting invitation per address", () => {
+  it("cancels older waiting invitations to an address in one workspace", async () => {
     await withRollback(db.pool, async (client) => {
       const [here, there] = await twoWorkspaces(client);
       await withoutTheIndex(client);
@@ -103,7 +103,7 @@ describe("the migration that holds one waiting invitation per address", () => {
 });
 
 describe("the index over waiting invitations", () => {
-  it("refuses a second waiting invitation to one address, any case", async () => {
+  it("refuses a second waiting invitation to one address, case-insensitively", async () => {
     await expect(
       withRollback(db.pool, async (client) => {
         const [here] = await twoWorkspaces(client);
@@ -113,7 +113,7 @@ describe("the index over waiting invitations", () => {
     ).rejects.toThrow(/invitation_waiting_uidx/);
   });
 
-  it("admits one waiting per workspace, beside any number decided", async () => {
+  it("accepts one waiting invitation per workspace beside any decided ones", async () => {
     const standing = await withRollback(db.pool, async (client) => {
       const [here, there] = await twoWorkspaces(client);
       const ids = [

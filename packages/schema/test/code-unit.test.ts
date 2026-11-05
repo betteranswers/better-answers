@@ -5,7 +5,7 @@ import { byCodeUnit } from "@better-answers/schema/code-unit";
 const MIXED = ["b", "B", "a-b", "a_b", "A", "a", "ä", "10", "9", "", "a"];
 
 describe("byCodeUnit", () => {
-  it("orders by code unit, as a comparator-less sort does", () => {
+  it("orders strings as sort() with no comparator does", () => {
     expect(MIXED.toSorted(byCodeUnit)).toEqual([
       "",
       "10",
@@ -25,7 +25,7 @@ describe("byCodeUnit", () => {
     expect(["bar", "Foo"].toSorted(byCodeUnit)).toEqual(["Foo", "bar"]);
   });
 
-  it("holds equal strings equal", () => {
+  it("returns zero for two equal strings", () => {
     expect(byCodeUnit("a", "a")).toBe(0);
   });
 });

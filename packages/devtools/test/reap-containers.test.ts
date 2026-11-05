@@ -94,7 +94,7 @@ const removals = (daemon: Daemon): string[] =>
   daemon.calls().filter((call) => call.startsWith("rm "));
 
 describe("reap-containers", () => {
-  it("removes only stopped containers no running Ryuk still serves", () => {
+  it("removes only stopped containers that no running Ryuk serves", () => {
     const daemon = daemonAnswering(
       "mixed",
       listing([
@@ -146,7 +146,7 @@ describe("reap-containers", () => {
     expect(removals(daemon)).toEqual([]);
   });
 
-  it("counts a vanished container gone and a refused removal failed", () => {
+  it("counts a vanished container removed, a refused one failed", () => {
     const daemon = daemonAnswering(
       "refusing",
       listing([
@@ -194,7 +194,7 @@ describe("reap-containers", () => {
     expect(daemon.calls()).toEqual([]);
   });
 
-  it("spares a live run's container and names an ended run's", async () => {
+  it("keeps a live run's container and lists an ended run's", async () => {
     const live = holdAContainer();
     // With Ryuk off, nothing clears the container once its process is gone and it has stopped.
     const ended = holdAContainer({ TESTCONTAINERS_RYUK_DISABLED: "true" });

@@ -193,7 +193,7 @@ export const passageUnder = (
     return row.id;
   });
 
-/** Each passage row's `xmin`, in id order: it moves whenever the row is rewritten. */
+/** Each passage row's `xmin`, in id order. Postgres changes `xmin` whenever the row is rewritten. */
 export const passageVersionsOf = async (
   db: MigratedPostgres,
   workspaceId: string,

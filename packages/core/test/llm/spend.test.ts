@@ -141,8 +141,8 @@ const settledOnce = async (calls: readonly CallSpent[]): Promise<Asker> => {
   return asking;
 };
 
-describe("spend", () => {
-  it("settles a reservation as one priced row per call", async () => {
+describe("reserving and settling model spend", () => {
+  it("settles a reservation into one priced llm_call row per call", async () => {
     const asking = await settledOnce([A_FAILED_ATTEMPT, A_CALL]);
 
     expect(await reservationsOf(asking)).toEqual([]);
@@ -172,7 +172,7 @@ describe("spend", () => {
     ]);
   });
 
-  it("refuses past the limit and leaves no row (AE9)", async () => {
+  it("refuses a reservation over the limit, writing no row (AE9)", async () => {
     await priced("2026-10-01", "3", "15");
     const asking = await anAsker("0.149999");
 
@@ -181,7 +181,7 @@ describe("spend", () => {
     expect(await callsOf(asking)).toEqual([]);
   });
 
-  it("passes one of two raced reservations under the limit", async () => {
+  it("admits only one of two concurrent reservations under the limit", async () => {
     await priced("2026-10-01", "3", "15");
     const asking = await anAsker("0.25");
 
@@ -196,7 +196,7 @@ describe("spend", () => {
     expect(await reservationsOf(asking)).toHaveLength(1);
   });
 
-  it("calls no model and reserves nothing with no limit", async () => {
+  it("reserves nothing and calls no model without a spending limit", async () => {
     await priced("2026-10-01", "3", "15");
     const asking = await anAsker();
 
@@ -207,7 +207,7 @@ describe("spend", () => {
     expect(await reservationsOf(asking)).toEqual([]);
   });
 
-  it("sweeps expired reservations into failed calls at reserved cost", async () => {
+  it("settles expired reservations as failed calls at reserved cost", async () => {
     await priced("2026-10-01", "3", "15");
     const asking = await anAsker("10");
     answered(await reserving(asking, NOW));
@@ -248,7 +248,7 @@ describe("spend", () => {
 
     const late = await settling(asking, reservationId, [A_CALL]);
 
-    assert(!late.ok, "the sweep's reservation settles no second time");
+    assert(!late.ok, "a reservation the sweep settled was settled again");
     expect(String(late.error)).toContain(reservationId);
     expect(await callsOf(asking)).toMatchObject([{ outcome: "failed", cost_gbp: "0.15" }]);
   });
@@ -260,7 +260,7 @@ describe("spend", () => {
     expect(await callsOf(asking)).toEqual([]);
   });
 
-  it("passes a reservation that meets the limit exactly", async () => {
+  it("accepts a reservation that reaches the limit exactly", async () => {
     await priced("2026-10-01", "3", "15");
     const asking = await anAsker("0.15");
 
@@ -268,7 +268,7 @@ describe("spend", () => {
     expect(await reserving(asking)).toEqual({ ok: false, error: "spending-limit-met" });
   });
 
-  it("calls no model for a purpose with no model choice", async () => {
+  it("reserves nothing for a purpose with no model choice", async () => {
     await priced("2026-10-01", "3", "15");
     const { asker, recordId } = await anAsker("10");
 
@@ -284,7 +284,7 @@ describe("spend", () => {
     expect(answered(reserved)).toEqual({ reserved: false, because: "no-model-choice" });
   });
 
-  it("keeps a reservation inside its expiry from the sweep", async () => {
+  it("sweeps no reservation until its expiry has passed", async () => {
     await priced("2026-10-01", "3", "15");
     const asking = await anAsker("10");
     answered(await reserving(asking, NOW));
@@ -316,7 +316,7 @@ describe("spend", () => {
     });
   });
 
-  it("prices a call by today's price, never a later one", async () => {
+  it("prices a call by today's price, not a future one", async () => {
     const pricedLater = "claude-priced-later";
     const asking = await anAsker("10", pricedLater);
     const tomorrow = new Date(NOW.getTime() + 86_400_000).toISOString().slice(0, 10);
@@ -329,7 +329,7 @@ describe("spend", () => {
     expect(await reservationsOf(asking)).toMatchObject([{ reserved_gbp: "0.15" }]);
   });
 
-  it("releases what a settle spent less than it reserved", async () => {
+  it("releases the unspent part of a reservation on settling", async () => {
     await priced("2026-10-01", "3", "15");
     const asking = await anAsker("0.20");
     const first = reservationIdOf(answered(await reserving(asking)));
@@ -340,7 +340,7 @@ describe("spend", () => {
     expect(answered(await reserving(asking))).toMatchObject({ reserved: true });
   });
 
-  it("holds no prompt and no completion in a call's row", async () => {
+  it("stores no prompt or completion column in an llm_call row", async () => {
     const asking = await settledOnce([A_CALL]);
 
     const read = await db().pool.query("SELECT * FROM llm_call WHERE workspace_id = $1", [
@@ -348,7 +348,7 @@ describe("spend", () => {
     ]);
 
     const [row] = rowsFrom(read);
-    assert(row !== undefined, "the call left a row");
+    assert(row !== undefined, "the settled call wrote no llm_call row");
     expect(Object.keys(row).toSorted()).toEqual([
       "answer_id",
       "called_at",

@@ -19,7 +19,7 @@ const aShareLockOnTheAuditLog = (): Promise<string> =>
   });
 
 describe("the harness's pools", () => {
-  it("connects pool as a superuser, whom no policy binds", async () => {
+  it("connects pool as a superuser, which no policy binds", async () => {
     const read = await withRollback(db().pool, async (client) => {
       await testData(client).modelChoice();
       const found = await client.query<{ superuser: boolean; modelChoices: number }>(
@@ -34,7 +34,7 @@ describe("the harness's pools", () => {
 });
 
 describe("the harness's transactions", () => {
-  it("withCommit keeps its writes for the next case", async () => {
+  it("withCommit keeps its writes for the next test", async () => {
     let written = "";
     await withCommit(db().pool, async (client) => {
       written = (await testData(client).modelChoice()).id;
@@ -45,7 +45,7 @@ describe("the harness's transactions", () => {
     expect(found.rowCount).toBe(1);
   });
 
-  it("whileAnAuditWriteIsOpen holds audit_event row-exclusive until its work ends", async () => {
+  it("whileAnAuditWriteIsOpen locks audit_event row-exclusive until its work ends", async () => {
     const during = await whileAnAuditWriteIsOpen(db().pool, aShareLockOnTheAuditLog);
 
     expect({ during, after: await aShareLockOnTheAuditLog() }).toEqual({

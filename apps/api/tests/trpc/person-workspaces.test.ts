@@ -29,7 +29,7 @@ describe("reading a person's own workspaces over tRPC", () => {
     ]);
   });
 
-  it("answers each person their own workspaces, never another's", async () => {
+  it("lists only the signed-in person's workspaces", async () => {
     const calder = await app().provision({ name: "Calder" });
     const ryedale = await app().provision({ name: "Ryedale" });
     const priya = await app().person();
@@ -45,7 +45,7 @@ describe("reading a person's own workspaces over tRPC", () => {
     ]);
   });
 
-  it("refuses a pending second factor, then answers once confirmed", async () => {
+  it("refuses until the second factor is confirmed, then lists", async () => {
     const thornby = await app().provision({ name: "Thornby" });
     const key = await holdAnAuthenticator(app(), thornby.admin.id);
     const client = await signedInByEmailOnly(app(), thornby.admin.email);

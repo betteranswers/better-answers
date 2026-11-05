@@ -32,10 +32,10 @@ FIXTURE = read_credential_envelope()
 KEY = bytes.fromhex(FIXTURE["key"])
 
 
-def test_the_cipher_version_and_widths_match_the_agreement() -> None:
+def test_the_cipher_version_and_byte_widths_match_the_cases_file() -> None:
     fixture = read_credential_envelope()
 
-    spoken = {
+    declared = {
         "aead": ENVELOPE_AEAD,
         "version": ENVELOPE_VERSION,
         "key_bytes": ENVELOPE_KEY_BYTES,
@@ -44,19 +44,19 @@ def test_the_cipher_version_and_widths_match_the_agreement() -> None:
         "tag_bytes": ENVELOPE_TAG_BYTES,
     }
 
-    assert spoken == {
+    assert declared == {
         "aead": fixture["aead"],
         "version": fixture["version"],
         **fixture["frame"],
     }
 
 
-def test_opens_with_the_agreements_test_key() -> None:
+def test_the_cases_file_key_has_the_expected_length() -> None:
     assert len(KEY) == read_credential_envelope()["frame"]["key_bytes"]
 
 
 @pytest.mark.parametrize("vector", FIXTURE["opens"], ids=lambda vector: vector["name"])
-def test_opens_every_agreed_frame_to_its_exact_plaintext(
+def test_opens_every_cases_file_frame_to_its_plaintext(
     vector: dict[str, str],
 ) -> None:
     assert opened(KEY, bytes.fromhex(vector["frame"])) == bytes.fromhex(
@@ -67,16 +67,16 @@ def test_opens_every_agreed_frame_to_its_exact_plaintext(
 @pytest.mark.parametrize(
     "vector", FIXTURE["refuses"], ids=lambda vector: vector["name"]
 )
-def test_refuses_each_bad_frame_in_the_word_the_agreement_names(
+def test_rejects_each_bad_frame_with_the_expected_error_name(
     vector: dict[str, str],
 ) -> None:
-    with pytest.raises(UnopenableError) as refused:
+    with pytest.raises(UnopenableError) as raised:
         opened(KEY, bytes.fromhex(vector["frame"]))
 
-    assert refused.value.name == vector["refusal"]
+    assert raised.value.name == vector["refusal"]
 
 
-def test_the_agreement_carries_a_frame_for_every_refusal_word() -> None:
+def test_the_cases_file_has_a_frame_for_every_error_name() -> None:
     fixture = read_credential_envelope()
 
     assert fixture["opens"]
@@ -88,7 +88,7 @@ def test_the_agreement_carries_a_frame_for_every_refusal_word() -> None:
 
 
 @pytest.mark.parametrize("vector", FIXTURE["opens"], ids=lambda vector: vector["name"])
-def test_writes_a_frame_with_the_agreed_widths_and_version_first(
+def test_sealed_frame_has_the_version_first_and_expected_length(
     vector: dict[str, str],
 ) -> None:
     fixture = read_credential_envelope()
@@ -106,7 +106,7 @@ def test_writes_a_frame_with_the_agreed_widths_and_version_first(
 
 
 @pytest.mark.parametrize("vector", FIXTURE["opens"], ids=lambda vector: vector["name"])
-def test_opens_its_own_sealed_plaintext_byte_for_byte(
+def test_opens_its_own_sealed_plaintext(
     vector: dict[str, str],
 ) -> None:
     plaintext = bytes.fromhex(vector["plaintext"])
@@ -123,7 +123,7 @@ def test_a_fresh_nonce_makes_each_seal_a_different_frame(
     assert len({sealed(KEY, plaintext) for _ in range(16)}) == 16
 
 
-ONE_SEALS_NONCE = """
+PRINT_ONE_SEAL_NONCE = """
 import sys
 from better_answers_worker.envelope import (
     ENVELOPE_NONCE_BYTES,
@@ -136,9 +136,9 @@ print(frame[ENVELOPE_VERSION_BYTES:][:ENVELOPE_NONCE_BYTES].hex())
 """
 
 
-def a_nonce_sealed_in_a_process_of_its_own() -> str:
+def nonce_sealed_in_a_new_process() -> str:
     finished = subprocess.run(
-        [sys.executable, "-c", ONE_SEALS_NONCE, KEY.hex()],
+        [sys.executable, "-c", PRINT_ONE_SEAL_NONCE, KEY.hex()],
         capture_output=True,
         text=True,
         check=True,
@@ -146,14 +146,14 @@ def a_nonce_sealed_in_a_process_of_its_own() -> str:
     return finished.stdout.strip()
 
 
-def test_two_processes_sealing_under_one_key_draw_different_nonces() -> None:
-    first = a_nonce_sealed_in_a_process_of_its_own()
-    second = a_nonce_sealed_in_a_process_of_its_own()
+def test_two_processes_sealing_with_one_key_use_different_nonces() -> None:
+    first = nonce_sealed_in_a_new_process()
+    second = nonce_sealed_in_a_new_process()
 
     assert first != second
 
 
-def test_a_wrong_length_key_raises_a_defect_not_a_refusal() -> None:
+def test_a_wrong_length_key_raises_value_error_not_unopenable_error() -> None:
     short = KEY[1:]
 
     with pytest.raises(ValueError, match="envelope: a key is"):

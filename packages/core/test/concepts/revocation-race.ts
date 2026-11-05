@@ -4,7 +4,7 @@ import type { PostgresDoor } from "../../src/store/postgres/index.ts";
 import {
   holdingTable,
   isBlockedOnTable,
-  lendingOnceSettled,
+  poolWaitingFor,
   until,
 } from "../support/suite-postgres.ts";
 
@@ -29,7 +29,6 @@ export const parkedOnTable =
   (writeThenRevoke) =>
     holdingTable(pool, table, () => writeThenRevoke(() => isBlockedOnTable(pool, table)));
 
-/** A write, parked by `parking`, with a revocation queued behind it before it resumes. */
 export const writeRevokedWhileParked = async <T>(
   pool: pg.Pool,
   door: PostgresDoor,
@@ -42,7 +41,7 @@ export const writeRevokedWhileParked = async <T>(
   const revoker = await pool.connect();
   let acting: Promise<T> | undefined;
   let revoking: Promise<unknown> = Promise.resolve();
-  const postgres = { ...door, pool: lendingOnceSettled(door.pool, () => revoking) };
+  const postgres = { ...door, pool: poolWaitingFor(door.pool, () => revoking) };
   try {
     await parking(async (parked) => {
       acting = race.write(postgres);

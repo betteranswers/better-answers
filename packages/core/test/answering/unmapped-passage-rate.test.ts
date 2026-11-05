@@ -50,7 +50,7 @@ const NONE_LEFT_OUT = { mapUnavailable: NONE, mapUnknown: NONE };
 const rateOf = (workspace: ProvisionedWorkspace, workspaceId: string = workspace.workspaceId) =>
   unmappedPassageRate(ANSWER_MEASURES, workspace.door, { workspaceId });
 
-const doorKeepingStatements = (workspace: ProvisionedWorkspace) => {
+const doorRecordingStatements = (workspace: ProvisionedWorkspace) => {
   const { pool } = workspace.door;
   const statements: string[] = [];
   const connect = async () => {
@@ -84,7 +84,7 @@ describe("the unmapped-passage rate", () => {
     });
   });
 
-  it("counts a map-unavailable or unknown answer apart from mapped ones", async () => {
+  it("counts map-unavailable and unknown-map records separately from mapped ones", async () => {
     const workspace = await provisionedWorkspace(db(), "Map-less");
     const { workspaceId } = workspace;
     await aRecordFlagged(workspaceId, ["incomplete"], [A_PASSAGE], LIVE);
@@ -97,7 +97,7 @@ describe("the unmapped-passage rate", () => {
     });
   });
 
-  it("counts a record flagged incomplete twice once", async () => {
+  it("counts a record flagged incomplete twice as one", async () => {
     const workspace = await provisionedWorkspace(db(), "Flagged twice");
     await aRecordFlagged(workspace.workspaceId, ["incomplete", "incomplete"], [A_PASSAGE]);
 
@@ -107,7 +107,7 @@ describe("the unmapped-passage rate", () => {
     });
   });
 
-  it("counts a record whose incomplete flag an Admin closed", async () => {
+  it("counts a record after an Admin closes its incomplete flag", async () => {
     const workspace = await provisionedWorkspace(db(), "Closed flag");
     const { workspaceId } = workspace;
     const record = await aRecordFlagged(workspaceId, [], [A_PASSAGE]);
@@ -141,7 +141,7 @@ describe("the unmapped-passage rate", () => {
 
   it("reads in a read-only transaction", async () => {
     const workspace = await provisionedWorkspace(db(), "Read only");
-    const { door, statements } = doorKeepingStatements(workspace);
+    const { door, statements } = doorRecordingStatements(workspace);
 
     expect(
       await unmappedPassageRate(ANSWER_MEASURES, door, { workspaceId: workspace.workspaceId }),
@@ -152,7 +152,7 @@ describe("the unmapped-passage rate", () => {
     expect(statements[0]).toBe("BEGIN READ ONLY");
   });
 
-  it("refuses malformed for a workspace id that is not one", async () => {
+  it("returns malformed for an invalid workspace id", async () => {
     const workspace = await provisionedWorkspace(db(), "Malformed");
 
     expect(await rateOf(workspace, "ws_synthetic")).toEqual({ ok: false, error: "malformed" });

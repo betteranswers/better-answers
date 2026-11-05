@@ -40,8 +40,8 @@ const authenticatorsHeldBy = async (personId: string) =>
     )
   ).rows;
 
-describe("recording an authenticator's setup", () => {
-  it("records it, stamps the session and issues ten codes", async () => {
+describe("recording an authenticator setup", () => {
+  it("records it, confirms the session and issues ten codes", async () => {
     const personId = await seedPerson(db().pool);
     const authenticatorId = await authenticatorFor(db().pool, personId, { verified: true });
     const sessionId = await aSession(personId, AT);
@@ -73,7 +73,7 @@ describe("recording an authenticator's setup", () => {
     ]);
   });
 
-  it("records a setup once, though each finish stamps its session", async () => {
+  it("records a setup once but confirms each finishing session", async () => {
     const personId = await seedPerson(db().pool);
     const authenticatorId = await authenticatorFor(db().pool, personId, { verified: true });
     const sessions = [await aSession(personId, AT), await aSession(personId, AT)];
@@ -103,7 +103,7 @@ describe("recording an authenticator's setup", () => {
     ]);
   });
 
-  it("issues no codes to a person who holds some", async () => {
+  it("issues no codes to a person who already has some", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: true });
     await recoveryCodeFor(db().pool, personId, AT);
@@ -122,7 +122,7 @@ describe("recording an authenticator's setup", () => {
     ]);
   });
 
-  it("refuses while the setup still waits on a code", async () => {
+  it("refuses while the setup awaits its first code", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: false });
     const sessionId = await aSession(personId);
@@ -139,7 +139,7 @@ describe("recording an authenticator's setup", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("stamps no session another person holds", async () => {
+  it("confirms no session that belongs to another person", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: true });
     const strangersSession = await aSession(await seedPerson(db().pool));
@@ -198,7 +198,7 @@ describe("recording an authenticator's setup", () => {
 });
 
 describe("removing an authenticator", () => {
-  it("lets a person needing no factor remove their only one", async () => {
+  it("lets someone who needs no factor remove their only authenticator", async () => {
     const personId = await seedPerson(db().pool);
     const authenticatorId = await authenticatorFor(db().pool, personId, { verified: true });
 
@@ -233,7 +233,7 @@ describe("removing an authenticator", () => {
     expect(removed).toEqual({ ok: false, error: "last-second-factor" });
   });
 
-  it("lets an Admin who holds a passkey remove it", async () => {
+  it("lets an Admin with a passkey remove the authenticator", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     const authenticatorId = await authenticatorFor(db().pool, adminUserId, { verified: true });
     await passkeyFor(db().pool, adminUserId);
@@ -243,7 +243,7 @@ describe("removing an authenticator", () => {
     expect(removed).toEqual({ ok: true, value: { authenticatorId } });
   });
 
-  it("refuses to remove a setup still waiting on a code", async () => {
+  it("refuses to remove a setup that awaits its first code", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: false });
 
@@ -254,7 +254,7 @@ describe("removing an authenticator", () => {
 });
 
 describe("reading a person's second factor", () => {
-  it("answers nothing held for a new person", async () => {
+  it("reports no factors for a new person", async () => {
     const personId = await seedPerson(db().pool);
 
     const read = await readSecondFactor(bootstrap, door(), { personId, now: AT });
@@ -277,7 +277,7 @@ describe("reading a person's second factor", () => {
     });
   });
 
-  it("answers an Admin's authenticator and unused codes", async () => {
+  it("reports an Admin's authenticator and unused codes", async () => {
     const { adminUserId } = await provisionedWorkspace(db(), "Acme");
     await authenticatorFor(db().pool, adminUserId, { verified: true });
     await passkeyFor(db().pool, adminUserId);
@@ -298,7 +298,7 @@ describe("reading a person's second factor", () => {
     expect(read.value.passkeys).toHaveLength(1);
   });
 
-  it("answers each passkey's name, added and last used times", async () => {
+  it("reports each passkey's name, creation time and last use", async () => {
     const personId = await seedPerson(db().pool);
     const used = await passkeyFor(db().pool, personId);
     const unused = await passkeyFor(db().pool, personId);
@@ -330,7 +330,7 @@ describe("reading a person's second factor", () => {
     });
   });
 
-  it("dates a passkey written with no time of its own", async () => {
+  it("gives a creation time to a passkey stored without one", async () => {
     const personId = await seedPerson(db().pool);
     await passkeyFor(db().pool, personId);
 
@@ -340,7 +340,7 @@ describe("reading a person's second factor", () => {
     expect(read.value.passkeys[0]?.createdAt).toMatch(/^\d{4}-\d\d-\d\dT/);
   });
 
-  it("answers a setup that waits on its code", async () => {
+  it("reports a setup that awaits its first code", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: false });
 
@@ -349,7 +349,7 @@ describe("reading a person's second factor", () => {
     expect(read).toMatchObject({ ok: true, value: { authenticator: "awaiting-code" } });
   });
 
-  it("answers this session's standing and the workspace it administers", async () => {
+  it("reports this session's standing and the workspace it administers", async () => {
     const { adminUserId, workspaceId } = await provisionedWorkspace(db(), "Acme");
     await passkeyFor(db().pool, adminUserId);
     const sessionId = await aSession(adminUserId);
@@ -391,7 +391,7 @@ describe("reading a person's second factor", () => {
     });
   });
 
-  it("refuses a person nobody holds", async () => {
+  it("refuses an unknown person", async () => {
     const read = await readSecondFactor(bootstrap, door(), {
       personId: "01J00000000000000000000000",
       now: AT,
@@ -400,7 +400,7 @@ describe("reading a person's second factor", () => {
     expect(read).toEqual({ ok: false, error: "person-gone" });
   });
 
-  it("promotes on the operator mark, clearing at the next confirmation", async () => {
+  it("marks the operator as promoted until their next confirmation", async () => {
     const email = `operator-${ulid().toLowerCase()}@example.test`;
     const personId = await seedPerson(db().pool, { email });
     const promotedRead = async () => {

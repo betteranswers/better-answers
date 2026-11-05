@@ -99,7 +99,7 @@ type GateRun = {
   readonly summary: string;
 };
 
-const gateRan = async (env: Readonly<Record<string, string>>): Promise<GateRun> => {
+const runGate = async (env: Readonly<Record<string, string>>): Promise<GateRun> => {
   const run = mkdtempSync(path.join(scratch, "gate-"));
   mkdirSync(path.join(run, "bin"));
   writeFileSync(path.join(run, "bin", "gh"), STUB_GH, { mode: 0o755 });
@@ -138,9 +138,9 @@ const refused = (said: string, trigger: string): GateRun => ({
   summary: "",
 });
 
-describe("the gate a merge's release passes", () => {
+describe("the release gate for a merge", () => {
   it("releases a build's commit while it is main's head", async () => {
-    expect(await gateRan({ COMMIT: HEAD, EVENT: "push" })).toEqual({
+    expect(await runGate({ COMMIT: HEAD, EVENT: "push" })).toEqual({
       code: 0,
       said: "",
       output: decided(true, HEAD, "merge"),
@@ -148,8 +148,8 @@ describe("the gate a merge's release passes", () => {
     });
   });
 
-  it("skips a build's commit once main has moved on", async () => {
-    expect(await gateRan({ COMMIT: OLDER, EVENT: "push" })).toEqual(
+  it("skips a build's commit once main has a newer head", async () => {
+    expect(await runGate({ COMMIT: OLDER, EVENT: "push" })).toEqual(
       skipped(
         `${OLDER} is no longer main's head; ${HEAD} is. Production never goes back to an older commit, so a newer commit's green build releases in its place.`,
         "merge",
@@ -164,7 +164,7 @@ describe("the gate a merge's release passes", () => {
     },
     { mode: "drill", instead: "Dispatch `release` with `rehearsed_by` (RUNBOOK.md page 6)." },
   ])("skips a build's release in $mode mode", async ({ mode, instead }) => {
-    expect(await gateRan({ COMMIT: HEAD, EVENT: "push", RELEASE_MODE: mode })).toEqual(
+    expect(await runGate({ COMMIT: HEAD, EVENT: "push", RELEASE_MODE: mode })).toEqual(
       skipped(
         `RELEASE_MODE is ${mode}, so a green build does not release itself. ${instead}`,
         "merge",
@@ -173,7 +173,7 @@ describe("the gate a merge's release passes", () => {
   });
 
   it("refuses a build's commit when main's head cannot be read", async () => {
-    expect(await gateRan({ COMMIT: HEAD, EVENT: "push", STUB_GH_FAILS: "yes" })).toEqual(
+    expect(await runGate({ COMMIT: HEAD, EVENT: "push", STUB_GH_FAILS: "yes" })).toEqual(
       refused(
         `main's head could not be read, so ${HEAD} is not released: a newer commit may already be the head`,
         "merge",
@@ -182,15 +182,15 @@ describe("the gate a merge's release passes", () => {
   });
 
   it("refuses a commit that is not a full sha", async () => {
-    expect(await gateRan({ COMMIT: HEAD.slice(0, 7), EVENT: "push" })).toEqual(
+    expect(await runGate({ COMMIT: HEAD.slice(0, 7), EVENT: "push" })).toEqual(
       refused("commit is not a full commit sha (40 hex characters)", "merge"),
     );
   });
 });
 
-describe("the gate the nightly release passes", () => {
+describe("the release gate for the nightly release", () => {
   const nightly = (env: Readonly<Record<string, string>>) =>
-    gateRan({ EVENT: "schedule", RELEASE_MODE: "nightly", ...env });
+    runGate({ EVENT: "schedule", RELEASE_MODE: "nightly", ...env });
 
   it("releases main's newest commit with a green build", async () => {
     expect(
@@ -241,8 +241,8 @@ describe("the gate the nightly release passes", () => {
     );
   });
 
-  it("has nothing to do in per-merge mode", async () => {
-    expect(await gateRan({ EVENT: "schedule" })).toEqual(
+  it("skips the nightly release in per-merge mode", async () => {
+    expect(await runGate({ EVENT: "schedule" })).toEqual(
       skipped(
         "RELEASE_MODE is per-merge, so the nightly release has nothing to do. Every green build on main releases itself.",
         "nightly",
@@ -257,9 +257,9 @@ const EVERY_TRIGGER = [
   { trigger: "dispatch", env: { EVENT: "workflow_dispatch" } },
 ];
 
-describe("the gate a dispatched release passes", () => {
-  it("lets a dispatch through outside drill mode, naming no drill", async () => {
-    expect(await gateRan({ EVENT: "workflow_dispatch", RELEASE_MODE: "nightly" })).toEqual({
+describe("the release gate for a dispatched release", () => {
+  it("passes a dispatch outside drill mode without a drill record", async () => {
+    expect(await runGate({ EVENT: "workflow_dispatch", RELEASE_MODE: "nightly" })).toEqual({
       code: 0,
       said: "",
       output: decided(true, "", "dispatch"),
@@ -267,8 +267,8 @@ describe("the gate a dispatched release passes", () => {
     });
   });
 
-  it("refuses an undrilled dispatch in drill mode", async () => {
-    expect(await gateRan({ EVENT: "workflow_dispatch", RELEASE_MODE: "drill" })).toEqual(
+  it("refuses a dispatch without rehearsed_by in drill mode", async () => {
+    expect(await runGate({ EVENT: "workflow_dispatch", RELEASE_MODE: "drill" })).toEqual(
       refused(
         "RELEASE_MODE is drill: a release must ride a drill that just proved a restore, or state a hotfix reason. Fill `rehearsed_by` (RUNBOOK.md page 6)",
         "dispatch",
@@ -276,9 +276,9 @@ describe("the gate a dispatched release passes", () => {
     );
   });
 
-  it("lets a dispatch naming its drill through in drill mode", async () => {
+  it("passes a dispatch that names its drill in drill mode", async () => {
     expect(
-      await gateRan({
+      await runGate({
         EVENT: "workflow_dispatch",
         RELEASE_MODE: "drill",
         REHEARSED_BY: "drills/drill-20270104T020000Z.md",
@@ -287,9 +287,9 @@ describe("the gate a dispatched release passes", () => {
   });
 
   it.each(EVERY_TRIGGER)(
-    "fails closed on an unknown mode, for a $trigger",
+    "refuses an unknown RELEASE_MODE for a $trigger",
     async ({ trigger, env }) => {
-      expect(await gateRan({ ...env, RELEASE_MODE: "weekly" })).toEqual(
+      expect(await runGate({ ...env, RELEASE_MODE: "weekly" })).toEqual(
         refused(
           "RELEASE_MODE is 'weekly', which is not per-merge, nightly or drill, so nothing is released. Set one (gh variable set RELEASE_MODE --body nightly), or delete it for per-merge",
           trigger,
@@ -301,7 +301,7 @@ describe("the gate a dispatched release passes", () => {
 
 const READ_KEY = "hcr_read_only_key_for_tests";
 
-/** GitHub starts the 02:35 schedule hours late, about here. */
+/** GitHub often starts the 02:35 schedule hours late, at about this time. */
 const READ_AT = "2026-10-01T09:00:00Z";
 
 const STUB_DATE = [
@@ -322,7 +322,7 @@ const checksAnswer =
     return { status: 200, body: JSON.stringify({ checks: check === undefined ? [] : [check] }) };
   };
 
-const freshnessRead = async (
+const runBackupFresh = async (
   checks: Readonly<Record<string, Check>>,
   key: string = READ_KEY,
   at: string = READ_AT,
@@ -342,14 +342,14 @@ const freshnessRead = async (
   return result;
 };
 
-/** Pings in the dead-man service's own form: seconds, and an offset rather than `Z`. */
+/** The dead-man service writes ping times to the second, with an offset instead of `Z`. */
 const LAST_HOURS_DUMP = "2026-10-01T08:05:12+00:00";
 const TONIGHTS_COPIES = "2026-10-01T02:04:51+00:00";
 
-describe("the backup a nightly release rides on", () => {
-  it("names the dump and copies it rides, both fresh", async () => {
+describe("the backup check before a nightly release", () => {
+  it("names the fresh dump and copies the release relies on", async () => {
     expect(
-      await freshnessRead({
+      await runBackupFresh({
         "pg-hourly": { status: "up", last_ping: LAST_HOURS_DUMP },
         nightly: { status: "up", last_ping: TONIGHTS_COPIES },
       }),
@@ -362,7 +362,7 @@ describe("the backup a nightly release rides on", () => {
 
   it("refuses a dump whose last run failed", async () => {
     expect(
-      await freshnessRead({
+      await runBackupFresh({
         "pg-hourly": { status: "down", last_ping: LAST_HOURS_DUMP },
         nightly: { status: "up", last_ping: TONIGHTS_COPIES },
       }),
@@ -373,10 +373,10 @@ describe("the backup a nightly release rides on", () => {
     });
   });
 
-  it("holds the dump to 65 minutes before the read", async () => {
+  it("requires a dump at most 65 minutes before the read", async () => {
     const pinged = async (dump: string) =>
       (
-        await freshnessRead({
+        await runBackupFresh({
           "pg-hourly": { status: "up", last_ping: dump },
           nightly: { status: "up", last_ping: TONIGHTS_COPIES },
         })
@@ -392,7 +392,7 @@ describe("the backup a nightly release rides on", () => {
     const copies = "2026-09-30T02:04:51+00:00";
 
     expect(
-      await freshnessRead({
+      await runBackupFresh({
         "pg-hourly": { status: "up", last_ping: LAST_HOURS_DUMP },
         nightly: { status: "up", last_ping: copies },
       }),
@@ -403,21 +403,21 @@ describe("the backup a nightly release rides on", () => {
     });
   });
 
-  it("takes a dump pinged while the read is under way", async () => {
+  it("accepts a dump pinged during the read", async () => {
     expect(
-      await freshnessRead({
+      await runBackupFresh({
         "pg-hourly": { status: "up", last_ping: "2026-10-01T09:00:01+00:00" },
         nightly: { status: "up", last_ping: TONIGHTS_COPIES },
       }),
     ).toMatchObject({ code: 0, err: "" });
   });
 
-  it("takes the night before's copies when read before 02:00", async () => {
+  it("accepts the previous night's copies when read before 02:00", async () => {
     const dump = "2026-10-01T01:05:12+00:00";
     const copies = "2026-09-30T02:04:51+00:00";
 
     expect(
-      await freshnessRead(
+      await runBackupFresh(
         {
           "pg-hourly": { status: "up", last_ping: dump },
           nightly: { status: "up", last_ping: copies },
@@ -428,8 +428,8 @@ describe("the backup a nightly release rides on", () => {
     ).toMatchObject({ code: 0, err: "" });
   });
 
-  it("refuses when the service will not answer for the key", async () => {
-    expect(await freshnessRead({}, "not-the-key")).toEqual({
+  it("refuses when the service rejects the read key", async () => {
+    expect(await runBackupFresh({}, "not-the-key")).toEqual({
       code: 1,
       out: "",
       err: "::error::the dead-man service answered 401 for the pg-hourly check, so the backup's freshness is unknown and nothing is released\n",
@@ -437,7 +437,7 @@ describe("the backup a nightly release rides on", () => {
   });
 
   it("refuses without the read key", async () => {
-    expect(await freshnessRead({}, "")).toEqual({
+    expect(await runBackupFresh({}, "")).toEqual({
       code: 1,
       out: "",
       err: "::error::HEALTHCHECKS_READ_KEY is not set in the production environment, so the nightly release cannot read whether the box's backup is fresh (RUNBOOK.md page 6)\n",
@@ -450,7 +450,7 @@ const WORKER_DIGEST = "sha256:e0d1c2b3a4958677f6e5d4c3b2a19080f7e6d5c4b3a29181a0
 
 type Redeployed = Ran & { readonly heard: readonly Heard[] };
 
-const redeployedThrough = async (
+const runRedeploy = async (
   answer: (heard: Heard) => Answer,
   credentials: Readonly<Record<string, string>> = {},
 ): Promise<Redeployed> => {
@@ -550,9 +550,9 @@ const called = (heard: Heard): string => `${heard.method} ${heard.url}`;
 const digestSet = (key: string, value: string): string =>
   `${JSON.stringify({ key, value, is_preview: false, is_buildtime: true, is_runtime: true })}\n`;
 
-describe("the redeploy a release makes", () => {
+describe("the redeploy step of a release", () => {
   it("sets the pull step and digests, deploys, then waits", async () => {
-    const redeployed = await redeployedThrough(orchestrator());
+    const redeployed = await runRedeploy(orchestrator());
     const credentialed = { token: "Bearer deploy-token", access: ["access-id", "access-secret"] };
 
     expect(redeployed.heard.map(sent)).toEqual([
@@ -587,7 +587,7 @@ describe("the redeploy a release makes", () => {
   });
 
   it("leaves the pull step alone when already set", async () => {
-    const redeployed = await redeployedThrough(orchestrator({ pullStep: PULL_STEP }));
+    const redeployed = await runRedeploy(orchestrator({ pullStep: PULL_STEP }));
 
     expect({ code: redeployed.code, calls: redeployed.heard.map(called) }).toEqual({
       code: 0,
@@ -603,7 +603,7 @@ describe("the redeploy a release makes", () => {
   });
 
   it("waits through queued and in-progress until finished", async () => {
-    const redeployed = await redeployedThrough(
+    const redeployed = await runRedeploy(
       orchestrator({
         reads: [deploymentIs("queued"), deploymentIs("in_progress"), deploymentIs("finished")],
       }),
@@ -617,7 +617,7 @@ describe("the redeploy a release makes", () => {
   });
 
   it("fails the release when the deployment fails, naming it", async () => {
-    const redeployed = await redeployedThrough(
+    const redeployed = await runRedeploy(
       orchestrator({ reads: [deploymentIs("in_progress"), deploymentIs("failed")] }),
     );
 
@@ -627,12 +627,12 @@ describe("the redeploy a release makes", () => {
     });
   });
 
-  it("gives up when its wait runs out, naming the deployment", async () => {
+  it("fails, naming the deployment, when the wait times out", async () => {
     const started = Date.now();
-    const redeployed = await redeployedThrough(
-      orchestrator({ reads: [deploymentIs("in_progress")] }),
-      { RELEASE_DEPLOY_WAIT_SECONDS: "2", RELEASE_DEPLOY_DELAY_SECONDS: "0.2" },
-    );
+    const redeployed = await runRedeploy(orchestrator({ reads: [deploymentIs("in_progress")] }), {
+      RELEASE_DEPLOY_WAIT_SECONDS: "2",
+      RELEASE_DEPLOY_DELAY_SECONDS: "0.2",
+    });
     const elapsed = Date.now() - started;
 
     expect({
@@ -652,7 +652,7 @@ describe("the redeploy a release makes", () => {
 
   it("writes nothing while a deployment is queued or running", async () => {
     for (const status of ["queued", "in_progress"]) {
-      const redeployed = await redeployedThrough(orchestrator({ listed: [status, "finished"] }));
+      const redeployed = await runRedeploy(orchestrator({ listed: [status, "finished"] }));
 
       expect({
         code: redeployed.code,
@@ -667,7 +667,7 @@ describe("the redeploy a release makes", () => {
   });
 
   it("writes nothing when the deployment list is unreadable", async () => {
-    const redeployed = await redeployedThrough(
+    const redeployed = await runRedeploy(
       orchestratorAnswering((heard) => heard.url === DEPLOYMENTS_LIST, {
         status: 200,
         body: JSON.stringify({ count: 0 }),
@@ -681,8 +681,8 @@ describe("the redeploy a release makes", () => {
     });
   });
 
-  it("stops at a deploy the orchestrator skipped", async () => {
-    const redeployed = await redeployedThrough(
+  it("stops when the orchestrator queues no new deployment", async () => {
+    const redeployed = await runRedeploy(
       orchestrator({
         deploy: {
           status: 200,
@@ -706,8 +706,8 @@ describe("the redeploy a release makes", () => {
     });
   });
 
-  it("names the read ability when the first read is refused", async () => {
-    const redeployed = await redeployedThrough(
+  it("names Coolify's read ability when the first read gets 403", async () => {
+    const redeployed = await runRedeploy(
       orchestratorAnswering(readsTheApplication, {
         status: 403,
         body: JSON.stringify({ message: "Missing required permissions: read" }),
@@ -722,7 +722,7 @@ describe("the redeploy a release makes", () => {
   });
 
   it("keeps polling past a failed status read", async () => {
-    const redeployed = await redeployedThrough(
+    const redeployed = await runRedeploy(
       orchestrator({ reads: [{ status: 502, body: "" }, deploymentIs("finished")] }),
     );
 
@@ -732,8 +732,8 @@ describe("the redeploy a release makes", () => {
     }).toEqual({ code: 0, reads: 2 });
   });
 
-  it("stops at the edge's redirect to sign-in", async () => {
-    const redeployed = await redeployedThrough(
+  it("stops when the edge redirects the application read to sign-in", async () => {
+    const redeployed = await runRedeploy(
       orchestratorAnswering((heard) => heard.url === "/api/v1/applications/uuid-1", {
         status: 302,
         body: "",
@@ -747,8 +747,8 @@ describe("the redeploy a release makes", () => {
     );
   });
 
-  it("stops waiting at the edge's redirect to sign-in", async () => {
-    const redeployed = await redeployedThrough(
+  it("stops polling when the edge redirects to sign-in", async () => {
+    const redeployed = await runRedeploy(
       orchestrator({ reads: [{ status: 302, body: "" }, deploymentIs("finished")] }),
     );
 
@@ -758,10 +758,8 @@ describe("the redeploy a release makes", () => {
     });
   });
 
-  it("stops at an orchestrator that refuses the deploy", async () => {
-    const redeployed = await redeployedThrough(
-      orchestrator({ deploy: { status: 500, body: "{}" } }),
-    );
+  it("stops when the orchestrator refuses the deploy", async () => {
+    const redeployed = await runRedeploy(orchestrator({ deploy: { status: 500, body: "{}" } }));
 
     expect(redeployed.code).toBe(1);
     expect(redeployed.heard).toHaveLength(6);
@@ -770,8 +768,8 @@ describe("the redeploy a release makes", () => {
     );
   });
 
-  it("stops at a deploy answer naming no deployment", async () => {
-    const redeployed = await redeployedThrough(
+  it("stops when the deploy answer names no deployment", async () => {
+    const redeployed = await runRedeploy(
       orchestrator({ deploy: { status: 200, body: JSON.stringify({ deployments: [] }) } }),
     );
 
@@ -782,8 +780,8 @@ describe("the redeploy a release makes", () => {
     });
   });
 
-  it("calls nothing without its edge credential", async () => {
-    const redeployed = await redeployedThrough(orchestrator(), {
+  it("calls nothing without CF_ACCESS_CLIENT_ID", async () => {
+    const redeployed = await runRedeploy(orchestrator(), {
       CF_ACCESS_CLIENT_ID: "",
     });
 
@@ -809,8 +807,8 @@ const jobOf = (name: string): ReleaseJob => {
   return job;
 };
 
-describe("how the workflows hand a release its commit", () => {
-  it("calls the release after every image leg, on main alone", () => {
+describe("how build.yml calls release.yml with its commit", () => {
+  it("releases only on main, after the image job succeeds", () => {
     expect(build().jobs.release).toEqual({
       needs: "image",
       if: "${{ !cancelled() && needs.image.result == 'success' && github.ref == 'refs/heads/main' }}",
@@ -843,11 +841,11 @@ describe("how the workflows hand a release its commit", () => {
     expect(release().concurrency.group).not.toEqual(build().concurrency.group);
   });
 
-  it("runs the gate, promote and record, nothing else", () => {
+  it("has only the gate, promote and record jobs", () => {
     expect(Object.keys(release().jobs)).toEqual(["gate", "promote", "record"]);
   });
 
-  it("promotes only what the gate passes, at the gate's commit", () => {
+  it("runs promote only when the gate passes, at its commit", () => {
     const [gate, promote] = [jobOf("gate"), jobOf("promote")];
     const checkout = promote.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
 
@@ -863,7 +861,7 @@ describe("how the workflows hand a release its commit", () => {
     expect(checkout?.with?.["ref"]).toEqual("${{ needs.gate.outputs.commit || 'main' }}");
   });
 
-  it("checks the backup first, then redeploys and smokes", () => {
+  it("checks the backup, then redeploys, then runs the smoke test", () => {
     const { steps } = jobOf("promote");
     const backup = steps.findIndex(running("deploy/backup-fresh.sh"));
     const redeploy = steps.findIndex(running("deploy/release-redeploy.sh"));
@@ -873,11 +871,11 @@ describe("how the workflows hand a release its commit", () => {
     expect([backup >= 0, backup < redeploy, redeploy < smoke]).toEqual([true, true, true]);
   });
 
-  it("outlasts the redeploy's wait and the smoke's by ten minutes", () => {
+  it("times out ten minutes after the redeploy and smoke would", () => {
     const defaultOf = (script: string, name: string): number => {
       const text = readFileSync(path.join(repositoryRoot, "deploy", script), "utf8");
       const found = new RegExp(`\\$\\{${name}:-(\\d+)\\}`).exec(text)?.[1];
-      assert(found !== undefined, `${script} gives ${name} no default`);
+      assert(found !== undefined, `${script} sets no default for ${name}`);
       return Number(found);
     };
     const smokeReadSeconds = 5;
@@ -889,7 +887,7 @@ describe("how the workflows hand a release its commit", () => {
     expect(jobOf("promote")["timeout-minutes"] * 60).toBeGreaterThanOrEqual(wait + smoke + 600);
   });
 
-  it("reads the switch the runbook tells the owner to set", () => {
+  it("reads the RELEASE_MODE variable that the runbook says to set", () => {
     const ask = jobOf("gate").steps.find((step) => step.id === "ask");
     const runbook = readFileSync(path.join(repositoryRoot, "docs/operations/RUNBOOK.md"), "utf8");
 
@@ -897,14 +895,14 @@ describe("how the workflows hand a release its commit", () => {
     expect(runbook).toContain("gh variable set RELEASE_MODE --body nightly");
   });
 
-  it("is read by nothing in check.yml", () => {
+  it("is not referenced by check.yml", () => {
     const check = readFileSync(path.join(repositoryRoot, ".github/workflows/check.yml"), "utf8");
 
     expect(check).not.toMatch(/release\.yml|workflow_run/);
   });
 });
 
-describe("the tag a release records", () => {
+describe("how a release records its tag", () => {
   it("promotes with read access and no stored credential", () => {
     const promote = jobOf("promote");
     const checkout = promote.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
@@ -922,7 +920,7 @@ describe("the tag a release records", () => {
     expect(writers).toEqual(["record"]);
   });
 
-  it("tags promote's head after health names its digest", () => {
+  it("tags promote's head after /health reports its digest", () => {
     const { steps } = jobOf("record");
     const checkout = steps.find((step) => step.uses?.startsWith("actions/checkout@"));
     const health = steps.findIndex(running("deploy/await-release.sh"));
@@ -933,19 +931,19 @@ describe("the tag a release records", () => {
     expect([health >= 0, health < push]).toEqual([true, true]);
   });
 
-  it("installs nothing in the job holding write access", () => {
+  it("installs nothing in the record job, which has write access", () => {
     const { steps } = jobOf("record");
 
     expect(steps.filter(installs)).toEqual([]);
   });
 
-  it("records on the smoke", () => {
+  it("runs record only after promote and its smoke succeed", () => {
     const record = jobOf("record");
 
     expect({ needs: record.needs, if: record.if }).toEqual({ needs: "promote", if: undefined });
   });
 
-  it("tags by hand only a release production answers healthy on", () => {
+  it("tells the owner to hand-tag only a healthy release", () => {
     const said = [jobOf("promote"), jobOf("record")]
       .flatMap((job) => job.steps)
       .filter((step) => step.if === "failure()")
@@ -1003,7 +1001,7 @@ const taggedBy = ({ calls }: Recorded) => {
 };
 
 describe("the tag the record job makes", () => {
-  it("takes the tag, message and head promote named", () => {
+  it("reads the tag, message and head from promote's outputs", () => {
     expect(jobOf("record").steps.find(running('git push origin "refs/tags/${tag}"'))?.env).toEqual({
       TAG: "${{ needs.promote.outputs.tag }}",
       MESSAGE: "${{ needs.promote.outputs.message }}",
@@ -1035,7 +1033,7 @@ const cronOf = (spec: string): { readonly minute: number; readonly hour: number 
 };
 
 describe("when the nightly release runs", () => {
-  it("runs after the box's nightly copy and that hour's dump", () => {
+  it("runs after the box's nightly copy and the hourly dump", () => {
     const boxCron = readFileSync(deployScript("backup.Dockerfile"), "utf8");
     const dumpMinute = Number(/'(\d+) \* \* \* \* root [^']*backup\.sh hourly/.exec(boxCron)?.[1]);
     const copiesAt = /'(\d+) (\d+) \* \* \* root [^']*backup\.sh nightly/.exec(boxCron);

@@ -12,7 +12,7 @@ const at = (offsetMs: number) => {
   vi.setSystemTime(new Date(LATER_THAN_ANY_MILLISECOND_MINTED + offsetMs));
 };
 
-describe("the minter, for anything that keeps an id", () => {
+describe("ulid(), the id minter", () => {
   it("mints an id of 26 Crockford base32 characters", () => {
     const minted = ulid();
 
@@ -36,7 +36,7 @@ describe("the minter, for anything that keeps an id", () => {
     for (const id of minted) expect(new RegExp(ULID_PATTERN).test(id)).toBe(true);
   });
 
-  it("carries one millisecond into every id minted in it", () => {
+  it("gives ids minted in one millisecond the same time prefix", () => {
     at(1000);
 
     const [first, second] = [ulid(), ulid()];
@@ -44,7 +44,7 @@ describe("the minter, for anything that keeps an id", () => {
     expect(second.slice(0, 10)).toBe(first.slice(0, 10));
   });
 
-  it("sorts ids in minting order across instants and a year", () => {
+  it("sorts ids in minting order across milliseconds and a year", () => {
     at(2000);
     const earlier = ulid();
     at(3000);

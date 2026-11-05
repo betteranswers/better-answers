@@ -96,7 +96,8 @@ const starIn = async (
     }
     return { hub: hub.uid, spokes };
   });
-  // Autovacuum counts a live map's rows; uncounted, the planner joins every node to every step.
+  // Autovacuum has not analysed the new rows yet. Without statistics, the planner joins every
+  // node to every step.
   await db().pool.query("ANALYZE map_node, map_edge");
   return star;
 };
@@ -162,7 +163,7 @@ describe("a map walk", () => {
     expect(admin.map((step) => step.uid).includes(middle)).toBe(shape.adminSees);
   });
 
-  it("answers a withheld entry exactly as one nobody mapped", async () => {
+  it("answers a withheld entry the same as an unmapped one", async () => {
     const scenario = await arrange();
     const restricted = await seeded((seed) =>
       seed.mapNode({ workspaceId: scenario.workspaceId, sensitivity: "Restricted" }),
@@ -178,7 +179,7 @@ describe("a map walk", () => {
     expect(absent).toEqual([]);
   });
 
-  it("never crosses workspaces, even through an edge naming another's node", async () => {
+  it("never walks into another workspace's nodes, even along an edge", async () => {
     const ours = await arrange();
     const theirs = await arrange();
     const { home, theirEntry, theirFar } = await seeded(async (seed) => {
@@ -207,7 +208,7 @@ describe("a map walk", () => {
     ]);
   });
 
-  it("walks only the live generation, with source entities beside it", async () => {
+  it("walks only the live generation plus the source entities", async () => {
     const scenario = await arrange();
     const { entry, liveFar, nextFar, entity } = await seeded(async (seed) => {
       const a = await seed.mapNode({ workspaceId: scenario.workspaceId });
@@ -258,7 +259,7 @@ describe("a map walk", () => {
     expect(after.map((step) => step.uid)).not.toContain(liveFar);
   });
 
-  it("answers a node's fields alone, nothing off an edge", async () => {
+  it("returns only node fields, with no edge fields", async () => {
     const scenario = await arrange();
     const entry = await seeded(async (seed) => {
       const a = await seed.mapNode({ workspaceId: scenario.workspaceId });
@@ -274,7 +275,7 @@ describe("a map walk", () => {
     }
   });
 
-  it("fails past its timeout, and the next transaction answers", async () => {
+  it("fails on timeout, and the next walk still succeeds", async () => {
     const scenario = await arrange();
     const entry = await seeded((seed) => seed.mapNode({ workspaceId: scenario.workspaceId }));
 
@@ -287,7 +288,7 @@ describe("a map walk", () => {
 });
 
 describe("a map walk from several entries", () => {
-  it("reaches what its entries reach, each node at least depth", async () => {
+  it("reaches each node at its smallest depth from any entry", async () => {
     const scenario = await arrange();
     const { a, b, c, d, e } = await seeded(async (seed) => {
       const node = async (): Promise<string> =>
@@ -320,7 +321,7 @@ describe("a map walk from several entries", () => {
     ]);
   });
 
-  it("cuts past the cap by depth then uid, every run", async () => {
+  it("truncates at the cap in depth then uid order, repeatably", async () => {
     const scenario = await arrange();
     const { hub, spokes } = await starIn(scenario);
     const lone = await seeded((seed) => seed.mapNode({ workspaceId: scenario.workspaceId }));
@@ -335,7 +336,7 @@ describe("a map walk from several entries", () => {
     expect(second).toEqual(first);
   });
 
-  it("spends none of the cap on a withheld entry", async () => {
+  it("does not count a withheld entry towards the cap", async () => {
     const scenario = await arrange();
     const { hub, spokes } = await starIn(scenario);
     const withheld = await seeded(async (seed) => {
@@ -364,7 +365,7 @@ describe("a map walk from several entries", () => {
     expect(uidsByDepth(admin)).toContainEqual([withheld, 0]);
   });
 
-  it("cuts every entry's path through a withheld node", async () => {
+  it("stops every entry's path at a withheld node", async () => {
     const scenario = await arrange();
     const { entries, middle, far } = await seeded(async (seed) => {
       const a = await seed.mapNode({ workspaceId: scenario.workspaceId });
@@ -391,7 +392,7 @@ describe("a map walk from several entries", () => {
     expect(uidsByDepth(admin)).toEqual([...entries.map((uid) => [uid, 0]), [middle, 1], [far, 2]]);
   });
 
-  it("reaches a node inward at its least depth", async () => {
+  it("walks inward to each node at its smallest depth", async () => {
     const scenario = await arrange();
     const { near, far, between, source } = await seeded(async (seed) => {
       const node = async (): Promise<string> =>
@@ -466,7 +467,7 @@ const hubOf = async (
 };
 
 describe("a map walk narrowed to collections", () => {
-  it("keeps a collection's neighbours past a hub's thousand others", async () => {
+  it("reaches collection nodes that the cap drops from whole walks", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
     const { hub, last: inside } = await hubOf(workspaceId, {
@@ -482,7 +483,7 @@ describe("a map walk narrowed to collections", () => {
     expect(whole.map((step) => step.uid)).not.toContain(inside[0]);
   });
 
-  it("never leaves a named collection and comes back", async () => {
+  it("does not pass through a node outside the named collections", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
     const { entry, outside, beyond, unfiled } = await seeded(async (seed) => {
@@ -536,7 +537,7 @@ describe("a map walk narrowed to collections", () => {
     ]);
   });
 
-  it("passes through a node that is no concept", async () => {
+  it("passes through a node that is not a concept", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
     const { entry, section, beyond } = await seeded(async (seed) => {
@@ -560,7 +561,7 @@ describe("a map walk narrowed to collections", () => {
     expect(uidsByDepth(whole)).toContainEqual([section, 1]);
   });
 
-  it("caps concepts alone when no collection is named", async () => {
+  it("caps only concepts when no collection is named", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
     const { hub, last: concepts } = await hubOf(workspaceId, {
@@ -590,8 +591,8 @@ describe("a map walk narrowed to collections", () => {
       walkConceptsFromEntries(principal, tx, [ids.conceptIri.parse(entry)], collections),
     );
     expect(uidsByDepth(narrowed.answer)).toEqual([[entry, 0]]);
-    expect(cteFilters(narrowed.nodes, "walk"), "what the grouping reads").toEqual(["no filter"]);
-    expect(cteFilters(narrowed.nodes, "nearest"), "what reads the groups").toEqual([
+    expect(cteFilters(narrowed.nodes, "walk"), "the walk CTE's filters").toEqual(["no filter"]);
+    expect(cteFilters(narrowed.nodes, "nearest"), "the nearest CTE's filters").toEqual([
       "(label = 'Concept'::text)",
     ]);
   });
@@ -675,8 +676,8 @@ const linkedPair = async (): Promise<{
   return { scenario, product, policy };
 };
 
-describe("the delta a second commit runs", () => {
-  it("takes a link the edit removed off the map", async () => {
+describe("the map delta for a later commit", () => {
+  it("removes from the map a link the edit deleted", async () => {
     const { scenario, product, policy } = await linkedPair();
     await land(scenario, deltaOf(policy));
     expect(await edgesFrom(scenario, policy.iri)).toEqual([
@@ -690,7 +691,7 @@ describe("the delta a second commit runs", () => {
     expect(await edgesFrom(scenario, policy.iri)).toEqual([]);
   });
 
-  it("moves an inbound link's denormalised kind with its target's kind", async () => {
+  it("updates an inbound link's stored target kind when it changes", async () => {
     const { scenario, product, policy } = await linkedPair();
 
     await land(scenario, deltaOf(product));
@@ -704,7 +705,7 @@ describe("the delta a second commit runs", () => {
     ]);
   });
 
-  it("leaves a citer's lineage alone until the cited concept's deprecation", async () => {
+  it("changes derived-from to supersedes once the cited concept is deprecated", async () => {
     const scenario = await arrange();
     const cited = await conceptIn(scenario, { path: "knowledge/expenses.md", kind: "Policy" });
     const successor = await conceptIn(scenario, {
@@ -730,7 +731,7 @@ describe("the delta a second commit runs", () => {
     ]);
   });
 
-  it("derives from a deprecated concept of another kind, never supersedes", async () => {
+  it("derives from, not supersedes, a deprecated concept of another kind", async () => {
     const scenario = await arrange();
 
     const retired = await conceptIn(scenario, {
@@ -781,8 +782,8 @@ const derived = async (
 const reached = (links: readonly LinkFacts[]): readonly string[] =>
   links.map((edge) => edge.to_uid);
 
-describe("what a body's markdown makes an edge of", () => {
-  it("quotes the link's sentence, cut at the terminators either side", async () => {
+describe("which markdown in a body makes an edge", () => {
+  it("stores the sentence that holds the link, without its neighbours", async () => {
     const { target, links } = await derived(
       [
         "# Expenses",
@@ -806,7 +807,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("ends an unterminated sentence at its own paragraph's end", async () => {
+  it("ends an unterminated sentence at the end of its paragraph", async () => {
     const { target, links } = await derived(
       "See [the product](./product.md) for tiers\n\nReceipts are kept for six years.",
     );
@@ -816,7 +817,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("takes the nearest heading, any level, trimmed, as its section", async () => {
+  it("names the section after the nearest heading, any level, trimmed", async () => {
     const { target, links } = await derived(
       [
         "# Expenses",
@@ -840,7 +841,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("derives nothing from quoted code, keeping the prose around it", async () => {
+  it("ignores links inside code but keeps the prose around them", async () => {
     const { target, links } = await derived(
       [
         "# Expenses",
@@ -895,7 +896,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("closes a backtick run only with one of its length", async () => {
+  it("closes a backtick run only with one of equal length", async () => {
     const { target, links } = await derived("See ``[the product](./product.md)` for tiers.");
 
     expect(links).toEqual([
@@ -903,7 +904,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("takes a definition only from its own line, however spaced", async () => {
+  it("reads a link definition only from its own line", async () => {
     const { target, links } = await derived(
       [
         "Details in [tight] and nothing in [aside].",
@@ -947,7 +948,7 @@ describe("what a body's markdown makes an edge of", () => {
     expect(reached(links)).toEqual([target.iri]);
   });
 
-  it("reads a filename's colon as path, never a scheme", async () => {
+  it("reads a filename's colon as part of the path", async () => {
     const { target, links } = await derived(
       "Hosted at [the vendor](//example.test/product), and detailed in [the annexe](./a:b.md).",
       ["knowledge/a:b.md"],
@@ -956,7 +957,7 @@ describe("what a body's markdown makes an edge of", () => {
     expect(reached(links)).toEqual([target.iri]);
   });
 
-  it("makes one lineage edge per cited concept, none for others", async () => {
+  it("makes one lineage edge per cited concept, ignoring URLs", async () => {
     const scenario = await arrange();
     const cited = await conceptIn(scenario, { path: "knowledge/expenses.md", kind: "Policy" });
 
@@ -985,7 +986,7 @@ describe("what a body's markdown makes an edge of", () => {
     ).toEqual([cited.iri, unwritten].toSorted());
   });
 
-  it("backfills a link written before its target landed, however deep", async () => {
+  it("adds a link once its target lands, at any depth", async () => {
     const scenario = await arrange();
     const author = await authorOf(
       scenario,
@@ -1051,8 +1052,8 @@ const landedAt = async (
   return landed;
 };
 
-describe("a path reference no concept holds yet", () => {
-  it("stores a link to a path no concept holds", async () => {
+describe("a path reference with no concept at that path yet", () => {
+  it("stores a link to an empty path as unresolved", async () => {
     const scenario = await arrange();
     const author = await authorOf(
       scenario,
@@ -1067,7 +1068,7 @@ describe("a path reference no concept holds yet", () => {
     expect(await linksFrom(scenario, author.iri)).toEqual([]);
   });
 
-  it("settles every reference when a concept lands at its path", async () => {
+  it("resolves every waiting reference once a concept lands there", async () => {
     const scenario = await arrange();
     const first = await linkingLater(scenario, "knowledge/policy.md");
     const second = await linkingLater(scenario, "knowledge/deep/procedure.md");
@@ -1079,7 +1080,7 @@ describe("a path reference no concept holds yet", () => {
     expect(await unresolvedAt(scenario, LATER)).toBe(0);
   });
 
-  it("settles a percent-encoded link at the path it decodes to", async () => {
+  it("resolves a percent-encoded link at its decoded path", async () => {
     const scenario = await arrange();
     const author = await authorOf(scenario, "Ask [the team](%C3%A9quipe.md) first.");
     await land(scenario, deltaOf(author));
@@ -1093,7 +1094,7 @@ describe("a path reference no concept holds yet", () => {
     expect(await unresolvedFrom(scenario, author.iri)).toEqual([]);
   });
 
-  it("answers a moved concept at the path older links name", async () => {
+  it("resolves a link once a concept moves to its path", async () => {
     const scenario = await arrange();
     const moved = await landedAt(scenario, "knowledge/old.md");
     const author = await authorOf(scenario, "See [the new rule](/knowledge/new.md) first.");
@@ -1119,7 +1120,7 @@ describe("a path reference no concept holds yet", () => {
     ]);
   });
 
-  it("settles a sources path into lineage once it lands", async () => {
+  it("turns a sources path into lineage once its concept lands", async () => {
     const scenario = await arrange();
     const successor = await conceptIn(scenario, {
       path: "knowledge/expenses.md",
@@ -1146,7 +1147,7 @@ describe("a path reference no concept holds yet", () => {
     expect(await unresolvedFrom(scenario, successor.iri)).toEqual([]);
   });
 
-  it("takes a connected source's passage as evidence, never lineage", async () => {
+  it("treats a connected source's passage as evidence, not lineage", async () => {
     const scenario = await arrange();
     await landedAt(scenario, "knowledge/pricing.md", { kind: "Policy" });
     const document = ulid();
@@ -1171,7 +1172,7 @@ describe("a path reference no concept holds yet", () => {
     }).toEqual({ unresolved: [], edges: [] });
   });
 
-  it("drops a rewritten link's unresolved row", async () => {
+  it("deletes the unresolved row when the link is rewritten", async () => {
     const scenario = await arrange();
     const author = await linkingLater(scenario, "knowledge/policy.md");
 

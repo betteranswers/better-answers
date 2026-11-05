@@ -118,8 +118,8 @@ const mapMadeBy = async (each: z.output<typeof linksCase>) => {
   return { links, unresolved };
 };
 
-describe("the edges a concept body's footnotes make", () => {
-  it("makes exactly the links and unresolved paths each case names", async () => {
+describe("the edges built from a concept body's footnotes", () => {
+  it("makes exactly the links and unresolved paths each case lists", async () => {
     const made = [];
     for (const each of fixture.cases) made.push({ case: each.case, ...(await mapMadeBy(each)) });
 
@@ -133,7 +133,7 @@ describe("the edges a concept body's footnotes make", () => {
   });
 });
 
-describe("the citation marks a concept body carries", () => {
+describe("the citation marks in a concept body", () => {
   it("resolves each mark to the source each case names", () => {
     const read = fixture.cases.map((each) => ({
       case: each.case,
@@ -145,7 +145,7 @@ describe("the citation marks a concept body carries", () => {
     expect(read).toEqual(fixture.cases.map((each) => ({ case: each.case, marks: each.marks })));
   });
 
-  it("places each mark where the body writes it", () => {
+  it("places each mark at its position in the body", () => {
     for (const each of fixture.cases) {
       for (const { at, mark } of linksAndMarksOf(each.body, citedSourcesOf(each.sources)).marks) {
         expect({ case: each.case, written: each.body.slice(at, at + mark.length) }).toEqual({

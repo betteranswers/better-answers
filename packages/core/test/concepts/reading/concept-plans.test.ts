@@ -16,7 +16,7 @@ const QUERY = "holiday policy";
 
 const HOLIDAY = "Holiday policy";
 
-/** Below about a hundred rows, reading the workspace's concepts whole is cheaper than a GIN probe. */
+/** Postgres reads a table of under about a hundred rows sequentially instead of probing the GIN index. */
 const INVOICES = 500;
 
 const arrangedWithInvoices = async (): Promise<{
@@ -38,7 +38,7 @@ const arrangedWithInvoices = async (): Promise<{
       });
     }
   });
-  // VACUUM flushes GIN's pending list and ANALYZE counts the rows; the planner prices both.
+  // VACUUM flushes the GIN pending list and ANALYZE updates the row counts. The planner uses both.
   await db().pool.query("VACUUM ANALYZE concept_index");
   return { admin, workspaceId };
 };
@@ -49,7 +49,7 @@ const matching = (person: UserPrincipal) =>
     return found.ok ? ok(found.value.map(({ concept }) => concept.title)) : found;
   });
 
-describe("the concept arm's plan, as the api under its policy", () => {
+describe("the concept search plan, run as the api role", () => {
   it("matches through the GIN index on the search column", async () => {
     const { admin } = await arrangedWithInvoices();
 
@@ -59,7 +59,7 @@ describe("the concept arm's plan, as the api under its policy", () => {
     expect(found.indexes).toContain("concept_index_search_gin");
   });
 
-  it("keeps the GIN index for weak matches past a cursor", async () => {
+  it("keeps the GIN index for weak matches after a cursor", async () => {
     const { admin } = await arrangedWithInvoices();
 
     const found = await planned(db(), admin, async (reader, tx) => {

@@ -24,7 +24,7 @@ import { A_MAP_NODE } from "./support/rls-probes.ts";
 
 let surfaceReadFromTheDatabase: RolesSurface;
 
-const NOTHING_OF_THE_EIGHT = {
+const NO_TABLE_PRIVILEGE = {
   SELECT: false,
   INSERT: false,
   UPDATE: false,
@@ -36,7 +36,7 @@ const NOTHING_OF_THE_EIGHT = {
 };
 
 const held = (...privileges: readonly string[]): Record<string, boolean> => ({
-  ...NOTHING_OF_THE_EIGHT,
+  ...NO_TABLE_PRIVILEGE,
   ...Object.fromEntries(privileges.map((privilege) => [privilege, true])),
 });
 
@@ -60,7 +60,7 @@ const columnsHeld = async (
 
 const thePartition = async (client: pg.PoolClient): Promise<string> => {
   const found = await client.query<{ relname: string }>(
-    // `relispartition` is true of a partitioned index too, and pg_class answers in no order.
+    // `relispartition` is also true for a partitioned index, and pg_class returns rows in no set order.
     `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = 'index' AND c.relispartition AND c.relkind = 'r'
       ORDER BY c.relname`,
@@ -75,7 +75,7 @@ const THE_DEFAULTS_REVOKED = [
   'ALTER DEFAULT PRIVILEGES IN SCHEMA "index" REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM worker_rt',
 ];
 
-/** A server of its own: the surface names every role on the server, and a shared one keeps others'. */
+/** Its own server, because the surface lists every role on the server and a shared server holds other suites' roles. */
 let db: MigratedPostgres;
 
 beforeAll(async () => {
@@ -99,14 +99,14 @@ const asCatalogued = (role: string, migrator: string | undefined): string | unde
 const messageOf = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
 
-describe("the roles' surface", () => {
-  it("is byte-identical to a regeneration over a fresh partitioned database", async () => {
+describe("the committed roles surface", () => {
+  it("matches its regeneration over a fresh partitioned database", async () => {
     const regenerated = renderRolesSurface(await readRolesSurface(db.pool));
 
     expect(readFileSync(rolesSurfacePath, "utf8")).toBe(regenerated);
   });
 
-  it("names exactly the catalogue's roles, and no grantee beyond them", async () => {
+  it("names exactly the catalogue's roles, and no other grantee", async () => {
     const catalogued = await db.pool.query<{ rolname: string }>(
       String.raw`SELECT rolname FROM pg_roles WHERE rolname NOT LIKE 'pg\_%'`,
     );
@@ -130,7 +130,7 @@ describe("the roles' surface", () => {
     expect([...new Set(grantees)].filter((grantee) => !named.has(grantee))).toEqual([]);
   });
 
-  it("holds PUBLIC's own schema USAGE", () => {
+  it("records PUBLIC's USAGE on the public schema", () => {
     expect(readFileSync(rolesSurfacePath, "utf8")).toContain(
       '{"role":"PUBLIC","object":"public","privilege":"USAGE","grantable":false,"owner":"pg_database_owner"}',
     );
@@ -147,7 +147,7 @@ describe("the roles' surface", () => {
     ]);
   });
 
-  it("is the same file after a second tenant signs up", async () => {
+  it("is unchanged after a second tenant signs up", async () => {
     await withRollback(db.pool, async (client) => {
       await oneWorkspacePartition(client);
 
@@ -157,7 +157,7 @@ describe("the roles' surface", () => {
     });
   });
 
-  it("collapses a granted partition to one token naming its parent", async () => {
+  it("shows a granted partition as one token naming its parent", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query(`GRANT SELECT ON ${await thePartition(client)} TO worker_rt`);
 
@@ -178,8 +178,8 @@ describe("the roles' surface", () => {
   });
 });
 
-describe("the two statements that make the flip", () => {
-  it("move no existing relation's ACL", async () => {
+describe("the two statements that revoke worker_rt's default privileges", () => {
+  it("change no existing relation's ACL", async () => {
     await withRollback(db.pool, async (client) => {
       const before = (await readRolesSurface(client)).relations;
 
@@ -190,8 +190,8 @@ describe("the two statements that make the flip", () => {
   });
 });
 
-describe("a table created after the flip", () => {
-  it("gives worker_rt nothing and app_rt four verbs in either schema", async () => {
+describe("a table created once worker_rt's defaults are revoked", () => {
+  it("gives worker_rt nothing and app_rt four privileges in either schema", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query("CREATE TABLE public.after_the_flip (id text PRIMARY KEY)");
       await client.query('CREATE TABLE "index".after_the_flip (id text PRIMARY KEY)');
@@ -199,7 +199,7 @@ describe("a table created after the flip", () => {
       for (const table of ["public.after_the_flip", '"index".after_the_flip']) {
         expect({ table, worker: await privilegesHeld(client, "worker_rt", table) }).toEqual({
           table,
-          worker: NOTHING_OF_THE_EIGHT,
+          worker: NO_TABLE_PRIVILEGE,
         });
         expect({ table, api: await privilegesHeld(client, "app_rt", table) }).toEqual({
           table,
@@ -217,15 +217,15 @@ describe("a table created after the flip", () => {
       await refusesEach(client, [
         [
           "SELECT id FROM public.after_the_flip",
-          "a connector's new table gives the worker nothing until a migration says otherwise",
+          "the worker reading a connector's new table before a migration grants it",
         ],
         [
           "SELECT id FROM model_choice",
-          "the worker could DELETE this table by the default alone, and never read it",
+          "the worker reading model_choice, which the default alone let it delete but not read",
         ],
         [
           "SELECT workspace_id FROM workspace_config",
-          "nor this one, so both go with the flip that makes the rest a statement",
+          "the worker reading workspace_config, which the default revoke also covers",
         ],
       ]);
 
@@ -239,8 +239,8 @@ describe("a table created after the flip", () => {
   });
 });
 
-describe("what worker_rt reaches after the flip", () => {
-  it("is exactly what the journal's GRANTs name, table by table", async () => {
+describe("what worker_rt reaches once its defaults are revoked", () => {
+  it("matches the journal's GRANTs, table by table", async () => {
     await withRollback(db.pool, async (client) => {
       expect({
         job: await privilegesHeld(client, "worker_rt", "public.job"),
@@ -252,13 +252,13 @@ describe("what worker_rt reaches after the flip", () => {
         job: held("SELECT", "INSERT", "UPDATE"),
         workspace: held("SELECT"),
         passage: THE_FOUR_VERBS,
-        modelChoice: NOTHING_OF_THE_EIGHT,
-        workspaceConfig: NOTHING_OF_THE_EIGHT,
+        modelChoice: NO_TABLE_PRIVILEGE,
+        workspaceConfig: NO_TABLE_PRIVILEGE,
       });
     });
   });
 
-  it("is a column set on the finding, and nothing table-wide", async () => {
+  it("is a set of finding columns, with nothing table-wide", async () => {
     await withRollback(db.pool, async (client) => {
       expect({
         table: await privilegesHeld(client, "worker_rt", "public.finding"),
@@ -266,7 +266,7 @@ describe("what worker_rt reaches after the flip", () => {
         select: await columnsHeld(client, "worker_rt", "public.finding", "SELECT"),
         update: await columnsHeld(client, "worker_rt", "public.finding", "UPDATE"),
       }).toEqual({
-        table: NOTHING_OF_THE_EIGHT,
+        table: NO_TABLE_PRIVILEGE,
         insert: [
           "category",
           "char_end",
@@ -299,7 +299,7 @@ describe("what worker_rt reaches after the flip", () => {
     });
   });
 
-  it("is the whole document to read, write-back columns to update", async () => {
+  it("on source_document is SELECT, plus UPDATE on write-back columns", async () => {
     await withRollback(db.pool, async (client) => {
       expect({
         table: await privilegesHeld(client, "worker_rt", "public.source_document"),
@@ -321,13 +321,13 @@ describe("what worker_rt reaches after the flip", () => {
 });
 
 describe("the functions the journal installs", () => {
-  it("refuse the roles the migration did not name", async () => {
+  it("refuse every role the migration did not grant", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query("SET LOCAL ROLE worker_rt");
       await refusesEach(client, [
         [
           "SELECT id FROM model_choice_for('embedding'::llm_purpose)",
-          "the model choice resolver goes to the roles its callers run as, and the worker is not one",
+          "the worker calling the model choice resolver, which only its callers' roles may run",
         ],
       ]);
 
@@ -335,10 +335,16 @@ describe("the functions the journal installs", () => {
       await refusesEach(client, [
         [
           "SELECT suggestion_decides_once()",
-          "a trigger's function fires under the trigger and is called by nobody directly",
+          "app_rt calling a trigger function directly, which only its trigger runs",
         ],
-        ["SELECT map_generation_flip_guard()", "the same for the generation flip's guard"],
-        ["SELECT map_row_generation_guard()", "and for the guard on a map row's generation"],
+        [
+          "SELECT map_generation_flip_guard()",
+          "app_rt calling the generation flip's guard directly",
+        ],
+        [
+          "SELECT map_row_generation_guard()",
+          "app_rt calling the map row generation guard directly",
+        ],
       ]);
 
       const resolved = await client.query(
@@ -348,7 +354,7 @@ describe("the functions the journal installs", () => {
     });
   });
 
-  it("carry no PUBLIC EXECUTE row between them", async () => {
+  it("grant no EXECUTE to PUBLIC", async () => {
     const toPublic = await db.pool.query<{ fn: string }>(
       String.raw`SELECT n.nspname || '.' || p.proname AS fn
                    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace,
@@ -366,7 +372,7 @@ describe("the functions the journal installs", () => {
     ).toEqual([]);
   });
 
-  it("would show a PUBLIC EXECUTE the moment one arrived", async () => {
+  it("would show a PUBLIC EXECUTE grant once one exists", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query(
         "CREATE FUNCTION public.granted_to_nobody() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$",
@@ -389,13 +395,13 @@ describe("the functions the journal installs", () => {
     });
   });
 
-  it("are the journal's alone, leaving out an extension's own functions", async () => {
+  it("are only the journal's, not an extension's own functions", async () => {
     const shipped = await db.pool.query<{ n: number }>(
       "SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'vector_dims'",
     );
 
     const [count] = shipped.rows;
-    assert(count !== undefined, "count(*) answers one row");
+    assert(count !== undefined, "count(*) returned no row");
 
     expect({
       inTheImage: count.n > 0,
@@ -405,7 +411,7 @@ describe("the functions the journal installs", () => {
     }).toEqual({ inTheImage: true, inTheSurface: false });
   });
 
-  it("still fire as triggers, though nobody holds EXECUTE on them", async () => {
+  it("still fire as triggers, though no role holds EXECUTE", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = testData(client);
       const workspace = await seed.workspace();
@@ -445,7 +451,7 @@ describe("the functions the journal installs", () => {
   });
 });
 
-describe("the declared note over the SECURITY DEFINER functions", () => {
+describe("the declared list of SECURITY DEFINER functions", () => {
   it("names exactly the set the catalogue holds", async () => {
     const catalogued = await db.pool.query<{ fn: string; args: string }>(
       String.raw`SELECT n.nspname || '.' || p.proname AS fn,
@@ -463,7 +469,7 @@ describe("the declared note over the SECURITY DEFINER functions", () => {
     expect(identities(catalogued.rows)).toEqual(identities(SECURITY_DEFINER_REACH));
   });
 
-  it("names a reason and declared tables, some the surface omits", () => {
+  it("list reasons and declared tables, some absent from the surface", () => {
     const declared = declaredTableNames();
     const stated = new Set(surfaceReadFromTheDatabase.relations.map((row) => row.object));
 
@@ -481,7 +487,7 @@ describe("the declared note over the SECURITY DEFINER functions", () => {
     expect([...new Set(silent)]).toEqual(["public.concept_write_request"]);
   });
 
-  it("matches the definer rows in the surface itself", () => {
+  it("matches the definer rows in the surface", () => {
     const definers = surfaceReadFromTheDatabase.functions
       .filter((row) => row.security_definer)
       .map((row) => identityOf({ fn: row.object, args: row.args }));

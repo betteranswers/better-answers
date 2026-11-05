@@ -64,67 +64,71 @@ const figuresOf = (name: string, times: readonly number[]) =>
   ] as const;
 
 describe("the governed edit at 250 concepts", () => {
-  it("times a direct write, a save and its places count", { timeout: 300_000 }, async () => {
-    const scenario = await arrange();
-    const iris = await seeded(scenario);
+  it(
+    "times writeConcept, saveConcept and conceptToEdit at 250 concepts",
+    { timeout: 300_000 },
+    async () => {
+      const scenario = await arrange();
+      const iris = await seeded(scenario);
 
-    const writes: number[] = [];
-    for (let edit = 0; edit < EDITS; edit += 1) {
-      const at = edit;
-      const input = {
-        ...policyAt(at, `Rule ${at} holds for every claim, edit ${edit}.`),
-        iri: iris[at],
-        expects: { head: await head(scenario.admin, scenario.git) },
-      };
-      writes.push(
-        await timed(async () => {
-          answered(await writeConcept(scenario.admin, doorsOf(scenario), input));
-        }),
-      );
-    }
+      const writes: number[] = [];
+      for (let edit = 0; edit < EDITS; edit += 1) {
+        const at = edit;
+        const input = {
+          ...policyAt(at, `Rule ${at} holds for every claim, edit ${edit}.`),
+          iri: iris[at],
+          expects: { head: await head(scenario.admin, scenario.git) },
+        };
+        writes.push(
+          await timed(async () => {
+            answered(await writeConcept(scenario.admin, doorsOf(scenario), input));
+          }),
+        );
+      }
 
-    const saves: number[] = [];
-    const counts: number[] = [];
-    for (let edit = 0; edit < EDITS; edit += 1) {
-      const iri = iris[EDITS + edit];
-      assert(iri !== undefined, "a concept was seeded for each edit");
-      counts.push(
-        await timed(async () => {
-          answered(
-            await readingAs(db().runtimePool, scenario.admin, (reader, tx) =>
-              conceptToEdit(reader, tx, { iri }, passages(reader, tx)),
-            ),
-          );
-        }),
-      );
-      const seed = answered(
-        await readingAs(db().runtimePool, scenario.admin, (reader, tx) =>
-          conceptToEdit(reader, tx, { iri }, passages(reader, tx)),
-        ),
-      );
-      saves.push(
-        await timed(async () => {
-          const saved = await saveConcept(
-            scenario.admin,
-            { ...doorsOf(scenario), passages },
-            {
-              iri,
-              parts: { ...seed.parts, body: `${seed.parts.body} Saved ${edit}.` },
-              sources: seed.sources,
-              base: seed.base,
-              withheld: seed.withheld.map((source) => source.at),
-            },
-          );
-          expect(saved).toMatchObject({ ok: true, value: { outcome: "committed" } });
-        }),
-      );
-    }
+      const saves: number[] = [];
+      const counts: number[] = [];
+      for (let edit = 0; edit < EDITS; edit += 1) {
+        const iri = iris[EDITS + edit];
+        assert(iri !== undefined, "no concept was seeded for this edit");
+        counts.push(
+          await timed(async () => {
+            answered(
+              await readingAs(db().runtimePool, scenario.admin, (reader, tx) =>
+                conceptToEdit(reader, tx, { iri }, passages(reader, tx)),
+              ),
+            );
+          }),
+        );
+        const seed = answered(
+          await readingAs(db().runtimePool, scenario.admin, (reader, tx) =>
+            conceptToEdit(reader, tx, { iri }, passages(reader, tx)),
+          ),
+        );
+        saves.push(
+          await timed(async () => {
+            const saved = await saveConcept(
+              scenario.admin,
+              { ...doorsOf(scenario), passages },
+              {
+                iri,
+                parts: { ...seed.parts, body: `${seed.parts.body} Saved ${edit}.` },
+                sources: seed.sources,
+                base: seed.base,
+                withheld: seed.withheld.map((source) => source.at),
+              },
+            );
+            expect(saved).toMatchObject({ ok: true, value: { outcome: "committed" } });
+          }),
+        );
+      }
 
-    await recordFigures("the governed edit at 250 concepts", [
-      ...figuresOf("writeConcept", writes),
-      ...figuresOf("saveConcept", saves),
-      ...figuresOf("conceptToEdit with placesUsing", counts),
-    ]);
-    expect(writes).toHaveLength(EDITS);
-  });
+      await recordFigures("the governed edit at 250 concepts", [
+        ...figuresOf("writeConcept", writes),
+        ...figuresOf("saveConcept", saves),
+        ...figuresOf("conceptToEdit with placesUsing", counts),
+      ]);
+      expect(writes).toHaveLength(EDITS);
+    },
+  );
 });

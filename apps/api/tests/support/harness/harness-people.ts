@@ -19,8 +19,8 @@ export const groupsMaking = z.object({
 });
 
 /**
- * The slice's own actions record the member as actor; a transaction each gives each event its own
- * instant.
+ * Calls the slice's own actions, so each audit event names the member as actor. One transaction per
+ * action gives each event its own timestamp.
  */
 export const makeGroups = async (
   app: TestApp,

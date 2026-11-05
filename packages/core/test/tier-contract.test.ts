@@ -176,7 +176,7 @@ const materialiseBrokenContracts = (root: string) => {
 };
 
 describe("the tier contract", () => {
-  it("names exactly the agreements this tier speaks, in their forms", () => {
+  it("lists exactly the agreements this tier uses, with their forms", () => {
     const contract = readManifest();
 
     expect(Object.keys(contract.agreements).toSorted()).toEqual(
@@ -187,7 +187,7 @@ describe("the tier contract", () => {
     }
   });
 
-  it("lists exactly the fixtures on disk, under agreements it names", () => {
+  it("lists every fixture on disk, each under a known agreement", () => {
     const contract = readManifest();
 
     for (const fixture of contract.fixtures) {
@@ -200,7 +200,7 @@ describe("the tier contract", () => {
     );
   });
 
-  it("counts a fixture and never a dotfile", () => {
+  it("skips dotfiles, the manifest and the README when listing fixtures", () => {
     mkdirSync(path.join(throwaway, "id-shape"));
     writeFileSync(path.join(throwaway, "id-shape", "cases.json"), "{}");
     writeFileSync(path.join(throwaway, "manifest.json"), "{}");
@@ -214,11 +214,11 @@ describe("the tier contract", () => {
     expect(fixturesOnDisk(throwaway)).toEqual(["id-shape/cases.json"]);
   });
 
-  it("finds every declared form answered and every directory claimed", () => {
+  it("finds no missing fixture and no directory without an agreement", () => {
     expect(formFailures(readManifest(), contractsDir)).toEqual([]);
   });
 
-  it("names the agreement and form of each unanswered entry", () => {
+  it("reports each broken agreement with its form and the problem", () => {
     materialiseBrokenContracts(brokenRoot);
 
     expect(formFailures(readManifest(brokenRoot), brokenRoot)).toEqual([
@@ -285,8 +285,8 @@ const materialised = (index: number, tree: Tree): string => {
   return root;
 };
 
-describe("the contract's digest, this tier's version of the contract", () => {
-  it("answers the framing's hex over every case's tree", () => {
+describe("the contract digest, which versions the contracts directory", () => {
+  it("hashes each case's tree to its expected hex digest", () => {
     expect(
       DIGEST_CASES.map(({ why, tree }, index) => ({
         why,
@@ -295,7 +295,7 @@ describe("the contract's digest, this tier's version of the contract", () => {
     ).toEqual(DIGEST_CASES.map(({ why }) => ({ why, hex: EXPECTED_HEX[why] })));
   });
 
-  it("counts a symlink for nothing", () => {
+  it("ignores a symlink when hashing", () => {
     const root = materialised(DIGEST_CASES.length, { "manifest.json": "{}" });
     mkdirSync(path.join(root, "queue"));
     symlinkSync(path.join(root, "manifest.json"), path.join(root, "queue", "cases.json"));
@@ -303,7 +303,7 @@ describe("the contract's digest, this tier's version of the contract", () => {
     expect(contractDigest(root)).toBe(EXPECTED_HEX["the manifest alone"]);
   });
 
-  it("carries the whole hash, never a short form", () => {
+  it("holds the full 64-character hash", () => {
     expect(CONTRACT_DIGEST).toMatch(/^[0-9a-f]{64}$/);
   });
 });
@@ -320,7 +320,7 @@ const readIdShape = () =>
   );
 
 describe("id-shape, the agreement about what an id looks like", () => {
-  it("pins the pattern this tier's boundary narrows an id to", () => {
+  it("matches the id pattern this tier's boundary schema uses", () => {
     expect(readIdShape().pattern).toBe(ULID_PATTERN);
   });
 
@@ -385,7 +385,7 @@ const lineFor = (file: string, said: string): string =>
   said.split("\n").find((line) => line.startsWith(`${file}:`)) ?? "";
 
 describe("citation, the agreement about what a citation looks like", () => {
-  it("refuses every citing sentence, quoting the cited text back", () => {
+  it("flags every citing sentence and quotes the cited text", () => {
     const said = commentGate.output(citedTree);
 
     expect(
@@ -396,7 +396,7 @@ describe("citation, the agreement about what a citation looks like", () => {
     ).toEqual(citedSentences.map(({ prose }) => ({ prose, names: true })));
   });
 
-  it("walks past every sentence the fixture says cites nothing", () => {
+  it("passes every sentence the fixture says cites nothing", () => {
     const clean = readCitation().cites_nothing;
 
     expect({ clean, flagged: commentGate.flagged(treeOf(clean)) }).toEqual({ clean, flagged: [] });

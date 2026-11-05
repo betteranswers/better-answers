@@ -31,7 +31,8 @@ print(json.dumps(held[:1]))
 def held_when_imported(
     library: str, watched: Sequence[str], ran: str, box: dict[str, str]
 ) -> list[dict[str, str]]:
-    # A child process: pytest has every library loaded before the first test runs.
+    # This runs in a child process because pytest imports every library before the
+    # first test.
     environment = {
         name: value for name, value in os.environ.items() if name not in watched
     } | box

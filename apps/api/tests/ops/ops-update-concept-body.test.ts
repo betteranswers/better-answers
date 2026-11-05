@@ -198,7 +198,7 @@ const countOf = async (table: "bundle_commit" | "audit_event", workspaceId: stri
   return found.rows[0]?.count;
 };
 
-const standingOf = async (scene: Awaited<ReturnType<typeof imported>>) => ({
+const snapshotOf = async (scene: Awaited<ReturnType<typeof imported>>) => ({
   row: await conceptAt(scene.workspaceId, RETENTION),
   file: await scene.fileNow(),
   commits: await countOf("bundle_commit", scene.workspaceId),
@@ -210,7 +210,7 @@ const frontmatterOf = (file: string): string => file.slice(0, file.indexOf("\n--
 const changedLinesOf = (run: Run): readonly string[] =>
   run.lines.slice(1, -1).filter((line) => !line.startsWith("  "));
 
-const movedSaid = (iri: string, base: string): string =>
+const staleRefusalLine = (iri: string, base: string): string =>
   `update-concept-body: REFUSED — ${iri} moved: it no longer stands at ${base}, or its file at the bundle's head is ahead of its row; nothing was written. Run with --dry-run again, and if that refuses the same way a minute later, the rows are behind the bundle: RUNBOOK page 10`;
 
 const MODES = [
@@ -218,8 +218,8 @@ const MODES = [
   ["dry run", true],
 ] as const;
 
-describe("pnpm ops update-concept-body: a standing concept's body replaced in place", () => {
-  it("updates the body, keeping frontmatter bytes, status and verifications", async () => {
+describe("pnpm ops update-concept-body, which replaces a concept's body", () => {
+  it("replaces the body and keeps frontmatter bytes, status, and verifications", async () => {
     const scene = await imported();
     const before = await scene.fileNow();
     const verified = await verificationsOf(scene.workspaceId, scene.held.iri);
@@ -240,7 +240,7 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     expect(verified).toHaveLength(2);
   });
 
-  it("says both hashes and the short commit when done", async () => {
+  it("prints both content hashes and the short commit when done", async () => {
     const scene = await imported();
     const to = contentHashOf(scene.file.frontmatter, scene.nextBody, RETENTION);
 
@@ -263,14 +263,14 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     );
     assert(opened.found, "the updated concept did not open");
     const trust = opened.concept?.trust;
-    assert(trust !== undefined, "the updated concept carries its trust");
+    assert(trust !== undefined, "the updated concept has no trust");
     expect({ words: trustWords(trust), status: trust.status }).toEqual({
       words: "Verified by Theo Approver · 1 June 2026 · imported",
       status: "current",
     });
   });
 
-  it("writes one committed event naming both hashes, no body", async () => {
+  it("writes one committed event with both hashes and no body", async () => {
     const scene = await imported();
     const earlier = await committedEventsOf(scene.workspaceId, scene.held.iri);
 
@@ -297,9 +297,9 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     expect(JSON.stringify(added)).not.toContain("ninety days");
   });
 
-  it("dry run prints the held hash and diff, writes nothing", async () => {
+  it("prints the current hash and diff on a dry run", async () => {
     const scene = await imported();
-    const before = await standingOf(scene);
+    const before = await snapshotOf(scene);
     const to = contentHashOf(scene.file.frontmatter, scene.nextBody, RETENTION);
 
     const run = await scene.update({ dryRun: true, expect: undefined });
@@ -312,10 +312,10 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     expect(run.lines.at(-1)).toBe(
       `update-concept-body: dry run — the body would move ${RETENTION} from ${scene.held.content_hash} to ${to}; frontmatter, status, verification and citations kept; nothing was written`,
     );
-    expect(await standingOf(scene)).toEqual(before);
+    expect(await snapshotOf(scene)).toEqual(before);
   });
 
-  it("diffs and lands a CRLF body by its normalised lines", async () => {
+  it("diffs and writes a CRLF body as LF lines", async () => {
     const scene = await imported();
     const crlf = scene.nextBody.replaceAll("\n", "\r\n");
 
@@ -327,19 +327,22 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     expect((await conceptAt(scene.workspaceId, RETENTION)).body).toBe(scene.nextBody);
   });
 
-  it.each(MODES)("refuses a moved hash on a %s as stale-precondition", async (_mode, dryRun) => {
-    const scene = await imported();
-    const other = await conceptAt(scene.workspaceId, SUPPORT);
-    const before = await standingOf(scene);
+  it.each(MODES)(
+    "refuses a stale --expect on a %s as stale-precondition",
+    async (_mode, dryRun) => {
+      const scene = await imported();
+      const other = await conceptAt(scene.workspaceId, SUPPORT);
+      const before = await snapshotOf(scene);
 
-    const run = await scene.update({ dryRun, expect: other.content_hash });
+      const run = await scene.update({ dryRun, expect: other.content_hash });
 
-    expect(run.exitCode).toBe(8);
-    expect(run.lines).toEqual([movedSaid(scene.held.iri, other.content_hash)]);
-    expect(await standingOf(scene)).toEqual(before);
-  });
+      expect(run.exitCode).toBe(8);
+      expect(run.lines).toEqual([staleRefusalLine(scene.held.iri, other.content_hash)]);
+      expect(await snapshotOf(scene)).toEqual(before);
+    },
+  );
 
-  it("refuses a head ahead of its row as stale-precondition", async () => {
+  it("refuses as stale-precondition when git is ahead of the row", async () => {
     const scene = await imported();
     const git = openTestGit(app());
     const inFlight = await commit(scene.principal, git, {
@@ -353,19 +356,19 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
       at: IMPORTED_AT,
     });
     expect(inFlight).toMatchObject({ ok: true });
-    const before = await standingOf(scene);
+    const before = await snapshotOf(scene);
 
     const run = await scene.update();
 
     expect(run.exitCode).toBe(8);
-    expect(run.lines).toEqual([movedSaid(scene.held.iri, scene.held.content_hash)]);
-    expect(await standingOf(scene)).toEqual(before);
+    expect(run.lines).toEqual([staleRefusalLine(scene.held.iri, scene.held.content_hash)]);
+    expect(await snapshotOf(scene)).toEqual(before);
   });
 
   it("refuses an unknown iri as no-such-concept, writing nothing", async () => {
     const scene = await imported();
     const unknown = conceptIriOf(ulid());
-    const before = await standingOf(scene);
+    const before = await snapshotOf(scene);
 
     const run = await scene.update({ iri: unknown });
 
@@ -373,7 +376,7 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     expect(run.lines).toEqual([
       `update-concept-body: REFUSED — no concept ${unknown} stands in workspace ${scene.workspaceId} that ${scene.admin.email} can read; a Restricted concept needs an Admin; nothing was written`,
     ]);
-    expect(await standingOf(scene)).toEqual(before);
+    expect(await snapshotOf(scene)).toEqual(before);
   });
 
   it.each([
@@ -381,7 +384,7 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     ["the held body plus trailing whitespace", "   \n\n\n"],
   ])("refuses %s as unchanged", async (_shape, trailing) => {
     const scene = await imported();
-    const before = await standingOf(scene);
+    const before = await snapshotOf(scene);
 
     const run = await scene.update({ body: `${scene.file.body}${trailing}` });
 
@@ -389,12 +392,12 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     expect(run.lines).toEqual([
       `update-concept-body: REFUSED — the body given is the one ${scene.held.iri} already holds; nothing was written`,
     ]);
-    expect(await standingOf(scene)).toEqual(before);
+    expect(await snapshotOf(scene)).toEqual(before);
   });
 
-  it("refuses a body over the limit once normalised, even dry", async () => {
+  it("refuses an over-long body, even on a dry run", async () => {
     const scene = await imported();
-    const before = await standingOf(scene);
+    const before = await snapshotOf(scene);
 
     const run = await scene.update({
       dryRun: true,
@@ -406,13 +409,13 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     expect(run.lines).toEqual([
       `update-concept-body: REFUSED — --iri ${scene.held.iri} is not a concept iri, or the body is longer than a concept holds; nothing was written`,
     ]);
-    expect(await standingOf(scene)).toEqual(before);
+    expect(await snapshotOf(scene)).toEqual(before);
   });
 
-  it("refuses a --as who is no member, exit 4", async () => {
+  it("exits 4 when --as names a non-member", async () => {
     const scene = await imported();
     const stranger = await app().person();
-    const before = await standingOf(scene);
+    const before = await snapshotOf(scene);
 
     const run = await scene.update({ as: stranger.email });
 
@@ -420,14 +423,14 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     expect(run.lines).toEqual([
       `update-concept-body: REFUSED — ${stranger.email} is not a member of workspace ${scene.workspaceId}; invite them first`,
     ]);
-    expect(await standingOf(scene)).toEqual(before);
+    expect(await snapshotOf(scene)).toEqual(before);
   });
 
-  it.each(MODES)("refuses a Viewer's %s as owner-forbids, exit 5", async (_mode, dryRun) => {
+  it.each(MODES)("refuses a Viewer's %s as owner-forbids with exit 5", async (_mode, dryRun) => {
     const scene = await imported();
     const viewer = await app().person();
     await app().addMember(scene.workspaceId, viewer.id, "Viewer");
-    const before = await standingOf(scene);
+    const before = await snapshotOf(scene);
 
     const run = await scene.update({ dryRun, as: viewer.email });
 
@@ -435,12 +438,12 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     expect(run.lines).toEqual([
       `update-concept-body: REFUSED — ${viewer.email} neither owns ${scene.held.iri} nor is an Admin of this workspace; nothing was written`,
     ]);
-    expect(await standingOf(scene)).toEqual(before);
+    expect(await snapshotOf(scene)).toEqual(before);
   });
 
-  it("answers usage to an empty stdin, writing nothing", async () => {
+  it("gives a usage error for empty stdin and writes nothing", async () => {
     const scene = await imported();
-    const before = await standingOf(scene);
+    const before = await snapshotOf(scene);
 
     const run = await scene.update({ body: "" });
 
@@ -448,6 +451,6 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
       exitCode: 2,
       lines: ["update-concept-body: the new body is read from stdin, and stdin was empty"],
     });
-    expect(await standingOf(scene)).toEqual(before);
+    expect(await snapshotOf(scene)).toEqual(before);
   });
 });

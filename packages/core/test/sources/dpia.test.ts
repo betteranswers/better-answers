@@ -90,8 +90,8 @@ const ALWAYS = ["special-category", "bank-details", "government-identifier"] as 
 const DEFAULT_ON = ["date-of-birth", "home-address", "personal-contact"] as const;
 const DEFAULT_OFF = ["person-name", "job-title"] as const;
 
-describe("the categories a connected source's rules in force can raise", () => {
-  it("names the always and default-on sets for an unconfigured source", async () => {
+describe("the personal data categories a DPIA input lists", () => {
+  it("lists the always and default-on sets for an unconfigured source", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceIn(scenario);
 
@@ -106,7 +106,7 @@ describe("the categories a connected source's rules in force can raise", () => {
     }
   });
 
-  it("names the default-off set once a source switches it on", async () => {
+  it("adds the default-off set when a source switches it on", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceIn(scenario, {
       default_on: true,
@@ -120,7 +120,7 @@ describe("the categories a connected source's rules in force can raise", () => {
     ]);
   });
 
-  it("drops a switched-off default-on set and keeps the always set", async () => {
+  it("drops the default-on set when the source switches it off", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceIn(scenario, {
       default_on: false,
@@ -133,7 +133,7 @@ describe("the categories a connected source's rules in force can raise", () => {
     ]);
   });
 
-  it("carries the connected source's own rules in force", async () => {
+  it("includes the connected source's rules in force", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceIn(scenario, {
       default_on: false,
@@ -147,8 +147,8 @@ describe("the categories a connected source's rules in force can raise", () => {
   });
 });
 
-describe("what the platform holds whatever the connected source", () => {
-  it("names four platform-held categories on connected sources with different rules", async () => {
+describe("the categories the platform holds for every connected source", () => {
+  it("lists the same four categories whatever a source's rules", async () => {
     const scenario = await arrange();
     const safe = await connectedSourceIn(scenario);
     const everything = await connectedSourceIn(scenario, { default_on: true, default_off: true });
@@ -164,7 +164,7 @@ describe("what the platform holds whatever the connected source", () => {
     expect((await documentFor(scenario, everything)).platformHeldCategories).toEqual(expected);
   });
 
-  it("carries the special-category label with its recorded condition", async () => {
+  it("includes the special category with its recorded condition", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceIn(scenario);
 
@@ -177,7 +177,7 @@ describe("what the platform holds whatever the connected source", () => {
 });
 
 describe("the model choices a DPIA input lists", () => {
-  it("prints the provider's retention sentence a model choice carries", async () => {
+  it("includes the retention sentence a model choice records", async () => {
     const scenario = await arrange();
     const tail = "Prompts and outputs are deleted within 30 days; no training on customer data.";
     const connectedSource = await answeringModelChoiceAndConnectedSource(scenario, tail);
@@ -194,7 +194,7 @@ describe("the model choices a DPIA input lists", () => {
     ]);
   });
 
-  it("says not recorded without a model choice's retention sentence", async () => {
+  it("says not recorded for a missing retention sentence", async () => {
     const scenario = await arrange();
     const connectedSource = await answeringModelChoiceAndConnectedSource(scenario, null);
 
@@ -210,7 +210,7 @@ describe("the model choices a DPIA input lists", () => {
     ]);
   });
 
-  it("names each provider's sub-processor, and not recorded for others", async () => {
+  it("names a known provider's sub-processor, else says not recorded", async () => {
     const scenario = await arrange();
     await modelChoiceIn(scenario, {
       purpose: "extraction",
@@ -249,14 +249,14 @@ describe("the model choices a DPIA input lists", () => {
     ]);
   });
 
-  it("lists no purpose the workspace has not configured", async () => {
+  it("lists nothing when the workspace has no model choice", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceIn(scenario);
 
     expect((await documentFor(scenario, connectedSource)).modelChoices).toEqual([]);
   });
 
-  it("lists no embedding model choice and never names Mistral", async () => {
+  it("leaves out the embedding model choice and its provider", async () => {
     const scenario = await arrange();
     await modelChoiceIn(scenario, {
       purpose: "embedding",
@@ -278,8 +278,8 @@ describe("the model choices a DPIA input lists", () => {
   });
 });
 
-describe("what the platform has no row for", () => {
-  it("says not recorded for a source's scope and retention class", async () => {
+describe("the DPIA input's scope, retention, class and audience", () => {
+  it("says not recorded for the scope and retention class", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceIn(scenario);
 
@@ -291,7 +291,7 @@ describe("what the platform has no row for", () => {
     });
   });
 
-  it("reads the connected source's class and audience off its row", async () => {
+  it("reads the class and audience from the connected source's row", async () => {
     const scenario = await arrange();
     const connectedSource = await seedingWith(
       db().pool,
@@ -314,7 +314,7 @@ describe("what the platform has no row for", () => {
   });
 });
 
-describe("the hash the publish row carries", () => {
+describe("the DPIA hash a publish records", () => {
   it("is the same across two reads of an unchanged source", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceIn(scenario);
@@ -336,7 +336,7 @@ describe("the hash the publish row carries", () => {
     expect(after).not.toBe(before);
   });
 
-  it("takes the shape of the audit log's content-hash kind", async () => {
+  it("matches the audit log's content-hash format", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceIn(scenario);
 
@@ -348,7 +348,7 @@ describe("who may read a DPIA input", () => {
   it.each([
     ["a Viewer", (scenario: Scenario) => scenario.viewer],
     ["an Editor", (scenario: Scenario) => scenario.editor],
-  ] as const)("refuses %s, as the document is the Admin's alone", async (_who, principalOf) => {
+  ] as const)("refuses %s, because only an Admin may read it", async (_who, principalOf) => {
     const scenario = await arrange();
     const connectedSourceId = await connectedSourceIn(scenario);
 
@@ -359,7 +359,7 @@ describe("who may read a DPIA input", () => {
     expect(read).toEqual({ ok: false, error: "role-forbids" });
   });
 
-  it("says no-such-connected-source for another workspace's connected source", async () => {
+  it("refuses another workspace's connected source as not found", async () => {
     const mine = await arrange();
     const theirs = await arrange();
     const connectedSourceId = await connectedSourceIn(theirs);
@@ -371,7 +371,7 @@ describe("who may read a DPIA input", () => {
     expect(read).toEqual({ ok: false, error: "no-such-binding" });
   });
 
-  it("names an id that is not the minter's shape", () => {
+  it("rejects a connected source id in the wrong format", () => {
     expect(parse(dpiaReadInput, { connectedSourceId: "not-an-id" })).toEqual({
       ok: false,
       error: { word: "malformed", fields: { connectedSourceId: "bad-format" } },

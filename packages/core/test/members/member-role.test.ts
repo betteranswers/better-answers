@@ -13,7 +13,7 @@ import {
   until,
   whileWritesAreRefused,
 } from "../support/suite-postgres.ts";
-import { bothHoldingTheirOwnRow, heldAs, membersSuite } from "./members-suite.ts";
+import { actingOnEachOther, heldAs, membersSuite } from "./members-suite.ts";
 
 const db = postgresForSuite();
 
@@ -33,7 +33,7 @@ const roleChangedBy = (
 ) => heldAs(workspace, actor, (principal, tx) => changing(principal, tx, personId, role));
 
 describe("changing a member's role", () => {
-  it("moves a member to the asked role, recording both roles", async () => {
+  it("changes a member's role, recording the old and new roles", async () => {
     const workspace = await provisionedWorkspace(db(), "Rolled");
     const viewer = await joining(workspace, "Viewer");
 
@@ -53,7 +53,7 @@ describe("changing a member's role", () => {
     ]);
   });
 
-  it("applies on the member's next request", async () => {
+  it("takes effect on the member's next request", async () => {
     const workspace = await provisionedWorkspace(db(), "NextRequest");
     const second = await joining(workspace, "Admin");
 
@@ -74,7 +74,7 @@ describe("changing a member's role", () => {
     expect([...(await adminsOf(workspace))].sort()).toEqual([workspace.adminUserId, editor].sort());
   });
 
-  it("writes nothing when the member already holds the role asked", async () => {
+  it("writes nothing when the member already has the role", async () => {
     const workspace = await provisionedWorkspace(db(), "Unmoved");
     const editor = await joining(workspace, "Editor");
 
@@ -89,18 +89,21 @@ describe("changing a member's role", () => {
 });
 
 describe("what changing a role refuses", () => {
-  it.each(["Owner", "admin", ""])("refuses %j, no-such-role, and writes nothing", async (role) => {
-    const workspace = await provisionedWorkspace(db(), "NoSuchRole");
-    const viewer = await joining(workspace, "Viewer");
+  it.each(["Owner", "admin", ""])(
+    "refuses %j with no-such-role and writes nothing",
+    async (role) => {
+      const workspace = await provisionedWorkspace(db(), "NoSuchRole");
+      const viewer = await joining(workspace, "Viewer");
 
-    const refused = await roleChangedBy(workspace, workspace.adminUserId, viewer, role);
+      const refused = await roleChangedBy(workspace, workspace.adminUserId, viewer, role);
 
-    expect(refused).toEqual({ ok: false, error: "no-such-role" });
-    expect((await rolesOf(workspace))[viewer]).toBe("Viewer");
-    expect(await roleChangesIn(workspace)).toEqual([]);
-  });
+      expect(refused).toEqual({ ok: false, error: "no-such-role" });
+      expect((await rolesOf(workspace))[viewer]).toBe("Viewer");
+      expect(await roleChangesIn(workspace)).toEqual([]);
+    },
+  );
 
-  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (held) => {
+  it.each(["Editor", "Viewer"] as const)("refuses the %s role with role-forbids", async (held) => {
     const workspace = await provisionedWorkspace(db(), `Forbidden${held}`);
     const actor = await joining(workspace, held);
     const viewer = await joining(workspace, "Viewer");
@@ -111,7 +114,7 @@ describe("what changing a role refuses", () => {
     expect((await rolesOf(workspace))[viewer]).toBe("Viewer");
   });
 
-  it("refuses a person not a member here, no-such-member", async () => {
+  it("refuses a non-member here with no-such-member", async () => {
     const ours = await provisionedWorkspace(db(), "OursOnly");
     const theirs = await provisionedWorkspace(db(), "TheirsOnly");
     const elsewhere = await joining(theirs, "Viewer");
@@ -136,8 +139,8 @@ describe("what changing a role refuses", () => {
   });
 });
 
-describe("the last Admin", () => {
-  it("refuses demoting the workspace's only Admin, last-admin, and writes nothing", async () => {
+describe("demoting the last Admin", () => {
+  it("refuses demoting the only Admin with last-admin, writing nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "OnlyAdmin");
     const { adminUserId } = workspace;
 
@@ -162,7 +165,7 @@ describe("the last Admin", () => {
     expect(await adminsOf(workspace)).toEqual([successor]);
   });
 
-  it("counts the Admins an uncommitted demotion leaves, not those found", async () => {
+  it("counts the Admins left after a concurrent uncommitted demotion", async () => {
     const workspace = await provisionedWorkspace(db(), "Counted");
     const { adminUserId } = workspace;
     const other = await joining(workspace, "Admin");
@@ -200,15 +203,13 @@ describe("the last Admin", () => {
     expect(await roleChangesIn(workspace)).toHaveLength(1);
   });
 
-  it("answers the deadlock between two demotions changed-meanwhile, never a failure", async () => {
+  it("returns changed-meanwhile, not an error, when two demotions deadlock", async () => {
     const workspace = await provisionedWorkspace(db(), "Deadlocked");
     const first = workspace.adminUserId;
     const second = await joining(workspace, "Admin");
 
-    const answers = await bothHoldingTheirOwnRow(
-      workspace,
-      [first, second],
-      (principal, tx, other) => changing(principal, tx, other, "Editor"),
+    const answers = await actingOnEachOther(workspace, [first, second], (principal, tx, other) =>
+      changing(principal, tx, other, "Editor"),
     );
 
     expect(answers.map((answer) => answer.ok).sort()).toEqual([false, true]);

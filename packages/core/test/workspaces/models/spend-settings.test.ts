@@ -48,7 +48,7 @@ const limitsStored = async (workspaceId: string) => {
 };
 
 describe("a workspace's spending limit", () => {
-  it("is stored under its key as the pounds given", async () => {
+  it("stores the given pounds under its config key", async () => {
     const { workspaceId } = await provisionedWorkspace(db(), "Limited");
 
     expect(await limiting(workspaceId, "12.50")).toEqual({
@@ -71,7 +71,7 @@ describe("a workspace's spending limit", () => {
     expect(await limiting(ulid(), "50")).toEqual({ ok: false, error: "no-such-workspace" });
   });
 
-  it("answers the store's failure and sets nothing", async () => {
+  it("returns the store's error and sets nothing", async () => {
     const { workspaceId } = await provisionedWorkspace(db(), "Limited");
 
     const refused = await whileWritesAreRefused(db().pool, "workspace_config", () =>
@@ -85,7 +85,7 @@ describe("a workspace's spending limit", () => {
 });
 
 describe("a model's price", () => {
-  it("answers what it priced, from which day", async () => {
+  it("returns the model and the day its price starts", async () => {
     expect(await pricing()).toEqual({
       ok: true,
       value: { provider: "anthropic", model: "claude-sonnet-5-5", effectiveFrom: "2026-10-14" },
@@ -119,14 +119,14 @@ describe("a model's price", () => {
   });
 
   it.each([
-    ["a day the calendar lacks", { effectiveFrom: "2026-02-30" }],
+    ["a date that does not exist", { effectiveFrom: "2026-02-30" }],
     ["a provider outside the two", { provider: "openai" }],
     ["a model name with capitals", { model: "sk-ant-API03 key" }],
   ])("refuses %s as malformed", async (_shape, overrides) => {
     expect(await pricing(overrides)).toEqual({ ok: false, error: "malformed" });
   });
 
-  it("answers the store's failure", async () => {
+  it("returns the store's error", async () => {
     const refused = await whileWritesAreRefused(db().pool, "model_price", () => pricing());
 
     assert(!refused.ok);
@@ -180,7 +180,7 @@ describe("a decision model's threshold", () => {
     });
   });
 
-  it("replaces a threshold set before, recording each", async () => {
+  it("replaces an earlier threshold, recording both", async () => {
     const model = aModel();
 
     await thresholding(model, {});
@@ -231,7 +231,7 @@ describe("a decision model's threshold", () => {
     expect(await thresholdsHeld(model)).toEqual({ stored: [], recorded: [] });
   });
 
-  it("answers the store's failure and sets nothing", async () => {
+  it("returns the store's error and sets nothing", async () => {
     const model = aModel();
 
     const refused = await whileWritesAreRefused(db().pool, "decision_threshold", () =>

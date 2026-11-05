@@ -104,7 +104,7 @@ const sentOf = (input: string | URL | Request, init: RequestInit = {}): Sent => 
 const NO_MORE: Reply = { status: 418, body: "" };
 
 /** A hung attempt rejects once its timeout has fired, as `fetch` does on an aborted signal. */
-const answering = (next: Answer, signal: AbortSignal | null | undefined) => {
+const responseFor = (next: Answer, signal: AbortSignal | null | undefined) => {
   if (next === "unreachable") throw new TypeError("fetch failed");
   if (next === "hang") {
     if (signal?.aborted === true) throw new DOMException("timed out", "TimeoutError");
@@ -123,7 +123,7 @@ const theWire = (...replies: readonly Answer[]) => {
   const sent: Sent[] = [];
   const fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     sent.push(sentOf(input, init));
-    return answering(replies[sent.length - 1] ?? NO_MORE, init?.signal);
+    return responseFor(replies[sent.length - 1] ?? NO_MORE, init?.signal);
   };
   return { sent, fetch };
 };
@@ -157,7 +157,7 @@ const clientOn = (
   return { client, lines, waits, timeouts };
 };
 
-const calling = (wire: Wire, options?: Parameters<typeof clientOn>[1]) =>
+const callSonnet = (wire: Wire, options?: Parameters<typeof clientOn>[1]) =>
   clientOn(wire, options).client.callModel(TO_SONNET, A_CALL);
 
 const RATE_LIMITED: Reply = {
@@ -176,11 +176,11 @@ describe("the Messages shape", () => {
   it("sends the model, its key and the Messages body", async () => {
     const wire = theWire(ANSWERED);
 
-    await calling(wire);
+    await callSonnet(wire);
 
     expect(wire.sent).toHaveLength(1);
     const [sent] = wire.sent;
-    assert(sent !== undefined, "the call was sent");
+    assert(sent !== undefined, "no request was sent");
     expect(sent.url).toBe("https://api.anthropic.com/v1/messages");
     expect(sent.init.method).toBe("POST");
     expect(sent.init.headers).toEqual({
@@ -217,8 +217,8 @@ describe("the Messages shape", () => {
     });
   });
 
-  it("answers with the parsed answer and the tokens it spent", async () => {
-    const called = await calling(theWire(ANSWERED), { secondsPerRead: 1.5 });
+  it("returns the parsed answer and the tokens it spent", async () => {
+    const called = await callSonnet(theWire(ANSWERED), { secondsPerRead: 1.5 });
 
     expect(called).toEqual({
       outcome: "answered",
@@ -235,7 +235,7 @@ describe("the Messages shape", () => {
       output_tokens: 96,
     };
 
-    const called = await calling(
+    const called = await callSonnet(
       theWire({ status: 200, body: reply(THE_ANSWER, "end_turn", usage) }),
     );
 
@@ -244,7 +244,7 @@ describe("the Messages shape", () => {
     ]);
   });
 
-  it("joins the text blocks and passes over the thinking ones", async () => {
+  it("joins the text blocks and skips the thinking blocks", async () => {
     const body = JSON.stringify({
       content: [
         { type: "thinking", thinking: "", signature: "sig" },
@@ -255,7 +255,7 @@ describe("the Messages shape", () => {
       usage: { input_tokens: 10, output_tokens: 4 },
     });
 
-    const called = await calling(theWire({ status: 200, body }));
+    const called = await callSonnet(theWire({ status: 200, body }));
 
     expect(called).toMatchObject({ outcome: "answered", answer: { fits: [] } });
   });
@@ -277,13 +277,13 @@ describe("the Messages shape", () => {
     const billing: Reply = { status: 402, body: errorReply("billing_error", "Payment failed.") };
     const limited = { ...RATE_LIMITED, headers: { "retry-after": "60" } };
 
-    expect((await calling(theWire(tierCap))).outcome).toBe("spend-cap");
-    expect((await calling(theWire(ownLimit))).outcome).toBe("spend-cap");
-    expect((await calling(theWire(billing))).outcome).toBe("spend-cap");
-    expect((await calling(theWire(limited))).outcome).toBe("rate-limited");
+    expect((await callSonnet(theWire(tierCap))).outcome).toBe("spend-cap");
+    expect((await callSonnet(theWire(ownLimit))).outcome).toBe("spend-cap");
+    expect((await callSonnet(theWire(billing))).outcome).toBe("spend-cap");
+    expect((await callSonnet(theWire(limited))).outcome).toBe("rate-limited");
   });
 
-  it("reads a credit balance too low as a spend cap", async () => {
+  it("treats a low credit balance as a spend cap", async () => {
     const wire = theWire({
       status: 400,
       body: errorReply(
@@ -292,23 +292,23 @@ describe("the Messages shape", () => {
       ),
     });
 
-    expect(await calling(wire)).toEqual({ outcome: "spend-cap", spent: [NOTHING_SPENT] });
+    expect(await callSonnet(wire)).toEqual({ outcome: "spend-cap", spent: [NOTHING_SPENT] });
     expect(wire.sent).toHaveLength(1);
   });
 
-  it("fails a bad request that names no spend limit, once", async () => {
+  it("fails once on a bad request that names no limit", async () => {
     const wire = theWire({
       status: 400,
       body: errorReply("invalid_request_error", "max_tokens: must be at most 128000"),
     });
 
-    expect(await calling(wire)).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
+    expect(await callSonnet(wire)).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
     expect(wire.sent).toHaveLength(1);
   });
 
-  it("fails a reply that is not the shape's JSON", async () => {
-    const notJson = await calling(theWire({ status: 200, body: "<html>Bad gateway</html>" }));
-    const notTheShape = await calling(
+  it("fails a reply that is not Messages JSON", async () => {
+    const notJson = await callSonnet(theWire({ status: 200, body: "<html>Bad gateway</html>" }));
+    const notTheShape = await callSonnet(
       theWire({ status: 200, body: JSON.stringify({ content: "yes", usage: {} }) }),
     );
 
@@ -316,8 +316,8 @@ describe("the Messages shape", () => {
     expect(notTheShape).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
   });
 
-  it("fails an answer of the wrong shape, keeping its tokens", async () => {
-    const called = await calling(theWire({ status: 200, body: reply('{"fits":"yes"}') }));
+  it("fails a wrongly shaped answer and still records its tokens", async () => {
+    const called = await callSonnet(theWire({ status: 200, body: reply('{"fits":"yes"}') }));
 
     expect(called).toEqual({
       outcome: "failed",
@@ -325,8 +325,10 @@ describe("the Messages shape", () => {
     });
   });
 
-  it("answers a refusal with the tokens it was billed", async () => {
-    const called = await calling(theWire({ status: 200, body: reply("I can't help.", "refusal") }));
+  it("returns refused with the tokens the refusal was billed", async () => {
+    const called = await callSonnet(
+      theWire({ status: 200, body: reply("I can't help.", "refusal") }),
+    );
 
     expect(called).toEqual({
       outcome: "refused",
@@ -334,10 +336,10 @@ describe("the Messages shape", () => {
     });
   });
 
-  it("fails an answer cut off at its token limit, once", async () => {
+  it("fails once on an answer cut off at max_tokens", async () => {
     const wire = theWire({ status: 200, body: reply('{"fits":[]}', "max_tokens") });
 
-    expect(await calling(wire)).toEqual({
+    expect(await callSonnet(wire)).toEqual({
       outcome: "failed",
       spent: [{ tokensIn: 1580, tokensOut: 96, seconds: 0, outcome: "failed" }],
     });
@@ -423,7 +425,7 @@ describe("the decision shape", () => {
 
     expect(wire.sent).toHaveLength(1);
     const [sent] = wire.sent;
-    assert(sent !== undefined, "the call was sent");
+    assert(sent !== undefined, "no request was sent");
     expect(sent.url).toBe(
       "https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/run/@cf/cloudflare/clef-flash",
     );
@@ -448,7 +450,7 @@ describe("the decision shape", () => {
     });
   });
 
-  it("answers each question's probability of yes and its tokens", async () => {
+  it("returns each question's probability of yes and the tokens spent", async () => {
     const called = await clientOn(theWire(DECIDED), { secondsPerRead: 0.5 }).client.decide(
       TO_CLEF_FLASH,
       A_DECISION,
@@ -461,7 +463,7 @@ describe("the decision shape", () => {
     });
   });
 
-  it("fails a reply skipping a question, keeping its tokens", async () => {
+  it("fails a reply that skips a question, recording its tokens", async () => {
     const wire = theWire({
       status: 200,
       body: decisionReply({ "1": { type: "noul", noul: 0.93 } }),
@@ -473,7 +475,7 @@ describe("the decision shape", () => {
     });
   });
 
-  it("fails a probability outside nought to one", async () => {
+  it("fails a probability outside the range 0 to 1", async () => {
     const wire = theWire({
       status: 200,
       body: decisionReply({ "1": { type: "noul", noul: 1.2 }, "2": { type: "noul", noul: 0 } }),
@@ -482,7 +484,7 @@ describe("the decision shape", () => {
     expect((await deciding(wire)).outcome).toBe("failed");
   });
 
-  it("fails a reply that is not the envelope's JSON", async () => {
+  it("fails a reply outside Cloudflare's success envelope", async () => {
     const unwrapped = JSON.stringify({ answers: {}, usage: { input_tokens: 1, output_tokens: 0 } });
     const unsuccessful = JSON.stringify({
       result: { answers: {}, usage: { input_tokens: 1, output_tokens: 0 } },
@@ -500,7 +502,7 @@ describe("the decision shape", () => {
     }
   });
 
-  it("reads the daily allocation spent as a spend cap", async () => {
+  it("treats a used-up daily free allocation as a spend cap", async () => {
     const wire = theWire({
       status: 429,
       body: JSON.stringify({
@@ -518,14 +520,14 @@ describe("the decision shape", () => {
     expect(wire.sent).toHaveLength(1);
   });
 
-  it("tries a rate limit with no JSON body again", async () => {
+  it("retries a rate limit that has no JSON body", async () => {
     const wire = theWire({ status: 429, body: "<html>Too many requests</html>" }, DECIDED);
 
     expect((await deciding(wire)).outcome).toBe("answered");
     expect(wire.sent).toHaveLength(2);
   });
 
-  it("tries capacity exceeded again after the wait asked", async () => {
+  it("retries capacity exceeded after the retry-after wait", async () => {
     const outOfCapacity: Reply = {
       status: 429,
       body: cloudflareError(3040, "Capacity temporarily exceeded, please try again."),
@@ -538,7 +540,7 @@ describe("the decision shape", () => {
     expect(waits).toEqual([4_000]);
   });
 
-  it("tries each of the provider's own faults again", async () => {
+  it("retries each 5xx server error from the provider", async () => {
     for (const status of [500, 502, 503, 504]) {
       const wire = theWire(
         { status, body: cloudflareError(3043, "Internal server error") },
@@ -550,7 +552,7 @@ describe("the decision shape", () => {
     }
   });
 
-  it("fails a refused request once", async () => {
+  it("fails once on a request the provider refuses", async () => {
     const wire = theWire({ status: 400, body: cloudflareError(5007, "No such model") });
     const { client, lines } = clientOn(wire);
 
@@ -562,7 +564,7 @@ describe("the decision shape", () => {
     expect(lines.map(({ line }) => line.read)).toEqual(["failed"]);
   });
 
-  it("logs the reply's ray as its request id", async () => {
+  it("logs the reply's cf-ray header as the request id", async () => {
     const wire = theWire(DECIDED);
     const { client, lines } = clientOn(wire);
 
@@ -586,8 +588,8 @@ describe("the decision shape", () => {
   });
 });
 
-describe("a decision model's window", () => {
-  it("sends a request exactly as long as the window", async () => {
+describe("a decision model's context window in bytes", () => {
+  it("sends a request exactly the size of the window", async () => {
     const wire = theWire(DECIDED);
 
     await deciding(wire, callOfBytes(WINDOW_BYTES));
@@ -629,7 +631,7 @@ describe("a decision model's window", () => {
     expect(wire.sent).toEqual([]);
   });
 
-  it("holds Clef to its own larger window", async () => {
+  it("applies Clef's own larger window", async () => {
     const wire = theWire(DECIDED, DECIDED);
     const toClef = { ...TO_CLEF_FLASH, model: "clef" };
     const clefBytes = 196_608;
@@ -640,7 +642,7 @@ describe("a decision model's window", () => {
     expect(wire.sent.map(({ body }) => Buffer.byteLength(body))).toEqual([clefBytes]);
   });
 
-  it("never sends a model with no published window", async () => {
+  it("sends nothing to a model with no published window", async () => {
     const wire = theWire(DECIDED);
 
     const called = await deciding(wire, A_DECISION, { ...TO_CLEF_FLASH, model: "clef-pro" });
@@ -650,25 +652,25 @@ describe("a decision model's window", () => {
   });
 });
 
-describe("a model of the other wire shape", () => {
+describe("a call in the wrong wire shape for its model", () => {
   type Client = ReturnType<typeof clientOn>["client"];
   it.each([
     [
-      "a decision model no Messages call",
+      "a Messages call to a decision model",
       ANSWERED,
       (client: Client) => client.callModel(TO_CLEF_FLASH, A_CALL),
     ],
     [
-      "a Messages model no decision call",
+      "a decision call to a Messages model",
       DECIDED,
       (client: Client) => client.decide(TO_SONNET, A_DECISION),
     ],
     [
-      "a Messages model no yes-or-no call",
+      "a yes-or-no call to a Messages model",
       DECIDED,
       (client: Client) => client.decideYesNo(TO_SONNET, A_DECISION),
     ],
-  ] as const)("sends %s", async (_case, replied, call) => {
+  ] as const)("sends nothing for %s", async (_case, replied, call) => {
     const wire = theWire(replied);
     const { client, lines } = clientOn(wire);
 
@@ -680,14 +682,14 @@ describe("a model of the other wire shape", () => {
   });
 });
 
-describe("a model of the decision shape", () => {
-  it("is called through the decision shape, and Sonnet through Messages", () => {
+describe("the wire shape of a model", () => {
+  it("maps Clef Flash to the decision shape, Sonnet to Messages", () => {
     expect([wireShapeOf(TO_CLEF_FLASH), wireShapeOf(TO_SONNET)]).toEqual(["decision", "messages"]);
   });
 });
 
 describe("a model call's attempts", () => {
-  it("tries a rate-limited call again after the wait asked", async () => {
+  it("retries a rate-limited call after the retry-after wait", async () => {
     const wire = theWire(RATE_LIMITED, ANSWERED);
     const { client, waits } = clientOn(wire);
 
@@ -701,7 +703,7 @@ describe("a model call's attempts", () => {
     expect(waits).toEqual([5000]);
   });
 
-  it("waits its backoff when longer than the wait asked", async () => {
+  it("waits its backoff when the backoff exceeds retry-after", async () => {
     const wire = theWire(
       { ...RATE_LIMITED, headers: { "retry-after": "1" } },
       OVERLOADED,
@@ -714,7 +716,7 @@ describe("a model call's attempts", () => {
     expect(waits).toEqual([2000, 8000]);
   });
 
-  it("answers rate limited when the wait asked is too long", async () => {
+  it("returns rate-limited when retry-after exceeds thirty seconds", async () => {
     const wire = theWire({ ...RATE_LIMITED, headers: { "retry-after": "31" } });
     const { client, waits } = clientOn(wire);
 
@@ -725,7 +727,7 @@ describe("a model call's attempts", () => {
     expect(waits).toEqual([]);
   });
 
-  it("waits up to thirty seconds a rate limit asks", async () => {
+  it("waits a retry-after of exactly thirty seconds", async () => {
     const wire = theWire({ ...RATE_LIMITED, headers: { "retry-after": "30" } }, ANSWERED);
     const { client, waits } = clientOn(wire);
 
@@ -733,7 +735,7 @@ describe("a model call's attempts", () => {
     expect(waits).toEqual([30_000]);
   });
 
-  it("answers rate limited after three limited attempts", async () => {
+  it("returns rate-limited after three rate-limited attempts", async () => {
     const wire = theWire(RATE_LIMITED, RATE_LIMITED, RATE_LIMITED);
     const { client, waits } = clientOn(wire);
 
@@ -744,7 +746,7 @@ describe("a model call's attempts", () => {
     expect(waits).toEqual([5000, 8000]);
   });
 
-  it("reads a retry-after that is not whole seconds as none", async () => {
+  it("ignores a retry-after that is not whole seconds", async () => {
     const wire = theWire({ ...RATE_LIMITED, headers: { "retry-after": "12.5" } }, ANSWERED);
     const { client, waits } = clientOn(wire);
 
@@ -768,37 +770,37 @@ describe("a model call's attempts", () => {
     expect(waits).toEqual([2000, 8000]);
   });
 
-  it("fails a 200 whose body is lost, once", async () => {
+  it("fails once on a 200 whose body drops", async () => {
     const wire = theWire({ droppedAfter: 200 }, ANSWERED);
 
-    expect(await calling(wire)).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
+    expect(await callSonnet(wire)).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
     expect(wire.sent).toHaveLength(1);
   });
 
-  it("tries an overload whose body is lost again", async () => {
+  it("retries a 529 overload whose body drops", async () => {
     const wire = theWire({ droppedAfter: 529 }, ANSWERED);
 
-    expect((await calling(wire)).outcome).toBe("answered");
+    expect((await callSonnet(wire)).outcome).toBe("answered");
     expect(wire.sent).toHaveLength(2);
   });
 
-  it("tries a provider timeout again", async () => {
+  it("retries a provider timeout", async () => {
     const wire = theWire({ status: 504, body: errorReply("timeout_error", "Timed out") }, ANSWERED);
 
-    expect((await calling(wire)).outcome).toBe("answered");
+    expect((await callSonnet(wire)).outcome).toBe("answered");
   });
 
-  it("never tries a spend cap or a refusal again", async () => {
+  it("never retries a spend cap or a refusal", async () => {
     const capped = theWire({ status: 402, body: errorReply("billing_error", "Payment failed.") });
     const refused = theWire({ status: 200, body: reply("No.", "refusal") });
 
-    await calling(capped);
-    await calling(refused);
+    await callSonnet(capped);
+    await callSonnet(refused);
 
     expect([capped.sent.length, refused.sent.length]).toEqual([1, 1]);
   });
 
-  it("fits every attempt and wait inside a reservation's life", () => {
+  it("fits all attempts and waits inside the reservation lifetime", () => {
     const longestCallMs =
       MAX_ATTEMPTS * ATTEMPT_TIMEOUT_MS + (MAX_ATTEMPTS - 1) * LONGEST_RETRY_WAIT_MS;
 
@@ -808,7 +810,7 @@ describe("a model call's attempts", () => {
   });
 });
 
-/** A wait runs `lateMs` over, as a late timer does; a negative timeout throws, as `AbortSignal.timeout`'s does. */
+/** Each wait overruns by `lateMs`, as a late timer does. A negative timeout throws, as `AbortSignal.timeout` does. */
 const deadlineClient = (wire: Wire, attemptMs: readonly number[], lateMs = 0) => {
   const elapsed = { ms: 0 };
   const timeouts: number[] = [];
@@ -835,8 +837,8 @@ const deadlineClient = (wire: Wire, attemptMs: readonly number[], lateMs = 0) =>
 
 const WITHIN_150_S: ModelCall<z.output<typeof verdicts>> = { ...A_CALL, withinMs: 150_000 };
 
-describe("a call's own deadline", () => {
-  it("bounds a retry's timeout by what the deadline leaves", async () => {
+describe("a call with its own deadline", () => {
+  it("caps a retry's timeout at the time the deadline leaves", async () => {
     const wire = theWire(OVERLOADED, ANSWERED);
     const { client, timeouts } = deadlineClient(wire, [100_000, 0]);
 
@@ -846,7 +848,7 @@ describe("a call's own deadline", () => {
     expect(timeouts).toEqual([120_000, 48_000]);
   });
 
-  it("fails rather than wait past the deadline", async () => {
+  it("fails instead of waiting past the deadline", async () => {
     const wire = theWire(OVERLOADED, ANSWERED);
     const { client } = deadlineClient(wire, [149_000, 0]);
 
@@ -856,7 +858,7 @@ describe("a call's own deadline", () => {
     expect(wire.sent).toHaveLength(1);
   });
 
-  it("skips a retry the deadline would leave under ten seconds", async () => {
+  it("skips a retry that would have under ten seconds left", async () => {
     const wire = theWire(OVERLOADED, ANSWERED);
     const { client, waits } = deadlineClient(wire, [138_001, 0]);
 
@@ -897,7 +899,7 @@ describe("a call's own deadline", () => {
     expect(wire.sent).toHaveLength(1);
   });
 
-  it("answers rate limited rather than wait past the deadline", async () => {
+  it("returns rate-limited instead of waiting past the deadline", async () => {
     const wire = theWire(RATE_LIMITED, ANSWERED);
     const { client } = deadlineClient(wire, [146_000, 0]);
 
@@ -969,7 +971,7 @@ describe("what a model call logs", () => {
     expect(lines.map(({ line }) => [line.status, line.read])).toEqual([[null, "timed-out"]]);
   });
 
-  it("logs what each attempt's reply read as", async () => {
+  it("logs each attempt's status and how its reply was read", async () => {
     const reads = async (...replies: readonly Answer[]) => {
       const { client, lines } = clientOn(theWire(...replies));
       await client.callModel(TO_SONNET, A_CALL);
@@ -995,23 +997,23 @@ describe("what a model call logs", () => {
   });
 });
 
-describe("a reply a proxy wrote", () => {
-  it("tries a rate limit with no JSON body again", async () => {
+describe("a non-JSON reply from a proxy", () => {
+  it("retries a rate limit that has no JSON body", async () => {
     const wire = theWire({ status: 429, body: "<html>Too Many Requests</html>" }, ANSWERED);
 
-    expect((await calling(wire)).outcome).toBe("answered");
+    expect((await callSonnet(wire)).outcome).toBe("answered");
     expect(wire.sent).toHaveLength(2);
   });
 
-  it("fails a bad request with no JSON body, once", async () => {
+  it("fails once on a bad request with no JSON body", async () => {
     const wire = theWire({ status: 400, body: "<html>Bad Request</html>" });
 
-    expect(await calling(wire)).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
+    expect(await callSonnet(wire)).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
   });
 });
 
-describe("the client's own clock", () => {
-  it("waits its backoff on the timer when none is injected", async () => {
+describe("the client's default timer", () => {
+  it("waits on setTimeout when no wait function is injected", async () => {
     vi.useFakeTimers();
     try {
       const wire = theWire(OVERLOADED, ANSWERED);
@@ -1089,30 +1091,30 @@ describe("resolving a workspace's model", () => {
       key: A_KEY,
     });
     const [sent] = wire.sent;
-    assert(sent !== undefined, "the call was sent");
+    assert(sent !== undefined, "no request was sent");
     expect(sent.init.headers).toMatchObject({ "x-api-key": A_KEY });
     expect(JSON.parse(sent.body)).toMatchObject({ model: SONNET });
   });
 
-  it("answers no model for a purpose with no choice", async () => {
+  it("resolves no model for a purpose with no model choice", async () => {
     const { asker } = await aWorkspace({ provider: "anthropic", purpose: "answering" });
 
     expect(answered(await resolving(asker))).toBeUndefined();
   });
 
-  it("answers no model for a workspace holding no key", async () => {
+  it("resolves no model for a workspace with no model key", async () => {
     const { asker } = await aWorkspace({ provider: "anthropic" }, false);
 
     expect(answered(await resolving(asker))).toBeUndefined();
   });
 
-  it("answers no model for a provider no wire shape speaks", async () => {
+  it("resolves no model for a provider with no wire shape", async () => {
     const { asker } = await aWorkspace({ provider: "mistral" });
 
     expect(answered(await resolving(asker))).toBeUndefined();
   });
 
-  it("answers no model for a provider no key names", async () => {
+  it("resolves no model for the keyless local provider", async () => {
     const { asker } = await aWorkspace({ provider: "local" });
 
     expect(answered(await resolving(asker))).toBeUndefined();
@@ -1160,7 +1162,7 @@ const choiceEventsOf = async (workspaceId: string) =>
   );
 
 describe("setting a model choice", () => {
-  it("stores and records a priced model of a sub-processor", async () => {
+  it("stores and audits a priced model from a listed sub-processor", async () => {
     await priced("anthropic", SONNET, "2026-10-01");
     const { workspaceId } = await aWorkspace(undefined, false);
 
@@ -1192,7 +1194,7 @@ describe("setting a model choice", () => {
     expect(await choicesOf(workspaceId)).toEqual([]);
   });
 
-  it("refuses priced Workers AI with no threshold stored", async () => {
+  it("refuses a priced Workers AI model with no decision threshold", async () => {
     const model = aDecisionModel();
     await priced("cloudflare", model, "2026-10-01");
     const { workspaceId } = await aWorkspace(undefined, false);
@@ -1204,7 +1206,7 @@ describe("setting a model choice", () => {
     expect(await choicesOf(workspaceId)).toEqual([]);
   });
 
-  it("refuses priced, thresholded Workers AI until the DPIA names it", async () => {
+  it("refuses a priced Workers AI model missing from the DPIA", async () => {
     const model = aDecisionModel();
     await priced("cloudflare", model, "2026-10-01");
     answered(
@@ -1223,7 +1225,7 @@ describe("setting a model choice", () => {
     expect(await choicesOf(workspaceId)).toEqual([]);
   });
 
-  it("refuses local, which no price can name", async () => {
+  it("refuses the local provider, which has no sub-processor entry", async () => {
     const { workspaceId } = await aWorkspace(undefined, false);
 
     expect(await choosing(workspaceId, "local", "clef-flash")).toEqual({
@@ -1254,7 +1256,7 @@ describe("setting a model choice", () => {
     });
   });
 
-  it("refuses a purpose, provider or model it cannot read", async () => {
+  it("refuses a malformed purpose, provider, or model name", async () => {
     const { workspaceId } = await aWorkspace(undefined, false);
 
     for (const [provider, model, purpose] of [

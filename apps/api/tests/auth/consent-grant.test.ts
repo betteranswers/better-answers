@@ -17,7 +17,7 @@ const runInStore: AsyncLocalStorage<unknown>["run"] = Reflect.get(
   "run",
 );
 
-const landingBeforeTheLibrary = (landing: () => Promise<unknown>): void => {
+const runBeforeTheGrant = (landing: () => Promise<unknown>): void => {
   vi.spyOn(AsyncLocalStorage.prototype, "run").mockImplementation(function (
     this: AsyncLocalStorage<unknown>,
     store: unknown,
@@ -44,11 +44,11 @@ const anAdminOnAcmesPage = async (on: TestApp) => {
   return { acme, zenith, client, consent };
 };
 
-describe("a consent grant in the library", () => {
-  it("answers a switch landing mid-grant with the moved page", async () => {
+describe("a consent grant inside Better Auth", () => {
+  it("shows the workspace-moved page when the active workspace changes mid-grant", async () => {
     const { acme, zenith, client, consent } = await anAdminOnAcmesPage(app());
     const before = await consentsGiven();
-    landingBeforeTheLibrary(async () => {
+    runBeforeTheGrant(async () => {
       expect((await setActiveWorkspace(client, zenith.workspaceId)).status).toBe(200);
     });
 
@@ -63,7 +63,7 @@ describe("a consent grant in the library", () => {
     expect(await consentsGiven()).toEqual(before);
   });
 
-  it("refuses a session pending its second factor mid-grant", async () => {
+  it("answers 400 once becoming Admin mid-grant requires a second factor", async () => {
     const acme = await app().provision({ name: "Acme" });
     const zenith = await app().provision({ name: "Zenith" });
     const editor = await app().person();
@@ -72,7 +72,7 @@ describe("a consent grant in the library", () => {
     const consent = await driveToPage(app(), client, editor);
     expect(consent.pathname).toBe("/consent");
     const before = await consentsGiven();
-    landingBeforeTheLibrary(() => app().addMember(zenith.workspaceId, editor.id, "Admin"));
+    runBeforeTheGrant(() => app().addMember(zenith.workspaceId, editor.id, "Admin"));
 
     const refused = await client.form(`/consent${consent.search}`, connectIn(acme.workspaceId));
 

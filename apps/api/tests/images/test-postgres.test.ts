@@ -32,7 +32,7 @@ const INHERITED_PATH = process.env["PATH"] ?? "";
 
 const projectOf = (stemName: string): string => {
   const digest = /@sha256:([0-9a-f]{64})$/.exec(POSTGRES_IMAGE)?.[1];
-  if (digest === undefined) throw new Error("POSTGRES_IMAGE carries no digest");
+  if (digest === undefined) throw new Error("POSTGRES_IMAGE has no digest");
   return `${stemName}-${digest.slice(0, 12)}`;
 };
 
@@ -86,7 +86,7 @@ afterAll(() => {
   testPostgres(port, ["down", "--all"]);
 });
 
-describe("the shared test postgres's address", () => {
+describe("deploy/test-postgres.sh address", () => {
   it("prints its address without calling Docker", () => {
     const shims = mkdtempSync(path.join(tmpdir(), "ba-test-postgres-shims-"));
     const called = path.join(shims, "docker-called");
@@ -123,7 +123,7 @@ describe("the shared test postgres's address", () => {
 });
 
 describe("the shared test postgres", () => {
-  it("starts on its loopback port, printing the variable to export", () => {
+  it("starts on a loopback port and prints the export line", () => {
     expect(outcomeOf(upFirst)).toEqual("ran");
     expect(upFirst.stdout.split("\n")).toEqual(
       matching.arrayContaining([
@@ -134,27 +134,27 @@ describe("the shared test postgres", () => {
     expect(upFirst.stdout).toContain("deploy/test-postgres.sh down");
   });
 
-  it("names a port moved off the derived one", () => {
+  it("prints TEST_POSTGRES_PORT when the port differs from the derived one", () => {
     expect(upFirst.stdout.split("\n")).toContain(`export TEST_POSTGRES_PORT=${String(port)}`);
   });
 
-  it("signs the printed URI in as a superuser", async () => {
+  it("connects as a superuser through the printed URI", async () => {
     expect(await queried("SELECT rolsuper FROM pg_roles WHERE rolname = current_user")).toEqual([
       { rolsuper: true },
     ]);
   });
 
-  it("runs the one pinned image, by digest", () => {
+  it("runs only the pinned image, by digest", () => {
     expect(imagesOf(project)).toEqual([POSTGRES_IMAGE]);
   });
 
-  it("stamps the server with the pinned image", async () => {
+  it("sets better_answers.image to the pinned image", async () => {
     expect(await queried("SELECT current_setting('better_answers.image', true) AS image")).toEqual([
       { image: POSTGRES_IMAGE },
     ]);
   });
 
-  it("runs without durability, as the suites' own servers do", async () => {
+  it("turns off fsync and durability like the suites' own servers", async () => {
     expect(
       await queried(`SELECT current_setting('fsync') AS fsync,
                             current_setting('synchronous_commit') AS synchronous_commit,
@@ -165,13 +165,13 @@ describe("the shared test postgres", () => {
     ]);
   });
 
-  it("caps its WAL at the pinned size", async () => {
+  it("sets max_wal_size to 512MB", async () => {
     expect(await queried("SELECT current_setting('max_wal_size') AS max_wal_size")).toEqual([
       { max_wal_size: "512MB" },
     ]);
   });
 
-  it("starts nothing new when already up", () => {
+  it("reuses the running container when already up", () => {
     const container = onlyContainer(project);
     const startedAt = inspected(container, "{{.State.StartedAt}}");
     const again = testPostgres(port, ["up"]);
@@ -183,7 +183,7 @@ describe("the shared test postgres", () => {
     }).toEqual({ containers: [container], startedAt });
   });
 
-  it("refuses another image, leaving that container running", async () => {
+  it("refuses when another image runs and leaves that container running", async () => {
     const otherStem = `${stem}-other`;
     const elsewhere = projectOf(otherStem);
     const otherPort = await freePort();
@@ -209,14 +209,14 @@ describe("the shared test postgres", () => {
     }
   }, 180_000);
 
-  it("refuses a port already in use, and starts nothing", async () => {
+  it("refuses a port already in use and starts no container", async () => {
     const takenStem = `${stem}-taken`;
     expect(
       await upOnATakenPort((taken) => testPostgres(taken, ["up"], takenStem), projectOf(takenStem)),
     ).toEqual({ status: 1, containers: [], namesThePort: true });
   });
 
-  it("carries no testcontainers label, so the reaper never lists it", () => {
+  it("has no testcontainers label, so the reaper cannot find it", () => {
     const container = onlyContainer(project);
     const reapable = execFileSync(
       "docker",
@@ -233,7 +233,7 @@ describe("the shared test postgres", () => {
     }).toEqual({ labels: [], listed: false });
   });
 
-  it("keeps its data in memory, so down discards every database", async () => {
+  it("keeps its data in memory, so down deletes every database", async () => {
     await queried("CREATE DATABASE made_before_down");
     expect({
       mounts: inspected(
@@ -255,7 +255,7 @@ describe("the shared test postgres", () => {
   }, 180_000);
 });
 
-describe("the shared test postgres's servers under one stem", () => {
+describe("several shared test postgres servers under one project stem", () => {
   const allStem = `${stem}-all`;
   const outsider = `${allStem}-0123456789abcd`;
   let allPort: number;
@@ -273,14 +273,14 @@ describe("the shared test postgres's servers under one stem", () => {
     composeDown(outsider);
   });
 
-  it("names the other servers still running under its stem", () => {
+  it("lists the other servers still running under its stem", () => {
     expect(outcomeOf(upBeside)).toEqual("ran");
     expect(upBeside.stdout.split("\n")).toContain(
       `test-postgres: also running: ${allStem} — deploy/test-postgres.sh down --all clears them`,
     );
   });
 
-  it("stops every server under its stem, and only those", () => {
+  it("stops every server under its stem and no others", () => {
     const down = testPostgres(allPort, ["down", "--all"], allStem);
     expect({
       status: down.status,

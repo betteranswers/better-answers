@@ -36,7 +36,7 @@ EMBEDDING_DIMENSIONS = embedding_dimensions()
 
 def _returning_row(cursor: Cursor[Any]) -> dict[str, Any]:
     row = cursor.fetchone()
-    assert row is not None
+    assert row is not None, "the statement returned no row"
     assert cursor.description is not None
     columns = cursor.description
     return {column.name: value for column, value in zip(columns, row, strict=True)}

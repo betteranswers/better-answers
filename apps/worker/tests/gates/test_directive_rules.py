@@ -11,7 +11,7 @@ MANIFEST = WORKER_ROOT / "pyproject.toml"
 A_REASON = "the loader imports it by name"
 
 
-def rules_fired_over(tree: Path, source: str) -> list[str]:
+def ruff_codes_for(tree: Path, source: str) -> list[str]:
     probe = tree / "probe.py"
     probe.write_text(source, encoding="utf-8")
     completed = subprocess.run(
@@ -46,10 +46,10 @@ def rules_fired_over(tree: Path, source: str) -> list[str]:
         ("a HACK", "# HACK: read the limit from the config\nKEEP = 1\n", "FIX004"),
     ],
 )
-def test_ruff_refuses_a_blanket_directive_and_a_deferred_task(
+def test_ruff_refuses_blanket_directives_and_task_comments(
     tmp_path: Path, what: str, source: str, rule: str
 ) -> None:
-    assert rule in rules_fired_over(tmp_path, source), what
+    assert rule in ruff_codes_for(tmp_path, source), what
 
 
 @pytest.mark.parametrize(
@@ -66,4 +66,4 @@ def test_ruff_refuses_a_blanket_directive_and_a_deferred_task(
 def test_ruff_accepts_a_directive_naming_what_it_suppresses(
     tmp_path: Path, what: str, source: str
 ) -> None:
-    assert rules_fired_over(tmp_path, source) == [], what
+    assert ruff_codes_for(tmp_path, source) == [], what

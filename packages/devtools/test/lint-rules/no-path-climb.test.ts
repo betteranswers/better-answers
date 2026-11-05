@@ -115,7 +115,7 @@ describe("the no-path-climb rule", () => {
   });
 });
 
-describe("the no-path-climb rule stays silent", () => {
+describe("the no-path-climb rule accepts", () => {
   it.each([
     ["a fixture beside its test", 'new URL("../fixtures/bundle", import.meta.url)'],
     [
@@ -137,20 +137,20 @@ describe("the no-path-climb rule stays silent", () => {
     ["a path under a root helper", 'path.join(repositoryRoot, "deploy/x.sh")'],
     ["a string that only reads like a climb", '"../sources/bid-library.md"'],
     ["a Playwright locator", 'row.locator("..")'],
-  ])("over %s", (_what, expression) => {
+  ])("%s", (_what, expression) => {
     const file = "apps/api/tests/ops/probe.test.ts";
 
     expect(lint.flagged(reading(file, `export const at = ${expression};`))).toEqual([]);
   });
 
-  it("over a relative import, which the import rules read", () => {
+  it("a relative import, which the import rules check", () => {
     const file = "apps/api/tests/ops/probe.test.ts";
     const code = 'import { seed } from "../../../src/seed.ts";\nexport const again = seed;';
 
     expect(lint.flagged(reading(file, code))).toEqual([]);
   });
 
-  it("over a file in the repository's own root workspace", () => {
+  it("a file in the repository's own root workspace", () => {
     const file = "scripts/probe.mjs";
     const code = 'export const at = path.resolve(import.meta.dirname, "..");';
 
@@ -171,7 +171,7 @@ describe("the no-path-climb rule on the toolchain root", () => {
   it.each([
     ["another export of the toolchain module", "workspacePackages", "apps/api"],
     ["a workspace that has no helper", "repositoryRoot", "packages/design-system"],
-  ])("stays silent over %s", (_what, name, workspace) => {
+  ])("accepts %s", (_what, name, workspace) => {
     const probe = `${workspace}/tests/probe.test.ts`;
     const code = `import { ${name} } from "@better-answers/devtools/paths";\nexport const at = ${name};`;
 
@@ -179,7 +179,7 @@ describe("the no-path-climb rule on the toolchain root", () => {
   });
 
   it.each(["packages/devtools/test/probe.test.ts", "apps/api/tests/support/roots/roots.ts"])(
-    "stays silent over the helper's own file %s",
+    "accepts the helper's own file %s",
     (probe) => {
       expect(lint.flagged(reading(probe, `${IMPORT}\nexport const at = repositoryRoot;`))).toEqual(
         [],
@@ -198,13 +198,13 @@ describe("the no-path-climb rule in the real config", () => {
   });
 
   it.each(["apps/api/src/probe.ts", "packages/schema/src/probe.ts"])(
-    "stays silent over production source in %s",
+    "accepts production source in %s",
     (file) => {
       expect(inTheRealConfig.flagged(reading(file, CLIMB))).toEqual([]);
     },
   );
 
-  it("is lifted by one override", () => {
+  it("is turned off by one override", () => {
     expect(lifting).toHaveLength(1);
   });
 

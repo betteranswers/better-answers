@@ -7,13 +7,13 @@ import { postgresForSuite } from "./support/probes.ts";
 const db = postgresForSuite();
 
 describe("the factory's defaults", () => {
-  it("spells no word in a default person's address", async () => {
+  it("gives a default person an address of digits at example.invalid", async () => {
     const person = await withRollback(db().pool, (client) => testData(client).user());
 
     expect(person.email).toMatch(/^\d+@example\.invalid$/);
   });
 
-  it("spells no word in a default group's name", async () => {
+  it("names a default group Group followed by a number", async () => {
     const group = await withRollback(db().pool, (client) => testData(client).group());
 
     expect(group.name).toMatch(/^Group \d+$/);
