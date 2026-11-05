@@ -1,5 +1,6 @@
 import { CONCEPT_REFUSALS } from "../concepts/index.ts";
 import { ERASURE_REFUSALS } from "../erasure/index.ts";
+import { GUIDE_REFUSALS } from "../guides/index.ts";
 import { KERNEL_REFUSALS, type Catalogue } from "../kernel/index.ts";
 import { MEMBER_REFUSALS } from "../members/index.ts";
 import { RUN_REFUSALS } from "../runs/index.ts";
@@ -13,5 +14,6 @@ export const REFUSAL_CATALOGUE = {
   workspaces: WORKSPACE_REFUSALS,
   erasure: ERASURE_REFUSALS,
   concepts: CONCEPT_REFUSALS,
+  guides: GUIDE_REFUSALS,
   runs: RUN_REFUSALS,
 } as const satisfies Catalogue;

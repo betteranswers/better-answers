@@ -1,7 +1,8 @@
 import { assert, describe, expect, it } from "vitest";
 
 import { coverageOf, seedGuide } from "../../src/guides/index.ts";
-import { northgate, NORTHGATE, type Northgate } from "../fixtures/northgate.ts";
+import { NORTHGATE } from "../fixtures/northgate-concepts.ts";
+import { northgate, type Northgate } from "../fixtures/northgate.ts";
 import { doorsOf, suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
 import { percentile, recordFigures } from "../support/figures.ts";
 import { answered, readingAs, seedingWith } from "../support/suite-postgres.ts";

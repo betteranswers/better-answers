@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { boundarySchemas } from "@better-answers/schema";
+
 import { readableClause, readableParameters } from "../access/index.ts";
 import { record } from "../audit/index.ts";
 import { withBundleWrite } from "../bundle/index.ts";
@@ -35,7 +37,11 @@ import {
   type IncludeRow,
 } from "./write-ups.ts";
 
-type IncludeAvailableInput = { readonly writeUpId: string };
+export const includeAvailableInput = z.strictObject({
+  writeUpId: boundarySchemas.writeUp.select.shape.id,
+});
+
+type IncludeAvailableInput = z.input<typeof includeAvailableInput>;
 
 const includeAvailableAction = declareAction({
   admits: { role: "Editor", purposes: [] },

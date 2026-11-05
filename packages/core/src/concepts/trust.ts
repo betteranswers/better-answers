@@ -160,3 +160,41 @@ const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boo
 
   return midnight !== undefined && midnight + ONE_DAY_MS <= now.getTime();
 };
+
+const STATUS_RANK = {
+  deprecated: 0,
+  "out-of-date": 1,
+  draft: 2,
+  "changed-since-checked": 3,
+  current: 4,
+} as const satisfies Record<TrustStatus, number>;
+
+const TIER_RANK = {
+  unverified: 0,
+  "machine-confirmed": 1,
+  "human-reviewed": 2,
+} as const satisfies Record<Trust["tier"], number>;
+
+const rankOf = (trust: Trust): number =>
+  trust.status === "current"
+    ? STATUS_RANK.current + TIER_RANK[trust.tier]
+    : STATUS_RANK[trust.status];
+
+/** Of two equally weak trusts, the one verified longest ago limits what rests on both. */
+const weaker = (one: Trust, other: Trust): Trust => {
+  const difference = rankOf(one) - rankOf(other);
+  if (difference !== 0) return difference < 0 ? one : other;
+  return (one.verifiedAt ?? "") <= (other.verifiedAt ?? "") ? one : other;
+};
+
+const NOTHING_CITED: Trust = {
+  tier: "unverified",
+  verifiedBy: null,
+  verifiedAt: null,
+  rider: null,
+  status: "current",
+};
+
+/** Prose is as trusted as the least trusted concept it rests on, and unverified when it rests on none. */
+export const weakestTrust = (trusts: readonly Trust[]): Trust =>
+  trusts.reduce(weaker, trusts[0] ?? NOTHING_CITED);

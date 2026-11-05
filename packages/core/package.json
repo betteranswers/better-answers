@@ -28,6 +28,7 @@
     "./testing/warm-objects": "./test/support/warm-objects.ts",
     "./testing/postgres": "./test/support/suite-postgres.ts",
     "./testing/bundle": "./test/fixtures/bundle.ts",
+    "./testing/northgate": "./test/fixtures/northgate-concepts.ts",
     "./testing/bundle-root": "./test/fixtures/bundle-root.ts",
     "./testing/documents": "./test/support/suite-documents.ts",
     "./testing/worker-process": "./test/support/worker-process.ts",

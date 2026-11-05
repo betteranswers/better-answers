@@ -165,6 +165,8 @@ const CATALOGUED = {
   "malformed-path": "malformed by concepts",
   "malformed-message": "malformed by concepts",
 
+  "marker-without-include": "inapplicable by guides",
+
   "no-such-job": "absent by runs",
 };
 

@@ -5,6 +5,7 @@ export const ACTION_HEADLINES = {
   "knowledge.concept.class_overridden": "Sensitivity overridden",
   "knowledge.concept.committed": "Concept saved",
   "knowledge.feedback.closed": "Flag on an answer closed",
+  "knowledge.guide.brief_saved": "Brief saved",
   "knowledge.guide.included": "Concepts included in a section",
   "knowledge.guide.seeded": "Guide seeded",
   "knowledge.manifest.written": "Knowledge base description updated",
