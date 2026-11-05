@@ -7,6 +7,7 @@ import {
   navOf,
   railOf,
   seedConcepts,
+  signIn,
 } from "./harness.ts";
 
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
@@ -53,4 +54,13 @@ export const knowledgeMenuOpened = async (page: Page): Promise<Locator> => {
   const menu = navOf(page, "Knowledge");
   await expect(menu).toBeVisible();
   return menu;
+};
+
+export const signedIn = async (
+  page: Page,
+  api: APIRequestContext,
+  email: string,
+): Promise<void> => {
+  await page.goto("/sign-in");
+  await signIn(page, api, email);
 };

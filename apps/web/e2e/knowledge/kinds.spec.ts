@@ -15,10 +15,9 @@ import {
   person,
   provision,
   seedConcepts,
-  signIn,
   skipLinkReachesThePage,
 } from "../harness.ts";
-import { listsItsKeystrokes } from "../knowledge.ts";
+import { listsItsKeystrokes, signedIn } from "../knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -72,11 +71,6 @@ const aWorkspaceOfKinds = async (api: APIRequestContext, name: string): Promise<
     admin: { id: workspace.admin.id, email: adminEmail },
     editor: { id: made.id, email: editorEmail },
   };
-};
-
-const signedIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
-  await page.goto("/sign-in");
-  await signIn(page, api, email);
 };
 
 const kinds = (page: Page): Locator => page.getByRole("region", { name: "Kinds" });

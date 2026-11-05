@@ -17,12 +17,11 @@ import {
   seedConcepts,
   seedGuide,
   seedManifest,
-  signIn,
   signOutFromTheShell,
   skipLinkReachesThePage,
   tabUntilFocused,
 } from "../harness.ts";
-import { knowledgeMenuOpened, listsItsKeystrokes } from "../knowledge.ts";
+import { knowledgeMenuOpened, listsItsKeystrokes, signedIn } from "../knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -76,11 +75,6 @@ const aWorkspaceToExport = async (api: APIRequestContext, name: string): Promise
     conceptFiles: concepts.map((concept) => concept.path),
     fileOf: (title) => files.get(title) ?? "",
   };
-};
-
-const signedIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
-  await page.goto("/sign-in");
-  await signIn(page, api, email);
 };
 
 const exportsRegion = (page: Page): Locator => page.getByRole("region", { name: "Exports" });

@@ -187,5 +187,4 @@ export {
   exportGuideSnapshot,
   exportRecords,
   exportRecordsInput,
-  type ExportRefusal,
 } from "./knowledge-export.ts";
