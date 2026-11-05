@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   skipToken,
   useInfiniteQuery,
   useMutation,
@@ -238,4 +239,39 @@ export const useIncludeAvailable = () => {
   );
   return (writeUpId: string): Promise<{ readonly included: number }> =>
     including.mutateAsync({ writeUpId });
+};
+
+export type AllKnowledgeAsked = inferInput<Api["knowledge"]["allKnowledge"]>;
+
+export type AllKnowledge = inferOutput<Api["knowledge"]["allKnowledge"]>;
+
+export type AllKnowledgeRow = AllKnowledge["rows"][number];
+
+export const useAllKnowledge = (asked: AllKnowledgeAsked) => {
+  const api = useTRPC();
+  return useQuery(
+    api.knowledge.allKnowledge.queryOptions(asked, { placeholderData: keepPreviousData }),
+  );
+};
+
+export type KindCounted = inferOutput<Api["knowledge"]["kinds"]>["kinds"][number];
+
+export const useKinds = () => {
+  const api = useTRPC();
+  return useQuery(api.knowledge.kinds.queryOptions());
+};
+
+export const useSetOwners = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    api.knowledge.setOwners.mutationOptions({
+      onSettled: () =>
+        Promise.all([
+          queryClient.invalidateQueries(api.knowledge.allKnowledge.pathFilter()),
+          queryClient.invalidateQueries({ queryKey: api.knowledge.collections.queryKey() }),
+          queryClient.invalidateQueries({ queryKey: memberOptions(api).queryKey }),
+        ]),
+    }),
+  );
 };
