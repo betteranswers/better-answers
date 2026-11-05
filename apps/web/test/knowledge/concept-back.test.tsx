@@ -116,6 +116,10 @@ describe("the concept page's way back", () => {
     expect(markedInTheMenu()).toEqual(["All Knowledge"]);
     const main = within(screen.getByRole("main"));
     expect(main.queryByRole("link", { name: "Back to Search" })).toBeNull();
+    expect(
+      main.getByRole("heading", { level: 1 }).textContent,
+      "the page titles itself for the group it was opened from",
+    ).toBe("Curation");
 
     fireEvent.click(main.getByRole("link", { name: "Back to All Knowledge" }));
 

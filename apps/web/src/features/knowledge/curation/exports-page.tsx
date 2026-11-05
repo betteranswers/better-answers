@@ -68,6 +68,7 @@ type Download = {
   readonly pending: boolean;
   readonly off: boolean;
   readonly run: () => void;
+  readonly id: string;
 };
 
 const failureOf = (said: OwnSentences) => {
@@ -104,16 +105,24 @@ const GUIDE: Way<GuideExported> = {
   failed: failureOf(SAID_OF_EXPORTED_GUIDE),
 };
 
+/** The mutation saves the file itself, so a person who leaves the page mid-export still receives it. */
+const saveIn =
+  <Answer,>(way: Way<Answer>) =>
+  (answer: Answer): void => {
+    saveFile(way.file(answer));
+  };
+
 function useDownload<Answer>(way: Way<Answer>, exporting: Exporting<Answer>, say: Say): Download {
   const { pending, start } = exporting;
   const off = pending || start === undefined;
+  const id = useId();
   const run = () => {
     if (off) return;
     say({ tone: "said", words: WORDS.preparingSaid(way.name) });
     start({
       onSuccess: (answer) => {
-        saveFile(way.file(answer));
         say({ tone: "said", words: way.saved(answer) });
+        if (document.activeElement === document.body) document.getElementById(id)?.focus();
       },
       onError: (failure) => {
         say(refusalOf(failure)?.word === ANSWERED_BY_THE_DIALOG ? undefined : way.failed(failure));
@@ -121,13 +130,14 @@ function useDownload<Answer>(way: Way<Answer>, exporting: Exporting<Answer>, say
     });
   };
   useKeystroke(way.keystroke, run);
-  return { pending, off, run };
+  return { pending, off, run, id };
 }
 
 function DownloadButton(properties: { readonly of: Named; readonly download: Download }) {
   const { of, download } = properties;
   return (
     <Button
+      id={download.id}
       type="button"
       variant="outline"
       aria-disabled={download.off}
@@ -160,7 +170,7 @@ function ExportRow(properties: {
 }
 
 function KnowledgeBaseExport(properties: { readonly say: Say }) {
-  const exporting = useExportKnowledgeBase();
+  const exporting = useExportKnowledgeBase(saveIn(KNOWLEDGE_BASE));
   const download = useDownload(
     KNOWLEDGE_BASE,
     {
@@ -179,7 +189,7 @@ function KnowledgeBaseExport(properties: { readonly say: Say }) {
 }
 
 function RecordsExport(properties: { readonly say: Say }) {
-  const exporting = useExportRecords();
+  const exporting = useExportRecords(saveIn(RECORDS));
   const download = useDownload(
     RECORDS,
     {
@@ -267,7 +277,7 @@ function GuideControls(properties: {
 
 function GuideExport(properties: { readonly say: Say }) {
   const read = useGuides();
-  const exporting = useExportGuide();
+  const exporting = useExportGuide(saveIn(GUIDE));
   const [picked, setPicked] = useState<string>();
   const listed = read.data ?? NO_GUIDES;
   const guideId = listed.find((guide) => guide.guideId === picked)?.guideId ?? listed[0]?.guideId;

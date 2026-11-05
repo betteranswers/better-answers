@@ -298,6 +298,22 @@ describe("a guide snapshot", () => {
     expect(guide.markdown).toContain("Professional indemnity policy.");
   });
 
+  it("says how many sections it leaves out", async () => {
+    const world = await guideWorld();
+    const outsider = await memberAs(world.scenario, "Admin");
+    const insider = await memberAs(world.scenario, "Admin", world.ng.finance);
+    const leftOut = (markdown: string): number =>
+      Number(
+        /\n\n(\d+) sections? (?:is|are) left out, because you cannot read/u.exec(markdown)?.[1],
+      );
+
+    const outside = answered(await guideOf(outsider, world)).markdown;
+    const inside = answered(await guideOf(insider, world)).markdown;
+
+    expect(leftOut(outside)).toBeGreaterThan(leftOut(inside));
+    expect(outside).toMatch(/\n\n\d+ sections are left out, because you cannot read them/u);
+  });
+
   it("an unknown guide is not found", async () => {
     const world = await guideWorld();
     const admin = await memberAs(world.scenario, "Admin");

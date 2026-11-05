@@ -451,11 +451,19 @@ const sectionMarkdown = ({ section, brief, trustWords: words }: Carried): string
     renderBrief(brief.markdown, brief.includes, "snapshot"),
   ].join("\n\n");
 
+const leftOutWords = (count: number): string[] =>
+  count === 0
+    ? []
+    : [
+        `${String(count)} ${count === 1 ? "section is" : "sections are"} left out, because you cannot read ${count === 1 ? "it" : "them"} or ${count === 1 ? "it holds" : "they hold"} no text yet.`,
+      ];
+
 const markdownOf = ({ guide, sections }: GuideCarried, at: Date): string =>
   `${[
     `# ${titleOf(guide)}`,
     `Guide snapshot, ${ukLongDate(at.toISOString())}. Not maintained. It does not change when the guide does.`,
     ...sections.map(sectionMarkdown),
+    ...leftOutWords(guide.sections.length - sections.length),
   ].join("\n\n")}\n`;
 
 export const exportGuideSnapshot = async (

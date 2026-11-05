@@ -282,17 +282,17 @@ export type RecordsExported = inferOutput<Api["knowledge"]["exportRecords"]>;
 
 export type GuideExported = inferOutput<Api["knowledge"]["exportGuide"]>;
 
-export const useExportKnowledgeBase = () => {
+export const useExportKnowledgeBase = (saved: (answer: KnowledgeBaseExported) => void) => {
   const api = useTRPC();
-  return useMutation(api.knowledge.exportBundle.mutationOptions());
+  return useMutation(api.knowledge.exportBundle.mutationOptions({ onSuccess: saved }));
 };
 
-export const useExportRecords = () => {
+export const useExportRecords = (saved: (answer: RecordsExported) => void) => {
   const api = useTRPC();
-  return useMutation(api.knowledge.exportRecords.mutationOptions());
+  return useMutation(api.knowledge.exportRecords.mutationOptions({ onSuccess: saved }));
 };
 
-export const useExportGuide = () => {
+export const useExportGuide = (saved: (answer: GuideExported) => void) => {
   const api = useTRPC();
-  return useMutation(api.knowledge.exportGuide.mutationOptions());
+  return useMutation(api.knowledge.exportGuide.mutationOptions({ onSuccess: saved }));
 };

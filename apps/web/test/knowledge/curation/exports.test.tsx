@@ -233,6 +233,21 @@ describe("the Exports page", () => {
     await readyToDownload(KNOWLEDGE_BASE);
   });
 
+  it("still saves the file when the person leaves the page", async () => {
+    const api = anAdminOffering();
+    const router = await openAt(PAGE, api);
+    const running = heldBack(api, EXPORT_BUNDLE, read(KNOWLEDGE_BASE_ANSWER));
+
+    fireEvent.click(await readyToDownload(KNOWLEDGE_BASE));
+    await running.asked;
+    await router.navigate({ to: "/knowledge/kinds" });
+    await waitFor(() => expect(router.state.location.pathname).toBe("/knowledge/kinds"));
+    running.resolve();
+
+    const file = await theOneSaved();
+    expect(file.name).toBe(KNOWLEDGE_BASE_ANSWER.name);
+  });
+
   it("offers no guide download when there are no guides", async () => {
     await openAt(PAGE, anAdminOffering([]));
 
@@ -426,7 +441,9 @@ describe("a stale confirmation before an export", () => {
     expect(asked(procedure)).toHaveLength(2);
     expect(whatTheAlertSays()).toBe("");
     expect(whatTheStatusSays()).toContain(`Saved ${answer.name}.`);
-    await readyToDownload(name);
+    expect(document.activeElement, "focus was lost when the dialog closed").toBe(
+      await readyToDownload(name),
+    );
   });
 
   it("leaves the page quiet and ready when the person cancels", async () => {
