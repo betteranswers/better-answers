@@ -27,6 +27,7 @@ import { type CommitAuthor, type GitDoor } from "../../store/git/index.ts";
 import { withMember, type PostgresDoor } from "../../store/postgres/index.ts";
 import { type FrontmatterSource } from "../file.ts";
 import { writeConcept, type WriteConceptRefusal, type WriteDoors } from "../writes/write.ts";
+import { cataloguedOf, evidenceOfSources } from "./landing.ts";
 import {
   countVerifications,
   IMPORT_SENSITIVITY_DEFAULT,
@@ -190,6 +191,25 @@ type OpenedImport = {
   readonly present: ReadonlySet<string>;
 };
 
+const citedIn = (principal: UserPrincipal, concept: LoadedConcept) =>
+  evidenceOfSources(principal.workspaceId, concept.frontmatter);
+
+const uncataloguedIn = (
+  principal: UserPrincipal,
+  concepts: readonly LoadedConcept[],
+  catalogued: ReadonlySet<string>,
+): Unsound | undefined => {
+  for (const concept of concepts) {
+    const gone = citedIn(principal, concept).find(
+      (piece) => !catalogued.has(piece.sourceDocumentId),
+    );
+    if (gone !== undefined) {
+      return { file: concept.file, reason: "document-not-catalogued", about: gone.locator };
+    }
+  }
+  return undefined;
+};
+
 const importContextOf = (
   principal: UserPrincipal,
   postgres: PostgresDoor,
@@ -211,6 +231,13 @@ const importContextOf = (
           concepts.flatMap((concept) => concept.verified.map((event) => event.email)),
         ),
         author: await authorOf(fresh, tx, fresh.userId),
+        catalogued: await cataloguedOf(
+          fresh,
+          tx,
+          concepts.flatMap((concept) =>
+            citedIn(fresh, concept).map((piece) => piece.sourceDocumentId),
+          ),
+        ),
         present:
           input.dryRun === true
             ? await presentVerifications(
@@ -248,10 +275,12 @@ const openImport = async (
   const read = await importContextOf(principal, postgres, input, concepts);
   if (!read.ok) return err(read.error);
   if (!read.value.ok) return err(read.value.error);
-  const { persons, ...context } = read.value.value;
+  const { persons, catalogued, ...context } = read.value.value;
 
   const resolved = resolvedOf(concepts, persons);
   if (!resolved.ok) return err({ kind: "unsound", ...resolved.error });
+  const uncatalogued = uncataloguedIn(principal, concepts, catalogued);
+  if (uncatalogued !== undefined) return err({ kind: "unsound", ...uncatalogued });
   return ok({ manifest, resolved: resolved.value, ...context });
 };
 

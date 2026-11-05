@@ -2,19 +2,26 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it } from "vitest";
 
-import { head } from "@better-answers/core/store/git";
-import { passageLocatorOf, type ConceptIri } from "@better-answers/schema";
+import { commit, head } from "@better-answers/core/store/git";
+import { conceptIriOf, passageLocatorOf, ulid, type ConceptIri } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import {
+  acceptSuggestions,
   conceptToEdit,
   importBundle,
+  reconcile,
+  RECONCILER,
+  renderConceptFile,
   saveConcept,
+  submitSuggestionSet,
+  suggestionSetSummary,
   writeConcept,
   type ConceptToEdit,
   type Frontmatter,
   type SaveConceptInput,
 } from "../../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../../src/kernel/index.ts";
+import { actorIdOf, type UserPrincipal } from "../../../src/kernel/index.ts";
 import { passageAt } from "../../../src/sources/index.ts";
 import type { Tx } from "../../../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit } from "../../fixtures/bundle.ts";
@@ -22,6 +29,7 @@ import {
   auditEventRowsOf,
   connectedSourceHolding,
   overriddenBy,
+  publishedOnceIndexed,
   writeUpIncluding,
 } from "../../fixtures/sourced-concept.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "../../fixtures/workspace-with-bundle.ts";
@@ -338,7 +346,186 @@ describe("a save seeded from the raw file", () => {
   });
 });
 
+describe("a save around a source whose document is gone", () => {
+  const replayedCitingAGoneDocument = async (
+    scenario: Scenario,
+    handbookPublished: Date | null = null,
+  ) => {
+    const handbook = await documentLanded(db().pool, scenario.workspaceId, {
+      title: "Handbook",
+      text: "Allowances are paid monthly.",
+      sensitivity: "Public",
+      publishedAt: handbookPublished,
+    });
+    const gone = await connectedSourceHolding(db(), scenario.workspaceId);
+    await db().pool.query("DELETE FROM source_document WHERE workspace_id = $1 AND id = $2", [
+      scenario.workspaceId,
+      gone.documentId,
+    ]);
+    minted += 1;
+    const iri = conceptIriOf(ulid());
+    const path = `knowledge/policy/allowances-${minted}.md`;
+    const goneLocator = passageLocatorOf(gone.documentId, 0, 4);
+    const pushed = await commit(scenario.admin, scenario.git, {
+      path,
+      content: renderConceptFile(
+        {
+          iri,
+          title: `Allowances ${minted}`,
+          type: "Policy",
+          status: "stable",
+          sources: [
+            { title: "Board minutes", resource: "minutes", locator: goneLocator },
+            { title: "Handbook", resource: "handbook", locator: handbook.locator },
+          ],
+        },
+        "Allowances are paid monthly.",
+      ),
+      message: "Push the allowances policy from outside the platform",
+      author: { name: "Ada Admin", email: "ada@acme.invalid" },
+      trailers: { actor: actorIdOf(scenario.admin), audit: ulid() },
+      expectedHead: await head(scenario.admin, scenario.git),
+      at: new Date(),
+    });
+    if (!pushed.ok) throw new Error(`the push was refused: ${String(pushed.error)}`);
+    const replay = await reconcile(RECONCILER, doorsOf(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+    expect(replay).toMatchObject({ ok: true, value: { replayed: [pushed.value.sha] } });
+    return { iri, path, handbook, goneLocator };
+  };
+
+  const sensitivityOf = async (iri: ConceptIri): Promise<string | undefined> => {
+    const found = await db().pool.query<{ sensitivity: string }>(
+      "SELECT sensitivity FROM concept_index WHERE iri = $1",
+      [iri],
+    );
+    return found.rows[0]?.sensitivity;
+  };
+
+  const sensitivityOncePublished = async (
+    scenario: Scenario,
+    iri: ConceptIri,
+    connectedSourceId: string,
+  ) => {
+    const published = await publishedOnceIndexed(db(), scenario.admin, connectedSourceId);
+    expect(published.ok).toBe(true);
+    return sensitivityOf(iri);
+  };
+
+  it("saves an edit that carries the gone source in place", async () => {
+    const scenario = await arrange();
+    const { iri, path, goneLocator } = await replayedCitingAGoneDocument(scenario, new Date());
+    expect(await sensitivityOf(iri)).toBe("Restricted");
+
+    const { seed, answer } = await editedBy(
+      scenario,
+      scenario.admin,
+      iri,
+      withBody("Allowances are paid on the last working day."),
+    );
+
+    expect(seed.withheld).toContainEqual({ at: 0, label: "Board minutes" });
+    expect(answer).toEqual({
+      ok: true,
+      value: { outcome: "committed", iri, sha: matching.any(String) },
+    });
+    const { file } = await fileAtHead(scenario, path);
+    expect(file).toContain(`"locator": ${JSON.stringify(goneLocator)}`);
+    expect(file).toContain("Allowances are paid on the last working day.");
+    expect(await sensitivityOf(iri)).toBe("Restricted");
+  });
+
+  it("keeps the saved concept Restricted through a later cascade", async () => {
+    const scenario = await arrange();
+    const { iri, handbook } = await replayedCitingAGoneDocument(scenario);
+    const { answer } = await editedBy(scenario, scenario.admin, iri, withBody("Paid monthly."));
+    expect(answer).toEqual({
+      ok: true,
+      value: { outcome: "committed", iri, sha: matching.any(String) },
+    });
+
+    expect(await sensitivityOncePublished(scenario, iri, handbook.connectedSourceId)).toBe(
+      "Restricted",
+    );
+  });
+
+  const acceptedEdit = async (scenario: Scenario, iri: ConceptIri, path: string, body: string) => {
+    const found = await db().pool.query<{
+      merge_key: string;
+      kind: string;
+      title: string;
+      frontmatter: Frontmatter;
+      content_hash: string;
+    }>(
+      `SELECT i.merge_key, c.kind, c.title, c.frontmatter, c.content_hash
+         FROM concept_index c
+         JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
+        WHERE c.iri = $1`,
+      [iri],
+    );
+    const held = found.rows[0];
+    assert(held !== undefined, "the replayed concept is indexed");
+    const { iri: _iri, ...frontmatter } = held.frontmatter;
+    const set = await submitSuggestionSet(
+      scenario.editor,
+      { postgres: scenario.postgres },
+      {
+        kind: "edit",
+        requests: [
+          {
+            mergeKey: held.merge_key,
+            path,
+            conceptKind: held.kind,
+            title: held.title,
+            frontmatter,
+            body,
+            baseContentHash: held.content_hash,
+          },
+        ],
+      },
+    );
+    assert(set.ok, `the suggestion was refused: ${inspect(set)}`);
+    const summary = answered(
+      await readingAs(db().runtimePool, scenario.admin, (principal, tx) =>
+        suggestionSetSummary(principal, tx, set.value.setId),
+      ),
+    );
+    return acceptSuggestions(scenario.admin, doorsOf(scenario), {
+      decisions: summary.map((item) => ({
+        suggestionId: item.suggestionId,
+        expectedTarget: item.target,
+      })),
+    });
+  };
+
+  it("keeps an accepted edit Restricted through a later cascade", async () => {
+    const scenario = await arrange();
+    const { iri, path, handbook } = await replayedCitingAGoneDocument(scenario);
+
+    const accepted = await acceptedEdit(scenario, iri, path, "Allowances are paid on the 25th.");
+
+    expect(accepted).toMatchObject({ ok: true, value: [{ outcome: { ok: true } }] });
+    expect(await sensitivityOncePublished(scenario, iri, handbook.connectedSourceId)).toBe(
+      "Restricted",
+    );
+  });
+});
+
 describe("what a save refuses", () => {
+  it("refuses a save newly citing a document not catalogued", async () => {
+    const scenario = await arrange();
+    const concept = await written(scenario);
+    const before = await historyOf(scenario);
+
+    const { answer: refused } = await editedBy(scenario, scenario.admin, concept.iri, () => ({
+      sources: [{ title: "Minutes", resource: "minutes", locator: passageLocatorOf(ulid(), 0, 4) }],
+    }));
+
+    expect(refused).toEqual({ ok: false, error: "no-such-document" });
+    expect(await historyOf(scenario)).toEqual(before);
+  });
+
   it("refuses a bare wire locator as a string source", async () => {
     const scenario = await arrange();
     const handbook = await connectedSourceHolding(db(), scenario.workspaceId);

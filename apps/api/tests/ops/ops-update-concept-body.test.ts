@@ -290,6 +290,7 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
           contentHash: row.content_hash,
           fromContentHash: scene.held.content_hash,
           evidenceCount: 0,
+          evidenceAgrees: true,
         },
       },
     ]);

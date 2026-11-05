@@ -31,7 +31,7 @@ import {
 import { holdsEveryGroup } from "../members/index.ts";
 import { writeConceptVisibility } from "../store/map/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
-import { restsAlsoOnItsReconcilerHit } from "./writes/reconciler-hit.ts";
+import { restsAlsoOnItsCommit } from "./writes/reconciler-hit.ts";
 
 const VISIBILITY_ACTIONS = declareActions("knowledge", {
   sensitivityOverridden: action("knowledge.concept.class_overridden", {
@@ -178,7 +178,7 @@ const recomputeConceptVisibility = async (
     iri,
     kind: row.kind,
     fallback: visibilityOf(row),
-    alsoOn: await restsAlsoOnItsReconcilerHit(principal, tx, iri),
+    alsoOn: await restsAlsoOnItsCommit(principal, tx, iri),
   });
   await tx.query(
     `UPDATE concept_index SET sensitivity = $3, audience = $4, audience_groups = $5, updated_at = now()

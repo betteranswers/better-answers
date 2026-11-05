@@ -434,6 +434,7 @@ describe("accepting a suggestion", () => {
           commitSha: accepted.sha,
           contentHash: accepted.contentHash,
           setId: set.setId,
+          evidenceAgrees: true,
         },
       },
     ]);
