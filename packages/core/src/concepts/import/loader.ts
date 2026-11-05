@@ -63,6 +63,7 @@ export type UnsoundReason =
   | "path-refused"
   | "link-outside-tree"
   | "verifier-not-a-member"
+  | "document-not-catalogued"
   | "merge-key-clash";
 
 export type Unsound = {

@@ -31,6 +31,7 @@ import { scopeClause, scopeParameter, type Tx } from "../../store/postgres/index
 import { contentHashOf, parseConceptFile, type Frontmatter } from "../file.ts";
 import type { Acceptance } from "../index.ts";
 import { conceptVisibilityFrom, replaceCitations } from "../visibility.ts";
+import { restsAlsoOnWhenReplayed } from "../writes/reconciler-hit.ts";
 import { markDeciding } from "../writes/suggestions.ts";
 
 export const mergeKeyOf = (foldedKind: string, title: string): string =>
@@ -153,13 +154,6 @@ export const cataloguedOf = async (
   return new Set(found.rows.map((row) => row.id));
 };
 
-export const holdsEveryDocument = async (
-  principal: Principal,
-  tx: Tx,
-  documentIds: readonly string[],
-): Promise<boolean> =>
-  (await cataloguedOf(principal, tx, documentIds)).size === new Set(documentIds).size;
-
 export type EvidenceRow = z.infer<typeof boundarySchemas.evidence.insert>;
 
 export const evidenceOfSources = (
@@ -179,6 +173,58 @@ export const evidenceOfSources = (
     });
   }
   return [...rows.values()];
+};
+
+export type Citing = {
+  readonly landed: readonly EvidenceRow[];
+  readonly agrees: boolean;
+  readonly restsAlsoOn: readonly Visibility[];
+  readonly goneAnew: boolean;
+};
+
+const citedBefore = async (
+  principal: Principal,
+  tx: Tx,
+  iri: string,
+): Promise<ReadonlySet<string>> => {
+  const found = await tx.query<{
+    workspace_id: EvidenceRow["workspaceId"];
+    frontmatter: Frontmatter;
+  }>(
+    `SELECT workspace_id, frontmatter FROM concept_index
+      WHERE workspace_id = ${scopeClause(1)} AND iri = $2`,
+    [scopeParameter(principal), iri],
+  );
+  const row = found.rows[0];
+  if (row === undefined) return new Set();
+  return new Set(
+    evidenceOfSources(row.workspace_id, row.frontmatter).map((piece) => piece.sourceDocumentId),
+  );
+};
+
+export const citingOf = async (
+  principal: Principal,
+  tx: Tx,
+  iri: string,
+  evidence: readonly EvidenceRow[],
+): Promise<Citing> => {
+  const catalogued = await cataloguedOf(
+    principal,
+    tx,
+    evidence.map((piece) => piece.sourceDocumentId),
+  );
+  const landed = evidence.filter((piece) => catalogued.has(piece.sourceDocumentId));
+  const agrees = landed.length === evidence.length;
+  const restsAlsoOn = restsAlsoOnWhenReplayed(agrees);
+  if (agrees) return { landed, agrees, restsAlsoOn, goneAnew: false };
+  const before = await citedBefore(principal, tx, iri);
+  const gone = evidence.filter((piece) => !catalogued.has(piece.sourceDocumentId));
+  return {
+    landed,
+    agrees,
+    restsAlsoOn,
+    goneAnew: gone.some((piece) => !before.has(piece.sourceDocumentId)),
+  };
 };
 
 const sameVisibility = (one: Visibility, other: Visibility): boolean =>

@@ -16,22 +16,22 @@ export const RECONCILER_ACTIONS = declareActions("platform", {
 export const restsAlsoOnWhenReplayed = (evidenceAgrees: boolean): readonly Visibility[] =>
   evidenceAgrees ? [] : [RESTRICTED_TO_ADMINS];
 
-const EVIDENCE_AGREES = "evidenceAgrees" satisfies keyof DetailOf<
+export const EVIDENCE_AGREES = "evidenceAgrees" satisfies keyof DetailOf<
   typeof RECONCILER_ACTIONS.replayed.detail
 >;
 
-export const restsAlsoOnItsReconcilerHit = async (
+export const restsAlsoOnItsCommit = async (
   principal: Principal,
   tx: Tx,
   iri: string,
 ): Promise<readonly Visibility[]> => {
   const hit = await tx.query<{ evidence_agrees: boolean | null }>(
-    `SELECT (e.detail ->> $4)::boolean AS evidence_agrees
+    `SELECT (e.detail ->> $3)::boolean AS evidence_agrees
        FROM concept_index c
        JOIN bundle_commit bc ON bc.workspace_id = c.workspace_id AND bc.sha = c.commit_sha
        JOIN audit_event e ON e.workspace_id = bc.workspace_id AND e.id = bc.audit_event_id
-      WHERE c.workspace_id = ${scopeClause(1)} AND c.iri = $2 AND e.action = $3`,
-    [scopeParameter(principal), iri, RECONCILER_ACTIONS.replayed.name, EVIDENCE_AGREES],
+      WHERE c.workspace_id = ${scopeClause(1)} AND c.iri = $2`,
+    [scopeParameter(principal), iri, EVIDENCE_AGREES],
   );
   return restsAlsoOnWhenReplayed(hit.rows[0]?.evidence_agrees ?? true);
 };

@@ -70,6 +70,8 @@ const UNSOUND_WORDS = {
   "link-outside-tree": (about) => `links to ${about}, which is not a concept in the tree`,
   "verifier-not-a-member": (about) =>
     `is verified by ${about}, who is not a member of this workspace; invite them first`,
+  "document-not-catalogued": (about) =>
+    `cites ${about}, which names no document this workspace's catalogue holds; connect its source first, or remove the citation`,
   "merge-key-clash": (about) => `derives the same merge key as ${about}`,
 } satisfies Readonly<Record<UnsoundReason, (about: string) => string>>;
 

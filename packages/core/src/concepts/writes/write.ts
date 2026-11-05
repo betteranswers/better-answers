@@ -39,16 +39,17 @@ import {
 import { withMember, type PostgresDoor, type Tx } from "../../store/postgres/index.ts";
 import { contentHashOf, parseConceptFile, renderConceptFile, type Frontmatter } from "../file.ts";
 import {
+  citingOf,
   evidenceOfSources,
   heldByIri,
   heldVisibilityOf,
   holderOfPath,
-  holdsEveryDocument,
   indexRowOf,
   type IndexRow,
   landRows,
   placesUsingReadableOrNot,
   WRITE_CONSTRAINTS,
+  type Citing,
   type EvidenceRow,
   type Held,
 } from "../import/landing.ts";
@@ -57,6 +58,7 @@ import { deciderAdmits, ownerAdmits, standingConcept } from "../owners.ts";
 import { conceptVisibilityFrom } from "../visibility.ts";
 import type { PassedOnCommitRefusal } from "../vocabulary.ts";
 import { acceptedKeyOf } from "./merge-key.ts";
+import { EVIDENCE_AGREES } from "./reconciler-hit.ts";
 import {
   conceptOfSuggestion,
   payloadFor,
@@ -73,12 +75,14 @@ const CONCEPT_ACTIONS = declareActions("knowledge", {
     contentHash: "contentHash",
     fromContentHash: "contentHash?",
     evidenceCount: "count",
+    [EVIDENCE_AGREES]: "flag",
   }),
   accepted: action("knowledge.suggestion.accepted", {
     iri: "iri",
     commitSha: "gitSha",
     contentHash: "contentHash",
     setId: "id",
+    [EVIDENCE_AGREES]: "flag",
   }),
 });
 
@@ -235,7 +239,7 @@ type ParsedWrite = {
 type Facts = {
   readonly held: Held | undefined;
   readonly derived: Visibility | undefined;
-  readonly catalogued: boolean;
+  readonly citing: Citing;
   readonly resolved: string | undefined;
   readonly landsAt: string;
   readonly landsOnto: string | undefined;
@@ -281,9 +285,9 @@ const writeUnderLock = async (
   const row = parsed.data;
 
   const landed = await commitAndLandWrite(principal, doors, write, row, {
+    ...existing,
     at: now,
     fromContentHash: existing.held?.contentHash,
-    landsAt: existing.landsAt,
   });
   if (!landed.ok) return err(landed.error);
 
@@ -302,6 +306,7 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
       const admission = await writersRefusal(fresh, tx, write, input.path);
       const held = await heldByIri(fresh, tx, iri);
       const landsAt = landingKeyOf(write, held);
+      const citing = await citingOf(fresh, tx, iri, write.evidence);
       return {
         admission,
         held,
@@ -314,13 +319,10 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
                 kind: foldKind(input.kind),
                 fallback: heldVisibilityOf(held),
                 citing: write.evidence.map((piece) => piece.sourceDocumentId),
+                alsoOn: citing.restsAlsoOn,
               }),
 
-        catalogued: await holdsEveryDocument(
-          fresh,
-          tx,
-          write.evidence.map((piece) => piece.sourceDocumentId),
-        ),
+        citing,
 
         resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
         landsAt,
@@ -343,7 +345,7 @@ const WRITE_REFUSALS: readonly (readonly [
   (write: ParsedWrite, existing: Existing) => boolean,
 ])[] = [
   ["no-such-concept", ({ input }, { held }) => input.iri !== undefined && held === undefined],
-  ["no-such-document", (_, { catalogued }) => !catalogued],
+  ["no-such-document", (_, { citing }) => citing.goneAnew],
   ["already-decided", (_, { waiting }) => !waiting],
   [
     "merge-key-taken",
@@ -463,10 +465,9 @@ const carriesItsProposal = ({ input }: ParsedWrite, payload: SuggestionPayload) 
   "base" in input.expects &&
   payload.baseContentHash === input.expects.base;
 
-type WriteLanding = {
+type WriteLanding = Pick<Facts, "landsAt" | "citing"> & {
   readonly at: Date;
   readonly fromContentHash: string | undefined;
-  readonly landsAt: string;
 };
 
 const commitAndLandWrite = async (
@@ -509,7 +510,7 @@ const landWrite = async (
   write: ParsedWrite,
   row: IndexRow,
   committed: Committed,
-  { fromContentHash, landsAt }: WriteLanding,
+  { fromContentHash, landsAt, citing }: WriteLanding,
 ): Promise<void> => {
   const acceptance = write.input.acceptance;
   if (acceptance === undefined) {
@@ -517,7 +518,8 @@ const landWrite = async (
       iri: row.iri,
       commitSha: committed.sha,
       contentHash: write.contentHash,
-      evidenceCount: write.evidence.length,
+      evidenceCount: citing.landed.length,
+      evidenceAgrees: citing.agrees,
     };
     await record(fresh, tx, {
       id: write.auditEventId,
@@ -536,6 +538,7 @@ const landWrite = async (
         commitSha: committed.sha,
         contentHash: write.contentHash,
         setId: acceptance.setId,
+        evidenceAgrees: citing.agrees,
       },
     });
   }
@@ -545,8 +548,8 @@ const landWrite = async (
     commit: committed,
     actor: actorIdOf(fresh),
     auditEventId: write.auditEventId,
-    evidence: write.evidence,
-    restsAlsoOn: [],
+    evidence: citing.landed,
+    restsAlsoOn: citing.restsAlsoOn,
     acceptance,
   });
 };
