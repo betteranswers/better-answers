@@ -154,20 +154,26 @@ jobs:
       - if: matrix.probe-toolchain == 'python'
         run: uv sync --frozen --only-group probe
         working-directory: apps/worker
+      # The leg's one build. A second build for the push could re-run a step BuildKit's cache
+      # missed, and the weights and suffix list steps fetch afresh, so it would ship bytes
+      # the probe never read.
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         id: load
         if: matrix.probe
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          # Both exports name these, or the probed and pushed digests are two builds.
           outputs: type=docker,oci-mediatypes=false
           provenance: false
           sbom: false
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Read only: exporting from both would upload one build's cache twice, the
-          # pushing step below resolving every layer this one produced.
+          # In the registry, not the Actions cache, which any run on main can write: these
+          # layers ship, and only a job holding `packages: write` can write here. A failed
+          # export warns rather than fails, so a refused cache never stops a built image
+          # from being probed and pushed.
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
       # With no id the probe would build an image of its own, and the leg would push
       # something nothing read.
       - name: the image is read before it ships
@@ -181,29 +187,33 @@ jobs:
             exit 1
           fi
           ${PROBE}
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        id: build
-        with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
-          outputs: type=image,push=true,oci-mediatypes=false
-          provenance: false
-          sbom: false
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # In the registry, not the Actions cache, which any run on main can write: these
-          # layers ship, and only a job holding `packages: write` can write here. A failed
-          # export warns rather than fails, because the image is pushed before it and a red
-          # step here would skip the digest check and the attestation.
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
+      # The daemon keeps images in containerd, which pushes the manifest the load wrote
+      # byte for byte. The digest is read back from the registry, not from the runner.
+      - name: the image the probe read is the image pushed
+        id: push
+        env:
+          LOADED: ${{ steps.load.outputs.imageid }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}
+          TAG: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+        run: |
+          if [ -z "${LOADED}" ]; then
+            echo "::error::no image was built and probed, so there is nothing to push: a leg ships only the image its probe read"
+            exit 1
+          fi
+          if ! docker info --format '{{json .DriverStatus}}' | grep -q io.containerd.snapshotter.v1; then
+            echo "::error::the daemon does not keep images in containerd, so a push would write a manifest the probe never read"
+            exit 1
+          fi
+          docker push --quiet --all-tags "${IMAGE}"
+          digest="$(docker buildx imagetools inspect "${TAG}" --format '{{json .Manifest}}' | jq -r .digest)"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
       - name: digest to the job summary
         env:
           TIER: ${{ matrix.tier }}
           OWNER: ${{ github.repository_owner }}
           PROBE: ${{ matrix.probe }}
           PROBED: ${{ steps.load.outputs.digest }}
-          PUSHED: ${{ steps.build.outputs.digest }}
+          PUSHED: ${{ steps.push.outputs.digest }}
         run: |
           {
             echo "### ${TIER}"
@@ -221,14 +231,14 @@ jobs:
               echo "tested \`${PROBED}\`, pushed \`${PUSHED}\`"
             } >> "$GITHUB_STEP_SUMMARY"
             if [ "${PROBED}" != "${PUSHED}" ]; then
-              echo "::error::${TIER} probed ${PROBED} and pushed ${PUSHED}: the two exports have stopped being one manifest"
+              echo "::error::${TIER} probed ${PROBED} and the registry answers ${PUSHED}: the push did not ship the manifest the probe read"
               exit 1
             fi
           fi
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
           create-storage-record: false
 
