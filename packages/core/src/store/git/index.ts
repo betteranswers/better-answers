@@ -12,4 +12,5 @@ export type { CommitAuthor, CommitRequest, Committed, CommitRefusal } from "./co
 export { commitsAfter, historyNaming, readCommit, fileAt, fileAtHead } from "./history.ts";
 export type { CommitRead } from "./history.ts";
 export { ERASED_DOMAIN, rewriteHistory } from "./rewrite.ts";
+export { bundleSnapshot } from "./snapshot.ts";
 export type { Needles, Pseudonymisation } from "./rewrite.ts";

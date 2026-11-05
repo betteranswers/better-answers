@@ -128,7 +128,7 @@ export const emptyRootCommit = async (
 export const treeCommitted = async (
   door: GitDoor,
   workspaceId: string,
-  files: ReadonlyMap<string, string>,
+  files: ReadonlyMap<string, string | Uint8Array>,
   message: string,
 ): Promise<string> => {
   const workTree = await mkdtemp(path.join(tmpdir(), "better-answers-tree-"));
