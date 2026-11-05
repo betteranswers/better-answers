@@ -14,14 +14,15 @@ export {
   readSectionTrusts,
   type KindConceptsInput,
 } from "./reading/browse.ts";
-export {
-  allKnowledgeInput,
-  readAllKnowledge,
-  readKinds,
-  type AllKnowledgeInput,
-} from "./curation.ts";
+export { allKnowledgeInput, readAllKnowledge, readKinds } from "./curation.ts";
 /** @public S3 */
-export type { AllKnowledge, AllKnowledgeRow, CurationRefusal, KindCounted } from "./curation.ts";
+export type {
+  AllKnowledge,
+  AllKnowledgeInput,
+  AllKnowledgeRow,
+  CurationRefusal,
+  KindCounted,
+} from "./curation.ts";
 export {
   conceptToEdit,
   conceptToEditInput,

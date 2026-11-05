@@ -13,7 +13,7 @@ import type { Role, UserPrincipal } from "../../src/kernel/index.ts";
 import { seedingWith } from "../support/suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 
-export type Check = { readonly actor: string; readonly at: Date };
+type Check = { readonly actor: string; readonly at: Date };
 
 export type Shelved = {
   readonly path: string;
@@ -91,6 +91,58 @@ export const shelveOne = async (
   const [iri] = await shelve(pool, workspaceId, [concept]);
   if (iri === undefined) throw new Error(`${concept.path} was not shelved`);
   return iri;
+};
+
+const WIDE_COLLECTIONS = 12;
+const WIDE_KINDS = 8;
+
+export type WideKnowledge = {
+  readonly count: number;
+
+  /** People who own the collections, and an override on every tenth concept, in turn. */
+  readonly owners: readonly string[];
+
+  /** The actor of two verifications on every third concept. */
+  readonly checker: string;
+};
+
+const wideConceptAt = (at: number, checker: string): Shelved => ({
+  path: `knowledge/collection-${at % WIDE_COLLECTIONS}/concept-${at}.md`,
+  title: `Concept ${String(at).padStart(5, "0")}`,
+  kind: `Kind ${at % WIDE_KINDS}`,
+  checks:
+    at % 3 === 0
+      ? [
+          { actor: checker, at: new Date(Date.UTC(2026, 0, 1 + (at % 200))) },
+          { actor: checker, at: new Date(Date.UTC(2026, 6, 1 + (at % 100))) },
+        ]
+      : [],
+});
+
+/** Concepts over twelve collections and eight kinds with owners and checks, analysed as a live workspace is. */
+export const seedWideKnowledge = async (
+  pool: pg.Pool,
+  workspaceId: string,
+  wide: WideKnowledge,
+): Promise<readonly ConceptIri[]> => {
+  const iris = await shelve(
+    pool,
+    workspaceId,
+    Array.from({ length: wide.count }, (_unused, at) => wideConceptAt(at, wide.checker)),
+  );
+  await seedingWith(pool, async (seed) => {
+    for (const [at, personId] of wide.owners.entries()) {
+      for (let collection = at; collection < WIDE_COLLECTIONS; collection += wide.owners.length) {
+        await seed.conceptOwner({ workspaceId, collection: `collection-${collection}`, personId });
+      }
+    }
+    for (const [at, iri] of iris.filter((_iri, held) => held % 10 === 0).entries()) {
+      const personId = wide.owners[at % wide.owners.length];
+      if (personId !== undefined) await seed.conceptOwner({ workspaceId, iri, personId });
+    }
+  });
+  await pool.query("ANALYZE concept_index, concept_owner, concept_verification");
+  return iris;
 };
 
 export const joinedAs = async (

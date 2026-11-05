@@ -7,6 +7,7 @@ import {
   collectionsAndOwners,
   nameOwner,
   nameOwnerOfEach,
+  nameOwnerOfEachInput,
   ownedBy,
   ownerOf,
   writeConcept,
@@ -534,6 +535,11 @@ const overridesOf = async (scenario: Scenario): Promise<readonly string[]> =>
 const namingEach = (scenario: Scenario, by: UserPrincipal, input: NameOwnerOfEachInput) =>
   withMember(by, scenario.postgres, (fresh, tx) => nameOwnerOfEach(fresh, tx, input));
 
+const nothingNamed = async (scenario: Scenario) => ({
+  overrides: await overridesOf(scenario),
+  events: (await db().pool.query(OWNER_EVENTS, [scenario.workspaceId])).rowCount,
+});
+
 const shelvedPolicies = (scenario: Scenario, count: number): Promise<readonly ConceptIri[]> =>
   shelve(
     db().pool,
@@ -668,8 +674,7 @@ describe("naming one owner on many concepts", () => {
 
     const refused = { ok: true, value: { ok: false, error: "no-such-concept" } };
     expect(answers).toEqual([refused, refused, refused]);
-    expect(await overridesOf(scenario)).toEqual([]);
-    expect((await db().pool.query(OWNER_EVENTS, [scenario.workspaceId])).rowCount).toBe(0);
+    expect(await nothingNamed(scenario)).toEqual({ overrides: [], events: 0 });
   });
 
   it("names a Restricted concept for an Admin", async () => {
@@ -697,8 +702,7 @@ describe("naming one owner on many concepts", () => {
 
     const refused = { ok: true, value: { ok: false, error: "role-forbids" } };
     expect([byAnEditor, byAViewer]).toEqual([refused, refused]);
-    expect(await overridesOf(scenario)).toEqual([]);
-    expect((await db().pool.query(OWNER_EVENTS, [scenario.workspaceId])).rowCount).toBe(0);
+    expect(await nothingNamed(scenario)).toEqual({ overrides: [], events: 0 });
   });
 
   it("refuses a person outside the workspace, writing nothing", async () => {
@@ -728,6 +732,19 @@ describe("naming one owner on many concepts", () => {
     });
 
     expect(named).toEqual({ ok: true, value: { ok: false, error: "malformed" } });
+  });
+
+  it("takes up to two hundred concepts at the input", () => {
+    const iris = Array.from({ length: 200 }, () => conceptIriOf(ulid()));
+    const personId = ulid();
+
+    const atTheLimit = nameOwnerOfEachInput.safeParse({ iris, personId });
+    const pastIt = nameOwnerOfEachInput.safeParse({
+      iris: [...iris, conceptIriOf(ulid())],
+      personId,
+    });
+
+    expect([atTheLimit.success, pastIt.success]).toEqual([true, false]);
   });
 
   it("waits for a write holding one of its concepts", async () => {

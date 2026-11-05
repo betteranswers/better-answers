@@ -6,7 +6,13 @@ import { conceptIriOf, ulid, WELL_FORMED_ULID, type ConceptIri } from "@better-a
 import { allKnowledgeInput, readAllKnowledge, readKinds } from "../../src/concepts/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { withMember, type PostgresDoor } from "../../src/store/postgres/index.ts";
-import { joinedAs, shelve, shelveOne, type Shelved } from "../fixtures/concept-shelf.ts";
+import {
+  joinedAs,
+  seedWideKnowledge,
+  shelve,
+  shelveOne,
+  type Shelved,
+} from "../fixtures/concept-shelf.ts";
 import { nameOwnerAs, principalFor } from "../fixtures/workspace-with-bundle.ts";
 import { provisionedWorkspace } from "../support/platform.ts";
 import { answered, postgresForSuite, seedingWith } from "../support/suite-postgres.ts";
@@ -646,5 +652,27 @@ describe("reading what the reader may read", () => {
 
     expect(read.rows.map(({ title }) => title)).toEqual(["Expenses"]);
     expect(kinds.map(({ count }) => count)).toEqual([1]);
+  });
+});
+
+describe("the wide workspace the budget reads", () => {
+  it("seeds a wide workspace the Curation reads can count", async () => {
+    const floor = await aFloor();
+    const checker = await joinedAs(db(), floor.workspaceId, "Editor");
+    await seedWideKnowledge(db().pool, floor.workspaceId, {
+      count: 120,
+      owners: [floor.owner.userId],
+      checker: `human:${checker.userId}`,
+    });
+
+    const page = await knowledgeRead(floor, floor.owner);
+    const kinds = await kindsRead(floor, floor.owner);
+
+    expect(page).toMatchObject({ total: 120, pageSize: 50 });
+    expect(page.rows).toHaveLength(50);
+    expect(kinds.map(({ kind, count }) => [kind, count])).toEqual(
+      Array.from({ length: 8 }, (_unused, at) => [`Kind ${at}`, 15]),
+    );
+    expect(kinds.every(({ collections }) => collections.length === 3)).toBe(true);
   });
 });
