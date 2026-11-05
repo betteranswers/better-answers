@@ -17,6 +17,9 @@ export type Check = { readonly actor: string; readonly at: Date };
 
 export type Shelved = {
   readonly path: string;
+
+  /** Fixes the IRI, so a test can know which of two tied concepts comes first. */
+  readonly iri?: ConceptIri;
   readonly kind?: string;
   readonly title?: string;
   readonly sensitivity?: (typeof SENSITIVITIES)[number];
@@ -27,25 +30,31 @@ export type Shelved = {
   readonly checks?: readonly Check[];
 };
 
+const audienceOf = (groups: readonly string[] | undefined) =>
+  groups === undefined ? {} : { audience: AUDIENCE_GROUPS, audienceGroups: [...groups] };
+
+const draftOf = (draft: true | undefined) =>
+  draft === undefined ? {} : { status: CONCEPT_DRAFT_STATUS, publishedAt: null };
+
 const shelvedWith = async (
   seed: TestData,
   workspaceId: string,
   commitSha: string,
   shelved: Shelved,
 ): Promise<ConceptIri> => {
-  const { path, audienceGroups, draft, checks = [], ...columns } = shelved;
+  const { path, iri, audienceGroups, draft, checks = [], ...columns } = shelved;
   const title = columns.title ?? path;
+  if (iri !== undefined) await seed.conceptIdentity({ workspaceId, iri });
   const row = await seed.conceptIndex({
     workspaceId,
     commitSha,
     path,
+    ...(iri === undefined ? {} : { iri }),
     ...columns,
     title,
     frontmatter: { title, type: columns.kind ?? "Policy" },
-    ...(audienceGroups === undefined
-      ? {}
-      : { audience: AUDIENCE_GROUPS, audienceGroups: [...audienceGroups] }),
-    ...(draft === undefined ? {} : { status: CONCEPT_DRAFT_STATUS, publishedAt: null }),
+    ...audienceOf(audienceGroups),
+    ...draftOf(draft),
   });
   for (const check of checks) {
     await seed.conceptVerification({
@@ -88,11 +97,15 @@ export const joinedAs = async (
   db: MigratedPostgres,
   workspaceId: string,
   role: Role,
-  name?: string,
+  options: { readonly name?: string; readonly group?: string } = {},
 ): Promise<UserPrincipal> => {
+  const { name, group } = options;
   const person = await seedingWith(db.pool, async (seed) => {
     const user = await seed.user(name === undefined ? {} : { name });
     await seed.member({ workspaceId, userId: user.id, role });
+    if (group !== undefined) {
+      await seed.groupMember({ workspaceId, groupId: group, userId: user.id });
+    }
     return user;
   });
   return principalFor(db, workspaceId, person.id);
