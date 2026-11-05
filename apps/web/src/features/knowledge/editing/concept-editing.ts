@@ -159,6 +159,17 @@ export const savedAs = (target: EditTarget, open: Open, confirmed: boolean): Sav
     : { ...common, collection: target.collection ?? "" };
 };
 
+export const sourceNumberOf = (
+  withheld: readonly { readonly at: number }[],
+  index: number,
+): number => {
+  let number = index;
+  for (const { at } of withheld.toSorted((one, other) => one.at - other.at)) {
+    if (at <= number) number += 1;
+  }
+  return number + 1;
+};
+
 export type CannotSave = "collection" | "title" | "kind" | "body";
 
 export const cannotSaveBecause = (target: EditTarget, draft: Draft): CannotSave | undefined => {

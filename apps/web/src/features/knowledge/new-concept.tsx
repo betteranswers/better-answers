@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import type { WriteOptions } from "@/shared/address/list-address.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { useConceptEditing } from "./editing/concept-actions.tsx";
@@ -14,7 +15,9 @@ export type NewConceptHeld = {
   readonly subject: string;
 };
 
-type Write = (patch: Partial<NewConceptHeld>) => void;
+type Write = (patch: Partial<NewConceptHeld>, options?: WriteOptions) => void;
+
+const OWN_WRITE: WriteOptions = { ignoreBlocker: true };
 
 const CLEARED: NewConceptHeld = { new: "", collection: "", kind: "", tags: "", subject: "" };
 
@@ -30,11 +33,11 @@ function NewConceptEditor(properties: {
     prefill: { title: held.new, kind: held.kind, tags: held.tags, subject: held.subject },
     startsOpen: true,
     onCollection: (collection) => {
-      write({ collection: collection ?? "" });
+      write({ collection: collection ?? "" }, OWN_WRITE);
     },
     onFinished: (outcome) => {
       properties.onFinished(outcome);
-      write(CLEARED);
+      write(CLEARED, OWN_WRITE);
     },
   });
   return (
@@ -61,7 +64,7 @@ export function NewConcept(properties: { readonly held: NewConceptHeld; readonly
           held={properties.held}
           write={properties.write}
           onFinished={(outcome) => {
-            setSaid(outcome === "suggested" ? LAUNCH_WORDS.suggested : "");
+            setSaid(outcome === "suggested" ? LAUNCH_WORDS.suggestedNew : "");
           }}
         />
       ) : null}

@@ -11,11 +11,9 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
-import { z } from "zod";
 
 import { WHILE_A_CEILING_HOLDS, type FailedDuring } from "@/shared/api/query-client.ts";
 import { ceilingLiftsIn, refusalOf, useTRPC } from "@/shared/api/trpc.ts";
-import { inThisTab, keepInThisTab } from "@/shared/browser-storage.ts";
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { titleOf } from "@/shared/knowledge/concept-frontmatter.ts";
 import { useMember } from "@/shared/member/member.ts";
@@ -50,6 +48,7 @@ import {
   type Leaving,
 } from "./concept-editor.tsx";
 import { EDITOR_WORDS as WORDS, SAID_OF_EDITING } from "./editor-words.ts";
+import { draftKeyOf, forgetDraft, keptDraftOf, sameDraft, useKeptDraft } from "./kept-draft.ts";
 
 export type Prefill = {
   readonly title: string;
@@ -134,51 +133,6 @@ const draftOf = (read: EditRead): Draft => ({
   sources: read.sources,
 });
 
-const sameDraft = (one: Draft, other: Draft): boolean =>
-  one.title === other.title &&
-  one.kind === other.kind &&
-  one.description === other.description &&
-  one.tags === other.tags &&
-  one.body === other.body &&
-  JSON.stringify(one.sources) === JSON.stringify(other.sources);
-
-const SOURCE_ENTRY = z.union([
-  z.string(),
-  z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
-]);
-
-const KEPT_DRAFT = z.object({
-  base: z.string().nullable(),
-  draft: z.object({
-    title: z.string(),
-    kind: z.string(),
-    description: z.string(),
-    tags: z.string(),
-    body: z.string(),
-    sources: z.array(SOURCE_ENTRY),
-  }),
-});
-
-const draftKeyOf = (person: string, iri: string): string =>
-  `better-answers.concept-draft.${person}.${iri}`;
-
-const keptDraftOf = (person: string, iri: string, base: string | null): Draft | undefined => {
-  const raw = inThisTab()?.getItem(draftKeyOf(person, iri));
-  if (raw === null || raw === undefined) return undefined;
-  try {
-    const kept = KEPT_DRAFT.safeParse(JSON.parse(raw));
-    return kept.success && kept.data.base === base ? kept.data.draft : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-const forgetDraft = (person: string | undefined, target: EditTarget): void => {
-  if (person !== undefined && target.kind === "concept") {
-    inThisTab()?.removeItem(draftKeyOf(person, target.iri));
-  }
-};
-
 const askedOf = (target: EditTarget): EditAsked | undefined => {
   if (target.kind === "concept") return { iri: target.iri };
   return target.collection === undefined ? undefined : { collection: target.collection };
@@ -216,7 +170,7 @@ type Opened = { readonly open: Open; readonly own: Draft };
 const useOpened = (
   target: EditTarget,
   prefill: Prefill | undefined,
-  person: string | undefined,
+  draftKey: string | undefined,
 ) => {
   const readToEdit = useReadToEdit();
   const subject = useSubjectLink(prefill?.subject);
@@ -236,10 +190,7 @@ const useOpened = (
     const asked = askedOf(target);
     const read = asked === undefined ? BLANK : await readToEdit(asked);
     const own = withPrefill(draftOf(read));
-    const kept =
-      restoring && target.kind === "concept" && person !== undefined
-        ? keptDraftOf(person, target.iri, read.base)
-        : undefined;
+    const kept = restoring ? keptDraftOf(draftKey, read.base) : undefined;
     const draft = kept !== undefined && !sameDraft(kept, own) ? kept : own;
     const mode = openingMode(draft.body);
     return { open: { read, draft, mode, lossy: mode === "source" }, own };
@@ -251,15 +202,16 @@ const useOpened = (
 const useOpenFlow = (
   session: Session,
   options: SessionOptions,
-  person: string | undefined,
+  draftKey: string | undefined,
   focusHeading: () => void,
 ) => {
   const { state, dispatch, target } = session;
-  const { opened, readToEdit, subjectSettled } = useOpened(target, options.prefill, person);
+  const { opened, readToEdit, subjectSettled } = useOpened(target, options.prefill, draftKey);
   const [baseline, setBaseline] = useState<Draft>();
   const [generation, setGeneration] = useState(0);
   const [problem, setProblem] = useState<Failure>();
   const started = useRef(false);
+  const choices = useRef(0);
 
   const applied = (read: Opened) => {
     setBaseline(read.own);
@@ -308,10 +260,18 @@ const useOpenFlow = (
 
   const choose = async (collection: string | undefined) => {
     setProblem(undefined);
-    await guarded(async () => {
-      const read = collection === undefined ? BLANK : await readToEdit({ collection });
-      dispatch({ type: "relocated", read });
-    }, setProblem);
+    choices.current += 1;
+    const mine = choices.current;
+    const lastChosen = () => mine === choices.current;
+    await guarded(
+      async () => {
+        const read = collection === undefined ? BLANK : await readToEdit({ collection });
+        if (lastChosen()) dispatch({ type: "relocated", read });
+      },
+      (failure) => {
+        if (lastChosen()) setProblem(failure);
+      },
+    );
   };
 
   const forgetProblem = () => {
@@ -323,7 +283,7 @@ const useOpenFlow = (
 
 const useSaveFlow = (
   session: Session,
-  person: string | undefined,
+  draftKey: string | undefined,
   finished: (outcome: Finished) => void,
 ) => {
   const { state, dispatch, target } = session;
@@ -354,7 +314,7 @@ const useSaveFlow = (
   };
 
   const done = (answer: Extract<Saved, { readonly outcome: "committed" | "suggested" }>) => {
-    forgetDraft(person, target);
+    forgetDraft(draftKey);
     finished(answer.outcome);
     const page = answer.outcome === "committed" ? conceptPageOf(answer.iri) : undefined;
     if (target.kind === "new" && page !== undefined) void navigate({ href: page });
@@ -397,8 +357,14 @@ const failed = (failure: Failure, during: FailedDuring): Outcome => {
 const said = (words: string): Outcome => ({ tone: "said", words });
 
 type Outcomes = {
-  readonly [Stage in EditorState["stage"]]: (state: StateAt<Stage>) => Outcome | undefined;
+  readonly [Stage in EditorState["stage"]]: (
+    state: StateAt<Stage>,
+    target: EditTarget,
+  ) => Outcome | undefined;
 };
+
+const suggestedWords = (target: EditTarget): string =>
+  target.kind === "new" ? WORDS.suggestedNew : WORDS.suggested;
 
 const editingOutcome = (state: StateAt<"editing">): Outcome | undefined => {
   if (state.failure !== undefined) return failed(state.failure, "action");
@@ -413,12 +379,14 @@ const OUTCOMES: Outcomes = {
   confirming: () => undefined,
   saving: () => said(WORDS.saving),
   stale: () => said(WORDS.stale),
-  done: (state) => said(state.outcome === "committed" ? WORDS.saved : WORDS.suggested),
+  done: (state, target) =>
+    said(state.outcome === "committed" ? WORDS.saved : suggestedWords(target)),
 };
 
 const outcomeFrom = <Stage extends EditorState["stage"]>(
   state: StateAt<Stage>,
-): Outcome | undefined => OUTCOMES[state.stage](state);
+  target: EditTarget,
+): Outcome | undefined => OUTCOMES[state.stage](state, target);
 
 const OPEN_STAGES: ReadonlySet<EditorState["stage"]> = new Set([
   "loading",
@@ -448,24 +416,6 @@ const useLeaving = (blocks: boolean): Leaving | undefined => {
     : undefined;
 };
 
-const useKeptDraft = (
-  person: string | undefined,
-  target: EditTarget,
-  state: EditorState,
-  baseline: Draft | undefined,
-) => {
-  const held = "open" in state ? state.open : undefined;
-  const iri = target.kind === "concept" ? target.iri : undefined;
-  const draft = held?.draft;
-  const base = held?.read.base;
-  useEffect(() => {
-    if (person === undefined || iri === undefined || draft === undefined) return;
-    if (baseline === undefined || base === undefined) return;
-    if (sameDraft(draft, baseline)) inThisTab()?.removeItem(draftKeyOf(person, iri));
-    else keepInThisTab(draftKeyOf(person, iri), JSON.stringify({ base, draft }));
-  }, [person, iri, draft, base, baseline]);
-};
-
 function EditorRegion(properties: Omit<EditorProps, "shown"> & { readonly state: EditorState }) {
   const { state, ...props } = properties;
   if (state.stage === "loading")
@@ -490,17 +440,18 @@ export function ConceptSession(properties: SessionProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const session = { state, dispatch, target };
   const person = useMember().data?.person.id;
-  const opening = useOpenFlow(session, properties, person, () => {
+  const draftKey = draftKeyOf(person, target, properties.prefill?.title);
+  const opening = useOpenFlow(session, properties, draftKey, () => {
     headingRef.current?.focus();
   });
   const finish = (outcome: Finished) => {
     properties.buttonRef.current?.focus();
     properties.onFinished?.(outcome);
   };
-  const saving = useSaveFlow(session, person, finish);
+  const saving = useSaveFlow(session, draftKey, finish);
   const collections = useChoosableCollections(target.kind === "new");
   const leaving = useLeaving(hasUnsaved(state, opening.baseline));
-  useKeptDraft(person, target, state, opening.baseline);
+  useKeptDraft(draftKey, state, opening.baseline);
   usePresses(properties.presses, opening.press);
   const expanded = OPEN_STAGES.has(state.stage);
   const { onExpanded } = properties;
@@ -538,7 +489,7 @@ export function ConceptSession(properties: SessionProps) {
   };
 
   const outcome =
-    opening.problem === undefined ? outcomeFrom(state) : failed(opening.problem, "action");
+    opening.problem === undefined ? outcomeFrom(state, target) : failed(opening.problem, "action");
 
   return (
     <>

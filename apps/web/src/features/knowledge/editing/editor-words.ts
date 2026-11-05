@@ -34,6 +34,8 @@ export const EDITOR_WORDS = {
   commitsNew: (collection: string): string =>
     `Saving adds this concept for everyone who can read ${collection}.`,
   suggests: "Saving sends your edit to the concept's owner. Nothing changes until they decide.",
+  suggestsNew:
+    "Saving sends your new concept to the collection's owner or an Admin. Nothing is added until they decide.",
   reuse: (places: number): string =>
     `It is used in ${String(places)} places, and each one will show the change.`,
   save: "Save",

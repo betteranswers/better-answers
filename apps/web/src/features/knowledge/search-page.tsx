@@ -511,7 +511,7 @@ function SearchRegion() {
           offered={offersANewConcept(searched, shown.length, state)}
           onOffer={() => {
             flush();
-            write({ new: query });
+            write({ new: search });
           }}
         />
         <Results

@@ -6,7 +6,6 @@ import {
   useId,
   useMemo,
   useRef,
-  useState,
   type KeyboardEvent,
   type RefObject,
 } from "react";
@@ -18,7 +17,6 @@ import { Label } from "@/shared/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/shared/ui/native-select.tsx";
 import { Textarea } from "@/shared/ui/textarea.tsx";
 
-import type { SourceEntry } from "../knowledge-api.ts";
 import { EDITOR_KEYSTROKES } from "../knowledge-state.ts";
 import {
   cannotSaveBecause,
@@ -30,6 +28,7 @@ import {
 } from "./concept-editing.ts";
 import { EDITOR_WORDS as WORDS } from "./editor-words.ts";
 import { losesMarkdown } from "./markdown-round-trip.ts";
+import { SourcesField } from "./sources-field.tsx";
 import { VisualBody } from "./visual-body.tsx";
 
 export { openingMode } from "./markdown-round-trip.ts";
@@ -73,7 +72,7 @@ const consequenceOf = (open: Open, target: EditTarget): string | undefined => {
   const commits = open.read.standing === "commits";
   if (target.kind === "concept") return commits ? WORDS.commits : WORDS.suggests;
   if (target.collection === undefined) return undefined;
-  return commits ? WORDS.commitsNew(target.collection) : WORDS.suggests;
+  return commits ? WORDS.commitsNew(target.collection) : WORDS.suggestsNew;
 };
 
 const IN_A_TEXT_FIELD = 'input, textarea, [contenteditable="true"], [role="textbox"]';
@@ -179,97 +178,6 @@ function CollectionField(properties: {
   );
 }
 
-type SourceRow = { readonly id: number; readonly entry: SourceEntry };
-
-type SourceRows = { readonly rows: readonly SourceRow[]; readonly next: number };
-
-const NAMING_KEYS = ["title", "resource"] as const;
-
-const labelOf = (entry: Exclude<SourceEntry, string>, number: number): string => {
-  const named = NAMING_KEYS.map((key) => entry[key]).find(
-    (value) => typeof value === "string" && value.trim() !== "",
-  );
-  return typeof named === "string" ? named : WORDS.source(number);
-};
-
-function SourcesField(properties: {
-  readonly sources: readonly SourceEntry[];
-  readonly withheld: number;
-  readonly locked: boolean;
-  readonly onChange: (sources: readonly SourceEntry[]) => void;
-}) {
-  const { locked } = properties;
-  const hintId = useId();
-  const [held, setHeld] = useState<SourceRows>(() => ({
-    rows: properties.sources.map((entry, at) => ({ id: at, entry })),
-    next: properties.sources.length,
-  }));
-  const change = (next: SourceRows) => {
-    if (locked) return;
-    setHeld(next);
-    properties.onChange(next.rows.map((row) => row.entry));
-  };
-  const replaced = (id: number, entry: SourceEntry) =>
-    held.rows.map((row) => (row.id === id ? { id, entry } : row));
-
-  return (
-    <fieldset className="mt-4 min-w-0" aria-describedby={hintId}>
-      <legend className="text-sm font-medium">{WORDS.sources}</legend>
-      <p id={hintId} className="mt-1.5 text-muted-foreground">
-        {WORDS.sourcesNumbered}
-      </p>
-      <ol className="mt-2 grid list-decimal gap-2 pl-6">
-        {held.rows.map((row, at) => (
-          <li key={row.id} className="flex flex-wrap items-center gap-2">
-            {typeof row.entry === "string" ? (
-              <Input
-                aria-label={WORDS.source(at + 1)}
-                value={row.entry}
-                readOnly={locked}
-                className="min-w-0 flex-1"
-                onChange={(event) => {
-                  change({ ...held, rows: replaced(row.id, event.target.value) });
-                }}
-              />
-            ) : (
-              <span className="min-w-0 flex-1 wrap-anywhere">{labelOf(row.entry, at + 1)}</span>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-disabled={locked}
-              onClick={() => {
-                change({ ...held, rows: held.rows.filter((each) => each.id !== row.id) });
-              }}
-            >
-              <span aria-hidden>{WORDS.remove}</span>
-              <span className="sr-only">{WORDS.removeSource(at + 1)}</span>
-            </Button>
-          </li>
-        ))}
-      </ol>
-      {properties.withheld === 0 ? null : (
-        <p className="mt-2 text-muted-foreground">{WORDS.withheld(properties.withheld)}</p>
-      )}
-      {held.rows.some((row) => typeof row.entry !== "string") ? null : (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-2"
-          aria-disabled={locked}
-          onClick={() => {
-            change({ rows: [...held.rows, { id: held.next, entry: "" }], next: held.next + 1 });
-          }}
-        >
-          {WORDS.addSource}
-        </Button>
-      )}
-    </fieldset>
-  );
-}
-
 function ModeSwitch(properties: {
   readonly mode: Mode;
   readonly lossy: boolean;
@@ -334,7 +242,7 @@ function BodySection(properties: {
   const field = {
     label: WORDS.body,
     value: open.draft.body,
-    describedBy: reasonId,
+    describedBy: lossy ? reasonId : undefined,
     onChange: (markdown: string) => {
       events.edit({ body: markdown });
     },
@@ -514,7 +422,7 @@ export function ConceptEditor(properties: EditorProps) {
       <SourcesField
         key={properties.generation}
         sources={open.draft.sources}
-        withheld={open.read.withheld.length}
+        withheld={open.read.withheld}
         locked={locked}
         onChange={(sources) => {
           events.edit({ sources });

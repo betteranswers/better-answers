@@ -58,6 +58,7 @@ export const LAUNCH_WORDS = {
   suggest: "Suggest an edit",
   loading: "The editor is still loading.",
   suggested: "Your suggestion is waiting for the concept's owner to decide.",
+  suggestedNew: "Your suggestion is waiting for the collection's owner or an Admin to decide.",
 } as const;
 
 const conceptsCounted = (count: number): string => counted(count, "concept", "concepts");

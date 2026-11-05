@@ -5,13 +5,13 @@ import { useMemo, useState } from "react";
 import { cn } from "@/shared/lib/utils.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
-import { MARKDOWN_EXTENSIONS, markdownOf } from "./markdown-round-trip.ts";
+import { endingOf, MARKDOWN_EXTENSIONS, markdownOf } from "./markdown-round-trip.ts";
 
 export type BodyField = {
   readonly label: string;
   readonly value: string;
   readonly onChange: (markdown: string) => void;
-  readonly describedBy?: string;
+  readonly describedBy?: string | undefined;
 };
 
 type Control = {
@@ -58,6 +58,7 @@ const attributesOf = (label: string, describedBy: string | undefined) => {
 export function VisualBody(properties: BodyField) {
   const { label, describedBy, onChange } = properties;
   const [initial] = useState(properties.value);
+  const ending = endingOf(initial);
   const editorProps = useMemo(
     () => ({ attributes: attributesOf(label, describedBy) }),
     [label, describedBy],
@@ -69,7 +70,7 @@ export function VisualBody(properties: BodyField) {
     contentType: "markdown",
     editorProps,
     onUpdate: ({ editor: updated }) => {
-      onChange(markdownOf(updated));
+      onChange(markdownOf(updated) + ending);
     },
   });
 

@@ -149,19 +149,27 @@ describe("typing a new concept from Search", () => {
   it("opens fresh for a search whose draft was saved", async () => {
     const api = aNewConceptApi("suggests");
     api.set(SAVE, suggested);
-    const offer = await searchWithNoMatch("Cyber Essentials Plus certificate", api);
-    fireEvent.click(offer);
+    api.set("knowledge.find", finding({}));
+    const query = "Cyber Essentials Plus certificate";
+    await openedSearch(
+      api,
+      newConceptAt({
+        search: query,
+        new: query,
+        subject: A_CONCEPT_IRI,
+        collection: "policies",
+        kind: "Certification",
+      }),
+    );
     await newConceptHeading();
-    typedInto(kindField(), "Certification");
-    chose("policies");
-    await screen.findByText(/Saving sends your new concept/u);
+    typedInto(titleField(), "Cyber Essentials Plus");
     pressed("Save");
     await screen.findByText(/Your suggestion is waiting/u);
 
     fireEvent.click(await screen.findByRole("button", { name: NEW_CONCEPT_OFFER }));
 
     await newConceptHeading();
-    expect(kindField().value).toBe("");
+    expect(titleField().value).toBe(query);
   });
 
   it("uses the live search text when the offer is pressed", async () => {

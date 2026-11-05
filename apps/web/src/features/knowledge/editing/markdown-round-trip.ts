@@ -63,6 +63,8 @@ const TRAILING_BREAKS = /\n+$/u;
 
 const trimmed = (text: string): string => text.replace(TRAILING_BREAKS, "");
 
+export const endingOf = (text: string): string => TRAILING_BREAKS.exec(text)?.[0] ?? "";
+
 const CODE = /(?<!\\)(```[\s\S]*?```|`[^`\n]*`)/u;
 
 const PLAIN_ENTITIES: readonly (readonly [RegExp, string])[] = [
