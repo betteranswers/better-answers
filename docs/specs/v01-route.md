@@ -30,7 +30,7 @@ Every block gates v0.1 except S8, the reserve. Rows are in build order within a 
 
 1. If a row on your strand is building, build its unmerged units from its plan without replanning.
 2. Otherwise take the next row on the strand the owner's prompt names, or on any strand if it names none.
-3. If that strand has no next row, take the first planned or unplanned row whose Blocked by entries are all met. Build a planned row from its plan.
+3. If that strand has no next row, take the first planned or unplanned row, in table order, whose Blocked by entries are all met. Build a planned row from its plan.
 4. A parallel session may take a second row on a strand by rule 3. Two sessions never take one block.
 5. Read the brief and list the block's open Linear issues, labelled from the Route Block group.
 
@@ -52,6 +52,8 @@ Edit a row in the pull request that makes the change true.
 | A plan or owner ruling changes a block's waits | Blocked by |
 | A reserve row's trigger fires | Status `unplanned` |
 | Work lands ahead of its block, with the owner's agreement | Status unchanged, and the work's line moves from Must carry to Builds on |
+
+A block is done when its Done when checks hold, not when every issue on its label has closed.
 
 ### Keep a brief current
 
