@@ -33,6 +33,7 @@ The actions include `provision`, `addMember`, `endEverySignInAndToken`, `markThe
 Northgate guide and its concepts), `seedManifest` (the knowledge base's manifest, which a typed knowledge
 base lacks until an import writes one), `seedQuestions`,
 `makeGroups`, `scriptAsking` (scripts the model a question meets) and `releaseTheModel` (releases a model call it held).
+The knowledge specs share their steps in `apps/web/e2e/knowledge.ts`, among them `signedIn` (opens the sign-in page and signs a seeded person in).
 
 ## The fixture module
 
