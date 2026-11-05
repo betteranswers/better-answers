@@ -13,9 +13,13 @@ reviews:
   review_status: true
   collapse_walkthrough: true
   sequence_diagrams: false
+  # Cubic is the default reviewer. A positive label opts a pull request in while enabled is false.
+  # 0 turns off CodeRabbit's default pause after 5 reviewed commits, which would silence a labelled pull request.
   auto_review:
-    enabled: true
+    enabled: false
+    labels: ["review:coderabbit"]
     drafts: false
+    auto_pause_after_reviewed_commits: 0
   path_filters:
     - "!pnpm-lock.yaml"
     - "!apps/worker/uv.lock"

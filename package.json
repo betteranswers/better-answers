@@ -33,6 +33,7 @@
     "comment-density": "node scripts/comment-density.mjs apps packages",
     "insert-scan": "node scripts/insert-scan.mjs apps packages",
     "loose-files": "node scripts/loose-files.mjs",
+    "cubic-review": "node scripts/cubic-review.mjs",
     "review-coverage": "node scripts/review-coverage.mjs",
     "skill-paths": "node scripts/skill-paths.mjs",
     "skills-update": "AI_AGENT=claude npx --yes skills@1.7.6 update -p -y && node scripts/skill-paths.mjs --write",

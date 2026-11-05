@@ -1,0 +1,15 @@
+[
+  {
+    "check_runs": [
+      {
+        "name": "cubic · AI code reviewer",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-19T12:40:36Z",
+        "output": {
+          "title": "AI review not needed for merge commit"
+        }
+      }
+    ]
+  }
+]
