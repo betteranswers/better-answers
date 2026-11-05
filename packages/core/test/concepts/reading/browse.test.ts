@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AUDIENCE_GROUPS, CONCEPT_DRAFT_STATUS, type SENSITIVITIES } from "@better-answers/schema";
-import type { TestData } from "@better-answers/schema/testing";
+import type { ConceptIri } from "@better-answers/schema";
 
 import {
   readKindConcepts,
@@ -10,6 +9,7 @@ import {
 } from "../../../src/concepts/index.ts";
 import type { Role, UserPrincipal } from "../../../src/kernel/index.ts";
 import { withMember, type PostgresDoor } from "../../../src/store/postgres/index.ts";
+import { joinedAs, shelve as shelveInto, type Shelved } from "../../fixtures/concept-shelf.ts";
 import { principalFor } from "../../fixtures/workspace-with-bundle.ts";
 import { provisionedWorkspace } from "../../support/platform.ts";
 import { answered, postgresForSuite, seedingWith } from "../../support/suite-postgres.ts";
@@ -25,66 +25,21 @@ type Shelf = {
   readonly viewer: UserPrincipal;
 };
 
-type Shelved = {
-  readonly path: string;
-  readonly kind?: string;
-  readonly title?: string;
-  readonly sensitivity?: (typeof SENSITIVITIES)[number];
-  readonly audienceGroups?: readonly string[];
-  readonly draft?: true;
-};
-
-const joined = async (workspaceId: string, role: Role): Promise<UserPrincipal> => {
-  const person = await seedingWith(db().pool, async (seed) => {
-    const user = await seed.user();
-    await seed.member({ workspaceId, userId: user.id, role });
-    return user;
-  });
-  return principalFor(db(), workspaceId, person.id);
-};
-
 const aShelf = async (): Promise<Shelf> => {
   const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Acme");
   return {
     workspaceId,
     postgres: door,
     admin: await principalFor(db(), workspaceId, adminUserId),
-    viewer: await joined(workspaceId, "Viewer"),
+    viewer: await joinedAs(db(), workspaceId, "Viewer"),
   };
 };
 
-const shelvedWith = async (
-  seed: TestData,
-  workspaceId: string,
-  commitSha: string,
-  shelved: Shelved,
-): Promise<string> => {
-  const { path, audienceGroups, draft, ...columns } = shelved;
-  const title = columns.title ?? path;
-  const row = await seed.conceptIndex({
-    workspaceId,
-    commitSha,
-    path,
-    ...columns,
-    title,
-    frontmatter: { title, type: columns.kind ?? "Policy" },
-    ...(audienceGroups === undefined
-      ? {}
-      : { audience: AUDIENCE_GROUPS, audienceGroups: [...audienceGroups] }),
-    ...(draft === undefined ? {} : { status: CONCEPT_DRAFT_STATUS, publishedAt: null }),
-  });
-  return row.iri;
-};
+const joined = (workspaceId: string, role: Role): Promise<UserPrincipal> =>
+  joinedAs(db(), workspaceId, role);
 
-const shelve = (shelf: Shelf, concepts: readonly Shelved[]): Promise<readonly string[]> =>
-  seedingWith(db().pool, async (seed) => {
-    const { sha } = await seed.bundleCommit({ workspaceId: shelf.workspaceId });
-    const iris: string[] = [];
-    for (const shelved of concepts) {
-      iris.push(await shelvedWith(seed, shelf.workspaceId, sha, shelved));
-    }
-    return iris;
-  });
+const shelve = (shelf: Shelf, concepts: readonly Shelved[]): Promise<readonly ConceptIri[]> =>
+  shelveInto(db().pool, shelf.workspaceId, concepts);
 
 const treeReadBy = async (shelf: Shelf, reader: UserPrincipal) =>
   answered(
