@@ -218,6 +218,22 @@ def test_a_connected_sources_passage_is_evidence_never_lineage() -> None:
     ) == ([], [])
 
 
+def test_a_concept_cited_with_a_passage_locator_stays_lineage() -> None:
+    frontmatter: Frontmatter = {
+        "sources": [{"resource": OTHER_IRI, "locator": f"{DOCUMENT}/chars:0-12"}]
+    }
+
+    derived = edges(
+        "A body.",
+        frontmatter,
+        by_iri={OTHER_IRI: ResolvedTarget(OTHER_IRI, "Policy", "stable")},
+    )
+
+    assert [(edge.uid, edge.label, edge.to_uid) for edge in derived] == [
+        (f"lineage:{IRI}:0", DERIVED_FROM_LABEL, OTHER_IRI)
+    ]
+
+
 def test_a_fence_closes_only_on_its_own_character_no_shorter() -> None:
     body = "````\n~~~\n```\nstill inside\n````\n\nOut here.\n"
 
