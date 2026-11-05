@@ -1,6 +1,6 @@
 import { FilterRow } from "@/shared/list/filter-row.tsx";
 
-import { useKinds } from "../knowledge-api.ts";
+import { useKinds, type KindCounted } from "../knowledge-api.ts";
 import type { AllKnowledgeAddress, Standing } from "./all-knowledge-address.ts";
 import { HIDEABLE } from "./all-knowledge-columns.tsx";
 import { choiceOf, YOUR_COLLECTIONS } from "./curation-state.ts";
@@ -8,7 +8,7 @@ import { ALL_KNOWLEDGE_WORDS as WORDS } from "./curation-words.ts";
 
 type Choice = { readonly value: string; readonly label: string };
 
-const NO_KINDS: readonly string[] = [];
+const NO_KINDS: readonly KindCounted[] = [];
 
 const choicesOf = (names: readonly string[], held: string | undefined): readonly Choice[] =>
   [...new Set(held === undefined ? names : [...names, held])]
@@ -28,8 +28,8 @@ export function AllKnowledgeFilters(properties: {
 }) {
   const { standing, address } = properties;
   const { scope, state } = address;
-  const kinds = useKinds().data?.kinds;
-  const collections = (kinds ?? []).flatMap((each) =>
+  const kinds = useKinds().data?.kinds ?? NO_KINDS;
+  const collections = kinds.flatMap((each) =>
     each.collections.flatMap((held) => (held.collection === null ? [] : [held.collection])),
   );
   const heldKind = state.kind === "" ? undefined : state.kind;
@@ -51,7 +51,10 @@ export function AllKnowledgeFilters(properties: {
           label: WORDS.filters.kind.label,
           value: heldKind,
           anyLabel: WORDS.filters.kind.any,
-          choices: choicesOf(kinds?.map((each) => each.kind) ?? NO_KINDS, heldKind),
+          choices: choicesOf(
+            kinds.map((each) => each.kind),
+            heldKind,
+          ),
           onChange: address.chooseKind,
         },
       ]}

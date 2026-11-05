@@ -79,17 +79,20 @@ type Disclosures = {
   readonly toggle: (kind: string) => void;
 };
 
-const DisclosuresContext = createContext<Disclosures | undefined>(undefined);
+const DisclosuresContext = createContext<Disclosures>({
+  opened: NONE_OPEN,
+  toggle: () => undefined,
+});
 
 function KindCell(properties: { readonly kind: KindCounted }) {
   const { kind } = properties;
   const disclosures = useContext(DisclosuresContext);
-  const open = disclosures?.opened.has(kind.kind) === true;
+  const open = disclosures.opened.has(kind.kind);
   return (
     <Collapsible
       open={open}
       onOpenChange={() => {
-        disclosures?.toggle(kind.kind);
+        disclosures.toggle(kind.kind);
       }}
     >
       <CollapsibleTrigger className="-mx-1 inline-flex min-h-6 items-center gap-1 px-1 text-left font-medium wrap-anywhere hover:underline">
