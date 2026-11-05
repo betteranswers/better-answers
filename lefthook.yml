@@ -67,6 +67,11 @@ templates:
   # A push from a worktree sets GIT_DIR, and a test's throwaway repository would then write into the real one.
   without-git-env: unset $(git rev-parse --local-env-vars);
 
+post-merge:
+  commands:
+    gitnexus:
+      run: sh scripts/gitnexus-refresh.sh
+
 pre-push:
   # Naming {files} stops lefthook from skipping a push that changes no file on disk or only deletes files.
   files: echo lefthook.yml

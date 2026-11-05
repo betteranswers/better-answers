@@ -26,7 +26,7 @@ The areas the rail lists, each holding groups of pages:
 
 ## 2. Content fundamentals
 
-**To ensure consistency, use the platform's glossary:** `CONCEPTS.md`
+**To ensure consistency, use the platform's glossary:** `GLOSSARY.md`
 
 **Trust words are a closed set**, written verbatim and always as text:
 Verified by <person> · Verified automatically · Unverified · Changed since verified ·

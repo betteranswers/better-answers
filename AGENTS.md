@@ -225,15 +225,15 @@ Read a doc directly in these cases:
 <!-- gitnexus:keep -->
 ## Gitnexus Policy
 
-GitNexus indexes this project as **better-answers**. Use the GitNexus MCP tools to read code and to find what a change affects.
+GitNexus serves a call graph of this project as **better-answers**. Use it to find what a change affects. To find and read code, use jCodeMunch.
 
-> If the index is stale, run `node .gitnexus/run.cjs analyze` from the project root.
+> Every GitNexus answer reports its staleness. If it is behind `HEAD`, run `node .gitnexus/run.cjs analyze` from the project root before you trust an impact count. The rebuild takes about 80 seconds.
 
 ### Use it for
 
 - The blast radius of a change to a symbol that other code calls: `impact({target: "symbolName", direction: "upstream"})`.
 - The symbols and flows that a large diff touches: `detect_changes()`.
-- The callers, the callees, and the flows of a symbol: `context({name: "symbolName"})`.
+- The execution flows that pass through a symbol: `context({name: "symbolName"})`.
 - Security review: `explain({target: "fileOrSymbol"})` lists taint findings, which are flows from a source to a sink. It needs `analyze --pdg`.
 
 ### Renames
@@ -242,7 +242,7 @@ GitNexus indexes this project as **better-answers**. Use the GitNexus MCP tools 
 
 ### From a worktree
 
-GitNexus `analyze` runs after every merge to `main`. A worktree does not have the runner.
+A `post-merge` hook re-runs `analyze` in the background when the main checkout merges or pulls into `main`. A worktree does not have the runner.
 
 - Pass `worktree: <the worktree's absolute path>` to `detect_changes`.
 - `impact`, `context`, and `query` read the index of the main checkout. Their answers describe `main`, not the edits in the worktree.
