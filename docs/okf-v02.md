@@ -1,51 +1,154 @@
-# OKF v0.2 on this platform — what the spec defines, what it leaves open, where each lands
+# OKF v0.2 on this platform
 
-Read before proposing any key, writing convention or feature that touches a concept file. Primary source: `~/Documents/development/knowledge-catalog/okf/SPEC.md` — v0.2, upstream `GoogleCloudPlatform/knowledge-catalog`, last spec commit `3fcbb9f` (24/07/2026); re-read upstream on 26/08/2026, still v0.2. Long form with line references: `.scratch/v01-spec/research/okf-v02-capabilities.md`.
+Read this page before you propose a key, a writing convention, or a feature that touches a concept file.
+
+The primary source is `~/Documents/development/knowledge-catalog/okf/SPEC.md`. It is OKF v0.2 from the upstream repository `GoogleCloudPlatform/knowledge-catalog`, at spec commit `3fcbb9f`. A longer version of this page, with line references into the spec, is `.scratch/v01-spec/research/okf-v02-capabilities.md`.
 
 ## What the spec defines
 
-- **Bundle** — a directory tree of UTF-8 markdown files with YAML frontmatter. Git is *recommended* for history and review, not required; a tarball or a subdirectory of a larger repository is equally a bundle. Reserved files: `index.md` (listing) and `log.md` (prose history). Every other `.md` file is a concept.
-- **Concept** — one file; identity is the path minus `.md`. `type` is the only required key (a free string, "not registered centrally"). Recommended: `title`, `description` (one sentence, used by index generators), `resource`, `tags`. Producers may add any key; consumers must preserve unknown keys and must not reject a document for them.
-- **Provenance** — `sources[]` with `resource` (required), `id`, `title`, `author`, `usage_count`, `last_modified`, and a sibling `usage_window`. A body footnote whose label is a `sources[].id` attributes one claim to one *whole* source. A `resource` may point at another concept in the bundle — lineage is a link, never a field. No credibility score by design.
-- **Trust** — `generated {by, at}` and `verified [{by, at}]`. The trust tier is *derived*, never stored: no `verified` → unverified; only non-`human:` verifiers → machine-confirmed; any `human:<id>` → human-reviewed. A verification event has no scope, outcome or note. "Trust tiers are advisory signals, not access control."
-- **Lifecycle** — `status: draft | stable | deprecated` (absent = stable; deprecated is "kept for links and history; no longer current"); `stale_after` as an absolute `YYYY-MM-DD`.
-- **Links** — standard markdown links, directed and *untyped*: "the specific kind is conveyed by the surrounding prose, not by the link itself". Broken links are legal — "not-yet-written knowledge".
-- **Actors** — `<producer>/<version>`, `human:<id>`, `process:<id>`; `<id>` is opaque.
-- **Attested computation** — a concept type carrying a deterministic computation and the means to check a run; receipts are never stored in the bundle.
-- **Non-goals** — a fixed taxonomy of types; replacing domain schemas; prescribing storage, serving or query; the attestation runtime.
+**Bundle.** A bundle is a directory tree of UTF-8 markdown files with YAML frontmatter. The spec recommends git for history and review but does not require it. A tarball or a subdirectory of a larger repository is also a bundle. Two file names are reserved: `index.md` is a listing, and `log.md` is a prose history. Every other `.md` file is a concept.
 
-## What the spec leaves to the consumer, and where this platform puts each
+**Concept.** A concept is one file. Its identity is its path without the `.md` extension.
 
-| The spec is silent on | What the spec and Google's sample do instead | Where it lives here | Ruled by |
-| --- | --- | --- | --- |
-| Supersession — no field, no edge | `status: deprecated` keeps the file; the acme sample names the successor in prose and a link; neo4j-okf infers "one deterministic replacement" from links at query time | A deprecated concept stays in the bundle for history and reproducibility and is not surfaced to new work; **the successor carries the lineage** — a `sources[]` entry or a *Supersedes* line on the new concept, as Google's sample does — and the map derives the edge from that backward link; the deprecated file changes only its `status` (Liam, 26/08/2026) | Ticket 23 fixes the exact form; never an extension key |
-| Conflicting claims | Not modelled; neo4j-okf: "conflict *detection* is a query; resolution is human" | `conflict` records raised at extraction, never resolved by the pipeline; the answer path shows both values with their sources | ADR 0003 amendment; ADR 0014 (`conflict` records); ticket 20 |
-| Context (a claim true only in one setting) | Prose and links | A claim that differs by context is a separate concept (atom-boundary rule) linked to the context it holds in; the map carries the edge | ADR 0003 |
-| Temporal reasoning beyond `generated.at`, `verified.at`, `stale_after`, `sources[].last_modified` | None — no valid-from, no as-of | Git history plus deprecated concepts kept; "as of" queries are map and records work beyond v0.1 | Fog |
-| Typed relations | Untyped links; kind in prose | The map holds the link with its two kinds, section and sentence (`LINKS_TO`); the kind of a relation is read from the sentence; no predicate list anywhere; `SUPERSEDES` · `CITES` · `IS_CONCEPT` the only named edges | ADR 0026 |
-| Entity equivalence / resolution | None | Merge key `(workspace, folded type, normalised title)` at write time (`mergeKeyOf`); an *Also known as* body line feeds search, not the key; matcher-proposed, Admin-confirmed merges ("Are these the same thing?"), a *No* remembered | ADR 0003 amendment; ADR 0014 amendment; ADR 0026 |
-| Identity across renames and bundles | Path only | `iri` — the one code-owned identity key the platform writes into the file | ADR 0002 |
-| Evidence finer than a whole source | Footnote → whole source | `sources[].locator` in the file (the entry or span); the `evidence` table holds span, hash and version | Ticket 46 kept it; ADR 0014 (`evidence` rows, written at commit) |
-| Citing a concept from prose outside the bundle (a guide's Brief, a response) | Body footnotes attribute a claim to a whole source; nothing for prose outside a bundle | A write-up's markdown carries a footnote reference labelled by its include (`[^i7]`); the footnote text is rendered from the include row, never stored; the promotion gate rewrites markers into `sources[]` footnotes when it mints an `Answer`, so include ids never enter a file | ADR 0015 (ticket 19) |
-| Taxonomy of `type` | Non-goal; free string | Honoured: kinds emerge with the concepts, folded for case and plural at write; the kinds in use are a derived Kinds list with counts; rename/merge is one bulk commit; no file, no closed-world check | ADR 0026 (supersedes 0001) |
-| Access control | "not access control" | **Sensitivity** on connected source, document, passage and concept row; trust never gates viewing | Ticket 38 D1; ticket 24 |
-| Storage, serving, query | Non-goal | Concept index rows, passages, embeddings and the map — all derived from the bundle, none a source of truth; the bundle is written only by the api, one commit per action, platform-prepared changes waiting as suggestions | ADR 0012 (ticket 15) |
-| Multi-bundle, tenancy, bundle identity | None | One bundle per tenant; collection directories as future bundle boundaries; in-bundle manifest | ADR 0002, 0003; research 35 |
-| History | Git plus prose `log.md` | Git history for the bundle; append-only versions on write-ups and guide definitions; `log.md` generated at export from the commit log | ADR 0004, 0014 |
+- `type` is the only required key. It is a free string, "not registered centrally".
+- The recommended keys are `title`, `description`, `resource`, and `tags`. A `description` is one sentence, and index generators use it.
+- A producer may add any key. A consumer must keep unknown keys and must not reject a document because of them.
 
-## The platform's stance (Liam, 26/08/2026)
+**Provenance.** A concept lists its sources in `sources[]`. Each entry has `resource`, which is required, and may have `id`, `title`, `author`, `usage_count`, and `last_modified`. A `usage_window` key sits beside `sources`, not inside an entry. A body footnote whose label is a `sources[].id` attributes one claim to one whole source. A `resource` may point at another concept in the same bundle, so lineage is a link and never a separate field. The spec stores no credibility score, by design.
 
-- **OKF targets the data layer.** The bundle is the substrate any AI system reads and writes: structured, contextual, portable, machine-readable, and readable by a person in any editor. System-agnostic, so a customer can adopt new AI tools against it with confidence.
-- **Two knowledge layers on OKF.** The bundle (concepts, graph-*shaped* through its links) and the map built on top (queryable, traversable, reasoned over). Everything the spec leaves open is met in the map and in records — never with keys in the file. The spec's silence on supersession is a boundary, not a gap.
-- **Simplicity is the reason OKF is here.** If a planned feature or piece of infrastructure needs a concept file to carry more than the spec plus `iri` and `locator`, the approach is probably over-complicated; re-evaluate before proceeding.
-- **The file is written for a company with no platform** and to the spec.
-- **The bundle-alone test.** A key, a value or a writing convention goes into a concept file only if a company with no platform and no guides would still want it there. Evidence, trust, lifecycle, identity, the company's own language and its links pass; anything that exists so a guide, a section, an audience or a page can find or phrase a concept fails, and is a platform record instead. Every new key on a concept file is argued against this test in the decision record that admits it, before the key; and every extraction or enrichment prompt is written for the file, never for whatever will read it. Nothing can check it — the test is a judgement about a company that does not exist — which is why it is applied where a key is argued for rather than where one is written.
+**Trust.** A concept records `generated {by, at}` and `verified [{by, at}]`. A consumer derives the trust tier and never stores it:
 
-## Assumed but not in the spec
+- With no `verified` entry, the concept is unverified.
+- If every verifier is a non-`human:` actor, the concept is machine-confirmed.
+- If any verifier is a `human:<id>` actor, the concept is human-reviewed.
 
-- The file format is fixed — markdown with YAML frontmatter. JSON exists only as a consumer's projection (Knowledge Catalog aspects, a graph store). The map is free to use any representation.
-- A bundle is not necessarily a git repository.
-- `verified` cannot record a failed check; the tier ignores `at` entirely and keys off the `human:` prefix alone — verifier ≠ generator is a platform rule (Google's own sample self-verifies).
-- `stale_after` absent → Google's reference implementation treats the concept as fresh; the platform's default is ticket 23's.
-- In practice Google's producers emit `generated` and `sources` only; `verified`, `status` and `stale_after` appear only in the hand-authored sample.
-- Knowledge Catalog (Google, article of 26/08/2026) ingests one Entry per concept with an `okf` aspect carrying all thirteen fields, including `verified`, `status` and `stale_after`; a team "publishes a trustworthy bundle for its own agents" — the granularity Google now describes.
+A verification event has no scope, outcome, or note. In the spec's words, "Trust tiers are advisory signals, not access control."
+
+**Lifecycle.** `status` is `draft`, `stable`, or `deprecated`. A concept with no `status` is stable. A deprecated concept is "kept for links and history; no longer current". `stale_after` is an absolute date in `YYYY-MM-DD` form.
+
+**Links.** Links are standard markdown links. They are directed and untyped: "the specific kind is conveyed by the surrounding prose, not by the link itself". A broken link is legal, because it can stand for "not-yet-written knowledge".
+
+**Actors.** An actor is `<producer>/<version>`, `human:<id>`, or `process:<id>`. The `<id>` part is opaque.
+
+**Attested computation.** This is a concept type that carries a deterministic computation and the means to check a run of it. A bundle never stores the receipts of a run.
+
+**Non-goals.** The spec does not define a fixed taxonomy of types. It does not replace domain schemas. It does not prescribe storage, serving, or query, and it does not define the attestation runtime.
+
+## What the spec leaves open, and where this platform puts each point
+
+Each entry says what the spec does, what this platform does, and which decision record holds the full rule. Decision records are in `docs/solutions/architecture-patterns/adr-NNNN.md`.
+
+### Supersession
+
+The spec has no supersession field and no supersession edge. `status: deprecated` keeps the old file. Google's acme sample names the successor in prose and links to it. The neo4j-okf project infers "one deterministic replacement" from links at query time.
+
+Here, a deprecated concept stays in the bundle for history and reproducibility, and the platform does not show it to new work. The deprecated file changes only its `status`. The successor carries the lineage as a `sources[]` entry that cites the deprecated concept. The map derives the `SUPERSEDES` edge from that entry when the cited concept is deprecated and has the same type. Any other `sources[]` entry that cites a concept gives a `DERIVED_FROM` edge. Supersession never uses an extension key.
+
+### Conflicting claims
+
+The spec does not model conflicts. neo4j-okf says that "conflict *detection* is a query; resolution is human".
+
+Here, extraction raises `conflict` records, and the pipeline never resolves them. The answer path shows both values, each with its sources. See ADR 0003 and ADR 0014.
+
+### Context
+
+The spec expresses a claim that holds in only one setting through prose and links.
+
+Here, a claim that differs by context is a separate concept, under the atom-boundary rule. It links to the context it holds in, and the map carries the edge. See ADR 0003.
+
+### Temporal reasoning
+
+The spec has no valid-from or as-of date. Its only dates are `generated.at`, `verified.at`, `stale_after`, and `sources[].last_modified`.
+
+Here, git history and the deprecated concepts that stay in the bundle hold the past. As-of queries are future work in the map and the records.
+
+### Typed relations
+
+The spec's links are untyped, and the surrounding prose says what kind of relation a link is.
+
+Here, the map stores each link as a `LINKS_TO` edge with two properties, the section and the sentence that hold it. The platform reads the kind of relation from that sentence. No list of predicates exists. The other named edges are `SUPERSEDES`, `DERIVED_FROM`, `CITES`, and `IS_CONCEPT`. See ADR 0026.
+
+### Entity equivalence
+
+The spec has no way to say that two concepts are the same thing.
+
+Here, the platform computes a merge key at write time with `mergeKeyOf`. The key is unique per workspace and combines the folded type with the normalised title. An *Also known as* line in the body feeds search but is not part of the key. A matcher proposes merges, and an Admin confirms each one by answering "Are these the same thing?". The platform remembers a *No*. See ADR 0003, ADR 0014, and ADR 0026.
+
+### Identity across renames and bundles
+
+The spec identifies a concept by its path only.
+
+Here, `iri` is the identity key. It is the one key that the platform's code owns and writes into the file. See ADR 0002.
+
+### Evidence finer than a whole source
+
+The spec's footnotes attribute a claim to a whole source.
+
+Here, `sources[].locator` in the file names the entry or span inside the source. The `evidence` table holds the span, its hash, and its version. The platform writes `evidence` rows at commit. See ADR 0014.
+
+### Citations from prose outside the bundle
+
+The spec's body footnotes attribute a claim inside a bundle. It defines nothing for prose outside a bundle, such as a guide's Brief or a response.
+
+Here, a write-up's markdown carries a footnote marker whose label is an include id, for example `[^i7]`. The platform renders the footnote text from the include row and never stores it. When the promotion gate mints an `Answer` concept, it rewrites each marker into a footnote on a `sources[]` entry. Include ids therefore never enter a concept file. See ADR 0015.
+
+### Taxonomy of `type`
+
+The spec makes a type taxonomy a non-goal, and `type` is a free string.
+
+Here, the platform keeps that rule. Kinds appear as concepts are written. At write time the platform folds each kind for case and plural. The kinds in use form a derived Kinds list with a count for each. A rename or merge of a kind is one bulk commit. No file lists the kinds, and no check rejects an unknown kind. See ADR 0026.
+
+### Access control
+
+The spec says trust tiers are "not access control".
+
+Here, sensitivity controls access. A sensitivity value sits on each connected source, document, passage, and concept row. Trust never decides who can view a concept.
+
+### Storage, serving, and query
+
+The spec makes these a non-goal.
+
+Here, the platform derives the concept index rows, passages, embeddings, and the map from the bundle. None of them is a source of truth. Only the api writes to the bundle, with one commit per action. Changes that the platform prepares wait as suggestions until someone accepts them. See ADR 0012.
+
+### Multiple bundles, tenancy, and bundle identity
+
+The spec defines none of these.
+
+Here, each tenant has one bundle. Collection directories may become bundle boundaries later. A manifest inside the bundle identifies it. See ADR 0002 and ADR 0003.
+
+### History
+
+The spec uses git and the prose file `log.md`.
+
+Here, git history records changes to the bundle. Write-ups and guide definitions keep append-only versions. The platform generates `log.md` from the commit log at export. See ADR 0004 and ADR 0014.
+
+## Why this platform keeps the file to the spec
+
+OKF is the data layer. Any AI system can read and write a bundle. A bundle is structured, portable, and machine-readable, and a person can read it in any editor. Because the format belongs to no single system, a customer can point new AI tools at the same bundle.
+
+The platform has two knowledge layers. The first is the bundle, a set of concepts that the links shape into a graph. The second is the map built on top of the bundle, which the platform queries, traverses, and reasons over. Everything the spec leaves open is met in the map and in platform records, never with new keys in the file. The spec says nothing about supersession, and the platform treats that silence as a boundary to respect, not a gap to fill.
+
+Simplicity is the reason the platform uses OKF. A concept file carries the spec's keys plus `iri` and `sources[].locator`. If a planned feature needs the file to carry more, the design is probably too complex, and you should rethink it before you build it.
+
+The concept file follows the spec and is written for a company that has no platform.
+
+### The bundle-alone test
+
+A key, a value, or a writing convention goes into a concept file only if a company with no platform and no guides would still want it there.
+
+- Evidence, trust, lifecycle, identity, the company's own language, and its links pass the test.
+- Anything that exists so a guide, a section, an audience, or a page can find or phrase a concept fails. It becomes a platform record instead.
+
+The decision record that admits a new key must argue it against this test before the key lands. Write every extraction or enrichment prompt for the file, never for whatever will read the file.
+
+No tool can check this test, because it is a judgement about a company that does not exist. For that reason, apply it where someone argues for a key, not where code writes one.
+
+## Assumptions that the spec does not state
+
+- The file format is fixed: markdown with YAML frontmatter. JSON appears only as a consumer's projection, such as Knowledge Catalog aspects or a graph store. The map can use any representation.
+- A bundle need not be a git repository.
+- `verified` cannot record a failed check. The trust tier ignores `at` and depends only on the `human:` prefix.
+- The spec does not require the verifier to differ from the generator. This platform requires it. Google's own sample verifies its own output.
+- When `stale_after` is absent, Google's reference implementation treats the concept as fresh. This platform does the same.
+- Google's producers emit only `generated` and `sources`. Only the hand-authored sample uses `verified`, `status`, and `stale_after`.
+- Knowledge Catalog ingests one Entry per concept. Each Entry has an `okf` aspect that carries all thirteen fields, including `verified`, `status`, and `stale_after`. Google describes a team that "publishes a trustworthy bundle for its own agents", which sets the granularity at one bundle per team.

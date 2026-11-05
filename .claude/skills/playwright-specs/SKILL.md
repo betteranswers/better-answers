@@ -117,8 +117,8 @@ signs in by email while the device holds a passkey.
 - **Wait with auto-retrying matchers.** `await expect(…).toBeVisible()`, `.toHaveURL()`,
   `.toHaveCount(0)`. Where a navigation must complete before the next action, assert the thing that
   proves the page was left. Never a fixed sleep, and never a load state.
-- **Title says what the system does for whom**: `"a member of two workspaces picks
-  one, and everything after is scoped to the pick"`, not `"picker test"`.
+- **Title says what the system does for whom**, in at most 10 words (`holdTitle`):
+  `"a member of two workspaces sees only their pick"`, not `"picker test"`.
 - **A set-up repeated across a file becomes a local helper**, whose name says what it sets up. It
   takes no comment (ADR 0045). A reason the name cannot carry goes in an assertion's message.
 - **Give an assertion a message wherever the failure would not name itself.** The harness's own

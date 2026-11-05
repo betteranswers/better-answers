@@ -45,7 +45,7 @@ A branch is tested alone, so a cause that `main` already carries shows on the br
 | Path | When | Seen |
 | --- | --- | --- |
 | **Main first** | The fix passes on `main`'s current version too. Land it in a pull request of its own; the Renovate pull request goes green untouched | #238: pnpm 11.27 left Playwright's test server running, fixed by starting it with `node`. #245: pnpm 12's native binary baked into the api image. Both unblocked #215 |
-| **On the branch** | The fix holds only with the new version: a test that asserts the old version, a re-dated reading | #187 and #248: `test_image.py` pins `pdf-inspector` |
+| **On the branch** | The fix holds only with the new version: a test that asserts the old version | #187 and #248: `test_image.py` pins `pdf-inspector` |
 | **A rule** | Renovate proposes something this repository refuses, or cuts its pull requests so that none can pass alone. A `packageRules` entry in `renovate.json`, its `description` saying why and naming the pull requests that showed it. A hold that follows what another package requires also gets a test in `packages/devtools/test/ci/dependency-versions.test.ts` that reads the requirement, so the hold cannot outlive it | #240: `requires-python` and the `python` image held below 3.14. #562 and #571: `pg` moved per workspace, fixed by the grouping in #582 |
 | **A ticket** | The fix needs a migration, a production check or a person's review. Leave the pull request open and unlanded | #211: better-auth 1.7.5 refuses a column 1.7.3 dropped, so a migration rides with the bump in its issue |
 
@@ -72,7 +72,7 @@ Order matters because Renovate **regenerates** a branch when its rebase box is t
 What a fix owes, whichever path:
 
 - **Every file still naming the old version**: `git grep -nF '<old version>' -- ':!*.lock' ':!pnpm-lock.yaml'`. jCodeMunch's index leaves Dockerfiles out, so its answer is not evidence here. A test comparing the manifest's pin to a literal moves with the pin; a literal handed to a function as input stays.
-- **The comment above each moved pin** in `apps/worker/pyproject.toml` and the Dockerfiles. Many carry a dated reading (licence, wheel tags, digest) and say what a bump owes: a probe to re-run, a reading to re-date. Re-read the licence and wheels at the source (`curl -s https://pypi.org/pypi/<name>/<version>/json`), re-date, run what it names.
+- **The comment above each moved pin** in `apps/worker/pyproject.toml` and the Dockerfiles. Some name a check a bump needs, such as a probe to re-run. Run that check. Do not add a date, a licence reading, or a version history to the comment.
 - **Review**: `impact` before an edit and `detect_changes` before each commit, then pstack's Shipping verdict from a verifier that did not write the change, recorded as the `verdict` commit status on the verified head (`AGENTS.md`, *Workflow*). GitNexus leaves test files out, so `impact` on a test answers *not found*, and the blast radius is the assertion itself. One commit per fix, in `commitlint.config.mjs`'s form; a branch fix has no `Refs:` footer.
 - **An issue**, when the path says so: filed in Linear (`docs/agents/issue-tracker.md`), with the pull request's number and the log line in its Notes. When the fix cannot land ahead of the new version, the issue carries the bump too, and the Renovate pull request closes as redundant once it lands.
 

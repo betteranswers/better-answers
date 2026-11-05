@@ -4,135 +4,256 @@ A living company knowledge map for UK SMBs, built on the Open Knowledge Format (
 
 ## Repository context
 
-- `VISION.md` — the destination this repo builds towards.
-- `GLOSSARY.md` — the glossary.
-- `docs/specs/` — `v01-route.md` with `route/` is the route spec. `v01-stories.md` holds the v0.1 user stories.
-- `docs/okf-v02.md` — what OKF defines, what it leaves open, and where each lands here. Read it before adding a key, convention or feature which impacts to the knowledge layer (bundles, concepts, search).
-- `docs/plans/` — unified plan artifacts.
+- `VISION.md` describes what this repository builds towards.
+- `GLOSSARY.md` is the glossary.
+- `docs/specs/` holds the specs. `v01-route.md` and the `route/` folder are the route spec. `v01-stories.md` holds the v0.1 user stories.
+- `docs/okf-v02.md` says what OKF defines, what it leaves open, and where each part lands in this repository. Read it before you add a key, a convention, or a feature that changes the knowledge layer (bundles, concepts, and search).
+- `docs/plans/` holds the unified plans.
 
-## Directory Layout
+## Directory layout
 
 | Path | What it is |
 | --- | --- |
-| `apps/api/` | Hono on Node. Holds transports only |
-| `apps/web/` | Vite React single-page app. It talks to `apps/api/` over tRPC only |
-| `apps/worker/` | Python knowledge worker (uv). |
-| `packages/core/` | The business logic `apps/api` calls: capability slices over four store doors. Transport-agnostic |
-| `packages/devtools/` | The repository's gate tooling |
-| `packages/` | The rest of the shared TypeScript: `schema`, `design-system` |
-| `contracts/` | The tier contract's language-neutral fixtures |
-| `docs/personas/` | Personas used for dogfooding |
-| `docs/operations/` | Public-facing ops documents. Documents that are not public-facing are under `.planning/estate/` |
-| `deploy/` | Compose files and deployment configuration |
-| `.cubic/wiki/` | Cubic's generated wiki |
+| `apps/api/` | Hono on Node. It holds only transports. |
+| `apps/web/` | Vite React single-page app. It talks to `apps/api/` only over tRPC. |
+| `apps/worker/` | Python knowledge worker, managed with uv. |
+| `packages/core/` | The business logic that `apps/api` calls: capability slices over four store doors. It does not depend on a transport. |
+| `packages/devtools/` | The tooling for the repository's gates. |
+| `packages/` | The other shared TypeScript packages: `schema` and `design-system`. |
+| `contracts/` | The language-neutral fixtures of the tier contract. |
+| `docs/personas/` | Personas for dogfooding. |
+| `docs/operations/` | Public-facing operations documents. The other operations documents are in `.planning/estate/`. |
+| `deploy/` | Compose files and deployment configuration. |
+| `.cubic/wiki/` | The wiki that Cubic generates. |
 
 ## Where a file goes
 
-- Source groups by capability: `src/<capability>/`, named in the glossary's words. A capability over 15 files gets subfolders by sub-capability. A file that something other than an import names by path stays where it is.
-- Test folders mirror source folders. A test sits in the folder that mirrors the folder of the slice whose entry or module it drives: `test/a/b/` for `src/a/b/`, `tests/a/b/` in `apps/api` and `apps/worker`, and `test/<feature>/` or `e2e/<feature>/` for `src/features/<feature>/` in `apps/web`. The test root mirrors the source root, which is `src/better_answers_worker/` in `apps/worker`. Imports that only set a test up, a store door or `kernel`, do not place it. Name the file for the behaviour it checks, or for the source file when it checks that one file end to end. To find the tests of a source file, open its mirror folder and search for its path or the names it exports.
-- A test folder that mirrors no source folder is one of four kinds. `support/` and `fixtures/` hold helpers. `gates/` at the test root holds the checks of the repository itself: a config, a lint rule, a workflow, a skill, the tree. A run folder holds the tests a job other than `check` selects, such as `readings/`, `budgets/` and `images/`. A pinned folder mirrors a tree outside `src/`, or holds one source file's tests when they fill a folder. `pnpm run test-folders` holds this. Its table in `packages/devtools/src/scans/test-folders.ts` lists every run and pinned folder, and why.
-- A helper one folder uses sits beside its tests. A helper two folders share goes to `support/`. In `apps/web`, every helper of `test/` goes to `test/support/`. A helper's own test sits beside the helper.
-- A test or script reaches repository files through its workspace's `roots` helper: `repositoryRoot` and `workspaceRoot` in `apps/api/tests/support/roots/roots.ts`, `apps/web/test/support/roots.ts`, `packages/core/test/support/roots/roots.ts` and `packages/schema/test/support/roots/roots.ts`, `REPOSITORY_ROOT` and `WORKER_ROOT` in `apps/worker/tests/support/roots.py`, `repositoryRoot` in `packages/devtools/src/paths.ts`, and `REPOSITORY_ROOT` in `packages/devtools/python/roots.py`. Outside `packages/devtools`, only the roots helpers import `repositoryRoot` from `@better-answers/devtools/paths`. `pnpm run lint` and `pnpm run climb-scan` refuse the common ways of climbing out of a workspace, and each message names the helper's file. Production source under `src/` and files at the repository root, such as `scripts/`, are exempt.
-- A folder in a `src`, `test`, `tests` or `e2e` tree holds at most 15 tracked files directly. `pnpm run loose-files` holds the limit. Its table in `packages/devtools/src/scans/loose-files.ts` lists the folders a tool pins over it, and why.
-- Move files with `node scripts/move-files.mjs <table.tsv>`, one `<old>\t<new>` row per file. It rewrites the imports and path mentions, then runs `git mv`. Run `scripts/test-inventory.sh <dir>` before and after the move and `diff -r` the two directories. A move changes no test file's name or title.
+### Source files
+
+- Group source by capability, in `src/<capability>/`. Name each capability with the glossary's words.
+- When a capability has more than 15 files, give it subfolders by sub-capability.
+- Leave a file where it is if something other than an import names it by path.
+
+### Test files
+
+Test folders mirror source folders. Put a test in the folder that mirrors the folder of the slice whose entry or module the test drives.
+
+- `test/a/b/` mirrors `src/a/b/`.
+- In `apps/api` and `apps/worker`, the test root is `tests/`, so `tests/a/b/` mirrors `src/a/b/`.
+- In `apps/worker`, the source root is `src/better_answers_worker/`, and the test root mirrors it.
+- In `apps/web`, `test/<feature>/` or `e2e/<feature>/` mirrors `src/features/<feature>/`.
+
+An import that only sets a test up, such as a store door or `kernel`, does not decide where the test goes.
+
+Name a test file for the behaviour it checks. If the test checks one source file end to end, name it for that source file.
+
+To find the tests of a source file, open its mirror folder. Then search for the file's path or for the names it exports.
+
+### Test folders that mirror no source folder
+
+A test folder that mirrors no source folder is one of four kinds:
+
+- `support/` and `fixtures/` hold helpers.
+- `gates/` at the test root holds the checks of the repository itself, such as a config, a lint rule, a workflow, a skill, or the tree.
+- A run folder holds the tests that a job other than `check` selects. `readings/`, `budgets/`, and `images/` are run folders.
+- A pinned folder mirrors a tree outside `src/`. A pinned folder can also hold the tests of one source file when those tests fill a folder.
+
+`pnpm run test-folders` enforces these kinds. The table in `packages/devtools/src/scans/test-folders.ts` lists every run folder and every pinned folder, with the reason for each.
+
+### Test helpers
+
+- Put a helper that one folder uses beside that folder's tests.
+- Put a helper that two folders share in `support/`.
+- In `apps/web`, put every helper of `test/` in `test/support/`.
+- Put a helper's own test beside the helper.
+
+### Paths to repository files
+
+A test or a script reaches repository files through the roots helper of its workspace:
+
+| Workspace | Helper file | Names |
+| --- | --- | --- |
+| `apps/api` | `apps/api/tests/support/roots/roots.ts` | `repositoryRoot`, `workspaceRoot` |
+| `apps/web` | `apps/web/test/support/roots.ts` | `repositoryRoot`, `workspaceRoot` |
+| `packages/core` | `packages/core/test/support/roots/roots.ts` | `repositoryRoot`, `workspaceRoot` |
+| `packages/schema` | `packages/schema/test/support/roots/roots.ts` | `repositoryRoot`, `workspaceRoot` |
+| `apps/worker` | `apps/worker/tests/support/roots.py` | `REPOSITORY_ROOT`, `WORKER_ROOT` |
+| `packages/devtools` (TypeScript) | `packages/devtools/src/paths.ts` | `repositoryRoot` |
+| `packages/devtools` (Python) | `packages/devtools/python/roots.py` | `REPOSITORY_ROOT` |
+
+- Outside `packages/devtools`, only the roots helpers import `repositoryRoot` from `@better-answers/devtools/paths`.
+- `pnpm run lint` and `pnpm run climb-scan` refuse the common ways to climb out of a workspace. Each error message names the file of the helper to use.
+- Production source under `src/` is exempt from these checks. Code at the repository root, such as `scripts/`, is also exempt.
+
+### Folder size
+
+A folder in a `src`, `test`, `tests`, or `e2e` tree holds at most 15 tracked files directly. `pnpm run loose-files` enforces the limit. The table in `packages/devtools/src/scans/loose-files.ts` lists the folders that a tool pins above the limit, with the reason for each.
+
+### Move files
+
+1. Run `scripts/test-inventory.sh <before-dir>`.
+2. Write a TSV table with one `<old>\t<new>` row for each file.
+3. Run `node scripts/move-files.mjs <table.tsv>`. The script rewrites the imports and the path mentions, then runs `git mv`.
+4. Run `scripts/test-inventory.sh <after-dir>`.
+5. Compare the two directories with `diff -r <before-dir> <after-dir>`.
+
+A move changes no test file's name and no test's title.
 
 ## Coding
 
-- Read the environment in the tier's config module. Pass it to a child process through one named function.
-- No backward compatibility by default. No `omitempty` shims, no legacy fallbacks, no dual-path support. Only add compat when explicitly requested.
+- Read the environment in the tier's config module.
+- Pass the environment to a child process through one named function.
+- Add backward compatibility only when someone asks for it. Without that request, add no `omitempty` shims, no legacy fallbacks, and no second code path for the old behaviour.
 
 ## Testing
 
-- Test at the lowest layer that can see the claim. A pure function's test calls it in-process and imports its module by path. In `packages/core`, a test under `test/<x>/` imports the modules of `src/<x>/` that way (`test/store/<door>/` and `src/store/<door>/` for a door) and reaches every other directory through an entry the package's `exports` map names. A transport's test crosses its interface: `apps/api` through `server.request(...)`, `apps/worker` through the job or module entry point. A page's single-screen behaviour is a component test through Testing Library.
-- Use the real Postgres, object store, git repository or map only where that store is the claim: row-level security and zero-rows, migrations, the SQL a slice runs, locks and races, governed commits and history rewrites, the erasure rehearsal, boundary-schema parity, and the tier contract's SQL agreements. Each route or command keeps one case through its real entry.
-- A decision over rows already read is a pure function on its slice. Never mock this repository's own code, and never add an in-memory stand-in for a store the platform runs. An in-memory adapter replaces only a third-party service, such as an LLM provider, behind its injected seam.
-- The browser suite holds one spec per page, with its latency budget, the accessibility gate and keyboard reach, and the journeys that cross pages through the real api. A bug's regression test sits at the lowest layer that reproduces it.
-- Images, compose scripts and the api's stop run in the image job, `pnpm run check:images`, which `check` leaves out. A test that spawns the worker stays in its package's `check`. A test that records figures, or a performance budget, runs on the schedule, not in `check`.
-- Postgres aborts the transaction after a failed statement, even a caught one. Assert the rejection or the rows before any returned value if the intention is for a test to provoke a failure.
+### Test at the lowest layer that can see the claim
+
+- Test a pure function in-process, and import its module by path.
+- In `packages/core`, a test under `test/<x>/` imports the modules of `src/<x>/` by path. For a store door, the test folder is `test/store/<door>/` and the source folder is `src/store/<door>/`.
+- In `packages/core`, a test reaches every other directory through an entry in the package's `exports` map.
+- Test a transport through its interface. In `apps/api`, call `server.request(...)`. In `apps/worker`, call the job or the module entry point.
+- Test the behaviour of a page on a single screen with a component test that uses Testing Library.
+- Put the regression test for a bug at the lowest layer that reproduces the bug.
+
+### Use a real store only where the store is the claim
+
+Use the real Postgres, object store, git repository, or map only when the test is about that store. These claims are about a store:
+
+- Row-level security and zero-rows tests.
+- Migrations.
+- The SQL that a slice runs.
+- Locks and races.
+- Governed commits and history rewrites.
+- The erasure rehearsal.
+- Parity of the boundary schema.
+- The SQL agreements of the tier contract.
+
+Each route or command keeps one test case that goes through its real entry.
+
+Write a decision over rows that the code already read as a pure function in its slice.
+
+Never mock this repository's own code. Never add an in-memory stand-in for a store that the platform runs. An in-memory adapter can replace only a third-party service, such as an LLM provider, behind its injected seam.
+
+### Browser specs
+
+- The browser suite has one spec for each page.
+- A page's spec covers its latency budget, the accessibility gate, and keyboard reach.
+- The browser suite also holds the journeys that cross pages through the real api.
+
+### Jobs outside `check`
+
+- The image job, `pnpm run check:images`, runs the tests of the images, the compose scripts, and the api's stop. `check` does not run them.
+- A test that spawns the worker stays in its package's `check`.
+- A test that records figures runs on the schedule, not in `check`.
+- A performance-budget test runs on the schedule, not in `check`.
+
+### Failures in Postgres
+
+Postgres aborts the transaction after a failed statement, even when the code catches the error. If a test provokes a failure, assert the rejection or the rows before you assert any returned value.
 
 ## Secrets
 
-- `docs/operations/SECRETS.md` says where each secret lives (ADR 0052). The tier's config module reads a deployment's secret once. A workspace's or a person's secret is a row in the database and never comes from the environment. Never log a secret.
+- `docs/operations/SECRETS.md` lists where each secret lives.
+- The tier's config module reads each deployment secret once.
+- A workspace's secret or a person's secret is a row in the database. It never comes from the environment.
+- Never log a secret.
 
 ## Agent skills
 
 ### Workflow
 
-Use `pstack` skills. 
+Use the `pstack` skills. For day-to-day work, run `/poteto-mode <goal and definition of done>`. Name the goal and how to tell that it is done. Do not name the skills.
 
-Day-to-day workflow: `/poteto-mode <goal and definition of done>` - name the goal and how to tell it is done, not the skills.
+The project playbooks in `.agents/playbooks/` add this repository's steps to the pstack playbooks.
 
-The project playbooks in `.agents/playbooks/` add this repository's steps to pstack's.
+Cubic's PR bot reviews a pull request when it opens. CodeRabbit reviews only pull requests that have the `review:coderabbit` label. Run Cubic's CLI, `pnpm run cubic-review`, before you open a pull request and before each later push. `.agents/playbooks/review.md` gives the details.
 
-Cubic's PR bot reviews a pull request when it opens. CodeRabbit only reviews pull requests labelled `review:coderabbit`. Run Cubic's CLI, `pnpm run cubic-review`, before opening a pull request and before each later push. See `.agents/playbooks/review.md` for more information.
+Until v0.1, the session lands its own pull request when the verdict is `PASS` or `PASS+NOTES`. The session does not wait for the owner to approve.
 
-Until v0.1 the session lands its own pull request, with no press from the owner, once the verdict is `PASS` or `PASS+NOTES`.
+The verifier records its Shipping verdict as a commit status on the verified head, with the context `verdict`. The state is `success` for PASS or PASS+NOTES, and `failure` for FAIL. The description names the verdict and the verifier. For example:
 
-The verifier records its Shipping verdict as a commit status on the verified head, context `verdict`: `success` for PASS or PASS+NOTES, `failure` for FAIL, and a description naming the verdict and the verifier, for example `gh api repos/{owner}/{repo}/statuses/<sha> -f state=success -f context=verdict -f description='PASS by <verifier>'`. The `main` ruleset requires a successful `verdict` and `check` on the head. The session lands with `gh pr merge <n> --squash --match-head-commit <verified-sha>`. Before landing, read `main`'s newest completed `build` run (`gh run list --workflow build.yml --branch main --status completed --limit 1`), and when that run is red, land the fix for `main` first.
+```sh
+gh api repos/{owner}/{repo}/statuses/<sha> -f state=success -f context=verdict -f description='PASS by <verifier>'
+```
+
+The `main` ruleset requires a successful `verdict` status and a successful `check` on the head.
+
+To land a pull request:
+
+1. Read the newest completed `build` run on `main` with `gh run list --workflow build.yml --branch main --status completed --limit 1`.
+2. If that run failed, land the fix for `main` first.
+3. Land the pull request with `gh pr merge <n> --squash --match-head-commit <verified-sha>`.
 
 ### Skills
 
-A `paths` line in a skills frontmatter loads it for the files it serves. The table of lines is in `packages/devtools/src/scans/skill-paths.ts`. Update skills with `pnpm run skills-update` only. It runs `npx skills update` and then `skill-paths --write`, and every `skills-lock.json` entry sets `installMode: copy`.
+A `paths` line in a skill's frontmatter loads the skill for the files that the skill serves. The table of these lines is in `packages/devtools/src/scans/skill-paths.ts`.
+
+Update skills only with `pnpm run skills-update`. The command runs `npx skills update`, then `skill-paths --write`. Every entry in `skills-lock.json` sets `installMode: copy`.
 
 ### Issue tracker
 
-The backlog lives in **Linear** - accessed via the `linear-server` MCP.  See `docs/agents/issue-tracker.md`.
+The backlog is in Linear. Use the `linear-server` MCP server to reach it. `docs/agents/issue-tracker.md` gives the details.
 
 ### Lessons learned
 
-`docs/solutions/` is the repository's memory of solved problems, organized by category with YAML frontmatter. Look up the docs whose `applies_when` matches the area you are working in.
+`docs/solutions/` records the problems that this repository has solved. The docs are in folders by category and have YAML frontmatter. Before you work in an area, read the docs whose `applies_when` matches that area.
 
 ### Mutation triage
 
-A mutation survivor is a hypothesis until a probe verifies it. See `docs/agents/mutation-triage.md`.
+Treat a surviving mutant as a hypothesis until a probe verifies it. `docs/agents/mutation-triage.md` gives the procedure.
 
 ### Cloud sessions
 
-When a session runs in a cloud environment, see `docs/agents/cloud-sessions.md`.
+When a session runs in a cloud environment, read `docs/agents/cloud-sessions.md`.
 
 ## Doc exploration
 
-Use jDocMunch to find and read this repository's indexed Markdown:
+Use jDocMunch to find and read the indexed Markdown in this repository:
 
-- Start with `doc_resolve_repo` on `"<repo's absolute path>"`.
-- Find a passage with `search_sections`, and read it with `get_section` or `get_sections`.
-- Open a long file's structure with `get_document_outline` before reading any of it.
+1. Run `doc_resolve_repo` on `"<repo's absolute path>"`.
+2. Find a passage with `search_sections`. Read it with `get_section` or `get_sections`.
+3. Before you read a long file, open its structure with `get_document_outline`.
 
-Read a doc directly when you will work through all of it (a plan you are carrying out), when you are about to edit it, or when a command needs it raw, such as a grep that also covers code.
+Read a doc directly in these cases:
+
+- You will work through all of it, such as a plan that you carry out.
+- You are about to edit it.
+- A command needs the raw file, such as a grep that also covers code.
 
 <!-- gitnexus:start -->
 <!-- gitnexus:keep -->
 ## Gitnexus Policy
 
-This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+GitNexus indexes this project as **better-answers**. Use the GitNexus MCP tools to read code and to find what a change affects.
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root.
+> If the index is stale, run `node .gitnexus/run.cjs analyze` from the project root.
 
 ### Use it for
 
-- The blast radius of a change to a symbol other code calls: `impact({target: "symbolName", direction: "upstream"})`.
-- The symbols and flows a large diff touches: `detect_changes()`.
-- Full context on a symbol — callers, callees, the flows it takes part in: `context({name: "symbolName"})`.
-- Security review: `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
+- The blast radius of a change to a symbol that other code calls: `impact({target: "symbolName", direction: "upstream"})`.
+- The symbols and flows that a large diff touches: `detect_changes()`.
+- The callers, the callees, and the flows of a symbol: `context({name: "symbolName"})`.
+- Security review: `explain({target: "fileOrSymbol"})` lists taint findings, which are flows from a source to a sink. It needs `analyze --pdg`.
 
 ### Renames
 
-- Rename a symbol with `rename` as it follows the call graph, not find-and-replace.
+- Rename a symbol with `rename`, not with find-and-replace. `rename` follows the call graph.
 
-## From a worktree
+### From a worktree
 
-GitNexus `analyze` runs after every merge to `main`; the runner is absent from a worktree.
+GitNexus `analyze` runs after every merge to `main`. A worktree does not have the runner.
 
-- `detect_changes` takes `worktree: <the worktree's absolute path>`.
-- `impact`, `context` and `query` read the main checkout's index, so they answer about `main`, not the worktree's edits.
-- An `impact` that answers *ambiguous* is re-run by `target_uid` before its risk counts.
-- `rename` stays a dry run. It reads **and writes** the main checkout's files.
+- Pass `worktree: <the worktree's absolute path>` to `detect_changes`.
+- `impact`, `context`, and `query` read the index of the main checkout. Their answers describe `main`, not the edits in the worktree.
+- If `impact` answers *ambiguous*, run it again by `target_uid` before you count its risk.
+- Run `rename` only as a dry run. It reads and writes the files of the main checkout.
 
 ### Resources
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/better-answers/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/better-answers/context` | Codebase overview and index freshness |
 | `gitnexus://repo/better-answers/clusters` | All functional areas |
 | `gitnexus://repo/better-answers/processes` | All execution flows |
 | `gitnexus://repo/better-answers/process/{name}` | Step-by-step execution trace |

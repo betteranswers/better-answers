@@ -1,54 +1,68 @@
 # The platform destination
 
-The way to v0.1 is the route spec, `docs/specs/v01-route.md`.
+`docs/specs/v01-route.md` sets out the route to the first release, v0.1.
 
 ## In one line
 
-**Better Answers** — for SMBs who need accurate information about their business: a living company knowledge map that humans and agents use confidently to run business activities — every answer cited, permission-aware and explainable.
+**Better Answers** is a map of a company's own knowledge, built for small and medium-sized businesses that need accurate information about themselves. People and agents rely on the map to run business activities, and every answer it gives is cited, permission-aware, and explainable.
 
 ## Why now
 
-A company's knowledge lives scattered across systems, documents and people's heads — unstructured, duplicated, contradictory, often stale. Point an AI tool at that and it answers confidently, wrongly and without a trail. The Open Knowledge Framework (OKF) introduces a unified, portable shape which enables any human or AI system to traverse and reason across a company's knowledge. The map is an asset that grows with the business: each new AI use case is cheaper and safer than the last, and where no formal governance exists the map is the practical path to it.
+A company's knowledge is spread across systems, documents, and people's heads. Much of it is unstructured, duplicated, contradictory, or out of date. An AI tool pointed at that knowledge answers with confidence, often wrongly, and leaves no trail.
+
+The Open Knowledge Framework (OKF) gives that knowledge one portable shape. Any person or AI system can follow the links in that shape and reason across it. The map is an asset that grows with the business. Each new AI use case builds on the same map, so it costs less and carries less risk than the one before. Where a company has no formal governance, the map is the practical way to get some.
 
 ## The knowledge system
 
-Three knowledge layers, and the platform's records over them:
+The system has three layers of knowledge. The platform also keeps records about them.
 
-1. **Sources** — the company's systems and documents, copied (or read live, with no copy kept), reviewed for sensitivity, indexed for search. Sources stay where they are and keep evolving.
-2. **Bundles** — the OKF concepts: the curated body of what the company knows, one trust-bearing unit per file, written to the spec and readable without the platform. OKF's structure is explicit, graph-shaped by default, providing rich queryable, traversable context, able to be reasoned over even before any extraction has taken place. Each concept file holds its own trust and credibility signals; portable; the company's asset.
-3. **Map** — derived from the bundles and the records: It keeps the shape of what the company knows standing as knowledge grows, and grows itself — from what each bundle already holds (people, teams, products, datasets, systems, policies) to the edges between them. 
+1. **Sources.** These are the company's systems and documents. The platform copies each source, or reads it live and keeps no copy. It reviews the content for sensitivity and indexes it for search. Sources stay where they are and keep changing.
+2. **Bundles.** A bundle holds OKF concepts, the curated body of what the company knows. Each concept is one file and one unit of trust. The file follows the spec, and a person can read it without the platform. It carries its own trust and credibility signals, it is portable, and it belongs to the company. OKF structure is explicit and forms a graph by default. A reader can query it, follow its links, and reason over it before any extraction runs.
+3. **Map.** The platform derives the map from the bundles and the records. The map keeps the shape of the company's knowledge current as that knowledge grows. It begins with the things each bundle already names, such as people, teams, products, datasets, systems, and policies, and adds the edges between them.
 
-**Records** are what the platform keeps because it runs use cases: guides and their write-ups, usage and outcomes, opportunities and responses, connected sources, audit, review. They cite concepts by IRI and never restate them. Where a unit lives is decided by the minting rule: a concept when a company with no platform would keep it as knowledge — the customer's Q&A pairs are concepts — a record when it exists only because the platform runs a use case.
+**Records** are what the platform keeps because it runs use cases. They include guides and their write-ups, usage and outcomes, opportunities and responses, connected sources, audit, and review. A record cites concepts by IRI and never restates them.
 
-Every layer answers questions; the path depends on the question — search over documents, traversal over concepts and the map as a tool that extends the bundles - "What breaks if this policy changes?" a recursive grep over files becomes one prepared map traversal.
+The minting rule decides where a unit lives. If a company with no platform would still keep the unit as knowledge, the unit is a concept. By this rule, the customer's question-and-answer pairs are concepts. If the unit exists only because the platform runs a use case, it is a record.
+
+Every layer answers questions, and the question decides the path. Search finds documents. Traversal follows concepts. The map extends the bundles for questions that cross many concepts. Take "What breaks if this policy changes?" Over plain files, the answer needs a recursive grep. With the map, it is one prepared traversal.
 
 ## What a consumer sees on every concept
 
-Provenance (what it was created from), trust (who checked it, when, against what), freshness (is it still true), lifecycle (is it current or deprecated), attestation (was a figure produced the way we said). Errors are fixed at the right level: concept wrong → edit the concept; source wrong → fix the source; retrieval wrong → fix the evals. Trust never gates viewing; sensitivity does; actions are gated by the reader's role and its threshold.
+Every concept shows a consumer five things:
+
+- Provenance: what the concept was created from.
+- Trust: who checked it, when, and against what.
+- Freshness: whether it is still true.
+- Lifecycle: whether it is current or deprecated.
+- Attestation: whether a figure was produced the way the platform says it was.
+
+A fault is fixed where it starts. If the concept is wrong, edit the concept. If the source is wrong, fix the source. If retrieval is wrong, fix the evals.
+
+Trust never controls who can view a concept. Sensitivity does. The reader's role, and the threshold set for that role, control which actions the reader can take.
 
 ## Who uses it
 
-- **People** — employees of different backgrounds using the platform to run business activities and to curate knowledge: Admins (sources, kinds, suggestions, Control Centre), bid and sales writers, product and technical staff.
-- **Platform Agents** — through the platform's MCP server, plugins and skills; local or hosted; producer agents that map and enrich the knowledge, consumer agents that answer and draft.
-- **External Agents** — the remote MCP server provides exceptional read access that enables agents from other platforms, or assistants (e.g., a user in Claude Desktop/AI/Cowork) to carry our knowledge anywhere it's needed - a task in Asana that references a concept file that needs an action, a workspace in Notion or a Channel on Teams where users want to discuss a concept, the map, or anything knowledge-shaped. 
+- **People.** Employees with different backgrounds use the platform to run business activities and to curate knowledge. They include Admins, bid and sales writers, and product and technical staff. Admins manage sources, kinds, suggestions, and the Control Centre.
+- **Platform agents.** These agents work through the platform's MCP server, plugins, and skills, and run locally or hosted. Producer agents map and enrich the knowledge. Consumer agents answer questions and draft documents.
+- **External agents.** The remote MCP server gives read access to agents and assistants on other platforms, for example a user in Claude Desktop, Claude.ai, or Cowork. Those agents take the company's knowledge to wherever the work happens. An Asana task can reference a concept file that needs action. A Notion workspace or a Teams channel can hold a discussion about a concept, the map, or anything else the knowledge covers.
 
-## Turning knowledge into action — the outcome loop
+## The outcome loop turns knowledge into action
 
-Use-case outcomes drive the knowledge: a bid outcome triggers a review of the answers it used; a renewal pack draws on what was delivered. A company does not want a dashboard of counts; it wants "here is where to focus, grounded in your data" and "here is the pack, ready for review".
+The outcomes of use cases feed back into the knowledge. A bid outcome starts a review of the answers the bid used. A renewal pack draws on what the company delivered. A dashboard of counts does little for a company. What helps is a pointer to where to focus, grounded in the company's own data, and a pack that is ready for review.
 
-Use cases, in the order they land:
+Use cases arrive in this order:
 
 | Stage | Use case | What it needs from the knowledge system |
 | --- | --- | --- |
-| **v0.1 — single source of truth** (this map) | Product, service and sector guides; the bid libraries as `Answer` concepts; search and cited Q&A; answering a question set (a bid pack or proposal document) from the knowledge with citations; a read-only MCP surface; Control Centre (one Admin area; its sections are named in ticket 37); sensitivity, roles, coverage | The three layers; concepts-only bundle; write-ups as records; trust and sensitivity; the concept write path |
-| **Next — bids and proposals** | Opportunities, versioned packs, extracted question sets with constraints, responses, submissions, outcomes; the outcome loop | The write-up primitive with prompt = question; Q&A trust and provenance; the promotion gate |
-| **Then** | Renewal packs; intelligence feeds as sources; take-action in connected systems as the user, approval-gated; proposals and prospecting | Acting credentials and the approval layer; feed entries as sources |
-| **Later** | Meeting notes, support-ticket sentiment, marketing campaigns, development documentation; customer-hosted deployment | Broader connectors; the customer-hosted worker |
+| **v0.1: single source of truth** | Product, service, and sector guides. The bid libraries as `Answer` concepts. Search and cited Q&A. Answers to a question set, such as a bid pack or a proposal document, drawn from the knowledge with citations. A read-only MCP server. The Control Centre, a single Admin area. Sensitivity, roles, and coverage. | The three layers. Bundles that hold only concepts. Write-ups kept as records. Trust and sensitivity. The path that writes concepts. |
+| **Next: bids and proposals** | Opportunities, versioned packs, question sets extracted with their constraints, responses, submissions, and outcomes. The outcome loop. | Write-ups that take the question as their prompt. Trust and provenance for Q&A. The promotion gate, which mints an `Answer` concept from a write-up. |
+| **Then** | Renewal packs. Intelligence feeds as sources. Actions in connected systems, taken as the user and only after approval. Proposals and prospecting. | Credentials to act with, and the approval layer. Feed entries as sources. |
+| **Later** | Meeting notes, support-ticket sentiment, marketing campaigns, and development documentation. Customer-hosted deployment. | Broader connectors. The customer-hosted worker. |
 
 ## Principles that do not move
 
-- **Simplicity through OKF.** The concept file stays to spec; the spec's silences are met in the map and records. If a feature needs more in the file, the approach is re-evaluated. (`docs/okf-v02.md`)
-- **Private by default.** A connected source counts as restricted until an Admin publishes it; personal data never enters the bundle; every call carries a principal; every answer is permission-aware.
-- **Local models are preferred**, per purpose, per workspace — the model choice keyed by purpose is what delivers it. Local *embedding* is a named precondition, triggered by the first workspace that asks for it and not by a date: it needs a model-host box the first estate has no room for.
-- **Multi-tenant-ready data model, single deployment**, UK-preferred hosting, customer-hosted later.
-- **Repo quality is first-class**: functional tests through the interface, a glossary that code obeys, ADRs for what is hard to reverse.
+- **Simplicity through OKF.** The concept file stays to the spec. Where the spec says nothing, the map and the records fill the gap. A feature that needs more in the file needs a new design. `docs/okf-v02.md` states the rule.
+- **Private by default.** A connected source is restricted until an Admin publishes it. Personal data never enters the bundle. Every call carries a principal, and every answer respects the reader's permissions.
+- **Local models first.** Each workspace can prefer a local model for each purpose, because the model choice is keyed by purpose. Local embedding starts when the first workspace asks for it, not on a set date. It needs a separate machine to host the model, and the first deployment has no room for one.
+- **A multi-tenant-ready data model on a single deployment.** Hosting in the UK is preferred. Customer-hosted deployment comes later.
+- **Repository quality is first-class.** Functional tests run through the interface. Code follows the glossary. ADRs record the decisions that are hard to reverse.
