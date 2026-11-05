@@ -168,6 +168,7 @@ describe("the next step", () => {
 
     expect(lines(reviewed.report)).toContain("codeql\tpending (in_progress)");
     expect(reviewed.exitCode).toBe(0);
+    expect(lines(reviewed.report)).toContain("a bot is still running, so this is not final");
     expect(nextOf(reviewed.report)).toBe("next: none");
     expect(unreviewed.exitCode).toBe(3);
   });

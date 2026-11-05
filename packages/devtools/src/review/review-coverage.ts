@@ -10,7 +10,7 @@ const CODERABBIT_FILE_LIMIT = 100;
 /** A run still going after this long did not run, so the verdict rule decides. */
 const RUNNING_LIMIT_MINUTES = 20;
 
-/** Cubic, asked by comment, shows a check run or a reply within this long or did not start. The label's wait is not timed here. */
+/** Cubic, asked by comment, shows a check run within this long or did not start. Only that wait is timed. */
 const START_WAIT_MINUTES = 10;
 
 const minutes = (count: number): number => count * 60 * 1000;
@@ -232,7 +232,9 @@ export const assess = (
     `head ${pullRequest.headRefOid}`,
     ...judged.map(({ bot, state }) => `${bot.name}\t${describeState(state)}`),
     `ai reviewers on this head: ${String(reviewers.length)} of ${String(BOTS.filter((bot) => bot.ai).length)}`,
-    ...(facts.pending ? ["a bot is still running, so this is not final"] : []),
+    ...(judged.some(({ state }) => state.kind === "pending")
+      ? ["a bot is still running, so this is not final"]
+      : []),
     `pull request: ${String(pullRequest.changedFiles)} files, label ${REVIEW_LABEL} ${facts.labelled ? "set" : "not set"}, Cubic reviewed it: ${yesNo(facts.cubicReviewed)}, Cubic hit its limit: ${yesNo(facts.limited)}, Cubic asked: ${yesNo(facts.asked)}`,
     `next: ${rule.next(pr)}`,
   ];
