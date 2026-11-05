@@ -130,7 +130,7 @@ describe("the one navigation list", () => {
     ]);
   });
 
-  it("calls only today's sixteen pages built", () => {
+  it("calls only today's seventeen pages built", () => {
     expect(
       pagesOf([...AREAS, CONSOLE])
         .filter((each) => each.built)
@@ -140,6 +140,7 @@ describe("the one navigation list", () => {
       "/ask/your-questions",
       "/ask/connect-claude",
       "/knowledge/search",
+      "/knowledge/guides",
       "/knowledge/knowledge-base",
       "/knowledge/collections-and-owners",
       "/inbox/waiting-on-you",
@@ -188,7 +189,7 @@ const ASK_OUTLINE = ["Ask", [[null, ["New Question", "Your Questions", "Connect 
 const KNOWLEDGE_WITH_CURATION = [
   "Knowledge",
   [
-    ["Browse", ["Search", "Knowledge Base"]],
+    ["Browse", ["Search", "Guides", "Knowledge Base"]],
     ["Curation", ["Collections and Owners"]],
   ],
 ];
@@ -202,7 +203,7 @@ describe("what each person is shown", () => {
 
       expect(outline(shown.areas)).toEqual([
         ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]],
-        ["Knowledge", [["Browse", ["Search", "Knowledge Base"]]]],
+        ["Knowledge", [["Browse", ["Search", "Guides", "Knowledge Base"]]]],
       ]);
       expect(shown.home).toBe(HOMES[role]);
       expect(shown.areas[0]?.opensAt).toBe(HOMES[role]);
@@ -315,7 +316,7 @@ describe("what each person is shown", () => {
 
     expect(outline(visibleTo(overrideOwner, AREAS).areas)).toEqual([
       ASK_OUTLINE,
-      ["Knowledge", [["Browse", ["Search", "Knowledge Base"]]]],
+      ["Knowledge", [["Browse", ["Search", "Guides", "Knowledge Base"]]]],
       INBOX_OUTLINE,
     ]);
     expect(hides(visibleTo(overrideOwner, AREAS), path)).toBe(false);
@@ -331,7 +332,7 @@ describe("what each person is shown", () => {
 
     expect(outline(visibleTo(owningNothing, AREAS).areas)).toEqual([
       ASK_OUTLINE,
-      ["Knowledge", [["Browse", ["Search", "Knowledge Base"]]]],
+      ["Knowledge", [["Browse", ["Search", "Guides", "Knowledge Base"]]]],
     ]);
   });
 
@@ -578,7 +579,7 @@ describe("an address the person may not see", () => {
     expect(asked.filter((path) => path.includes("members."))).toEqual([]);
   });
 
-  for (const path of ["/people/thresholds", "/suggestions/to-decide", "/knowledge/guides"]) {
+  for (const path of ["/people/thresholds", "/suggestions/to-decide", "/knowledge/conflicts"]) {
     it(`shows an Admin the unbuilt ${path} as not found`, async () => {
       vi.stubGlobal("fetch", answeringAs("Admin"));
 

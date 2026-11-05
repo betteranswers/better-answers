@@ -1,6 +1,6 @@
-import type { ChainedCommands } from "@tiptap/core";
+import type { ChainedCommands, Editor, Extensions } from "@tiptap/core";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -12,6 +12,12 @@ export type BodyField = {
   readonly value: string;
   readonly onChange: (markdown: string) => void;
   readonly describedBy?: string | undefined;
+};
+
+export type VisualOptions = {
+  readonly extensions?: Extensions | undefined;
+  readonly autofocus?: boolean | undefined;
+  readonly beside?: ((editor: Editor) => ReactNode) | undefined;
 };
 
 type Control = {
@@ -55,8 +61,8 @@ const attributesOf = (label: string, describedBy: string | undefined) => {
     : { ...attributes, "aria-describedby": describedBy };
 };
 
-export function VisualBody(properties: BodyField) {
-  const { label, describedBy, onChange } = properties;
+export function VisualBody(properties: BodyField & VisualOptions) {
+  const { label, describedBy, onChange, beside } = properties;
   const [initial] = useState(properties.value);
   const ending = endingOf(initial);
   const editorProps = useMemo(
@@ -65,10 +71,11 @@ export function VisualBody(properties: BodyField) {
   );
 
   const editor = useEditor({
-    extensions: MARKDOWN_EXTENSIONS,
+    extensions: properties.extensions ?? MARKDOWN_EXTENSIONS,
     content: initial,
     contentType: "markdown",
     editorProps,
+    autofocus: properties.autofocus === true ? "end" : false,
     onUpdate: ({ editor: updated }) => {
       onChange(markdownOf(updated) + ending);
     },
@@ -101,6 +108,7 @@ export function VisualBody(properties: BodyField) {
           </Button>
         ))}
       </div>
+      {beside?.(editor)}
       <EditorContent editor={editor} className={FIELD} />
     </div>
   );

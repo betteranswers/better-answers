@@ -12,6 +12,9 @@ import { WaitingEditPage } from "@/features/inbox/waiting-edit-page.tsx";
 import { WaitingOnYouPage } from "@/features/inbox/waiting-on-you-page.tsx";
 import { CollectionsAndOwnersPage } from "@/features/knowledge/collections-and-owners-page.tsx";
 import { ConceptPage } from "@/features/knowledge/concept-page.tsx";
+import { GuidePage } from "@/features/knowledge/guides/guide-page.tsx";
+import { GUIDE_ID } from "@/features/knowledge/guides/guide-state.ts";
+import { GuidesPage } from "@/features/knowledge/guides/guides-page.tsx";
 import { KnowledgeBasePage } from "@/features/knowledge/knowledge-base-page.tsx";
 import { SearchPage } from "@/features/knowledge/search-page.tsx";
 import { AuditLogPage } from "@/features/people/audit-log/audit-log-page.tsx";
@@ -38,6 +41,7 @@ const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>
   ["/ask/your-questions", { draw: YourQuestionsPage }],
   ["/ask/connect-claude", { draw: ConnectClaudePage }],
   ["/knowledge/search", { draw: SearchPage }],
+  ["/knowledge/guides", { draw: GuidesPage }],
   ["/knowledge/knowledge-base", { draw: KnowledgeBasePage }],
   ["/knowledge/collections-and-owners", { draw: CollectionsAndOwnersPage }],
   ["/inbox/waiting-on-you", { draw: WaitingOnYouPage }],
@@ -67,6 +71,7 @@ const BUILT_DETAILS: ReadonlyMap<string, BuiltDetail> = new Map<PagePath, BuiltD
     },
   ],
   ["/knowledge/search", { value: CONCEPT_IRI, draw: (iri) => <ConceptPage iri={iri} /> }],
+  ["/knowledge/guides", { value: GUIDE_ID, draw: (guideId) => <GuidePage guideId={guideId} /> }],
   [
     "/inbox/waiting-on-you",
     {
