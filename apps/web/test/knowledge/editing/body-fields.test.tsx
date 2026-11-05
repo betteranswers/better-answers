@@ -52,6 +52,26 @@ describe("the visual body field", () => {
     expect(onChange).toHaveBeenLastCalledWith("Start more");
   });
 
+  it("hands back the ending the starting text had", async () => {
+    const onChange = vi.fn<(markdown: string) => void>();
+    render(<VisualBody label="Body" value={"Start\n\n"} onChange={onChange} />);
+
+    caretAtEnd(field());
+    await userEvent.setup().keyboard(" more");
+
+    expect(onChange).toHaveBeenLastCalledWith("Start more\n\n");
+  });
+
+  it("hands back no ending to a body that had none", async () => {
+    const onChange = vi.fn<(markdown: string) => void>();
+    render(<VisualBody label="Body" value="" onChange={onChange} />);
+
+    caretAtEnd(field());
+    await userEvent.setup().keyboard("First");
+
+    expect(onChange).toHaveBeenLastCalledWith("First");
+  });
+
   it("turns a line into a list from the toolbar", async () => {
     const onChange = vi.fn<(markdown: string) => void>();
     const user = userEvent.setup();

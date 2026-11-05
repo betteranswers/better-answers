@@ -7,8 +7,10 @@ import {
   A_CONCEPT_PAGE,
   aConceptApi,
   aConceptToEdit,
+  aNewConceptApi,
   asksOf,
   committed,
+  newConceptAt,
   PARTS,
   savesAsked,
   suggested,
@@ -41,6 +43,8 @@ const editorOpened = async (api: Api) => {
 };
 
 const titleField = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Title" });
+
+const bodyField = () => screen.getByRole("textbox", { name: "Body" });
 
 const retitled = (title: string) => {
   fireEvent.change(titleField(), { target: { value: title } });
@@ -173,6 +177,49 @@ describe("editing a concept on its own page", () => {
     expect(screen.getByRole("button", { name: "Visual" }).getAttribute("aria-disabled")).toBe(
       "true",
     );
+  });
+
+  it("describes the body by a reason only when shown", async () => {
+    await editorOpened(aConceptApi("commits"));
+    expect(bodyField().getAttribute("aria-describedby")).toBeNull();
+    cleanup();
+
+    const body = "| Year | Kept |\n| --- | --- |\n| 2026 | Yes |";
+    await editorOpened(aConceptApi("commits", { parts: { ...PARTS, body } }));
+    const reason = await screen.findByText(
+      "This text uses markdown the visual editor would change, so it opens as markdown.",
+    );
+    await waitFor(() => {
+      expect(bodyField().getAttribute("aria-describedby")).toBe(reason.id);
+    });
+  });
+
+  it("numbers a source after a hidden one by its place", async () => {
+    await editorOpened(
+      aConceptApi("commits", {
+        sources: ["Audit handbook", "Calder handbook"],
+        withheld: [{ at: 0, label: "Restricted board minutes" }],
+      }),
+    );
+
+    expect(screen.queryByRole("textbox", { name: "Source 1" })).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Source 2" }).closest("li")?.value).toBe(2);
+    expect(screen.getByRole("textbox", { name: "Source 3" }).closest("li")?.value).toBe(3);
+    expect(screen.getByRole("button", { name: "Remove source 2" })).toBeDefined();
+  });
+
+  it("numbers sources around a hidden one in the middle", async () => {
+    await editorOpened(
+      aConceptApi("commits", {
+        sources: ["Audit handbook", "Calder handbook"],
+        withheld: [{ at: 1, label: "Restricted board minutes" }],
+      }),
+    );
+
+    expect(screen.getByRole("textbox", { name: "Source 1" })).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "Source 3" })).toBeDefined();
+    pressed("Add a source");
+    expect(screen.getByRole("textbox", { name: "Source 4" })).toBeDefined();
   });
 
   it("says Saving before the server answers, then Saved", async () => {
@@ -339,7 +386,7 @@ describe("editing a concept on its own page", () => {
     expect(screen.queryByText(/Restricted board minutes/u)).toBeNull();
     pressed("Remove source 1");
     pressed("Add a source");
-    fireEvent.change(screen.getByRole("textbox", { name: "Source 2" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Source 3" }), {
       target: { value: "Calder handbook" },
     });
     pressed("Save");
@@ -428,30 +475,10 @@ describe("editing a concept on its own page", () => {
       expect(screen.queryByRole("heading", { level: 3, name: "New Concept" })).toBeNull();
     });
     expect(
-      await screen.findByText("Your suggestion is waiting for the concept's owner to decide."),
+      await screen.findByText(
+        "Your suggestion is waiting for the collection's owner or an Admin to decide.",
+      ),
     ).toBeDefined();
     expect(router.state.location.searchStr).not.toContain("knowledge.new");
   });
 });
-
-const newConceptAt = (fields: Readonly<Record<string, string>>): string => {
-  const query = new URLSearchParams(
-    Object.entries(fields).map(([name, value]) => [`knowledge.${name}`, value]),
-  );
-  return `${SEARCH_PAGE.path}?${query.toString()}`;
-};
-
-const aNewConceptApi = (): Api => {
-  const api = aConceptApi("commits", {
-    parts: { ...PARTS, title: "", kind: "", tags: [], body: "" },
-    sources: [],
-    base: null,
-    usedIn: 0,
-  });
-  api.set("knowledge.tree", () =>
-    read({
-      collections: [{ collection: "policies", count: 1, kinds: [{ kind: "Policy", count: 1 }] }],
-    }),
-  );
-  return api;
-};

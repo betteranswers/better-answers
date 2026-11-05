@@ -84,3 +84,27 @@ const SAVE_ASKED = z.object({
 
 export const savesAsked = () =>
   asksOf("knowledge.saveConcept").map((asked) => SAVE_ASKED.parse(asked));
+
+export const newConceptAt = (fields: Readonly<Record<string, string>>): string => {
+  const query = new URLSearchParams(
+    Object.entries(fields).map(([name, value]) => [`knowledge.${name}`, value]),
+  );
+  return `${SEARCH_PAGE.path}?${query.toString()}`;
+};
+
+export const BLANK_TO_EDIT = {
+  parts: { ...PARTS, title: "", kind: "", tags: [], body: "" },
+  sources: [],
+  base: null,
+  usedIn: 0,
+};
+
+export const aNewConceptApi = (standing: Standing = "commits"): Api => {
+  const api = aConceptApi(standing, BLANK_TO_EDIT);
+  api.set("knowledge.tree", () =>
+    read({
+      collections: [{ collection: "policies", count: 1, kinds: [{ kind: "Policy", count: 1 }] }],
+    }),
+  );
+  return api;
+};
