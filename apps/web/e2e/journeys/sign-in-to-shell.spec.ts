@@ -12,12 +12,12 @@ import {
 
 const thePicker = (page: Page) => page.getByRole("heading", { level: 1, name: "Your Workspaces" });
 
-test("sign-in lands a sole member and scopes a picked workspace", async ({
+test("sign-in opens the only workspace or the picked one", async ({
   page,
   request,
   passesTheAccessibilityGate,
 }) => {
-  await test.step("a sole member lands in the shell: workspace, person, role", async () => {
+  await test.step("a member of one workspace signs in and sees the workspace name, their own name, and their role", async () => {
     const email = anAddress("sole");
     const workspace = await provision(request, { name: "Acme Joinery", adminEmail: email });
 
@@ -37,7 +37,7 @@ test("sign-in lands a sole member and scopes a picked workspace", async ({
     await passesTheAccessibilityGate();
   });
 
-  await test.step("a two-workspace member picks the second, and everything after is scoped to it", async () => {
+  await test.step("a member of two workspaces picks the second on Your Workspaces, then sees only that workspace", async () => {
     const email = anAddress("both");
     const { first, second } = await memberOfTwoWorkspaces(request, email, {
       first: "Northern Tooling",

@@ -62,7 +62,7 @@ const topOf = async (drawn: Locator): Promise<number> => {
 const clearOfTheBand = async (page: Page, focused: Locator): Promise<void> => {
   await expect(focused).toBeFocused();
   await expect(focused).toBeInViewport();
-  expect(await topOf(focused), "the band covers the focused item").toBeGreaterThanOrEqual(
+  expect(await topOf(focused), "the page banner covers the focused item").toBeGreaterThanOrEqual(
     await bottomOf(page.getByRole("banner")),
   );
 };
@@ -90,7 +90,7 @@ const CONCEPTS = 3000;
 const A_KIND = 400;
 
 test.describe("Knowledge Base", () => {
-  test("a narrow window stacks the list under the tree", async ({
+  test("a Viewer browses 3,000 concepts by keyboard at two widths", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -120,19 +120,20 @@ test.describe("Knowledge Base", () => {
     expect(seeded).toBe(CONCEPTS);
     const concepts = conceptsOf(page, "Insurance Policy", "company");
 
-    await test.step("renders the knowledge tree within its budget", async () => {
+    await test.step("shows the tree and each page of concepts within the list time budget", async () => {
       const startedAtMs = Date.now();
       await page.goto(openedAt("company", "Insurance Policy"));
       await expect(itemOf(page, "sales")).toBeVisible();
       await expect(rowsOf(concepts)).toHaveCount(A_PAGE);
       const elapsedMs = Date.now() - startedAtMs;
       test.info().annotations.push({ type: "knowledge tree", description: `${elapsedMs} ms` });
-      expect(elapsedMs, "the tree and its first page rendered past the budget").toBeLessThan(
-        LIST_BUDGET_MS,
-      );
+      expect(
+        elapsedMs,
+        "the tree and the first page of concepts took longer than the time budget to render",
+      ).toBeLessThan(LIST_BUDGET_MS);
 
       const counts = await countsIn(treeOf(page));
-      expect(counts, "the tree lists ten collections").toHaveLength(COLLECTIONS.length);
+      expect(counts, "the tree does not list ten collections").toHaveLength(COLLECTIONS.length);
       expect(counts.reduce((sum, count) => sum + count, 0)).toBe(CONCEPTS);
       await expect(countOf(concepts)).toHaveText(/\b400\b/);
       await expect(concepts.getByRole("link").first()).toHaveText("Insurance Policy 001");
@@ -144,15 +145,16 @@ test.describe("Knowledge Base", () => {
         await expect(rowsOf(concepts)).toHaveCount(shown + A_PAGE);
         const pagedMs = Date.now() - pagedAtMs;
         test.info().annotations.push({ type: "next page", description: `${pagedMs} ms` });
-        expect(pagedMs, `the page past ${String(shown)} rendered past the budget`).toBeLessThan(
-          LIST_BUDGET_MS,
-        );
+        expect(
+          pagedMs,
+          `the page after concept ${String(shown)} took longer than the time budget to render`,
+        ).toBeLessThan(LIST_BUDGET_MS);
       }
       await expect(more).toHaveCount(0);
       await expect(concepts.getByRole("link").last()).toHaveText("Insurance Policy 400");
     });
 
-    await test.step("works the tree by keyboard alone", async () => {
+    await test.step("a Viewer moves through the tree and the concept list by keyboard alone", async () => {
       await atTheKnowledgeBase(page);
 
       await skipLinkReachesThePage(page);
@@ -184,7 +186,10 @@ test.describe("Knowledge Base", () => {
       await expect(rowsOf(concepts)).toHaveCount(A_PAGE);
 
       await page.keyboard.press("Tab");
-      await expect(concepts.getByRole("link").first(), "one Tab left the tree").toBeFocused();
+      await expect(
+        concepts.getByRole("link").first(),
+        "one Tab did not move focus from the tree to the first concept",
+      ).toBeFocused();
       await page.keyboard.press(KEY.concepts.key);
       await expect(
         concepts.getByRole("heading", { name: "Insurance Policy in company" }),
@@ -192,7 +197,10 @@ test.describe("Knowledge Base", () => {
       await page.keyboard.press(KEY.tree.key);
       await expect(itemOf(page, "Insurance Policy")).toBeFocused();
       await page.keyboard.press(KEY.concepts.key);
-      await expect(itemOf(page, "company"), "the tree let a page key through").toBeFocused();
+      await expect(
+        itemOf(page, "company"),
+        "the tree did not treat the concepts key as a typed letter",
+      ).toBeFocused();
       await page.keyboard.press("ArrowLeft");
       await expect(itemOf(page, "company")).toHaveAttribute("aria-expanded", "false");
       await passesTheAccessibilityGate();
@@ -203,7 +211,7 @@ test.describe("Knowledge Base", () => {
     await expect(rowsOf(concepts)).toHaveCount(A_PAGE);
     await expect(
       concepts.getByRole("columnheader"),
-      "a narrow list repeats the kind its heading names",
+      "the narrow list keeps the Kind column that its heading already names",
     ).toHaveText(["Title", "Trust"]);
 
     expect(await topOf(concepts), "the list is not under the tree").toBeGreaterThanOrEqual(

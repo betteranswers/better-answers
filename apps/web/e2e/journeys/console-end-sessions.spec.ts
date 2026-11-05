@@ -93,8 +93,8 @@ const openPriya = async (page: Page, tag: string): Promise<Locator> => {
   return sheet;
 };
 
-test.describe("a person, opened from Everyone as a sheet", () => {
-  test("ends every sign-in everywhere behind a confirmation, within its budget", async ({
+test.describe("a person's sheet, opened from the Everyone page", () => {
+  test("an operator cancels, then ends every sign-in and token", async ({
     page,
     request,
     baseURL,

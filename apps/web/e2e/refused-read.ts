@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { z } from "zod";
 
-/** A batch's address names its procedures in the order of its answers; a call sent alone names one. */
+/** A batched tRPC URL lists its procedure names, separated by commas, in the same order as the responses. An unbatched URL lists one name. */
 export const askedAt = (url: string): readonly string[] =>
   new URL(url).pathname.replace("/trpc/", "").split(",");
 
@@ -29,7 +29,7 @@ export const refusalAnswering = async (page: Page, procedure: string) => {
   const batch = z.array(z.unknown()).safeParse(answers);
   const answer = batch.success ? batch.data[askedAt(answered.url()).indexOf(procedure)] : answers;
   const refused = aRefusedCall.safeParse(answer);
-  if (!refused.success) throw new Error(`the api did not refuse ${procedure}`);
+  if (!refused.success) throw new Error(`The API did not refuse ${procedure}`);
   const { httpStatus, refusal, retryAfterSeconds } = refused.data.error.data;
   return { status: httpStatus, ...refusal, waitSeconds: retryAfterSeconds };
 };
@@ -40,7 +40,7 @@ const wholeSeconds = z.coerce.number().int().optional();
 
 export const authAnswering = async (page: Page, path: string) => {
   const answered = await page.waitForResponse((answer) => new URL(answer.url()).pathname === path);
-  if (answered.ok()) throw new Error(`the api did not refuse ${path}`);
+  if (answered.ok()) throw new Error(`The API did not refuse ${path}`);
   const { code, error } = aRefusalOutsideTrpc.parse(await answered.json());
   return {
     status: answered.status(),

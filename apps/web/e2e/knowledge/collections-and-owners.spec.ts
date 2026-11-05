@@ -102,7 +102,7 @@ const saveOf = (page: Page, collection: string): Locator =>
 const said = (page: Page): Locator => collections(page).getByRole("status").nth(1);
 
 test.describe("Collections and Owners", () => {
-  test("an Editor owning a collection finds it under Curation", async ({
+  test("a collection-owning Editor finds Collections and Owners under Curation", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -140,7 +140,9 @@ test.describe("Collections and Owners", () => {
     await expect(ownerOf(page, "policy")).toHaveText(EDITOR);
     const elapsed = Date.now() - started;
     test.info().annotations.push({ type: "collections", description: `${elapsed} ms` });
-    expect(elapsed, "the collections rendered past the list's budget").toBeLessThan(LIST_BUDGET_MS);
+    expect(elapsed, "the collections took longer than the list time budget to render").toBeLessThan(
+      LIST_BUDGET_MS,
+    );
 
     await expect(collections(page)).toMatchAriaSnapshot(`
       - region "Collections and Owners":
@@ -166,7 +168,7 @@ test.describe("Collections and Owners", () => {
     `);
     await passesTheAccessibilityGate();
 
-    await test.step("an Admin names and clears owners by keyboard alone", async () => {
+    await test.step("an Admin sets and clears collection owners by keyboard alone", async () => {
       await signOutFromTheShell(page, EDITOR);
       await signedInAtThePage(page, request, at.admin.email);
 
@@ -175,7 +177,10 @@ test.describe("Collections and Owners", () => {
         "Change the Owner of the Collection in Focus",
       ]);
       await page.keyboard.press(KEY.changeOwner.key);
-      await expect(pickerOf(page, "held"), "the key did not reach the first picker").toBeFocused();
+      await expect(
+        pickerOf(page, "held"),
+        "the change-owner key did not move focus to the first New Owner picker",
+      ).toBeFocused();
 
       await page.keyboard.press("Tab");
       await page.keyboard.press("Tab");
@@ -197,7 +202,10 @@ test.describe("Collections and Owners", () => {
       await expect(ownerOf(page, "safety")).toHaveText(VIEWER);
 
       await page.keyboard.press(KEY.changeOwner.key);
-      await expect(pickerOf(page, "safety"), "the key left the row in focus").toBeFocused();
+      await expect(
+        pickerOf(page, "safety"),
+        "the change-owner key did not focus the picker of the collection in focus",
+      ).toBeFocused();
     });
   });
 });

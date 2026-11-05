@@ -15,7 +15,7 @@ const entryCodeOf = (built: Built, name: string): string => {
     const entry = output.output.find((chunk) => chunk.type === "chunk" && chunk.isEntry);
     if (entry?.type === "chunk") return entry.code;
   }
-  throw new Error(`the ${name} built no entry chunk`);
+  throw new Error(`The Vite build of ${name} produced no entry chunk`);
 };
 
 export const bundledHarness = async (harness: {
@@ -25,7 +25,7 @@ export const bundledHarness = async (harness: {
   readonly props?: Record<string, unknown>;
 }): Promise<string> => {
   const entry = `virtual:${harness.name}`;
-  // The build hands a library's entry over as a path under its root, so the plugin claims either.
+  // Vite may pass the library entry to resolveId as a path under the build root, so the plugin matches by suffix.
   const resolved = `\0${harness.name}`;
   const source = [
     'import { createElement } from "react";',
@@ -61,7 +61,7 @@ export const bundledHarness = async (harness: {
 const servedStylesheets = async (request: APIRequestContext): Promise<string> => {
   const served = await (await request.get("/")).text();
   const links = served.match(/<link[^>]*rel="stylesheet"[^>]*>/g) ?? [];
-  expect(links, "the served build names no stylesheet").not.toHaveLength(0);
+  expect(links, "the served page links no stylesheet").not.toHaveLength(0);
   return links.join("");
 };
 

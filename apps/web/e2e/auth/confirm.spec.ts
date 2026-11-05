@@ -67,7 +67,7 @@ const wrongCodesUntilTheWait = async (page: Page, key: string) => {
   throw new Error(`${String(MOST_TRIES)} wrong codes, and the field never had to wait`);
 };
 
-test("repeated wrong codes make the field wait; passkeys still confirm", async ({
+test("locks the code field after wrong codes, but passkeys work", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -79,10 +79,15 @@ test("repeated wrong codes make the field wait; passkeys still confirm", async (
   await expect(passkeyButton(page)).toBeFocused();
   const elapsed = Date.now() - started;
   test.info().annotations.push({ type: "confirm read", description: `${elapsed} ms` });
-  expect(elapsed, "the confirm page was not read within its second").toBeLessThan(READ_BUDGET_MS);
+  expect(elapsed, "the confirm page took longer than one second to load").toBeLessThan(
+    READ_BUDGET_MS,
+  );
 
   await page.keyboard.press("Tab");
-  await expect(codeField(page), "Tab left the passkey without reaching the code").toBeFocused();
+  await expect(
+    codeField(page),
+    "Tab from Use Your Passkey did not reach the code field",
+  ).toBeFocused();
 
   const { waitSeconds, saidOfAWrongCode } = await wrongCodesUntilTheWait(page, key);
 
@@ -94,7 +99,7 @@ test("repeated wrong codes make the field wait; passkeys still confirm", async (
   await page.keyboard.press("Shift+Tab");
   await expect(
     passkeyButton(page),
-    "Shift+Tab left the code without reaching the passkey",
+    "Shift+Tab from the code field did not reach Use Your Passkey",
   ).toBeFocused();
   await page.keyboard.press("Enter");
   await landedAtHome(page, "Admin");

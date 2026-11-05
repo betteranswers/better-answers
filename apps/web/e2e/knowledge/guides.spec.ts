@@ -144,7 +144,7 @@ const editorOpened = async (page: Page, section: Locator): Promise<Locator> => {
 test.describe("the guide page", () => {
   test.describe.configure({ mode: "serial" });
 
-  test("renders the seeded guide within its budget", async ({
+  test("shows the seeded guide to an Editor", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -160,10 +160,12 @@ test.describe("the guide page", () => {
     ).toBeVisible();
     const elapsedMs = Date.now() - startedAtMs;
     test.info().annotations.push({ type: "guide page", description: `${elapsedMs} ms` });
-    expect(elapsedMs, "the guide rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+    expect(elapsedMs, "the guide took longer than its time budget to render").toBeLessThan(
+      LIST_BUDGET_MS,
+    );
     await skipLinkReachesThePage(page);
 
-    await test.step("shows eight sections in tree order, each with its trust word", async () => {
+    await test.step("shows the eight sections in order, each with its trust status", async () => {
       const headings = SECTIONS.map(([number, prompt]) => `${number}. ${prompt}`);
       for (const heading of headings) await expect(sectionOf(page, heading)).toBeVisible();
       await expect(sectionOf(page, FIRST_SECTION)).toContainText("Unverified");
@@ -177,7 +179,7 @@ test.describe("the guide page", () => {
       await expect(notes.nth(1).getByRole("link", { name: HEADCOUNT })).toBeVisible();
     });
 
-    await test.step("names the missing fact and its owner beside an action", async () => {
+    await test.step("shows the missing fact, its owner, and an Add This Fact link", async () => {
       const insurance = sectionOf(page, INSURANCE);
       await expect(insurance).toContainText("3 of 4");
       const gap = insurance.getByText(EMPLOYERS_LIABILITY);
@@ -186,11 +188,11 @@ test.describe("the guide page", () => {
       await expect(insurance.getByRole("link", { name: "Add This Fact" })).toBeVisible();
       await expect(
         insurance.getByRole("heading", { name: PROFESSIONAL_INDEMNITY }),
-        "the Editor in finance reads the restricted concept in the section's Detail",
+        "the Editor in finance cannot read the restricted concept in the section's Detail",
       ).toBeVisible();
     });
 
-    await test.step("opens the Detail of a section by keyboard, with focus inside it", async () => {
+    await test.step("opens a section's Detail by keyboard and moves focus into it", async () => {
       const first = sectionOf(page, FIRST_SECTION);
       const show = first.getByRole("button", { name: "Show Detail" });
       await expect(show).toHaveAttribute("aria-expanded", "false");
@@ -213,7 +215,7 @@ test.describe("the guide page", () => {
     await passesTheAccessibilityGate();
   });
 
-  test("acknowledges a Brief save within its budget", async ({
+  test("an Editor saves a Brief and sees the save confirmed", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -258,18 +260,19 @@ test.describe("the guide page", () => {
     }
     theActionsLandedWithinTheirBudget("save the Brief", acknowledged);
     test.info().annotations.push({ type: "brief saved", description: `${saved.join(", ")} ms` });
-    expect(Math.max(...saved), "a save was not shown within its budget").toBeLessThan(
-      SAVED_BUDGET_MS,
-    );
+    expect(
+      Math.max(...saved),
+      "a saved version took longer than its time budget to appear",
+    ).toBeLessThan(SAVED_BUDGET_MS);
 
-    await test.step("announces an unchanged save and writes no version", async () => {
+    await test.step("saving an unchanged Brief creates no new version and says so", async () => {
       await editorOpened(page, first);
       await savedByKeystroke();
       await expect(status).toContainText(`Version ${String(ACTION_SAMPLES + 2)} stands`);
       await page.getByRole("button", { name: "Close editor" }).click();
     });
 
-    await test.step("moves a footnote chip by keyboard, and a reload keeps it", async () => {
+    await test.step("an Editor cuts and pastes a footnote chip, and the new order stays after a reload", async () => {
       const text = await editorOpened(page, first);
       const labels = async () =>
         chipsOf(page).evaluateAll((chips) =>
@@ -282,7 +285,7 @@ test.describe("the guide page", () => {
       await chipsOf(page).nth(0).click();
       await page.keyboard.press("ArrowRight");
       await page.keyboard.press("ControlOrMeta+v");
-      expect(await labels(), "the cut chip did not move behind the next paragraph's").toEqual([
+      expect(await labels(), "the cut footnote chip did not move to after the next chip").toEqual([
         before[1],
         before[0],
         before[2],
@@ -297,7 +300,7 @@ test.describe("the guide page", () => {
       await expect(notes.nth(1).getByRole("link", { name: REGISTRATION })).toBeVisible();
     });
 
-    await test.step("asks once before a section's draft is left", async () => {
+    await test.step("asks the Editor to confirm before they leave a Brief with unsaved changes", async () => {
       const again = await editorOpened(page, sectionOf(page, FIRST_SECTION));
       await again.press(END_OF_THE_BRIEF);
       await page.keyboard.type(" Not saved.");
@@ -312,7 +315,7 @@ test.describe("the guide page", () => {
     });
   });
 
-  test("acknowledges a copy within its budget", async ({
+  test("an Editor copies a Brief and sees the copy confirmed", async ({
     page,
     request,
     context,
@@ -346,11 +349,12 @@ test.describe("the guide page", () => {
     }
     theActionsLandedWithinTheirBudget("copy", acknowledged);
     test.info().annotations.push({ type: "brief copied", description: `${copied.join(", ")} ms` });
-    expect(Math.max(...copied), "a copy was not shown within its budget").toBeLessThan(
-      COPIED_BUDGET_MS,
-    );
+    expect(
+      Math.max(...copied),
+      "a copy confirmation took longer than its time budget to appear",
+    ).toBeLessThan(COPIED_BUDGET_MS);
 
-    await test.step("recorded one usage row per copy, naming the version and the person", async () => {
+    await test.step("records one usage row per copy, with the version and the person who copied it", async () => {
       const rows = await usage();
       expect(rows).toHaveLength(before + ACTION_SAMPLES);
       expect(rows.at(-1)).toMatchObject({
@@ -362,7 +366,7 @@ test.describe("the guide page", () => {
       });
     });
 
-    await test.step("put superscripts and Sources on the clipboard, brackets in its text", async () => {
+    await test.step("puts superscript footnotes and a Sources list in the copied HTML, and bracketed numbers in the copied plain text", async () => {
       const held = await page.evaluate(async () => {
         const [item] = await navigator.clipboard.read();
         const textOf = async (type: string) => (await item?.getType(type))?.text();
@@ -374,7 +378,7 @@ test.describe("the guide page", () => {
       expect(held.text).toContain("Source: Northgate company records, register entry.");
     });
 
-    await test.step("pasted into a rich field keeps superscripts, into a plain one keeps brackets", async () => {
+    await test.step("pasting into a rich text field keeps the superscripts, and pasting into a plain text field keeps the brackets", async () => {
       await page.goto(guided.path);
       await page.setContent(
         '<div id="rich" contenteditable="true" style="min-height:4em"></div><textarea id="plain"></textarea>',
@@ -401,14 +405,14 @@ test.describe("the guide page", () => {
     const first = sectionOf(page, FIRST_SECTION);
     await expect(first).toBeVisible();
 
-    await test.step("reads the first Brief and opens its Detail, with no way to edit", async () => {
+    await test.step("a Viewer reads the first Brief and opens its Detail but sees no Edit Brief button", async () => {
       await expect(footnotesOf(first)).toHaveCount(4);
       await expect(page.getByRole("button", { name: "Edit Brief" })).toHaveCount(0);
       await first.getByRole("button", { name: "Show Detail" }).click();
       await expect(first.getByRole("region", { name: "Detail of section 1" })).toBeFocused();
     });
 
-    await test.step("shows the insurance section's heading and coverage, never its text", async () => {
+    await test.step("shows the insurance section's heading and coverage but not its text", async () => {
       const insurance = sectionOf(page, INSURANCE);
       await expect(insurance).toContainText("2 of 4");
       await expect(insurance.getByRole("list", { name: "Footnotes" })).toHaveCount(0);
@@ -416,7 +420,7 @@ test.describe("the guide page", () => {
       await expect(page.getByText(PROFESSIONAL_INDEMNITY)).toHaveCount(0);
     });
 
-    await test.step("offers no Copy where the Viewer's role asks for more trust", async () => {
+    await test.step("shows the Viewer no Copy button and says they cannot copy the section yet", async () => {
       await expect(page.getByRole("button", { name: "Copy", exact: true })).toHaveCount(0);
       await expect(first).toContainText("You can’t copy this section yet.");
     });

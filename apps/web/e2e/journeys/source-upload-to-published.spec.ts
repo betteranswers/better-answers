@@ -46,7 +46,10 @@ const listsNothingConnected = async (page: Page, open: () => Promise<unknown>): 
   const whileLoading = await saidNowIn(region.locator('[aria-live="polite"]'));
   const answered = page.waitForResponse((answer) => isTheList(new URL(answer.url())));
   list.release();
-  expect(await answeredTheList(await answered), "the list's read was not answered").toBe(true);
+  expect(
+    await answeredTheList(await answered),
+    "the request for the Connected Sources list got no answer",
+  ).toBe(true);
   await expect(
     region.locator('[aria-live="polite"]'),
     "the list still says it is loading",
@@ -55,14 +58,14 @@ const listsNothingConnected = async (page: Page, open: () => Promise<unknown>): 
   await expect(region.getByRole("listitem")).toHaveCount(0);
 };
 
-test("an Admin connects by keyboard, then publishes within 100 ms", async ({
+test("an Admin connects a document by keyboard, then publishes it", async ({
   page,
   request,
   passesTheAccessibilityGate,
 }) => {
   const { workspace } = await anAdminAtSources(page, request, { workspace: "Airedale Tooling" });
 
-  await test.step("an Admin connects by keyboard and sees received, indexing, indexed", async () => {
+  await test.step("an Admin connects a document by keyboard and sees its state go from Received to Indexing to Indexed", async () => {
     await listsNothingConnected(page, () => page.goto("/sources/connected-sources"));
     await expect(connectedSourcesRegion(page)).toMatchAriaSnapshot(`
       - region "Connected Sources":
@@ -76,13 +79,13 @@ test("an Admin connects by keyboard, then publishes within 100 ms", async ({
     `);
     await expect(
       page.getByRole("button", { name: /^connect/i }),
-      "the head's action is the one way to connect",
+      "the page does not show exactly one Connect button",
     ).toHaveCount(1);
     await passesTheAccessibilityGate();
     await skipLinkReachesThePage(page);
 
-    // The wait switches on Chromium's chooser interception, which can land after an immediate
-    // key press, leaving the chooser uncaught and cancelled.
+    // Start waiting before the key press. Chromium's file chooser interception can start late,
+    // and Chromium cancels a chooser it misses.
     const choosing = page.waitForEvent("filechooser");
     await page.keyboard.press("b");
     const dialog = page.getByRole("dialog", { name: "Connect a Document" });
@@ -142,9 +145,10 @@ test("an Admin connects by keyboard, then publishes within 100 ms", async ({
 
     await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "claimed" });
     await expect(stateOf(page, "The staff handbook")).toHaveText("Indexing");
-    await expect(lastSynced, "a sync that started is said as it was while queued").not.toHaveText(
-      whileQueued,
-    );
+    await expect(
+      lastSynced,
+      "the last-synced text did not change when the queued sync started",
+    ).not.toHaveText(whileQueued);
     await expect(lastSynced).toHaveText(A_SYNC_UNDER_WAY);
 
     await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "done" });
@@ -152,7 +156,7 @@ test("an Admin connects by keyboard, then publishes within 100 ms", async ({
     await expect(lastSyncedOf(page, "The staff handbook")).toHaveText(/^\d{2}:\d{2} · /);
   });
 
-  await test.step("publishes within 100 ms after stating confirmations and audit row", async () => {
+  await test.step("an Admin ticks the three confirmations, sees what the audit log will record, and publishes within 100 ms", async () => {
     await seedConnectedSources(request, {
       workspaceId: workspace.workspaceId,
       connectedSources: [
@@ -243,7 +247,10 @@ test("an Admin connects by keyboard, then publishes within 100 ms", async ({
     await page.keyboard.press("Tab");
     await expect(dialog.getByRole("checkbox", { name: "DPIA reference recorded" })).toBeFocused();
     await page.keyboard.press("Space");
-    await expect(waiting, "a ticked confirmation is carried as not yet made").toHaveCount(0);
+    await expect(
+      waiting,
+      "What the Audit Log Will Record lists a ticked confirmation as not made",
+    ).toHaveCount(0);
     await page.keyboard.press("Tab");
     await page.keyboard.press("Tab");
     await expect(commit).toBeFocused();

@@ -283,7 +283,7 @@ const removedAtAKey = async (
     await page.keyboard.press("Enter");
     await expect(memberRows(page)).toHaveCount(left);
     samples.push(await actionClocked(page));
-    expect((await answered).ok(), `the removal of ${name} was refused`).toBe(true);
+    expect((await answered).ok(), `the removal of ${name} failed`).toBe(true);
   }
   return samples;
 };
@@ -297,11 +297,11 @@ const bottomOf = async (drawn: Locator): Promise<number> => {
 
 const endsUnderItsLastLine = async (card: Locator, lastLine: Locator): Promise<void> => {
   const named = await card.getByRole("heading").innerText();
-  await expect(card.getByRole("status"), `${named}: the empty outcome region`).toHaveText("");
+  await expect(card.getByRole("status"), `${named}: the status region is not empty`).toHaveText("");
   const [cardEnds, lineEnds] = await Promise.all([bottomOf(card), bottomOf(lastLine)]);
   expect(
     cardEnds - lineEnds,
-    `${named}: an empty band stands under the card's last line`,
+    `${named}: the card has empty space below its last line`,
   ).toBeLessThanOrEqual(ONE_GAP_PX);
 };
 
@@ -347,7 +347,7 @@ test.describe("the People group's Members page", () => {
       "Calder Castings",
     );
     const priya = joined.find((member) => member.displayName === "Priya Shah");
-    assert.ok(priya !== undefined, "Priya Shah was joined");
+    assert.ok(priya !== undefined, "Priya Shah is not a member");
     await addMember(request, {
       workspaceId: elsewhere.workspaceId,
       userId: priya.id,
@@ -357,16 +357,17 @@ test.describe("the People group's Members page", () => {
       await invite(request, { workspaceId, email, inviterId: adminId, role: "Viewer" });
     }
 
-    await test.step("renders the list within the constitution's latency budget", async () => {
+    await test.step("shows the list of three members within the list time budget", async () => {
       const started = Date.now();
       await page.goto(MEMBERS_PAGE);
       await expect(memberRows(page)).toHaveCount(3);
       const elapsed = Date.now() - started;
 
       test.info().annotations.push({ type: "members list", description: `${elapsed} ms` });
-      expect(elapsed, "the list of three members rendered past its budget").toBeLessThan(
-        LIST_BUDGET_MS,
-      );
+      expect(
+        elapsed,
+        "the list of three members took longer than its time budget to render",
+      ).toBeLessThan(LIST_BUDGET_MS);
     });
 
     await test.step("lets an Admin reach and search members by keyboard alone", async () => {
@@ -454,9 +455,9 @@ test.describe("the People group's Members page", () => {
       await expect(selectionBar(page)).toHaveCount(0);
     });
 
-    await test.step("at 320 pixels shows person and role, hiding the rest", async () => {
+    await test.step("at 320 pixels wide shows only the Person and Role columns, and Columns adds Groups back", async () => {
       const desktop = page.viewportSize();
-      assert.ok(desktop !== null, "the page has a viewport");
+      assert.ok(desktop !== null, "the page has no viewport");
       await expect(membersRegion(page).getByRole("columnheader", { name: "Joined" })).toBeVisible();
       await page.setViewportSize({ width: 320, height: 720 });
 
@@ -478,7 +479,7 @@ test.describe("the People group's Members page", () => {
       await page.setViewportSize(desktop);
     });
 
-    await test.step("shows a member's role, groups and each role's meaning", async () => {
+    await test.step("shows a member's role, their groups, and a description of each role", async () => {
       await listedAfresh(page, 3);
       await memberLink(page, "Priya Shah").focus();
       await page.keyboard.press(PEOPLE_KEYSTROKES.open.key);
@@ -492,12 +493,12 @@ test.describe("the People group's Members page", () => {
         await expect(radio).toHaveAccessibleDescription(/\S/);
         meanings.push(await describing(radio));
       }
-      expect(new Set(meanings).size, "two roles are described alike").toBe(3);
+      expect(new Set(meanings).size, "two of the three roles share a description").toBe(3);
       await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeChecked();
       await expect(changeRoleButton(page)).toBeDisabled();
       await expect(
         thePage(page).getByText("Editor", { exact: true }),
-        "the role is said outside the Role card",
+        "the role name appears outside the Role card",
       ).toHaveCount(1);
       await expect(accessOf(page).getByRole("term")).toHaveText([
         "Joined",
@@ -559,20 +560,20 @@ test.describe("the People group's Members page", () => {
       await expect(
         thePage(page).getByRole("heading", { level: 2, name: "Remove and End Every Sign-In" }),
       ).toBeFocused();
-      await expect(page, "a section took an address of its own").toHaveURL(
+      await expect(page, "the section link changed the page URL").toHaveURL(
         new RegExp(`${memberPageAt(priya.id)}$`),
       );
     });
 
-    await test.step("stacks a member's header and sections at 320 pixels, scrolling nothing sideways", async () => {
+    await test.step("at 320 pixels wide shows the On This Page links below the member's header, with no sideways scrolling", async () => {
       const desktop = page.viewportSize();
-      assert.ok(desktop !== null, "the page has a viewport");
+      assert.ok(desktop !== null, "the page has no viewport");
       await page.setViewportSize({ width: 320, height: 720 });
 
       const sections = thePage(page).getByRole("navigation", { name: "On This Page" });
       await expect
         .poll(() => roomBetween(personHeading(page, "Priya Shah"), sections), {
-          message: "the section nav does not stack below the header",
+          message: "the section nav stacks below the header",
         })
         .toBeGreaterThan(0);
       const room = await page.evaluate(pageRoom);
@@ -581,7 +582,7 @@ test.describe("the People group's Members page", () => {
       await page.setViewportSize(desktop);
     });
 
-    await test.step("changes a member's role within its budget, and it holds", async () => {
+    await test.step("changes a member's role within the action time budget, and the new role stays after a reload", async () => {
       await listedAfresh(page, 3);
       await openedByName(page, "Sam Okoro");
       await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
@@ -615,18 +616,22 @@ test.describe("the People group's Members page", () => {
         PEOPLE_KEYSTROKES.endEverySignInAndToken,
         PEOPLE_KEYSTROKES.remove,
       ]) {
-        await expect(keyListed(keystrokes, key), `the list holds no ${key}`).toBeVisible();
+        await expect(
+          keyListed(keystrokes, key),
+          `the keystroke list does not include ${key}`,
+        ).toBeVisible();
       }
       await expect(
         keyListed(keystrokes, PEOPLE_KEYSTROKES.approve.key),
-        "the Requests tab's keystrokes on Members",
+        "the Members keystroke list has a keystroke from the Requests tab",
       ).toHaveCount(0);
       await keystrokesDismissed(page, keystrokes);
 
       await tabUntilFocused(page, memberLink(page, "Priya Shah"));
       await page.keyboard.press(PEOPLE_KEYSTROKES.changeRole.key);
       await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
-      // The group checks the radio it moves to, a task later, only while the arrow is still held.
+      // The radio group checks the focused radio one task later, and only while the arrow key is
+      // down. Hold ArrowDown until the check lands.
       await page.keyboard.down("ArrowDown");
       await expect(thePage(page).getByRole("radio", { name: "Viewer", exact: true })).toBeChecked();
       await page.keyboard.up("ArrowDown");
@@ -637,7 +642,10 @@ test.describe("the People group's Members page", () => {
 
       const onThePage = await keystrokesListed(page, "Members");
       for (const { key } of Object.values(MEMBER_PAGE_KEYSTROKES)) {
-        await expect(keyListed(onThePage, key), `the list holds no ${key}`).toBeVisible();
+        await expect(
+          keyListed(onThePage, key),
+          `the keystroke list does not include ${key}`,
+        ).toBeVisible();
       }
       await keystrokesDismissed(page, onThePage);
       await page.keyboard.press(MEMBER_PAGE_KEYSTROKES.remove.key);
@@ -649,7 +657,7 @@ test.describe("the People group's Members page", () => {
       await expect(cellOf(page, "Priya Shah", "Role")).toHaveText("Viewer");
     });
 
-    await test.step("ends a member's sign-ins within budget, and it holds", async () => {
+    await test.step("ends a member's sign-ins within the action time budget, and the end time stays after a reload", async () => {
       await listedAfresh(page, 3);
       await openedByName(page, "Priya Shah");
       await expect(accessOf(page)).not.toContainText(ENDED_AT);
@@ -684,9 +692,10 @@ test.describe("the People group's Members page", () => {
 
       await page.keyboard.press(PEOPLE_KEYSTROKES.tickInvitation.key);
       await expect(invitationTickOf(page, dropped)).toBeChecked();
-      await expect(invitationOutcome(page), "a tick wiped the resend's outcome").toHaveText(
-        saidOfTheResend,
-      );
+      await expect(
+        invitationOutcome(page),
+        "selecting the invitation removed the resend message",
+      ).toHaveText(saidOfTheResend);
       await page.keyboard.press(PEOPLE_KEYSTROKES.tickInvitation.key);
       await expect(invitationTickOf(page, dropped)).not.toBeChecked();
 
@@ -699,9 +708,10 @@ test.describe("the People group's Members page", () => {
         invitationsRegion(page).getByRole("heading", { name: "Invitations" }),
       ).toBeFocused();
       await expect(invitationOutcome(page)).toContainText(dropped);
-      await expect(invitationOutcome(page), "the cancel said nothing of its own").not.toHaveText(
-        saidOfTheResend,
-      );
+      await expect(
+        invitationOutcome(page),
+        "after the cancel, the status still shows the resend message",
+      ).not.toHaveText(saidOfTheResend);
 
       const keystrokes = await keystrokesListed(page, "Members");
       for (const listed of [
@@ -716,12 +726,12 @@ test.describe("the People group's Members page", () => {
       ]) {
         await expect(
           keyListed(keystrokes, listed.key),
-          `the list holds no ${listed.key}`,
+          `the keystroke list does not include ${listed.key}`,
         ).toBeVisible();
       }
       await expect(
         keyListed(keystrokes, PEOPLE_KEYSTROKES.open.key),
-        "the Members tab's keystrokes on Invitations",
+        "the Invitations keystroke list has a keystroke from the Members tab",
       ).toHaveCount(0);
       await keystrokesDismissed(page, keystrokes);
 
@@ -807,7 +817,7 @@ test.describe("the People group's Members page", () => {
       await expect(listHeading(page)).toBeFocused();
     });
 
-    await test.step("removes a member behind a confirmation, within its budget", async () => {
+    await test.step("removes a member after a confirmation, within the action time budget", async () => {
       await listedAfresh(page, 2);
       const personHeader = membersRegion(page).getByRole("columnheader", { name: "Person" });
       await personHeader.getByRole("button").click();
@@ -862,7 +872,7 @@ test.describe("the People group's Members page", () => {
     });
   });
 
-  test("opens Members with its heading, tabs, count, then action", async ({ page, request }) => {
+  test("shows the heading, tabs, count, then Invite a Person button", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Ribble Castings");
     await expect(memberRows(page)).toHaveCount(3);
 
@@ -882,33 +892,37 @@ test.describe("the People group's Members page", () => {
             - button "Invite a Person"
             - searchbox "Search by name or address"
     `);
-    await expect(main.getByText(/\b3 [a-z]/), "the count is said twice").toHaveCount(1);
+    await expect(
+      main.getByText(/\b3 [a-z]/),
+      "the member count does not appear exactly once",
+    ).toHaveCount(1);
 
     const heading = membersRegion(page).getByRole("heading", { level: 2, name: "Members" });
-    expect((await heading.boundingBox())?.width, "the tab's name shows twice").toBeLessThanOrEqual(
-      1,
-    );
+    expect(
+      (await heading.boundingBox())?.width,
+      "the Members heading is visible beside the Members tab",
+    ).toBeLessThanOrEqual(1);
   });
 });
 
 test.describe("a member's own page", () => {
-  test("draws a role pill square, the avatar and radios round", async ({ page, request }) => {
+  test("draws a square role pill, round avatar, and round radios", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Wharfe Gauges");
     const pill = rowOf(page, "Priya Shah").getByText("Editor", { exact: true });
-    await expect(pill, "the kit's rounded-full on a pill").toHaveCSS("border-radius", "0px");
+    await expect(pill, "the role pill has rounded corners").toHaveCSS("border-radius", "0px");
 
     await openedByName(page, "Priya Shah");
     const avatar = thePage(page).locator("[data-slot='avatar']");
-    await expect(avatar, "the avatar, a kept circle").toHaveCSS("border-radius", "999px");
+    await expect(avatar, "the avatar is not a circle").toHaveCSS("border-radius", "999px");
     await expect(
       thePage(page).getByRole("radio", { name: "Admin", exact: true }),
-      "a radio, a kept circle",
+      "the Admin radio is not a circle",
     ).toHaveCSS("border-radius", "999px");
   });
 });
 
 test.describe("ending every sign-in and token a member holds here", () => {
-  test("ends the Admin's own sign-ins, then admits a fresh one", async ({ page, request }) => {
+  test("an Admin ends their own sign-ins, then signs in again", async ({ page, request }) => {
     const admin = anAddress("admin");
     await provision(request, { name: "Esk Rolling", adminEmail: admin });
     await page.goto(MEMBERS_PAGE);
@@ -931,8 +945,8 @@ test.describe("ending every sign-in and token a member holds here", () => {
   });
 });
 
-test.describe("a member's page before any action's outcome", () => {
-  test("ends each card under its last line, its status standing", async ({ page, request }) => {
+test.describe("a member's page before any action", () => {
+  test("adds no space under a card with an empty status", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Swale Bookbinders");
     await openedByName(page, "Priya Shah");
 
@@ -947,24 +961,29 @@ test.describe("a member's page before any action's outcome", () => {
 });
 
 test.describe("bulk actions on the members ticked", () => {
-  test("ticks at the first click after a bulk role change", async ({ page, request }) => {
+  test("one click selects a member after a bulk role change", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Ribble Joinery");
     await tickOf(page, "Priya Shah").check();
     const dialog = await changeRoleOpened(page, "Change Role for 1 Member");
     await dialog.getByRole("button", { name: "Change Role", exact: true }).focus();
     await page.keyboard.press("Enter");
-    await expect(outcomeOf(page), "the outcome counts one changed").toHaveText(/^\D*1\D*$/);
+    await expect(outcomeOf(page), "the message does not say that one member changed").toHaveText(
+      /^\D*1\D*$/,
+    );
     await expect(listHeading(page)).toBeFocused();
     await expect(
       countOf(membersRegion(page)).locator(".."),
-      "focus on the tab's hidden heading draws no ring",
+      "focus on the hidden Members heading shows no focus ring",
     ).not.toHaveCSS("box-shadow", "none");
 
     await tickOf(page, "Sam Okoro").click();
-    await expect(tickOf(page, "Sam Okoro"), "the first click ticked nothing").toBeChecked();
+    await expect(
+      tickOf(page, "Sam Okoro"),
+      "the first click did not select Sam Okoro",
+    ).toBeChecked();
   });
 
-  test("a second action waits on the first, whose refusal lands", async ({
+  test("a second bulk action waits without hiding the first's refusal", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -975,7 +994,10 @@ test.describe("bulk actions on the members ticked", () => {
     await tickOf(page, "Priya Shah").check();
     const dialog = await changeRoleOpened(page, "Change Role for 1 Member");
     await dialog.getByRole("button", { name: "Change Role", exact: true }).click();
-    await expect(outcomeOf(page), "the pending change counts its one member").toHaveText(/\b1\b/);
+    await expect(
+      outcomeOf(page),
+      "the pending change message does not count one member",
+    ).toHaveText(/\b1\b/);
     const saidPending = await outcomeOf(page).innerText();
 
     await tickOf(page, "Sam Okoro").check();
@@ -984,7 +1006,7 @@ test.describe("bulk actions on the members ticked", () => {
     await action.focus();
     await page.keyboard.press("Enter");
     await expect(outcomeOf(page)).toHaveText(/\S/);
-    await expect(outcomeOf(page), "the second press said nothing of its own").not.toHaveText(
+    await expect(outcomeOf(page), "the second press shows no message of its own").not.toHaveText(
       saidPending,
     );
     await page.keyboard.press(`Shift+${PEOPLE_KEYSTROKES.removeSelected.key}`);
@@ -1009,10 +1031,15 @@ test.describe("bulk actions on the members ticked", () => {
     const address = cellOf(page, "Oliver Bannerman", "Person").getByText(long, { exact: true });
     await expect(address).toBeVisible();
     const lines = await renderedLines(address);
-    expect(lines.join(""), "the address reads as other text").toBe(long);
-    expect(lines.length, "the address fits one line, so no break is shown").toBeGreaterThan(1);
+    expect(lines.join(""), "the wrapped lines do not join to make the address").toBe(long);
+    expect(
+      lines.length,
+      "the address fits on one line, so the test cannot check where it wraps",
+    ).toBeGreaterThan(1);
     for (const line of lines.slice(0, -1)) {
-      expect(line, "a line of the address ends inside a word").toMatch(/[@.-]$/);
+      expect(line, "a line of the address does not end at an @, a dot, or a hyphen").toMatch(
+        /[@.-]$/,
+      );
     }
   });
 });

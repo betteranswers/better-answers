@@ -68,7 +68,7 @@ await page.route(
 
 await asked(page);
 
-expect(await refused.promise, "the api did not refuse at the spending limit").toContain(
+expect(await refused.promise, "the API did not refuse at the spending limit").toContain(
   "spending-limit-met",
 );
 expect(await modelCallsIn(request, workspaceId)).toEqual({ judge: 0, draft: 0 });

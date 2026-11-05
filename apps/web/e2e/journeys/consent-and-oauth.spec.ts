@@ -28,13 +28,13 @@ const connectedAt = async (page: Page): Promise<URL> => {
   return callback;
 };
 
-test("takes a named member from connector sign-in straight to consent", async ({
+test("a member with a display name goes straight to consent", async ({
   page,
   request,
   baseURL,
   passesTheAccessibilityGate,
 }) => {
-  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite no baseURL");
   const email = anAddress("named-connecting");
   await provision(request, { name: "Named Connecting Ltd", adminEmail: email });
   await catchClaudesRedirect(page);

@@ -22,7 +22,7 @@ const anAdminOnSetup = async (page: Page, api: APIRequestContext): Promise<void>
   await expect(passkeyName(page)).toBeVisible();
 };
 
-test("setup shows one primary, whichever way is open", async ({
+test("setup shows one primary button for passkey or authenticator", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -34,7 +34,9 @@ test("setup shows one primary, whichever way is open", async ({
   await expect(passkeyName(page)).toBeVisible();
   const elapsed = Date.now() - started;
   test.info().annotations.push({ type: "setup read", description: `${elapsed} ms` });
-  expect(elapsed, "the setup page was not read within its second").toBeLessThan(READ_BUDGET_MS);
+  expect(elapsed, "the setup page took longer than one second to load").toBeLessThan(
+    READ_BUDGET_MS,
+  );
   await expect(primaries(page)).toHaveText(["Add a Passkey"]);
 
   await tabUntilFocused(page, authenticatorInstead(page));

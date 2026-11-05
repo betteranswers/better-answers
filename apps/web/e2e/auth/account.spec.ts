@@ -72,7 +72,7 @@ const anEditorOnAccount = async (page: Page, api: Parameters<typeof person>[0]) 
   await expect(setUpButton(page)).toBeVisible();
 };
 
-test("Done waits for the tick, and a reload shows none", async ({
+test("Done needs the checkbox ticked and reload hides the codes", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -119,7 +119,7 @@ const keptOnThisBrowser = (page: Page, theme: string) =>
 const paintedHex = (hex: string): string =>
   `rgb(${[1, 3, 5].map((at) => String(Number.parseInt(hex.slice(at, at + 2), 16))).join(", ")})`;
 
-test("draws the authenticator's code dark on light in dark", async ({ page, request }) => {
+test("draws the QR code dark on light in dark mode", async ({ page, request }) => {
   await keptOnThisBrowser(page, "dark");
   await signedInWithNoWorkspace(page, request, "theme-code");
   await page.goto("/account");
@@ -131,12 +131,15 @@ test("draws the authenticator's code dark on light in dark", async ({ page, requ
     code.locator("path[stroke]").first().getAttribute("stroke"),
     code.locator("path[fill]").first().getAttribute("fill"),
   ]);
-  assert.ok(stroke !== null, "the code's modules name no stroke");
-  assert.ok(fill !== null, "the code's field names no fill");
+  assert.ok(stroke !== null, "the code's modules set no stroke");
+  assert.ok(fill !== null, "the code's field sets no fill");
   const modules = paintedHex(stroke);
   const field = paintedHex(fill);
-  expect(contrastBetween(modules, field), "a scanner cannot read the code").toBeGreaterThanOrEqual(
-    4.5,
+  expect(
+    contrastBetween(modules, field),
+    "the code has less than the 4.5:1 contrast a scanner needs",
+  ).toBeGreaterThanOrEqual(4.5);
+  expect(modules, "the code is not drawn dark on light").toBe(
+    await tokenColour(page, "--grey-900"),
   );
-  expect(modules, "the code is drawn light on dark").toBe(await tokenColour(page, "--grey-900"));
 });

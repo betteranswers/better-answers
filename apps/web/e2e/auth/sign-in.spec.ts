@@ -36,9 +36,12 @@ const theSendsAnswer = (page: Page) =>
 
 const waitNamedBy = async (answered: ReturnType<typeof theSendsAnswer>): Promise<number> => {
   const response = await answered;
-  expect(response.status(), "the send was not refused by a ceiling").toBe(429);
+  expect(response.status(), "the send was not rate-limited").toBe(429);
   const waitSeconds = Number(response.headers()["retry-after"]);
-  expect(Number.isInteger(waitSeconds), "the ceiling's refusal named no wait").toBe(true);
+  expect(
+    Number.isInteger(waitSeconds),
+    "the rate-limit response gives no Retry-After seconds",
+  ).toBe(true);
   return waitSeconds;
 };
 
@@ -46,7 +49,10 @@ const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
   await page.getByLabel("Email Address").fill(email);
   await page.getByRole("button", { name: "Send Code" }).click();
   await expect(codeField(page)).toBeVisible();
-  await expect(page.getByRole("status"), "the page says nothing of the email").toHaveText(/\S/);
+  await expect(
+    page.getByRole("status"),
+    "the page shows no status message about the email",
+  ).toHaveText(/\S/);
 };
 
 const saysANewEmailWent = async (page: Page, earlier: string): Promise<void> => {
@@ -82,7 +88,7 @@ const pastedIntoTheField = async (page: Page, copied: string): Promise<void> => 
   await page.keyboard.press("ControlOrMeta+V");
 };
 
-/** A frame and a task, so what the page does with an answer it holds is done before a spec reads it. */
+/** Waits one animation frame and one task, so the page handles any response it holds before the test reads it. */
 const aFramePassed = (page: Page): Promise<void> =>
   page.evaluate(
     () =>
@@ -91,7 +97,7 @@ const aFramePassed = (page: Page): Promise<void> =>
       }),
   );
 
-/** Headless Chromium shows every tab, so a tab's being hidden or shown is set and told by hand. */
+/** Headless Chromium reports every tab as visible, so this sets `visibilityState` and fires `visibilitychange` by hand. */
 const shownAs = (page: Page, state: DocumentVisibilityState): Promise<void> =>
   page.evaluate((now) => {
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => now });
@@ -127,7 +133,7 @@ const anEditorOf = async (request: APIRequestContext, name: string): Promise<str
   return email;
 };
 
-test("a new code sent from the code step signs in", async ({
+test("a new code from Send a New Code signs in", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -140,11 +146,16 @@ test("a new code sent from the code step signs in", async ({
 
   await page.getByRole("button", { name: "Send a New Code" }).click();
 
-  await expect(codeField(page), "the new code's field did not take focus").toBeFocused();
-  await expect(codeField(page), "the refused digits outlived the new code").toHaveValue("");
+  await expect(
+    codeField(page),
+    "the code field did not get focus after Send a New Code",
+  ).toBeFocused();
+  await expect(codeField(page), "Send a New Code left the wrong digits in the field").toHaveValue(
+    "",
+  );
   await saysANewEmailWent(page, saidOfTheFirst);
   const refused = page.getByRole("alert", { includeHidden: true });
-  await expect(refused, "the wrong code's refusal outlived the new code").toBeEmpty();
+  await expect(refused, "Send a New Code left the wrong-code error in place").toBeEmpty();
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading "Enter Your Code" [level=1]
@@ -165,9 +176,9 @@ test("a new code sent from the code step signs in", async ({
       }),
     ),
   );
-  expect(treatments, "the row draws its three buttons").toHaveLength(3);
+  expect(treatments, "the row does not have three buttons").toHaveLength(3);
   for (const treatment of treatments) {
-    expect(treatment, "the row mixes its treatments").toEqual(treatments[0]);
+    expect(treatment, "the row's buttons do not share one style").toEqual(treatments[0]);
   }
   await passesTheAccessibilityGate();
   await codeField(page).fill(await codeSentTo(request, email));
@@ -176,13 +187,13 @@ test("a new code sent from the code step signs in", async ({
   await landedAtHome(page, "Admin");
 });
 
-test("Sign In waits at its ceiling and works by keyboard", async ({
+test("Sign In works by keyboard and shows the rate-limit wait", async ({
   page,
   context,
   request,
   passesTheAccessibilityGate,
 }) => {
-  await test.step("keeps the framed sign-in page inside 320 pixels", async () => {
+  await test.step("fits the sign-in page in 320 pixels without sideways scroll", async () => {
     const narrow = await context.newPage();
     await narrow.setViewportSize({ width: 320, height: 720 });
     await narrow.goto("/sign-in");
@@ -191,7 +202,7 @@ test("Sign In waits at its ceiling and works by keyboard", async ({
     await narrow.close();
   });
 
-  await test.step("makes the pages outside the shell keyboard-operable, landmarked and labelled", async () => {
+  await test.step("signs in by keyboard on pages outside the shell, each with one main landmark", async () => {
     const keyboard = anAddress("keyboard");
     await person(request, keyboard);
 
@@ -245,7 +256,10 @@ test("Sign In waits at its ceiling and works by keyboard", async ({
   await passesTheAccessibilityGate();
 
   await page.keyboard.press("e");
-  await expect(page.getByLabel("Email Address"), "focus left the way on").toBeFocused();
+  await expect(
+    page.getByLabel("Email Address"),
+    "e did not move focus to Email Address",
+  ).toBeFocused();
   await expect(page.getByLabel("Email Address")).toHaveValue(email);
 });
 
@@ -261,7 +275,7 @@ test("signs in from a code pasted with a space", async ({ page, request }) => {
   await landedAtHome(page, "Admin");
 });
 
-test("a tab waiting on one address ignores another's sign-in", async ({
+test("a tab waiting for one email ignores another email's sign-in", async ({
   page,
   context,
   request,
@@ -298,7 +312,7 @@ const failingEveryRead = (times: number) => {
   };
 };
 
-test("a tab whose first read failed still follows a sign-in", async ({
+test("a tab whose session checks failed still follows a sign-in", async ({
   page,
   context,
   request,
@@ -320,7 +334,7 @@ test("a tab whose first read failed still follows a sign-in", async ({
   await landedAtHome(page, "Editor");
 });
 
-test("a shown tab waits for a sign-in of its own", async ({ page, request }) => {
+test("an already signed-in tab still waits for its new code", async ({ page, request }) => {
   const email = anAddress("standing");
   await provision(request, { name: "Standing Ltd", adminEmail: email });
   await signedInAtHome(page, request, email);
@@ -333,10 +347,12 @@ test("a shown tab waits for a sign-in of its own", async ({ page, request }) => 
   await confirmedWhenAsked(page, request, email);
   await landedAtHome(page, "Admin");
 
-  expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);
+  expect(await sessionHeldBy(page), "the tab uses the existing session, not the new one").not.toBe(
+    standing,
+  );
 });
 
-test("brings an ended session through sign-in back to its page", async ({
+test("signing in after an expired session returns to the page", async ({
   page,
   context,
   request,
@@ -361,5 +377,8 @@ test("brings an ended session through sign-in back to its page", async ({
   await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
 
   await signOutFromTheShell(page, workspace.admin.name);
-  expect(await signInSaysWhy(page), "a sign-out read as an ended session").not.toBe(ended);
+  expect(
+    await signInSaysWhy(page),
+    "after sign-out, the sign-in page gives the ended-session reason",
+  ).not.toBe(ended);
 });

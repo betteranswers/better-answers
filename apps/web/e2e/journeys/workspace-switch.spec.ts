@@ -24,7 +24,7 @@ const aMemberOnlyOf = async (api: APIRequestContext, workspaceId: string, name: 
   return member.id;
 };
 
-test("switches to another workspace's home, reading its members", async ({ page, request }) => {
+test("an Admin switches workspace and sees its home and members", async ({ page, request }) => {
   const { first, second } = await inTwoWorkspaces(page, request, {
     first: "Wharfe Joinery",
     second: "Aire Joinery",
@@ -41,7 +41,9 @@ test("switches to another workspace's home, reading its members", async ({ page,
   await expect(memberLink(page, "Only In Aire")).toBeVisible();
   const elapsed = Date.now() - started;
   test.info().annotations.push({ type: "switching workspace", description: `${elapsed} ms` });
-  expect(elapsed, "the switch took longer than its second").toBeLessThan(SWITCH_BUDGET_MS);
+  expect(elapsed, "the workspace switch took longer than one second").toBeLessThan(
+    SWITCH_BUDGET_MS,
+  );
 
   await landedAtHome(page, "Admin");
   await expect(memberLink(page, "Only In Wharfe")).toHaveCount(0);

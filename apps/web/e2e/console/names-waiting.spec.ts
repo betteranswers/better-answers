@@ -70,7 +70,7 @@ const priyaFlagged = async (page: Page, api: APIRequestContext) => {
 };
 
 test.describe("the console's Names Waiting page", () => {
-  test("lists each flagged name with its flags, within budget", async ({
+  test("lists each flagged name with every workspace that flagged it", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -85,21 +85,26 @@ test.describe("the console's Names Waiting page", () => {
       personId: priya.id,
     });
 
-    await test.step("renders the list within the constitution's latency budget", async () => {
+    await test.step("renders the list within one second", async () => {
       const started = Date.now();
       await page.goto(NAMES_WAITING_PAGE);
       await expect(waitingRowOf(page, name)).toBeVisible();
       const elapsed = Date.now() - started;
 
       test.info().annotations.push({ type: "names waiting list", description: `${elapsed} ms` });
-      expect(elapsed, "the names waiting rendered past their budget").toBeLessThan(LIST_BUDGET_MS);
+      expect(elapsed, "Names Waiting took longer than one second to render").toBeLessThan(
+        LIST_BUDGET_MS,
+      );
     });
 
-    await test.step("is keyboard-operable and lists its keystrokes", async () => {
+    await test.step("works by keyboard and lists its keyboard shortcuts", async () => {
       await skipLinkReachesThePage(page);
       await page.keyboard.press("c");
       await expect(outcomeOf(namesWaiting(page))).toHaveText(/\S/);
-      await expect(page.getByRole("dialog"), "a name opened with none in focus").toHaveCount(0);
+      await expect(
+        page.getByRole("dialog"),
+        "c opened a dialog when no name had focus",
+      ).toHaveCount(0);
       const listed = await keystrokesListed(page, "Names Waiting");
       await expect(listed.getByRole("definition")).toHaveText([
         "Search the Names Waiting by Name or Workspace",
@@ -119,7 +124,7 @@ test.describe("the console's Names Waiting page", () => {
       await expect(correct).toBeFocused();
     });
 
-    await test.step("narrows by name or workspace, and says when none match", async () => {
+    await test.step("filters by name or workspace and says when nothing matches", async () => {
       await page.keyboard.press(NAMES_WAITING_KEYSTROKES.search.key);
       await expect(waitingSearch(page)).toBeFocused();
       await page.keyboard.type(name.toUpperCase());
@@ -142,12 +147,13 @@ test.describe("the console's Names Waiting page", () => {
       await expect(waitingSearch(page)).toHaveValue("");
       await expect(
         waitingSearch(page),
-        "Escape cleared the search and lost its place",
+        "focus left the search box after Escape cleared it",
       ).toBeFocused();
       await expect(waitingRowOf(page, name)).toBeVisible();
-      await expect(waitingCount(page), "the count still says what the search left").not.toHaveText(
-        narrowed,
-      );
+      await expect(
+        waitingCount(page),
+        "after Escape, the count still shows the filtered total",
+      ).not.toHaveText(narrowed);
       await expect(waitingCount(page)).toHaveText(/\d/);
     });
 

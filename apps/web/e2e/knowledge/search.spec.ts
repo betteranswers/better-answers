@@ -135,15 +135,16 @@ const aPassageOpenedWhileTheListLoads = async (
   const release = await aPassageClickedWhileTheListLoads(page);
   const panel = passagePanel(page, FORKLIFT_GUIDE);
   await expect(panel.getByRole("heading", { name: FORKLIFT_GUIDE })).toBeFocused();
-  await expect(matchesOf(page), "the opener is still on the page while the list loads").toHaveCount(
-    0,
-  );
+  await expect(
+    matchesOf(page),
+    "the match that opened the panel is still in the list while the new list loads",
+  ).toHaveCount(0);
   return { panel, release };
 };
 
 const searched = async (page: Page, query: string): Promise<void> => {
   await searchBox(page).fill(query);
-  await expect(page, "the typed search has not settled into the address").toHaveURL(
+  await expect(page, "the URL does not hold the typed search").toHaveURL(
     (url) => url.searchParams.get("knowledge.search") === query,
   );
   await expect(said(page)).toContainText(query);
@@ -161,7 +162,7 @@ const foundNothing = async (
   await expect(said(page)).toContainText(query);
   const whileAsking = await saidNow(page);
   find.release();
-  await expect(said(page), "the status still says the search is asking").not.toHaveText(
+  await expect(said(page), "the status still says the search is running").not.toHaveText(
     whileAsking,
   );
   await expect(said(page)).toContainText(query);
@@ -179,7 +180,7 @@ test.describe("the Knowledge Search page", () => {
     await expect(first).toContainText("Document");
     await expect(first).toContainText("Not company knowledge");
     await expect(first).toContainText("Internal");
-    await expect(first, "the match shows its passage's opening line").toContainText(
+    await expect(first, "the match does not show its passage's opening line").toContainText(
       "Pallet bay 1 takes stock wrapped and labelled before it is racked.",
     );
     const opener = first.getByRole("button", { name: HANDBOOK });
@@ -193,16 +194,16 @@ test.describe("the Knowledge Search page", () => {
     const panelLeft = await panel.evaluate((drawn) => drawn.getBoundingClientRect().left);
     await expect
       .poll(() => first.evaluate((row) => row.getBoundingClientRect().right), {
-        message: "the open panel covers the match beside it",
+        message: "the open panel does not cover the match beside it",
       })
       .toBeLessThanOrEqual(panelLeft);
     await expect(page).toHaveURL(/\/knowledge\/search\?/);
 
     await searchBox(page).click();
-    await expect(panel, "the page behind the panel closed it").toBeVisible();
+    await expect(panel, "the panel closed after a click on the page behind it").toBeVisible();
     await opener.focus();
     await page.keyboard.press("Escape");
-    await expect(panel, "Escape on the page closed the panel").toBeVisible();
+    await expect(panel, "the panel closed after Escape on the page").toBeVisible();
 
     await panel.getByRole("heading", { name: HANDBOOK }).focus();
     await page.keyboard.press("Escape");
@@ -210,7 +211,7 @@ test.describe("the Knowledge Search page", () => {
     await expect(opener).toBeFocused();
   });
 
-  test("hands Tab off the panel while the new list loads", async ({ page, request }) => {
+  test("Tab from the panel reaches the heading while results load", async ({ page, request }) => {
     const { panel } = await aPassageOpenedWhileTheListLoads(page, request, "Nidd Bays");
 
     await page.keyboard.press("Tab");
@@ -218,11 +219,11 @@ test.describe("the Knowledge Search page", () => {
     await page.keyboard.press("Tab");
     await expect(
       searchRegion(page).getByRole("heading", { name: "Search" }),
-      "Tab stayed in the panel while the new list loaded",
+      "Tab did not leave the panel while the new list loaded",
     ).toBeFocused();
   });
 
-  test("hands Tab from the open panel back to its opener", async ({
+  test("Tab moves focus from the panel back to its match", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -241,7 +242,7 @@ test.describe("the Knowledge Search page", () => {
     await page.keyboard.press("Tab");
     await expect(panel.getByRole("button", { name: "Close" })).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(opener, "Tab off the panel did not reach the page").toBeFocused();
+    await expect(opener, "Tab from the panel did not move focus back to the page").toBeFocused();
     await expect(panel).toBeVisible();
 
     await opener.press("Enter");
@@ -250,14 +251,15 @@ test.describe("the Knowledge Search page", () => {
     await expect(opener).toBeFocused();
 
     await searchBox(page).fill("forklift");
-    await expect(panel, "a new search left the last one's passage open").toHaveCount(0);
+    await expect(panel, "a new search left the previous search's passage open").toHaveCount(0);
     await expect(searchBox(page)).toBeFocused();
-    await expect(said(page), "a new search was said to have lost a passage").toHaveText(
-      withNoPassageOpened,
-    );
+    await expect(
+      said(page),
+      "the status does not read as it did before any passage opened",
+    ).toHaveText(withNoPassageOpened);
   });
 
-  test("keeps the panel off the passkey offer, at 1280 px", async ({ page, request }) => {
+  test("the passage panel never covers the passkey offer at 1280px", async ({ page, request }) => {
     await aVirtualAuthenticator(page);
     const email = anAddress("admin");
     const workspace = await provision(request, { name: "Holme Keys", adminEmail: email });
@@ -275,11 +277,11 @@ test.describe("the Knowledge Search page", () => {
     const panel = await passagePanel(page, HANDBOOK).boundingBox();
     const offer = await dismiss.boundingBox();
 
-    assert.ok(panel !== null, "the panel drew a box");
-    assert.ok(offer !== null, "the passkey offer drew a box");
+    assert.ok(panel !== null, "the panel draws no box");
+    assert.ok(offer !== null, "the passkey offer draws no box");
     expect(
       offer.x + offer.width,
-      "the panel covers the passkey offer's Dismiss",
+      "the passage panel covers the Dismiss Passkey Offer button",
     ).toBeLessThanOrEqual(panel.x);
   });
 
@@ -315,7 +317,7 @@ test.describe("the Knowledge Search page", () => {
     });
   }
 
-  test("searches, opens and pages by keyboard", async ({
+  test("an Admin searches, opens, and loads more matches by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -367,7 +369,7 @@ test.describe("the Knowledge Search page", () => {
 
     await passesTheAccessibilityGate();
 
-    await test.step("carries a decimal from jump-to to Search as typed, through a reload", async () => {
+    await test.step("a decimal typed in Jump To reaches the Search box unchanged and stays after a reload", async () => {
       await page.goto(HOMES.Admin.path);
       await landedAtHome(page, "Admin");
       await page.keyboard.press("Control+k");
@@ -385,14 +387,16 @@ test.describe("the Knowledge Search page", () => {
       await expect(searchBox(page)).toHaveValue(DECIMAL);
     });
 
-    await test.step("renders a page of matches within the list's budget", async () => {
+    await test.step("shows a page of matches within the list time budget", async () => {
       const started = Date.now();
       await page.goto(asked("pallet"));
       await expect(matchesOf(page)).toHaveCount(A_PAGE);
       const elapsed = Date.now() - started;
 
       test.info().annotations.push({ type: "search", description: `${elapsed} ms` });
-      expect(elapsed, "a page of matches rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+      expect(elapsed, "a page of matches took longer than its time budget to render").toBeLessThan(
+        LIST_BUDGET_MS,
+      );
     });
   });
 });

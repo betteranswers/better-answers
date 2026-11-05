@@ -63,7 +63,7 @@ const auditIn = async (page: Page, theme: string): Promise<void> => {
   const marked = await drawnMarks(page);
   expect(
     marked.length,
-    `${where} marks ${String(marked.length)} objects: ${marked.join(" ")}`,
+    `${where} has decorative marks on ${String(marked.length)} elements, over the limit: ${marked.join(" ")}`,
   ).toBeLessThanOrEqual(MOST_MARKED);
 
   const aside = await page.addStyleTag({ content: TEXTURES_ASIDE });
@@ -78,8 +78,13 @@ const auditIn = async (page: Page, theme: string): Promise<void> => {
     .flatMap((result) => result.nodes)
     .filter((node) => node.any.some(undecidedBehind))
     .map((node) => node.target.join(" "));
-  expect(undecided, `axe could not decide contrast over a texture on ${where}`).toEqual([]);
-  expect(await faintEdges(page), `controls drawn under 3:1 on ${where}`).toEqual([]);
+  expect(
+    undecided,
+    `axe could not check the text contrast over a background texture on ${where}`,
+  ).toEqual([]);
+  expect(await faintEdges(page), `controls on ${where} have an edge contrast below 3:1`).toEqual(
+    [],
+  );
 };
 
 const themeOf = (page: Page): Promise<string | undefined> =>
@@ -168,7 +173,7 @@ export const test = base.extend<BrowserFixtures>({
       }
       expect(
         audited,
-        `this test left the browser at ${left}, which this product did not serve, so the accessibility gate had no page of ours to audit — call \`passesTheAccessibilityGate()\` at the page the test is about`,
+        `The test ended at ${left}, a page this app does not serve, so the accessibility gate had no page to check. Call \`passesTheAccessibilityGate()\` on the page that the test checks.`,
       ).toBe(true);
     },
     { auto: true },

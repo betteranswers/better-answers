@@ -57,7 +57,7 @@ const activityOf = (page: Page): Locator => thePage(page).getByRole("region", { 
 
 const linesOf = (page: Page): Locator => activityOf(page).getByRole("listitem");
 
-test("an Admin invites; invitees join; Activity shows only joining", async ({
+test("invited people join, and their Activity shows only the join", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -65,7 +65,7 @@ test("an Admin invites; invitees join; Activity shows only joining", async ({
   const adminEmail = anAddress("admin");
   const workspace = await provision(request, { name: "Calder Joinery", adminEmail });
 
-  await test.step("an Admin invites a person by address; the invitation waits", async () => {
+  await test.step("an Admin invites a person by email address, and the invitation shows as Waiting", async () => {
     await page.goto(MEMBERS_PAGE);
     await signIn(page, request, adminEmail);
     await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
@@ -78,7 +78,7 @@ test("an Admin invites; invitees join; Activity shows only joining", async ({
     await addressField(page).fill(address);
     const role = inviteDialog(page).getByRole("combobox", { name: "Role" });
     const describedBy = await role.getAttribute("aria-describedby");
-    assert.ok(describedBy !== null, "the Role field is described by its meaning");
+    assert.ok(describedBy !== null, "the Role field has no description of its meaning");
     const meant = await inviteDialog(page).locator(`[id="${describedBy}"]`).innerText();
     await role.click();
     await page.getByRole("option", { name: "Editor" }).click();
@@ -86,7 +86,7 @@ test("an Admin invites; invitees join; Activity shows only joining", async ({
     await expect(role).toHaveAccessibleDescription(/\S/);
     await expect(
       role,
-      "the role's meaning did not follow the pick",
+      "the Role description did not change when the Admin picked Editor",
     ).not.toHaveAccessibleDescription(meant);
     await inviteDialog(page).getByRole("button", { name: "Send Invitation" }).click();
 
@@ -106,16 +106,19 @@ test("an Admin invites; invitees join; Activity shows only joining", async ({
     await expect(countOf(invitationsRegion(page))).toHaveText(/\b1\b/);
     await expect(
       page.getByRole("main").getByRole("status").filter({ hasText: /\d/ }),
-      "a second count, the members', shows on Invitations",
+      "the Invitations tab does not show only its own count",
     ).toHaveCount(1);
     await expect(
       invitationsRegion(page).getByRole("radio", { name: /^Waiting\b/ }),
     ).toHaveAccessibleName("Waiting 1");
-    expect(await emailsSentTo(request, address), "the invitation's one email").toBe(1);
+    expect(
+      await emailsSentTo(request, address),
+      "the invitation did not send exactly one email",
+    ).toBe(1);
     await passesTheAccessibilityGate();
   });
 
-  await test.step("an invited newcomer names themselves on the invitation, then joins", async () => {
+  await test.step("a new person opens an invitation link, enters their display name, and joins", async () => {
     const { address, link } = await anInvitation(request, workspace.workspaceId, "Editor");
 
     await page.context().clearCookies();
@@ -155,7 +158,7 @@ test("an Admin invites; invitees join; Activity shows only joining", async ({
     await passesTheAccessibilityGate();
   });
 
-  await test.step("a member's Activity shows only joining, with no Load more", async () => {
+  await test.step("a new member's Activity shows one line for their joining and no Load More button", async () => {
     const address = anAddress("ola");
     await person(request, address, { displayName: "Ola Brennan" });
     const invited = await invite(request, {

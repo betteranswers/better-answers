@@ -28,12 +28,12 @@ const codeUsedByKeyboard = async (field: Locator, code: string): Promise<void> =
   await page.keyboard.press("Tab");
   await expect(
     page.getByRole("button", { name: "Use Code" }),
-    "Tab left the field without reaching Use Code",
+    "Tab from the field did not reach Use Code",
   ).toBeFocused();
   await page.keyboard.press("Enter");
 };
 
-test("unticked codes come back as a new set at sign-in", async ({
+test("replaces recovery codes never confirmed as saved at sign-in", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -42,7 +42,7 @@ test("unticked codes come back as a new set at sign-in", async ({
   await codeField(page).fill(codeOf(key));
   await expect(heading(page, "Save Your Recovery Codes")).toBeVisible();
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
-  await expect(saidOfTheSet(page), "a first set says it replaces one").toHaveCount(1);
+  await expect(saidOfTheSet(page), "the first set says it replaces an earlier set").toHaveCount(1);
   const first = await codesListed(page).allInnerTexts();
 
   await page.context().clearCookies();
@@ -55,9 +55,9 @@ test("unticked codes come back as a new set at sign-in", async ({
   const second = await codesListed(page).allInnerTexts();
   expect(
     second.filter((code) => first.includes(code)),
-    "a code of the first set came back",
+    "the new set shares a code with the first set",
   ).toEqual([]);
-  await expect(saidOfTheSet(page), "the set does not say it replaces one").toHaveCount(2);
+  await expect(saidOfTheSet(page), "the new set does not say it replaces the first").toHaveCount(2);
   await passesTheAccessibilityGate();
   await codesTicked(page, "Finish Setup");
   await landedAtHome(page, "Admin");
@@ -68,18 +68,20 @@ test("unticked codes come back as a new set at sign-in", async ({
   await expect(recoveryField(page)).toBeFocused();
   const elapsed = Date.now() - started;
   test.info().annotations.push({ type: "recovery read", description: `${elapsed} ms` });
-  expect(elapsed, "the recovery page was not read within its second").toBeLessThan(READ_BUDGET_MS);
+  expect(elapsed, "the recovery page took longer than one second to load").toBeLessThan(
+    READ_BUDGET_MS,
+  );
 
   const refused = authAnswering(page, "/second-factor/recovery");
   const [replaced] = first;
-  assert.ok(replaced !== undefined, "the first set listed a code");
+  assert.ok(replaced !== undefined, "the first set lists no code");
   await codeUsedByKeyboard(recoveryField(page), replaced);
   expect(await refused).toMatchObject({ status: 400, word: "recovery-code-wrong" });
   await expect(theRefusal(page)).toBeVisible();
   await keepsItsWordOffThePage(page, "recovery-code-wrong");
   await passesTheAccessibilityGate();
   const [current] = second;
-  assert.ok(current !== undefined, "the second set listed a code");
+  assert.ok(current !== undefined, "the second set lists no code");
   await codeUsedByKeyboard(recoveryField(page), current);
   await expect(heading(page, "Set Up a New Second Factor")).toBeVisible();
 });

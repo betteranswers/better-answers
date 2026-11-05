@@ -18,23 +18,24 @@ const anAdminSignedIn = async (page: Page, api: APIRequestContext, workspace: st
 };
 
 test.describe("the Answer Tests page", () => {
-  test("is keyboard-reachable and axe-clean under its group", async ({
+  test("loads under the Questions heading and works by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     await anAdminSignedIn(page, request, "Arkengarthdale Hinges");
 
-    await test.step("renders within the constitution's list budget", async () => {
+    await test.step("loads within the list time budget", async () => {
       const startedAtMs = Date.now();
       await page.goto(ANSWER_TESTS.path);
       await expect(answerTests(page)).toHaveText(/\S/);
       const elapsedMs = Date.now() - startedAtMs;
 
       test.info().annotations.push({ type: "answer tests page", description: `${elapsedMs} ms` });
-      expect(elapsedMs, "the Answer Tests page rendered past its budget").toBeLessThan(
-        LIST_BUDGET_MS,
-      );
+      expect(
+        elapsedMs,
+        "the Answer Tests page took longer than its time budget to render",
+      ).toBeLessThan(LIST_BUDGET_MS);
     });
 
     await skipLinkReachesThePage(page);

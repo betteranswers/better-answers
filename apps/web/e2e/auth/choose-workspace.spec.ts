@@ -44,11 +44,11 @@ test("lists a member's workspaces within a second", async ({
   await expect(rowsOf(page)).toHaveCount(2);
   const elapsed = Date.now() - started;
   test.info().annotations.push({ type: "workspace list", description: `${elapsed} ms` });
-  expect(elapsed, "the list of two workspaces rendered past its budget").toBeLessThan(
+  expect(elapsed, "two workspaces took longer than one second to render").toBeLessThan(
     LIST_BUDGET_MS,
   );
 
-  await test.step("ends the chooser with Account, Sign out and Keyboard shortcuts", async () => {
+  await test.step("puts Account, Sign Out, and Keyboard Shortcuts after the workspaces", async () => {
     const workspaces = page.getByRole("main").getByRole("listitem").getByRole("button");
     await expect(workspaces).toHaveCount(2);
 
@@ -64,7 +64,10 @@ test("lists a member's workspaces within a second", async ({
     await page.keyboard.press("Tab");
     await expect(workspaces.first(), "Tab did not reach the first workspace").toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(workspaces.last(), "a role tag took a stop between the workspaces").toBeFocused();
+    await expect(
+      workspaces.last(),
+      "Tab stopped on the role tag between the workspaces",
+    ).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Account" })).toBeFocused();
     await page.keyboard.press("Tab");
@@ -81,7 +84,7 @@ test("lists a member's workspaces within a second", async ({
 
   await passesTheAccessibilityGate();
 
-  await test.step("keeps a long workspace name and role at 320 pixels", async () => {
+  await test.step("wraps a long workspace name and keeps its role visible at 320 pixels", async () => {
     const narrow = await context.newPage();
     await narrow.setViewportSize({ width: 320, height: 720 });
     await narrow.goto("/choose-workspace");
@@ -89,7 +92,7 @@ test("lists a member's workspaces within a second", async ({
 
     const named = narrow.getByRole("button", { name: first.name, exact: true });
     await expect(named).toHaveAccessibleDescription("Admin");
-    expect(await linesOf(named), "the long name stays on one line").toBeGreaterThan(1);
+    expect(await linesOf(named), "the long name does not wrap").toBeGreaterThan(1);
     await expect(
       rowsOf(narrow).filter({ has: named }).getByText("Admin", { exact: true }),
     ).toBeInViewport({ ratio: 1 });

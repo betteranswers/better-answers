@@ -64,7 +64,7 @@ export const tabUntilFocused = async (
     await page.keyboard.press("Tab");
     await eachStop();
   }
-  await expect(target, "Tab never reached it").toBeFocused();
+  await expect(target, "pressing Tab did not move focus to the target").toBeFocused();
 };
 
 export const tabOpenedByKeyboard = async (page: Page, path: string, name: string) => {
@@ -80,7 +80,7 @@ export const tabOpenedByKeyboard = async (page: Page, path: string, name: string
     await page.keyboard.press("ArrowRight");
     await expect(tabs.nth(at)).toBeFocused();
   }
-  await expect(page.getByRole("tab", { name }), `no tab ${name}`).toHaveAttribute(
+  await expect(page.getByRole("tab", { name }), `the ${name} tab is not selected`).toHaveAttribute(
     "aria-selected",
     "true",
   );
@@ -108,7 +108,7 @@ export const signInHeading = (page: Page, carriedOn: CarriedOn | "nothing" = "no
 
 export const signInSaysWhy = async (page: Page): Promise<string> => {
   await expect(signInHeading(page)).toBeVisible();
-  await expect(page.getByRole("status"), "the sign-in page says nothing of the arrival").toHaveText(
+  await expect(page.getByRole("status"), "the sign-in page shows no status message").toHaveText(
     /\S/,
   );
   return page.getByRole("status").innerText();
@@ -164,7 +164,7 @@ export const notFoundOfferingHome = async (page: Page, role: Role): Promise<void
 
 const ACTION_BUDGET_MS = 100;
 
-/** On CI the shared runner's processor sets the number, not the page, so there it is only recorded. */
+/** On CI, the shared runner's processor decides the timing more than the page does, so there the test records the timing without asserting it. */
 const BUDGET_ASSERTED = !process.env["CI"];
 
 const ANSWER_HELD_AT_MOST_MS = 2_000;
@@ -241,7 +241,7 @@ export const actionClocked = async (page: Page): Promise<number> => {
   );
   if (clocked.kind === "landed") return clocked.ms;
   throw new Error(
-    `the page did not read ${JSON.stringify(clocked.reads)} while the server's answer was held for ${String(clocked.heldMs)} ms: the action waits on a round trip, or the page never reads it`,
+    `The page did not show ${JSON.stringify(clocked.reads)} while the server response was held for ${String(clocked.heldMs)} ms. Either the action waits for a server round trip, or the page never shows that text.`,
   );
 };
 
@@ -256,16 +256,17 @@ export const theActionsLandedWithinTheirBudget = (
   action: string,
   samples: readonly number[],
 ): void => {
-  expect(samples.length, `the ${action} was never clocked`).toBeGreaterThan(0);
+  expect(samples.length, `no timing was recorded for the ${action}`).toBeGreaterThan(0);
   const median = medianOf(samples);
   test.info().annotations.push({
     type: actionAnnotationOf(action),
     description: `${samples.map((elapsed) => `${String(elapsed)} ms`).join(", ")}; median ${String(median)} ms`,
   });
   if (!BUDGET_ASSERTED) return;
-  expect(median, `the ${action} did not read as landed within its budget`).toBeLessThan(
-    ACTION_BUDGET_MS,
-  );
+  expect(
+    median,
+    `the median time for the ${action} to show its result is over its budget`,
+  ).toBeLessThan(ACTION_BUDGET_MS);
 };
 
 export const theActionLandedWithinItsBudget = async (page: Page, action: string): Promise<void> => {
@@ -275,18 +276,19 @@ export const theActionLandedWithinItsBudget = async (page: Page, action: string)
 export const saysARefusal = (
   alert: Locator,
   within?: { readonly timeout: number },
-): Promise<void> => expect(alert, "the alert says nothing").toHaveText(/\S/, within);
+): Promise<void> => expect(alert, "the alert has no text").toHaveText(/\S/, within);
 
 export const saysOfItsRead = (list: Locator): Promise<void> =>
-  expect(list.locator('[aria-live="polite"]'), "the list says nothing of its read").toHaveText(
-    /\S/,
-  );
+  expect(
+    list.locator('[aria-live="polite"]'),
+    "the list's aria-live region has no text",
+  ).toHaveText(/\S/);
 
 export const saysSomethingNew = (region: Locator, earlier: string): Promise<void> =>
   expect
     .poll(
       async () => ["", earlier.trim()].includes((await region.innerText()).trim()),
-      "the region says nothing, or only what it said before",
+      "The region shows new text",
     )
     .toBe(false);
 
@@ -295,14 +297,14 @@ export const saysTheWait = async (
   waitSeconds: number | undefined,
 ): Promise<void> => {
   const minutes = Math.ceil((waitSeconds ?? 0) / 60);
-  expect(minutes, "the ceiling's answer named no wait").toBeGreaterThan(0);
-  await expect(alert, `the alert does not say a wait of ${String(minutes)} minutes`).toHaveText(
+  expect(minutes, "the refusal gives no wait time").toBeGreaterThan(0);
+  await expect(alert, `the alert does not show a wait of ${String(minutes)} minutes`).toHaveText(
     new RegExp(String.raw`\b${String(minutes)}\b`),
   );
 };
 
 export const keepsItsWordOffThePage = (page: Page, word: RefusalWord): Promise<void> =>
-  expect(page.locator("body"), `the page shows the word ${word}`).not.toContainText(word);
+  expect(page.locator("body"), `the page shows the refusal word ${word}`).not.toContainText(word);
 
 const KEY_IN_FOURS = /^[A-Z2-7]{4}(?: [A-Z2-7]{1,4})+$/;
 
@@ -369,10 +371,11 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
     type Rgba = readonly [number, number, number, number];
     const SIDES = ["top", "right", "bottom", "left"] as const;
     const HUGS_WITHIN_PX = 8;
-    // A computed colour can be `oklab()` or `color()`, which Tailwind's `/50` writes; a canvas reads any.
+    // Tailwind's `/50` modifier can make a computed colour `oklab()` or `color()`. A 2D canvas converts any colour format to RGBA.
     const pixel = new OffscreenCanvas(1, 1).getContext("2d", { willReadFrequently: true });
     const rgba = (colour: string): Rgba => {
-      if (pixel === null) throw new Error("the page has no canvas to read a colour with");
+      if (pixel === null)
+        throw new Error("The page could not create a 2D canvas context to read colours");
       pixel.clearRect(0, 0, 1, 1);
       pixel.fillStyle = colour;
       pixel.fillRect(0, 0, 1, 1);

@@ -10,7 +10,7 @@ import {
 
 const READ_BUDGET_MS = 1000;
 
-test("a named invitee reads it within a second, joins keyboard-only", async ({
+test("an invitee with a display name joins by keyboard", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -27,7 +27,9 @@ test("a named invitee reads it within a second, joins keyboard-only", async ({
   await expect(joinButton(page)).toBeVisible();
   const elapsedMs = Date.now() - started;
   test.info().annotations.push({ type: "invitation read", description: `${elapsedMs} ms` });
-  expect(elapsedMs, "the invitation was not read within its second").toBeLessThan(READ_BUDGET_MS);
+  expect(elapsedMs, "the invitation took longer than one second to load").toBeLessThan(
+    READ_BUDGET_MS,
+  );
   await expect(invitedAs(page, "Viewer")).toBeVisible();
   await expect(nameField(page)).toHaveCount(0);
   await passesTheAccessibilityGate();
@@ -35,7 +37,7 @@ test("a named invitee reads it within a second, joins keyboard-only", async ({
   await page.keyboard.press("Tab");
   await expect(joinButton(page)).toBeFocused();
   const ring = await joinButton(page).evaluate((element) => getComputedStyle(element).boxShadow);
-  expect(ring, "the focused action shows no focus ring").not.toBe("none");
+  expect(ring, "the focused button shows no focus ring").not.toBe("none");
   await page.keyboard.press("Enter");
 
   await expect(page.getByRole("banner").getByText("Ryedale Metalwork")).toBeVisible();

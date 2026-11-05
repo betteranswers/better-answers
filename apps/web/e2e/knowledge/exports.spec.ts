@@ -102,7 +102,7 @@ const entryOf = (zip: string, entry: string): string =>
   execFileSync("unzip", ["-p", zip, entry], { encoding: "utf8" });
 
 test.describe("Exports", () => {
-  test("an Admin downloads every export, an Editor finds none", async ({
+  test("an Admin downloads each export, and Editors cannot open Exports", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -110,7 +110,7 @@ test.describe("Exports", () => {
     test.slow();
     const at = await aWorkspaceToExport(request, "Teme Valley Surveys");
 
-    await test.step("an Editor owning a collection finds no Exports", async () => {
+    await test.step("an Editor who owns a collection sees no Exports link and gets the not-found page", async () => {
       await signedIn(page, request, at.editor.email);
       await expect(await knowledgeMenuOpened(page)).toMatchAriaSnapshot(`
         - navigation "Knowledge":
@@ -148,7 +148,9 @@ test.describe("Exports", () => {
     await expect(downloadOf(page, GUIDE)).toBeVisible();
     const elapsed = Date.now() - started;
     test.info().annotations.push({ type: "exports", description: `${elapsed} ms` });
-    expect(elapsed, "the exports rendered past the list's budget").toBeLessThan(LIST_BUDGET_MS);
+    expect(elapsed, "the exports took longer than the list time budget to render").toBeLessThan(
+      LIST_BUDGET_MS,
+    );
 
     await expect(exportsRegion(page)).toMatchAriaSnapshot(`
       - region "Exports":
@@ -173,7 +175,7 @@ test.describe("Exports", () => {
             - button "Download the Guide Snapshot"
     `);
 
-    await test.step("lists each download's keystroke under ?", async () => {
+    await test.step("lists the key for each download under ?", async () => {
       await skipLinkReachesThePage(page);
       await listsItsKeystrokes(page, "Exports", KEY, [
         "Download the Knowledge Base Snapshot",
@@ -182,12 +184,12 @@ test.describe("Exports", () => {
       ]);
     });
 
-    await test.step("reaches and runs each download by keyboard alone", async () => {
+    await test.step("an Admin reaches and starts each download by keyboard alone", async () => {
       const knowledgeBase = downloadOf(page, KNOWLEDGE_BASE);
       await tabUntilFocused(page, knowledgeBase);
       const snapshot = await downloadedBy(page, () => page.keyboard.press("Enter"));
       await expect(said(page)).toContainText(snapshot.suggestedFilename());
-      await expect(knowledgeBase, "focus left the download that ran").toBeFocused();
+      await expect(knowledgeBase, "focus left the button of the download that ran").toBeFocused();
       expect(snapshot.suggestedFilename()).toMatch(/^knowledge-base-\d{4}-\d{2}-\d{2}\.zip$/u);
       const snapshotZip = await savedTo(snapshot, testInfo);
       const snapshotFiles = entriesOf(snapshotZip);
@@ -195,7 +197,7 @@ test.describe("Exports", () => {
       expect(snapshotFiles).toEqual(expect.arrayContaining([...at.conceptFiles]));
       expect(
         snapshotFiles.filter((file) => file.startsWith("guides/")),
-        "the snapshot carries a guide",
+        "the Knowledge Base Snapshot contains a guide",
       ).toEqual([]);
       expect(snapshotFiles.filter((file) => !file.startsWith("knowledge/"))).toEqual([]);
       expect(entryOf(snapshotZip, at.fileOf("Annual leave"))).toContain("25 days of leave");
@@ -221,7 +223,7 @@ test.describe("Exports", () => {
       expect(readFileSync(markdown, "utf8")).toContain("Not maintained");
     });
 
-    await test.step("runs each download on its own key", async () => {
+    await test.step("starts each download with its own key", async () => {
       await page.getByRole("main").focus();
       const snapshot = await downloadedBy(page, () => page.keyboard.press(KEY.knowledgeBase.key));
       expect(snapshot.suggestedFilename()).toMatch(/\.zip$/u);
@@ -231,7 +233,7 @@ test.describe("Exports", () => {
       expect(guide.suggestedFilename()).toMatch(/\.md$/u);
     });
 
-    await test.step("never says bundle", async () => {
+    await test.step("does not use the word bundle", async () => {
       await expect(page.getByRole("main")).not.toContainText(/bundle/iu);
     });
 

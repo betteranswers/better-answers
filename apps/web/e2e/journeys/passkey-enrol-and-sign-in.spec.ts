@@ -45,11 +45,15 @@ test("a person adds a passkey, then signs in without email", async ({ page, requ
 
   const name = await passkeyAdded(page);
 
-  await expect(outcomeOf(page), "the page says nothing of the add").toBeVisible();
+  await expect(
+    outcomeOf(page),
+    "the page shows no message after the passkey is added",
+  ).toBeVisible();
   await expect(rowOf(page, name)).toBeFocused();
-  await expect(rowOf(page, name), "an unused passkey shows a time of use").not.toContainText(
-    A_TIME_OF_USE,
-  );
+  await expect(
+    rowOf(page, name),
+    "a passkey that was never used shows a time of last use",
+  ).not.toContainText(A_TIME_OF_USE);
   const emailsBefore = await emailsSentTo(request, signedIn.email);
 
   await signedOut(page);

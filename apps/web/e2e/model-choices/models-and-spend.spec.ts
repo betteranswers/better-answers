@@ -52,8 +52,8 @@ const signedInWith = async (
   return workspace;
 };
 
-test.describe("the Models and spend page's model choices card", () => {
-  test("is keyboard-reachable and axe-clean under its group", async ({
+test.describe("the Model Choices card on the Models and Spend page", () => {
+  test("loads under the Models heading and works by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -63,16 +63,17 @@ test.describe("the Models and spend page's model choices card", () => {
       modelChoices: ANSWERING_AND_EMBEDDING,
     });
 
-    await test.step("renders the list within the constitution's latency budget", async () => {
+    await test.step("shows the five model purposes within the list time budget", async () => {
       const started = Date.now();
       await page.goto(MODELS_AND_SPEND.path);
       await expect(modelChoicesCard(page).getByRole("listitem")).toHaveCount(5);
       const elapsed = Date.now() - started;
 
       test.info().annotations.push({ type: "model choices list", description: `${elapsed} ms` });
-      expect(elapsed, "the model choices list rendered past its budget").toBeLessThan(
-        LIST_BUDGET_MS,
-      );
+      expect(
+        elapsed,
+        "the Model Choices list took longer than its time budget to render",
+      ).toBeLessThan(LIST_BUDGET_MS);
     });
 
     await skipLinkReachesThePage(page);

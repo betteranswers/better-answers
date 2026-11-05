@@ -18,7 +18,7 @@ const reasonField = (page: Page) => page.getByLabel("Reason");
 
 const requestSent = (page: Page) => page.getByRole("alert", { name: "Request sent" });
 
-test("a person in no workspace asks to join by keyboard", async ({
+test("a person with no workspace asks to join by keyboard", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -39,12 +39,14 @@ test("a person in no workspace asks to join by keyboard", async ({
       - button "Sign Out"
       - button "Keyboard Shortcuts"
   `);
-  await expect(shortNameField(page), "the field shows no example").toHaveAccessibleDescription(
-    /acme-joinery/,
-  );
-  await expect(reasonField(page), "the field names no limit").toHaveAccessibleDescription(
-    new RegExp(REASON_MAX_CHARACTERS.toLocaleString("en-GB")),
-  );
+  await expect(
+    shortNameField(page),
+    "Workspace Short Name gives no example",
+  ).toHaveAccessibleDescription(/acme-joinery/);
+  await expect(
+    reasonField(page),
+    "Reason does not state its character limit",
+  ).toHaveAccessibleDescription(new RegExp(REASON_MAX_CHARACTERS.toLocaleString("en-GB")));
   await passesTheAccessibilityGate();
 
   await page.keyboard.press("j");

@@ -10,7 +10,7 @@ import {
   signIn,
 } from "./harness.ts";
 
-/** Matched by name anywhere in the path, because the tRPC client batches its reads. */
+/** Matches the procedure name anywhere in the path, because the tRPC client can batch several reads into one URL. */
 export const isAFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
 
 export const heldBack = async (page: Page, named: (url: URL) => boolean) => {
@@ -35,7 +35,10 @@ export const listsItsKeystrokes = async (
 ): Promise<void> => {
   const listed = await keystrokesListed(page, named);
   for (const { key } of Object.values(declared)) {
-    await expect(keyListed(listed, key), `the list holds no ${key}`).toBeVisible();
+    await expect(
+      keyListed(listed, key),
+      `the keyboard shortcuts list does not show ${key}`,
+    ).toBeVisible();
   }
   for (const action of actions) await expect(listed).toContainText(action);
   await keystrokesDismissed(page, listed);

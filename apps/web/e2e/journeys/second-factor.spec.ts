@@ -53,7 +53,7 @@ const anAdminWaiting = async (page: Page, api: APIRequestContext, email: string)
   return key;
 };
 
-test("a pending Admin confirms; an Editor sets up an authenticator", async ({
+test("Admins confirm before Members opens, and Editors add an authenticator", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -67,7 +67,7 @@ test("a pending Admin confirms; an Editor sets up an authenticator", async ({
     workspaceId: workspace.workspaceId,
   });
 
-  await test.step("a pending Admin opening Members confirms, then lands back there", async () => {
+  await test.step("an Admin who opens Members enters an authenticator code on Confirm It's You, then lands on Members", async () => {
     const key = await anAdminWaiting(page, request, workspace.admin.email);
 
     await page.goto(MEMBERS);
@@ -97,9 +97,12 @@ test("a pending Admin confirms; an Editor sets up an authenticator", async ({
 
     expect(
       codes.every((code) => RECOVERY_CODE.test(code)),
-      "a code is not one the api mints",
+      "a recovery code does not match the format the API issues",
     ).toBe(true);
-    await expect(outcomeOf(page), "the page says nothing of the setup").toBeVisible();
+    await expect(
+      outcomeOf(page),
+      "the page shows no message after the authenticator is set up",
+    ).toBeVisible();
     await expect(removeButton(page), "the page does not list the authenticator").toBeVisible();
     await expect(
       codesBlock(page).getByRole("heading", { name: "Save Your Recovery Codes" }),

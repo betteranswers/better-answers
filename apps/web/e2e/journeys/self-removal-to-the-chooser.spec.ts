@@ -41,7 +41,7 @@ const anAdminBesideAnotherAtPeople = async (
 };
 
 test.describe("bulk actions on the members ticked", () => {
-  test("removing yourself before your membership reads lands on the chooser", async ({
+  test("self-removal waits for the Admin's role, then opens Your Workspaces", async ({
     page,
     request,
   }) => {
@@ -62,8 +62,14 @@ test.describe("bulk actions on the members ticked", () => {
     await tickOf(page, "Test person").check();
     await expect(outcomeOf(page)).toHaveText("");
     await selectionAction(page, "Remove").click();
-    await expect(outcomeOf(page), "Remove says to wait for your role").toHaveText(/\S/);
-    await expect(page.getByRole("dialog"), "no confirmation opens unread").toHaveCount(0);
+    await expect(
+      outcomeOf(page),
+      "Remove showed no message while the Admin's role loaded",
+    ).toHaveText(/\S/);
+    await expect(
+      page.getByRole("dialog"),
+      "a confirmation opened before the Admin's role loaded",
+    ).toHaveCount(0);
     read.resolve();
     await expect(avatarOf(page, "Test person")).toBeVisible();
 

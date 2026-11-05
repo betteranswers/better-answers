@@ -26,9 +26,9 @@ const pagePainted = (page: Page) =>
   page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
 const paintsTheDarkPage = async (page: Page): Promise<string> => {
-  expect(await themeOf(page), "the page ignored the theme kept").toBe("dark");
+  expect(await themeOf(page), "the page did not keep the saved theme").toBe("dark");
   const painted = await pagePainted(page);
-  expect(painted, "the page's token resolves in dark").not.toBe("rgba(0, 0, 0, 0)");
+  expect(painted, "the page background is transparent in dark mode").not.toBe("rgba(0, 0, 0, 0)");
   expect(painted).toBe(await tokenPainted(page, "--surface-page", "background-color"));
   return painted;
 };
@@ -52,22 +52,24 @@ const connectOnceRevoked = async (page: Page, api: APIRequestContext, userId: st
   await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();
 };
 
-test("draws consent in the sign-in pages' card, faces and tokens", async ({
+test("styles the Connect Claude consent page like the sign-in pages", async ({
   page,
   request,
   baseURL,
   passesTheAccessibilityGate,
 }) => {
-  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite no baseURL");
   await anAdminSignedIn(page, request, "drawn");
 
   const started = Date.now();
   await atConsent(page, baseURL);
   const elapsed = Date.now() - started;
   test.info().annotations.push({ type: "consent read", description: `${elapsed} ms` });
-  expect(elapsed, "consent was not read within its second").toBeLessThan(READ_BUDGET_MS);
+  expect(elapsed, "the consent page took longer than one second to load").toBeLessThan(
+    READ_BUDGET_MS,
+  );
 
-  expect(await drawnMarks(page), "the card stands for its primary button").toEqual(["card"]);
+  expect(await drawnMarks(page), "the card is not the only marked region").toEqual(["card"]);
   const geistLoaded = await page.evaluate(async () => {
     await document.fonts.ready;
     return [
@@ -75,12 +77,12 @@ test("draws consent in the sign-in pages' card, faces and tokens", async ({
       document.fonts.check('16px "Geist Mono Variable"'),
     ];
   });
-  expect(geistLoaded, "the api serves both faces").toEqual([true, true]);
+  expect(geistLoaded, "the API did not serve both Geist fonts").toEqual([true, true]);
   await expect(consentHeading(page)).toHaveCSS("font-family", /^"Geist Variable"/);
 
   const connect = page.getByRole("button", { name: "Connect" });
   const fill = await tokenPainted(page, "--control-primary-bg", "background-color");
-  expect(fill, "the primary's token resolves").not.toBe("rgba(0, 0, 0, 0)");
+  expect(fill, "the primary button's colour token is transparent").not.toBe("rgba(0, 0, 0, 0)");
   await expect(connect).toHaveCSS("background-color", fill);
   await expect(connect).toHaveCSS("border-radius", "0px");
 
@@ -101,13 +103,13 @@ test("draws consent in the sign-in pages' card, faces and tokens", async ({
   expect(sideways, "the page scrolls sideways at 320px").toBe(0);
 });
 
-test("draws consent, then its refusal, in the dark theme kept", async ({
+test("keeps the saved dark theme on the consent pages", async ({
   page,
   request,
   baseURL,
   passesTheAccessibilityGate,
 }) => {
-  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite no baseURL");
   await page.emulateMedia({ colorScheme: "light" });
   const workspace = await anAdminSignedIn(page, request, "keeps-dark");
   await atConsent(page, baseURL);
@@ -120,10 +122,16 @@ test("draws consent, then its refusal, in the dark theme kept", async ({
   await page.reload();
 
   await expect(consentHeading(page)).toBeVisible();
-  expect(await paintsTheDarkPage(page), "dark painted the light page").not.toBe(light);
+  expect(
+    await paintsTheDarkPage(page),
+    "the dark theme paints the page the same as the light theme",
+  ).not.toBe(light);
   await expect(page.locator("script[src]"), "the consent page loaded the SPA").toHaveCount(0);
   await passesTheAccessibilityGate();
 
   await connectOnceRevoked(page, request, workspace.admin.id);
-  expect(await paintsTheDarkPage(page), "dark painted the light page").not.toBe(light);
+  expect(
+    await paintsTheDarkPage(page),
+    "the dark theme paints the page the same as the light theme",
+  ).not.toBe(light);
 });

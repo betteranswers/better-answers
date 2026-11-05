@@ -47,20 +47,23 @@ const authenticatorSetUpThere = async (page: Page): Promise<string> => {
   return key;
 };
 
-test("a recovery code's setup swaps in a new authenticator", async ({
+test("an Admin uses a recovery code to replace their authenticator", async ({
   page,
   request,
   passesTheAccessibilityGate,
 }) => {
   const { email, key, codes } = await anAdminWithAnAuthenticator(page, request);
   const [code] = codes;
-  assert.ok(code !== undefined, "the admin holds a recovery code");
+  assert.ok(code !== undefined, "the admin holds no recovery code");
 
   await recoveryCodeSpent(page, code);
   await passesTheAccessibilityGate();
   const newKey = await authenticatorSetUpThere(page);
 
-  await expect(saidOfTheSet(page), "the set does not say it replaces one").toHaveCount(2);
+  await expect(
+    saidOfTheSet(page),
+    "Save Your Recovery Codes does not say that the new codes replace the old ones",
+  ).toHaveCount(2);
   await codesTicked(page, "Finish Setup");
   await landedAtHome(page, "Admin");
   await signedInAgain(page, request, email);

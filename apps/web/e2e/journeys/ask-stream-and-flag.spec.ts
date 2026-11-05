@@ -29,7 +29,7 @@ const aWorkspaceToAsk = async (api: APIRequestContext) => {
   return audits;
 };
 
-test("a drafted sentence streams in, then its flag is stored", async ({
+test("an Admin sees a sentence mid-stream, then flags it", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -50,14 +50,17 @@ test("a drafted sentence streams in, then its flag is stored", async ({
     test
       .info()
       .annotations.push({ type: "first sentence, streamed", description: `${elapsed} ms` });
-    await expect(askButton(page), "the stream had ended").toHaveAttribute("aria-disabled", "true");
+    await expect(
+      askButton(page),
+      "the Ask button was enabled before the model was released, so the answer stopped streaming early",
+    ).toHaveAttribute("aria-disabled", "true");
     await expect(audits.getByRole("button", { name: `Cites ${POLICY.title}` })).toBeVisible();
     await releaseTheModel(request, workspaceId);
     await expect(askButton(page)).not.toHaveAttribute("aria-disabled", "true");
     await passesTheAccessibilityGate();
   });
 
-  await test.step("flags one drafted sentence, storing it and its concept", async () => {
+  await test.step("flags a drafted sentence as Wrong, then finds it and its cited concept under Flagged on Questions Asked", async () => {
     await audits.getByRole("button", { name: `Flag “${DRAFTED}”` }).click();
     const flagging = page.getByRole("dialog", { name: `Flag “${DRAFTED}”` });
     await flagging.getByRole("radio", { name: "Wrong" }).check();

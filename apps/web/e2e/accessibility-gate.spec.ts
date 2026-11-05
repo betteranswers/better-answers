@@ -17,7 +17,7 @@ const fadeAButtonBackFromItsDisabledLook = (): void => {
   button.style.cssText =
     "background: var(--primary); color: var(--primary-foreground); padding: 8px 16px; opacity: 0.5; transition: opacity 4s step-end";
   document.querySelector("main")?.append(button);
-  // Styled once at its disabled look, so the change below is a transition rather than a start.
+  // Force a style calculation at half opacity, so the change below runs as a transition.
   button.getBoundingClientRect();
   button.style.opacity = "1";
 };
@@ -58,7 +58,7 @@ const writeWordsOverAnImage = (): void => {
   document.querySelector("main")?.append(words);
 };
 
-/** Legible in light; in dark its words take a hairline's colour. Axe skips words in the page's own. */
+/** Readable in light mode. Dark mode uses the border colour, because axe skips text that matches its background. */
 const writeWordsLostInTheDark = (): void => {
   const style = document.createElement("style");
   style.textContent =
@@ -123,10 +123,7 @@ const drawAFieldOnItsRowsRule = (): void => {
   document.querySelector("main")?.append(row);
 };
 
-/**
- * A wordless checkbox, dimmed with its box: axe refuses a dimmed field by its words, so only a
- * wordless control shows the edge check alone.
- */
+/** axe already fails a dimmed field on text contrast, so only a control without text tests the edge check alone. */
 const drawAWordlessCheckbox = (dimmedTo: number): void => {
   const box = document.createElement("div");
   box.style.opacity = String(dimmedTo);
@@ -167,20 +164,20 @@ const theSignInPage = async (page: Page): Promise<void> => {
   await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
 };
 
-test("audits the page a spec leaves, though it never asked", async ({ page }) => {
+test("audits a test's last page even without an explicit call", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
   await page.evaluate(drawAPictureWithNoAltText);
 });
 
-test("refuses a spec that leaves the product and audits nothing", async ({ page }) => {
+test("fails a test that leaves the origin without an audit", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
 
   await page.goto("about:blank");
 });
 
-test("lets a spec leave the origin once it has audited", async ({
+test("passes a test that audits before it leaves the origin", async ({
   page,
   passesTheAccessibilityGate,
 }) => {
@@ -189,11 +186,11 @@ test("lets a spec leave the origin once it has audited", async ({
   await page.goto("about:blank");
 });
 
-test("passes a clean page the spec never asked about", async ({ page }) => {
+test("passes a test that ends on an accessible page", async ({ page }) => {
   await theSignInPage(page);
 });
 
-test("audits a button once its fade from disabled has ended", async ({
+test("waits for a button's opacity transition to end before auditing", async ({
   page,
   passesTheAccessibilityGate,
 }) => {
@@ -202,83 +199,83 @@ test("audits a button once its fade from disabled has ended", async ({
   await passesTheAccessibilityGate();
 });
 
-test("passes a control scrolled half under a band that stays", async ({ page }) => {
+test("passes a button half hidden under a sticky header", async ({ page }) => {
   await theSignInPage(page);
   expect(
     await page.evaluate(scrollAControlHalfUnderABand),
-    "the case left no control half under its band",
+    "the setup left no button half under the sticky header",
   ).toBe(true);
 });
 
-test("audits beside a spinner that never stops turning", async ({ page }) => {
+test("audits a page with a spinner that never stops", async ({ page }) => {
   await theSignInPage(page);
   await page.evaluate(setASpinnerTurning);
 });
 
-test("refuses a page that marks more than three objects", async ({ page }) => {
+test("fails a page that marks more than three regions", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
   await page.evaluate(markFourObjects);
 });
 
-test("audits the contrast of words inside a marked object", async ({ page }) => {
+test("checks the contrast of text inside a marked region", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
   await page.evaluate(writeFaintWordsInAMarkedObject);
 });
 
-test("refuses words whose contrast axe cannot decide", async ({ page }) => {
+test("fails text over an image when axe cannot decide contrast", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
   await page.evaluate(writeWordsOverAnImage);
 });
 
-test("refuses words that are lost only in the dark", async ({ page }) => {
+test("fails text that is unreadable only in dark mode", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
   await page.evaluate(writeWordsLostInTheDark);
 });
 
-test("refuses a field drawn with no edge to find", async ({ page }) => {
+test("fails a field drawn with no visible border", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
   await page.evaluate(drawAFieldWithNoEdge);
 });
 
-test("refuses a field with no edge on a see-through tint", async ({ page }) => {
+test("fails a borderless field on a semi-transparent tint", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
   await page.evaluate(drawAFieldWithNoEdgeOnATint);
 });
 
-test("refuses fields that only a layout box's border surrounds", async ({ page }) => {
+test("fails fields whose only edge is a layout box's border", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
   await page.evaluate(drawEdgelessFieldsInABorderedBox);
 });
 
-test("refuses a field a filled box's sides stand off", async ({ page }) => {
+test("fails a field set 9px inside a filled box", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
   await page.evaluate(drawAnEdgelessFieldInAFilledBox, "9px");
 });
 
-test("finds a field by a filled box hugging one side", async ({ page }) => {
+test("passes a field within 5px of a filled box's edge", async ({ page }) => {
   await theSignInPage(page);
   await page.evaluate(drawAnEdgelessFieldInAFilledBox, "5px 9px 9px");
 });
 
-test("finds a field by the rule its row draws", async ({ page }) => {
+test("passes a field whose row draws a bottom border", async ({ page }) => {
   await theSignInPage(page);
   await page.evaluate(drawAFieldOnItsRowsRule);
 });
 
-test("finds a wordless checkbox by its edge at full strength", async ({ page }) => {
+test("passes a checkbox with no visible label at full opacity", async ({ page }) => {
   await theSignInPage(page);
   await page.evaluate(drawAWordlessCheckbox, 1);
 });
 
-test("refuses a checkbox whose edge is dimmed with its box", async ({ page }) => {
+test("fails a checkbox dimmed to 30% opacity with its box", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
   await page.evaluate(drawAWordlessCheckbox, 0.3);

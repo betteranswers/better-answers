@@ -33,7 +33,7 @@ const unknownPage = (page: Page) => page.getByRole("heading", { level: 1, name: 
 
 const copyAddress = (page: Page) => page.getByRole("button", { name: "Copy Address" });
 
-test("lists the shell's keystrokes alone on Connect Claude, unknown pages", async ({
+test("shows only app-wide shortcuts on Connect Claude and unknown pages", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -43,15 +43,17 @@ test("lists the shell's keystrokes alone on Connect Claude, unknown pages", asyn
   await page.getByRole("main").getByRole("link", { name: "connect Claude" }).click();
   await expect(page).toHaveURL(new RegExp(`${CONNECT_CLAUDE.path}$`));
   const theShells = ["Show This List", "Jump To"];
-  const addsNoLine = "the list adds no line for a page with no keystrokes of its own";
+  const addsNoLine = "Keyboard Shortcuts added a line for a page with no shortcuts";
 
-  await test.step("renders within the page's budget", async () => {
+  await test.step("renders Connect Claude within one second", async () => {
     const started = Date.now();
     await page.goto(CONNECT_CLAUDE.path);
     await expect(copyAddress(page)).toBeVisible();
     const elapsed = Date.now() - started;
     test.info().annotations.push({ type: "connect claude", description: `${elapsed} ms` });
-    expect(elapsed, "Connect Claude rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+    expect(elapsed, "Connect Claude took longer than one second to render").toBeLessThan(
+      LIST_BUDGET_MS,
+    );
   });
 
   await test.step("reaches Copy Address by keyboard alone", async () => {
@@ -60,7 +62,7 @@ test("lists the shell's keystrokes alone on Connect Claude, unknown pages", asyn
     await expect(copyAddress(page)).toBeFocused();
   });
 
-  await test.step("lists the shell's keystrokes alone on Connect Claude", async () => {
+  await test.step("shows only app-wide shortcuts on Connect Claude", async () => {
     await page
       .getByRole("navigation", { name: "Areas" })
       .getByRole("button", { name: "Keyboard Shortcuts" })
@@ -72,7 +74,7 @@ test("lists the shell's keystrokes alone on Connect Claude, unknown pages", asyn
     await keystrokesDismissed(page, onConnect);
   });
 
-  await test.step("lists the shell's keystrokes alone on an unknown page", async () => {
+  await test.step("shows only app-wide shortcuts on an unknown page", async () => {
     await page.goto(HOMES.Admin.path);
     await expect(unknownPage(page)).toBeVisible();
     const onUnknown = await keystrokesListed(page, "This Page");

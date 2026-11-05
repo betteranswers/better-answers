@@ -196,7 +196,7 @@ const modelChoicesBroken = async (route: Route) => {
   await route.fulfill({ json: broken });
 };
 
-test("the Shell frames every page, within budget and by keyboard", async ({
+test("the shell's header, rail, and menu work by keyboard", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -204,7 +204,7 @@ test("the Shell frames every page, within budget and by keyboard", async ({
   const email = anAddress("shell");
   const workspace = await provisionedWithATeam(request, "Wharfedale Castings", email);
 
-  await test.step("offers a signed-out visitor the logo and sign-in at an unknown address", async () => {
+  await test.step("shows a signed-out visitor the logo and Sign In on an unknown page", async () => {
     await page.goto(NOWHERE);
 
     await expect(unknownPage(page)).toBeVisible();
@@ -221,7 +221,7 @@ test("the Shell frames every page, within budget and by keyboard", async ({
   await signIn(page, request, email);
   await expect(page).toHaveURL(new RegExp(`${MODELS_AND_SPEND.path}$`));
 
-  await test.step("tabs skip link, band, icon rail, menu, toolbar, page", async () => {
+  await test.step("Tab visits the skip link, header, rail, menu, tabs, and panel in order", async () => {
     const rail = railOf(page);
     await expect(rail.getByRole("link", { name: "Control Centre" })).toHaveAttribute(
       "aria-current",
@@ -239,7 +239,10 @@ test("the Shell frames every page, within budget and by keyboard", async ({
       jumpToOf(page),
       avatarOf(page, workspace.admin.name),
     ];
-    expect(await inDocumentOrder(page, band), "the band reads out of order").toBe(true);
+    expect(
+      await inDocumentOrder(page, band),
+      "the header's controls are out of document order",
+    ).toBe(true);
 
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
@@ -289,7 +292,7 @@ test("the Shell frames every page, within budget and by keyboard", async ({
     await expect(switcherMenuOf(page, workspace.name)).toHaveCount(0);
   });
 
-  await test.step("draws the jump-to list within its second, timed in the page", async () => {
+  await test.step("opens the Jump To list within one second, timed in the browser", async () => {
     await page.reload();
     await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 
@@ -297,7 +300,9 @@ test("the Shell frames every page, within budget and by keyboard", async ({
     await page.keyboard.press("Meta+k");
     const elapsed = await actionClocked(page);
     test.info().annotations.push({ type: "jump-to list", description: `${elapsed} ms` });
-    expect(elapsed, "the jump-to list did not draw within its second").toBeLessThan(LIST_BUDGET_MS);
+    expect(elapsed, "the Jump To list took longer than one second to draw").toBeLessThan(
+      LIST_BUDGET_MS,
+    );
 
     await expect(jumpToDialogOf(page).getByRole("group", { name: "Pages" })).toBeVisible();
     await expect(jumpToOptionOf(page, new RegExp(PRIYA))).toBeVisible();
@@ -309,7 +314,7 @@ test("the Shell frames every page, within budget and by keyboard", async ({
   const failed = page.getByRole("heading", { level: 1, name: FAILED_HEADING });
   const navigation = page.getByRole("navigation", { name: "Control Centre" });
 
-  await test.step("offers a way out of a page that throws, shell intact and tabbable", async () => {
+  await test.step("shows an error with a way out, and the shell still works by keyboard", async () => {
     await expect(page.getByRole("alert").filter({ has: failed })).toBeVisible();
     await expect(page.getByRole("alert").getByRole("paragraph")).toHaveText(/\S/);
     await expect(page.getByRole("link", { name: "Go to Members" })).toHaveAttribute(
@@ -335,7 +340,7 @@ test("the Shell frames every page, within budget and by keyboard", async ({
     await passesTheAccessibilityGate();
   });
 
-  await test.step("carries on to another tab and another page after the failure", async () => {
+  await test.step("opens another tab and another page after the failure", async () => {
     await expect(page.getByRole("tab", { name: "Model Choices" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -352,10 +357,7 @@ test("the Shell frames every page, within budget and by keyboard", async ({
   });
 });
 
-test("scrolls nothing sideways at 320 pixels, navigation open or closed", async ({
-  page,
-  request,
-}) => {
+test("never scrolls sideways at 320 px, menu open or closed", async ({ page, request }) => {
   await narrowAtModelsAndSpend(page, request, "Acme Joinery");
 
   await scrollsNothingSideways(page, "with the sheet closed");
@@ -370,7 +372,7 @@ test("scrolls nothing sideways at 320 pixels, navigation open or closed", async 
   await scrollsNothingSideways(page, "with the sheet open");
 });
 
-test("offers an Admin their own home at an unknown address", async ({
+test("sends an Admin from an unknown page to their home", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -434,7 +436,8 @@ const drawnFocus = (page: Page, edge: string): Promise<Drawn | undefined> =>
       }
       return parent === null ? "rgb(255, 255, 255)" : getComputedStyle(parent).backgroundColor;
     };
-    // A ring is the element whose shadow carries the ink edge; a utility pads it with clear layers.
+    // The ring is the element whose box-shadow contains the focus colour. Utility classes add
+    // transparent shadow layers, which the filter below drops.
     const ringed = [focused, ...focused.querySelectorAll<HTMLElement>("*")].filter((element) =>
       getComputedStyle(element).boxShadow.includes(inked),
     );
@@ -484,21 +487,25 @@ const walked = async (page: Page): Promise<readonly Drawn[]> => {
 
 const holdsTheRing = async (page: Page, stops: readonly Drawn[]): Promise<void> => {
   const token = await tokenPainted(page, "--focus-ring", "box-shadow");
-  expect(stops.length, "the walk reached no control").toBeGreaterThan(2);
+  expect(stops.length, "Tab reached fewer than three controls").toBeGreaterThan(2);
   for (const stop of stops) {
-    expect(stop.rings, `${stop.name} draws ${String(stop.rings)} rings`).toBe(1);
-    expect(stop.shadow, `${stop.name} draws a ring that is not the token's`).toBe(token);
+    expect(stop.rings, `${stop.name} draws ${String(stop.rings)} focus rings, not one`).toBe(1);
+    expect(
+      stop.shadow,
+      `${stop.name} draws its focus ring in a colour other than --focus-ring`,
+    ).toBe(token);
     const edge = contrastBetween(stop.edge, stop.behind);
     test
       .info()
       .annotations.push({ type: "focus edge", description: `${stop.name}: ${edge.toFixed(2)}:1` });
-    expect(edge, `${stop.name}'s focus edge on ${stop.behind}`).toBeGreaterThanOrEqual(
-      NON_TEXT_CONTRAST,
-    );
+    expect(
+      edge,
+      `${stop.name}'s focus ring has less than 3:1 contrast against ${stop.behind}`,
+    ).toBeGreaterThanOrEqual(NON_TEXT_CONTRAST);
   }
 };
 
-test("draws the token's ring on every shell page control", async ({ page, request }) => {
+test("draws the standard focus ring on every Members page control", async ({ page, request }) => {
   const email = anAddress("focus");
   await provision(request, { name: "Calder Joinery", adminEmail: email });
   await signedInAtHome(page, request, email);
@@ -522,5 +529,8 @@ test("sign-out from the shell ends the session", async ({ page, request }) => {
 
   await page.goto("/people");
   await expect(signInHeading(page)).toBeVisible();
-  await expect(page.getByRole("status"), "a sign-out read as something else").toHaveText(signedOut);
+  await expect(
+    page.getByRole("status"),
+    "the sign-in page does not say the person signed out",
+  ).toHaveText(signedOut);
 });

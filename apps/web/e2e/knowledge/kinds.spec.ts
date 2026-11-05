@@ -95,7 +95,7 @@ const listed = async (page: Page): Promise<string[]> =>
 const filter = (page: Page): Locator => kinds(page).getByRole("button", { name: WORDS.tail });
 
 test.describe("Kinds", () => {
-  test("renders within its budget, read by keyboard alone", async ({
+  test("an Admin filters, sorts, and opens kinds by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -108,7 +108,9 @@ test.describe("Kinds", () => {
     await expect(kinds(page).getByRole("table")).toBeVisible();
     const elapsed = Date.now() - started;
     test.info().annotations.push({ type: "kinds", description: `${elapsed} ms` });
-    expect(elapsed, "the kinds rendered past the list's budget").toBeLessThan(LIST_BUDGET_MS);
+    expect(elapsed, "the kinds took longer than the list time budget to render").toBeLessThan(
+      LIST_BUDGET_MS,
+    );
 
     await expect(kinds(page)).toMatchAriaSnapshot(`
       - region "Kinds":
@@ -155,7 +157,7 @@ test.describe("Kinds", () => {
 
     await skipLinkReachesThePage(page);
 
-    await test.step("switches the filter by keyboard alone", async () => {
+    await test.step("turns the Kinds With Two or Fewer Concepts filter on and off by keyboard alone", async () => {
       await page.keyboard.press("Tab");
       await expect(filter(page)).toBeFocused();
       await page.keyboard.press("Enter");
@@ -167,7 +169,7 @@ test.describe("Kinds", () => {
       expect(await listed(page)).toHaveLength(3);
     });
 
-    await test.step("sorts by concepts by keyboard alone", async () => {
+    await test.step("sorts by the Concepts column by keyboard alone", async () => {
       await page.keyboard.press("Tab");
       await expect(kinds(page).getByRole("button", { name: "Kind", exact: true })).toBeFocused();
       await page.keyboard.press("Tab");
@@ -194,7 +196,7 @@ test.describe("Kinds", () => {
       await expect(collectionsOf(page, "Policy")).toHaveCount(0);
     });
 
-    await test.step("holds the filter and the sort through a reload", async () => {
+    await test.step("keeps the filter and the sort after a reload", async () => {
       await page.keyboard.press(KEY.tail.key);
       await expect(filter(page)).toHaveAttribute("aria-pressed", "true");
       await page.reload();
@@ -212,7 +214,7 @@ test.describe("Kinds", () => {
     ]);
   });
 
-  test("counts only what an owning Editor can read", async ({
+  test("a collection-owning Editor's counts include only concepts they can read", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -221,7 +223,7 @@ test.describe("Kinds", () => {
     await signedIn(page, request, at.editor.email);
     await kindsDrawn(page);
 
-    expect(await listed(page), "a withheld concept was counted").toEqual([
+    expect(await listed(page), "the counts include withheld concepts").toEqual([
       "Policy 2",
       "Procedure 2",
       "Term 1",
@@ -231,14 +233,14 @@ test.describe("Kinds", () => {
     await expect(kinds(page).getByText("board")).toHaveCount(0);
     await expect(page.getByText(/bundle/iu)).toHaveCount(0);
 
-    await test.step("shows the three small kinds when filtered", async () => {
+    await test.step("shows all three kinds when the Kinds With Two or Fewer Concepts filter is on", async () => {
       await filter(page).click();
       await expect(filter(page)).toHaveAttribute("aria-pressed", "true");
       expect(await listed(page)).toEqual(["Policy 2", "Procedure 2", "Term 1"]);
       await expect(kinds(page).getByText("3 kinds")).toBeVisible();
     });
 
-    await test.step("counts each kind per readable collection", async () => {
+    await test.step("counts each kind in each collection the Editor can read", async () => {
       await disclosureOf(page, "Policy").click();
       await expect(collectionsOf(page, "Policy").getByRole("listitem")).toHaveText(["hr2"]);
       await disclosureOf(page, "Procedure").click();

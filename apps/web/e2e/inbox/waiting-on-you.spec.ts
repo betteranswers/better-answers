@@ -147,7 +147,7 @@ const answered = async (page: Page, procedure: "accept" | "decline", act: () => 
     page.waitForResponse((each) => each.url().includes(`inbox.${procedure}`)),
     act(),
   ]);
-  expect(answer.ok(), `the ${procedure} was refused`).toBe(true);
+  expect(answer.ok(), `the ${procedure} failed`).toBe(true);
 };
 
 const signedInAtTheList = async (page: Page, api: APIRequestContext, email: string) => {
@@ -157,7 +157,7 @@ const signedInAtTheList = async (page: Page, api: APIRequestContext, email: stri
 };
 
 test.describe("Waiting on You", () => {
-  test("an Editor owner bulk-accepts by keyboard alone at 320px", async ({
+  test("a collection-owning Editor bulk-accepts suggestions by keyboard at 320px", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -181,7 +181,7 @@ test.describe("Waiting on You", () => {
     await page.setViewportSize(NARROW);
     await signedInAtTheList(page, request, at.editor.email);
 
-    await test.step("bulk-accepts two suggestions by keyboard alone at 320px", async () => {
+    await test.step("selects two suggestions and accepts both by keyboard alone at 320px", async () => {
       await skipLinkReachesThePage(page);
       await listsItsKeystrokes(page, "Waiting on You", KEY, [
         "Select or Clear the Suggestion in Focus",
@@ -204,7 +204,7 @@ test.describe("Waiting on You", () => {
 
     await page.setViewportSize(wide);
 
-    await test.step("renders 50 rows within the list budget", async () => {
+    await test.step("shows 50 suggestions within the list time budget", async () => {
       const rendered: number[] = [];
       for (let sample = 0; sample < LIST_SAMPLES; sample += 1) {
         const started = Date.now();
@@ -218,10 +218,12 @@ test.describe("Waiting on You", () => {
         type: "waiting on you",
         description: `${rendered.map((elapsed) => `${String(elapsed)} ms`).join(", ")}; median ${String(median)} ms`,
       });
-      expect(median, "the list rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+      expect(median, "the list took longer than its time budget to render").toBeLessThan(
+        LIST_BUDGET_MS,
+      );
     });
 
-    await test.step("accepts by key within the action budget", async () => {
+    await test.step("accepts a selected suggestion by keystroke within the action time budget", async () => {
       const clocked: number[] = [];
       for (const { title } of BULK_CONCEPTS.slice(0, ACTION_SAMPLES)) {
         await tickOf(page, title).first().check();
@@ -235,7 +237,7 @@ test.describe("Waiting on You", () => {
       theActionsLandedWithinTheirBudget("accepting a suggestion", clocked);
     });
 
-    await test.step("opens a suggestion within budget and declines it by keyboard alone", async () => {
+    await test.step("opens a suggestion within the list time budget and starts to decline it by keyboard alone", async () => {
       await page.goto(WAITING_ON_YOU.path);
       await expect(rowTitles(page).first()).toBeVisible();
       const opened = (await rowTitles(page).first().innerText()).trim();
@@ -249,7 +251,9 @@ test.describe("Waiting on You", () => {
       ).toBeVisible();
       const elapsed = Date.now() - started;
       test.info().annotations.push({ type: "suggestion", description: `${String(elapsed)} ms` });
-      expect(elapsed, "a suggestion rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+      expect(elapsed, "the suggestion took longer than the list time budget to open").toBeLessThan(
+        LIST_BUDGET_MS,
+      );
 
       await tabUntilFocused(page, page.getByRole("link", { name: "Back to Waiting on You" }));
       await page.keyboard.press("Tab");

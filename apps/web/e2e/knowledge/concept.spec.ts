@@ -175,7 +175,7 @@ const edges = (drawn: Locator) =>
   });
 
 test.describe("the concept page", () => {
-  test("leaves focus in the box when its row never drew", async ({ page, request }) => {
+  test("keeps focus in the search box after going back fails", async ({ page, request }) => {
     const seeded = await aWorkspaceOfConcepts(request, "Ouse Annals");
     await signedInAsTheAdmin(page, request, seeded);
     await page.goto(asked("audit"));
@@ -192,10 +192,10 @@ test.describe("the concept page", () => {
     await box.fill("audit logs");
 
     await expect(matchOf(page, RETENTION)).toBeVisible();
-    await expect(box, "a row from the search left took focus from the box").toBeFocused();
+    await expect(box, "the search box lost focus when the matches loaded").toBeFocused();
   });
 
-  test("acknowledges a save within its budget", async ({
+  test("an Admin edits a concept's title and sees it saved", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -238,7 +238,7 @@ test.describe("the concept page", () => {
     await expect(conceptOf(page, title)).toBeVisible();
   });
 
-  test("renders within its budget, read by keyboard alone", async ({
+  test("an Admin reads a concept's sources and links by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -251,7 +251,9 @@ test.describe("the concept page", () => {
     await expect(conceptOf(page, RETENTION).getByText(CLAIM)).toBeVisible();
     const elapsedMs = Date.now() - startedAtMs;
     test.info().annotations.push({ type: "concept page", description: `${elapsedMs} ms` });
-    expect(elapsedMs, "the concept rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+    expect(elapsedMs, "the concept took longer than its time budget to render").toBeLessThan(
+      LIST_BUDGET_MS,
+    );
 
     await skipLinkReachesThePage(page);
     await listsItsKeystrokes(page, "Search", KEY, [
@@ -272,7 +274,7 @@ test.describe("the concept page", () => {
     await page.keyboard.press("Tab");
     await expect(
       sourceLines(page).nth(0).getByRole("button", { name: POLICY }),
-      "Tab off the panel did not reach the page",
+      "Tab from the panel did not move focus back to the page",
     ).toBeFocused();
     await passesTheAccessibilityGate();
     await page.keyboard.press("Enter");
@@ -301,7 +303,7 @@ test.describe("the concept page", () => {
       const next = await edges(concept.getByRole("heading", { name: "Who decides" }));
       const drawn = await edges(inline);
       expect(drawn.top, "the panel is not under its claim").toBeGreaterThanOrEqual(claim.bottom);
-      expect(drawn.bottom, "the panel is not above the next block").toBeLessThanOrEqual(next.top);
+      expect(drawn.bottom, "the panel is not above the next heading").toBeLessThanOrEqual(next.top);
       expect(await scrolledSideways(page), "the page scrolls sideways at 320 px").toBe(0);
 
       await page.keyboard.press("Escape");

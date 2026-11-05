@@ -98,7 +98,7 @@ const asksCounted = (page: Page): string[] => {
 };
 
 test.describe("Ask › New question", () => {
-  test("reopens a refused flag with its draft and the refusal", async ({ page, request }) => {
+  test("keeps the flag's draft and shows why sending failed", async ({ page, request }) => {
     await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
     await asked(page);
     const result = answered(page, "Answered");
@@ -115,12 +115,15 @@ test.describe("Ask › New question", () => {
     await expect(flagging.getByRole("textbox", { name: "Note" })).toHaveValue(NOTE);
   });
 
-  test("says the spending limit in the refusal's sentence", async ({ page, request }) => {
+  test("blocks questions at the spending limit without calling a model", async ({
+    page,
+    request,
+  }) => {
     const { workspaceId } = await aViewerAsking(page, request, {
       judging: { fits: [USERS.title] },
       limitGbp: "0.001",
     });
-    // Streamed, so the refusal is a line of the body; the browser keeps no streamed body to read.
+    // The browser keeps no streamed body, so the route copies the body that carries the refusal.
     const refused = Promise.withResolvers<string>();
     await page.route(
       (url) => url.pathname.includes("ask.question"),
@@ -134,7 +137,7 @@ test.describe("Ask › New question", () => {
 
     await asked(page);
 
-    expect(await refused.promise, "the api did not refuse at the spending limit").toContain(
+    expect(await refused.promise, "the API did not refuse at the spending limit").toContain(
       "spending-limit-met",
     );
     expect(await modelCallsIn(request, workspaceId)).toEqual({ judge: 0, draft: 0 });
@@ -144,7 +147,7 @@ test.describe("Ask › New question", () => {
     await keepsItsWordOffThePage(page, "spending-limit-met");
   });
 
-  test("starts no second question while an answer streams", async ({ page, request }) => {
+  test("ignores Enter and Ask while an answer is streaming", async ({ page, request }) => {
     const { workspaceId } = await aViewerAsking(page, request, {
       judging: { fits: [USERS.title] },
       holds: "judge",
@@ -154,17 +157,17 @@ test.describe("Ask › New question", () => {
     await asked(page);
     await expect.poll(async () => (await modelCallsIn(request, workspaceId)).judge).toBe(1);
     await questionBox(page).press("Enter");
-    // Held disabled to the pointer as to the keyboard, so the press is the page's to ignore.
+    // Playwright waits on an aria-disabled button, so force the click to prove the page ignores it.
     await askButton(page).click({ force: true });
     await releaseTheModel(request, workspaceId);
 
     await expect(answered(page, "Answered")).toBeVisible();
     await expect(askButton(page)).not.toHaveAttribute("aria-disabled", "true");
-    expect(asks, "a second question was sent").toEqual(["POST"]);
+    expect(asks, "the question was not sent exactly once").toEqual(["POST"]);
     expect(await modelCallsIn(request, workspaceId)).toEqual({ judge: 1, draft: 0 });
   });
 
-  test("asks nothing for a blank question, saying so", async ({ page, request }) => {
+  test("refuses a blank question and lets Shift+Enter add a line", async ({ page, request }) => {
     await aViewerAsking(page, request, {});
     const asks = asksCounted(page);
 
@@ -175,10 +178,10 @@ test.describe("Ask › New question", () => {
     await questionBox(page).fill("How do buyers");
     await questionBox(page).press("Shift+Enter");
     await expect(questionBox(page)).toHaveValue("How do buyers\n");
-    expect(asks, "a question was asked").toEqual([]);
+    expect(asks, "a blank question was sent").toEqual([]);
   });
 
-  test("clears the question and its result on a workspace switch", async ({ page, request }) => {
+  test("clears the question and answer after switching workspace", async ({ page, request }) => {
     const { first, second } = await inTwoWorkspaces(
       page,
       request,
@@ -196,7 +199,7 @@ test.describe("Ask › New question", () => {
     await expect(answered(page, "Not Answered")).toHaveCount(0);
   });
 
-  test("opens related knowledge beside the answer, tabbing back out", async ({
+  test("opens related knowledge in a panel that Tab leaves open", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -206,7 +209,7 @@ test.describe("Ask › New question", () => {
       judging: { fits: [USERS.title] },
     });
 
-    await test.step("shows a fitting Answer word for word, within its budget", async () => {
+    await test.step("shows a verified answer word for word within one second", async () => {
       await questionBox(page).fill(QUESTION);
       const started = Date.now();
       await questionBox(page).press("Enter");
@@ -216,13 +219,15 @@ test.describe("Ask › New question", () => {
       const elapsed = Date.now() - started;
 
       test.info().annotations.push({ type: "first content", description: `${elapsed} ms` });
-      expect(elapsed, "the verdict landed past the answer's budget").toBeLessThan(ANSWER_BUDGET_MS);
+      expect(elapsed, "the answer took longer than one second to arrive").toBeLessThan(
+        ANSWER_BUDGET_MS,
+      );
       await expect(audits.getByText(USERS.body)).toBeVisible();
       await expect(audits.getByText("Verified automatically")).toBeVisible();
       await expect(result.getByText("Judged", { exact: true })).toBeVisible();
       await expect(result.getByText(SUPPLIER.body)).toHaveCount(0);
       await expect(said(page)).toHaveText(/\S/);
-      await expect(questionBox(page), "focus left the question").toBeFocused();
+      await expect(questionBox(page), "focus left the question box").toBeFocused();
     });
 
     await scriptAsking(request, { workspaceId, judging: { fits: [] }, drafting: DRAFTING });
@@ -240,7 +245,7 @@ test.describe("Ask › New question", () => {
     await expect(panel).toBeVisible();
   });
 
-  test("opens a cited concept beneath its sentence at 320 px", async ({ page, request }) => {
+  test("opens a citation below its sentence at 320 px", async ({ page, request }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await aViewerAsking(page, request, { judging: { fits: [] }, drafting: DRAFTING });
     await asked(page);

@@ -30,7 +30,7 @@ const personRows = (page: Page): Locator =>
     .filter({ has: page.getByRole("cell") });
 
 test.describe("the console's Everyone page", () => {
-  test("is keyboard-operable, sounds like a table and passes axe", async ({
+  test("works by keyboard and is announced as a table", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -39,16 +39,17 @@ test.describe("the console's Everyone page", () => {
     const { tag } = operators;
     await person(request, anAddress(`${tag}-priya`), { displayName: "Priya Shah" });
 
-    await test.step("renders the list within the constitution's latency budget", async () => {
+    await test.step("renders the list within one second", async () => {
       const started = Date.now();
       await page.goto(EVERYONE_PAGE);
       await expect(personRows(page).first()).toBeVisible();
       const elapsed = Date.now() - started;
 
       test.info().annotations.push({ type: "everyone list", description: `${elapsed} ms` });
-      expect(elapsed, "the first page of everyone rendered past its budget").toBeLessThan(
-        LIST_BUDGET_MS,
-      );
+      expect(
+        elapsed,
+        "the first page of Everyone took longer than one second to render",
+      ).toBeLessThan(LIST_BUDGET_MS);
     });
 
     await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
@@ -86,14 +87,17 @@ test.describe("the console's Everyone page", () => {
     `);
     await expect(
       everyone(page).getByText("Search by name or address", { exact: true }),
-      "the search is a labelled field of its own again",
+      "the search box has a separate visible label",
     ).toHaveCount(0);
     await passesTheAccessibilityGate();
 
     await skipLinkReachesThePage(page);
     await page.keyboard.press("o");
     await expect(outcomeOf(everyone(page))).toHaveText(/\S/);
-    await expect(page.getByRole("dialog"), "a person opened with none in focus").toHaveCount(0);
+    await expect(
+      page.getByRole("dialog"),
+      "o opened a dialog when no person had focus",
+    ).toHaveCount(0);
 
     const listed = (await keystrokesListed(page, "Everyone")).getByRole("definition");
     await expect(listed).toHaveText([
@@ -114,7 +118,10 @@ test.describe("the console's Everyone page", () => {
     await expect(searchBox(page)).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(searchBox(page)).toHaveValue("");
-    await expect(searchBox(page), "Escape cleared the search and lost its place").toBeFocused();
+    await expect(
+      searchBox(page),
+      "focus left the search box after Escape cleared it",
+    ).toBeFocused();
     await page.keyboard.type(`${tag}-priya`);
     await expect(personRows(page)).toHaveCount(1);
 

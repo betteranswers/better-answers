@@ -83,7 +83,7 @@ export const markTheOperator = (
 ) => ask(api, "/operators", { email, change }, operatorMarked);
 const invitationWritten = z.object({ id: z.string() });
 
-/** The store keeps Better Auth's spelling; a spec says the glossary's. */
+/** The database stores Better Auth's spelling, "canceled". Specs use the glossary's spelling, "cancelled". */
 const STORED_STATUS = { accepted: "accepted", cancelled: "canceled" } as const;
 
 export const invite = (
@@ -176,7 +176,10 @@ export const claudeExchanges = async (
       code_verifier: asked.verifier,
     },
   });
-  expect(exchanged.ok(), `the code's exchange answered ${exchanged.status()}`).toBe(true);
+  expect(
+    exchanged.ok(),
+    `exchanging the authorization code for tokens returned ${exchanged.status()}, not a 2xx status`,
+  ).toBe(true);
   const tokens = z.object({ refresh_token: z.string() }).parse(await exchanged.json());
   return { refreshToken: tokens.refresh_token };
 };
@@ -436,7 +439,10 @@ const modelCalls = z.object({ judge: z.number(), draft: z.number() });
 
 export const modelCallsIn = async (api: APIRequestContext, workspaceId: string) => {
   const answered = await api.get(`${HARNESS}/asking/calls`, { params: { workspaceId } });
-  expect(answered.ok(), `the calls answered ${answered.status()}`).toBe(true);
+  expect(
+    answered.ok(),
+    `reading the model call counts returned ${answered.status()}, not a 2xx status`,
+  ).toBe(true);
   return modelCalls.parse(await answered.json());
 };
 
@@ -473,7 +479,9 @@ const capturedFor = async <T>(
   answer: z.ZodType<T>,
 ): Promise<T> => {
   const sent = await api.get(`${HARNESS}${path}?email=${encodeURIComponent(email)}`);
-  expect(sent.ok(), `nothing was captured at ${path} for this address`).toBe(true);
+  expect(sent.ok(), `the test harness captured nothing at ${path} for this email address`).toBe(
+    true,
+  );
   return answer.parse(await sent.json());
 };
 
@@ -487,7 +495,10 @@ const emailsCounted = z.object({ sent: z.number() });
 
 export const emailsSentTo = async (api: APIRequestContext, email: string): Promise<number> => {
   const counted = await api.get(`${HARNESS}/emails?to=${encodeURIComponent(email)}`);
-  expect(counted.ok(), `counting the emails answered ${counted.status()}`).toBe(true);
+  expect(
+    counted.ok(),
+    `counting the sent emails returned ${counted.status()}, not a 2xx status`,
+  ).toBe(true);
   return emailsCounted.parse(await counted.json()).sent;
 };
 

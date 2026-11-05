@@ -53,7 +53,7 @@ const theOperator = async (page: Page, api: APIRequestContext, workspaceName: st
 };
 
 test.describe("the console's Workspaces page", () => {
-  test("is keyboard-operable, sounds like a table and passes axe", async ({
+  test("works by keyboard and is announced as a table", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -61,21 +61,21 @@ test.describe("the console's Workspaces page", () => {
     const workspace = await theOperator(page, request, "Pendle Toolworks");
     const ours = rowOf(page, workspace.name);
 
-    await test.step("renders the list within the constitution's latency budget", async () => {
+    await test.step("renders the list within one second", async () => {
       const started = Date.now();
       await page.goto(EVERY_WORKSPACE);
       await expect(ours).toBeVisible();
       const elapsed = Date.now() - started;
 
       test.info().annotations.push({ type: "workspaces list", description: `${elapsed} ms` });
-      expect(elapsed, "the workspaces list took longer than its second").toBeLessThan(
+      expect(elapsed, "the workspaces list took longer than one second to render").toBeLessThan(
         LIST_BUDGET_MS,
       );
     });
 
-    await test.step("scrolls nothing sideways at 320 pixels", async () => {
+    await test.step("does not scroll sideways at 320 pixels", async () => {
       const desktop = page.viewportSize();
-      assert.ok(desktop !== null, "the page has a viewport");
+      assert.ok(desktop !== null, "the page has no viewport");
       await page.setViewportSize({ width: 320, height: 720 });
       await page.goto(EVERY_WORKSPACE);
       await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
@@ -90,7 +90,10 @@ test.describe("the console's Workspaces page", () => {
           .locator("[data-slot=table-container]")
           .evaluate((table) => table.scrollWidth - table.clientWidth),
       };
-      expect(room, "the page or its table scrolls sideways").toEqual({ page: 0, table: 0 });
+      expect(room, "the page or its table scrolls sideways").toEqual({
+        page: 0,
+        table: 0,
+      });
 
       await listOf(page).getByRole("button", { name: "Columns" }).click();
       await page.getByRole("menuitemcheckbox", { name: "Members" }).click();

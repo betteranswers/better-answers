@@ -114,7 +114,7 @@ const filterOf = (page: Page, name: "Collection" | "Kind"): Locator =>
   reviewed(page).getByRole("combobox", { name: `Filter by ${name}` });
 
 test.describe("All Knowledge", () => {
-  test("renders All knowledge's first page within its budget", async ({
+  test("shows each role only the concepts they can curate", async ({
     page,
     context,
     request,
@@ -128,7 +128,9 @@ test.describe("All Knowledge", () => {
     await expect(rowsOf(page).nth(FIRST_PAGE - 1)).toBeVisible();
     const elapsed = Date.now() - started;
     test.info().annotations.push({ type: "all knowledge", description: `${elapsed} ms` });
-    expect(elapsed, "the first page rendered past the list's budget").toBeLessThan(LIST_BUDGET_MS);
+    expect(elapsed, "the first page took longer than the list time budget to render").toBeLessThan(
+      LIST_BUDGET_MS,
+    );
     await expect(rowsOf(page)).toHaveCount(FIRST_PAGE);
     await expect(page.getByRole("main")).not.toContainText(/bundle/i);
 
@@ -194,7 +196,7 @@ test.describe("All Knowledge", () => {
       await expect(rowOf(page, "Fire drills")).toContainText(NEW_OWNER);
     });
 
-    await test.step("an owning Editor opens on their collection and keeps the filter", async () => {
+    await test.step("an Editor who owns a collection sees it first and keeps their filter and sort after opening a concept", async () => {
       await context.clearCookies();
       await signedInAt(page, request, at.owningEditorEmail);
       await page.goto(ALL_KNOWLEDGE);
@@ -225,7 +227,7 @@ test.describe("All Knowledge", () => {
       await expect(titleOf(page, "Annual leave")).toBeFocused();
     });
 
-    await test.step("an Editor owning nothing meets the not-found page", async () => {
+    await test.step("an Editor who owns no collection sees the not-found page", async () => {
       await context.clearCookies();
       await signedInAt(page, request, at.owningNothingEmail);
       await page.goto(ALL_KNOWLEDGE);

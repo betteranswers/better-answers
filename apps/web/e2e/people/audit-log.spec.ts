@@ -104,18 +104,18 @@ const aFullPageOpened = async (
 };
 
 test.describe("the System group's Audit log page", () => {
-  test("draws each event on one line, naming no family", async ({ page, request }) => {
+  test("shows each event on one line without naming its family", async ({ page, request }) => {
     await anAdminAtTheAuditLog(page, request, "Derwent Joinery");
     await expect(linesOf(page)).toHaveCount(3);
 
     for (const line of await linesOf(page).all()) {
       const box = await line.boundingBox();
-      expect(box?.height, "an event at rest is taller than one line").toBeLessThan(ONE_LINE_PX);
+      expect(box?.height, "a closed event is taller than one line").toBeLessThan(ONE_LINE_PX);
     }
     for (const family of ["People", "Knowledge", "Sources", "Platform"]) {
       await expect(
         linesOf(page).filter({ hasText: new RegExp(family) }),
-        `a line says ${family} at rest`,
+        `a closed event names the ${family} family`,
       ).toHaveCount(0);
     }
 
@@ -125,25 +125,29 @@ test.describe("the System group's Audit log page", () => {
     await expect(familyFilter(page)).toHaveText("Platform");
   });
 
-  test("opens an event's detail, a sign-in address beneath each name", async ({
+  test("event details show each person's sign-in address under their name", async ({
     page,
     request,
   }) => {
     const { priya } = await anAdminAtTheAuditLog(page, request, "Aire Valley Tooling");
 
     const priyas = linesOf(page).nth(1);
-    await expect(priyas, "a name no other actor shares shows an address at rest").not.toContainText(
-      priya.email,
-    );
+    await expect(
+      priyas,
+      "a closed event shows an address for an actor whose name is unique",
+    ).not.toContainText(priya.email);
     const details = detailsOf(priyas);
     await expect(details).toHaveAttribute("aria-expanded", "false");
     const restsAt = (await details.boundingBox())?.y;
-    expect(restsAt, "Details is not drawn on the event's line").toBeDefined();
+    expect(restsAt, "the Details button has no position on the page").toBeDefined();
     await details.click();
 
     await expect(details).toHaveAttribute("aria-expanded", "true");
     await expect(priyas.getByRole("definition").first()).toHaveText(`Priya Shah${priya.email}`);
-    expect((await details.boundingBox())?.y, "Details moved as its list opened").toBe(restsAt);
+    expect(
+      (await details.boundingBox())?.y,
+      "the Details button moved when the details opened",
+    ).toBe(restsAt);
 
     const provisioned = linesOf(page).nth(2);
     await detailsOf(provisioned).click();
@@ -153,23 +157,24 @@ test.describe("the System group's Audit log page", () => {
     }
   });
 
-  test("searches, opens and pages the audit log by keyboard", async ({
+  test("an Admin searches, opens, and loads older events by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     const at = await anAdminAtTheAuditLog(page, request, "Calder Castings");
 
-    await test.step("renders the audit log within the latency budget", async () => {
+    await test.step("shows the audit log within the list time budget", async () => {
       const started = Date.now();
       await page.goto(AUDIT_LOG_PAGE);
       await expect(linesOf(page)).toHaveCount(3);
       const elapsed = Date.now() - started;
 
       test.info().annotations.push({ type: "audit log", description: `${elapsed} ms` });
-      expect(elapsed, "the audit log of three events rendered past its budget").toBeLessThan(
-        LIST_BUDGET_MS,
-      );
+      expect(
+        elapsed,
+        "the audit log of three events took longer than its time budget to render",
+      ).toBeLessThan(LIST_BUDGET_MS);
     });
 
     await aFullPageOpened(page, request, at, 51);

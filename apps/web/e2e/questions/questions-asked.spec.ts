@@ -78,7 +78,7 @@ const leadingLineOf = async (page: Page, name: string, path: string) => {
   await page.goto(path);
   await expect(page.getByRole("heading", { level: 1, name: "Questions" })).toBeVisible();
   const lead = page.getByRole("main").locator("h1 + p");
-  await expect(lead, `${name}'s heading leads no line`).toHaveText(/\S/);
+  await expect(lead, `${name} shows no line of text under its heading`).toHaveText(/\S/);
   return lead.innerText();
 };
 
@@ -92,36 +92,40 @@ const aPageAndOneMoreOpened = async (page: Page, api: APIRequestContext, name: s
   await signedInAtTheQuestions(page, api, at);
 };
 
-test.describe("Questions asked", () => {
-  test("renders a page of rows within the list budget", async ({
+test.describe("the Questions Asked page", () => {
+  test("an Admin reaches the first of 50 questions by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     await aPageAndOneMoreOpened(page, request, "Wharfe Pages");
 
-    await test.step("leads the Questions group's pages with one line, auditing each", async () => {
+    await test.step("each Questions page shows the same line under its heading and passes the accessibility checks", async () => {
       const lines = new Set<string>();
       for (const [name, path] of QUESTIONS_PAGES) {
         lines.add(await leadingLineOf(page, name, path));
-        expect(lines.size, `${name} leads with a line of its own`).toBe(1);
+        expect(
+          lines.size,
+          `${name} shows a different line under its heading from the other Questions pages`,
+        ).toBe(1);
         await passesTheAccessibilityGate();
       }
     });
 
-    await test.step("renders a page of 50 rows within the list budget", async () => {
+    await test.step("shows a page of 50 questions within the list time budget", async () => {
       const started = Date.now();
       await page.goto(QUESTIONS_ASKED);
       await expect(rowsOf(questionsAsked(page))).toHaveCount(50);
       const elapsed = Date.now() - started;
 
       test.info().annotations.push({ type: "questions asked", description: `${elapsed} ms` });
-      expect(elapsed, "a page of 50 questions rendered past its budget").toBeLessThan(
-        LIST_BUDGET_MS,
-      );
+      expect(
+        elapsed,
+        "a page of 50 questions took longer than its time budget to render",
+      ).toBeLessThan(LIST_BUDGET_MS);
     });
 
-    await test.step("reaches the first question by Tab from the skip link", async () => {
+    await test.step("an Admin presses Tab from the skip link until the first question has focus", async () => {
       await skipLinkReachesThePage(page);
       await tabUntilFocused(page, rowsOf(questionsAsked(page)).first());
     });

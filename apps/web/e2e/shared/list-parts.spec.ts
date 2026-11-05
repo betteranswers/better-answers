@@ -48,23 +48,25 @@ const roomAtTheEdge = () => {
   };
 };
 
-test.describe("the shared list parts, drawn together", () => {
-  test("tick, menu and clear work by keyboard alone", async ({
+test.describe("the shared list components rendered together", () => {
+  test("select, row menu, and clear selection work by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
-    await test.step("draws the list within the list's second", async () => {
+    await test.step("renders the list within one second", async () => {
       const started = Date.now();
       await drawn(page, request);
       const elapsed = Date.now() - started;
       test.info().annotations.push({ type: "list parts", description: `${elapsed} ms` });
-      expect(elapsed, "the list parts drew past the list's budget").toBeLessThan(LIST_BUDGET_MS);
+      expect(elapsed, "the list took longer than one second to render").toBeLessThan(
+        LIST_BUDGET_MS,
+      );
     });
 
     const trigger = page.getByRole("button", { name: "Actions for Cy Twombly" });
 
-    await test.step("ticks a row and opens its menu by keyboard", async () => {
+    await test.step("selects a row and opens its Actions menu by keyboard", async () => {
       await tabUntilFocused(page, tickOf(page, "Cy Twombly"));
       await page.keyboard.press("Space");
       await expect(bar(page).getByRole("status")).toHaveText(/\b1\b/);
@@ -104,7 +106,7 @@ test.describe("the shared list parts, drawn together", () => {
       `);
     });
 
-    await test.step("passes the accessibility gate with a row ticked and the selection bar open", async () => {
+    await test.step("passes the accessibility gate with a row selected and the selection bar showing", async () => {
       await expect(bar(page)).toBeVisible();
       await passesTheAccessibilityGate();
     });
@@ -114,7 +116,7 @@ test.describe("the shared list parts, drawn together", () => {
       await expect(bar(page)).toBeHidden();
     });
 
-    await test.step("keeps every part but the table inside 320 pixels", async () => {
+    await test.step("keeps everything except the table within 320 pixels", async () => {
       await page.setViewportSize({ width: 320, height: 720 });
       await tickOf(page, "Cy Twombly").click();
       await tickOf(page, "Ada Lovelace").click();
@@ -123,7 +125,10 @@ test.describe("the shared list parts, drawn together", () => {
 
       const room = await page.evaluate(roomAtTheEdge);
       expect(room.scrolls, "the page scrolls sideways").toBeLessThanOrEqual(room.holds);
-      expect(room.pastTheEdge, "a part outside the table reaches past the edge").toEqual([]);
+      expect(
+        room.pastTheEdge,
+        "an element outside the table extends past the screen's right edge",
+      ).toEqual([]);
       test.info().annotations.push({
         type: "table at 320 pixels",
         description: `${String(room.tableScrolls)} px of columns in ${String(room.tableHolds)} px`,

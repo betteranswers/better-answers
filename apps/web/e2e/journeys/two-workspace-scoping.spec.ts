@@ -56,7 +56,10 @@ const switchedInAnotherTab = async (
   await switched(elsewhere, first.name, second.name);
   await landedAtHome(elsewhere, "Admin");
   await expect(switcherOf(elsewhere, second.name)).toBeVisible();
-  await expect(switcherOf(page, first.name), "the tab left behind heard of it").toBeVisible();
+  await expect(
+    switcherOf(page, first.name),
+    "the first tab left the first workspace",
+  ).toBeVisible();
   return elsewhere;
 };
 
@@ -75,7 +78,10 @@ const landedHomeSayingWhy = async (page: Page, now: Workspace): Promise<void> =>
   await saysARefusal(page.getByRole("banner").getByRole("alert"));
   await keepsItsWordOffThePage(page, SWITCHED.word);
   await landedAtHome(page, "Admin");
-  await expect(switcherOf(page, now.name), "the band names the workspace left").toBeVisible();
+  await expect(
+    switcherOf(page, now.name),
+    "the top bar does not name the workspace the other tab switched to",
+  ).toBeVisible();
 };
 
 const atSamsPage = async (page: Page, api: APIRequestContext, two: Two): Promise<Locator> => {
@@ -106,14 +112,16 @@ test.describe("an action from a tab left in another workspace", () => {
     expect(await answered).toMatchObject(SWITCHED);
 
     await membersReadAfresh(elsewhere, two.second);
-    await expect(roleOf(elsewhere, "Sam Okoro"), `removed from ${two.second.name}`).toHaveText(
-      "Viewer",
-    );
+    await expect(
+      roleOf(elsewhere, "Sam Okoro"),
+      `Sam Okoro is no longer a Viewer in ${two.second.name}`,
+    ).toHaveText("Viewer");
     await landedHomeSayingWhy(page, two.second);
     await passesTheAccessibilityGate();
     await backIn(elsewhere, two);
-    await expect(roleOf(elsewhere, "Sam Okoro"), `removed from ${two.first.name}`).toHaveText(
-      "Editor",
-    );
+    await expect(
+      roleOf(elsewhere, "Sam Okoro"),
+      `Sam Okoro is no longer an Editor in ${two.first.name}`,
+    ).toHaveText("Editor");
   });
 });

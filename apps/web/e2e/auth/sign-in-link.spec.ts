@@ -59,7 +59,7 @@ const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, w
 
 const signInButton = (page: Page) => page.getByRole("button", { name: "Sign In", exact: true });
 
-test("signing in by link in another tab lands the asker", async ({ page, context, request }) => {
+test("a sign-in link opened in another tab signs in both", async ({ page, context, request }) => {
   const { asking, token } = await aLinkAskedForIn(context, request, "Follow");
 
   await page.goto(linkTo(token));
@@ -70,7 +70,7 @@ test("signing in by link in another tab lands the asker", async ({ page, context
   await landedAtHome(asking, "Editor");
 });
 
-test("Sign In Link reads six digits and copies on c", async ({
+test("another browser shows the link's code, and c copies it", async ({
   page,
   context,
   request,
@@ -100,9 +100,10 @@ test("Sign In Link reads six digits and copies on c", async ({
         - strong
       - button "Keyboard Shortcuts"
   `);
-  await expect(page.getByRole("status").first(), "the page says nothing of the code").toHaveText(
-    /\S/,
-  );
+  await expect(
+    page.getByRole("status").first(),
+    "the page shows no status message about the code",
+  ).toHaveText(/\S/);
 
   await clockTheNextKey(page, {
     at: "//main[(.//*[@role='status'])[last()][normalize-space(.)]]",
@@ -112,19 +113,23 @@ test("Sign In Link reads six digits and copies on c", async ({
   await theActionLandedWithinItsBudget(page, "copy");
 
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Copy Code" }), "Tab missed Copy").toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "Copy Code" }),
+    "Tab did not reach Copy Code",
+  ).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Keyboard Shortcuts" })).toBeFocused();
   await passesTheAccessibilityGate();
 
-  await test.step("a scanner's read spends nothing; the asking browser signs in", async () => {
+  await test.step("the earlier visit does not use up the link, so the first browser signs in", async () => {
     await context.addCookies(await anotherBrowser.cookies());
     await openedAfresh(page, linkTo(token));
     await expect(signInButton(page)).toBeFocused();
-    await expect(page.getByRole("status"), "the page does not say who signs in").toContainText(
-      email,
-    );
-    await expect(page, "the fragment lingers in the address").toHaveURL(/\/sign-in\/link$/);
+    await expect(
+      page.getByRole("status"),
+      "the status does not name the email that signs in",
+    ).toContainText(email);
+    await expect(page, "the link token is still in the URL").toHaveURL(/\/sign-in\/link$/);
     await passesTheAccessibilityGate();
 
     await page.keyboard.press("Enter");

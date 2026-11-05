@@ -108,14 +108,14 @@ const signedInAt = async (page: Page, api: APIRequestContext, member: Member, pa
 };
 
 test.describe("Your questions", () => {
-  test("renders a page of rows within the list budget", async ({
+  test("lists 50 questions within one second", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     const at = await aWorkspace(request, "Wharfe Pages");
     const retention = at.concepts.get(RETENTION);
-    assert.ok(retention, "the retention concept was not seeded");
+    assert.ok(retention, "the harness did not seed the retention concept");
     const answered: SeedRecord = {
       askedBy: at.editor.id,
       question: ANSWERED,
@@ -139,10 +139,12 @@ test.describe("Your questions", () => {
     const elapsed = Date.now() - started;
 
     test.info().annotations.push({ type: "your questions", description: `${elapsed} ms` });
-    expect(elapsed, "a page of 50 questions rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+    expect(elapsed, "50 questions took longer than one second to render").toBeLessThan(
+      LIST_BUDGET_MS,
+    );
     await expect(rowsOf(yourQuestions(page)).first()).toHaveText("Question number 51");
 
-    await test.step("reaches every row and More by keyboard alone", async () => {
+    await test.step("reaches every row and Load More by keyboard alone", async () => {
       await skipLinkReachesThePage(page);
       await page.keyboard.press("Tab");
       await expect(rowsOf(yourQuestions(page)).first()).toBeFocused();
@@ -157,7 +159,7 @@ test.describe("Your questions", () => {
       await expect(rowsOf(yourQuestions(page)).last()).toBeFocused();
     });
 
-    await test.step("opens a record within budget and leaves it by keyboard alone", async () => {
+    await test.step("opens a question within one second and goes back by keyboard", async () => {
       const opened = Date.now();
       await page.keyboard.press("Enter");
       await expect(
@@ -166,7 +168,9 @@ test.describe("Your questions", () => {
       const drawn = Date.now() - opened;
 
       test.info().annotations.push({ type: "your record", description: `${drawn} ms` });
-      expect(drawn, "a record rendered past its budget").toBeLessThan(RECORD_BUDGET_MS);
+      expect(drawn, "the question took longer than one second to render").toBeLessThan(
+        RECORD_BUDGET_MS,
+      );
       await expect(page.getByText(FLAG_NOTE)).toBeVisible();
 
       const crumb = crumbOf(page, "Your Questions");

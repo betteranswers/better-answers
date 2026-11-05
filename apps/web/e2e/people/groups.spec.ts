@@ -51,7 +51,7 @@ const emptyStatusIn = (scope: Locator): Locator =>
 const standsWithoutRoom = async (status: Locator) => {
   await expect(status).not.toHaveCSS("display", "none");
   const box = await status.boundingBox();
-  expect(box?.height, "the empty region takes room on the page").toBeLessThanOrEqual(1);
+  expect(box?.height, "the empty status region takes up space on the page").toBeLessThanOrEqual(1);
 };
 
 const anAdminAtGroups = async (
@@ -87,26 +87,27 @@ const anAdminAtGroups = async (
 };
 
 test.describe("the People group's Groups page", () => {
-  test("renders the list within the constitution's latency budget", async ({
+  test("an Admin manages groups by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     await anAdminAtGroups(page, request, "Dales Engineering");
 
-    await test.step("renders the list within the constitution's latency budget", async () => {
+    await test.step("shows the list of two groups within the list time budget", async () => {
       const started = Date.now();
       await page.goto(GROUPS_PAGE);
       await expect(groupRows(page)).toHaveCount(2);
       const elapsed = Date.now() - started;
 
       test.info().annotations.push({ type: "groups list", description: `${elapsed} ms` });
-      expect(elapsed, "the list of two groups rendered past its budget").toBeLessThan(
-        LIST_BUDGET_MS,
-      );
+      expect(
+        elapsed,
+        "the list of two groups took longer than its time budget to render",
+      ).toBeLessThan(LIST_BUDGET_MS);
     });
 
-    await test.step("shows an Admin each group's count, and no one else's", async () => {
+    await test.step("shows an Admin each group's member count and no group from another workspace", async () => {
       await expect(nav(page).getByRole("link", { name: "Groups" })).toHaveAttribute(
         "aria-current",
         "page",
@@ -152,18 +153,27 @@ test.describe("the People group's Groups page", () => {
       for (const name of ["Bid writers", "HR team"]) {
         const opens = groupsRegion(page).getByRole("button", { name, exact: true });
         await expect(opens).toHaveAttribute("aria-haspopup", "dialog");
-        await expect(opens.locator("svg"), `${name} shows no cue that it opens`).toBeVisible();
+        await expect(
+          opens.locator("svg"),
+          `${name} shows no icon to say that it opens a dialog`,
+        ).toBeVisible();
       }
       await passesTheAccessibilityGate();
     });
 
-    await test.step("stands an outcome region in the accessibility tree before its first outcome", async () => {
+    await test.step("keeps each empty status region in the accessibility tree before the first message", async () => {
       const inTheBand = emptyStatusIn(page.getByRole("banner"));
-      await expect(inTheBand, "the band's outcome region is out of the tree").toHaveCount(1);
+      await expect(
+        inTheBand,
+        "the top bar's status region is not in the accessibility tree",
+      ).toHaveCount(1);
       await standsWithoutRoom(inTheBand);
 
       const onThePage = emptyStatusIn(groupsRegion(page));
-      await expect(onThePage, "the page's outcome region is out of the tree").toHaveCount(1);
+      await expect(
+        onThePage,
+        "the page's status region is not in the accessibility tree",
+      ).toHaveCount(1);
       for (const status of await onThePage.all()) {
         await standsWithoutRoom(status);
       }
@@ -171,7 +181,10 @@ test.describe("the People group's Groups page", () => {
 
       await groupsRegion(page).getByRole("button", { name: "Create a Group" }).click();
       const inTheDialog = emptyStatusIn(createDialog(page));
-      await expect(inTheDialog, "the dialog's outcome region is out of the tree").toHaveCount(1);
+      await expect(
+        inTheDialog,
+        "the dialog's status region is not in the accessibility tree",
+      ).toHaveCount(1);
       for (const status of await inTheDialog.all()) {
         await standsWithoutRoom(status);
       }
@@ -180,7 +193,7 @@ test.describe("the People group's Groups page", () => {
 
       await expect
         .poll(() => Promise.all(standing.map((status) => status.textContent())), {
-          message: "the outcome came in a region that was not there while it was empty",
+          message: "the message appears in a status region that was in the tree while empty",
         })
         .toContainEqual(expect.stringContaining("Estimators"));
       await expect(createDialog(page)).toHaveCount(0);
@@ -198,14 +211,17 @@ test.describe("the People group's Groups page", () => {
       }
       await expect(
         keyListed(keystrokes, PEOPLE_KEYSTROKES.changeRole.key),
-        "the Members page's keystrokes on Groups",
+        "the Groups keystroke list has a keystroke from the Members page",
       ).toHaveCount(0);
       await keystrokesDismissed(page, keystrokes);
 
       const saying = groupsRegion(page).getByRole("status").filter({ hasText: /\S/ });
-      await expect(saying, "only the count says anything at rest").toHaveCount(1);
+      await expect(
+        saying,
+        "a status region besides the count's shows text before any action",
+      ).toHaveCount(1);
       await page.keyboard.press("o");
-      await expect(saying, "a keystroke with no group in focus says nothing").toHaveCount(2);
+      await expect(saying, "pressing o with no group in focus shows no message").toHaveCount(2);
 
       await page.keyboard.press("n");
       await expect(nameField(page)).toBeFocused();
