@@ -247,6 +247,22 @@ describe("an audit event in today's words", () => {
     expect(removed).not.toBe(widened(null));
   });
 
+  it("says a concept the reader cannot read without its title", () => {
+    const withheld = { kind: "withheld", of: "concept" } as const;
+    const saved = byHannah({ action: "knowledge.concept.committed", subject: withheld });
+    const owned = byHannah({
+      action: "knowledge.owner.named",
+      subject: null,
+      detail: { iri: "https://better-answers.com/c/01J6HHHHHHHHHHHHHHHHHHHHHH", personId: "p" },
+      named: { iri: withheld, personId: PRIYA },
+    });
+
+    expect(sentenceOf(saved)).toBe("Hannah Wright saved a concept you cannot read");
+    expect(sentenceOf(owned)).toBe(
+      "Hannah Wright named Priya Shah owner of a concept you cannot read",
+    );
+  });
+
   it("opens on the platform for an action no person took", () => {
     const swept: SaidEvent = {
       action: "platform.graph.swept",

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { boundarySchemas, FAMILIES } from "@better-answers/schema";
 
+import { readableParameters, sensitivityAndAudienceClause } from "../../access/index.ts";
 import {
   type DetailNaming,
   eventsNewestFirst,
@@ -70,7 +71,8 @@ export type AuditEventSubject =
   | { readonly kind: "invitation"; readonly address: string }
   | { readonly kind: "erased-invitation" }
   | { readonly kind: ThingKind; readonly name: string }
-  | { readonly kind: "removed"; readonly of: ThingKind };
+  | { readonly kind: "removed"; readonly of: ThingKind }
+  | { readonly kind: "withheld"; readonly of: ThingKind };
 
 export type ReadAuditEvent = Pick<
   AuditEventRow,
@@ -237,7 +239,7 @@ const DETAIL_NAMED_KINDS: ReadonlyMap<string, NamedKind> = new Map([
   [STORED_DETAIL_KEYS.iri, "concept"],
 ]);
 
-type Names = ReadonlyMap<string, string>;
+type Names = ReadonlyMap<string, string | null>;
 
 type ThingNames = Readonly<Record<Exclude<NamedKind, "person">, Names>>;
 
@@ -249,8 +251,10 @@ const NAMES_IN = {
     "SELECT id, name FROM connected_source WHERE workspace_id = $1 AND id = ANY($2::text[])",
   document:
     "SELECT id, title AS name FROM source_document WHERE workspace_id = $1 AND id = ANY($2::text[])",
-  concept:
-    "SELECT iri AS id, title AS name FROM concept_index WHERE workspace_id = $1 AND iri = ANY($2::text[])",
+  concept: `SELECT c.iri AS id,
+                   CASE WHEN ${sensitivityAndAudienceClause("c", 3)} THEN c.title END AS name
+              FROM concept_index c
+             WHERE c.workspace_id = $1 AND c.iri = ANY($2::text[])`,
 } as const satisfies Readonly<Record<keyof ThingNames, string>>;
 
 type DetailId = readonly [key: string, kind: NamedKind, id: string];
@@ -287,18 +291,22 @@ const namesIn = async (
   ids: readonly string[],
 ): Promise<Names> => {
   if (ids.length === 0) return new Map();
-  const found = await tx.query<{ id: string; name: string }>(NAMES_IN[kind], [
+  const found = await tx.query<{ id: string; name: string | null }>(NAMES_IN[kind], [
     principal.workspaceId,
     ids,
+    ...(kind === "concept" ? readableParameters(principal) : []),
   ]);
   return new Map(found.rows.map((row) => [row.id, row.name]));
 };
 
-const thingOf = (kind: keyof ThingNames, name: string | undefined): AuditEventSubject => {
-  if (kind === "group") return name === undefined ? { kind: "deleted-group" } : { kind, name };
-  if (kind === "invitation") {
-    return name === undefined ? { kind: "erased-invitation" } : { kind, address: name };
+const thingOf = (kind: keyof ThingNames, name: string | null | undefined): AuditEventSubject => {
+  if (kind === "group") {
+    return typeof name === "string" ? { kind, name } : { kind: "deleted-group" };
   }
+  if (kind === "invitation") {
+    return typeof name === "string" ? { kind, address: name } : { kind: "erased-invitation" };
+  }
+  if (name === null) return { kind: "withheld", of: kind };
   return name === undefined ? { kind: "removed", of: kind } : { kind, name };
 };
 
