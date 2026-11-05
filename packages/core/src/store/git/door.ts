@@ -107,7 +107,6 @@ export const git = async (
   }
 };
 
-/** As git, but answers stdout's bytes undecoded, and fails past `maxBuffer` of them. */
 export const gitBytes = async (
   gitDir: string,
   arguments_: readonly string[],

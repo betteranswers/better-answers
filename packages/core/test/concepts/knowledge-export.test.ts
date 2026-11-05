@@ -35,7 +35,6 @@ const run = promisify(execFile);
 
 const { db, arrange } = suiteWithBundles();
 
-/** Past eleven at night in UTC is the next day in London in June. */
 const AT = new Date("2026-06-01T23:30:00Z");
 
 const CONFIRMED_BEFORE_MS = 5 * 60 * 1000;
@@ -139,7 +138,6 @@ const briefWith = async (
   return { writeUpId: section.writeUpId, version: saved.version };
 };
 
-/** Northgate's bid library, with a section citing a concept only finance may read. */
 const guideWorld = once(async (): Promise<GuideWorld> => {
   const scenario = await arrange();
   const ng = await northgate(db(), scenario);

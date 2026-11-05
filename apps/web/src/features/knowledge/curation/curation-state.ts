@@ -16,7 +16,6 @@ export const ALL_KNOWLEDGE_KEYSTROKES = {
 
 export const ALL_KNOWLEDGE_LIST = "all";
 
-/** The most concepts one Set Owner names, which `knowledge.setOwners` enforces. */
 export const MOST_SELECTED = 200;
 
 const SORTS = [
@@ -53,7 +52,6 @@ export const SORTABLE: ReadonlySet<string> = new Set(
   Object.values(SORTED).map(({ column }) => column),
 );
 
-/** Each field is held apart from its default, so only a choice the person made is in the address. */
 export const ALL_KNOWLEDGE_FIELDS = {
   collection: searchText(),
   kind: searchText(),
@@ -67,10 +65,8 @@ export const sortedOf = (sort: Sort | undefined): Sorted =>
 export const sortOf = (sorted: { readonly id: string; readonly desc: boolean }): Sort | undefined =>
   SORTS.find((sort) => sort === `${sorted.desc ? "-" : ""}${sorted.id}`);
 
-/** No collection is held when the person has not chosen, so the page decides what that means. */
 const NOTHING_HELD = "";
 
-/** A collection never holds a space, so neither choice below can be a collection's name. */
 const EVERY_COLLECTION_HELD = "every collection";
 
 export const YOUR_COLLECTIONS = "your collections";
@@ -84,7 +80,6 @@ const EVERY: CollectionScope = { kind: "every" };
 
 const OWNED: CollectionScope = { kind: "owned" };
 
-/** An owner who is not an Admin opens on the collections they own, and clearing that is a choice. */
 export const scopeOf = (held: string, ownerOnly: boolean): CollectionScope => {
   if (held === EVERY_COLLECTION_HELD) return EVERY;
   if (held !== NOTHING_HELD) return { kind: "one", collection: held };

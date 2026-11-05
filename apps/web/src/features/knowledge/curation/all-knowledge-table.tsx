@@ -67,7 +67,6 @@ const useOpenConcept = () => {
   );
 };
 
-/** A page past the last one, such as an address kept from a longer list, turns to the last. */
 const useStayWithinThePages = (
   read: AllKnowledge,
   settled: boolean,

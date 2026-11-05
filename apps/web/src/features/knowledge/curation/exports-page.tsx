@@ -42,7 +42,6 @@ const LISTED = Object.values(KEY);
 
 const NO_GUIDES: readonly GuideSummary[] = [];
 
-/** The router's dialog answers this refusal and runs the act again, so the page words nothing. */
 const ANSWERED_BY_THE_DIALOG = "confirmation-too-old" satisfies RefusalWord;
 
 type Say = (outcome: Outcome | undefined) => void;

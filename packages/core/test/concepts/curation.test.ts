@@ -28,11 +28,7 @@ type Floor = {
   readonly workspaceId: string;
   readonly postgres: PostgresDoor;
   readonly admin: UserPrincipal;
-
-  /** An Editor who owns the company collection. */
   readonly owner: UserPrincipal;
-
-  /** An Editor who owns nothing, so differs from `owner` in ownership alone. */
   readonly idle: UserPrincipal;
   readonly viewer: UserPrincipal;
 };

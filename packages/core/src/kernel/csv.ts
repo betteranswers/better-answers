@@ -6,6 +6,5 @@ const cellOf = (value: string): string => {
   return `"${inert.replaceAll('"', '""')}"`;
 };
 
-/** Every cell quoted and inert, every line ended CRLF. */
 export const csvOf = (lines: readonly (readonly string[])[]): string =>
   lines.map((cells) => `${cells.map(cellOf).join(",")}\r\n`).join("");

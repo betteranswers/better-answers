@@ -13,7 +13,6 @@ export type Indexed = {
 
 export type BundleIndexed = { readonly head: string; readonly iriOf: (path: string) => string };
 
-/** Commits `files` as the bundle's head, records that head, and indexes `indexed` at it. */
 export const bundleIndexed = async (
   db: MigratedPostgres,
   scenario: Scenario,
@@ -59,7 +58,6 @@ export const bundleIndexed = async (
   }
 };
 
-/** `count` concept files, each indexed for everyone, beside the manifest at a recorded head. */
 export const wideBundle = (
   db: MigratedPostgres,
   scenario: Scenario,

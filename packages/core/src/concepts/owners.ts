@@ -433,7 +433,6 @@ const checkedAndWrittenForEach = async (
   return refusal;
 };
 
-/** One concept override per IRI and one audit event each, under one batch id when there are several. */
 export const nameOwnerOfEach = async (
   principal: UserPrincipal,
   tx: Tx,

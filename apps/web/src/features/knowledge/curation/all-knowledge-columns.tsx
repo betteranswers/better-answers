@@ -23,7 +23,6 @@ export const HIDEABLE = [
 export const NARROW_HIDES: ReadonlySet<string> = new Set(["kind", "trust"]);
 
 export type Opening = {
-  /** The concept the person came back from, so focus returns to its title. */
   readonly returnedTo: string | undefined;
   readonly onLanded: () => void;
 };

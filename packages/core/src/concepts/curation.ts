@@ -53,10 +53,7 @@ export type AllKnowledgeRow = {
   readonly kind: string;
   readonly collection: string | null;
   readonly trustWords: string;
-
-  /** `own` is a per-concept override, which beats the collection's owner. */
   readonly owner: { readonly id: UserId; readonly name: string; readonly own: boolean } | null;
-
   readonly checkedBy: string | null;
   readonly checkedOn: string | null;
 };
@@ -170,7 +167,6 @@ const rowOf = (row: PageRow, now: Date): AllKnowledgeRow => {
   };
 };
 
-/** A page past the end holds no row to carry the count, so the count is asked for alone. */
 const totalBehind = async (
   rows: readonly PageRow[],
   page: number,

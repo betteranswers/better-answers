@@ -9,7 +9,6 @@ export type ZipEntry = { readonly path: string; readonly bytes: Uint8Array };
 /** A zip without its 64-bit extension counts its entries in 16 bits. */
 const ENTRIES_MAX = 0xff_ff;
 
-/** The zip crosses the wire whole, as base64 in one JSON answer. */
 const ZIP_BYTES_MAX = 64 * 1024 * 1024;
 
 const LOCAL = 0x04_03_4b_50;
@@ -97,7 +96,6 @@ const packedOf = ({ path, bytes }: ZipEntry, offset: number): Packed => {
   };
 };
 
-/** Sorted and stamped `at`, so one set of files writes the same bytes; never an invalid zip. */
 export const zipOf = (
   entries: readonly ZipEntry[],
   at: Date,

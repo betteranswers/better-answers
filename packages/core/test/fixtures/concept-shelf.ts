@@ -17,16 +17,12 @@ type Check = { readonly actor: string; readonly at: Date };
 
 export type Shelved = {
   readonly path: string;
-
-  /** Fixes the IRI, so a test can know which of two tied concepts comes first. */
   readonly iri?: ConceptIri;
   readonly kind?: string;
   readonly title?: string;
   readonly sensitivity?: (typeof SENSITIVITIES)[number];
   readonly audienceGroups?: readonly string[];
   readonly draft?: true;
-
-  /** Verifications of the concept as it stands, in the order they were made. */
   readonly checks?: readonly Check[];
 };
 
@@ -68,7 +64,6 @@ const shelvedWith = async (
   return ids.conceptIri.parse(row.iri);
 };
 
-/** Puts concept rows straight into the index, with no git behind them. Returns their IRIs in order. */
 export const shelve = (
   pool: pg.Pool,
   workspaceId: string,
@@ -98,11 +93,7 @@ const WIDE_KINDS = 8;
 
 export type WideKnowledge = {
   readonly count: number;
-
-  /** People who own the collections, and an override on every tenth concept, in turn. */
   readonly owners: readonly string[];
-
-  /** The actor of two verifications on every third concept. */
   readonly checker: string;
 };
 
@@ -119,7 +110,6 @@ const wideConceptAt = (at: number, checker: string): Shelved => ({
       : [],
 });
 
-/** Concepts over twelve collections and eight kinds with owners and checks, analysed as a live workspace is. */
 export const seedWideKnowledge = async (
   pool: pg.Pool,
   workspaceId: string,

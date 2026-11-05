@@ -7,7 +7,6 @@ type SnapshotFile = { readonly path: string; readonly bytes: Uint8Array };
 
 type BundleSnapshot = { readonly head: string; readonly files: readonly SnapshotFile[] };
 
-/** Every kept blob is held in memory at once, so the snapshot refuses past this many bytes. */
 const SNAPSHOT_BYTES_MAX = 256 * 1024 * 1024;
 
 const KNOWLEDGE = "knowledge/";
@@ -41,7 +40,6 @@ const blobsIn = (batch: Buffer, kept: readonly Listed[]): readonly SnapshotFile[
   });
 };
 
-/** The manifest and `readable` paths under `knowledge/` at one head; null for a bundle with none. */
 export const bundleSnapshot = async (
   principal: UserPrincipal,
   door: GitDoor,

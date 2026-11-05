@@ -27,7 +27,6 @@ const useWhileOnThisPage = <Held>(held: Held): Held => {
   return here ? held : lastHere;
 };
 
-/** What the address holds, what it means for this person, and the ways to change it. */
 export const useAllKnowledgeAddress = ({ admin, owned }: Standing) => {
   const listed = useListAddress(ALL_KNOWLEDGE_LIST, ALL_KNOWLEDGE_FIELDS);
   const { write } = listed;

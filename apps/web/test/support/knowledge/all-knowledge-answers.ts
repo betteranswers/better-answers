@@ -73,7 +73,6 @@ const inTheCollections = (row: ConceptRow, collections: readonly string[]): bool
 const matching = (asked: AllKnowledgeAsked) => (row: ConceptRow) =>
   inTheCollections(row, asked.collections) && (asked.kind === undefined || row.kind === asked.kind);
 
-/** Answers as the api does for a list held in the test: filtered, sorted by one column, then paged. */
 const answeringFrom = (listed: () => readonly ConceptRow[]) => (): unknown => {
   const asked = ASKED.parse(
     server.asks.findLast((ask) => ask.procedure === "knowledge.allKnowledge")?.input,
@@ -123,7 +122,6 @@ export const asAnEditorOwning = (api: Api, collections: readonly string[]) => {
   );
 };
 
-/** An Admin's workspace holding `listed`, which a Set Owner may change through `listed`'s owner. */
 export const anAllKnowledgeApi = (listed: () => readonly ConceptRow[]): Api => {
   const api = adaAnAdmin();
   api.set("members.list", () => read([ADA, RHIAN]));

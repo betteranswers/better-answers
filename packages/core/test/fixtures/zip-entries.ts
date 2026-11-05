@@ -2,7 +2,6 @@ import { crc32, inflateRawSync } from "node:zlib";
 
 const END_OF_DIRECTORY = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
 
-/** Reads a zip from its central directory, as an unzip tool does, failing an entry's bad CRC. */
 export const zipEntries = (zip: Uint8Array): ReadonlyMap<string, Buffer> => {
   const bytes = Buffer.from(zip);
   const end = bytes.lastIndexOf(END_OF_DIRECTORY);

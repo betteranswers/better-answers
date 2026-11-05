@@ -112,7 +112,6 @@ type Steps<Read, Made> = {
   readonly recorded: (member: UserPrincipal, tx: Tx, read: Read) => Promise<void>;
 };
 
-/** Reads holding no row, so no Admin waits on a large export, then records it in a short one. */
 const exported = async <Read, Made>(
   admin: UserPrincipal,
   door: PostgresDoor,
@@ -141,7 +140,6 @@ type Snapshot = { readonly head: string; readonly files: readonly ZipEntry[] };
 const READABLE_PATHS = `SELECT c.path FROM concept_index c
    WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}`;
 
-/** A file in git with no readable index row is left out, so nothing withheld leaves. */
 const snapshotRead =
   (git: GitDoor) =>
   async (member: UserPrincipal, tx: Tx): Promise<Result<Snapshot, ExportRefusal>> => {
@@ -206,7 +204,6 @@ const personNamed = (alias: string) => ({
                                 AND person.id = substr(${alias}.actor, ${String(PERSON_PREFIX.length + 1)})`,
 });
 
-/** A collection's default owner shows only beside a concept of that collection the reader may read. */
 const OWNERS = `SELECT o.iri IS NOT NULL AS of_concept, coalesce(o.collection, c.collection) AS collection,
          o.iri, c.title, o.person_id, u.name AS person_name
     FROM concept_owner o
@@ -402,7 +399,7 @@ const briefsOf = async (
   const briefs: Omit<Carried, "trustWords">[] = [];
   for (const section of guide.sections) {
     if (section.brief === undefined) continue;
-    // oxlint-disable-next-line eslint/no-await-in-loop -- every Brief is read on the export's one transaction
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every Brief is read on the caller's transaction
     const brief = await briefToCopy(member, tx, {
       writeUpId: section.writeUpId,
       version: section.brief.version,
@@ -415,7 +412,6 @@ const briefsOf = async (
   return ok(briefs);
 };
 
-/** The guide page's own reads, so a section the reader may not read carries no text. */
 const guideRead =
   (guideId: string, at: Date) =>
   async (member: UserPrincipal, tx: Tx): Promise<Result<GuideCarried, ExportRefusal>> => {
