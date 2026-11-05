@@ -61,9 +61,13 @@ describe("what a procedure may answer the wire", () => {
       "knowledge.collections",
       "knowledge.conceptToEdit",
       "knowledge.find",
+      "knowledge.guide",
+      "knowledge.guides",
+      "knowledge.includeAvailable",
       "knowledge.kindConcepts",
       "knowledge.nameOwner",
       "knowledge.open",
+      "knowledge.saveBrief",
       "knowledge.saveConcept",
       "knowledge.tree",
       "members.activity",
@@ -186,6 +190,10 @@ describe("what a procedure may answer the wire", () => {
       | "knowledge.kindConcepts"
       | "knowledge.conceptToEdit"
       | "knowledge.saveConcept"
+      | "knowledge.guides"
+      | "knowledge.guide"
+      | "knowledge.saveBrief"
+      | "knowledge.includeAvailable"
       | "inbox.waiting"
       | "inbox.item"
       | "inbox.accept"
