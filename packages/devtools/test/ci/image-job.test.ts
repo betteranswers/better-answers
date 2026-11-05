@@ -95,6 +95,13 @@ const runs = (step: ImageStep): string => step.run ?? "";
 const builds = (step: ImageStep): boolean =>
   (step.uses ?? "").startsWith("docker/build-push-action@");
 
+const MAIN_REF = "refs/heads/main";
+
+const MAIN_ONLY_EXPORT = new RegExp(
+  `^\\$\\{\\{ github\\.ref == '${MAIN_REF}' && (?<export>.+) \\|\\| '' \\}\\}$`,
+  "u",
+);
+
 const probeStepAt = (steps: readonly ImageStep[]): number =>
   steps.findIndex((step) => step.env?.[IMAGE_ID_VARIABLE] !== undefined);
 
@@ -162,5 +169,18 @@ describe("the job that probes every image it pushes", () => {
       "a second build can run a step again and push bytes the probe never read",
     ).toBe(1);
     expect(input(build, "outputs")).toContain("type=docker");
+  });
+
+  it("writes the layer cache only on a run of main", () => {
+    const [build] = imageJob().steps.filter(builds);
+    assert(build !== undefined, "the image job builds its image");
+
+    const exported = MAIN_ONLY_EXPORT.exec(input(build, "cache-to"))?.groups?.["export"];
+
+    expect(
+      exported,
+      `an export not guarded by ${MAIN_REF} runs on a branch or a dispatch and moves the tag main reads and ships`,
+    ).toBeDefined();
+    expect(exported, "a run on main keeps the cache warm").toContain(":buildcache");
   });
 });
