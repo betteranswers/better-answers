@@ -423,12 +423,36 @@ const readingTheBundle = async (workspaceId: string, git: GitDoor) => ({
   rows: await bundleCommitRowsIn(workspaceId),
 });
 
+const writeUpsCitingEach = (
+  workspaceId: string,
+  indexed: readonly { readonly iri: string; readonly content_hash: string }[],
+) =>
+  seedingWith(db().pool, async (seed) => {
+    for (const { iri, content_hash: contentHash } of indexed) {
+      const writeUp = await seed.writeUp({ workspaceId });
+      await seed.writeUpInclude({ workspaceId, writeUpId: writeUp.id, iri, contentHash });
+    }
+  });
+
+const reviewMarksIn = async (workspaceId: string) => {
+  const read = await db().pool.query<{ iri: string; needs_review: string | null }>(
+    `SELECT i.iri, w.needs_review
+       FROM write_up w
+       JOIN write_up_include i ON i.workspace_id = w.workspace_id AND i.write_up_id = w.id
+      WHERE w.workspace_id = $1`,
+    [workspaceId],
+  );
+  return Object.fromEntries(read.rows.map((row) => [row.iri, row.needs_review]));
+};
+
 const rewritingTheBundleOnce = async () => {
   const arranged = await bundleNamingThePerson();
   const { scenario, subjectRequestId } = arranged;
   const before = await readingTheBundle(scenario.workspaceId, scenario.git);
   const verificationsBefore = await verificationsIn(scenario.workspaceId);
   const indexedBefore = await indexedIn(scenario.workspaceId);
+  await writeUpsCitingEach(scenario.workspaceId, indexedBefore);
+  const reviewMarksBefore = await reviewMarksIn(scenario.workspaceId);
   const trustBefore = [
     await trustOf(scenario, arranged.iri),
     await trustOf(scenario, arranged.steadyIri),
@@ -447,6 +471,8 @@ const rewritingTheBundleOnce = async () => {
     verificationsAfter: await verificationsIn(scenario.workspaceId),
     indexedBefore,
     indexedAfter: await indexedIn(scenario.workspaceId),
+    reviewMarksBefore,
+    reviewMarksAfter: await reviewMarksIn(scenario.workspaceId),
     trustBefore,
     trustAfter: [
       await trustOf(scenario, arranged.iri),
@@ -1282,6 +1308,13 @@ describe("the verifications the rewrite moved", () => {
         .map((row) => row.iri),
     ).toEqual([]);
     expect(steadyAfter?.content_hash).toEqual(steadyBefore?.content_hash);
+  });
+
+  it("marks each write-up citing a rehashed concept for review", async () => {
+    const { iri, steadyIri, reviewMarksBefore, reviewMarksAfter } = await theBundleRewritten();
+
+    expect(reviewMarksBefore).toEqual({ [iri]: null, [steadyIri]: null });
+    expect(reviewMarksAfter).toEqual({ [iri]: "concept-changed", [steadyIri]: null });
   });
 
   it("records what it moved in the report's actions", async () => {

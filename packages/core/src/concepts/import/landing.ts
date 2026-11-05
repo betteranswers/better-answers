@@ -471,6 +471,8 @@ export const carryVerificationsOntoRewrite = async (
     );
     concepts += reindexed.rowCount ?? 0;
     if (contentHash === row.content_hash) continue;
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every write-up mark runs on the caller's transaction
+    await flagWriteUpsCiting(platform, tx, { iri: row.iri, contentHash });
     // oxlint-disable-next-line eslint/no-await-in-loop -- every verification move runs on the caller's transaction
     const moved = await tx.query(
       `UPDATE concept_verification SET content_hash = $3, origin = $4
