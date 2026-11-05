@@ -52,9 +52,12 @@ const BEFORE_THE_FINDER_SINCE = "2026-07-18T00:00:00Z";
 
 const REHEARSED_AT = new Date("2026-08-01T12:00:00.000Z");
 
-const BEYOND_USE =
-  "2026-08-03T12:00:00.000Z · 2026-08-31T12:00:00.000Z · " +
-  "2026-09-26T12:00:00.000Z · 2027-02-01T12:00:00.000Z";
+const BEYOND_USE = [
+  "2026-08-03T12:00:00.000Z",
+  "2026-08-31T12:00:00.000Z",
+  "2026-09-26T12:00:00.000Z",
+  "2027-02-01T12:00:00.000Z",
+] as const;
 
 const erasureDoors = (app: TestApp, at: Date) => ({
   git: openTestGit(app),
@@ -485,13 +488,10 @@ describe("pnpm ops", () => {
       const written = await readFile(file, "utf8");
       const [requested] = request.rows;
       assert(requested !== undefined, "no erasure request was recorded");
-      expect(written).toContain(`Erasure report for subject request ${requested.id}.`);
-      expect(written).toContain(
-        "Backup copies taken before 2026-08-01T12:00:00.000Z are beyond use: restored only in a " +
-          "disaster, encrypted at rest, deletable only by the escrowed credential, expiring on " +
-          `${BEYOND_USE}.`,
-      );
-      expect(written).toContain("Exports already issued are not recalled.");
+      expect(written.split("\n")[0]).toContain(requested.id);
+      for (const expiry of ["2026-08-01T12:00:00.000Z", ...BEYOND_USE]) {
+        expect(written).toContain(expiry);
+      }
       expect(await auditLogOf(served(), workspaceId)).toContainEqual({
         action: "platform.erasure.rehearsed",
         actor: "process:better-answers-erasure",

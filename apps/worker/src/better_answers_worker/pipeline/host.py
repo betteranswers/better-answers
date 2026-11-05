@@ -210,7 +210,7 @@ class Host:
             for environment in closed.values():
                 environment.close()
             logger.info(
-                "the connected source's stores were closed to stay within the cache",
+                "connected source stores closed to stay under the cache limit",
                 connected_source_id=oldest,
                 stores=list(closed),
                 held=self._held,

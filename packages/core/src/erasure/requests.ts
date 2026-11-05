@@ -112,9 +112,9 @@ const tooBroadIn = (identifiers: SubjectIdentifiers): IdentifierTooBroad | undef
     return {
       word: IDENTIFIER_TOO_BROAD,
       said:
-        `The identifier "${short}" is too broad to withhold: one under ` +
-        `${SUBJECT_IDENTIFIER_FLOOR} characters would withhold those characters in every ` +
-        "document of the workspace.",
+        `The identifier "${short}" is too short to withhold. An identifier under ` +
+        `${SUBJECT_IDENTIFIER_FLOOR} characters would be withheld wherever those characters ` +
+        "appear in the workspace's documents.",
     };
   }
   const oneWord = measured.find(({ below }) => below === "name-words")?.identifier;
@@ -122,8 +122,8 @@ const tooBroadIn = (identifiers: SubjectIdentifiers): IdentifierTooBroad | undef
     return {
       word: IDENTIFIER_TOO_BROAD,
       said:
-        `The name "${oneWord}" is too broad to withhold: a name of one word would withhold ` +
-        "that word in every document of the workspace.",
+        `The name "${oneWord}" is too broad to withhold. A one-word name would be withheld ` +
+        "wherever that word appears in the workspace's documents. Give the person's full name.",
     };
   }
   return undefined;

@@ -113,9 +113,9 @@ const found = findOutputWith(trust);
 const findEntry = defineEntry({
   road: "resolvers-transaction",
   name: "find",
-  title: "Find in the company's knowledge",
+  title: "Search Company Knowledge",
   description:
-    "Search the company's knowledge and preview what it finds, with one line per match. A concept's line shows its kind, title and trust state. A document that no concept on the map covers shows its title, its sensitivity, the marker 'Not company knowledge' and, in quotes after its `locator`, the first line of the passage that matched. To read a match in full, call `open` with a concept's `iri` or with the `locator` on a document's line. When more matches follow, the answer carries `nextCursor`. Pass it back as `cursor` to get the next page.",
+    "Search the company's knowledge and get a preview of the results, one line per match. Use it to find what the company knows about a topic, then call `open` to read a match in full. A concept's line gives its kind, title, collection, trust state and `iri`. A document that no concept covers is marked 'Not company knowledge'. Its line gives its title, its sensitivity, its `locator` and, in quotes, the first line of the passage that matched. If there are more matches, the result includes `nextCursor`. Send it back as `cursor` to get the next page.",
   scopes: ["knowledge:read"],
   // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the answering slice's own schema; the emitted-schema test reads its keys
   input: findInput,
@@ -172,9 +172,9 @@ const askEntryAt = (origin: string) =>
   defineEntry({
     road: "own-transaction",
     name: "ask",
-    title: "Ask the company's knowledge a question",
+    title: "Ask a Question",
     description:
-      "Ask a question. The result starts with a verdict. Under `answers` is each `Answer` in the company's knowledge that a judge found answers the question as asked. Under `related` are the other concepts that bear on it. Quote an `Answer` under `answers` unchanged, with who verified it. What is under `related` is related knowledge, not a judged answer: write only what those concepts state, name each one you use, and quote unchanged an `Answer` among them that comes in full. `judgeState` is `judged` when the judge ran, `judging-failed` when it could not judge (its candidates are then under `related`), and `not-judged` when the workspace has no judge or no `Answer` was a candidate; an `Answer` no judge passed is never under `answers`. A refusal of `spending-limit-met` means the workspace's model spend for the month is used up: do not ask again, and tell the person their Admin can ask better-answers to raise it. An `Answer` under `answers` comes back in full. An `Answer` under `related` comes back in full unless `judgeState` is `judged`; once it is, every `Answer` under `related`, whether the judge said no to it or did not see it, comes back as one line, as any other concept does. Read a concept given as one line with `open` and its `iri` before you write from it. Each concept is labelled with its collection, and `Answer`s under different collections are never merged: give each under its own. An empty `conflicts` list means no conflict was looked for, not that none exists. A verdict of `refuse` means nothing you can read bears on the question. A passage marked 'Not company knowledge' is to be quoted with its source named, never summarised. Each question is kept as a record, and the answer carries its `recordId`. The person who asked and the workspace's Admins may read it. The question's words are kept for twelve months; the verdict and which concepts were returned are kept for good, and who asked until that person is erased.",
+      "Ask a question and get the company's answer, with the knowledge it is based on. Use it when the person asks something the company's knowledge may answer. The result starts with a `verdict`, then lists each `Answer` that a judge found answers the question under `answers`, and other related concepts under `related`. Quote each `Answer` under `answers` unchanged, and say who verified it. The concepts under `related` are related knowledge, not a judged answer. Write only what those concepts state, and name each one you use. An `Answer` under `related` comes in full when `judgeState` is `not-judged` or `judging-failed`. Quote it unchanged. Every other concept under `related` comes as one line. Read it with `open` and its `iri` before you write from it. Each concept is labelled with its collection. Never merge `Answer`s from different collections. Give each one under its own collection. An empty `conflicts` list means that no conflicts were looked for, not that there are none. A `verdict` of `refuse` means that nothing you can read is related to the question. Quote a passage marked 'Not company knowledge' and name its source. Do not summarise it. If the call is refused with `spending-limit-met`, the workspace has used up its AI spending for the month. Do not ask again. Tell the person that their Admin can ask better-answers to raise the limit. Each question is saved as a record, and the result includes its `recordId`. The person who asked and the workspace's Admins can read the record. The question's words are kept for twelve months. The verdict and the concepts returned are kept permanently. Who asked is kept until that person is erased.",
     scopes: ["knowledge:read"],
     input: z.object({
       question: askInput.shape.question,
@@ -195,9 +195,9 @@ const askEntryAt = (origin: string) =>
 const openEntry = defineEntry({
   road: "resolvers-transaction",
   name: "open",
-  title: "Open a concept or a cited passage",
+  title: "Open a Concept or Passage",
   description:
-    "Read a source unchanged. Give a concept's `iri` (from a `find` match or an `ask` citation) to get its frontmatter, body, relations, trust state and evidence. Or give a `locator`, which a document match and a citation both carry, to get the passage itself. Give one of the two. Each evidence item names its source in the concept's own words, and carries the `locator` of a passage or the `iri` of a concept that opens it only where there is one you may read: an imported concept's evidence often has neither, and an item with neither has nothing to open. An item's `at` is the concept's own place in the source, such as a page, and opens nothing. A link in the body that names another concept's file cannot be opened by its path: `bodyLinks` gives the `iri` to open for each one you may read. Quote what comes back; do not summarise it.",
+    "Read a concept or a passage in full. Use it before you write from a `find` match, a one-line concept from `ask`, or a cited passage. Give a concept's `iri` to get its frontmatter, body, relations, trust state and evidence, or give a passage's `locator` to get the passage text. Give one of the two, not both. An evidence item names its source. It has a `locator` or an `iri` only when it leads to something you can read. An imported concept's evidence often has neither, and an item with neither cannot be opened. An item's `at` is a place in the source, such as a page, and cannot be opened. A link in the body cannot be opened by its file path. `bodyLinks` gives the `iri` to open for each link you can read. Quote what `open` returns. Do not summarise it.",
   scopes: ["knowledge:read"],
   // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the answering slice's own schema; the emitted-schema test reads its keys
   input: openInput,
@@ -216,9 +216,9 @@ const openEntry = defineEntry({
 const giveFeedbackEntry = defineEntry({
   road: "resolvers-transaction",
   name: "give_feedback",
-  title: "Give feedback on an answer",
+  title: "Give Feedback on an Answer",
   description:
-    "Store a person's verdict on an answer from `ask`, on the record of that question. The verdict is helpful, or a flag (wrong, out of date, incomplete, or should not have been shown) with a note in their words. Name the record by the `recordId` the answer carried; only the person who asked can give feedback on it. For a flag on a sentence you wrote from the answer, send that sentence and the concept it rested on as `disputed`. Call it only when the person asks you to. Each call stores another verdict beside the last, so a call repeated after a timeout stores it twice. The feedback is kept with the record, and no one is notified of it. The note, the disputed sentence and who gave it are kept until that person is erased; the verdict, reason and disputed concept are kept for good.",
+    "Save a person's feedback on an answer from `ask`, on the record of that question. Use it only when the person asks you to. The feedback is `helpful`, or a `flag` with a reason (wrong, out of date, incomplete, or should not have been shown) and a note in the person's words. Identify the question by the `recordId` from the `ask` result. Only the person who asked can give feedback on it. To flag a sentence you wrote from the answer, send that sentence and the concept you based it on as `disputed`. Each call saves a new verdict next to the earlier ones, so a call repeated after a timeout saves it twice. No one is notified of the feedback. The note, the disputed sentence and who gave the feedback are kept until that person is erased. The verdict, the reason and the disputed concept are kept permanently.",
   scopes: ["knowledge:read", "feedback:write"],
   input: z.object({
     recordId: feedbackFields.shape.recordId,

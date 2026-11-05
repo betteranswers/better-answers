@@ -7,7 +7,7 @@
     "An owner's rights over its own object are implicit, so they are left out of the privilege blocks and the ownership block says who owns what instead; that is also why a run-time partition, whose ACL is its owner's alone, adds no row here. A schema carries its owner on the row because the ownership block counts relations alone.",
     "The collapse reaches the ownership counts too: every partition of one parent is one row counting one relation, so a tenant signing up moves no line of this file.",
     "What it cannot say: which migration granted a column, because pg_attribute.attacl holds a set and two migrations' grants merge into one; whether a grant was meant, which is what deny-by-default on worker_rt makes legible in the diff rather than here; and what an owner may do with what it owns.",
-    "A security_definer function reaches tables past its caller's grants, and which tables is its body's and is held by nothing: a reviewer reads it where the diff is. What is held is the roster in packages/schema/src/definer-reach.ts — the SECURITY DEFINER set in the catalogue equals the set named there, both ways — so a fifth arrives as a red suite rather than in silence."
+    "A SECURITY DEFINER function reaches tables beyond its caller's grants, and only the function's body says which tables, so a reviewer reads the body in the diff. packages/schema/src/definer-reach.ts lists every SECURITY DEFINER function, and a test fails unless the catalogue's SECURITY DEFINER functions are exactly the ones listed there, so a new definer function cannot arrive unnoticed."
   ],
   "roles": [
     {"role":"<migrator>","can_login":true,"superuser":true,"bypass_rls":true,"member_of":[]},

@@ -161,7 +161,7 @@ class _Lease:
 def _outlived(job: ClaimedJob, worker_id: str, deadline_seconds: float) -> NoReturn:
     try:
         logger.error(
-            "the job outlived its deadline",
+            "job ran past its deadline",
             job_id=job.id,
             worker_id=worker_id,
             deadline_seconds=deadline_seconds,
@@ -198,7 +198,7 @@ def keeping_alive(
                     if not lease.renew(min(LEASE_SECONDS, remaining)):
                         if left() > 0:
                             logger.warning(
-                                "the claim was lost", job_id=job.id, worker_id=worker_id
+                                "job claim lost", job_id=job.id, worker_id=worker_id
                             )
                         break
         finally:

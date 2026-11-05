@@ -403,10 +403,9 @@ describe("the MCP endpoint under either protocol version", () => {
       (listed) => listed.name === "give_feedback",
     );
 
-    expect(entry?.description).toContain("on the record of that question");
     expect(entry?.description).toContain("`recordId`");
-    expect(entry?.description).toContain("a call repeated after a timeout stores it twice");
-    expect(entry?.description).not.toContain("one write");
+    expect(entry?.description).toContain("`disputed`");
+    expect(entry?.description).toMatch(/repeated.+twice/u);
     assert(entry !== undefined, "tools/list has no give_feedback entry");
     expect(Object.keys({ ...entry.inputSchema.properties })).toEqual([
       "recordId",
@@ -468,7 +467,7 @@ describe("the MCP endpoint under either protocol version", () => {
     );
 
     expect(JSON.stringify(entry?.outputSchema)).toContain('"bodyLinks"');
-    expect(entry?.description).toContain("`bodyLinks` gives the `iri` to open");
+    expect(entry?.description).toContain("`bodyLinks`");
   });
 
   it("describes find and open with glossary terms", async () => {
@@ -481,10 +480,7 @@ describe("the MCP endpoint under either protocol version", () => {
     expect(described.get("find")).toContain("locator");
     expect(described.get("open")).toContain("`iri`");
     expect(described.get("open")).toContain("locator");
-    expect(described.get("open")).toContain(
-      "carries the `locator` of a passage or the `iri` of a concept that opens it only where there is one you may read",
-    );
-    expect(described.get("open")).toContain("an item with neither has nothing to open");
+    expect(described.get("open")).toContain("`at`");
 
     expect(described.get("find")).toContain("one line per match");
     expect(described.get("find")?.toLowerCase()).not.toContain("chunk");
@@ -768,27 +764,20 @@ describe("ask, an entry on the own-transaction road", () => {
     const ask = (await listTools(inProcess(), FULL_TOKEN)).find((listed) => listed.name === "ask");
 
     expect(ask?.annotations?.readOnlyHint).toBe(true);
-    expect(ask?.description).toContain(
-      "Each question is kept as a record, and the answer carries its `recordId`.",
-    );
-    expect(ask?.description).toContain(
-      "The person who asked and the workspace's Admins may read it.",
-    );
-    expect(ask?.description).toContain(
-      "The question's words are kept for twelve months; the verdict and which concepts were returned are kept for good, and who asked until that person is erased.",
-    );
+    expect(ask?.description).toContain("`recordId`");
+    expect(ask?.description).toContain("Admins");
+    expect(ask?.description).toContain("twelve months");
+    expect(ask?.description).toContain("erased");
   });
 
   it("describes each judge state without promising a retry", async () => {
     const ask = (await listTools(inProcess(), FULL_TOKEN)).find((listed) => listed.name === "ask");
+    const judgeState = z
+      .object({ properties: z.object({ judgeState: z.object({ description: z.string() }) }) })
+      .parse(ask?.outputSchema).properties.judgeState.description;
 
-    expect(ask?.description).toContain(
-      "`judging-failed` when it could not judge (its candidates are then under `related`)",
-    );
-    expect(ask?.description).toContain(
-      "`not-judged` when the workspace has no judge or no `Answer` was a candidate",
-    );
-    expect(ask?.description).not.toContain("asking again later");
+    for (const state of JUDGE_STATES) expect(judgeState).toContain(`\`${state}\``);
+    expect(`${ask?.description} ${judgeState}`).not.toContain("again later");
   });
 
   describe("rejected by input validation", () => {

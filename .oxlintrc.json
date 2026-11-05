@@ -61,23 +61,23 @@
       "error",
       {
         "selector": "BinaryExpression[operator='in'][right.type='Identifier'][right.name=/^[A-Z][A-Z0-9_]+$/]",
-        "message": "`in` also answers for a name the table inherits, such as `toString`. Test the key with `Object.hasOwn(TABLE, key)`, or hold the table in a `Map`"
+        "message": "`in` also finds keys that the table inherits, such as `toString`. Test the key with `Object.hasOwn(TABLE, key)`, or store the table in a `Map`."
       },
       {
         "selector": "ForInStatement",
-        "message": "`for…in` also walks the keys an object inherits. Walk `Object.keys` or `Object.entries` with `for…of`"
+        "message": "`for…in` also visits the keys that an object inherits. Loop over `Object.keys` or `Object.entries` with `for…of` instead."
       },
       {
         "selector": "LabeledStatement",
-        "message": "A label jumps out of a nested loop. Move the inner loop into a function and return from it"
+        "message": "Labelled statements are not allowed. Move the inner loop into a function and return from it, instead of using a label to jump out of the nested loop."
       },
       {
         "selector": "CallExpression[callee.object.name='z'][callee.property.name='enum'] > :matches(ArrayExpression, TSAsExpression[expression.type='ArrayExpression'], TSSatisfiesExpression[expression.type='ArrayExpression'])",
-        "message": "A list written inside `z.enum` copies a closed set, and drifts from it. Declare the set once as an `as const` tuple, derive its type from it, and pass the tuple to `z.enum`"
+        "message": "Do not write the values inside `z.enum`, because the list is a copy of a fixed set and the copy drifts from the original. Declare the set once as an `as const` tuple, derive its type from the tuple, and pass the tuple to `z.enum`."
       },
       {
         "selector": "Literal[regex.flags=/[uv]/][regex.pattern=/^(?:[^\\\\]|\\\\.)*\\\\v/]",
-        "message": "Stryker negates `\\v` to `\\V`, which the `u` and `v` flags refuse at load, so the mutation run cannot import this module. Drop the flag and disable `eslint/require-unicode-regexp` on this line with that reason"
+        "message": "This regular expression contains `\\v` and has the `u` or `v` flag. Stryker mutates `\\v` to `\\V`, which those flags reject when the module loads, so the mutation run cannot import this module. Remove the flag, and disable `eslint/require-unicode-regexp` on this line with that reason."
       }
     ],
     "vitest/no-identical-title": "error",
@@ -161,7 +161,7 @@
             "patterns": [
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "Only packages/schema/src/boundary-schemas/drizzle-zod.ts may import drizzle-zod. Import the boundary schemas from @better-answers/schema instead."
               },
               {
                 "group": [
@@ -171,7 +171,7 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/; the rest of the tier takes Claims and a Principal from that module."
+                "message": "Only files under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ may import better-auth. Elsewhere in the api, get Claims and a Principal from apps/api/src/auth/ instead."
               }
             ]
           }
@@ -193,7 +193,7 @@
             "patterns": [
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "Only packages/schema/src/boundary-schemas/drizzle-zod.ts may import drizzle-zod. Import the boundary schemas from @better-answers/schema instead."
               }
             ]
           }
@@ -229,15 +229,15 @@
             "patterns": [
               {
                 "group": ["../*/**", "../../**"],
-                "message": "A relative import in apps/web stays inside its own directory; an import that crosses one is written `@/<zone>/…`."
+                "message": "A relative import in apps/web must stay inside its own directory. To import from another directory, write the path as `@/<zone>/…`."
               },
               {
                 "group": ["@better-answers/api", "@better-answers/api/*"],
-                "message": "apps/web imports nothing from apps/api. The one exception is `AppRouter` as an `import type`, in `apps/web/src/shared/api/trpc.ts` and no second file; runtime coupling stays zero."
+                "message": "apps/web must not import from apps/api, so that the two apps share no runtime code. The only exception is an `import type` of `AppRouter` in `apps/web/src/shared/api/trpc.ts`, and no other file may have one."
               },
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "Only packages/schema/src/boundary-schemas/drizzle-zod.ts may import drizzle-zod. Import the boundary schemas from @better-answers/schema instead."
               },
               {
                 "group": [
@@ -247,11 +247,11 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "In apps/web, better-auth is imported only by features/auth/auth-client.ts and features/auth/auth-hooks.ts; every other file reads the platform's types those hooks return."
+                "message": "In apps/web, only features/auth/auth-client.ts and features/auth/auth-hooks.ts may import better-auth. Other files use the platform's own types, which those hooks return."
               },
               {
                 "group": ["**/auth-client", "**/auth-client.ts"],
-                "message": "authClient is imported only by features/auth/auth-hooks.ts, which maps what it answers to the platform's own types."
+                "message": "Only features/auth/auth-hooks.ts may import authClient, because it converts what authClient returns into the platform's own types. Use the hooks in features/auth/auth-hooks.ts instead."
               }
             ]
           }
@@ -267,23 +267,23 @@
             "patterns": [
               {
                 "group": ["@/features/**"],
-                "message": "No feature imports another feature. Within a feature, imports are relative; ground two features share belongs in `apps/web/src/shared/`."
+                "message": "A feature must not import another feature. Inside a feature, use relative imports. Move code that two features share into `apps/web/src/shared/`."
               },
               {
                 "group": ["@/app/**"],
-                "message": "The direction is app → features → shared and never back: `app/` composes features, so a feature importing `app/` is a cycle waiting to be written."
+                "message": "Imports go from `app/` to features to `shared/`, never back. `app/` imports the features, so a feature that imports from `app/` can create an import cycle. Move the code the feature needs into the feature or into `shared/`."
               },
               {
                 "group": ["../*/**", "../../**"],
-                "message": "A relative import in apps/web stays inside its own directory; an import that crosses one is written `@/<zone>/…`."
+                "message": "A relative import in apps/web must stay inside its own directory. To import from another directory, write the path as `@/<zone>/…`."
               },
               {
                 "group": ["@better-answers/api", "@better-answers/api/*"],
-                "message": "apps/web imports nothing from apps/api. The one exception is `AppRouter` as an `import type`, in `apps/web/src/shared/api/trpc.ts` and no second file; runtime coupling stays zero."
+                "message": "apps/web must not import from apps/api, so that the two apps share no runtime code. The only exception is an `import type` of `AppRouter` in `apps/web/src/shared/api/trpc.ts`, and no other file may have one."
               },
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "Only packages/schema/src/boundary-schemas/drizzle-zod.ts may import drizzle-zod. Import the boundary schemas from @better-answers/schema instead."
               },
               {
                 "group": [
@@ -293,11 +293,11 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "In apps/web, better-auth is imported only by features/auth/auth-client.ts and features/auth/auth-hooks.ts; every other file reads the platform's types those hooks return."
+                "message": "In apps/web, only features/auth/auth-client.ts and features/auth/auth-hooks.ts may import better-auth. Other files use the platform's own types, which those hooks return."
               },
               {
                 "group": ["**/auth-client", "**/auth-client.ts"],
-                "message": "authClient is imported only by features/auth/auth-hooks.ts, which maps what it answers to the platform's own types."
+                "message": "Only features/auth/auth-hooks.ts may import authClient, because it converts what authClient returns into the platform's own types. Use the hooks in features/auth/auth-hooks.ts instead."
               }
             ]
           }
@@ -313,19 +313,19 @@
             "patterns": [
               {
                 "group": ["@/features/**", "@/app/**"],
-                "message": "shared/ imports nothing above it: it is the layer every feature and the app layer stand on, and an import upwards makes it one of them."
+                "message": "Code in `shared/` must not import from features or from `app/`, because they all import `shared/` and an upward import makes `shared/` depend on them. Move the code you need into `shared/`, or move this file out of `shared/`."
               },
               {
                 "group": ["../*/**", "../../**"],
-                "message": "A relative import in apps/web stays inside its own directory; an import that crosses one is written `@/<zone>/…`."
+                "message": "A relative import in apps/web must stay inside its own directory. To import from another directory, write the path as `@/<zone>/…`."
               },
               {
                 "group": ["@better-answers/api", "@better-answers/api/*"],
-                "message": "apps/web imports nothing from apps/api. The one exception is `AppRouter` as an `import type`, in `apps/web/src/shared/api/trpc.ts` and no second file; runtime coupling stays zero."
+                "message": "apps/web must not import from apps/api, so that the two apps share no runtime code. The only exception is an `import type` of `AppRouter` in `apps/web/src/shared/api/trpc.ts`, and no other file may have one."
               },
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "Only packages/schema/src/boundary-schemas/drizzle-zod.ts may import drizzle-zod. Import the boundary schemas from @better-answers/schema instead."
               },
               {
                 "group": [
@@ -335,11 +335,11 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "In apps/web, better-auth is imported only by features/auth/auth-client.ts and features/auth/auth-hooks.ts; every other file reads the platform's types those hooks return."
+                "message": "In apps/web, only features/auth/auth-client.ts and features/auth/auth-hooks.ts may import better-auth. Other files use the platform's own types, which those hooks return."
               },
               {
                 "group": ["**/auth-client", "**/auth-client.ts"],
-                "message": "authClient is imported only by features/auth/auth-hooks.ts, which maps what it answers to the platform's own types."
+                "message": "Only features/auth/auth-hooks.ts may import authClient, because it converts what authClient returns into the platform's own types. Use the hooks in features/auth/auth-hooks.ts instead."
               }
             ]
           }
@@ -356,19 +356,19 @@
               {
                 "group": ["@better-answers/api", "@better-answers/api/*"],
                 "allowTypeImports": true,
-                "message": "This file is the api's type seam: an `import type` is allowed here and a value import is not, so runtime coupling stays zero."
+                "message": "This file may import types from apps/api but not values, so that apps/web shares no runtime code with apps/api. Use `import type`."
               },
               {
                 "group": ["@/features/**", "@/app/**"],
-                "message": "shared/ imports nothing above it: it is the layer every feature and the app layer stand on, and an import upwards makes it one of them."
+                "message": "Code in `shared/` must not import from features or from `app/`, because they all import `shared/` and an upward import makes `shared/` depend on them. Move the code you need into `shared/`, or move this file out of `shared/`."
               },
               {
                 "group": ["../*/**", "../../**"],
-                "message": "A relative import in apps/web stays inside its own directory; an import that crosses one is written `@/<zone>/…`."
+                "message": "A relative import in apps/web must stay inside its own directory. To import from another directory, write the path as `@/<zone>/…`."
               },
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "Only packages/schema/src/boundary-schemas/drizzle-zod.ts may import drizzle-zod. Import the boundary schemas from @better-answers/schema instead."
               },
               {
                 "group": [
@@ -378,11 +378,11 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "In apps/web, better-auth is imported only by features/auth/auth-client.ts and features/auth/auth-hooks.ts; every other file reads the platform's types those hooks return."
+                "message": "In apps/web, only features/auth/auth-client.ts and features/auth/auth-hooks.ts may import better-auth. Other files use the platform's own types, which those hooks return."
               },
               {
                 "group": ["**/auth-client", "**/auth-client.ts"],
-                "message": "authClient is imported only by features/auth/auth-hooks.ts, which maps what it answers to the platform's own types."
+                "message": "Only features/auth/auth-hooks.ts may import authClient, because it converts what authClient returns into the platform's own types. Use the hooks in features/auth/auth-hooks.ts instead."
               }
             ]
           }
@@ -401,23 +401,23 @@
             "patterns": [
               {
                 "group": ["@/features/**"],
-                "message": "No feature imports another feature. Within a feature, imports are relative; ground two features share belongs in `apps/web/src/shared/`."
+                "message": "A feature must not import another feature. Inside a feature, use relative imports. Move code that two features share into `apps/web/src/shared/`."
               },
               {
                 "group": ["@/app/**"],
-                "message": "The direction is app → features → shared and never back: `app/` composes features, so a feature importing `app/` is a cycle waiting to be written."
+                "message": "Imports go from `app/` to features to `shared/`, never back. `app/` imports the features, so a feature that imports from `app/` can create an import cycle. Move the code the feature needs into the feature or into `shared/`."
               },
               {
                 "group": ["../*/**", "../../**"],
-                "message": "A relative import in apps/web stays inside its own directory; an import that crosses one is written `@/<zone>/…`."
+                "message": "A relative import in apps/web must stay inside its own directory. To import from another directory, write the path as `@/<zone>/…`."
               },
               {
                 "group": ["@better-answers/api", "@better-answers/api/*"],
-                "message": "apps/web imports nothing from apps/api. The one exception is `AppRouter` as an `import type`, in `apps/web/src/shared/api/trpc.ts` and no second file; runtime coupling stays zero."
+                "message": "apps/web must not import from apps/api, so that the two apps share no runtime code. The only exception is an `import type` of `AppRouter` in `apps/web/src/shared/api/trpc.ts`, and no other file may have one."
               },
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "Only packages/schema/src/boundary-schemas/drizzle-zod.ts may import drizzle-zod. Import the boundary schemas from @better-answers/schema instead."
               }
             ]
           }
@@ -565,7 +565,7 @@
     {
       "files": ["packages/schema/src/table-ownership.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 642, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 645, "skipBlankLines": true, "skipComments": true }]
       }
     }
   ],

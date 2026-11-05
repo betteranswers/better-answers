@@ -1818,7 +1818,7 @@ def detected_afresh_in(written: str) -> list[list[str]]:
     return [
         list(line["detected_afresh"])
         for line in (json.loads(one) for one in written.splitlines() if one.strip())
-        if line.get("event") == "the connected source's landed copies were read"
+        if line.get("event") == "landed documents read"
     ]
 
 

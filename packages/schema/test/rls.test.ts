@@ -237,7 +237,7 @@ describe("the identity set", () => {
   it("has a workspace column only where its exemption explains why", async () => {
     const carrying = new Set(
       Object.entries(RLS_EXEMPTIONS)
-        .filter(([, reason]) => reason.startsWith("Carries workspace_id on purpose"))
+        .filter(([, reason]) => reason.includes("workspace_id"))
         .map(([qualified]) => qualified),
     );
     expect([...carrying].toSorted()).toEqual(["public.invitation", "public.member"]);

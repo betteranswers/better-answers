@@ -319,7 +319,7 @@ describe("documents through the MCP find and open entries", () => {
       [
         `Note · ${COVERING_TITLE} · policies · Unverified · ${iri}`,
         "",
-        `More follow: call find again with cursor ${String(cursor)}`,
+        `There are more matches. To get them, call find again with cursor ${String(cursor)}`,
       ].join("\n"),
     );
     expect(structured(second)).toEqual({

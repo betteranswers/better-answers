@@ -28,43 +28,49 @@ export type ErasureReportInput = {
 const stamped = (at: Date): string => at.toISOString();
 
 const rewritten = (anchor: string): string =>
-  "Every actor identifier for this person has been rewritten across the repository's history, " +
-  "the index, the evidence and the map, and in the backup copies listed below. Names this " +
-  "person wrote or that were written about them inside concept bodies are listed for the " +
-  "owner to edit; an edit is a new commit and does not remove the name from earlier commits, " +
-  `from copies already exported, or from any backup copy taken before ${anchor}.`;
+  "This erasure rewrote every identifier that recorded this person as an actor, such as an " +
+  "author or a verifier. It rewrote them in the repository's history, the index, the evidence, " +
+  "the map and the backup copies listed below. Concept bodies can also name this person, in " +
+  "text they wrote or text about them. Those concepts are listed below for their owner to " +
+  "edit. An edit makes a new commit. The name stays in earlier commits, in " +
+  `exports already made, and in backup copies taken before ${anchor}.`;
 
 const beyondUse = (anchor: string, erasure: ErasureRecord): string =>
-  `Backup copies taken before ${anchor} are beyond use: restored only in a disaster, ` +
-  "encrypted at rest, deletable only by the escrowed credential, expiring on " +
-  `${stamped(erasure.beyondUseHourlyAt)} · ${stamped(erasure.beyondUseDailyAt)} · ` +
-  `${stamped(erasure.beyondUseWeeklyAt)} · ${stamped(erasure.beyondUseMonthlyAt)}. ` +
-  "Should a restore from such a copy occur, this request is re-applied before the platform " +
-  "serves reads.";
+  `Backup copies taken before ${anchor} are beyond use. They are encrypted, they are ` +
+  "restored only after a disaster, and only the escrowed credential can delete them. They " +
+  `expire on these dates: ${stamped(erasure.beyondUseHourlyAt)} (hourly), ` +
+  `${stamped(erasure.beyondUseDailyAt)} (daily), ${stamped(erasure.beyondUseWeeklyAt)} ` +
+  `(weekly) and ${stamped(erasure.beyondUseMonthlyAt)} (monthly). If the platform is ever ` +
+  "restored from one of these copies, it applies this erasure again before it serves any reads.";
 
-const ANCHOR_NAMED =
-  "The anchor above is the instant this routine took the erasure lock, not the stamp of the " +
-  "last dump before it: this routine reads no backup record, so the last dump precedes the anchor and " +
-  "every date above is the latest a copy can expire.";
+const anchorNamed = (anchor: string): string =>
+  `This erasure started at ${anchor}. The dates above count from that moment, not from the ` +
+  "last backup. The erasure does not read the backup records, and the last backup was taken " +
+  "before the erasure started. So each date above is the latest date that a copy can expire.";
 
 const SIGN_IN_IDENTITY_REMOVED =
-  "A person's sign-in identity is removed from the platform by the request that erases " +
-  "them from their last workspace.";
+  "A person's sign-in identity is removed only by the erasure that removes them from their " +
+  "last workspace.";
 
 const INVITATIONS_WHEREVER_SENT =
-  "Invitations sent to the address a person signs in with are deleted wherever they were sent, " +
-  "by the request that erases them from their last workspace; the invitation line above counts this " +
-  "workspace's alone.";
+  "The erasure that removes a person from their last workspace also deletes every invitation " +
+  "sent to the address they sign in with, in any workspace. The invitation count above covers " +
+  "this workspace only.";
 
 const DOCUMENTS_WITHHELD =
-  "The original files in the object store are untouched; the identifiers named in this request " +
-  "are withheld from the text of every document in this workspace, those held now and those " +
-  "bound later, each time a document is indexed; and the documents found above are indexed " +
-  "again now.";
+  "The original files in the object store are not changed. Instead, the identifiers named in " +
+  "this request are withheld from the text of every document in this workspace each time a " +
+  "document is indexed, including documents added later. The documents found above are being " +
+  "indexed again now.";
 
-const EXPORTS_NOT_RECALLED = "Exports already issued are not recalled. None have been issued.";
+const EXPORTS_NOT_RECALLED =
+  "This erasure cannot recall exports that were already made. No exports have been made.";
 
-const NO_CONCEPT_NAMES = "None: no concept body names this person.";
+const NO_CONCEPT_NAMES = "None. No concept body names this person.";
+
+export const NAMES_HEADING = "Concepts whose body names this person, for their owner to edit:";
+
+export const STORES_HEADING = "What the erasure found and did, by store:";
 
 const wordsFor = (action: ErasureAction | undefined): string => {
   const fields = Object.entries(action ?? {});
@@ -88,12 +94,12 @@ export const erasureReportOf = (input: ErasureReportInput): string => {
     "",
     beyondUse(anchor, input.erasure),
     "",
-    ANCHOR_NAMED,
+    anchorNamed(anchor),
     "",
-    "Names inside concept bodies, for the owner to edit:",
+    NAMES_HEADING,
     ...named,
     "",
-    "Where this person was held, and what the routine did:",
+    STORES_HEADING,
     ...input.map.map((entry) => `- ${entry.family}: ${wordsFor(input.actions[entry.family])}`),
     "",
     SIGN_IN_IDENTITY_REMOVED,

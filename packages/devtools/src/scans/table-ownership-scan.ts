@@ -148,7 +148,7 @@ const refusalOf = (map: OwnershipMap, { file, line, table, slice, reads }: Slice
     return `${where}: names ${table} from a file that belongs to no slice. Move the statement into the slice that needs the table.`;
   }
   const declared = reads ? "declares no read" : "declares no access";
-  return `${where}: ${slice} names ${table}, which ${String(map.TABLE_OWNERS[table])} owns, and ${WHERE_THE_MAP_LIVES} ${declared} by ${slice}. Read the table through its owner's face, or add an entry with a reason to CROSS_OWNER_TABLE_ACCESS.`;
+  return `${where}: ${slice} names ${table}, which ${String(map.TABLE_OWNERS[table])} owns, and ${WHERE_THE_MAP_LIVES} ${declared} by ${slice}. Read the table through the functions its owner exports, or add an entry with a reason to CROSS_OWNER_TABLE_ACCESS.`;
 };
 
 export const undeclaredIn = (map: OwnershipMap, reads: readonly SliceRead[]): readonly string[] =>

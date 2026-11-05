@@ -36,7 +36,11 @@ export const renderFind = (result: FindResult<string>): string => {
   const lines = result.matches.map(findLine);
   return result.nextCursor === undefined
     ? lines.join("\n")
-    : [...lines, "", `More follow: call find again with cursor ${result.nextCursor}`].join("\n");
+    : [
+        ...lines,
+        "",
+        `There are more matches. To get them, call find again with cursor ${result.nextCursor}`,
+      ].join("\n");
 };
 
 const quoted = (text: string): readonly string[] => text.split(/\r?\n/u).map((line) => `> ${line}`);
@@ -105,7 +109,7 @@ const VERDICT_LINES = {
   warn: "**Answered with a warning for your role.**",
   refuse: `**${NOT_ANSWERED}**`,
   related:
-    "**Related knowledge, not an answer.** Write only what these concepts state, naming each one you use, and quote an `Answer` word for word, opening one given as a line first.",
+    "**Related knowledge, not an answer.** Write only what these concepts state, and name each one you use. Quote an `Answer` word for word. If an `Answer` is given as one line, read it with `open` first.",
 } satisfies Record<QuestionVerdict, string>;
 
 const JUDGE_WORDS = {
@@ -132,7 +136,7 @@ const returnedText = (heading: string, concept: ReturnedConcept<string>): readon
 const RELATED_HEADING = "Related knowledge · ";
 
 const PREVIEWS_HEADING =
-  "Also bearing on the question, one line each: read one with `open` and its iri before writing from it.";
+  "Other related concepts, one line each. Read a concept with `open` and its iri before you write from it.";
 
 const relatedText = (related: readonly RelatedConcept<string>[]): readonly string[] => [
   ...related.flatMap((concept) =>
@@ -144,7 +148,7 @@ const relatedText = (related: readonly RelatedConcept<string>[]): readonly strin
   ),
 ];
 
-const FITS_HEADING = "Answers that fit, each word for word below:";
+const FITS_HEADING = "Answers to the question, each given word for word below:";
 
 const fitLine = (fit: ReturnedConcept<string>): string =>
   `- ${fit.collection ?? NO_COLLECTION} · ${fit.title} · ${fit.iri}`;
@@ -157,7 +161,7 @@ const unmappedText = (passage: PassageView): readonly string[] => [
 ];
 
 const FITS_THEN_RELATED =
-  "**Related knowledge, which the judge did not pass as answering the question as asked.**";
+  "**Related knowledge. The judge did not find that it answers the question as asked.**";
 
 const answeredText = (answer: PlannedAnswer<string>): readonly string[] =>
   answer.answers.length === 0
@@ -175,7 +179,7 @@ export const renderAnswer = (answer: AnswerResult<string>): string =>
     ...(answer.answers.length === 0 ? [] : [FITS_HEADING, ...answer.answers.map(fitLine)]),
     `_${JUDGE_WORDS[answer.judgeState]} · ${mapWords(answer.map)}_`,
     `Collections considered: ${namedOrNone(answer.collections)}`,
-    `Collections you may name: ${namedOrNone(answer.readableCollections)}`,
+    `Collections you can name: ${namedOrNone(answer.readableCollections)}`,
     ...answeredText(answer),
     ...answer.unmappedPassages.flatMap(unmappedText),
   ].join("\n");

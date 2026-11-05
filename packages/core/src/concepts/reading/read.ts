@@ -64,7 +64,7 @@ const PANE_COPY = {
   included: "Based on your current access, the evidence is included.",
   partlyIncluded: "Based on your current access, some of the evidence isn't included.",
   notIncluded: "Based on your current access, the evidence isn't included.",
-  sharedBeyondEvidence: "An Admin shared this concept beyond its evidence.",
+  sharedBeyondEvidence: "An Admin made this concept visible to people who can't see its sources.",
   nextWhenIncluded: "Open a source to read the passage the concept rests on.",
   nextWhenWithheld: "Ask an Admin for access to the sources, or read the concept as it stands.",
   nextWhenNothingCited: "Read the concept as it stands.",

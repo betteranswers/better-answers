@@ -46,7 +46,7 @@ The bundles in `dumps/git/` follow the same dates. The bare repository and the V
 
 The report says:
 
-> "Backup copies taken before `<anchor>` are beyond use: restored only in a disaster, encrypted at rest, deletable only by the escrowed credential, expiring on `<hourly>` · `<daily>` · `<weekly>` · `<monthly>`. Should a restore from such a copy occur, this request is re-applied before the platform serves reads."
+> "Backup copies taken before `<anchor>` are beyond use. They are encrypted, they are restored only after a disaster, and only the escrowed credential can delete them. They expire on these dates: `<hourly>` (hourly), `<daily>` (daily), `<weekly>` (weekly) and `<monthly>` (monthly). If the platform is ever restored from one of these copies, it applies this erasure again before it serves any reads."
 
 The last sentence is `pnpm ops replay-erasures --since <dump-at>`. Every restore runs it before `api` starts.
 

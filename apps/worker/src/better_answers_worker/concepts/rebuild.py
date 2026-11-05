@@ -204,7 +204,7 @@ def analyse_map(connection: psycopg.Connection, workspace_id: str) -> None:
         connection.execute("SELECT analyse_map()")
     except psycopg.Error as failure:
         logger.warning(
-            "the map was left unanalysed",
+            "analysing the map failed",
             workspace_id=workspace_id,
             error=type(failure).__name__,
             sqlstate=failure.sqlstate,

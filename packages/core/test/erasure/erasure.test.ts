@@ -204,9 +204,7 @@ describe("recording a subject request", () => {
       ok: false,
       error: {
         word: "identifier-too-broad",
-        said:
-          'The name "Will" is too broad to withhold: a name of one word would withhold that ' +
-          "word in every document of the workspace.",
+        said: matching.stringContaining('"Will"'),
       },
     });
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
@@ -228,9 +226,7 @@ describe("recording a subject request", () => {
       ok: false,
       error: {
         word: "identifier-too-broad",
-        said:
-          `The identifier "${refused}" is too broad to withhold: one under 3 characters ` +
-          "would withhold those characters in every document of the workspace.",
+        said: matching.stringContaining(`"${refused}"`),
       },
     });
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);

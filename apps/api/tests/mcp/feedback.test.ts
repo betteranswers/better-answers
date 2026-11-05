@@ -117,7 +117,7 @@ describe("give_feedback on a question record over MCP", () => {
     expect(await queuedIn(workspace.workspaceId)).toEqual(before);
     expect(structured(said)).toEqual({ outcome: "stored", feedback });
     expect(rendered(said)).toBe(
-      `Stored on record ${recordId}: flagged as wrong — "${A_NOTE}", with the sentence disputed and the concept it rested on. No one is notified of it.`,
+      `Feedback saved on record ${recordId}: flagged as wrong — "${A_NOTE}", with the disputed sentence and the concept it was based on. No one is notified.`,
     );
   });
 
@@ -130,7 +130,7 @@ describe("give_feedback on a question record over MCP", () => {
 
     expect(await feedbackKeptOn(recordId)).toEqual([helpfulFrom(workspace.admin.id)]);
     expect(rendered(said)).toBe(
-      `Stored on record ${recordId}: marked helpful. No one is notified of it.`,
+      `Feedback saved on record ${recordId}: marked helpful. No one is notified.`,
     );
   });
 

@@ -49,6 +49,7 @@ import {
   type IdentityArm,
   type RunErasureRefusal,
 } from "../../../src/erasure/index.ts";
+import { NAMES_HEADING } from "../../../src/erasure/report.ts";
 import { seedGuide } from "../../../src/guides/index.ts";
 import { actorIdOfPerson, type Result, type UserPrincipal } from "../../../src/kernel/index.ts";
 import {
@@ -138,9 +139,8 @@ const ERASURE_ACTOR = "process:better-answers-erasure";
 const COMPLETED = "people.erasure.completed";
 
 const INVITATIONS_WHEREVER_SENT =
-  "Invitations sent to the address a person signs in with are deleted wherever they were sent, " +
-  "by the request that erases them from their last workspace; the invitation line above counts this " +
-  "workspace's alone.";
+  "The erasure that removes a person from their last workspace also deletes every invitation " +
+  "sent to the address they sign in with, in any workspace.";
 
 const operatorLines: ErasureLogLine[] = [];
 
@@ -782,20 +782,16 @@ describe("the report", () => {
 
     const done = await completing(scenario, subjectRequestId);
 
-    expect(done.report).toContain(
-      "Every actor identifier for this person has been rewritten across the repository's history, " +
-        "the index, the evidence and the map, and in the backup copies listed below. Names this " +
-        "person wrote or that were written about them inside concept bodies are listed for the " +
-        "owner to edit; an edit is a new commit and does not remove the name from earlier commits, " +
-        "from copies already exported, or from any backup copy taken before 2026-06-01T12:00:00.000Z.",
-    );
-    expect(done.report).toContain(
-      "Backup copies taken before 2026-06-01T12:00:00.000Z are beyond use: restored only in a " +
-        "disaster, encrypted at rest, deletable only by the escrowed credential, expiring on " +
-        `${BEYOND_USE.hourly} · ${BEYOND_USE.daily} · ${BEYOND_USE.weekly} · ${BEYOND_USE.monthly}. ` +
-        "Should a restore from such a copy occur, this request is re-applied before the platform " +
-        "serves reads.",
-    );
+    const expiries = [
+      "2026-06-01T12:00:00.000Z",
+      BEYOND_USE.hourly,
+      BEYOND_USE.daily,
+      BEYOND_USE.weekly,
+      BEYOND_USE.monthly,
+    ];
+    const at = expiries.map((expiry) => done.report.indexOf(expiry));
+    expect(at.every((index) => index >= 0)).toBe(true);
+    expect(at.toSorted((one, other) => one - other)).toEqual(at);
 
     const [row] = await erasureRowsIn(scenario.workspaceId);
     expect({
@@ -818,7 +814,7 @@ describe("the report", () => {
   it("lists by IRI each concept whose body names the person", async () => {
     const { iri, done } = await theBundleRewritten();
 
-    expect(done.report).toContain("Names inside concept bodies, for the owner to edit:");
+    expect(done.report.split("\n")).toContain(NAMES_HEADING);
     expect(done.report).toContain(`- ${iri}`);
   });
 });

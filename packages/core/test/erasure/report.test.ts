@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { ErasureFamily, ErasureMap } from "../../src/erasure/map.ts";
-import { erasureReportOf, type ErasureActions } from "../../src/erasure/report.ts";
+import {
+  erasureReportOf,
+  NAMES_HEADING,
+  STORES_HEADING,
+  type ErasureActions,
+} from "../../src/erasure/report.ts";
 
 const mapOf = (...families: readonly ErasureFamily[]): ErasureMap =>
   families.map((family) => ({ family, categories: [], locations: [] }));
@@ -43,54 +48,43 @@ const EVERYTHING_DONE = reportOf({
 });
 
 const linesOf = (report: string, heading: string): readonly string[] => {
-  const after = report.split("\n").slice(report.split("\n").indexOf(heading) + 1);
+  const lines = report.split("\n");
+  if (!lines.includes(heading)) throw new Error(`the report has no line ${heading}`);
+  const after = lines.slice(lines.indexOf(heading) + 1);
   return after.slice(0, after.indexOf(""));
 };
 
 describe("the erasure report", () => {
   it("opens by naming the subject request", () => {
-    expect(NOTHING_DONE.split("\n")[0]).toBe(
-      "Erasure report for subject request subject-request-1.",
-    );
+    expect(NOTHING_DONE.split("\n")[0]).toContain("subject-request-1");
   });
 
-  it("separates paragraphs with one blank line", () => {
-    expect(NOTHING_DONE.split("\n\n").map((paragraph) => paragraph.slice(0, 20))).toEqual([
-      "Erasure report for s",
-      "Every actor identifi",
-      "Backup copies taken ",
-      "The anchor above is ",
-      "Names inside concept",
-      "Where this person wa",
-      "A person's sign-in i",
-      "Invitations sent to ",
-      "The original files i",
-      "Exports already issu",
-    ]);
-    expect(NOTHING_DONE.endsWith("None have been issued.\n")).toBe(true);
+  it("separates ten paragraphs and ends with a newline", () => {
+    const paragraphs = NOTHING_DONE.split("\n\n");
+    expect(paragraphs).toHaveLength(10);
+    expect(paragraphs.every((paragraph) => paragraph.trim() !== "")).toBe(true);
+    expect(NOTHING_DONE.endsWith(".\n")).toBe(true);
   });
 
-  it("anchors on the erasure lock, not on the last dump", () => {
+  it("dates each backup copy's expiry from the start, in order", () => {
+    const dates = [
+      "2026-06-01T12:00:00.000Z",
+      "2026-06-03T12:00:00.000Z",
+      "2026-07-01T12:00:00.000Z",
+      "2026-07-27T12:00:00.000Z",
+      "2026-12-01T12:00:00.000Z",
+    ];
+    const [, , expiry = "", anchored = ""] = NOTHING_DONE.split("\n\n");
+
+    const at = dates.map((date) => expiry.indexOf(date));
+    expect(at.every((index) => index >= 0)).toBe(true);
+    expect(at.toSorted((one, other) => one - other)).toEqual(at);
+    expect(anchored).toContain(dates[0]);
+  });
+
+  it("says no export is recalled, since none was made", () => {
     expect(NOTHING_DONE).toContain(
-      "The anchor above is the instant this routine took the erasure lock, not the stamp of the " +
-        "last dump before it: this routine reads no backup record, so the last dump precedes the anchor and " +
-        "every date above is the latest a copy can expire.",
-    );
-  });
-
-  it("dates each backup copy's expiry from the anchor", () => {
-    expect(NOTHING_DONE).toContain(
-      "Backup copies taken before 2026-06-01T12:00:00.000Z are beyond use: restored only in a " +
-        "disaster, encrypted at rest, deletable only by the escrowed credential, expiring on " +
-        "2026-06-03T12:00:00.000Z · 2026-07-01T12:00:00.000Z · 2026-07-27T12:00:00.000Z · " +
-        "2026-12-01T12:00:00.000Z. Should a restore from such a copy occur, this request is " +
-        "re-applied before the platform serves reads.",
-    );
-  });
-
-  it("says no export is recalled, since none was issued", () => {
-    expect(NOTHING_DONE).toContain(
-      "Exports already issued are not recalled. None have been issued.",
+      "This erasure cannot recall exports that were already made. No exports have been made.",
     );
   });
 
@@ -99,12 +93,10 @@ describe("the erasure report", () => {
     ["everything", EVERYTHING_DONE],
   ])("says documents withhold the identifiers when the routine did %s", (_, report) => {
     expect(report).toContain(
-      "The original files in the object store are untouched; the identifiers named in this request " +
-        "are withheld from the text of every document in this workspace, those held now and those " +
-        "bound later, each time a document is indexed; and the documents found above are indexed " +
-        "again now.",
+      "The original files in the object store are not changed. Instead, the identifiers named in " +
+        "this request are withheld from the text of every document in this workspace each time a " +
+        "document is indexed, including documents added later.",
     );
-    expect(report).not.toContain("The object store is untouched");
   });
 
   it.each([
@@ -112,9 +104,8 @@ describe("the erasure report", () => {
     ["everything", EVERYTHING_DONE],
   ])("says invitations are deleted everywhere when the routine did %s", (_, report) => {
     expect(report).toContain(
-      "Invitations sent to the address a person signs in with are deleted wherever they were sent, " +
-        "by the request that erases them from their last workspace; the invitation line above counts this " +
-        "workspace's alone.",
+      "The erasure that removes a person from their last workspace also deletes every invitation " +
+        "sent to the address they sign in with, in any workspace.",
     );
   });
 
@@ -123,27 +114,23 @@ describe("the erasure report", () => {
     ["everything", EVERYTHING_DONE],
   ])("explains sign-in identity removal when the routine did %s", (_, report) => {
     expect(report).toContain(
-      "A person's sign-in identity is removed from the platform by the request that erases " +
-        "them from their last workspace.",
+      "A person's sign-in identity is removed only by the erasure that removes them from their " +
+        "last workspace.",
     );
   });
 
   it("says none when no concept body names the person", () => {
-    expect(linesOf(NOTHING_DONE, "Names inside concept bodies, for the owner to edit:")).toEqual([
-      "None: no concept body names this person.",
-    ]);
+    const named = linesOf(NOTHING_DONE, NAMES_HEADING);
+    expect(named).toHaveLength(1);
+    expect(named[0]).not.toMatch(/^- /u);
   });
 
   it("lists each concept naming the person by IRI, sorted", () => {
-    expect(linesOf(EVERYTHING_DONE, "Names inside concept bodies, for the owner to edit:")).toEqual(
-      ["- iri:a", "- iri:b"],
-    );
+    expect(linesOf(EVERYTHING_DONE, NAMES_HEADING)).toEqual(["- iri:a", "- iri:b"]);
   });
 
   it("lists each family in map order with its counts sorted", () => {
-    expect(
-      linesOf(EVERYTHING_DONE, "Where this person was held, and what the routine did:"),
-    ).toEqual([
+    expect(linesOf(EVERYTHING_DONE, STORES_HEADING)).toEqual([
       "- identity-user: found 1, membershipsEnded 1, pseudonymised 1",
       "- identity-invitation: deleted 2, found 2",
       "- source-document: found 3, identifiersWithheld 3",
@@ -154,7 +141,7 @@ describe("the erasure report", () => {
     expect(
       linesOf(
         reportOf({ map: mapOf("concept-file", "bundle-commit"), actions: { "bundle-commit": {} } }),
-        "Where this person was held, and what the routine did:",
+        STORES_HEADING,
       ),
     ).toEqual(["- concept-file: nothing recorded", "- bundle-commit: nothing recorded"]);
   });

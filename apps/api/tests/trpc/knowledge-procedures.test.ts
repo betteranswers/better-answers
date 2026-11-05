@@ -567,7 +567,7 @@ describe("knowledge.open over tRPC", () => {
     expect(opened).toMatchObject({
       concept: {
         access: "partly-included",
-        lead: "Based on your current access, some of the evidence isn't included. An Admin shared this concept beyond its evidence.",
+        lead: "Based on your current access, some of the evidence isn't included. An Admin made this concept visible to people who can't see its sources.",
         next: "Ask an Admin for access to the sources, or read the concept as it stands.",
         evidence: [
           { id: "HANDBOOK", source: HANDBOOK_TITLE, locator: handbook },

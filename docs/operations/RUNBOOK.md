@@ -503,7 +503,7 @@ Use this procedure to look inside the running worker. Its image has no shell, no
 
 Use these steps when the worker restarts on its own.
 
-1. Find the log line `the job outlived its deadline`, which names the job. The thread stacks printed to stderr just before it show where the job hung.
+1. Find the log line `job ran past its deadline`, which names the job. The thread stacks printed to stderr just before it show where the job hung.
 2. Read the exit codes with `docker events --since 72h --filter event=die --filter container=<the worker's container>`. `exitCode=75` marks each such exit. `docker inspect` cannot show it, because it reads the running container.
 3. Count the restarts with `docker inspect -f '{{.RestartCount}}' <the worker's container>`.
 

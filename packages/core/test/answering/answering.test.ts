@@ -122,7 +122,7 @@ const described = (shape: Readonly<Record<string, z.ZodType>>): Readonly<Record<
   );
 
 const RELATED_LINE =
-  "**Related knowledge, not an answer.** Write only what these concepts state, naming each one you use, and quote an `Answer` word for word, opening one given as a line first.";
+  "**Related knowledge, not an answer.** Write only what these concepts state, and name each one you use. Quote an `Answer` word for word. If an `Answer` is given as one line, read it with `open` first.";
 
 const returned = (overrides: Partial<ReturnedConcept<string>> = {}): ReturnedConcept<string> => ({
   iri: "https://better-answers.com/c/01A",
@@ -163,7 +163,7 @@ describe("renderAnswer", () => {
       `Record of this question: ${A_RECORD}`,
       "_Not judged · map as of now_",
       "Collections considered: audits",
-      "Collections you may name: audits, lms",
+      "Collections you can name: audits, lms",
     ]);
   });
 
@@ -258,7 +258,7 @@ describe("renderAnswer", () => {
     expect(linesOf(rendered).slice(0, 5)).toEqual([
       "**Answered from the company's knowledge.**",
       `Record of this question: ${A_RECORD}`,
-      "Answers that fit, each word for word below:",
+      "Answers to the question, each given word for word below:",
       "- audits · Who exports it? · https://better-answers.com/c/01U",
       "- No collection · Who reads it? · https://better-answers.com/c/01A",
     ]);
@@ -312,7 +312,7 @@ describe("renderAnswer", () => {
     expect(rendered[6]).toBe("## Related knowledge · Answer · audits");
     expect(rendered.slice(-3)).toEqual([
       "",
-      "Also bearing on the question, one line each: read one with `open` and its iri before writing from it.",
+      "Other related concepts, one line each. Read a concept with `open` and its iri before you write from it.",
       "- Policy · Retention policy · No collection · Unverified · https://better-answers.com/c/01B",
     ]);
   });
@@ -373,7 +373,7 @@ describe("renderAnswer", () => {
         `Record of this question: ${A_RECORD}`,
         "_Not judged · map as of now_",
         "Collections considered: none",
-        "Collections you may name: none",
+        "Collections you can name: none",
         "",
         "Not company knowledge · Internal",
         "> Retained for six years.",
@@ -487,7 +487,7 @@ describe("renderFind", () => {
       [
         'document · The bid library\'s invoice · Not company knowledge · Internal · 01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44 · "The invoice was settled in March."',
         "",
-        "More follow: call find again with cursor eyJydW4iOiJ3ZWFrIn0",
+        "There are more matches. To get them, call find again with cursor eyJydW4iOiJ3ZWFrIn0",
       ].join("\n"),
     );
   });
@@ -678,7 +678,7 @@ describe("renderOpen and renderFeedback", () => {
 
   it("renders stored feedback and each flag reason in words", () => {
     const stored = (what: string): string =>
-      `Stored on record ${A_RECORD}: ${what}. No one is notified of it.`;
+      `Feedback saved on record ${A_RECORD}: ${what}. No one is notified.`;
 
     expect(
       renderFeedback({ outcome: "stored", feedback: { recordId: A_RECORD, verdict: "helpful" } }),
@@ -704,7 +704,7 @@ describe("renderOpen and renderFeedback", () => {
         },
       }),
     ).toBe(
-      `Stored on record ${A_RECORD}: flagged as wrong — "renewed in May", with the sentence disputed and the concept it rested on. No one is notified of it.`,
+      `Feedback saved on record ${A_RECORD}: flagged as wrong — "renewed in May", with the disputed sentence and the concept it was based on. No one is notified.`,
     );
   });
 });

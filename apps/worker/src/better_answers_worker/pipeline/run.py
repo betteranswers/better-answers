@@ -83,7 +83,7 @@ def index_connected_source(
                 connected_source = read_connected_source(cursor, sync)
             if connected_source is None:
                 logger.info(
-                    "the sync found no connected source to index",
+                    "no connected source to index",
                     connected_source_id=sync.connected_source_id,
                     reason=sync.reason,
                 )

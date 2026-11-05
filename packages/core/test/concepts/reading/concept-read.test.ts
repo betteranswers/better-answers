@@ -247,7 +247,7 @@ describe("the evidence pane", () => {
 
     expect(pane).toMatchObject({
       access: "not-included",
-      lead: "Based on your current access, the evidence isn't included. An Admin shared this concept beyond its evidence.",
+      lead: "Based on your current access, the evidence isn't included. An Admin made this concept visible to people who can't see its sources.",
       evidence: [{ source: "Document 1" }],
       sharedBeyondEvidence: { by: `human:${scenario.admin.userId}` },
       next: "Ask an Admin for access to the sources, or read the concept as it stands.",
@@ -265,7 +265,7 @@ describe("the evidence pane", () => {
 
     expect(pane).toMatchObject({
       access: "partly-included",
-      lead: "Based on your current access, some of the evidence isn't included. An Admin shared this concept beyond its evidence.",
+      lead: "Based on your current access, some of the evidence isn't included. An Admin made this concept visible to people who can't see its sources.",
       evidence: [{ source: "Document 1" }, { source: "Document 2", locator: locators[1] }],
       sharedBeyondEvidence: { by: `human:${scenario.admin.userId}` },
     });

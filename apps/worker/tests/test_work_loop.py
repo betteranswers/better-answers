@@ -874,7 +874,7 @@ def test_a_rebuild_whose_analyse_fails_still_goes_live(
         (line["event"], line["sqlstate"])
         for line in written
         if line["log_level"] == "warning"
-    ] == [("the map was left unanalysed", "55P03")]
+    ] == [("analysing the map failed", "55P03")]
 
 
 def a_workspace_with_a_queued_audit(
@@ -908,7 +908,7 @@ def error_lines_in(
     ]
 
 
-STAMP_MISMATCH_EVENT = "a deploy stamp does not match; claiming nothing"
+STAMP_MISMATCH_EVENT = "deploy stamp differs from this worker's, so it claims no jobs"
 
 
 def test_a_mismatched_schema_stamp_claims_nothing_and_exits_one(
@@ -1353,7 +1353,7 @@ def test_the_heartbeat_logs_a_lost_claim_and_stops(
     assert [
         line["job_id"]
         for line in heartbeat.written
-        if line["event"] == "the claim was lost"
+        if line["event"] == "job claim lost"
     ] == [heartbeat.job.id]
 
 
@@ -1478,9 +1478,9 @@ def test_a_job_past_its_deadline_ends_the_worker_process(
     )
     assert reclaimed.attempts == 2
     events = [line["event"] for line in written]
-    assert not {"job finished", "job failed", "the claim was lost"} & set(events)
+    assert not {"job finished", "job failed", "job claim lost"} & set(events)
     assert (events[-1], written[-1]["job_id"]) == (
-        "the job outlived its deadline",
+        "job ran past its deadline",
         reclaimed.id,
     )
     assert "in nightly_audit" in stderr, (
@@ -1534,7 +1534,7 @@ def test_a_lost_claim_still_ends_the_worker_at_its_deadline(
     )
 
     events = [line["event"] for line in written]
-    assert events[-2:] == ["the claim was lost", "the job outlived its deadline"]
+    assert events[-2:] == ["job claim lost", "job ran past its deadline"]
 
 
 LOOPING_WORKER_SOURCE = """

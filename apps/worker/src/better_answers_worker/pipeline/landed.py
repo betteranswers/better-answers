@@ -321,13 +321,13 @@ def redact_landed_copies(
     outcome = LandedSync(documents=answered, unreadable=unreadable)
     for refusal in unreadable:
         logger.warning(
-            "the sync could not read a document and found it unreadable",
+            "a document could not be read",
             connected_source_id=sync.connected_source_id,
             source_document_id=refusal.source_document_id,
             reason=refusal.reason,
         )
     logger.info(
-        "the connected source's landed copies were read",
+        "landed documents read",
         connected_source_id=sync.connected_source_id,
         documents=len(answered),
         detected_afresh=list(outcome.detected_afresh),

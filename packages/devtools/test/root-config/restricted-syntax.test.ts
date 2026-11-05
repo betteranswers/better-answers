@@ -54,8 +54,8 @@ describe("the syntax the lint refuses, with what to write instead", () => {
       parsing('  return z.enum(["a", "b"] satisfies readonly string[]);'),
       "as const",
     ],
-    ["`\\v` under the `u` flag", holding("  return /[\\v]/u.test(key);"), "Drop the flag"],
-    ["`\\v` under the `v` flag", holding("  return /[\\v]/v.test(key);"), "Drop the flag"],
+    ["`\\v` under the `u` flag", holding("  return /[\\v]/u.test(key);"), "Remove the flag"],
+    ["`\\v` under the `v` flag", holding("  return /[\\v]/v.test(key);"), "Remove the flag"],
   ])("refuses %s, naming the fix", (_shape, tree, instead) => {
     const findings = lint
       .output(tree)

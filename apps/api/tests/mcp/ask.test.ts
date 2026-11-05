@@ -206,7 +206,7 @@ describe("rendering the ask entry's answer as text", () => {
     expect(lines.slice(0, 4)).toEqual([
       "**Answered from the company's knowledge.**",
       `Record of this question: ${A_RECORD}`,
-      "Answers that fit, each word for word below:",
+      "Answers to the question, each given word for word below:",
       `- audits · ${THE_FIT.title} · ${THE_FIT.iri}`,
     ]);
     const block = [`Question: ${THE_FIT.title}`, `_${THE_FIT.trustWords}_`, "", "Admins read it."];

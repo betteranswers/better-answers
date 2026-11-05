@@ -256,7 +256,7 @@ def warm_the_detectors_stack(worker_id: str) -> None:
     from .redaction.pins import VERSION_STRING
 
     logger.info(
-        "the detector's stack is loaded",
+        "redaction detectors loaded",
         worker_id=worker_id,
         redaction_version=VERSION_STRING,
         rules=len(detector.RECOGNISERS),
@@ -271,7 +271,7 @@ def run(bootstrap: Bootstrap, *, once: bool, sleep: Sleep = sleep_until_stopped)
             if DIFFERS in stamps.values():
                 if stamps != said:
                     logger.error(
-                        "a deploy stamp does not match; claiming nothing",
+                        "deploy stamp differs from this worker's, so it claims no jobs",
                         migration_id=MIGRATION_ID,
                         contract_digest=CONTRACT_DIGEST,
                         worker_id=bootstrap.worker_id,

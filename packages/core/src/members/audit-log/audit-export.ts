@@ -119,10 +119,10 @@ const cellsOf = (event: ReadAuditEvent): readonly string[] => [
   detailWords(event.detail),
 ];
 
-const STOPPED = `The export stopped at ${EXPORT_CAP.toLocaleString("en-GB")} events. Narrow the search or the family for the rest.`;
+const STOPPED = `The export stopped at ${EXPORT_CAP.toLocaleString("en-GB")} events. To get the rest, narrow the search or pick a family.`;
 
 const TOO_BROAD =
-  "The search named more than 100 people or groups. Only the first 100 were read; narrow it for the rest.";
+  "The search matched more than 100 people or groups, so the export includes only the first 100. To get the rest, narrow the search.";
 
 const csvOfRead = (read: Read): string =>
   csvOf([

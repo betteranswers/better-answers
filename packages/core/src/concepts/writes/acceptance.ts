@@ -178,11 +178,11 @@ const returnedToProposerOn = (
   if (refusal === "merge-key-taken" || refusal === "resolution-moved") {
     return [
       "resolution-moved",
-      "the concept this suggestion resolves to moved after the set was opened",
+      "The concept this suggestion was matched to changed after the suggestion was made.",
     ];
   }
   if (refusal === "stale-precondition") {
-    return ["stale-precondition", "the concept moved after this suggestion was written"];
+    return ["stale-precondition", "The concept was edited after this suggestion was written."];
   }
   return undefined;
 };

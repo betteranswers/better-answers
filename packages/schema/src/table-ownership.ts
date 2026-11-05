@@ -129,542 +129,545 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "workspaces",
     access: "read and write",
     reason:
-      "Provisioning inserts the row and its config in one transaction, and the member read looks up the workspace's name, as the operator's lists of people and workspaces do; Better Auth owns the table as its organisation model, the workspaces slice owns the tenant's lifecycle over it.",
+      "The workspaces slice may read and write this table because provisioning inserts the row and its config in one transaction, and the member read and the operator's lists of people and workspaces look up a workspace's name. Better Auth owns the table as its organisation model, and this slice owns each tenant's lifecycle.",
   },
   {
     table: "public.member",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Provisioning writes the first Admin member in the same transaction as the workspace, and the slice reads the workspaces one person holds by their person id — the picker's cross-workspace read, which runs before any workspace is known. The operator's lists read every workspace's members: the one cross-workspace read after authentication, admitted to the operator alone.",
+      "The workspaces slice may read and write this table because provisioning writes the first Admin member in the same transaction as the workspace, and the workspace picker finds a person's workspaces by person id before any workspace is known. The operator's lists read every workspace's members, which is the only cross-workspace read after authentication and is allowed to the operator alone.",
   },
   {
     table: "public.user",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Ending every sign-in and token a person holds writes the instant every later claim is refused against; the platform writes a person it names before their first sign-in, unverified, and that sign-in finds the row; the person's own action writes their display name under its one rule, and adding a member or provisioning reads it to refuse a person with none; and the member read looks up the person's name and address for the shell, as the operator's list of people does for every person, with their revocation instant.",
+      "The workspaces slice may read and write this table because it writes the revocation instant that ends every sign-in and token a person holds, creates the row for a person the platform names before their first sign-in, and saves a person's own display name. It reads the table to refuse a new member or a provisioning with no display name, to show a person's name and address in the app shell, and to list every person with their revocation instant for the operator.",
   },
   {
     table: "public.session",
     by: POSTGRES_DOOR,
     access: "read",
     reason:
-      "The resolver reads the named session's confirmation beside the member and user rows it already reads, so the principal carries how fresh it is: the one rule a high-impact act and an operator's write judge on, and a caller whose claims name no session holds none.",
+      "The Postgres store may read this table because the principal resolver reads the named session's confirmation beside the member and user rows, so the principal records how fresh the session is. High-impact actions and operator writes check that freshness, and a caller whose claims name no session has none.",
   },
   {
     table: "public.session",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Revoking everywhere ends every browser session created before the instant, in the same transaction that wrote it; a person signs their own sessions out, each ending recorded in the identity set; the person's own read and the operator's inspection of a person name each session's device and when it began, was last extended and ends — never the address one came from.",
+      "The workspaces slice may read and write this table because revoking everywhere ends every browser session created before the revocation instant, in the same transaction that wrote the instant, and a person can sign out their own sessions, with each ending recorded in the identity audit log. A person's own view and the operator's inspection of a person show each session's device and when it began, was last extended, and ends, but never the address it came from.",
   },
   {
     table: "public.oauth_refresh_token",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Revocation's two scopes end the refresh tokens minted before the instant — every one of the person's, or only those whose consented workspace is this one. The operator's inspection of a person reads each grant as its line of rotated refresh tokens.",
+      "The workspaces slice may read and write this table because revocation ends the refresh tokens minted before the revocation instant, either all of a person's tokens or only those consented for this workspace. The operator's inspection of a person reads each grant as its chain of rotated refresh tokens.",
   },
   {
     table: "public.oauth_client",
     by: "workspaces",
     access: "read",
     reason:
-      "The operator's inspection of a person names the assistant each grant was issued to, by the name its metadata document gave.",
+      "The workspaces slice may read this table because the operator's inspection of a person names the assistant each grant was issued to, using the name from the client's metadata document.",
   },
   {
     table: "public.oauth_access_token",
     by: "workspaces",
     access: "write",
-    reason: "The same two scopes, so a live access token cannot outlive its refresh row.",
+    reason:
+      "The workspaces slice may write this table because revocation ends access tokens with the same two scopes as refresh tokens, so a live access token cannot outlive its refresh token.",
   },
   {
     table: "public.verification",
     by: "workspaces",
     access: "read and write",
     reason:
-      "A second factor's confirm parks what it waits on as a row keyed by session or address — an authenticator's secret, a passkey's challenge, the operator's restore code — reads it back while it lives and deletes it once spent, so no code verifies twice.",
+      "The workspaces slice may read and write this table because a second-factor confirm stores what it waits for as a row keyed by session or address (an authenticator's secret, a passkey's challenge, or the operator's restore code), reads it back while it is valid, and deletes it once used, so no code verifies twice.",
   },
   {
     table: "public.passkey",
     by: "workspaces",
     access: "read and write",
     reason:
-      "A person names, removes and confirms with their own passkeys here: a confirm advances the passkey's counter, a session's standing and the factor facts read whether the person holds one, and the operator's restore removes all but the one kept.",
+      "The workspaces slice may read and write this table because a person names, removes, and confirms with their own passkeys here, a confirm advances the passkey's counter, a session's standing and the second-factor facts check whether the person has a passkey, and the operator's restore removes every passkey except the one kept.",
   },
   {
     table: "public.passkey_last_use",
     by: "workspaces",
     access: "read and write",
     reason:
-      "A confirm by passkey stamps when it was last used, and the list of a person's passkeys reads that stamp beside each one.",
+      "The workspaces slice may read and write this table because a confirm by passkey records when the passkey was last used, and the list of a person's passkeys shows that time beside each one.",
   },
   {
     table: "public.authenticator",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Setting up an authenticator writes the person's row and confirming verifies it; a session's standing and the factor facts read whether it is verified, and removing it or the operator's restore deletes it.",
+      "The workspaces slice may read and write this table because setting up an authenticator writes the person's row and confirming it marks it verified, a session's standing and the second-factor facts check whether it is verified, and removing it or the operator's restore deletes it.",
   },
   {
     table: "public.recovery_code",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Recovery codes are minted, counted and spent here: a fresh set voids the old one, and spending deletes the one code typed in the transaction that confirms the session.",
+      "The workspaces slice may read and write this table because it creates, counts, and spends recovery codes, a new set replaces the old one, and spending a code deletes it in the same transaction that confirms the session.",
   },
   {
     table: "public.second_factor_throttle",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Each failed confirm counts against the person and a success clears the count, so the wait a wrong code earns is read and written in the transaction that judged the code.",
+      "The workspaces slice may read and write this table because each failed confirm counts against the person and a success clears the count, so the wait after a wrong code is read and written in the same transaction that checked the code.",
   },
   {
     table: "public.identity_audit_event",
     by: "workspaces",
     access: "read",
     reason:
-      "The operator's inspection of a person reads the identity set's records of their revocations, and an authenticator's addition is recorded once by reading for the record first; every write goes through the audit slice's face.",
+      "The workspaces slice may read this table because the operator's inspection of a person reads the records of their revocations, and adding an authenticator first checks for an existing record so the addition is recorded once. Every write goes through the audit slice's functions.",
   },
   {
     table: "public.user",
     by: "erasure",
     access: "read and write",
     reason:
-      "The routine's step 5 pseudonymises the row on the person's last workspace — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every row of a workspace's audit log and of the identity-set audit log names it — and reads the address off it first, because the two rows deleted below are keyed by address and not by person. The erasure rehearsal's seed writes one row the other way, the synthetic subject a drill erases, under a reserved domain that resolves nowhere.",
+      "The erasure slice may read and write this table because step 5 of the erasure routine pseudonymises the row on the person's last workspace: it replaces the address with a tombstone that names the erasure pseudonym, clears the name, and keeps the id, which every row of both audit logs names. It reads the address first, because the verification and invitation rows it deletes are keyed by address and not by person. The erasure rehearsal's seed also writes one row for the synthetic subject that a drill erases, under a reserved domain that resolves nowhere.",
   },
   {
     table: "public.member",
     by: "erasure",
     access: "read and write",
     reason:
-      "Every erasure request ends the person as a member here, which is the whole of what the arm for a person who holds another workspace does; the judgement between the two arms is the platform's and is never shown to an Admin. The read that makes it is `workspacesHeldBy` through the workspaces slice, recorded above. The erasure rehearsal's seed writes the one member it later ends, so the drill's subject is held where a real member is. The erasure map reads the rows first, so an access answer names each one.",
+      "The erasure slice may read and write this table because every erasure request ends the person's membership here, and for a person who belongs to another workspace that is all the erasure does. The platform chooses between those two paths by calling `workspacesHeldBy` in the workspaces slice, and never shows that choice to an Admin. The erasure rehearsal's seed writes the one member it later ends, and the erasure map reads the rows first so that the answer to an access request names each one.",
   },
   {
     table: "public.session",
     by: "erasure",
     access: "read and write",
     reason:
-      "A sign-in carries the address it came from and the agent that made it, so the person's sessions go with the identity set on the last workspace. The erasure map reads them first, so an access answer names each one, and the verification sweep finds a person's session-keyed rows through them.",
+      "The erasure slice may read and write this table because a session records the address it came from and the agent that made it, so the person's sessions are deleted with the rest of their identity on the last workspace. The erasure map reads them first so that the answer to an access request names each one, and the verification sweep uses them to find the person's session-keyed rows.",
   },
   {
     table: "public.verification",
     by: "erasure",
     access: "read and write",
     reason:
-      "A verification row is keyed by the address a code was sent to rather than by person, so it is deleted by the identifier set's addresses and the one the user row still carries — the erasure map's own predicate, which is why it runs before the address is taken away. The erasure map reads the rows first, so an access answer names each one.",
+      "The erasure slice may read and write this table because a verification row is keyed by the address a code was sent to, not by person, so the erasure deletes rows by the identifier set's addresses and by the address still on the user row. That match is the erasure map's own predicate, so the delete runs before the address is replaced. The erasure map reads the rows first so that the answer to an access request names each one.",
   },
   {
     table: "public.invitation",
     by: "erasure",
     access: "read and write",
     reason:
-      "An invitation names the address it was sent to. Deleted inside the requesting workspace and no other: an invitation another company sent is that company's record to answer for, and the map is fenced the same way. The erasure map reads the rows first, so an access answer names each one.",
+      "The erasure slice may read and write this table because an invitation names the address it was sent to. The erasure deletes invitations only in the requesting workspace, because an invitation another company sent is that company's record, and the erasure map is limited in the same way. The erasure map reads the rows first so that the answer to an access request names each one.",
   },
   {
     table: "public.account",
     by: "erasure",
     access: "write",
     reason:
-      "A linked account is the external identity a sign-in came through — a name for this person at another provider — so it goes with the identity set on the last workspace.",
+      "The erasure slice may write this table because a linked account is the external identity a sign-in came through, a name for this person at another provider, so it is deleted with the rest of their identity on the last workspace.",
   },
   {
     table: "public.passkey",
     by: "erasure",
     access: "read and write",
     reason:
-      "A passkey is the person's own credential, named by them and held for every workspace they belong to, so it goes with the identity set on the last workspace and stays while another workspace needs it. Its last-use row goes with it by the foreign key's cascade. The erasure map reads the rows first, so an access answer names each one.",
+      "The erasure slice may read and write this table because a passkey is the person's own credential, named by them and used for every workspace they belong to, so it is deleted with their identity on the last workspace and kept while another workspace needs it. The foreign key's cascade deletes its last-use row with it, and the erasure map reads the rows first so that the answer to an access request names each one.",
   },
   {
     table: "public.passkey_last_use",
     by: "erasure",
     access: "read",
     reason:
-      "The erasure map names each passkey's last use beside the passkey, so an access answer covers when the person used it; the delete is the cascade from `passkey`.",
+      "The erasure slice may read this table because the erasure map shows each passkey's last use beside the passkey, so the answer to an access request says when the person used it. The cascade from `passkey` deletes the rows.",
   },
   {
     table: "public.authenticator",
     by: "erasure",
     access: "write",
     reason:
-      "An authenticator is the person's own second factor, across every workspace, so it goes with the identity set on the last workspace and stays while another workspace needs it; the user row's flag for it is cleared in the same step.",
+      "The erasure slice may write this table because an authenticator is the person's own second factor for every workspace, so it is deleted with their identity on the last workspace and kept while another workspace needs it. The same step clears the user row's flag for it.",
   },
   {
     table: "public.recovery_code",
     by: "erasure",
     access: "write",
     reason:
-      "The recovery codes stand in for the person's second factor, so they go with it on the last workspace and stay with it otherwise.",
+      "The erasure slice may write this table because recovery codes stand in for the person's second factor, so they are deleted with it on the last workspace and kept with it otherwise.",
   },
   {
     table: "public.second_factor_throttle",
     by: "erasure",
     access: "read and write",
     reason:
-      "A person's failed confirms are a record of their sign-in, kept across every workspace, so they go with the second factor on the last workspace and stay with it otherwise. The erasure map reads the rows first, so an access answer names each one.",
+      "The erasure slice may read and write this table because a person's failed confirms are a record of their sign-in, kept across every workspace, so they are deleted with the second factor on the last workspace and kept with it otherwise. The erasure map reads the rows first so that the answer to an access request names each one.",
   },
   {
     table: "public.workspace_last_active",
     by: "erasure",
     access: "read and write",
     reason:
-      "When the person was last active here is this workspace's record of them, so every erasure from it deletes only that row under the workspace's scope. The erasure map reads it first, so an access answer names it.",
+      "The erasure slice may read and write this table because the person's last-active time here is this workspace's record of them, so every erasure from the workspace deletes only that row, under the workspace's scope. The erasure map reads it first so that the answer to an access request includes it.",
   },
   {
     table: "public.workspace_last_active",
     by: POSTGRES_DOOR,
     access: "read and write",
     reason:
-      "The claims resolution reads whether the member's last-active row here is an hour old, in the claims transaction, and stamps it only then, one conditional write in its own short transaction under that workspace's scope, so every door — the tRPC roads and the MCP surface alike — counts a use; a removal or an erasure deletes the row through the members slice that owns it.",
+      "The Postgres store may read and write this table because claims resolution checks whether the member's last-active row is an hour old and only then updates it, with one conditional write in its own short transaction under the workspace's scope, so every entry point, including the tRPC routes and the MCP server, counts a use. A removal or an erasure deletes the row through the members slice, which owns the table.",
   },
   {
     table: "public.question_asked",
     by: "erasure",
     access: "read and write",
     reason:
-      "A record names who asked, so every erasure from the workspace rewrites that id to the erasure pseudonym and keeps the row, which is kept for good. The erasure map reads the records first, so an access answer names each one.",
+      "The erasure slice may read and write this table because a record names who asked, so every erasure from the workspace rewrites that id to the erasure pseudonym and keeps the row, which is never deleted. The erasure map reads the records first so that the answer to an access request names each one.",
   },
   {
     table: "public.question_content",
     by: "erasure",
     access: "write",
     reason:
-      "The question is the person's own words, so the erasure deletes the content rows of the records it rewrites, ahead of the month's partition being dropped.",
+      "The erasure slice may write this table because a question is the person's own words, so the erasure deletes the content rows of the records it rewrites, before the month's partition is dropped.",
   },
   {
     table: "public.question_feedback",
     by: "erasure",
     access: "write",
     reason:
-      "Feedback names who gave it and may carry their note, so the erasure rewrites the id as it does on the record and clears the note and the disputed sentence; the reason and the disputed concept stay.",
+      "The erasure slice may write this table because feedback names who gave it and may carry their note, so the erasure rewrites the id as it does on the record and clears the note and the disputed sentence, but keeps the reason and the disputed concept.",
   },
   {
     table: "index.passage",
     by: "erasure",
     access: "read",
     reason:
-      "A person is found in the documents by searching the live passages for the identifier's words, and a candidate document's passages are read whole, in order, to confirm the match.",
+      "The erasure slice may read this table because it finds a person in the documents by searching the live passages for the identifier's words, and then reads a candidate document's passages in full, in order, to confirm the match.",
   },
   {
     table: "public.source_document",
     by: "erasure",
     access: "read",
     reason:
-      "The passage search keeps to documents that are not gone, and re-deriving after an erasure reads the connected source each matched document came from, so each is reprocessed. The rehearsal finds its seeded document's connected source the same way.",
+      "The erasure slice may read this table because the passage search skips documents that are gone, and re-deriving after an erasure reads the connected source each matched document came from, so that each document is reprocessed. The rehearsal finds its seeded document's connected source in the same way.",
   },
   {
     table: "public.bundle_commit",
     by: "erasure",
     access: "read",
     reason:
-      "The erasure map lists every bundle commit the person is the actor of, so an access answer names each one.",
+      "The erasure slice may read this table because the erasure map lists every bundle commit the person is the actor of, so that the answer to an access request names each one.",
   },
   {
     table: "public.concept_verification",
     by: "erasure",
     access: "read",
     reason:
-      "The erasure map lists every verification the person recorded on a concept, so an access answer names each one.",
+      "The erasure slice may read this table because the erasure map lists every verification the person recorded on a concept, so that the answer to an access request names each one.",
   },
   {
     table: "public.concept_sensitivity_override",
     by: "erasure",
     access: "read and write",
     reason:
-      "An override names who set it, so the erasure map lists each one the person set and every erasure from the workspace rewrites that id to the erasure pseudonym.",
+      "The erasure slice may read and write this table because an override names who set it, so the erasure map lists each override the person set, and every erasure from the workspace rewrites that id to the erasure pseudonym.",
   },
   {
     table: "public.concept_owner",
     by: "erasure",
     access: "read and write",
     reason:
-      "An owner row names the person and nothing else, so the erasure map lists each one naming the person and the member's ending deletes them; the concept falls back to its collection's owner, or to Admins.",
+      "The erasure slice may read and write this table because an owner row names only the person, so the erasure map lists each row that names them, and ending their membership deletes those rows. The concept then falls back to its collection's owner, or to the Admins.",
   },
   {
     table: "public.write_up_version",
     by: "erasure",
     access: "read and write",
     reason:
-      "A write-up version names who saved it, so the erasure map lists each one the person saved and every erasure from the workspace rewrites that id to the erasure pseudonym through `pseudonymise_record_actors`, keeping the version's text.",
+      "The erasure slice may read and write this table because a write-up version names who saved it, so the erasure map lists each version the person saved, and every erasure from the workspace rewrites that id to the erasure pseudonym through `pseudonymise_record_actors` and keeps the version's text.",
   },
   {
     table: "public.guide_definition_version",
     by: "erasure",
     access: "read and write",
     reason:
-      "A guide definition version names who saved it, so the erasure map lists each one the person saved and every erasure from the workspace rewrites that id to the erasure pseudonym through `pseudonymise_record_actors`, keeping the definition.",
+      "The erasure slice may read and write this table because a guide definition version names who saved it, so the erasure map lists each version the person saved, and every erasure from the workspace rewrites that id to the erasure pseudonym through `pseudonymise_record_actors` and keeps the definition.",
   },
   {
     table: "public.usage",
     by: "erasure",
     access: "read and write",
     reason:
-      "A usage row names who copied, exported or submitted the work, so the erasure map lists each one the person made and every erasure from the workspace rewrites that id to the erasure pseudonym.",
+      "The erasure slice may read and write this table because a usage row names who copied, exported, or submitted the work, so the erasure map lists each row the person made, and every erasure from the workspace rewrites that id to the erasure pseudonym.",
   },
   {
     table: "public.finding",
     by: "erasure",
     access: "read and write",
     reason:
-      "A finding names who reviewed or restored it and keeps the reason they typed, so the erasure map lists each one and every erasure from the workspace rewrites the id to the erasure pseudonym and clears that person's reason: a review reason to NULL, and a restore reason to the empty string, because `finding_restore_check` needs one on a restored finding.",
+      "The erasure slice may read and write this table because a finding names who reviewed or restored it and keeps the reason they typed. The erasure map lists each such finding, and every erasure from the workspace rewrites the id to the erasure pseudonym and clears that person's reason: a review reason becomes NULL, and a restore reason becomes the empty string, because `finding_restore_check` requires one on a restored finding.",
   },
   {
     table: "public.suggestion",
     by: "erasure",
     access: "read and write",
     reason:
-      "A suggestion names who proposed and who decided it and keeps the decider's reason, so the erasure map lists each one the person proposed or decided and every erasure from the workspace rewrites both ids to the erasure pseudonym, through `erase_from_the_suggestions`. That person's reason becomes a fixed sentence, because `suggestion_reason_length_check` refuses an empty one. `erase_from_the_write_requests` returns a waiting suggestion whose request body it had to replace.",
+      "The erasure slice may read and write this table because a suggestion names who proposed it and who decided it, and keeps the decider's reason. The erasure map lists each suggestion the person proposed or decided, and every erasure from the workspace rewrites both ids to the erasure pseudonym through `erase_from_the_suggestions`. That person's reason becomes a fixed sentence, because `suggestion_reason_length_check` refuses an empty one, and `erase_from_the_write_requests` returns a waiting suggestion whose request body it had to replace.",
   },
   {
     table: "public.concept_write_request",
     by: "erasure",
     access: "write",
     reason:
-      "A write request's title, frontmatter and body can carry the person's actor id or `human:<address>`, so the erasure map lists each request naming them through `concept_write_requests_naming` and every erasure from the workspace rewrites those to the erasure pseudonym through `erase_from_the_write_requests`, as it rewrites the bundle's files.",
+      "The erasure slice may write this table because a write request's title, frontmatter, and body can carry the person's actor id or `human:<address>`. The erasure map lists each request that names them through `concept_write_requests_naming`, and every erasure from the workspace rewrites those values to the erasure pseudonym through `erase_from_the_write_requests`, as it rewrites the bundle's files.",
   },
   {
     table: "public.concept_index",
     by: "erasure",
     access: "read",
     reason:
-      "When the map finds the person named in a concept's file, the routine reads which concepts live at those paths, so it can re-derive each one.",
+      "The erasure slice may read this table because, when the erasure map finds the person named in a concept's file, the routine reads which concepts live at those paths so that it can re-derive each one.",
   },
   {
     table: "public.session",
     by: "sweeps",
     access: "write",
     reason:
-      "A session holds the address it came from and the agent that made it, so the daily pass deletes every one past its expiry or its pending hour: nobody signs out of a session they abandoned.",
+      "The sweeps slice may write this table because a session holds the address it came from and the agent that made it, and nobody signs out of a session they abandoned, so the daily pass deletes every session past its expiry or its pending hour.",
   },
   {
     table: "public.verification",
     by: "sweeps",
     access: "write",
     reason:
-      "The library no longer deletes expired rows at lookup, because that made another person's just-expired code read as wrong, so the daily pass deletes every row a day past its expiry.",
+      "The sweeps slice may write this table because the library no longer deletes expired rows at lookup, since that made another person's just-expired code look wrong, so the daily pass deletes every row that is a day past its expiry.",
   },
   {
     table: "public.member",
     by: POSTGRES_DOOR,
     access: "read",
     reason:
-      "The Principal resolver reads the member row for (workspace, person) and the member's revocation instant, in the transaction that sets the scope — so the role is resolved in the same transaction as the read it authorises, which is what makes the door a door.",
+      "The Postgres store may read this table because the principal resolver reads the member row for (workspace, person) and the member's revocation instant in the transaction that sets the scope, so the role is resolved in the same transaction as the read it authorises.",
   },
   {
     table: "public.user",
     by: POSTGRES_DOOR,
     access: "read",
     reason:
-      "The same one resolve query joins the person's own revocation instant, so revocation's other scope costs no second round trip on the path every call takes.",
+      "The Postgres store may read this table because the same resolve query joins the person's own revocation instant, so checking person-wide revocation costs no second round trip on the path every call takes.",
   },
   {
     table: "public.group_member",
     by: POSTGRES_DOOR,
     access: "read",
     reason:
-      "The same one resolve query aggregates the caller's group ids into the Principal, because groups are re-read per call rather than carried on a credential: every visibility check then pays one member lookup it already has.",
+      "The Postgres store may read this table because the same resolve query collects the caller's group ids into the principal, since groups are read again on every call instead of being carried on a credential, so each visibility check uses a member lookup the query already made.",
   },
   {
     table: "public.workspace_config",
     by: POSTGRES_DOOR,
     access: "read and write",
     reason:
-      "A transport reads one setting of the caller's workspace by key in the transaction the door already scoped, as the MCP surface reads how long a client may keep its tool list; a reservation of spend reads the spending limit held to its commit, so two cannot both pass it; and the platform sets a setting by key, as the ops command sets the spending limit.",
+      "The Postgres store may read and write this table because a transport reads one setting of the caller's workspace by key in the transaction the store already scoped, as the MCP server reads how long a client may keep its tool list. A spend reservation reads the spending limit and holds it until commit so that two reservations cannot both pass it, and the platform sets a setting by key, as the ops command sets the spending limit.",
   },
   {
     table: "public.member",
     by: "members",
     access: "read and write",
     reason:
-      "Adding a person to a group reads whether they are a member of the workspace first, so the action answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; the request action reads the same row to answer already-a-member neutrally. An Admin's actions on a member write the row itself — a role change, a removal and the member's revocation instant — and a role change or a removal first holds every Admin row of the workspace, so it never loses its last.",
+      "The members slice may read and write this table because adding a person to a group first checks that they are a member of the workspace, so the action returns `no-such-member` instead of letting the composite foreign key abort the caller's transaction, and an access request reads the same row to answer already-a-member neutrally. An Admin's actions on a member (a role change, a removal, and the member's revocation instant) write the row itself, and a role change or a removal first locks every Admin row of the workspace so that the workspace never loses its last Admin.",
   },
   {
     table: "public.user",
     by: "members",
     access: "read",
     reason:
-      "Approving a request reads the requester's address to mint the invitation to it, and the Admin's queue names each requester so a person can be told apart from a person id; both reads are by the requester id already on a row of this workspace's queue.",
+      "The members slice may read this table because approving an access request reads the requester's address to send the invitation to, and the Admin's queue shows each requester's name so that a person is not shown as a bare person id. Both reads look up a requester id that is already on a row of this workspace's queue.",
   },
   {
     table: "public.workspace",
     by: "members",
     access: "read",
-    reason: "An invitation's email names the workspace it joins.",
+    reason:
+      "The members slice may read this table because an invitation's email names the workspace it joins.",
   },
   {
     table: "public.user",
     by: "concepts",
     access: "read",
     reason:
-      "Accepting an *edit* suggestion commits with the proposer as git author, and a git author line is a name and an address — which the audit log's `human:<person id>` deliberately is not, so the action reads them off the person the proposer names. Collections and owners names each collection's owner, and an owner who is no Admin cannot read the members list, so that read joins the owner's name.",
+      "The concepts slice may read this table because accepting an *edit* suggestion commits with the proposer as git author, and a git author line needs a name and an address, which the audit log's `human:<person id>` deliberately leaves out, so the action reads them from the person the proposer names. The collections and owners page also shows each collection owner's name, and an owner who is not an Admin cannot read the members list, so that read joins the owner's name.",
   },
   {
     table: "public.write_up_include",
     by: "concepts",
     access: "read",
     reason:
-      "A direct edit asks once before it commits, and Waiting on you tells an owner before they accept, how many places use the concept an edit would change: the write-ups including it plus the concepts linking to it. A write counts inside its own transaction so it decides on the count it holds, and the waiting list counts in its one statement so a page of suggestions costs one query.",
+      "The concepts slice may read this table because a direct edit asks once before it commits, and Waiting on you tells an owner before they accept, how many places use the concept the edit would change: the write-ups that include it plus the concepts that link to it. A write counts inside its own transaction so that it decides on the count it holds, and the waiting list counts in one statement so that a page of suggestions costs one query.",
   },
   {
     table: "public.member",
     by: "concepts",
     access: "read",
     reason:
-      "The same read joins the member row: a proposer is a string a producer wrote and `user` is global by design, so a lookup by id alone would let a compromised producer put any person on the platform into another tenant's commit. Only a member of this workspace can be named as an author. Naming an owner reads it too, to refuse a person who is not a member before the owner row's foreign key to it would.",
+      "The concepts slice may read this table because a proposer is a string a producer wrote and `user` is global by design, so a lookup by id alone would let a compromised producer put any person on the platform into another tenant's commit. Joining the member row means that only a member of this workspace can be named as an author. Naming an owner also reads the member row, to refuse a person who is not a member before the owner row's foreign key does.",
   },
   {
     table: "public.bundle_commit",
     by: "bundle",
     access: "read and write",
     reason:
-      "Every commit to the knowledge base lands its row in the transaction that holds the commit, whichever slice's write made it, so the slice that owns the write inserts it, and first reads that the commit it lands on has its row, since a commit on top of one whose rows were lost would stop the reconciler's replay; the concepts slice keeps the table, because its reconciler reads the rows and a rewritten history moves them.",
+      "The bundle slice may read and write this table because every commit to the knowledge base writes its row in the transaction that holds the commit, whichever slice made the write, and first checks that the commit it builds on has its row, since a commit on top of one whose rows were lost would stop the reconciler's replay. The concepts slice owns the table, because its reconciler reads the rows and a rewritten history moves them.",
   },
   {
     table: "public.user",
     by: "bundle",
     access: "read",
     reason:
-      "A write to the knowledge base commits with the running member as git author, and a git author line is a name and an address — which the audit log's `human:<person id>` deliberately is not, so the write reads them off the member's person id.",
+      "The bundle slice may read this table because a write to the knowledge base commits with the running member as git author, and a git author line needs a name and an address, which the audit log's `human:<person id>` deliberately leaves out, so the write reads them from the member's person id.",
   },
   {
     table: "public.member",
     by: "bundle",
     access: "read",
     reason:
-      "The same read joins the member row, so only a member of this workspace can sign one of its commits.",
+      "The bundle slice may read this table because the same read joins the member row, so that only a member of this workspace can sign one of its commits.",
   },
   {
     table: "public.invitation",
     by: "members",
     access: "read and write",
     reason:
-      "Approving an access request mints the invitation row directly, in the same transaction as the decision — a direct row write through the identity-write seam, never Better Auth's endpoint path, so the two invitation fences stand until the accept page ships. The slice also lists, counts and accepts the workspace's invitations and reads their statuses, each row under the workspace's scope.",
+      "The members slice may read and write this table because approving an access request writes the invitation row directly, in the same transaction as the decision, and never through Better Auth's endpoint, so the two invitation fences stay in place until the accept page ships. The slice also lists, counts, and accepts the workspace's invitations and reads their statuses, each under the workspace's scope.",
   },
   {
     table: "public.audit_event",
     by: "members",
     access: "read",
     reason:
-      "The audit log's search for a person finds them as an event's actor, its subject or a person its detail names, so a former member is found and an outsider never.",
+      "The members slice may read this table because the audit log's search for a person finds them as an event's actor, its subject, or a person its detail names, so it finds a former member but never an outsider.",
   },
   {
     table: "public.identity_audit_event",
     by: "members",
     access: "read",
     reason:
-      "A name flag is raised in the identity set, which no workspace's audit log holds, so the slice reads whether one still waits for a person and lists for the operator the flags not yet answered.",
+      "The members slice may read this table because a name flag is raised in the identity audit log, which no workspace's audit log holds, so the slice checks whether a flag still waits for a person and lists the unanswered flags for the operator.",
   },
   {
     table: "public.connected_source",
     by: "members",
     access: "read",
     reason:
-      "The audit log names a connected source an event's detail points at by its name, under the workspace's scope, rather than by an id no Admin can read.",
+      "The members slice may read this table because the audit log shows a connected source that an event's detail points at by its name, under the workspace's scope, instead of by an id that no Admin can read.",
   },
   {
     table: "public.source_document",
     by: "members",
     access: "read",
     reason:
-      "The audit log names a document an event's detail points at by its title, the same way.",
+      "The members slice may read this table because the audit log shows a document that an event's detail points at by its title, in the same way as a connected source.",
   },
   {
     table: "public.concept_index",
     by: "members",
     access: "read",
-    reason: "The audit log names a concept an event's detail points at by its title, the same way.",
+    reason:
+      "The members slice may read this table because the audit log shows a concept that an event's detail points at by its title, in the same way as a connected source.",
   },
   {
     table: "public.map_generation",
     by: MAP_DOOR,
     access: "read and write",
     reason:
-      "The delta builder creates the live-generation row on a workspace's first delta and passes it as a parameter on every write; the traversal templates pass it on every walk, so a rebuild's flip is one row update every read sees at once.",
+      "The map store may read and write this table because the delta builder creates the live-generation row on a workspace's first delta and passes it as a parameter on every write, and the traversal templates pass it on every walk, so a rebuild switches generation with one row update that every read sees at once.",
   },
   {
     table: "public.map_node",
     by: MAP_DOOR,
     access: "read and write",
     reason:
-      "The delta builder upserts the bundle-and-record nodes inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path.",
+      "The map store may read and write this table because the delta builder upserts the bundle and record nodes inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path.",
   },
   {
     table: "public.map_edge",
     by: MAP_DOOR,
     access: "read and write",
     reason:
-      "The delta builder replaces a concept's outgoing edges inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path.",
+      "The map store may read and write this table because the delta builder replaces a concept's outgoing edges inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path.",
   },
   {
     table: "public.map_unresolved_reference",
     by: MAP_DOOR,
     access: "read and write",
     reason:
-      "The delta builder replaces a concept's unresolved path references beside its edges, settles the ones naming the path a concept lands at, and sweeps a retired generation's; the delta and the worker's rebuild are its only writers, and no person reads it.",
+      "The map store may read and write this table because the delta builder replaces a concept's unresolved path references beside its edges, resolves the ones that name the path where a concept lands, and deletes a retired generation's rows. The delta builder and the worker's rebuild are its only writers, and no person reads it.",
   },
   {
     table: "public.concept_index",
     by: MAP_DOOR,
     access: "read",
     reason:
-      "The delta builder resolves a link's target to a concept and reads its kind off the index inside the action's own transaction, and the citers waiting on a landed concept's path are read back from it — the map is derived from the rows the same transaction just wrote.",
+      "The map store may read this table because the delta builder resolves a link's target to a concept and reads its kind from the index inside the action's own transaction, and reads back the citers that wait on a landed concept's path, so the map is derived from the rows that the same transaction just wrote.",
   },
   {
     table: "public.source_document",
     by: "concepts",
     access: "read",
     reason:
-      "The sensitivity derivation joins a concept's citations to the documents they locate, to reach the connected source each was yielded by — the platform-held fact a producer's citation cannot supply.",
+      "The concepts slice may read this table because the sensitivity derivation joins a concept's citations to the documents they point at, to find the connected source that produced each one, which the platform holds and a producer's citation cannot supply.",
   },
   {
     table: "public.connected_source",
     by: "concepts",
     access: "read",
     reason:
-      "A concept's sensitivity is the most restrictive among the connected sources of the evidence it cites and its audience their intersection; the evidence pane applies the reader's predicate to the same rows to say which cited evidence they may reach.",
+      "The concepts slice may read this table because a concept's sensitivity is the most restrictive among the connected sources of the evidence it cites, and its audience is their intersection. The evidence pane applies the reader's predicate to the same rows to show which cited evidence the reader may open.",
   },
   {
     table: "public.audit_event",
     by: "concepts",
     access: "read",
     reason:
-      "A concept the reconciler replayed rests also on that replay's event, which records whether its evidence agreed, so its visibility reads the event through the concept's bundle commit; the sync cascade reads its own followed events to find when it first followed a sync and which syncs and attempts it has already followed, so it follows none twice.",
+      "The concepts slice may read this table because a concept that the reconciler replayed also depends on that replay's event, which records whether its evidence agreed, so the concept's visibility reads the event through its bundle commit. The sync cascade reads its own earlier events to find when it first followed a sync and which syncs and attempts it has already followed, so that it never follows one twice.",
   },
   {
     table: "public.job",
     by: "sources",
     access: "read",
     reason:
-      "The publish action reads the status of the connected source's latest sync, its `index` job by subject, inside its own transaction: the worker holds SELECT alone on `connected_source`, so the sync's own row is the only place the tier doing the work can say where it got to, and only *done* lets a publish through. One column of one row, by the statement in `packages/core/src/sources/publish-connected-source.ts`. The review read's other question of the same table — what the latest finished sync found — goes through the runs slice's own door (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
+      "The sources slice may read this table because the publish action reads the status of the connected source's latest sync, its `index` job by subject, inside its own transaction, and only *done* lets a publish through. The worker holds only SELECT on `connected_source`, so the sync's job row is the only place where the worker can record how far it got. The read is one column of one row, by the statement in `packages/core/src/sources/publish-connected-source.ts`. The review read's other question about this table, what the latest finished sync found, goes through the runs slice's own function (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
   },
   {
     table: "public.audit_event",
     by: "sources",
     access: "read",
     reason:
-      "A repeated upload connect answers with what the first one bound rather than streaming a second copy: `FIRST_OUTCOME` in `packages/core/src/sources/connected-source.ts` joins the connected source's document to the audit event the first connect wrote, by subject and action, to hand back that event's id. A read of one row the same action wrote, never a write.",
+      "The sources slice may read this table because a repeated upload connect returns what the first connect bound instead of streaming a second copy. `FIRST_OUTCOME` in `packages/core/src/sources/connected-source.ts` joins the connected source's document to the audit event the first connect wrote, by subject and action, to return that event's id. It reads one row that the same action wrote and never writes.",
   },
   {
     table: "public.concept_index",
     by: "guides",
     access: "read",
     reason:
-      "A write-up's sensitivity is the most restrictive among its includes, read off the concepts' rows; the footnote read applies the concept's own predicate to every include, so a write-up's citation is never a side door to a concept its reader may not see.",
+      "The guides slice may read this table because a write-up's sensitivity is the most restrictive among its includes, read from the concepts' rows, and the footnote read applies each included concept's own predicate, so that a write-up's citation never exposes a concept its reader may not see.",
   },
   {
     table: "public.usage",
     by: "concepts",
     access: "read",
     reason:
-      "The records export lists every use of a concept or a write-up the Admin may read in one statement, so a large workspace's uses cost one query. Writing a use stays with the usage slice's `recordUsage`.",
+      "The concepts slice may read this table because the records export lists, in one statement, every use of a concept or a write-up that the Admin may read, so a large workspace's uses cost one query. Writing a use stays with the usage slice's `recordUsage`.",
   },
   {
     table: "public.write_up",
     by: "concepts",
     access: "read",
     reason:
-      "The records export keeps a use of a write-up only when the Admin may read that write-up, so its one statement applies the read predicate to the write-up's own row.",
+      "The concepts slice may read this table because the records export keeps a use of a write-up only when the Admin may read that write-up, so its one statement applies the read predicate to the write-up's own row.",
   },
 ] as const satisfies readonly CrossOwnerAccess[];

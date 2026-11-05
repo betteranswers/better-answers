@@ -39,24 +39,32 @@ const note = written("a note");
 
 const disputed = z.object({
   sentence: written("a disputed sentence").describe(
-    "The sentence the person disputes, as you wrote it.",
+    "The sentence the person disputes, exactly as you wrote it. Up to 2,000 characters.",
   ),
   concept: z
     .string()
     .regex(IRI)
-    .describe("The `iri` of the concept that sentence rested on, one the answer returned."),
+    .describe(
+      "The `iri` of the concept you based that sentence on. The answer must have returned it.",
+    ),
 });
 
 /** A transport's flat input: an MCP client takes no union at an input's root. */
 export const feedbackFields = z.object({
-  recordId: recordId.describe("The `recordId` the `ask` answer carried."),
-  verdict: z.enum(FEEDBACK_VERDICTS).describe("Helpful, or a flag with a reason."),
-  reason: reason.optional().describe("Required with a flag."),
-  note: note.optional().describe("With a flag: what was wrong, in the person's own words."),
+  recordId: recordId.describe("The `recordId` from the `ask` result."),
+  verdict: z
+    .enum(FEEDBACK_VERDICTS)
+    .describe("`helpful` if the answer helped, or `flag` if something was wrong with it."),
+  reason: reason
+    .optional()
+    .describe("Why the answer is flagged. Required when `verdict` is `flag`."),
+  note: note
+    .optional()
+    .describe("For a flag: what was wrong, in the person's own words. Up to 2,000 characters."),
   disputed: disputed
     .optional()
     .describe(
-      "With a flag on a sentence you wrote from the answer: that sentence and the concept it rested on.",
+      "For a flag on a sentence you wrote from the answer: that sentence and the concept you based it on.",
     ),
 });
 
@@ -174,11 +182,13 @@ const REASON_WORDS = {
 const flagSaid = (flag: Extract<FeedbackInput, { readonly verdict: "flag" }>): string => {
   const noted = flag.note === undefined ? "" : ` — "${flag.note}"`;
   const disputing =
-    flag.disputed === undefined ? "" : ", with the sentence disputed and the concept it rested on";
+    flag.disputed === undefined
+      ? ""
+      : ", with the disputed sentence and the concept it was based on";
   return `flagged as ${REASON_WORDS[flag.reason]}${noted}${disputing}`;
 };
 
 export const renderFeedback = ({ feedback }: FeedbackReceipt): string => {
   const what = feedback.verdict === "helpful" ? "marked helpful" : flagSaid(feedback);
-  return `Stored on record ${feedback.recordId}: ${what}. No one is notified of it.`;
+  return `Feedback saved on record ${feedback.recordId}: ${what}. No one is notified.`;
 };

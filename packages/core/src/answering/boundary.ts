@@ -21,17 +21,21 @@ export const findInput = z.object({
     .min(1)
     .max(500)
     .refine(holdsNoNul, "a query must not contain a NUL character")
-    .describe("What to look for, in the person's own words."),
+    .describe("The words to search for, as the person wrote them. Up to 500 characters."),
   limit: z
     .number()
     .int()
     .min(1)
     .max(FIND_LIMIT_AT_MOST)
     .default(5)
-    .describe("How many matches to preview."),
+    .describe(
+      `The number of matches to return, from 1 to ${FIND_LIMIT_AT_MOST}. The default is 5.`,
+    ),
   cursor: findCursor
     .optional()
-    .describe("The `nextCursor` of the page before, to read the page after it."),
+    .describe(
+      "The `nextCursor` value from the previous page of results. Send it to get the next page.",
+    ),
 });
 
 export type FindInput = z.output<typeof findInput>;
@@ -48,7 +52,9 @@ export const askInput = z.object({
     .min(1)
     .max(QUESTION_CHARACTERS_AT_MOST)
     .refine(holdsNoNul, "a question must not contain a NUL character")
-    .describe("The question, in the person's own words."),
+    .describe(
+      `The question, as the person asked it. Up to ${QUESTION_CHARACTERS_AT_MOST.toLocaleString("en-GB")} characters.`,
+    ),
   collections: z
     .array(
       z
@@ -60,7 +66,7 @@ export const askInput = z.object({
     .max(COLLECTIONS_AT_MOST)
     .default([])
     .describe(
-      "The collections the question concerns, each spelled as an answer's `readableCollections` spells it. Leave it out to consider every collection you can read.",
+      "The names of the collections to search, spelled exactly as in `readableCollections`. Leave it out to search every collection you can read.",
     ),
 });
 
@@ -75,12 +81,12 @@ export const openInput = z
   .object({
     iri: ids.conceptIri
       .optional()
-      .describe("The concept's identity, as a `find` line or an `ask` citation gives it."),
+      .describe("The concept's `iri`, copied from a `find` result or an `ask` result."),
     locator: z
       .string()
       .min(1)
       .optional()
-      .describe("The place of the passage a citation rests on, as the citation gives it."),
+      .describe("The `locator` of a passage, copied from a document match or an evidence item."),
   })
   .refine(
     (value): value is OpenInput => (value.iri === undefined) !== (value.locator === undefined),
@@ -119,7 +125,7 @@ const documentMatch = z.object({
   openingLine: z
     .string()
     .describe(
-      "The matched passage's first line with words, less any heading marks, cut short past 160 characters.",
+      "The first line of text in the matched passage, without heading marks. Lines longer than 160 characters are cut short.",
     ),
 });
 
@@ -151,16 +157,22 @@ const evidenceItem = z.object({
     .string()
     .regex(/\S/u)
     .exactOptional()
-    .describe("The concept's own place in the source, such as a page; it opens nothing."),
+    .describe(
+      "Where in the source the concept comes from, such as a page number. You cannot open it.",
+    ),
   locator: z
     .string()
     .regex(/\S/u)
     .exactOptional()
-    .describe("What opens the passage; absent where there is none you may read."),
+    .describe(
+      "Pass this to `open` to read the passage. Missing when there is no passage you can read.",
+    ),
   iri: z
     .string()
     .exactOptional()
-    .describe("The concept this source names; absent where there is none you may read."),
+    .describe(
+      "Pass this to `open` to read the concept this evidence names. Missing when there is no concept you can read.",
+    ),
 });
 
 export type Evidence<Iri extends string> = {
@@ -173,18 +185,23 @@ export type Evidence<Iri extends string> = {
 
 const previewedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
   z.object({
-    iri: z.string().describe("What `open` takes as `iri` to read the concept in full."),
-    url: z.string().describe("The concept's page, for the person to open."),
+    iri: z.string().describe("Pass this to `open` as `iri` to read the whole concept."),
+    url: z.string().describe("A link to the concept's page, for the person to open."),
     kind: z.string(),
-    title: z.string().describe("For an `Answer`, the question it answered."),
-    collection: z.string().nullable().describe("Null for a concept in no collection."),
+    title: z
+      .string()
+      .describe("The concept's title. For an `Answer`, this is the question it answers."),
+    collection: z
+      .string()
+      .nullable()
+      .describe("The concept's collection, or null if it is in no collection."),
     trust,
     trustWords: z.string(),
   });
 
 const returnedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
   previewedConceptWith(trust).extend({
-    body: z.string().describe("The `Answer`'s own words, to quote unchanged."),
+    body: z.string().describe("The full text of the `Answer`. Quote it unchanged."),
     evidence: z.array(evidenceItem),
   });
 
@@ -194,28 +211,32 @@ const relatedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
       .string()
       .exactOptional()
       .describe(
-        "An `Answer`'s own words when no judge ran or judging failed, to quote unchanged. Any other concept, and every `Answer` once the judge has run, comes without them: read it with `open` before writing from it.",
+        "The full text of an `Answer` when `judgeState` is `not-judged` or `judging-failed`. Quote it unchanged. Other concepts, and every `Answer` when `judgeState` is `judged`, have no `body`. Read them with `open` before you write from them.",
       ),
     evidence: z
       .array(evidenceItem)
       .exactOptional()
-      .describe("An `Answer`'s sources, when its words come too."),
+      .describe("The sources of an `Answer`. Present only when `body` is present."),
   });
 
 export const answerOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
   z.object({
     verdict: z.enum(QUESTION_VERDICTS),
-    recordId: z.string().describe("The id of the record kept of this question."),
+    recordId: z
+      .string()
+      .describe("The id of the saved record of this question. `give_feedback` takes it."),
     answers: z
       .array(returnedConceptWith(trust))
-      .describe("Every `Answer` a judge found to fit the question, as it stands."),
+      .describe("Each `Answer` that the judge found answers the question as asked, in full."),
     judgeState: z
       .enum(JUDGE_STATES)
-      .describe("How the judge stood: an `Answer` it did not judge is never a fit."),
+      .describe(
+        "Whether the judge ran. `judged`: it ran. `judging-failed`: it could not judge, so its candidates are under `related`. `not-judged`: the workspace has no judge, or no `Answer` was a candidate. Only a judged `Answer` appears under `answers`.",
+      ),
     related: z
       .array(relatedConceptWith(trust))
       .describe(
-        "The concepts that bear on the question, best first: an `Answer` as it stands when no judge ran or judging failed, and every other by its line.",
+        "Other concepts related to the question, best match first. An `Answer` comes in full when `judgeState` is `not-judged` or `judging-failed`. Every other concept comes as one line.",
       ),
     conflicts: z.array(
       z.object({
@@ -227,8 +248,12 @@ export const answerOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
     map: recordMapState,
     collections: z
       .array(z.string())
-      .describe("The collections considered: those named, or every one you can read."),
-    readableCollections: z.array(z.string()).describe("The collections you may name."),
+      .describe(
+        "The collections searched: the ones named in `collections`, or every collection you can read.",
+      ),
+    readableCollections: z
+      .array(z.string())
+      .describe("The collections you can read. Use these names in `collections`."),
   });
 
 export const openOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
@@ -254,7 +279,7 @@ export const openOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
               )
               .exactOptional()
               .describe(
-                "Each link in the body that leads to a concept you may read: the `address` the body wrote, and the `target` to pass to `open` as `iri`. A link not listed here has nothing to open.",
+                "The links in the body that lead to a concept you can read. `address` is the link as the body writes it, and `target` is the `iri` to pass to `open`. A link that is not listed here cannot be opened.",
               ),
             trust,
             trustWords: z.string(),
