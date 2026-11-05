@@ -1,222 +1,422 @@
 # Continuous integration
 
-**Operational reference, not a page of the docs site.** It is read from the repository, beside `BUILD_CACHE.md`, and it is where the design of `.github/workflows/` is written down. The files themselves carry only the whys a person editing a line needs at that line; everything about why the shape is the shape is here. Where a comment there and a sentence here disagree, the workflow is what runs and this page is what is wrong.
+This page is the design reference for `.github/workflows/`, read from the repository beside `BUILD_CACHE.md`, not the docs site. A workflow comment carries only the why its own line needs. When a comment and this page disagree, the workflow is right. The root `pnpm check` is the one list of gates, run on a laptop. The workflows decide **where** each gate runs.
 
-Seven workflows. `check.yml` decides whether a tree is green, on every pull request and when `build.yml` calls it. `build.yml` builds and pushes the tier images on `main`. `release.yml` promotes a pair of digests to production, after each green build, nightly or by hand, as the repository variable `RELEASE_MODE` says. `mutation.yml` scores the two mutable workspaces nightly. `budgets.yml` runs `packages/core`'s performance budgets nightly. `scan.yml` reads the images `build.yml` pushed for known vulnerabilities nightly, and gates nothing. `ghcr-cleanup.yml` deletes old BuildKit cache manifests from the image packages weekly, and its design is in `BUILD_CACHE.md`. The root `pnpm check` is the one list of gates, and it is what a person runs on a laptop. These files own **where** each of those gates runs.
+| Workflow | Runs | What it does |
+| --- | --- | --- |
+| `check.yml` | On every pull request, and when `build.yml` calls it | Decides whether a tree is green |
+| `build.yml` | On `main` | Builds and pushes the tier images |
+| `release.yml` | After a green build, nightly, or by hand, as the repository variable `RELEASE_MODE` says | Promotes a pair of digests to production |
+| `mutation.yml` | Nightly | Scores the two mutable workspaces |
+| `budgets.yml` | Nightly | Runs `packages/core`'s performance budgets |
+| `scan.yml` | Nightly | Reads the images `build.yml` pushed for known vulnerabilities. It gates nothing |
+| `ghcr-cleanup.yml` | Weekly | Deletes old BuildKit cache manifests from the image packages. Its design is in `BUILD_CACHE.md` |
 
 ## Every `uses:` names a commit SHA
 
-A tag is a moving reference into somebody else's repository, and these workflows hold a token that can push our images. So every `uses:` in the directory names a commit SHA with its tag beside it as a comment: the tag is what a person reads and what Renovate rewrites, the SHA is what runs. One pin per action across the whole directory. `renovate.json` keeps them pinned through `pinDigests` on the `github-actions` manager, and zizmor's `unpinned-uses` audit refuses a `uses:` that names anything else (*The linters*, below).
+Every `uses:` names a commit SHA, with its tag as a comment, because a tag can move and these workflows hold a token that pushes our images. Renovate rewrites the tag, and the SHA runs. Each action has one pin across the directory. `renovate.json` keeps the pins through `pinDigests` on the `github-actions` manager, and zizmor's `unpinned-uses` audit refuses anything else.
 
-Two more moving references are pinned the same way and for the same reason.
-
-**Every `runs-on:` names a release, `ubuntu-26.04`, and not the `ubuntu-latest` label.** GitHub migrates that label on a date of its own, so a tree that passed on Friday would fail on Monday for a reason no commit carries. A named release moves on a branch of its own — one edit, every leg, a full run green before `main` sees it. actionlint's list of hosted runners predates `ubuntu-26.04`, so `.github/actionlint.yaml` names it, and actionlint stays clean across the directory.
-
-**Every `setup-uv` reads its version out of one file**, `apps/worker/.tool-versions`, through `version-file:`. Unpinned, the action takes whatever uv is newest, which was 0.12.17 against the worker image's 0.12.9 — two builders resolving one lockfile. Why that file rather than `[tool.uv] required-version`, and what keeps it in step with the image, are said in the file itself.
+- Every `runs-on:` names `ubuntu-26.04`, not `ubuntu-latest`, which GitHub migrates on a date of its own. A move to a new release is one edit, with a full green run before `main` sees it. `.github/actionlint.yaml` names `ubuntu-26.04`, because actionlint's list of hosted runners predates it.
+- Every `setup-uv` reads its version from `apps/worker/.tool-versions` through `version-file:`. Unpinned, the action took uv 0.12.17 against the worker image's 0.12.9. The file says why it is used in place of `[tool.uv] required-version`, and what keeps it in step with the image.
 
 ## The linters
 
-`pnpm lint:workflows` is a step of root `check:gates`, so it runs in `full-root` and before every push. It runs three tools from the worker's locked dev group, where Renovate's `pep621` manager moves them:
+`pnpm lint:workflows` is a step of the root `check:gates`, so it runs in `full-root` and before every push. It runs three tools from the worker's locked dev group, which Renovate's `pep621` manager updates.
 
-- actionlint over every workflow, with `.github/actionlint.yaml`. It runs shellcheck over each `run:` step.
-- zizmor over `.github/`, offline so it needs no token, with `.github/zizmor.yml`. The config is named on the command line because, from a linked worktree, zizmor's own search walks past the worktree and reads the main checkout's.
-- shellcheck over every `.sh` file under `deploy/`, `.claude/hooks/` and `scripts/`, following a `source` into the file it names.
+- actionlint, over every workflow, with `.github/actionlint.yaml`. It runs shellcheck over each `run:` step.
+- zizmor, over `.github/`, offline, with `.github/zizmor.yml` named on the command line, because from a linked worktree its own search finds the main checkout's config.
+- shellcheck, over every `.sh` file under `deploy/`, `.claude/hooks/`, and `scripts/`, following each `source`.
 
-A finding is fixed, or allowed where it sits with its reason. Four are allowed:
+A finding is fixed, or allowed in place with its reason. Four are allowed.
 
-- `self-repository` is off in `.github/zizmor.yml`. It asks for GitHub's `$/` form of a local action or workflow, which actionlint refuses, so the two tools cannot both pass.
-- actionlint's refusal of `queue` under `concurrency` is ignored in `.github/actionlint.yaml`. GitHub documents the key and `release.yml` needs it (§ The concurrency groups); actionlint does not know it yet.
-- `release.yml`'s record job keeps its checkout's credential, because it pushes the release tag with it. That job installs nothing and runs no browser. Every other checkout sets `persist-credentials: false`. The lane job's fetch of its base needs none, the repository being public.
-- The `git-filter-repo` action writes to `GITHUB_PATH`. What it writes is uv's own tool directory, never an input.
+| Finding | Where | Why |
+| --- | --- | --- |
+| `self-repository` | Off in `.github/zizmor.yml` | It asks for GitHub's `$/` form of a local action or workflow, which actionlint refuses |
+| actionlint's refusal of `queue` under `concurrency` | Ignored in `.github/actionlint.yaml` | GitHub documents the key, and `release.yml` needs it. actionlint does not know it yet |
+| A checkout that keeps its credential | `release.yml`'s record job | It pushes the release tag with it, and installs nothing and runs no browser. Every other checkout sets `persist-credentials: false`. The public repository needs no credential for the lane job's fetch |
+| A write to `GITHUB_PATH` | The `git-filter-repo` action | It writes uv's own tool directory, never an input |
 
-`build.yml`'s image job takes no toolchain cache. Another run writes a cache entry, and this job holds the token that pushes images, so a poisoned entry would reach it. The cost is an uncached install of the probe's toolchain on every build, which on 27/09/2026 was 5 to 6 seconds for the api and backup legs' `pnpm install`, against 3 cached. The worker's probe installs the `probe` dependency group alone, pytest and the four packages under it, because its suite reads the image through Docker and imports nothing of the tier; the whole environment took 5 seconds uncached, against 2 cached, and the group alone takes 1. The job's layer cache is in the registry for the same reason (`BUILD_CACHE.md`, *The runner's cache*). `build.yml`'s `caches` job does write toolchain caches, and the image job still restores none of them. The `caches` job holds `contents: read` alone and ships nothing (§ `build.yml`).
+`build.yml`'s image job restores no toolchain cache, because any run can write a cache entry and this job holds the token that pushes images. Its layer cache is in the registry for the same reason (`BUILD_CACHE.md`, *The runner's cache*). The worker's probe installs only the `probe` dependency group, pytest and four packages, because its suite reads the image through Docker.
 
-`packages/devtools/test/root-config/lint-workflows.test.ts` runs each tool as the root script runs it, over throwaway repositories, and shows where it refuses and where it stays silent.
+`packages/devtools/test/root-config/lint-workflows.test.ts` runs each tool as the root script does, over throwaway repositories, and shows where each refuses and where it stays silent.
 
 ## The lanes
 
-The `lane` job puts each run in one of two lanes before any leg installs anything. Pull requests, and the runs `build.yml` calls on `main`, take the same lanes.
+The `lane` job puts each run in a lane before any leg installs anything. Pull requests and the runs `build.yml` calls on `main` take the same lanes.
 
 | Lane | When | What runs |
 | --- | --- | --- |
 | docs | every changed path ends `.md` | `docs-gates` alone: the root `check:docs` |
 | full | anything else | `full-root`, `full-core`, `full-api`, `full-web-unit`, `full-web-browser` (two shards), `full-worker`, `full-images` |
 
-**The base is per event.** A pull request diffs from its `base.sha`. A run `build.yml` calls reads the caller's `before`, because a called workflow's `github` context is the caller's. `workflow_call` is named beside `push` because GitHub does not say which of the two a called run reads as `github.event_name`. Anything else takes the full lane and probes the images: a dispatch, the all-zero `before` of a first push, or a base this clone cannot fetch. Wrong that way costs minutes. Wrong the other way ships a tree no gate read.
+### The base is per event
 
-**The docs lane's rule** is in the lane script, `scripts/docs-lane.mjs`, which answers from the paths alone. The test is `endsWith(".md")` and nothing looser: `.mdx` is not markdown these prose gates read, `notes.md.ts` is TypeScript, and a path with `.md` in the middle is whatever its own extension says. A rename is two paths under `--no-renames`, which is how a markdown file renamed to a `.ts` stays `full`. Prose mixed with code takes the full lane, because the docs lane runs the suites that read documents and none of those that read code. `packages/devtools/test/ci/docs-lane.test.ts` holds each case.
+- A pull request diffs from its `base.sha`.
+- A run that `build.yml` calls diffs from the caller's `before`, because a called workflow's `github` context is the caller's. `workflow_call` is named beside `push`, because GitHub does not say which a called run reads as `github.event_name`.
+- A dispatch, the all-zero `before` of a first push, or a base this clone cannot fetch takes the full lane and probes the images, because a wrong full lane costs only minutes.
 
-**The image probes run when an image's inputs change.** The `full-images` leg runs the suites that build the three images and read what is in them. Before that leg existed they cost the worker leg about three and a half minutes and the api leg one and a half. `build.yml` builds and probes every image again before it pushes. So on the full lane those suites stand down (`IMAGE_PROBE_DEFERRED=true`) unless a changed path is an image input, and the lane script answers that too. The leg still runs the compose scripts' tests and the stop test, which read no image. The inputs are what the three Dockerfiles copy to install, not the source they copy as it stands:
+### The docs lane's rule
 
-- every `package.json`, both lockfiles, `pnpm-workspace.yaml`, `tsconfig.base.json`, `patches/` and the api's `lifts/`;
-- the worker's redaction module, which the build runs to fetch the detector's weights;
-- the Dockerfiles and their ignore files, and the toolchain pins: `.node-version`, and the worker's `.tool-versions` and `.python-version`;
-- all of `deploy/`, the backup image's context;
-- the probes themselves, and the two workflows that build and run them.
+`scripts/docs-lane.mjs` decides from the paths alone, with `endsWith(".md")` and nothing looser, so `.mdx`, `notes.md.ts`, and a path with `.md` in the middle are not docs. Under `--no-renames` a rename is two paths, so a markdown file renamed to a `.ts` stays `full`. Prose mixed with code takes the full lane. `packages/devtools/test/ci/docs-lane.test.ts` holds each case.
 
-`packages/devtools/test/ci/docs-lane.test.ts` reads every `COPY` in the three Dockerfiles against the list, so a new `COPY` is either an input or named there as source. The trade is deliberate. With no live users, an image that a source change broke is found by `build.yml` after the merge and costs a fix-forward, not an outage. A caller that passes `images-probed-by-the-caller: true` defers the probes whatever changed, because it runs them itself.
+### The image probes run when an image's inputs change
+
+`build.yml` probes every image again before it pushes, so on the full lane the `full-images` suites that build and read the images stand down (`IMAGE_PROBE_DEFERRED=true`) unless a changed path is an image input. The compose scripts' tests and the stop test, which read no image, still run. The inputs are what the three Dockerfiles copy to install, not the source they copy:
+
+- every `package.json`, both lockfiles, `pnpm-workspace.yaml`, `tsconfig.base.json`, `patches/`, and the api's `lifts/`
+- the worker's redaction module, which the build runs to fetch the detector's weights
+- the Dockerfiles, their ignore files, and the toolchain pins: `.node-version`, and the worker's `.tool-versions` and `.python-version`
+- all of `deploy/`, the backup image's context
+- the probes, and the two workflows that build and run them
+
+`packages/devtools/test/ci/docs-lane.test.ts` checks every `COPY` in the three Dockerfiles against the list, so a new `COPY` is an input or is named there as source. An image that a source change broke is caught by `build.yml` after the merge, which with no live users costs a fix-forward. A caller that passes `images-probed-by-the-caller: true` defers the probes whatever changed, because it runs them itself.
 
 ## The legs and the verdict
 
-**The leg names carry their lane, and the fan-in reads them.** A job called `full-<something>` runs on the full lane and `docs-<something>` on the docs lane. The `check` job at the foot of the file requires exactly that: every leg whose prefix is this run's lane succeeded, and every other leg was skipped. A leg added by copying one of these is already under the verdict, and a leg whose condition stopped matching its name turns `check` red instead of going missing. The verdict also refuses a run that required no leg. `full-web-browser` is a matrix, and GitHub gives a matrix one entry in `needs`, `success` only when every shard succeeded, so a red shard makes the verdict red. `packages/devtools/test/ci/docs-lane.test.ts` runs the verdict over each lane's outcomes, and holds its `needs` to every job in the file.
+### The leg names carry their lane
 
-**`check` is the name, and it is the fan-in's.** The branch ruleset requires the status context `check` and `build.yml`'s `image` job waits on `needs: check`; neither reads a leg. So the legs may be renamed, split or added to freely, and that one job name may not move.
+A `full-<something>` job runs on the full lane, and a `docs-<something>` job on the docs lane. The `check` job at the foot of `check.yml` requires every leg with this run's lane prefix to succeed and every other leg to be skipped, and refuses a run that required no leg. So a copied leg is already under the verdict, and a leg whose condition stops matching its name turns `check` red. GitHub gives the `full-web-browser` matrix one entry in `needs`, `success` only when every shard succeeded. `packages/devtools/test/ci/docs-lane.test.ts` runs the verdict over each lane's outcomes, and holds its `needs` to every job in the file.
 
-**`pr-title` belongs to no lane, and runs on pull requests only.** The title becomes the squash commit's subject, so the job runs commitlint over it with the repository's one config, `commitlint.config.mjs`. It asks the API for the title when it runs rather than reading the event, so a re-run after a retitle reads the new title. It installs nothing: it runs commitlint through `pnpm dlx` at the versions the root `package.json` pins for `@commitlint/cli` and `@commitlint/config-conventional`. The verdict wants its success on a pull request and its skip on any other event.
+The branch ruleset requires the status context `check`, and `build.yml`'s `image` job waits on `needs: check`. Legs can be renamed, split, or added. The `check` job's name cannot change.
 
-The legs are separate jobs because the groups share nothing: run 35735268427, as one job, spent 795 seconds, of which the worker was 462, while the root gates, the libraries, the api and the web waited their turn. A full run now costs the longest leg rather than their sum, and each leg installs only the toolchain its own gates ask for.
+`pr-title` belongs to no lane and runs on pull requests only. It runs commitlint with `commitlint.config.mjs` over the title, which becomes the squash commit's subject, read from the API so a re-run after a retitle sees the new one. It installs nothing, and runs commitlint through `pnpm dlx` at the versions the root `package.json` pins for `@commitlint/cli` and `@commitlint/config-conventional`. The verdict requires its success on a pull request and its skip otherwise.
 
-- **`full-root`** — every gate the root `check` names ahead of the workspaces, each one a tool walked over the whole tree, then the libraries, which are the workspaces nothing deploys: `packages/schema` and `packages/devtools` whole, and `packages/core`'s typecheck. The root script is `check:root`, which is `check:tree` less core's suite. It brings uv because `packages/devtools`' lint and typecheck are ruff and mypy run through the worker's environment. It is also the only fresh clone in CI, so it is the only place the promise "install and the hook is there" can be tested.
-- **`full-core`** — `packages/core`'s suite, one job running `check:core:suite`. One job, because core is not on `check`'s critical path. The job brings uv, the detector's weights and the rewrite tool, because the suites that spawn the worker or rewrite a history live in it.
-- **`full-api`** — the api's gates, less `tests/images/`, which `full-images` runs. It takes the rewrite tool, because the erasure rehearsal reaches the same git step. It brings uv and the worker's environment because the api's suite runs the worker over an index job.
-- **`full-web-unit`** — the SPA's typecheck and its vitest suite, run as `check:web:unit`.
-- **`full-web-browser`** — the browser suite over the served build, split over a matrix of two jobs, each running `check:web:e2e --shard=<i>/<n>` with three Playwright workers. Two shards, because one job would become `check`'s slowest. Playwright deals tests to the shards, not files, because the suite is fully parallel, and each shard builds the SPA and starts its own api and Postgres. Three workers and not four, because the runner has four cores and the api, Postgres and the browser's own processes need one. Whatever the suite's outcome, each shard uploads `apps/web/test-results/` as `browser-traces-shard-<i>-attempt-<n>`, kept seven days. On CI a failed browser test is retried once and the retry records a trace, so a green run with a flake uploads one too, and the job summary's flaky table gives each trace's path in the artifact. Every run uploads a few kilobytes even when nothing retried: the accessibility gate's specs that are meant to fail each leave an error context.
-- **`full-worker`** — the longest leg until its suite ran in parallel, and so the length of a full run. The detector's weights and uv. No browser, and no `pnpm install` step — but that is not the same as not installing, which is why it takes `cache: pnpm`: pnpm verifies the tree before it runs a script, so `pnpm check:worker` installs all 665 packages first whether the leg asked for them or not, 12 seconds paid cold on every run. Removing the install itself is a change to how the root manifest spawns this gate. It also sets `COCOINDEX_DISABLE_USAGE_TRACKING`, because the indexing engine calls home on every update and this leg starts no container, so the image's own refusal cannot reach it.
+### The legs
 
-  The suite runs over four pytest-xdist workers, one per vCPU, with ruff and mypy running beside it; `apps/worker/src/better_answers_worker/check.py` holds both choices. The worker count lives there and not in pytest's `addopts`, so a run of one file by hand starts no workers. The workers share one Postgres, which the leg starts with `deploy/test-postgres.sh up` and names through `TEST_POSTGRES_URI=shared` (`local-gates.md`, *The shared test Postgres*). The first worker to need it migrates a template, and each test clones its own database from that. A clone takes a fiftieth of a second, where a container of its own took a second and a half. The image tests are not in this run: `check.py` deselects the `image` marker, and `uv run --frozen images` selects it. On a laptop the whole gate went from about 275 seconds to about 50.
+The legs are separate jobs, so a full run costs its longest leg, and each leg installs only its own toolchain.
 
-- **`full-images`** — the suites that start a container or a process of their own, run as `check:images`: the api's `tests/images/` (the api's and the backup image's contents, the compose scripts, the restore and the stop) and the worker's `tests/test_image.py`. Every other leg leaves them out. The api's `vitest.config.ts` excludes the folder and `vitest.images.config.ts` selects it, and the worker's `check` deselects the `image` marker. The leg takes the container builder and a read-only login to ghcr.io for the reasons `BUILD_CACHE.md` gives, and both toolchains. It alone receives `IMAGE_PROBE_DEFERRED` and `IMAGE_CACHE_REGISTRY`. A laptop's `check` and the root `check` run none of it: run `pnpm check:images` for these suites.
+| Leg | Runs | Brings |
+| --- | --- | --- |
+| `full-root` | `check:root` (`check:tree` less core's suite): the root gates over the whole tree, `packages/schema` and `packages/devtools` whole, and `packages/core`'s typecheck | uv, for `packages/devtools`' ruff and mypy |
+| `full-core` | `check:core:suite`, in one job, because core is off `check`'s critical path | uv, the detector's weights, and the rewrite tool, for the suites that spawn the worker or rewrite a history |
+| `full-api` | The api's gates, less `tests/images/` | uv and the worker's environment, for the index job its suite runs, and the rewrite tool, for the erasure rehearsal |
+| `full-web-unit` | `check:web:unit`, the SPA's typecheck and vitest suite | |
+| `full-web-browser` | `check:web:e2e --shard=<i>/<n>`, on a matrix of two jobs | |
+| `full-worker` | `pnpm check:worker` | uv and the detector's weights, with `cache: pnpm`. No browser |
+| `full-images` | `check:images` | The container builder and a read-only login to ghcr.io, for the reasons `BUILD_CACHE.md` gives, and both toolchains |
 
-Two vitest settings shape these legs. Under `GITHUB_ACTIONS`, every workspace's vitest config sets `slowTestThreshold` to `Infinity` through `packages/schema/test/support/ci/slow-test-threshold.ts`, so a leg's log lists no slow tests one by one. `packages/core`, `apps/api` and `apps/web` set `isolate: false`, so the test files one vitest worker runs share their modules. `packages/schema` and `packages/devtools` keep vitest's isolation.
+`full-root` is CI's only fresh clone, so only it can test that install puts the hook in place.
+
+**`full-web-browser`.** One job would be `check`'s slowest leg. Playwright deals tests, not files, to the two shards, because the suite is fully parallel. Each shard builds the SPA, starts its own api and Postgres, and runs three workers, leaving one of four cores for the api, Postgres, and the browser. Each shard always uploads `apps/web/test-results/` as `browser-traces-shard-<i>-attempt-<n>`, kept seven days. On CI a failed test is retried once with a trace, so a green run with a flake uploads one, and the job summary's flaky table gives its path. The accessibility gate's must-fail specs leave a few kilobytes in every upload.
+
+**`full-worker`.** pnpm verifies the tree before it runs a script, so `pnpm check:worker` installs all 665 packages first, 12 seconds cold, and the leg takes `cache: pnpm`. Removing that install means changing how the root manifest spawns this gate. The leg sets `COCOINDEX_DISABLE_USAGE_TRACKING`, because the indexing engine calls home on every update and the image's own refusal does not apply outside a container.
+
+The suite runs on four pytest-xdist workers, one per vCPU, beside ruff and mypy. `apps/worker/src/better_answers_worker/check.py` holds both choices, not pytest's `addopts`, so a one-file run by hand starts no workers. The workers share one Postgres, started with `deploy/test-postgres.sh up` and named by `TEST_POSTGRES_URI=shared` (`local-gates.md`, *The shared test Postgres*). The first worker to need it migrates a template, and each test clones its own database from it. `check.py` deselects the `image` marker, and `uv run --frozen images` selects it.
+
+**`full-images`.** It runs the api's `tests/images/` (the api and backup images' contents, the compose scripts, the restore, and the stop) and the worker's `tests/test_image.py`. The api's `vitest.config.ts` excludes the folder and `vitest.images.config.ts` selects it. The worker's `check` deselects the `image` marker. Only this leg receives `IMAGE_PROBE_DEFERRED` and `IMAGE_CACHE_REGISTRY`. No other `check` runs these suites. Run `pnpm check:images` for them.
+
+### Two vitest settings
+
+- Under `GITHUB_ACTIONS`, every workspace's vitest config sets `slowTestThreshold` to `Infinity` through `packages/schema/test/support/ci/slow-test-threshold.ts`, so a leg's log lists no slow tests one by one.
+- `packages/core`, `apps/api`, and `apps/web` set `isolate: false`, so the test files one vitest worker runs share their modules. `packages/schema` and `packages/devtools` keep vitest's isolation.
 
 ## The docs lane
 
-`check:docs` runs the suites that read this repository's **documents**, through the same runner as the root `check`, so one command still names every step that failed. `format:check` leads it because it leads the root `check`; on this lane it is a no-op by construction, `.oxfmtrc.json` ignoring `**/*.md`.
+`check:docs` runs the suites that read the repository's **documents**, through the root `check`'s runner, so one command names every failed step. `format:check` leads it, as it leads the root `check`, and does nothing here, because `.oxfmtrc.json` ignores `**/*.md`. The lane keeps gates because a docs-only commit can break one. It installs no uv, browser, rewrite tool, or builder.
 
-The lane keeps gates rather than skipping CI because a docs-only commit broke one: five specs moved into `docs/specs/` and the tag suite went red on the entries they made stale. It installs no uv, no browser, no rewrite tool and no builder.
+The lane has two known costs.
 
-What it still pays, said plainly: `apps/api` and `packages/core` start a Postgres container from their vitest `globalSetup` whichever files are selected, so this lane pays two container starts none of its suites touch. Making it not do so is a change to those configurations rather than to the workflow. And it is not every suite coupled to a markdown file — five are left to the full lane, four reading a committed redaction fixture and the worker's half of the contract count, whose other half is in this lane and catches the same commit without a uv environment.
+- `apps/api` and `packages/core` start a Postgres container from their vitest `globalSetup` whichever files are selected. The fix belongs in those configurations, not the workflow.
+- Five suites coupled to a markdown file run only on the full lane. Four read a committed redaction fixture. The fifth is the worker's half of the contract count, whose other half runs here without a uv environment.
 
 ## The concurrency groups
 
-A pull request cancels the run it supersedes; a run `build.yml` calls never does, because an image is worth building for every commit that lands. Both halves are written as one question, whether this is a pull request.
+| Run | A newer run in the same group |
+| --- | --- |
+| `check.yml` on a pull request | Cancels it |
+| `check.yml` called by `build.yml` | Never cancels it |
+| `build.yml` | Never cancels it |
+| `release.yml` | Queues behind it, in the one group `release-production` |
 
-A group holds one running and one pending job whatever `cancel-in-progress` says, and a third arrival cancels the pending one. That is why `build.yml`'s group is per commit and a called run's is too: under one group for `main`, three pushes inside one `check` would lose the second commit's images. The called workflow's group must also stay different from its caller's, or it waits on itself.
+`check.yml` decides both cases by whether this is a pull request, because every commit that lands needs its image. A group holds one running and one pending job whatever `cancel-in-progress` says, and a third arrival cancels the pending one, so `build.yml`'s group and a called run's group are per commit. A called workflow's group must differ from its caller's, or it waits on itself.
 
-`release.yml`'s one group, `release-production`, is the exception. It sets `queue: max`, which keeps up to 100 runs pending in the order they arrived, so no release is cancelled because a newer one queued behind it. A cancelled release would end its build cancelled rather than skipped. Each release asks for itself whether it is still the newest (§ `release.yml`). actionlint predates the `queue` key and refuses it as unknown, so `.github/actionlint.yaml` ignores that one message, and `packages/devtools/test/root-config/lint-workflows.test.ts` holds that any other unknown key there is still refused.
+`release-production` sets `queue: max`, which keeps up to 100 runs pending in arrival order, because a cancelled release would end its build cancelled, not skipped. Each release checks for itself whether it is the newest. `.github/actionlint.yaml` ignores actionlint's refusal of the `queue` key, and `packages/devtools/test/root-config/lint-workflows.test.ts` holds that actionlint still refuses any other unknown key there.
 
 ## `build.yml`
 
-Every commit gets its image. A run's concurrency group is its own commit, and the one tag a run writes is that commit's `sha-<short>` — a name no other run writes. There is no `:main` tag: with nothing serialising the runs it would end on whichever finished last. `release.yml` reads a commit's images back by its `sha-` tag and refuses when that commit has none yet.
+Each run's concurrency group is its own commit, and it writes one tag, that commit's `sha-<short>`. There is no `:main` tag, because with nothing serialising the runs it would end on whichever finished last. `release.yml` reads a commit's images by its `sha-` tag, and refuses when the commit has none yet.
 
-**Three images, and the list is here.** `api` from `apps/api/Dockerfile` built at the repository root, because it carries the SPA's build; `worker` from `apps/worker/Dockerfile` built in that directory; and `backup` from `deploy/backup.Dockerfile` built in `deploy/`. The first two are what `deploy/platform.compose.yaml` names by digest and what `release.yml` promotes; the third is `deploy/stores.compose.yaml`'s, set on that resource by hand at the first deploy and whenever the backup image changes, the stores stack not being the deploy unit. Postgres is never built here: it is the official pgvector image, pinned by digest in `packages/schema/src/postgres-image.ts` (ADR 0032).
+### Three images, and the list is here
 
-**The `caches` job writes on `main` what `check.yml`'s legs read.** A run restores Actions cache entries from its own ref and from the default branch, and a pull request's entries sit under its own ref, which no other run reads. So `full-core`, `full-api` and `full-worker` take the detector's weights with `actions/cache/restore`, and only this job saves them, with `actions/cache/save` under the same path and key. On 06/10/2026, before this job, the repository held eight copies of the weights at 889 MB each and none on `main`, and GitHub was evicting entries that later runs did read. The job asks first with `lookup-only` and stops when `main` already holds the key. Otherwise it fetches through `better_answers_worker.redaction.weights.fetch`, the call the worker image's build makes. `apps/worker/tests/redaction/test_redaction_descriptors.py` holds the two workflows to one key.
+| Image | Dockerfile | Built in | Deployed by |
+| --- | --- | --- | --- |
+| `api` | `apps/api/Dockerfile` | The repository root, because the image carries the SPA's build | `deploy/platform.compose.yaml`, by digest. `release.yml` promotes it |
+| `worker` | `apps/worker/Dockerfile` | That directory | `deploy/platform.compose.yaml`, by digest. `release.yml` promotes it |
+| `backup` | `deploy/backup.Dockerfile` | `deploy/` | `deploy/stores.compose.yaml`, set on that resource by hand at the first deploy and whenever the image changes, because the stores stack is not the deploy unit |
 
-The same job keeps the pnpm store and uv's cache current on `main`. Each is saved only when `main` holds no entry for its lockfile. The job runs beside the build, and nothing waits on it. It is `continue-on-error`, because `release.yml`'s nightly gate releases the newest commit whose `build.yml` run is green: a Hub download that fails here must not make a built and probed commit unreleasable, and the next push tries again. It holds `contents: read` alone and ships nothing. The image job restores no entry this job writes.
+Postgres is never built here. It is the official pgvector image, pinned by digest in `packages/schema/src/postgres-image.ts`.
 
-**The `check` job grants what `check.yml`'s jobs ask for.** GitHub reads every job of a called workflow before the run starts, and a job that asks for a scope the calling job did not grant fails the whole run as `startup_failure`, with no job run. It does so even for a job whose `if:` skips it: `pr-title` asks for `pull-requests: read` and never runs on a push, yet a push run fails for it. So `check` names `pull-requests: read`, and `packages: read` for the two legs that read the layer cache, beside `contents: read`, because a job's own `permissions:` replaces its workflow's block rather than adding to it. `packages/devtools/test/ci/workflow-permissions.test.ts` reads every job in the directory that calls a workflow. It fails on any scope granted short of what the called workflow's own block or one of its jobs asks for. It also fails on a call it cannot read through: a workflow from outside this directory, or a calling file that names no grant at all.
+### The `caches` job writes on `main` what `check.yml`'s legs read
 
-**The image ships from a checked tree and nothing else.** The `image` job needs `check`, so a `check` that fails or is cancelled skips it.
+A run restores cache entries only from its own ref and the default branch. So `full-core`, `full-api`, and `full-worker` restore the detector's weights with `actions/cache/restore`, and only the `caches` job saves them, with `actions/cache/save` under the same path and key. It checks with `lookup-only` and stops when `main` already holds the key. Otherwise it fetches through `better_answers_worker.redaction.weights.fetch`, as the worker image's build does. `apps/worker/tests/redaction/test_redaction_descriptors.py` holds the two workflows to one key.
 
-**The image the probe read is the image pushed.** Each leg builds once, into the runner's daemon. The image's own contents test probes that image, and the next step pushes it with `docker push`. The daemon keeps its images in containerd, which pushes the manifest the build wrote byte for byte. Until 05/11/2026 the push was a second build, which was to take every layer from the first build's cache. BuildKit does not promise that. On two runs of `main` that day it ran the worker's build steps again, and those steps fetch the weights and the suffix list afresh, so the pushed digest was not the probed one. On two more runs another run moved `buildcache` between the two builds, and the push build took the new layers. The summary says what was tested and which digest the registry gives for the pushed tag, and it refuses to claim "tested" about bytes nothing read. The push has already happened by then, so a difference is a red `main` rather than a prevented push.
+The job also saves the pnpm store and uv's cache when `main` holds no entry for their lockfile. Nothing waits on it, and it is `continue-on-error`, so a failed Hub download never makes a built commit unreleasable by the nightly gate. It holds only `contents: read`, and the image job restores none of its entries.
 
-**Provenance is written by referrer**, beside the image and keyed by the pushed digest, so the tag and the digest a person promotes still name the manifest itself rather than a wrapper around it (ADR 0022: the digest is the deploy variable). It is the job's last step and only on a leg that got that far. When it fails the leg is red with the image already pushed behind it — decided, not tolerated: a digest with no attestation must not look to a verifier like a digest something else pushed. `create-storage-record` is refused because it asks for a third scope and, without it, warns twice on every leg rather than failing.
+### The `check` job grants what `check.yml`'s jobs ask for
 
-**The probes are declared, not switched on by tier.** Each matrix leg carries the command that reads its image and the toolchain that command needs, and every step is gated on what the leg declares, so a fourth image joins by declaring a probe rather than by editing steps. A probe whose toolchain nothing installs fails its leg before the push.
+GitHub reads every job of a called workflow before the run starts. A job that asks for a scope the caller did not grant fails the whole run as `startup_failure`, even when its `if:` would skip it, as `pr-title` would on a push. A job's `permissions:` replaces its workflow's block, so `check` grants `contents: read`, `pull-requests: read`, and `packages: read` for the two legs that read the layer cache. `packages/devtools/test/ci/workflow-permissions.test.ts` reads every job that calls a workflow. It fails a grant short of what the called workflow's block or one of its jobs asks for, a call to a workflow outside this directory, and a calling file that names no grant.
 
-**The layer cache is a tag in the image's own package**, `buildcache`, and the leg's one build is its one writer. Only a run on `refs/heads/main` writes it: a run dispatched on a branch reads the tag, exports nothing and rebuilds the layers `main`'s do not cover, because a branch run that wrote it would decide which layers `main`'s next build reads and ships (on 05/11/2026 a branch run's export rewrote `worker:buildcache` mid-run and `main`'s builds went red). The rule is the workflow's own `cache-to`, which a dispatched branch's copy of `build.yml` can edit, so it stops an accident and not a deliberate write. It is in the registry rather than the Actions cache because any run on `main` can write an Actions cache entry, and this job ships what it restores. Only a token holding `packages: write` can move the tag, and this job is the only one that holds it. `check.yml`'s probes read it under `packages: read` and export nothing. The export writes the cache before the probe runs, so a leg whose probe fails still leaves its layers there. Each layer is keyed by its inputs, so the fix that changes those inputs builds past it. A failed export warns rather than turning the leg red, so a cache the registry refused never stops a built image from being probed and pushed. `BUILD_CACHE.md`, *The runner's cache*, has the rest.
+### The `image` job
 
-**The last job releases what this run pushed.** `release` calls `release.yml` with this run's commit once every leg of the matrix has pushed, and only on `main`; `release.yml` then decides by `RELEASE_MODE` whether the commit is released (§ `release.yml`). Its condition names `needs.image.result == 'success'` by hand, so one red image leg stops the release. It is a call from inside the run, not a second workflow triggered by `workflow_run`: zizmor refuses that trigger as dangerous, because such a run gets the default branch's secrets whatever run set it off. The job grants exactly what `release.yml`'s jobs ask for: `contents: write` for the tag, `packages: read` for reading the digests back, and `actions: read` for the gate's reading of `build.yml`'s runs.
+The `image` job needs `check`, so a failed or cancelled `check` skips it.
 
-**The call passes three secrets by name, not `secrets: inherit`.** The deploy token and the two edge credentials are secrets of the `production` environment, so in this run they are empty. A called job that names the environment reads one only when its caller passes that secret's name; given nothing, it reads nothing. The first automatic release, on 27/09/2026, sent its calls with three empty credentials, and the edge answered each with a redirect to sign-in that `curl -f` took for success. A probe run the same evening showed a name declared by the called workflow, passed by its caller and read in the environment: set, even though the caller's value is empty. `secrets: inherit` also worked, and would hand every secret the run holds to every job of the called workflow, which zizmor refuses.
+**The two exports are one manifest.** The build runs once into the runner's daemon, the contents test probes it, and a second export to the registry reuses the builder's cache. Both exports name the same media types and refuse both attestations, or buildx would give the runner and the registry two digests for one build. The summary says what was tested and what was pushed. A mismatch turns `main` red after the push.
+
+**Provenance is written by referrer**, keyed by the pushed digest, so the promoted digest, the deploy variable, names the manifest itself and not a wrapper. It is the leg's last step. A failure leaves the leg red with the image pushed, on purpose, so an unattested digest never looks like one something else pushed. `create-storage-record` is refused, because it needs a third scope and warns twice per leg without it.
+
+**The probes are declared per leg.** Each matrix leg declares the command that reads its image and that command's toolchain, and every step is gated on the declaration. A fourth image joins by declaring a probe. A probe whose toolchain nothing installs fails its leg before the push.
+
+**The layer cache is the `buildcache` tag in the image's own package.** The pushing step is its only writer, and only this job holds `packages: write`. `check.yml`'s probes read it under `packages: read` and export nothing. The cache export names neither image output, so the probed and pushed digests stay one manifest. A failed cache export only warns, because a red step after the push would skip the digest check and the attestation. `BUILD_CACHE.md`, *The runner's cache*, has the rest.
+
+### The last job releases what this run pushed
+
+On `main`, once every leg of the matrix has pushed, the `release` job calls `release.yml` with this run's commit, and `release.yml` decides by `RELEASE_MODE` whether to release it. Its condition names `needs.image.result == 'success'`, so one red image leg stops the release. It is a call, because zizmor refuses a `workflow_run` trigger, which gets the default branch's secrets whatever set it off. It grants exactly `contents: write` for the tag, `packages: read` for the digests, and `actions: read` for the gate to read `build.yml`'s runs.
+
+The call passes the deploy token and the two edge credentials by name. They are `production` environment secrets, empty in this run, and a called job that names the environment reads one only when its caller passes the name, even with an empty value. `secrets: inherit` would hand every secret to every called job, and zizmor refuses it.
 
 ## `release.yml`
 
-Three things start this, and nothing else deploys production (ADR 0022, amended twice on 2026-09-27): `build.yml`'s call after every green build on `main`, with that build's commit; a schedule at 02:35 UTC; and a person's dispatch, for a rollback or to promote digests they name. The repository variable `RELEASE_MODE` says which of them may release (§ The rhythm). The `production` environment holds the deploy secrets, admits only `main`, and has no required reviewer: a release that waited for one would not be automatic.
+Nothing else deploys production. Three triggers start it:
 
-**Three jobs, and one can write.** `gate` decides whether this run promotes, and which commit. `promote` checks the backup on a nightly release, redeploys, smokes and names the tag, with read access and no stored credential. `record` pushes the tag. It is the only job with `contents: write`, and it installs nothing and runs no browser. Promote hands the record job its head, so a commit that lands while the release runs is never the one tagged.
+- `build.yml`'s call after each green build on `main`, with that build's commit
+- a schedule at 02:35 UTC
+- a person's dispatch, for a rollback or to promote digests the person names
 
-**The gate.** The `gate` job runs `deploy/release-gate.sh`, which decides whether this run promotes and which commit. It refuses an unknown `RELEASE_MODE` before it decides anything. It runs inside the concurrency group, so it decides only after every earlier release has finished, and it deploys nothing, so a skipped run is cheap. For a called release:
+`RELEASE_MODE` says which may release (*The rhythm*). The `production` environment holds the deploy secrets, admits only `main`, and has no required reviewer.
 
-- a commit that is still `main`'s head is released, its checkout that commit and its digests the ones its build pushed under that commit's `sha-<short>` tag, never whatever `main`'s head has become since;
-- a commit that is not is skipped, with a notice and a line in the run's summary, and a newer commit's green build releases in its place, so production never moves back to an older commit;
-- when that newer build is red, nothing releases, and production stays on the last green commit;
-- when the API cannot say what `main`'s head is, the build turns red rather than risk a release out of order.
+### Three jobs, and one can write
 
-For the nightly release it walks `main`'s last 100 commits newest first. The first commit with a green `build.yml` run is released, unless a commit with a `release/*` tag comes first: then nothing newer than the last release is green, and the night promotes nothing. So the nightly release never moves production back either. A tag's name ends in the seven characters of its commit, which is how the gate matches one without reading every tag's object. `packages/devtools/test/ci/release-job.test.ts` runs the script over a stand-in `gh` for each mode and trigger. A night the gate refuses turns its run red, and nothing outside GitHub hears of it.
+| Job | What it does |
+| --- | --- |
+| `gate` | Decides whether this run promotes, and which commit |
+| `promote` | Checks the backup on a nightly release, redeploys, runs the smoke, and names the tag. It has read access and no stored credential |
+| `record` | Pushes the tag. It is the only job with `contents: write`, and it installs nothing and runs no browser |
 
-**The digests.** A dispatch's blank inputs mean the head of `main`: the digests `build.yml` pushed under that commit's `sha-<short>` tag, read back from ghcr.io. Staging is on demand and never stands (ADR 0024), so there is no "digest staging runs" to default to. When the head has no image — its build still running, or red — this refuses and names the commit. A release moves no branch, so it leaves `main`'s head where it found it, with the image it just promoted. It never reaches back for an older image: the ways on are to wait for that build, to dispatch `build` on `main`, or to pass the digests, which is what the runbook's rollback does. Every digest is passed between steps through `env:` and matched against `^sha256:[0-9a-f]{64}$` on its own before anything is PATCHed, never interpolated into a shell line.
+`promote` hands `record` its head, so a commit that lands mid-release is never the one tagged.
 
-**Every call before the wait must answer 2xx.** `deploy/release-redeploy.sh` makes each call with `--max-redirs 0` and its status code read back. It reads the platform resource, then the resource's deployments, and stops before it writes anything when one is `queued` or `in_progress`, naming it. A deployment that has not started reads the digests set before it starts, so setting them under it would ship this release with no smoke and no tag. A list it cannot read stops the release too. Then it sets the resource's compose build command to the pull step, `docker compose pull --policy missing`, when it is not that already. It PATCHes both digests, each flagged build-time as well as runtime, so the pull reads them. It POSTs `/deploy` and reads the deployment's id from the answer. Coolify 4.3.13 queues nothing when a deployment of the resource is already queued or running, and still answers with a new id that names no deployment. A deployment queued between the check and the POST would do that, so an answer saying `Deployment already queued for this commit.` stops the release at once, and its error says both digests are set. Then it reads the deployment's status every 10 seconds until it is `finished`, for 30 minutes by the clock from the POST, however many reads that takes. A `failed` or `cancelled-by-user` deployment, or a deployment that has not finished by then, turns the step red and names the deployment. The `promote` job's 60-minute limit leaves room for that wait, the calls before it and the smoke after it, so the script's own error is the one the run shows. A test holds the limit ten minutes above the two waits. Any call before the wait stops the release when it answers anything but 2xx. A status read that answers anything but 2xx or 3xx, a 502 or no answer at all, counts as one read and the wait goes on, because the edge can blip during a long pull. A 3xx stops the release wherever it comes. It is named as what it has always been here: the edge's redirect to sign-in, a missing or expired Access credential. The script refuses before any call when a credential is empty. The deploy token needs Coolify's `read`, `write` and `deploy` abilities, for the reads, the PATCHes and the POST in turn, and a 401 or 403 to a call before the wait names the ability that call needs. `packages/devtools/test/ci/release-job.test.ts` runs it against a stand-in orchestrator: the whole sequence, a pull step already set, a wait through `queued` and `in_progress`, a failed deployment, one that never finishes, a failed status read, a 302 before and during the wait, a token refused at the first read, a deployment already queued or running, a deployment list it cannot read, a refused deploy, a deploy that names no deployment and a deploy the orchestrator skipped.
+### The gate
 
-**The pull runs before the stop (BA-219).** The orchestrator's compose deploy stops the running containers and only then runs `docker compose up -d`, which pulls whatever is missing. On 20/10/2026 the worker image pulled for 16 minutes after the old `api` and `worker` were removed, and production answered 502 throughout. The one step the orchestrator runs before the stop is the application's compose build command, in place of `docker compose build`. So the pull step puts both images on the box first. `--policy missing` pulls nothing for an image already there, so a re-release or a rollback to images still on the box costs no pull. A pull that fails fails the deployment before the stop, and production keeps running the release before it. This relies on Coolify 4.3.13's `deploy_docker_compose_buildpack` running the build command before it stops the containers, so a Coolify upgrade reads that order again.
+The `gate` job runs `deploy/release-gate.sh`, which first refuses an unknown `RELEASE_MODE`. It runs inside the concurrency group, so it decides after every earlier release finishes, and it deploys nothing.
 
-**The rhythm**, which is a condition and not a date: one repository variable, `RELEASE_MODE`, in three modes.
+For a called release:
 
-- **`per-merge`**, the default while it is unset: every green build on `main` is released, as above.
-- **`nightly`**: no build releases itself. At 02:35 UTC the schedule promotes `main`'s newest green commit, once the box's own backup is fresh (§ The nightly backup).
-- **`drill`**: nothing releases itself, and a dispatched release refuses to run unless `rehearsed_by` names the drill report that just proved a restore, or a hotfix reason.
+- A commit that is still `main`'s head is released, with the digests its build pushed under its `sha-<short>` tag.
+- A commit that is no longer the head is skipped, with a notice and a summary line, and the newer commit's green build releases instead. Production never moves back.
+- When that newer build is red, nothing releases.
+- When the API cannot say what `main`'s head is, the build turns red rather than risk an out-of-order release.
 
-Any other value fails closed: every trigger refuses, naming the three. A dispatch outside `drill` needs no reason, being the rollback. The phases are ADR 0022's: `per-merge` until the first customer's bundle lands, while nobody relies on the product and a release is minutes to undo; `nightly` from then until the platform goes live, no earlier than the end of v0.1, so that a customer's data changes at most once a night and always just after a verified backup; `drill` from go-live. That is the forcing function: the switch is a check in the workflow, not a sentence in a runbook. `RUNBOOK.md` page 6 is the procedure.
+At night the gate walks `main`'s last 100 commits, newest first, and releases the first with a green `build.yml` run, unless a commit with a `release/*` tag comes first. It matches a tag by the seven commit characters that end its name. A refused night turns its run red, and nothing outside GitHub hears of it. `packages/devtools/test/ci/release-job.test.ts` runs the script over a stand-in `gh` for each mode and trigger.
 
-**The nightly backup.** A nightly release must ride a backup taken just before it. CI cannot take one. Nothing reaches the stores stack from GitHub but the orchestrator's API, which has no call to run a command in a container, and a way in over SSH would be a new credential onto the box. So the release runs just after the box's own backup and refuses unless that backup is fresh. The box's cron dumps the database at five past each hour and copies the object and git stores at 02:00. At 02:35 both have run, with mutation's 02:17 and scan's 03:41 on either side, and the monthly drill's 03:00 on VPC 2 still ahead. Freshness is read from the dead-man service, which each job pings only after its upload is verified. `deploy/backup-fresh.sh` asks its API, with the read-only key `HEALTHCHECKS_READ_KEY`, for the `pg-hourly` and `nightly` checks. Each must be `up`: a failed run marks a check down. Each must also have pinged recently: the dump within 65 minutes, an hour and its margin, and the copies since the last 02:00 UTC, so the night's run and not the last one. GitHub starts the schedule hours late, about 09:00 on 01/10/2026, which an age limit on the copies refused every night; the last 02:00 holds wherever the start lands. The line it prints is the tag's `Rode on:`. A read-only key sees check states and nothing else: no ping URL, so it cannot fake a backup. A delayed schedule still passes, since each hour brings a new dump. A night whose copies ran late or failed deploys nothing and turns red.
+### The digests
 
-**No signed-in run before go-live.** The smoke reads `/health` and one unauthenticated document, so a release can pass it and refuse every sign-in. Until go-live, the browser suite proves each page before it merges, and the smoke and the uptime probe watch production. The signed-in production journeys that ran here from 03/10/2026 were retired on 19/10/2026 until go-live (BA-204, ADR 0022). Git history keeps them for the go-live rebuild.
+A dispatch with blank inputs releases `main`'s head, with the digests `build.yml` pushed under its `sha-<short>` tag, read back from ghcr.io. Staging is on demand and never stands, so there is no "digest staging runs" to default to. When the head has no image yet, or its build is red, the release refuses and names the commit, and never falls back to an older image. Wait for that build, dispatch `build` on `main`, or pass the digests, as the runbook's rollback does. A release moves no branch. Steps pass digests through `env:`, match each against `^sha256:[0-9a-f]{64}$` before anything is PATCHed, and never interpolate one into a shell line.
 
-**The record.** Every release that held is an **annotated `release/<UTC stamp>-<short commit>` tag** — date, who, both digests, what it rode on, and the commit the digests were resolved from, which says per digest whether this head resolved it or a rollback passed it in. Promote names the tag and its message. The `record` job pushes it, as the release's last step and **only after the smoke passes**. It first checks again that `/health` names the promoted api digest. So the newest tag is always the last release that held, and the runbook's rollback takes it. A release whose smoke fails pushes no tag and says so in its run's summary. A dispatch that passes older digests still tags promote's head, `main`'s head at the dispatch, and the tag's `Commit:` line says the digests were passed in. Tagging `main`'s head is deliberate: after a rollback it stops the nightly gate promoting that head again. Until 27/09/2026 the tag went first, and two such tags that day named releases that never reached production; both have since been deleted from origin (`RUNBOOK.md` page 6). Its `By:` line names the person who dispatched it, or says the release was automatic. Its `Run:` line names the run. **Nothing in CI commits to a branch**: a tag is not governed by a branch ruleset, so the ruleset carries no bypass list, and `contents: write` on the record job is the whole permission the workflow's token needs. A tag ruleset on `release/*` restricts updates and deletions and leaves creation open, so the record job can push a new tag and nothing can move or delete one while the ruleset is on (`RUNBOOK.md` page 6, *The tag ruleset*). `deploy/RELEASES.md` holds the promotions up to 23/09/2026 and how to list the tags since.
+### Every call before the wait must answer 2xx
 
-**The smoke waits for the build it promoted.** The api being replaced answered `/health` healthy until the orchestrator swapped the container, so a 200 alone once passed against the old build before the new one had started. The deployment has finished before the smoke starts, since `release-redeploy.sh` waits for it. The smoke runs `deploy/await-release.sh`, which polls `/health` until it answers healthy **and** its `image` is the api digest this run resolved. It polls for six minutes from the first poll to the last, which now covers the api's start alone, and fails naming both digests. `apps/api/tests/deploy/await-release.test.ts` runs it against the api's own `/health`, served locally, and against a stand-in answering a deploy's sequence. A release whose api digest is already the one running, a worker-only rollback say, passes on its first poll: the api answering is the one it promoted, and the worker's digest is not on `/health`. The protected-resource document is read after it.
+`deploy/release-redeploy.sh` refuses before any call when a credential is empty. It makes each call with `--max-redirs 0` and reads its status code back.
 
-**About sixty a day, in `per-merge` mode.** At about sixty merges a day, that is up to sixty releases and sixty tags a day; `nightly` makes it one. There are fewer when merges land while a release runs, because only the newest commit is released. The tags still list newest first, and the rollback reads the top few, so their number costs nothing. Each release restarts `api`, though. The platform stack is a Compose resource, which the orchestrator redeploys by replacing containers, not by rolling them. The gap is the stop and the start: on 27/09/2026 the product answered nothing for about 45 seconds between the old `api` stopping and the new one answering. Since BA-219 the pull no longer sits inside it, because the pull step runs before the stop. With no users that costs nothing. On the Free plan the uptime probe alerts on a single failed probe (`coolify.md` § Ingress), so a probe that lands in that gap raises an alert. With probes five minutes apart, that is about one release in seven.
+1. Reads the platform resource and its deployments. It stops before any write, naming the deployment, when one is `queued` or `in_progress`, because that deployment would ship these digests with no smoke and no tag. An unreadable list also stops it.
+2. Sets the compose build command to the pull step, `docker compose pull --policy missing`, if it is not already.
+3. PATCHes both digests, flagged build-time as well as runtime, so the pull reads them.
+4. POSTs `/deploy` and reads the deployment's id. Coolify 4.3.13 answers a deploy behind a queued or running one with an id that names nothing, so `Deployment already queued for this commit.` stops the release, and the error says both digests are set.
+5. Reads the status every 10 seconds until `finished`, for 30 minutes from the POST. `failed`, `cancelled-by-user`, or a timeout turns the step red, naming the deployment.
+
+| Answer | Where | Result |
+| --- | --- | --- |
+| Anything but 2xx | A call before the wait | Stops the release. A 401 or 403 names the ability that call needs |
+| 3xx | Any call | Stops the release, named as the edge's redirect to sign-in, a missing or expired Access credential |
+| Anything but 2xx or 3xx, such as a 502 or no answer | A status read | Counts as one read, because the edge can blip during a long pull |
+
+The deploy token needs Coolify's `read`, `write`, and `deploy` abilities. The `promote` job's 60-minute limit sits ten minutes above the two waits, which a test holds, so the script's own error is the one the run shows. `packages/devtools/test/ci/release-job.test.ts` runs the script against a stand-in orchestrator, over the whole sequence and each failure above.
+
+### The pull runs before the stop
+
+The orchestrator's compose deploy stops the running containers, then runs `docker compose up -d`, which pulls whatever is missing. A pull there once left production answering 502 for 16 minutes. The compose build command runs before the stop, in place of `docker compose build`, so the pull step puts both images on the box first. `--policy missing` skips images already there, so a re-release or a rollback to images on the box pulls nothing. A failed pull fails the deployment before the stop, and production keeps the previous release. This relies on Coolify 4.3.13's `deploy_docker_compose_buildpack` running the build command before the stop. Check that order again after a Coolify upgrade.
+
+### The rhythm
+
+`RELEASE_MODE` is a condition, not a date. The phases are ADR 0022's.
+
+| Mode | What releases | Phase |
+| --- | --- | --- |
+| `per-merge` | Every green build on `main`. The default while the variable is unset | Until the first customer's bundle lands, while a release is minutes to undo |
+| `nightly` | At 02:35 UTC the schedule promotes `main`'s newest green commit, once the box's own backup is fresh (*The nightly backup*) | Until go-live, no earlier than the end of v0.1, so a customer's data changes at most once a night, just after a verified backup |
+| `drill` | Only a dispatch whose `rehearsed_by` names the drill report that just proved a restore, or a hotfix reason | From go-live |
+
+Any other value fails closed, and every trigger refuses, naming the three. Outside `drill` a dispatch needs no reason, because it is the rollback. `RUNBOOK.md` page 6 is the procedure.
+
+### The nightly backup
+
+A nightly release must ride a backup taken just before it. CI cannot take one, because the orchestrator's API cannot run a command in a container, and SSH would put a new credential on the box. So the release runs after the box's own backup and refuses unless it is fresh.
+
+| Time (UTC) | What runs |
+| --- | --- |
+| Five past each hour | The box's cron dumps the database |
+| 02:00 | The box's cron copies the object and git stores |
+| 02:17 | `mutation.yml` |
+| 02:35 | `release.yml` |
+| 03:00 | The monthly drill, on VPC 2 |
+| 03:41 | `scan.yml` |
+
+Each backup job pings the dead-man service only after its upload is verified. `deploy/backup-fresh.sh` reads the `pg-hourly` and `nightly` checks with the read-only key `HEALTHCHECKS_READ_KEY`. Each must be `up`, which a failed run clears. The dump must have pinged within 65 minutes, and the copies since the last 02:00 UTC. GitHub starts the schedule hours late, about 09:00 on 01/10/2026, and both limits hold wherever the start lands. A night whose copies ran late or failed deploys nothing and turns red. The script's output is the tag's `Rode on:` line. A read-only key sees no ping URL, so it cannot fake a backup.
+
+### No signed-in run before go-live
+
+The smoke reads `/health` and one unauthenticated document, so a release can pass it and refuse every sign-in. Until go-live, the browser suite proves each page before merge, and the smoke and uptime probe watch production. The signed-in production journeys ran here from 03/10/2026 to 19/10/2026 (BA-204). Git history keeps them for the go-live rebuild.
+
+### The record
+
+Every release that held is an **annotated `release/<UTC stamp>-<short commit>` tag**. Its message carries the date, a `By:` line (the person who dispatched it, or automatic), both digests, a `Rode on:` line, a `Commit:` line, and a `Run:` line. `Commit:` names the commit the digests were resolved from, and says per digest whether this head resolved it or a rollback passed it in.
+
+`promote` names the tag and writes its message. The `record` job pushes it last, **only after the smoke passes** and `/health` again names the promoted api digest, so the newest tag is always the last release that held, which the runbook's rollback takes. A release whose smoke fails pushes no tag and says so in its summary. A dispatch of older digests still tags `promote`'s head, `main`'s head at the dispatch, and `Commit:` says the digests were passed in. After a rollback, that tag stops the nightly gate promoting the head again.
+
+**Nothing in CI commits to a branch**, so the branch ruleset has no bypass list, and `contents: write` on the record job is the token's whole write permission. A tag ruleset on `release/*` restricts updates and deletions and leaves creation open, so nothing can move or delete a tag while it is on (`RUNBOOK.md` page 6, *The tag ruleset*). `deploy/RELEASES.md` holds the promotions up to 23/09/2026, and says how to list the tags since.
+
+### The smoke waits for the build it promoted
+
+Once `release-redeploy.sh` sees the deployment finish, the smoke runs `deploy/await-release.sh`. It polls `/health` for six minutes until it answers healthy **and** its `image` is the api digest this run resolved, because the old api answers healthy until its container is swapped, and fails naming both digests. A release whose api digest is already running, such as a worker-only rollback, passes on its first poll, because the worker's digest is not on `/health`. The smoke then reads the protected-resource document. `apps/api/tests/deploy/await-release.test.ts` runs the script against the api's own `/health`, served locally, and a stand-in that answers a deploy's sequence.
+
+### About sixty a day, in `per-merge` mode
+
+About sixty merges a day means up to sixty releases and tags, fewer when merges land mid-release. `nightly` makes one. The rollback reads only the newest tags, so their number costs nothing. Each release restarts `api`, because the orchestrator replaces a Compose resource's containers rather than rolling them. The product answers nothing for about 45 seconds between the old `api` stopping and the new one answering. On the Free plan the uptime probe alerts on one failed probe (`coolify.md`, *Ingress*), so with probes five minutes apart about one release in seven raises an alert. With no users, that costs nothing.
 
 ## `mutation.yml`
 
-Nightly at 02:17 UTC on hosted runners. The cadence is a choice and not a budget: the repository is public, so hosted standard runners carry no minute cap. Nightly rather than weekly because the summary names what newly survived since the previous run, which is the one thing a reader needs from a run that happens while they sleep. A falling score is a Linear issue, not a failed build: the job posts the numbers and does not gate, and a red job means the harness itself broke.
+Nightly at 02:17 UTC on hosted runners, which have no minute cap on a public repository, so the summary can name what newly survived since the previous run. The job does not gate. A falling score is a Linear issue, and a red job means the run itself broke.
 
-**Two legs, and what would bring a third back.** A score is only worth reporting where the tests that produce it exercise the code being mutated.
+### Two legs, and what would bring a third back
 
-- `apps/web`. Its primary test interface is a browser, and Stryker's Vitest runner cannot drive it. What is left is three jsdom files against a dozen components, so the score would be dominated by mutants no test covers. It comes back when a runner can drive the browser suite, or when component tests cover the pages on their own.
-- `apps/worker`. Its mutatable source is a few dozen lines of configuration and logging plus a schema view generated from the migration journal, so a mutmut score today measures the generator. It comes back when the tier gets behaviour worth mutating; the settings stay in `apps/worker/pyproject.toml` ready for it.
+The legs are `apps/api` and `packages/core`. A score means something only where the tests exercise the mutated code.
 
-**The baseline is the previous run's artifact.** Each leg starts from the previous run's mutant results, so a mutant whose file and covering tests nobody touched is not tested again. The results are Stryker's incremental file, which it writes when a run finishes and again on the interrupt a cancellation sends; the report is written only on a finish, so the incremental file is what each leg keeps, merged from its shards (below) and uploaded as `stryker-incremental-<leg>`, kept fourteen days. The restore, `.github/actions/mutation-baseline`, takes the newest such artifact a run on `main` uploaded before this run began, or, for a run dispatched on another branch, the newer of `main`'s and that branch's own. It takes one only from a run of this repository's own branches, because a fork's pull request can call its branch `main`, and nothing uploaded after this run began, so every job of the run, and a re-run of one, restores the same results and cuts the same slices from them.
+| Workspace | Why it has no leg | When it comes back |
+| --- | --- | --- |
+| `apps/web` | Its main test interface is a browser, which Stryker's Vitest runner cannot drive. Three jsdom files against a dozen components would leave a score of uncovered mutants | When a runner can drive the browser suite, or component tests cover the pages |
+| `apps/worker` | Its mutatable source is a few dozen lines of configuration and logging, plus a schema view generated from the migration journal, so a mutmut score measures the generator | When the tier gets behaviour worth mutating. The settings stay in `apps/worker/pyproject.toml` |
 
-It is an artifact and not an Actions cache entry because past its limit GitHub evicts the least recently used entry, and until 27/09/2026 the build's layers kept the cache there: they held 8.17 of its 10 GB on 21/09/2026. A checkpoint read once a night was evicted inside a day, and from 19/09/2026 every night started from nothing. Artifacts are stored outside that limit.
+### The baseline is the previous run's artifact
 
-**Each leg runs as shards.** A whole leg no longer fits one job (*How long a night takes*, below), so `scripts/mutation-shards.mjs` cuts each leg's `mutate` set into slices, and each slice is a job of its own, with its own ceiling, running Stryker with `--mutate` over it. The files are dealt by what they cost the previous run, the heaviest first, each onto the lightest shard so far. A file's cost is its mutants' seconds of a worker, fitted to the forced run of every shard on 24/09/2026: about 10 for an ordinary mutant, 13 for a static one and 370 for one that timed out, which waits out the whole related suite; a file the previous run did not hold is priced by its size at that run's seconds a byte, and a leg with no previous run is dealt by size alone. The first forced run was dealt by size, and its shards took 14 minutes to more than 350, the spread following the timed-out mutants and nothing the tree shows. The number of shards is set per leg in the workflow's matrix, 5 for `apps/api` and 20 for `packages/core`, and `packages/devtools/test/ci/mutation-baseline.test.ts` holds the matrix, the summary and the slices to one another. Every shard starts from the whole leg's results rather than its own slice's, so the slicing need not be stable: Stryker carries a file outside `--mutate` forward from the incremental file it read, and a file a new file moves to another shard keeps its results. A file too heavy for any one shard is named in `scripts/mutation-shards.mjs` with a number of pieces and cut by line into that many ranges, each a shard of its own ahead of the dealt ones, so the other files are dealt over the shards left as they were when the cut file had a shard to itself. A cut falls only between lines no mutant runs across, read from Stryker's own instrumenter, since Stryker mutates only what a range holds whole, and the pieces share the file's cost as the previous run priced it; the merge takes each of the file's mutants from the piece that holds the line it starts on.
+Each leg starts from the previous run's results, so an untouched mutant is not retested. Stryker writes its report only on a finish but its incremental file on a cancellation too, so each leg keeps the incremental file, merged from its shards and uploaded as `stryker-incremental-<leg>` for fourteen days.
 
-Each shard uploads the incremental file it left, and its report when it finished, as `stryker-shard-<leg>-<n>`, kept a day. The leg's `summary` job waits for every shard, whatever each did, and merges them: each file from the shard that owned it. A shard that stopped keeps what it tested and leaves the rest for the next run, so a forced run's gaps are never refilled with the results it was replacing; a shard that left nothing keeps its files' previous results, so a lost shard leaves the leg no poorer than it started. The summary is written once for the leg, over the union: which shards finished, then the score, the new survivors and the runner-fault check below. At most 6 shards run at once, because the organisation's plan runs 20 jobs and a run of `check.yml` takes 12: its lane, docs-gates, pr-title and check jobs and eight leg jobs, `full-web-browser` being two. `packages/devtools/test/ci/mutation-baseline.test.ts` counts those jobs from `check.yml`.
+`.github/actions/mutation-baseline` restores the newest such artifact a run on `main` uploaded before this run began. A dispatch on another branch takes the newer of `main`'s and that branch's own. It reads only this repository's own branches, because a fork can call its branch `main`, and ignores later uploads, so every job and re-run restores the same results. The baseline is an artifact because the Actions cache evicts its least recently used entry past 10 GB, and a nightly checkpoint was evicted within a day.
 
-A shard's upload runs whatever its outcome, so a shard that restored the leg's results and then went red before Stryker wrote anything hands them back, and the merge carries them forward. The summary uploads the merged results whenever its merge succeeded, a red runner-fault check included, so a red night carries the baseline forward, and it expires only after fourteen days in which no run got as far as its restore. A run whose restore cannot list or read the artifacts goes red rather than testing every mutant: a run from nothing would upload a poorer checkpoint than the one it could not read, and the next night would start from that. Runs on one branch take turns, a new one waiting for the one in progress, for the same reason: two runs overlapping would start from the same checkpoint, and the one that finished later would win however little it had tested, as a scheduled night would over a long seeding dispatch. A re-run keeps its run id, so its uploads replace the artifacts of the same names its first attempt left.
+### Each leg runs as shards
 
-**How long a night takes.** A night that starts from the night before's checkpoint tests only what changed, so its length follows the day's churn. From 11/09 to 18/09/2026, when `packages/core` held 3,574 mutants and `apps/api` 2,070 and neither count moved, each night reused between 93 and 99.6 per cent of the results and finished both legs in four to fifteen minutes. The counts have grown fast since: `packages/core` had 5,933 mutants on 22/09, 6,930 on 23/09 and 7,294 on 24/09, and `apps/api` 2,931. A whole leg stopped fitting one job: on 23/09/2026 the ceiling cancelled `packages/core` at 2,851 of 6,930 mutants and `apps/api` at 2,262 of 2,686. A forced run on 24/09 measured about 7.4 seconds a mutant a worker for `packages/core`'s ordinary mutants and 19 for `apps/api`'s, and a static mutant, one that runs as its module loads, re-runs every test file related to its file, which for most files is nearly the whole suite; 2,910 of core's mutants and 681 of api's are static. Stryker's own estimate, some 40 hours for a forced `packages/core`, prices every static mutant at the whole suite; most are killed by the first file that fails, and at the rates measured on 21 and 22/09, scaled to today's suite, a static mutant is nearer 55 seconds a worker, which puts a forced `packages/core` near 14 hours on one job and `apps/api` near 5. The forced run of every shard on 24/09/2026 measured the rest: a timed-out mutant costs about six minutes of a worker, and `packages/core` held 833 of them and `apps/api` 145, so they are most of a forced run's time. Dealt by that cost into 16 and 5 shards, each shard of several files comes to about an hour and a half, but a whole file sets a floor no count of shards moves: on that run `packages/core`'s `src/store/git/index.ts`, with some 180 timed-out mutants of 596, was over five hours on its own, and `src/store/map/index.ts` about two. Both have since been split by concern, git into `door.ts`, `commit.ts`, `history.ts` and `rewrite.ts` behind a 15-line `index.ts`, and map into `generations.ts`, `walk.ts` and `write.ts`, so the line-range cuts of those two files are gone from `scripts/mutation-shards.mjs` and each new file is dealt like any other. A file too heavy for one shard is still cut by line range into pieces, each a shard (*Each leg runs as shards*, above).
+A whole leg does not fit one job (*How long a night takes*). `scripts/mutation-shards.mjs` cuts each leg's `mutate` set into slices, and each slice is a job with its own ceiling, running Stryker with `--mutate` over it. The matrix sets 5 shards for `apps/api` and 20 for `packages/core`. `packages/devtools/test/ci/mutation-baseline.test.ts` holds the matrix, the summary, and the slices to one another.
 
-A cancelled shard's checkpoint is merged as a finished one's is, so the next night carries on from it. The dispatch input `ceiling-minutes` moves every shard's ceiling for one run, up to 350: it stays under the 360 minutes a hosted job is allowed because a job that reaches that limit is terminated rather than cancelled, and the upload after a cancellation needs time to run. A lost baseline is rebuilt on `main` with one dispatch with `ceiling-minutes` at 350, so the shard that holds the heaviest file finishes rather than carrying over; the nights after it start from what it left. The dispatch input `shards`, leg-number pairs such as `core-1,api-2`, runs only the shards it names: every step of the others is skipped, so they leave nothing, and the merge keeps their files' results from the run the restore read. It re-runs a shard that failed, or the shards a change to the slicing moved, without paying for the rest.
+Files are dealt heaviest first, each onto the lightest shard. A file's cost is its mutants' seconds of a worker in the previous run, fitted on 24/09/2026 at about 10 per ordinary mutant, 13 per static one, and 370 per timeout. A new file is priced by size at that run's seconds a byte. A leg with no previous run is dealt by size alone.
 
-**Each leg's Stryker config names its own vitest config.** Both legs' Stryker configs name `vitest.stryker.config.ts`, the workspace's vitest config without the `github-actions` reporter, so a shard's step summary stays empty and only the leg's `summary` job writes one. Vitest adds that reporter by default when `GITHUB_ACTIONS` is `true`, and it appends a "Vitest Test Report" to the step summary at the end of every run; under Stryker every mutant is a run, so each shard's summary held one report per mutant it tested. The reporter is dropped rather than kept with its summary turned off, because under Stryker its other output, an error annotation per failing test, would name killed mutants, and Stryker holds a test runner's output out of the job's log anyway. The workspaces' own suites keep the reporter. `packages/core` and `apps/api` configs also set `isolate: true`, because Stryker runs every file in one worker and a static mutant is live only in a module evaluated after Stryker activates it.
+Each shard starts from the whole leg's results, and Stryker carries files outside `--mutate` forward, so the slicing need not be stable.
 
-**`packages/core` runs its own test order under Stryker.** Its `vitest.stryker.config.ts` makes one more change: the file that failed the last run goes first, then the shortest. Vitest's own order puts the longest first, and the longest is `test/sources/cross-tier-document.test.ts`, which spawns the worker and took 94 of the dry run's 179 seconds on the hosted runner. A static mutant waited out that file before the quick one that kills it, and with four runners on four vCPUs many outlasted their timeout. On 27/09/2026 a forced run of one shard of 145 mutants took 34.9 minutes under vitest's order and 23.0 under this one, 2.19 hours of a worker against 1.30, and its timeouts fell from 8 to 6 with no kill turned survivor. The order decides only which file answers first, so a survivor is still the whole related suite's verdict. `ignoreStatic` was measured the same night and stays off: 952 of core's static mutants are reached, test by test, only by the audit and refusal-word walks, which import every slice inside a test, so under it they would run no test and fail the leg as a runner fault.
+A file too heavy for one shard is named in `scripts/mutation-shards.mjs` with a number of pieces, cut by line into that many ranges, each its own shard ahead of the dealt ones. Cuts fall only between lines no mutant spans, read from Stryker's instrumenter, because Stryker mutates only what a range holds whole. The pieces share the file's previous cost, and the merge takes each mutant from the piece holding its first line.
 
-**Cancellation has to reach Stryker.** A cancelled step signals its entry process and nothing under it, and a shell waiting on a child forwards no signal: behind `pnpm run mutation`, with a pnpm and an sh in between, Stryker was never signalled and never wrote the partial report it writes on SIGINT. The step `exec`s into pnpm's bin shim, which execs into node, so there is one process from the step down.
+### The merge
 
-**A runner fault fails the leg.** The leg's summary exits non-zero, naming a runner fault first, when any mutant in the merged results ran no test or the leg killed none: no verdict in such a report means anything, and it would otherwise read as a low score. A leg with a shard that wrote no report, one cut short at its ceiling say, is judged from the merged checkpoint. Reused results are judged too, so a checkpoint holding such rows keeps the leg red until a run with `force` tests every mutant again. It exists because of 23 to 24/09/2026: vitest 5 matches a test name against its suite chain joined with ` > `, the Stryker runner built the name with a space, and so no mutant's name filter selected a test; every mutant came back `Survived` with `testsCompleted: 0`, and the night was cancelled at its ceiling looking like a slow one. The runner's patch under `patches/` builds the name as the running vitest does, and `packages/devtools/test/mutation/vitest-runner-patch.test.ts` holds a mutant reached only by a test inside a `describe`, so a vitest or runner bump that breaks the filter again goes red on its pull request, before any night runs.
+Each shard uploads its incremental file, and its report when it finished, as `stryker-shard-<leg>-<n>`, kept a day, whatever its outcome. The leg's `summary` job waits for every shard and takes each file from the shard that owned it.
+
+- A shard that stopped keeps what it tested, so a forced run's gaps are never refilled with the results it was replacing.
+- A cancelled shard merges like a finished one.
+- A shard that went red before Stryker wrote anything hands back the results it restored.
+- A shard that left nothing keeps its files' previous results.
+
+The summary reports which shards finished, the score, the new survivors, and the runner-fault check. It uploads the merged results whenever the merge succeeded, even on a red runner fault, so the baseline expires only after fourteen days with no run reaching its restore.
+
+A restore that cannot list or read the artifacts turns the run red rather than start from nothing and upload a poorer checkpoint. Runs on one branch take turns, because overlapping runs would start from one checkpoint and the later finisher would win, however little it tested. A re-run keeps its run id, so its uploads replace its first attempt's.
+
+At most 6 shards run at once. The organisation's plan runs 20 jobs, and a `check.yml` run takes 12: its lane, docs-gates, pr-title, and check jobs, and eight leg jobs, with `full-web-browser` as two. `packages/devtools/test/ci/mutation-baseline.test.ts` counts those jobs from `check.yml`.
+
+### The dispatch inputs
+
+| Input | What it does |
+| --- | --- |
+| `ceiling-minutes` | Moves every shard's ceiling for one run, up to 350. A job that reaches the 360 minutes a hosted job is allowed is terminated, not cancelled, and the upload after a cancellation needs time to run |
+| `shards` | Runs only the shards it names, as leg-number pairs such as `core-1,api-2`. The others skip every step and leave nothing, and the merge keeps their files' results from the run the restore read. It re-runs a failed shard, or the shards a change to the slicing moved |
+
+To rebuild a lost baseline, dispatch on `main` with `ceiling-minutes` at 350, so the shard with the heaviest file finishes. The nights after start from what it left.
+
+### How long a night takes
+
+A night tests only what changed since the previous checkpoint. From 11/09 to 18/09/2026 each night finished both legs in four to fifteen minutes. A forced run tests every mutant. The forced run of every shard on 24/09/2026 measured these costs.
+
+| Measure | `packages/core` | `apps/api` |
+| --- | --- | --- |
+| Seconds of a worker for an ordinary mutant | About 7.4 | About 19 |
+| Static mutants | 2,910 | 681 |
+| Timed-out mutants, at about six minutes of a worker each | 833 | 145 |
+| A forced run on one job | Near 14 hours | Near 5 hours |
+
+A static mutant runs as its module loads and re-runs every test file related to its file, but most die at the first failing file, so one costs nearer 55 seconds of a worker. Timed-out mutants are most of a forced run's time.
+
+A single file sets a floor that no count of shards moves. `packages/core`'s `src/store/git/index.ts`, with some 180 timed-out mutants of 596, took over five hours on its own, and `src/store/map/index.ts` about two. Both are now split by concern. The git door is `door.ts`, `commit.ts`, `history.ts`, and `rewrite.ts` behind a 15-line `index.ts`. The map door is `generations.ts`, `walk.ts`, and `write.ts`. `scripts/mutation-shards.mjs` holds no line-range cut for either.
+
+### Each leg's Stryker config names its own vitest config
+
+Both legs' Stryker configs name `vitest.stryker.config.ts`, the workspace's vitest config without the `github-actions` reporter, so only the leg's `summary` job writes a step summary. Vitest adds that reporter when `GITHUB_ACTIONS` is `true`, and under Stryker it would append a "Vitest Test Report" per mutant and annotate killed mutants as errors. The workspaces' own suites keep it. `packages/core` and `apps/api` configs also set `isolate: true`, because Stryker runs every file in one worker and a static mutant is live only in a module evaluated after Stryker activates it.
+
+### `packages/core` runs its own test order under Stryker
+
+Its `vitest.stryker.config.ts` runs the file that failed the last run first, then the shortest. Vitest's own order runs the longest first, `test/sources/cross-tier-document.test.ts`, which spawns the worker and took 94 of the dry run's 179 seconds. Static mutants waited it out before the quick file that kills them, and many timed out. The order changes which file answers first, not the verdict, so a survivor is still the whole related suite's.
+
+`ignoreStatic` stays off. Only the audit and refusal-word walks, which import every slice inside a test, reach 952 of core's static mutants. Under `ignoreStatic` those would run no test and fail the leg as a runner fault.
+
+### Cancellation has to reach Stryker
+
+A cancelled step signals only its entry process, and a shell waiting on a child forwards nothing. Behind `pnpm run mutation`, with a pnpm and an sh in between, Stryker never got the SIGINT on which it writes its partial report. The step `exec`s into pnpm's bin shim, which execs into node, so one process runs from the step down.
+
+### A runner fault fails the leg
+
+The summary exits non-zero, naming a runner fault first, when any merged mutant ran no test or the leg killed none, because such a report would read as a low score. It judges the merged checkpoint, reused rows included, so such rows keep the leg red until a run with `force` retests every mutant.
+
+On 23 to 24/09/2026, vitest 5 matched a test name against its suite chain joined with ` > `, and the Stryker runner built the name with a space. No mutant's name filter selected a test, every mutant came back `Survived` with `testsCompleted: 0`, and the night hit its ceiling looking slow. The runner's patch under `patches/` builds the name as the running vitest does. `packages/devtools/test/mutation/vitest-runner-patch.test.ts` holds a mutant that only a test inside a `describe` reaches, so a vitest or runner bump that breaks the filter fails its pull request.
 
 ## `scan.yml`
 
-Nightly at 03:41 UTC, after `mutation.yml` has started, and on dispatch. It reads the images `build.yml` pushed for known vulnerabilities and gates nothing, for the reason `mutation.yml` is scheduled: a CVE published overnight is not a reason a merge fails, and `build.yml`'s job is to push a probed digest. A vulnerability it reports leaves the run green. A red run means the scan itself broke: the packages API refused the token, the scanner failed, or code scanning refused an upload.
+Nightly at 03:41 UTC, after `mutation.yml` starts, and on dispatch. It reads the images `build.yml` pushed for known vulnerabilities and gates nothing, because a CVE published overnight is no reason for a merge to fail, and `build.yml`'s job is to push a probed digest. A reported vulnerability leaves the run green. A red run means the scan broke: the packages API refused the token, the scanner failed, or code scanning refused an upload.
 
-**Which image.** Each package's newest version that carries a `sha-` tag, read from the packages API, which is the image `build.yml` last pushed for that tier. It is the one reading that covers all three tiers. The head of `main` is not one: its build may still be running, or red, and a scan of its tag would fail until the next green build. The release tags are not one either: each holds the `api` and `worker` digests production runs and nothing for `backup`, whose digest is set by hand. Scanning what production runs is a second target, and it is not built. The version is chosen by its tag and never by recency alone, because every provenance push writes two manifests after its image, one untagged and one tagged `sha256-<digest>`, so recency alone picks a signature rather than an image. The layer cache's version is tagged `buildcache` and never `sha-`, so it is never scanned. Each leg scans by digest, so a push that lands mid-run moves nothing under it, and its job summary names the digest and the tag.
+### Which image
 
-**The tier list is `build.yml`'s.** The `tiers` job reads `build.yml`'s image matrix when the run starts and hands the names to the scan, one leg each, with `fail-fast` off so one tier's broken scan cancels no other. A fourth image is scanned the first night after it ships, with no edit here.
+The scan reads each package's newest version with a `sha-` tag from the packages API, the image `build.yml` last pushed for the tier. `main`'s head is not scanned, because its build may still run or be red. The release tags hold no `backup` digest, which is set by hand, and scanning what production runs is a second target, not built. The version is chosen by tag, because every provenance push writes two newer manifests, one untagged and one tagged `sha256-<digest>`. The `buildcache` version has no `sha-` tag. Each leg scans by digest, so a push mid-run moves nothing, and its summary names the digest and the tag.
 
-**The scanner.** Trivy, through `aquasecurity/trivy-action`, which was vetted before it was pinned. In March 2026 an attacker force-pushed 76 of its 77 tags to a credential stealer (GHSA-69fq-xp46-6x23), and the `github-actions-templates` skill's own example pins it to `@master`, which the pin rule above refuses. The first pin, v0.36.0, is an immutable release cut after the incident, with a signed tag and its commit on `master`, and the `setup-trivy` action it calls is itself pinned by commit. The scanner's release is named in the step because the action's own default trailed three of Trivy's security fixes when it was pinned; Renovate's `github-actions` manager reads that input as a release of `aquasecurity/trivy`, so the pin does not age out of sight. The vulnerability database is fetched each night rather than cached, because any run on `main` can write an Actions cache entry, and a database planted there would hide what the scan reports. The registry token reaches the scanner as a Docker login, which is keyed by host, so it is offered to ghcr.io alone and never to `mirror.gcr.io`, where the scanner fetches its database first.
+### The tier list is `build.yml`'s
 
-**Where a vulnerability shows.** Each vulnerability a scan reports for a package, or for a binary path, is an alert in the repository's code scanning (Security, then Code scanning), so one CVE in several packages (openssl's three, say) shows as several alerts. Each is filed on the branch the run was on, `main` for the nightly run, under its tier's category: `image-api`, `image-worker` or `image-backup`. An alert closes itself the first time a scan no longer finds it, so the list is always the latest scan's. The owner reads the list. Nothing else is told, and nothing waits on it. An alert is not a task: one base-image bump can close dozens of them, and most are closed by a change nobody here writes, such as a Renovate pull request moving a pinned base. What becomes a Linear issue is a change to an image that the list shows is owed, such as a pin to move or a package to drop, and the issue names the alerts it expects to close.
+The `tiers` job reads `build.yml`'s image matrix when the run starts, and gives each tier a leg. `fail-fast` is off, so one tier's broken scan cancels no other. A fourth image is scanned the first night after it ships.
 
-**Triage of a vulnerability.** A vulnerability is assessed for its package in its image, not for its CVE alone, and settles one of three ways:
+### The scanner
 
-- **A fix we can take**, when the alert's *Fixed Version* names one: the task above takes it, and the alert closes itself. A fix inside a binary someone else builds, such as `rclone` or `age`, can be taken only once that binary's own release carries it; Renovate proposes that release, and until then the vulnerability is assessed as one with no fix.
-- **No fix, and unreachable**: the running service never takes the flawed path. Dismiss the alert as "won't fix", with a one-line reason saying what shows it.
-- **No fix, and reachable**: the alert stays open, and `IMAGE_VULNERABILITIES.md` names it under *Held open*, with the mitigation that holds it today and the task that removes it.
+The scanner is Trivy, through `aquasecurity/trivy-action`. In March 2026 an attacker force-pushed 76 of its 77 tags to a credential stealer (GHSA-69fq-xp46-6x23), so ignore the `github-actions-templates` skill's example, which pins `@master`. The first pin, v0.36.0, is an immutable release cut after the incident, with a signed tag and its commit on `master`. The `setup-trivy` action it calls is pinned by commit too. The step names Trivy's release, because the action's default trailed three of its security fixes, and Renovate's `github-actions` manager tracks that input as a release of `aquasecurity/trivy`. The database is fetched each night, because a database planted in the Actions cache would hide findings. The registry token is a Docker login, keyed by host, so it reaches ghcr.io alone and never `mirror.gcr.io`, where the scanner fetches its database first.
 
-The assessment asks what the package is in that image for and whether the running service takes the flawed path, and it is decided by the calls the service makes, the image's entry points and the advisory's own conditions. The image is read directly: `docker export` of the digest, then dpkg's status file for why a package is there, each ELF file's `DT_NEEDED` for what links a library, and the file list for the binaries a flaw needs. `IMAGE_VULNERABILITIES.md` keeps each package's assessment, so a new vulnerability in a package already there starts from it. A dismissal goes through the API, its reason at most 280 characters:
+### Where a vulnerability shows
+
+Each vulnerability a scan reports per package or binary path is a code scanning alert (**Security**, then **Code scanning**), so one CVE in openssl's three packages is three alerts. An alert is filed on the run's branch, `main` for the nightly run, under its tier's category: `image-api`, `image-worker`, or `image-backup`. It closes once a scan no longer finds it. The owner reads the list, and nothing else is told.
+
+An alert is not a task, because most close through a change nobody here writes, such as a Renovate pull request moving a pinned base. A Linear issue is for a change the list shows an image owes, such as a pin to move or a package to drop, and names the alerts it expects to close.
+
+### Triage of a vulnerability
+
+A vulnerability is assessed for its package in its image, not for its CVE alone.
+
+| Outcome | When | What happens |
+| --- | --- | --- |
+| A fix we can take | The alert's *Fixed Version* names one | The task above takes it, and the alert closes itself |
+| No fix, and unreachable | The running service never takes the flawed path | Dismiss it as "won't fix", with a one-line reason saying what shows it |
+| No fix, and reachable | The running service takes the flawed path | It stays open, named in `IMAGE_VULNERABILITIES.md` under *Held open* with its mitigation and the task that removes it |
+
+A fix inside a binary someone else builds, such as `rclone` or `age`, counts as no fix until that binary's release, which Renovate proposes, carries it.
+
+The service's calls, the image's entry points, and the advisory's conditions decide whether the flawed path is taken. Read the image directly.
+
+1. Run `docker export` on the digest.
+2. Read dpkg's status file for why a package is there.
+3. Read each ELF file's `DT_NEEDED` for what links a library.
+4. Read the file list for the binaries a flaw needs.
+
+`IMAGE_VULNERABILITIES.md` keeps each package's assessment, so a new vulnerability in a package already there starts from it. A dismissal goes through the API, with a reason of at most 280 characters:
 
 ```sh
 gh api -X PATCH 'repos/{owner}/{repo}/code-scanning/alerts/<number>' -f state=dismissed \
   -f dismissed_reason="won't fix" -f dismissed_comment='Unreachable (<task id>): <what shows it>'
 ```
 
-A dismissal outlives every rebuild: code scanning keeps it while the scan still reports the same package and CVE, and a fixed version appearing in the alert's text does not reopen it. So reading the list includes this query. It names each dismissed alert that the latest scan still reports with a fixed version, for a Debian package (filed under the image's own name) or a library a manifest pins. Each is reopened with `-f state=open` and taken as a fix. A binary someone else builds is left out, because its fix arrives as a Renovate pull request, and the scan after that merge closes the alert.
+A dismissal outlives every rebuild, even after a fixed version appears in the alert's text. So reading the list includes this query, which names each dismissed alert that the latest scan still reports with a fixed version, for a Debian package (filed under the image's own name) or a library a manifest pins. Reopen each with `-f state=open` and take it as a fix. A binary someone else builds is left out, because its fix arrives as a Renovate pull request, and the scan after that merge closes the alert.
 
 ```sh
 gh api --paginate 'repos/{owner}/{repo}/code-scanning/alerts?state=dismissed&per_page=100' --jq '.[]
@@ -226,24 +426,30 @@ gh api --paginate 'repos/{owner}/{repo}/code-scanning/alerts?state=dismissed&per
   | .number'
 ```
 
-The method is the same at every severity; `IMAGE_VULNERABILITIES.md` says which severities have been through it.
+The method is the same at every severity. `IMAGE_VULNERABILITIES.md` says which severities have been through it.
 
-**The alerts branch.** After the scan legs, whatever each did, the `alerts` job writes `alerts.json` to the branch `security/alerts`, as one commit with no parent that replaces the night before's. The file holds the run's URL, every open alert and the alerts the query above names, each cut to its number, dates, severity, rule, category, path, message, dismissal comment and URL. It exists for the weekly triage, a Claude Code routine run in the cloud: a cloud session's GitHub calls carry the Claude GitHub App's token, whatever token the session sets, and that App cannot read code scanning, so from 05/10 to 26/10/2026 the routine got a 403 every week. The routine reads the branch with `git fetch origin security/alerts` instead. The job's token reads code scanning and writes the branch; the ruleset covers `main` alone, and a push made with a run's own token starts no workflow.
+### The alerts branch
 
-**Code scanning on the repository.** The workflow changes no repository setting. If code scanning refuses the upload until one is turned on, turning it on is the owner's call, as the repository's admin.
+After the scan legs, whatever their outcome, the `alerts` job writes `alerts.json` to the branch `security/alerts` as one parentless commit that replaces the previous one. It holds the run's URL, every open alert, and the alerts the query above names, each cut to its number, dates, severity, rule, category, path, message, dismissal comment, and URL. The weekly triage, a cloud Claude Code routine, reads it with `git fetch origin security/alerts`, because a cloud session's GitHub calls carry the Claude GitHub App's token, which cannot read code scanning. The job's token reads code scanning and writes the branch. The ruleset covers `main` alone, and a push made with a run's own token starts no workflow.
+
+### Code scanning on the repository
+
+The workflow changes no repository setting. If code scanning refuses the upload until it is turned on, turning it on is the owner's call, as the repository's admin.
 
 ## The `docker-hub-login` action
 
-`.github/actions/docker-hub-login/` sends the Docker daemon's Docker Hub pulls through `mirror.gcr.io`, then logs the job in to Docker Hub for any image the mirror lacks. The mirror counts against no Docker Hub limit, while every logged-in leg shares the account's 200 pulls an hour, which CI spent until the legs failed (BA-314). The suites' Postgres (`pgvector/pgvector`) and the images the api and worker legs build come from Docker Hub, and an anonymous pull counts against the runner address's limit, which GitHub's runners share with every other anonymous puller. On 09/10/2026 that limit refused the image to every suite of #649's run twice (BA-96).
+`.github/actions/docker-hub-login/` sends the Docker daemon's Docker Hub pulls through `mirror.gcr.io`, then logs the job in to Docker Hub for any image the mirror lacks. The suites' Postgres (`pgvector/pgvector`) and the images the api and worker legs build come from Docker Hub. The mirror counts against no Docker Hub limit. Logged-in legs share the account's 200 pulls an hour, which CI used up until legs failed (BA-314). An anonymous pull counts against the runner address's limit, which GitHub's runners share with every other anonymous puller.
 
-**Every leg that starts a container calls it**: every `full-` leg in `check.yml` but `full-web-unit`, the image job in `build.yml`, the Stryker leg in `mutation.yml` and the job in `budgets.yml`. It restarts the daemon, so it runs before `setup-buildx-action`, whose builder takes the same mirror in its `buildkitd-config-inline`. It reads two repository secrets, `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, a read-only access token of that account. `build.yml` passes both to `check.yml` by name, as it passes the release its secrets, because a called workflow reads no secret it was not handed. A run that has neither, a fork's, warns and pulls anonymously as before, so the action never turns a missing secret into a red run.
+Every leg that starts a container calls it: every `full-` leg in `check.yml` except `full-web-unit`, the image job in `build.yml`, the Stryker leg in `mutation.yml`, and the job in `budgets.yml`. It restarts the daemon, so it runs before `setup-buildx-action`, whose builder takes the same mirror in its `buildkitd-config-inline`. It reads the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, a read-only access token, which `build.yml` passes to `check.yml` by name. A run without them, such as a fork's, warns and pulls anonymously.
 
-To rotate the token, make a new read-only access token on the Docker Hub account, then `gh secret set DOCKERHUB_TOKEN`, and revoke the old one.
+To rotate the token:
+
+1. Make a new read-only access token on the Docker Hub account.
+2. Run `gh secret set DOCKERHUB_TOKEN`.
+3. Revoke the old token.
 
 ## The `git-filter-repo` action
 
-`.github/actions/git-filter-repo/` installs the rewrite tool the erasure routine shells out to (ADR 0020), which the runner image does not carry. Without it a workspace's erasure suite fails on the runner while every machine it was written on is green, and there is no skip guard in that suite on purpose.
+`.github/actions/git-filter-repo/` installs the rewrite tool the erasure routine shells out to, which the runner image lacks. The erasure suite has no skip guard, on purpose. It is an action, not a step per workflow, because when the install lived only in `check.yml`, both mutation legs died on `git: 'filter-repo' is not a git command` and scored nothing for three nights.
 
-It is an action rather than a step per workflow because the install was written into `check.yml` and copied nowhere: Stryker's initial test run is a workspace's suite run whole, so both mutation legs died on `git: 'filter-repo' is not a git command`, mutated nothing and scored nothing for three nights before anyone looked. A step that has to be remembered is a step that will be forgotten.
-
-**The version is read out of `apps/api/Dockerfile` and is not written in the action.** A rewrite proved against one version of the tool and run against another is a rewrite nobody has tested, so the runner and the api image must carry the same one; a pinned value is written down once and read from there, because a second copy ages on its own. An action cannot import a constant, so reading the pin out of the file that declares it is the substitute. The action refuses a Dockerfile holding no such pin, or two. A job that runs the erasure suite without the action fails that suite, and the verdict job reads the failure.
+**The version is read from `apps/api/Dockerfile`, not written in the action.** The runner and the api image must carry the same tested version, so the action reads the pin from the file that declares it, and refuses a Dockerfile with no such pin, or two. A job that runs the erasure suite without the action fails that suite, and the verdict job reads the failure.
