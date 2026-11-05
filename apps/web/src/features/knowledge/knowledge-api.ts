@@ -275,3 +275,24 @@ export const useSetOwners = () => {
     }),
   );
 };
+
+export type KnowledgeBaseExported = inferOutput<Api["knowledge"]["exportBundle"]>;
+
+export type RecordsExported = inferOutput<Api["knowledge"]["exportRecords"]>;
+
+export type GuideExported = inferOutput<Api["knowledge"]["exportGuide"]>;
+
+export const useExportKnowledgeBase = () => {
+  const api = useTRPC();
+  return useMutation(api.knowledge.exportBundle.mutationOptions());
+};
+
+export const useExportRecords = () => {
+  const api = useTRPC();
+  return useMutation(api.knowledge.exportRecords.mutationOptions());
+};
+
+export const useExportGuide = () => {
+  const api = useTRPC();
+  return useMutation(api.knowledge.exportGuide.mutationOptions());
+};
