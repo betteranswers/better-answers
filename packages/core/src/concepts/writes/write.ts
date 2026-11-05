@@ -56,7 +56,7 @@ import { IMPORT_SENSITIVITY_DEFAULT } from "../import/loader.ts";
 import { deciderAdmits, ownerAdmits, standingConcept } from "../owners.ts";
 import { conceptVisibilityFrom } from "../visibility.ts";
 import type { PassedOnCommitRefusal } from "../vocabulary.ts";
-import { mergeKeyMovedBy } from "./merge-key.ts";
+import { acceptedKeyOf } from "./merge-key.ts";
 import {
   conceptOfSuggestion,
   payloadFor,
@@ -335,10 +335,8 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
     }),
   );
 
-const landingKeyOf = ({ input, mergeKey }: ParsedWrite, held: Held | undefined): string => {
-  if (input.acceptance === undefined || held === undefined) return mergeKey;
-  return mergeKeyMovedBy(held, input) ?? mergeKey;
-};
+const landingKeyOf = ({ input, mergeKey }: ParsedWrite, held: Held | undefined): string =>
+  input.acceptance === undefined ? mergeKey : acceptedKeyOf(mergeKey, held, input);
 
 const WRITE_REFUSALS: readonly (readonly [
   WriteConceptRefusal,

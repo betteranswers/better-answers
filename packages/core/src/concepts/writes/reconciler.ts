@@ -41,6 +41,7 @@ import {
 } from "../import/landing.ts";
 import { parseBundleManifest } from "../import/manifest.ts";
 import type { Acceptance } from "../index.ts";
+import { acceptedKeyOf } from "./merge-key.ts";
 import { RECONCILER_ACTIONS, restsAlsoOnWhenReplayed } from "./reconciler-hit.ts";
 import { payloadFor, targetOfMergeKey } from "./suggestions.ts";
 
@@ -310,9 +311,10 @@ const replayCommit = async (
         const row = replayableOf(workspaceId, facts, held, doors.clock);
         if (row === undefined) return err("unreadable-commit");
         const mergeKey =
-          suggested.mergeKey ??
-          held?.mergeKey ??
-          (await derivedMergeKey(platform, tx, row.iri, row.kind, row.title));
+          suggested.mergeKey === undefined
+            ? (held?.mergeKey ??
+              (await derivedMergeKey(platform, tx, row.iri, row.kind, row.title)))
+            : acceptedKeyOf(suggested.mergeKey, held, row);
         const evidence = await catalogued(
           platform,
           tx,
