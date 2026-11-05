@@ -549,7 +549,7 @@ const landWrite = async (
     actor: actorIdOf(fresh),
     auditEventId: write.auditEventId,
     evidence: citing.landed,
-    restsAlsoOn: citing.restsAlsoOn,
+    restsAlsoOn: [],
     acceptance,
   });
 };
