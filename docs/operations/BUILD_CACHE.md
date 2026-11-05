@@ -43,7 +43,7 @@ Every broken policy breaks one of these four mechanics:
 
 So put **one predicate in each array element**, and use **distinct keys within a rule**. A repeated key is the startup error `filters expect only one value`. Different keys combine with AND, so a rule names one cache type, and a sweep of three types is three rules. `daemon.json` cannot say "type A *or* type B" in one rule (moby/moby#46864).
 
-Age is a filter, `unused-for=48h`. `daemon.json` has no `keepDuration` key, as `buildkitd.toml` does, and drops it silently. `buildx inspect` then prints no `Keep Duration` line.
+Age is a filter, `unused-for=48h`. `buildkitd.toml` has a `keepDuration` key, but `daemon.json` has none and drops it silently. `buildx inspect` then prints no `Keep Duration` line.
 
 ## The policy
 
@@ -77,17 +77,17 @@ The runner's cache is one tag, `buildcache`, in each image's GHCR package: `ghcr
 
 **Why the registry and not the Actions cache.** Any workflow on `main` can write an Actions cache entry, because the cache service takes the runner's own token, not `GITHUB_TOKEN`, and no `permissions:` block limits it. The image job holds `packages: write`, `id-token: write`, and `attestations: write`, and ships what it restores, so it takes no Actions cache (zizmor's `cache-poisoning` audit, #441). Only a token with `packages: write` on a package moves its tag. Only the image job and the weekly deletion hold one, and the deletion pushes nothing.
 
-**One writer, and the probes only read.** The readers are the image-contents suites in `check.yml`'s `full-images` leg. `apps/api/tests/images/image-probe.ts` builds `api` and `backup`, and `apps/worker/tests/test_image.py` builds `worker`. Each passes `--cache-from` and no `--cache-to`, and holds its own argv as a literal. The leg holds only `packages: read`, logs in to the private packages on ghcr.io with its own `GITHUB_TOKEN`, and passes the registry as `IMAGE_CACHE_REGISTRY`. A registry tag has no ref scope, so read-only probes keep a pull request from deciding what `main`'s next build reads. The cost is that every pull request run carrying a layer change rebuilds that layer.
+**One writer, and the probes only read.** The readers are the image-contents suites in `check.yml`'s `full-images` leg. `apps/api/tests/images/image-probe.ts` builds `api` and `backup`, and `apps/worker/tests/test_image.py` builds `worker`. Each passes `--cache-from` and no `--cache-to`, and holds its own argv as a literal. The leg holds only `packages: read`, logs in to the private packages on ghcr.io with its own `GITHUB_TOKEN`, and passes the registry as `IMAGE_CACHE_REGISTRY`. A laptop names no registry and builds with the daemon. A registry tag has no ref scope, so read-only probes keep a pull request from deciding what `main`'s next build reads. The cost is that every pull request run carrying a layer change rebuilds that layer.
 
 **Reading needs the container builder.** Docker documents that the `docker` driver reads a registry cache only when the daemon keeps its images in containerd. The container builder comes from `docker/setup-buildx-action`. So `full-images` runs `setup-buildx`, and both suites refuse the `docker` driver.
 
-An unreadable cache is a warning. The build logs `importing cache manifest from …` with the error under it, and runs cold. A leg that loses the builder, the login, or `IMAGE_CACHE_REGISTRY` stays green, and only its run time shows the loss.
+An unreadable cache is a warning. The build logs `importing cache manifest from …` with the error under it, and runs cold. A leg that loses the builder, the login, or `IMAGE_CACHE_REGISTRY` stays green. No test holds those steps to those legs, so only the leg's run time shows the loss.
 
 **The worker's source is its runtime stage's last copy.** BuildKit reruns every instruction below the first whose input moved, and a rerun `COPY` is a new blob even with the same bytes. Copied below the venv, the weights, and the suffix list, the source's layer is the only one an edit outside `redaction/` remakes. An edit inside `redaction/`, where the pins live, still refetches the weights. `apps/worker/tests/test_image.py` holds the order.
 
 **Two commits' runs can write one tag at once.** `build.yml`'s concurrency group is per commit, so several legs can export to `worker:buildcache` at once. Each built the same image, so the last write is right.
 
-**An overwritten cache stays in the package.** Moving `buildcache` leaves the old manifest as an untagged version, with its layers, until the weekly cleanup deletes it. Every build adds its image, the attestation's two manifests, and a cache.
+**An overwritten cache stays in the package.** Moving `buildcache` leaves the old manifest as an untagged version, with its layers, until the weekly cleanup deletes it. Every build adds its image, the attestation's two manifests, and a cache. Container registry storage is free, and GitHub has said it will give a month's notice before that changes. The old versions lengthen the version lists, but `scan.yml` picks by `sha-` tag and `release.yml` resolves a `sha-` tag directly, so neither reads a cache.
 
 To check the caches, run:
 

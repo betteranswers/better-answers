@@ -90,8 +90,8 @@ The legs are separate jobs, so a full run costs its longest leg, and each leg in
 | `full-root` | `check:root` (`check:tree` less core's suite): the root gates over the whole tree, `packages/schema` and `packages/devtools` whole, and `packages/core`'s typecheck | uv, for `packages/devtools`' ruff and mypy |
 | `full-core` | `check:core:suite`, in one job, because core is off `check`'s critical path | uv, the detector's weights, and the rewrite tool, for the suites that spawn the worker or rewrite a history |
 | `full-api` | The api's gates, less `tests/images/` | uv and the worker's environment, for the index job its suite runs, and the rewrite tool, for the erasure rehearsal |
-| `full-web-unit` | `check:web:unit`, the SPA's typecheck and vitest suite | |
-| `full-web-browser` | `check:web:e2e --shard=<i>/<n>`, on a matrix of two jobs | |
+| `full-web-unit` | `check:web:unit`, the SPA's typecheck and vitest suite | Node and pnpm only |
+| `full-web-browser` | `check:web:e2e --shard=<i>/<n>`, on a matrix of two jobs | Playwright's Chromium |
 | `full-worker` | `pnpm check:worker` | uv and the detector's weights, with `cache: pnpm`. No browser |
 | `full-images` | `check:images` | The container builder and a read-only login to ghcr.io, for the reasons `BUILD_CACHE.md` gives, and both toolchains |
 
@@ -205,7 +205,7 @@ For a called release:
 - When that newer build is red, nothing releases.
 - When the API cannot say what `main`'s head is, the build turns red rather than risk an out-of-order release.
 
-At night the gate walks `main`'s last 100 commits, newest first, and releases the first with a green `build.yml` run, unless a commit with a `release/*` tag comes first. It matches a tag by the seven commit characters that end its name. A refused night turns its run red, and nothing outside GitHub hears of it. `packages/devtools/test/ci/release-job.test.ts` runs the script over a stand-in `gh` for each mode and trigger.
+At night the gate walks `main`'s last 100 commits, newest first, and releases the first with a green `build.yml` run, unless a commit with a `release/*` tag comes first. Then nothing newer than the last release is green, and the night promotes nothing. So the nightly release never moves production back either. It matches a tag by the seven commit characters that end its name. A refused night turns its run red, and nothing outside GitHub hears of it. `packages/devtools/test/ci/release-job.test.ts` runs the script over a stand-in `gh` for each mode and trigger.
 
 ### The digests
 
@@ -243,7 +243,7 @@ The orchestrator's compose deploy stops the running containers, then runs `docke
 | `nightly` | At 02:35 UTC the schedule promotes `main`'s newest green commit, once the box's own backup is fresh (*The nightly backup*) | Until go-live, no earlier than the end of v0.1, so a customer's data changes at most once a night, just after a verified backup |
 | `drill` | Only a dispatch whose `rehearsed_by` names the drill report that just proved a restore, or a hotfix reason | From go-live |
 
-Any other value fails closed, and every trigger refuses, naming the three. Outside `drill` a dispatch needs no reason, because it is the rollback. `RUNBOOK.md` page 6 is the procedure.
+Any other value fails closed, and every trigger refuses, naming the three. Outside `drill` a dispatch needs no reason, because it is the rollback. A check in the workflow holds the mode, not a sentence in a runbook. `RUNBOOK.md` page 6 is the procedure.
 
 ### The nightly backup
 
@@ -258,7 +258,7 @@ A nightly release must ride a backup taken just before it. CI cannot take one, b
 | 03:00 | The monthly drill, on VPC 2 |
 | 03:41 | `scan.yml` |
 
-Each backup job pings the dead-man service only after its upload is verified. `deploy/backup-fresh.sh` reads the `pg-hourly` and `nightly` checks with the read-only key `HEALTHCHECKS_READ_KEY`. Each must be `up`, which a failed run clears. The dump must have pinged within 65 minutes, and the copies since the last 02:00 UTC. GitHub starts the schedule hours late, about 09:00 on 01/10/2026, and both limits hold wherever the start lands. A night whose copies ran late or failed deploys nothing and turns red. The script's output is the tag's `Rode on:` line. A read-only key sees no ping URL, so it cannot fake a backup.
+Each backup job pings the dead-man service only after its upload is verified. `deploy/backup-fresh.sh` reads the `pg-hourly` and `nightly` checks with the read-only key `HEALTHCHECKS_READ_KEY`. Each must be `up`, which a failed run clears. The dump must have pinged within 65 minutes, and the copies since the last 02:00 UTC, so the night's copies count and the previous night's do not. GitHub starts the schedule hours late, about 09:00 on 01/10/2026, and both limits hold wherever the start lands. A delayed start still passes the dump's limit, since each hour brings a new dump. A night whose copies ran late or failed deploys nothing and turns red. The script's output is the tag's `Rode on:` line. A read-only key sees no ping URL, so it cannot fake a backup.
 
 ### No signed-in run before go-live
 
@@ -297,7 +297,7 @@ The legs are `apps/api` and `packages/core`. A score means something only where 
 
 Each leg starts from the previous run's results, so an untouched mutant is not retested. Stryker writes its report only on a finish but its incremental file on a cancellation too, so each leg keeps the incremental file, merged from its shards and uploaded as `stryker-incremental-<leg>` for fourteen days.
 
-`.github/actions/mutation-baseline` restores the newest such artifact a run on `main` uploaded before this run began. A dispatch on another branch takes the newer of `main`'s and that branch's own. It reads only this repository's own branches, because a fork can call its branch `main`, and ignores later uploads, so every job and re-run restores the same results. The baseline is an artifact because the Actions cache evicts its least recently used entry past 10 GB, and a nightly checkpoint was evicted within a day.
+`.github/actions/mutation-baseline` restores the newest such artifact a run on `main` uploaded before this run began. A dispatch on another branch takes the newer of `main`'s and that branch's own. It reads only this repository's own branches, because a fork can call its branch `main`, and ignores later uploads, so every job and re-run restores the same results. The baseline is an artifact because the Actions cache evicts its least recently used entry past 10 GB, and a nightly checkpoint was evicted within a day. Artifacts are stored outside that limit.
 
 ### Each leg runs as shards
 
@@ -382,7 +382,11 @@ The `tiers` job reads `build.yml`'s image matrix when the run starts, and gives 
 
 ### The scanner
 
-The scanner is Trivy, through `aquasecurity/trivy-action`. In March 2026 an attacker force-pushed 76 of its 77 tags to a credential stealer (GHSA-69fq-xp46-6x23), so ignore the `github-actions-templates` skill's example, which pins `@master`. The first pin, v0.36.0, is an immutable release cut after the incident, with a signed tag and its commit on `master`. The `setup-trivy` action it calls is pinned by commit too. The step names Trivy's release, because the action's default trailed three of its security fixes, and Renovate's `github-actions` manager tracks that input as a release of `aquasecurity/trivy`. The database is fetched each night, because a database planted in the Actions cache would hide findings. The registry token is a Docker login, keyed by host, so it reaches ghcr.io alone and never `mirror.gcr.io`, where the scanner fetches its database first.
+The scanner is Trivy, through `aquasecurity/trivy-action`. In March 2026 an attacker force-pushed 76 of its 77 tags to a credential stealer (GHSA-69fq-xp46-6x23). The `github-actions-templates` skill's example pins it to `@master`, which the pin rule above refuses.
+
+The first pin, v0.36.0, is an immutable release cut after the incident, with a signed tag and its commit on `master`. The `setup-trivy` action it calls is pinned by commit too. The step names Trivy's release, because the action's default trailed three of its security fixes, and Renovate's `github-actions` manager tracks that input as a release of `aquasecurity/trivy`.
+
+The database is fetched each night, not cached, because any run on `main` can write an Actions cache entry, and a database planted there would hide findings. The registry token is a Docker login, keyed by host, so it reaches ghcr.io alone and never `mirror.gcr.io`, where the scanner fetches its database first.
 
 ### Where a vulnerability shows
 

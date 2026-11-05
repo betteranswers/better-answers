@@ -97,9 +97,9 @@ The entry-step rows give recall in the first ten after reordering. Without it, r
 | 2026-10-21 | `76513a867` | Clef-flash | 77.9 %, 8 unscored | 53.9 %, 1 unscored | 835,709 |
 | 2026-10-21 | `76513a867` | Clef | 77.9 %, 8 unscored | 55.8 %, 1 unscored | 835,709 |
 
-Each of the first twelve other `Answer`s that Clef took at threshold 0.7, read by hand, answers a different question, such as an uptime question taking whether contractors are background checked. No threshold makes either Clef model a judge on this set, because one that keeps out the hard negatives still takes unrelated `Answer`s.
+Each of the first twelve other `Answer`s that Clef took at threshold 0.7, read by hand, answers a different question, such as an uptime question taking whether contractors are background checked. Claude Sonnet 5.5 and Claude Haiku 5.5 take none (§ The reuse reading). No threshold makes either Clef model a judge on this set, because one that keeps out the hard negatives still takes unrelated `Answer`s. At the entry step, reordering by either Clef model lifts paraphrase recall by 5.3 points and leaves buyer-worded recall level or lower.
 
-**The owner's choice from the two readings (21/10/2026).** Phew's workspace judges with Claude Sonnet 5.5 at its default effort, and no decision model has a threshold. Claude Haiku 5.5 at its default effort matched Sonnet 5.5 at about a fifteenth of the cost, but the set's 34 questions cannot tell the two apart, so Haiku waits for a larger set.
+**The owner's choice from the two readings (21/10/2026).** Phew's workspace judges with Claude Sonnet 5.5 at its default effort, and no decision model has a threshold. Sonnet 5.5 took 28 of 32 fits on the reuse set, with no hard negative and no unrelated `Answer`. Clef and Clef-flash took unrelated `Answer`s at every threshold read. Claude Haiku 5.5 at its default effort matched Sonnet 5.5 at about a fifteenth of the cost, but the set's 34 questions cannot tell the two apart, so Haiku waits for a larger set.
 
 ## The governed write at 3,000 concepts
 

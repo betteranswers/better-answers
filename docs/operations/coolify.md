@@ -32,9 +32,13 @@ Growth has two steps, neither needing a data-model change. Step **A**, when the 
 
 ## Ingress (Cloudflare)
 
-Every hostname resolves to the tunnel, which routes to the platform stack. Nothing else is exposed. The three hostnames in the table below share one origin (ADR 0034). The **agent** hostname is for the share agent, and the **apex** serves concept IRIs. There is no `mcp.` and no `docs.` hostname. A hostname that serves an unauthenticated OAuth flow or a sign-in cannot sit behind an interactive access wall. A machine hostname authenticates in the api before any body is read.
+Every hostname resolves to the tunnel, which routes to `http://api:3000` on the platform stack. Nothing else is exposed. There are three hostnames. The **app** hostname `app.<apex>` carries the single-page app, sign-in, consent, OAuth, and `/mcp` on one origin. The **agent** hostname serves only `/agent/v1/*`, for the share agent. The **apex** is for concept IRIs, and answers 404 to everything. There is no `mcp.` and no `docs.` hostname.
 
-**Two fences, checked against each other.** The first is the tunnel's ingress rules, ending in a catch-all `http_status:404`. Their values, the apex included, are private, and their shape is the table below. The second is `apps/api/src/ingress/hostnames.ts`, an ordered list of paths, each with a hostname role and a reason. The api refuses a path outside its hostname's paths before reading any body, so Better Auth's handler cannot answer its wildcard on every hostname. At the first deploy and at every change to either fence, check that every tunnel rule names a role in the file and every role has a tunnel rule. The api refuses to start unless `PUBLIC_URL` (whose host is the app hostname), `AGENT_HOSTNAME`, and `APEX_HOSTNAME` all differ.
+The private file records which edge policy each hostname carries. A hostname that serves an unauthenticated OAuth flow or a sign-in cannot sit behind an interactive access wall. A machine hostname authenticates in the api before any body is read.
+
+**Two fences, checked against each other.** The first is the tunnel's ingress rules, ending in a catch-all `http_status:404`. Their values, the apex included, are private, and their shape is the table below. The second is `apps/api/src/ingress/hostnames.ts`, an ordered list of paths, each with a hostname role and a reason. The api refuses a path outside its hostname's paths before reading any body, so Better Auth's handler cannot answer its wildcard on every hostname.
+
+At the first deploy and at every change to either fence, check that every tunnel rule names a role in the file and every role has a tunnel rule. The api refuses to start unless `PUBLIC_URL` (whose host is the app hostname), `AGENT_HOSTNAME`, and `APEX_HOSTNAME` all differ.
 
 | Tunnel rule (order matters) | Role in `hostnames.ts` | Service | What the fence allows |
 | --- | --- | --- | --- |
@@ -45,7 +49,7 @@ Every hostname resolves to the tunnel, which routes to the platform stack. Nothi
 
 **Rate limiting, by path on the app hostname.** Cloudflare's rules are the first line. The api's Postgres counters are the second, for every route group but discovery. The api counts each route group separately, and counts neither page loads nor discovery reads, which it serves with `Cache-Control: public, max-age=300`. A count's first refusal of an address in a window logs `ingress.address_ceiling_met` once, with the route group as `group`, and `anthropicRange` true for Anthropic's published range `160.79.104.0/21`, never the address. A line with `group` `oauth` and `anthropicRange` true is the trigger to revisit the token endpoint's ceiling. A request Cloudflare refuses logs nothing.
 
-Each path group counts per client IP: the authorization server (`/oauth2/*`), discovery (`/.well-known/*`), MCP without a bearer (`/mcp` with no `Authorization` header), and the sign-in endpoints (`/email-otp/send-verification-otp`, `/sign-in/email-otp`).
+The rules match by path, not by hostname, because every credential-shaped path is on the app hostname. Each path group counts per client IP: the authorization server (`/oauth2/*`), discovery (`/.well-known/*`), MCP without a bearer (`/mcp` with no `Authorization` header), and the sign-in endpoints (`/email-otp/send-verification-otp`, `/sign-in/email-otp`).
 
 **Plans meter rules, not paths.** Cloudflare Free allows one rate-limiting rule, Pro two, and Business five at $250/month, which this estate does not use (developers.cloudflare.com/waf/rate-limiting-rules). On Free, one OR expression with one shared threshold covers three groups. A Free expression may match URI paths only, so only the api's counters cover the `/mcp`-without-a-bearer group. On Pro, one rule covers the credential writes (`/oauth2/*`, the sign-in endpoints, `/mcp` without a bearer) and another covers discovery. The private file's § Ingress records each rule's place and threshold, with the date each was last tightened.
 
@@ -55,7 +59,9 @@ Rehearse a rule before writing it into the estate by running `pnpm --filter @bet
 
 **The uptime check is one external check on the app hostname.** It expects `200` from `/health` (the api is up and its database answers) and from `/.well-known/oauth-protected-resource/mcp` (discovery, which a connector needs first, is served).
 
-On Pro, Cloudflare Health Checks (under Traffic) request both paths from outside the boxes every minute, go red after three failures, alert the second channel through Cloudflare Notifications, and bypass rate limiting. On Free, `deploy/uptime-probe.sh` requests them through the public edge from VPC 2, by host cron every five minutes, and pings the healthchecks.io check `uptime` (5 min period, 5 min grace) with the outcome. healthchecks.io cannot replace the probe, because it only listens for pings.
+On Pro, Cloudflare Health Checks (under Traffic) request both paths from outside the boxes every minute, go red after three failures, alert the second channel through Cloudflare Notifications, and bypass rate limiting.
+
+On Free, `deploy/uptime-probe.sh` requests them through the public edge from VPC 2, by host cron every five minutes, so DNS, the tunnel, and the origin are all on the probed path. It pings the healthchecks.io check `uptime` (5 min period, 5 min grace) with the outcome. Its two requests per five minutes stay far under every rate-limiting threshold. healthchecks.io cannot replace the probe, because it only listens for pings.
 
 The uptime check is the one outside signal for VPC 1. On Pro, only its daily and monthly pings cover VPC 2. On Free, the probe's silence, VPC 2 down included, trips the dead-man alarm within ten minutes. `RUNBOOK.md` page 1 records both postures.
 
@@ -87,7 +93,7 @@ Rerun the file to make tables that later migrations add readable. A new credenti
 
 The operator's action is `RUNBOOK.md` § Browse production.
 
-The role is not a migration, because a migration cannot set its password (a hand-run `ALTER ROLE … PASSWORD` would follow anyway, as for `app_rt` and `worker_rt`), and the journal would put its row-level security bypass into every database it builds, test clusters included. The local database runs the file on every `up`.
+The role is not a migration, because a migration cannot set its password (a hand-run `ALTER ROLE … PASSWORD` would follow anyway, as for `app_rt` and `worker_rt`), and the journal would put its row-level security bypass into every database it builds, test clusters included. The generated roles surface also refuses a fourth role. The local database runs the file on every `up`, so the operator's one production run follows many local ones.
 
 ## The local embedding model choice
 
@@ -135,7 +141,7 @@ Every service on VPC 1 has a limit. Change one here and in the compose file toge
 | the Postgres resource | 1 GB, set in the orchestrator |
 | `api` | 512 MB |
 | `migrate` | 512 MB while it runs |
-| `worker` | 1.5 GB, plus 1.5 GB of swap (`memswap_limit`) |
+| `worker` | 1.5 GB, plus 1.5 GB of swap (`memswap_limit`). It runs one index at a time. |
 | the object store | 384 MB |
 | `backup` | 384 MB |
 | `cloudflared` | 128 MB |
@@ -145,4 +151,12 @@ The running services sum to about 3.9 GB of 4 GB. The page-cache floor is 512 MB
 
 ## Stage 7 state
 
-The private file holds where each secret goes, which channel carries which alert, how CI reaches the orchestrator through the edge, and the workflows' resource ids. The workflows read `COOLIFY_URL`, `COOLIFY_PROD_APP_UUID`, and `PUBLIC_URL` (repository variables), `COOLIFY_DEPLOY_TOKEN` (a secret), and `RELEASE_MODE`, which sets whether `release.yml` releases per merge, nightly, or only on a drill (`CI.md`, *The rhythm*). `SECRETS.md` holds the rules: a secret appears in exactly one env per box, the private-registry pull credential is in the server's Docker config and in no env, and there are no shared team-level or project-level variables, because one stack per box leaves nothing to share.
+The private file holds where each secret goes, which channel carries which alert, how CI reaches the orchestrator through the edge, and the workflows' resource ids.
+
+The workflows read these names:
+
+- `COOLIFY_URL`, `COOLIFY_PROD_APP_UUID`, and `PUBLIC_URL`, as repository variables
+- `COOLIFY_DEPLOY_TOKEN`, as a secret
+- `RELEASE_MODE`, which sets whether `release.yml` releases per merge, nightly, or only on a drill (`CI.md`, *The rhythm*)
+
+`SECRETS.md` holds the rules. A secret appears in exactly one env per box. The private-registry pull credential is in the server's Docker config and in no env. There are no shared team-level or project-level variables, because one stack per box leaves nothing to share.

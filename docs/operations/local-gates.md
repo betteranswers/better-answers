@@ -75,7 +75,7 @@ lefthook passes git's lines only to a job with `use_stdin`, not to a `skip` cond
 
 ### What each command's `run` carries
 
-- `{without-git-env}` unsets every variable that `git rev-parse --local-env-vars` lists. On a push from a linked worktree, git sets `GIT_DIR` to the worktree's git directory. `GIT_DIR` outranks the directory `git -C <dir>` names, so a suite that builds a throwaway repository would write to the worktree's repository instead.
+- `{without-git-env}` unsets every variable that `git rev-parse --local-env-vars` lists. On a push from a linked worktree, git sets `GIT_DIR` to the worktree's git directory. `GIT_DIR` outranks the directory `git -C <dir>` names, so a suite that builds a throwaway repository would write to the worktree's repository instead. A push from the main checkout sets no `GIT_DIR`, so only a worktree shows this.
 - `: {files};`, in the `gates` job only, does nothing when it runs. Without a files template, lefthook skips a `pre-push` command when the push changes no file still on disk, as when a push only deletes files. `{files}` makes lefthook read the hook's own `files` list, `lefthook.yml`, which is never empty. `pre-push-gates` needs no template, because lefthook skips on a push's files only in a hook named `pre-push`.
 
 ### Where it is installed
@@ -123,7 +123,9 @@ A `SessionStart` hook, `.claude/hooks/watch-cap-hook.sh`, runs the script with `
 
 `scripts/check.mjs` is `check` for each TypeScript workspace and for the root. It runs every step named on its command line, continues past failures, and ends by naming every step that failed. Each argument is a script in the manifest of the directory it runs in, so a manifest's `check` lists that workspace's gates.
 
-The runner exists because pnpm can select scripts by regular expression with `--no-bail`, but as of pnpm 11.24.0 that combination exits 0 when scripts fail. `pnpm -r --no-bail`, which the root uses across workspaces, does report a non-zero exit.
+The runner collects every failure rather than stopping at the first. A session told only about lint fixes lint, runs `check` again, and is then told about types.
+
+pnpm can also select scripts by regular expression with `--no-bail`, but as of pnpm 11.24.0 that combination exits 0 when scripts fail. `pnpm -r --no-bail`, which the root uses across workspaces, does report a non-zero exit.
 
 The worker has its own runner, `apps/worker/src/better_answers_worker/check.py`, because a uv workspace is not a pnpm workspace.
 
@@ -167,13 +169,13 @@ The shared servers follow these rules:
 
 ### `cubic.yaml`
 
-`cubic.yaml` configures the reviewer, and Cubic reads it from `main` only. Cubic enables five custom agents per repository, the repository's own first, then the organization's, and drops a sixth with no error. The Principal rule holds the API-auth checks, tenant scoping and request validation, instead of a separate agent.
+`cubic.yaml` configures the reviewer, and Cubic reads it from `main` only. Cubic enables five custom agents per repository, the repository's own first, then the organization's, and drops a sixth with no error. Each custom rule takes one of those slots. The Principal rule holds the API-auth checks, tenant scoping and request validation, instead of a separate agent.
 
 ### `jscpd.config.mjs`
 
 `jscpd.config.mjs` is a JavaScript module, not the `.jscpd.json` that jscpd reads by default. jscpd 5.1.2 parses its config as strict JSON. It rejects a `//` line, then runs on the defaults and exits zero. `scripts/jscpd.mjs` passes the module's values on the command line instead.
 
-The threshold is zero. Fold each copy into a helper, or name it in the config or beside the copy with `jscpd:ignore-start` and `jscpd:ignore-end` comments.
+The threshold is zero, because a percentage gets loosened the day it fails. Fold each copy into a helper, or name it in the config or beside the copy with `jscpd:ignore-start` and `jscpd:ignore-end` comments.
 
 jscpd skips these paths:
 
@@ -187,7 +189,7 @@ jscpd skips these paths:
 
 knip runs over the pnpm workspace as a step of root `check`. A file no code reaches, an export nothing imports, a dependency no workspace uses, or a dependency used but undeclared fails the branch.
 
-The configuration lists no process entry points. knip's plugins already reach the api's `main.ts`, `migrate.ts`, and `ops.ts`, the two servers the api's suite exposes, the schema's worker-view generator, the SPA's `main.tsx`, the two oxlint plugins, and the `check` runner. The plugins read the manifests' scripts, the SPA's `index.html`, and `.oxlintrc.json`'s `jsPlugins` specifiers. Listing the entry points again draws knip's "Remove redundant entry pattern" hint on every run.
+The configuration lists no process entry points. knip's plugins already reach the api's `main.ts`, `migrate.ts`, and `ops.ts`, the two servers the api's suite exposes, the schema's worker-view generator, the SPA's `main.tsx`, the two oxlint plugins, and the `check` runner. The plugins read the manifests' scripts, the SPA's `index.html`, and `.oxlintrc.json`'s `jsPlugins` specifiers. Listing the entry points again draws knip's "Remove redundant entry pattern" hint on every run. Leaving them inferred also means that the day a manifest stops naming one, knip reports the file as unreached.
 
 The configuration does not name `.gitnexus/`, where each checkout keeps its GitNexus index. `.git/info/exclude` excludes the directory, and knip parses that file beside `.gitignore`, from a worktree too, through the worktree's `gitdir`. `knip --debug` lists both under "Parsed gitignore files". An `ignore` entry for the directory would suppress nothing and draw knip's "Remove from ignore" hint on every run. `packages/devtools/test/scans/knip.test.ts` fails if a knip release stops reading the exclude file. Do not silence hints with `--no-config-hints`, which also silences the redundant-entry hints.
 

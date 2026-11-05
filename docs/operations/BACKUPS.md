@@ -85,14 +85,16 @@ Every third month the drill proves on a synthetic subject that an erasure erased
 | Lifecycle misconfigured | The drill's step 9 lists copies per tier against this matrix. |
 | The service itself down | Its healthcheck (cron alive, nothing stale in `/staging`), and every missed ping. |
 | A dump during the erasure routine | The routine holds `pg_advisory_lock(41)`, and the hourly job skips while it is held. |
+| A dump restored that predates an erasure | `replay-erasures --since` in every restore path. |
 | A dump or mirror sync during a production restore | `restore-production.sh` stops the service before its first change and restarts it once `api` answers, unless the run stops (`RUNBOOK.md` page 1). |
 | The mirror push fails (VPC 2 down, key rotated) | The nightly job fails, so the ping is missed. The bundles in `dumps/git/` do not depend on VPC 2. |
+| A workspace repository refused as another user's | The image trusts `/data/git/*`. The image probe's nightly run bundles a repository the api's uid owns. |
 | A job started without its variables | The image probe. At run time the job stops at its variable check, without a closing line or ping. |
-| A workspace not yet written to | `git bundle` and `git push --mirror` refuse its ref-less repository, so the nightly job skips it, though an unreadable repository still fails the job. A restore recreates it empty from the workspace's row, since the api refuses a workspace without one as an unrestored store. |
+| A workspace not yet written to | `git bundle` and `git push --mirror` refuse its ref-less repository, so the nightly job skips it, though an unreadable repository still fails the job. A restore recreates it empty from the workspace's row, since the api refuses a workspace without one as an unrestored store. The image probe's nightly runs hold a repository with no ref and one with no HEAD. Its restore steps hold a workspace with no bundle and a bucket with no bundle at all. |
 
 ## How the jobs run, and how to read the last one
 
-**cron hands a job `PATH=/usr/bin:/bin` and none of the container's variables**, so `/etc/cron.d/backup` runs `backup.sh` through `backup-env` (`deploy/backup-env.sh`). It reads PID 1's environment as root and passes on only the `backup` service's `environment:` names, `PATH`, and `HOME`, writing no copy. `TUNNEL_TOKEN`, `GARAGE_RPC_SECRET`, `GARAGE_ADMIN_TOKEN`, and the stores resource's other variables never reach a job. A test holds `backup-env`'s list equal to the compose block, so add a new variable to both. To run a job as cron does, run `docker exec <backup container> /usr/local/bin/backup-env /usr/local/bin/backup.sh hourly`.
+**cron hands a job `PATH=/usr/bin:/bin` and none of the container's variables**, so `/etc/cron.d/backup` runs `backup.sh` through `backup-env` (`deploy/backup-env.sh`). `backup-env` clears the environment it was started with. It then reads PID 1's environment, which only root can read, and passes on only the `backup` service's `environment:` names, `PATH`, and `HOME`, writing no copy. `TUNNEL_TOKEN`, `GARAGE_RPC_SECRET`, `GARAGE_ADMIN_TOKEN`, and the stores resource's other variables never reach a job. A test holds `backup-env`'s list equal to the compose block, so add a new variable to both. To run a job as cron does, run `docker exec <backup container> /usr/local/bin/backup-env /usr/local/bin/backup.sh hourly`.
 
 **The nightly bundle is verified inside its own repository**, the only place `git bundle verify` runs. The image's git config trusts `/data/git/*`, which the api's uid owns while the job runs as root. The mount is read-only.
 
@@ -104,7 +106,7 @@ A red `pg-hourly` or `nightly` check also stops the 02:35 UTC nightly release (`
 
 ## The `backup` rows
 
-Every script writes its `backup` row as the database resource's owner, its existing role (`postgres` for the drill). So the stores stack's `DATABASE_URL` is the owner DSN, and `restore-production.sh` takes the owner DSN. No other role, the api and worker included, has any privilege on the table. A row is one run of one kind on one store, keyed by kind, store, and start instant.
+Every script writes its `backup` row as the database resource's owner, the role it already connects as. The stores stack's `DATABASE_URL` is the owner DSN because a dump reads every table. The drill reaches production as `postgres`, and `restore-production.sh` takes the owner DSN. No other role, the api and worker included, has any privilege on the table. A row is one run of one kind on one store, keyed by kind, store, and start instant.
 
 | Kind | Written by | Store | When |
 | --- | --- | --- | --- |
