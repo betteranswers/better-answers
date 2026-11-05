@@ -46,7 +46,7 @@ import { doorsOf, suiteWithBundles, type Scenario } from "../../fixtures/workspa
 import { inputOf } from "../../support/suite-input.ts";
 import { readingAs } from "../../support/suite-postgres.ts";
 import { rewritingElsewhere } from "../bundle-fence.ts";
-import { standInRowsFor } from "./stand-in-rows.ts";
+import { recordLostCommitsSoAWriteCanLandOnThem } from "./lost-commits-recorded.ts";
 
 const { db, arrange } = suiteWithBundles();
 
@@ -97,7 +97,7 @@ const inTheWindow = async <T extends { readonly ok: boolean }>(
   scenario: Scenario,
   action: () => Promise<T>,
 ): Promise<T> => {
-  const loseAgain = await standInRowsFor(db().pool, scenario);
+  const loseAgain = await recordLostCommitsSoAWriteCanLandOnThem(db().pool, scenario);
   const close = await openTheWindow();
   try {
     return await action();
@@ -586,6 +586,24 @@ describe("a skeleton commit whose rows were lost", () => {
     expect(await recordedChain(scenario.workspaceId)).toEqual([[sha, null]]);
     expect((await replayedEvents(scenario.workspaceId)).map((event) => event["detail"])).toEqual([
       { commitSha: sha },
+    ]);
+  });
+
+  it("holds a live write back until replayed, then lands it", async () => {
+    const scenario = await arrange();
+    const first = await landed(scenario, scenario.editor, guideline("Mileage"));
+    const stray = await committedByHand(scenario, A_SKELETON, first.sha);
+    const input = guideline("Parking", { expects: { head: stray } });
+
+    const held = await writeConcept(scenario.editor, doorsOf(scenario), input);
+
+    expect(held).toEqual({ ok: false, error: "unrecorded-head" });
+    expect(await reconciled(scenario)).toMatchObject({ replayed: [stray], stopped: undefined });
+    const after = await landed(scenario, scenario.editor, input);
+    expect(await recordedChain(scenario.workspaceId)).toEqual([
+      [first.sha, null],
+      [stray, first.sha],
+      [after.sha, stray],
     ]);
   });
 

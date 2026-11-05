@@ -3,8 +3,7 @@ import type pg from "pg";
 import { bundleHistory } from "../../fixtures/bundle.ts";
 import type { Scenario } from "../../fixtures/workspace-with-bundle.ts";
 
-/** A live write refuses a head whose rows were lost, so lost commits get stand-in rows meanwhile. */
-export const standInRowsFor = async (
+export const recordLostCommitsSoAWriteCanLandOnThem = async (
   pool: pg.Pool,
   scenario: Scenario,
 ): Promise<() => Promise<void>> => {
