@@ -1,0 +1,245 @@
+import { describe, expect, it } from "vitest";
+
+import { briefCopy, recordCopy } from "../../src/concepts/index.ts";
+import type { UserPrincipal } from "../../src/kernel/index.ts";
+import { addToGroup } from "../../src/members/index.ts";
+import { withMember } from "../../src/store/postgres/index.ts";
+import { principalFor, suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
+import { answered, readingAs, seedingWith } from "../support/suite-postgres.ts";
+import {
+  briefCiting,
+  guideSeededOnce,
+  includeIdsOf,
+  latestVersionOf,
+  saveBriefAs,
+  writeUpOf,
+  type SeededGuide,
+} from "./northgate-guide.ts";
+
+const { db, arrange } = suiteWithBundles();
+
+const seededOnce = guideSeededOnce(db, arrange);
+
+const NOW = new Date("2026-06-01T00:00:00Z");
+
+const OVERVIEW = "Company overview";
+
+const INSURANCE = "Insurance and financial standing";
+
+const SUPPORT = "Support and service levels";
+
+const OFFER = "What we offer";
+
+type Section = {
+  readonly guide: SeededGuide;
+  readonly writeUpId: string;
+  readonly version: number;
+};
+
+const briefed = new Map<string, Promise<Section>>();
+
+const briefedSection = (prompt: string): Promise<Section> => {
+  const held = briefed.get(prompt);
+  if (held !== undefined) return held;
+  const made = (async () => {
+    const guide = await seededOnce();
+    const writeUpId = await writeUpOf(db(), guide, prompt);
+    answered(
+      await saveBriefAs(guide.ng.scenario, guide.ng.editor, {
+        writeUpId,
+        markdown: briefCiting(await includeIdsOf(db(), writeUpId)),
+        base: await latestVersionOf(db(), writeUpId),
+      }),
+    );
+    return { guide, writeUpId, version: await latestVersionOf(db(), writeUpId) };
+  })();
+  briefed.set(prompt, made);
+  return made;
+};
+
+const copyingAs = (reader: UserPrincipal, writeUpId: string) =>
+  readingAs(db().runtimePool, reader, (principal, tx) =>
+    briefCopy(principal, tx, { writeUpId }, NOW),
+  );
+
+const recordingAs = async (
+  section: Section,
+  reader: UserPrincipal,
+  input: { readonly writeUpId: string; readonly version: number },
+) => {
+  const recorded = await withMember(reader, section.guide.ng.scenario.postgres, (fresh, tx) =>
+    recordCopy(fresh, tx, input, NOW),
+  );
+  if (!recorded.ok) throw new Error(`the copy was not recorded: ${String(recorded.error)}`);
+  return recorded.value;
+};
+
+const copiedAndRecorded = async (section: Section, reader: UserPrincipal) => {
+  const copy = answered(await copyingAs(reader, section.writeUpId));
+  answered(
+    await recordingAs(section, reader, { writeUpId: section.writeUpId, version: copy.version }),
+  );
+  return copy;
+};
+
+type UsageRow = {
+  act: string;
+  write_up_version: number;
+  actor: string;
+  row: string;
+  columns: string[];
+};
+
+const usageRows = async (writeUpId: string) =>
+  (
+    await db().pool.query<UsageRow>(
+      `SELECT act, write_up_version, actor, to_jsonb(u)::text AS row,
+              ARRAY(SELECT jsonb_object_keys(to_jsonb(u)) ORDER BY 1) AS columns
+         FROM usage u WHERE write_up_id = $1 ORDER BY at, id`,
+      [writeUpId],
+    )
+  ).rows;
+
+const auditEvents = async (section: Section): Promise<number> => {
+  const found = await db().pool.query<{ n: number }>(
+    "SELECT count(*)::int AS n FROM audit_event WHERE workspace_id = $1",
+    [section.guide.ng.scenario.workspaceId],
+  );
+  return found.rows[0]?.n ?? -1;
+};
+
+const viewerIn = async (section: Section, group: string): Promise<UserPrincipal> => {
+  const { workspaceId } = section.guide.ng.scenario;
+  const person = await seedingWith(db().pool, async (seed) => {
+    const made = await seed.user();
+    await seed.member({ workspaceId, userId: made.id, role: "Viewer" });
+    return made;
+  });
+  answered(
+    await readingAs(db().runtimePool, section.guide.ng.admin, (admin, tx) =>
+      addToGroup(admin, tx, { groupId: group, userId: person.id }),
+    ),
+  );
+  return principalFor(db(), workspaceId, person.id);
+};
+
+describe("copying a section's Brief", () => {
+  it("a recorded copy writes one usage row naming the version", async () => {
+    const section = await briefedSection(OVERVIEW);
+    const { editor } = section.guide.ng;
+
+    const copy = await copiedAndRecorded(section, editor);
+
+    expect(copy.version).toBe(section.version);
+    expect(
+      (await usageRows(section.writeUpId)).map(({ act, write_up_version: version, actor }) => ({
+        act,
+        version,
+        actor,
+      })),
+    ).toEqual([{ act: "copied", version: section.version, actor: `human:${editor.userId}` }]);
+  });
+
+  it("a usage row holds no copied text", async () => {
+    const section = await briefedSection(SUPPORT);
+    await copiedAndRecorded(section, section.guide.ng.editor);
+
+    const rows = await usageRows(section.writeUpId);
+    expect(rows.map(({ row }) => /Claim|Sources/u.test(row))).toEqual([false]);
+    expect(rows.map(({ columns }) => columns)).toEqual([
+      ["act", "actor", "at", "id", "iri", "workspace_id", "write_up_id", "write_up_version"],
+    ]);
+  });
+
+  it("a copy below the role's threshold is refused", async () => {
+    const section = await briefedSection(OVERVIEW);
+    const { editor, viewer } = section.guide.ng;
+    const before = (await usageRows(section.writeUpId)).length;
+
+    const refused = await copyingAs(viewer, section.writeUpId);
+    const refusedToRecord = await recordingAs(section, viewer, {
+      writeUpId: section.writeUpId,
+      version: section.version,
+    });
+    const admitted = await copyingAs(editor, section.writeUpId);
+
+    expect(refused).toEqual({ ok: false, error: "below-action-threshold" });
+    expect(refusedToRecord).toEqual({ ok: false, error: "below-action-threshold" });
+    expect(admitted.ok).toBe(true);
+    expect((await usageRows(section.writeUpId)).length).toBe(before);
+  });
+
+  it("a recorded copy writes no audit event", async () => {
+    const section = await briefedSection(OVERVIEW);
+    const { editor } = section.guide.ng;
+    const before = await auditEvents(section);
+
+    answered(
+      await recordingAs(section, editor, {
+        writeUpId: section.writeUpId,
+        version: section.version,
+      }),
+    );
+
+    expect(await auditEvents(section)).toBe(before);
+  });
+
+  it("a Viewer in the audience copies a verified section", async () => {
+    const section = await briefedSection(INSURANCE);
+    const inFinance = await viewerIn(section, section.guide.ng.finance);
+
+    const copy = answered(await copyingAs(inFinance, section.writeUpId));
+
+    expect(copy.footnotes).toBe(4);
+    expect(copy.text).toMatch(/\n\nSources\n\[1\] .+\n\[2\] .+\n\[3\] .+\n\[4\] [^\n]+$/u);
+    expect(copy.html).toContain("<sup>4</sup>");
+  });
+
+  it("an outside Viewer finds no such section to copy", async () => {
+    const section = await briefedSection(INSURANCE);
+
+    const copying = await copyingAs(section.guide.ng.viewer, section.writeUpId);
+
+    expect(copying).toEqual({ ok: false, error: "not-found" });
+  });
+
+  it("a Brief with no text is not found to copy", async () => {
+    const guide = await seededOnce();
+    const writeUpId = await writeUpOf(db(), guide, "Data protection");
+
+    const copying = await copyingAs(guide.ng.editor, writeUpId);
+
+    expect(copying).toEqual({ ok: false, error: "not-found" });
+  });
+
+  it("a copy records the version it copied, not the latest", async () => {
+    const section = await briefedSection(OFFER);
+    const { editor } = section.guide.ng;
+    const copied = answered(await copyingAs(editor, section.writeUpId)).version;
+    answered(
+      await saveBriefAs(section.guide.ng.scenario, editor, {
+        writeUpId: section.writeUpId,
+        markdown: `Rewritten.\n\n${briefCiting(await includeIdsOf(db(), section.writeUpId))}`,
+        base: copied,
+      }),
+    );
+
+    answered(await recordingAs(section, editor, { writeUpId: section.writeUpId, version: copied }));
+
+    expect((await usageRows(section.writeUpId)).at(-1)?.write_up_version).toBe(copied);
+    expect(copied).toBeLessThan(await latestVersionOf(db(), section.writeUpId));
+  });
+
+  it("refuses to record a version the write-up never had", async () => {
+    const section = await briefedSection(OVERVIEW);
+    const before = (await usageRows(section.writeUpId)).length;
+
+    const refused = await recordingAs(section, section.guide.ng.editor, {
+      writeUpId: section.writeUpId,
+      version: 99,
+    });
+
+    expect(refused).toEqual({ ok: false, error: "not-found" });
+    expect((await usageRows(section.writeUpId)).length).toBe(before);
+  });
+});

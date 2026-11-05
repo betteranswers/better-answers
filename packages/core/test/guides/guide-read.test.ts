@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readSectionTrustWords } from "../../src/concepts/index.ts";
+import { readSectionTrusts, trustWords } from "../../src/concepts/index.ts";
 import { coverageOf, readGuide, readGuides, type GuideRead } from "../../src/guides/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { EMPLOYERS_LIABILITY } from "../fixtures/northgate-concepts.ts";
@@ -289,9 +289,9 @@ describe("the trust a section shows", () => {
     const seeded = await seededOnce();
     const guide = await guideAs(seeded, seeded.ng.editor);
 
-    const words = answered(
+    const trusts = answered(
       await readingAs(db().runtimePool, seeded.ng.editor, (principal, tx) =>
-        readSectionTrustWords(
+        readSectionTrusts(
           principal,
           tx,
           [
@@ -303,6 +303,7 @@ describe("the trust a section shows", () => {
         ),
       ),
     );
+    const words = trusts.map(trustWords);
 
     expect(words[0]).toMatch(/^Verified by .+ · 12 May 2026 · imported$/u);
     expect(words[1]).toBe("Unverified");

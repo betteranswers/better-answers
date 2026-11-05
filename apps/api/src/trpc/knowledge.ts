@@ -1,5 +1,7 @@
 import { find, findInput, open, openInput, type OpenResult } from "@better-answers/core/answering";
 import {
+  briefCopy,
+  briefCopyInput,
   collectionOwnerNamed,
   collectionsAndOwners,
   conceptToEdit,
@@ -9,14 +11,19 @@ import {
   nameOwnerInput,
   readKindConcepts,
   readKnowledgeTree,
-  readSectionTrustWords,
+  readSectionTrusts,
+  recordCopy,
+  recordCopyInput,
   saveConcept,
   saveConceptInput,
   standingOnConcept,
+  standsOn,
+  trustWords,
 } from "@better-answers/core/concepts";
 import {
   includeAvailable,
   includeAvailableInput,
+  readActionThreshold,
   readGuide,
   readGuideInput,
   readGuides,
@@ -79,9 +86,14 @@ const passages = (principal: UserPrincipal, tx: Tx) => (locator: string) =>
 
 type GuideAsked = Parameters<typeof readGuide>[2];
 
+type CopyOffer = "offered" | "below-action-threshold";
+
 type GuideAnswered = Omit<GuideRead, "sections"> & {
   readonly owner: { readonly id: string; readonly name: string } | null;
-  readonly sections: readonly (Omit<SectionRead, "citedIris"> & { readonly trustWords: string })[];
+  readonly sections: readonly (Omit<SectionRead, "citedIris"> & {
+    readonly trustWords: string;
+    readonly copy: CopyOffer;
+  })[];
 };
 
 const guideAnswered = async (
@@ -93,13 +105,15 @@ const guideAnswered = async (
   const guide = read.value;
   if (guide === undefined) return err(NOT_FOUND);
 
-  const trust = await readSectionTrustWords(
+  const trust = await readSectionTrusts(
     ctx.principal,
     ctx.tx,
     guide.sections.map((section) => section.citedIris),
     ctx.clock.now(),
   );
   if (!trust.ok) return trust;
+  const threshold = await readActionThreshold(ctx.principal, ctx.tx, asked.guideId);
+  if (!threshold.ok) return threshold;
   const owner = await attempt(() => collectionOwnerNamed(ctx.principal, ctx.tx, guide.collection));
   if (!owner.ok) return owner;
 
@@ -107,9 +121,10 @@ const guideAnswered = async (
     ...guide,
     owner: owner.value,
     sections: guide.sections.map(({ citedIris: _cited, ...section }, at) => {
-      const trustWords = trust.value[at];
-      if (trustWords === undefined) throw new Error(`section ${section.sectionId} has no trust`);
-      return { ...section, trustWords };
+      const held = trust.value[at];
+      if (held === undefined) throw new Error(`section ${section.sectionId} has no trust`);
+      const copy = standsOn(held, threshold.value) ? "offered" : "below-action-threshold";
+      return { ...section, trustWords: trustWords(held), copy };
     }),
   });
 };
@@ -190,6 +205,20 @@ export const knowledgeRouter = router({
         ),
       ),
     ),
+  briefCopy: knowledgeReadProcedure.input(parsedBy(briefCopyInput)).query(({ ctx, input }) =>
+    crossing(
+      ctx,
+      briefCopy.name,
+      given(input, (asked) => briefCopy(ctx.principal, ctx.tx, asked, ctx.clock.now())),
+    ),
+  ),
+  recordCopy: mutationProcedure.input(parsedBy(recordCopyInput)).mutation(({ ctx, input }) =>
+    crossing(
+      ctx,
+      recordCopy.name,
+      given(input, (asked) => recordCopy(ctx.principal, ctx.tx, asked, ctx.clock.now())),
+    ),
+  ),
   collections: queryProcedure.query(({ ctx }) =>
     crossing(ctx, collectionsAndOwners.name, collectionsAndOwners(ctx.principal, ctx.tx)),
   ),

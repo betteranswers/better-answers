@@ -175,6 +175,9 @@ const TIER_RANK = {
   "human-reviewed": 2,
 } as const satisfies Record<Trust["tier"], number>;
 
+export const standsOn = (trust: Trust, rung: Trust["tier"]): boolean =>
+  TIER_RANK[trust.status === "current" ? trust.tier : "unverified"] >= TIER_RANK[rung];
+
 const rankOf = (trust: Trust): number =>
   trust.status === "current"
     ? STATUS_RANK.current + TIER_RANK[trust.tier]
