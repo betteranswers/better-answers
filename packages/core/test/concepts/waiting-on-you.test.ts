@@ -56,6 +56,17 @@ const openedBy = (reader: UserPrincipal, suggestionId: string) =>
     ),
   );
 
+const declinedBy = (scenario: Scenario, decider: UserPrincipal, suggestionId: string) =>
+  declineSuggestion(decider, doorsOf(scenario), { suggestionId, reason: "Thirty days stands." });
+
+const waitingStatusOf = async (suggestionIds: readonly string[]) => {
+  const found = await db().pool.query<{ waiting: boolean }>(
+    "SELECT status = 'waiting' AS waiting FROM suggestion WHERE id = ANY($1) ORDER BY id",
+    [suggestionIds],
+  );
+  return found.rows.map((row) => row.waiting);
+};
+
 const named = async (principal: UserPrincipal, name: string) => {
   await db().pool.query('UPDATE "user" SET name = $2 WHERE id = $1', [principal.userId, name]);
   return { id: principal.userId, name };
@@ -326,10 +337,16 @@ describe("Waiting on you", () => {
       admin: await suggestionsWaitingFor(scenario.admin),
       adminOpensPublished: await openedBy(scenario.admin, published.suggestionId),
       adminOpensDraft: await openedBy(scenario.admin, draft.suggestionId),
+      adminDeclinesPublished: await declinedBy(scenario, scenario.admin, published.suggestionId),
+      adminDeclinesDraft: await declinedBy(scenario, scenario.admin, draft.suggestionId),
+      stillWaiting: await waitingStatusOf([published.suggestionId, draft.suggestionId]),
     }).toEqual({
       admin: [],
       adminOpensPublished: { ok: false, error: "not-found" },
       adminOpensDraft: { ok: false, error: "not-found" },
+      adminDeclinesPublished: { ok: false, error: "no-such-suggestion" },
+      adminDeclinesDraft: { ok: false, error: "no-such-suggestion" },
+      stillWaiting: [true, true],
     });
   });
 
@@ -357,6 +374,8 @@ describe("Waiting on you", () => {
       owner: await suggestionsWaitingFor(scenario.editor),
       adminOpens: await openedBy(scenario.admin, sibling.suggestionId),
       ownerOpens: await openedBy(scenario.editor, sibling.suggestionId),
+      adminDeclines: await declinedBy(scenario, scenario.admin, sibling.suggestionId),
+      ownerDeclines: await declinedBy(scenario, scenario.editor, sibling.suggestionId),
     };
 
     expect(orphaned).toEqual([
@@ -367,6 +386,8 @@ describe("Waiting on you", () => {
       owner: [],
       adminOpens: { ok: false, error: "not-found" },
       ownerOpens: { ok: false, error: "not-found" },
+      adminDeclines: { ok: false, error: "no-such-suggestion" },
+      ownerDeclines: { ok: false, error: "no-such-suggestion" },
     });
     expect(JSON.stringify(seen)).not.toContain(withheld);
   });
@@ -399,7 +420,7 @@ describe("Waiting on you", () => {
       });
     });
 
-    it("opens its edit for an Admin in its audience group", async () => {
+    it("lets an Admin in its audience group decide its edit", async () => {
       const scenario = await arrange();
       const { written, suggestionId } = await draftProposed(scenario);
       const finance = await groupNamed(db(), scenario, "Finance", [scenario.admin]);
@@ -412,9 +433,11 @@ describe("Waiting on you", () => {
       expect({
         admin: await suggestionsWaitingFor(scenario.admin),
         adminOpens: await openedBy(scenario.admin, suggestionId),
+        adminDeclines: await declinedBy(scenario, scenario.admin, suggestionId),
       }).toEqual({
         admin: [suggestionId],
         adminOpens: { ok: true, value: matching.objectContaining({ current: standingText }) },
+        adminDeclines: matching.objectContaining({ ok: true }),
       });
     });
 
