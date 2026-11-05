@@ -79,6 +79,23 @@ describe("a snapshot of the bundle", () => {
     expect(filesOf(snapshot)).toEqual([file(OPEN, NOT_UTF8)]);
   });
 
+  it("starts no blob read when it keeps no file", async () => {
+    const { door, principal, head } = await bundleHolding(
+      new Map([
+        [WITHHELD, "Pay bands.\n"],
+        [SKELETON, "sections: []\n"],
+      ]),
+    );
+    let snapshot: Snapshot | undefined;
+
+    const started = await gitStarts(async () => {
+      snapshot = await bundleSnapshot(principal, door, new Set([OPEN, SKELETON]));
+    });
+
+    expect(snapshot).toEqual({ ok: true, value: { head, files: [] } });
+    expect(started).toEqual(["rev-parse", "ls-tree"]);
+  });
+
   it("answers null for a bundle with no commit", async () => {
     const { door, principal } = await bundleHolding(new Map());
 
