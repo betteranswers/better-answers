@@ -314,6 +314,26 @@ export const nameOwners = (
   input: { workspaceId: string; userId: string; owners: readonly SeedOwner[] },
 ) => ask(api, "/owners", input, ownersNamed);
 
+const guideSeeded = z.object({
+  guideId: z.string(),
+  groupId: z.string(),
+  sections: z.array(
+    z.object({
+      sectionId: z.string(),
+      writeUpId: z.string(),
+      prompt: z.string(),
+      includes: z.array(z.object({ id: z.string(), iri: z.string(), title: z.string() })),
+    }),
+  ),
+  concepts: z.record(z.string(), z.string()),
+});
+
+/** @public BA-236 */
+export const seedGuide = (
+  api: APIRequestContext,
+  input: { workspaceId: string; userId: string; financeUserIds: readonly string[] },
+) => ask(api, "/guides", input, guideSeeded);
+
 type SeedIndexBatch = {
   readonly collection: string | null;
   readonly kind: string;

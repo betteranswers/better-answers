@@ -6,6 +6,7 @@ import { assert, describe, expect, it } from "vitest";
 import { overrideConceptSensitivity, writeConcept } from "@better-answers/core/concepts";
 import { head, initRepository } from "@better-answers/core/store/git";
 import { documentLanded, type DocumentShape } from "@better-answers/core/testing/documents";
+import { EMPLOYERS_LIABILITY } from "@better-answers/core/testing/northgate";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -14,8 +15,12 @@ import { connectAsHost, signIn } from "../support/flow.ts";
 import {
   conceptIndexSeeding,
   conceptsSeeding,
+  guideSeeding,
+  nameOwners,
+  ownersNaming,
   seedConceptIndex,
   seedConcepts,
+  seedGuide,
 } from "../support/harness/harness-knowledge.ts";
 import { actingIn, openTestGit } from "../support/harness/harness.ts";
 import {
@@ -708,5 +713,141 @@ describe("an edit saved over tRPC", () => {
 
     expect(owners).toMatchObject({ found: true, standing: "commits" });
     expect(outsiders).toMatchObject({ found: true, standing: "suggests" });
+  });
+});
+
+const INSURANCE = "Insurance and financial standing";
+
+const PROFESSIONAL_INDEMNITY = "Professional indemnity policy";
+
+const sectionOf = <Section extends { readonly prompt: string }>(
+  sections: readonly Section[],
+  prompt: string,
+): Section => {
+  const found = sections.find((section) => section.prompt === prompt);
+  assert(found !== undefined, `the guide holds no section ${prompt}`);
+  return found;
+};
+
+const aGuideHeldByAnEditorInFinance = async () => {
+  const workspace = await app().provision();
+  const outsider = await app().person();
+  await app().addMember(workspace.workspaceId, outsider.id, "Viewer");
+  const editor = await app().person();
+  await app().addMember(workspace.workspaceId, editor.id, "Editor");
+  const seeded = await seedGuide(
+    app(),
+    guideSeeding.parse({
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      financeUserIds: [editor.id],
+    }),
+  );
+  return { workspace, outsider, editor, seeded };
+};
+
+describe("a guide over tRPC", () => {
+  it("lists the guide through the knowledge router", async () => {
+    const { outsider, editor, seeded } = await aGuideHeldByAnEditorInFinance();
+    const listed = { guideId: seeded.guideId, kind: "Bid library", collection: "company" };
+
+    const forEditor = await (await webSignedIn(app(), editor.email)).api.knowledge.guides.query();
+    const forOutsider = await (
+      await webSignedIn(app(), outsider.email)
+    ).api.knowledge.guides.query();
+
+    expect(forEditor).toEqual([{ ...listed, subject: null, sections: 8, needsReview: 1 }]);
+    expect(forOutsider).toEqual([{ ...listed, subject: null, sections: 8, needsReview: 0 }]);
+  });
+
+  it("reads the guide through the knowledge router", async () => {
+    const { workspace, outsider, editor, seeded } = await aGuideHeldByAnEditorInFinance();
+    await nameOwners(
+      app(),
+      ownersNaming.parse({
+        workspaceId: workspace.workspaceId,
+        userId: workspace.admin.id,
+        owners: [{ collection: "company", personId: editor.id }],
+      }),
+    );
+    const { guideId } = seeded;
+
+    const outsiders = await (
+      await webSignedIn(app(), outsider.email)
+    ).api.knowledge.guide.query({ guideId });
+    const editors = await (
+      await webSignedIn(app(), editor.email)
+    ).api.knowledge.guide.query({ guideId });
+
+    expect(outsiders.owner).toEqual({ id: editor.id, name: editor.name });
+    expect(outsiders.sections).toHaveLength(8);
+    expect(sectionOf(outsiders.sections, INSURANCE).coverage).toMatchObject({ met: 2, of: 4 });
+    expect(sectionOf(outsiders.sections, INSURANCE).brief).toBeUndefined();
+    expect(sectionOf(outsiders.sections, "Company overview").brief).toMatchObject({ version: 2 });
+    expect(sectionOf(editors.sections, INSURANCE)).toMatchObject({
+      coverage: { met: 3, of: 4 },
+      brief: { version: 2 },
+    });
+    for (const answer of [outsiders, editors]) {
+      expect(JSON.stringify(answer)).not.toContain("citedIris");
+    }
+    expect(JSON.stringify(outsiders)).not.toContain(PROFESSIONAL_INDEMNITY);
+  });
+
+  it("saves a Brief through the knowledge router", async () => {
+    const { editor, seeded } = await aGuideHeldByAnEditorInFinance();
+    const { api } = await webSignedIn(app(), editor.email);
+    const { writeUpId } = sectionOf(seeded.sections, "Company overview");
+    const read = await api.knowledge.guide.query({ guideId: seeded.guideId });
+    const standing = sectionOf(read.sections, "Company overview").brief?.editable?.markdown;
+    assert(standing !== undefined, "an Editor reads the Brief's markdown");
+    const edited = `${standing}\n\nNorthgate answers bids from one library.`;
+
+    const unchanged = await api.knowledge.saveBrief.mutate({
+      writeUpId,
+      markdown: standing,
+      base: 2,
+    });
+    const changed = await api.knowledge.saveBrief.mutate({ writeUpId, markdown: edited, base: 2 });
+    const again = await api.knowledge.saveBrief.mutate({ writeUpId, markdown: edited, base: 3 });
+
+    expect(unchanged).toEqual({ saved: false, version: 2 });
+    expect(changed).toEqual({ saved: true, version: 3 });
+    expect(again).toEqual({ saved: false, version: 3 });
+  });
+
+  it("includes an available concept through the knowledge router", async () => {
+    const { workspace, editor, seeded } = await aGuideHeldByAnEditorInFinance();
+    await seedConcepts(
+      app(),
+      conceptsSeeding.parse({
+        workspaceId: workspace.workspaceId,
+        userId: workspace.admin.id,
+        concepts: [
+          {
+            title: EMPLOYERS_LIABILITY.title,
+            collection: "company",
+            kind: EMPLOYERS_LIABILITY.kind,
+            body: EMPLOYERS_LIABILITY.body,
+            frontmatter: { tags: [...EMPLOYERS_LIABILITY.tags] },
+          },
+        ],
+      }),
+    );
+    const { api } = await webSignedIn(app(), editor.email);
+    const { writeUpId } = sectionOf(seeded.sections, INSURANCE);
+    const sectionRead = async () =>
+      sectionOf((await api.knowledge.guide.query({ guideId: seeded.guideId })).sections, INSURANCE);
+    const before = await sectionRead();
+
+    const included = await api.knowledge.includeAvailable.mutate({ writeUpId });
+    const after = await sectionRead();
+    const repeated = await api.knowledge.includeAvailable.mutate({ writeUpId });
+
+    expect(before.coverage).toMatchObject({ met: 3, of: 4 });
+    expect(included).toMatchObject({ included: 1 });
+    expect(after.coverage).toMatchObject({ met: 4, of: 4 });
+    expect(after.brief?.detail.map(({ title }) => title)).toContain(EMPLOYERS_LIABILITY.title);
+    expect(repeated).toEqual({ included: 0 });
   });
 });
