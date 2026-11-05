@@ -32,7 +32,11 @@ type Options = {
   readonly reportUnsaved: (sectionId: string, unsaved: boolean) => void;
 };
 
-export type BriefEditing = { readonly actions: ReactNode; readonly editor: ReactNode };
+export type BriefEditing = {
+  readonly actions: ReactNode;
+  readonly editor: ReactNode;
+  readonly open: boolean;
+};
 
 export function useBriefEditing(options: Options): BriefEditing {
   const { sectionId, brief, reportUnsaved } = options;
@@ -57,8 +61,11 @@ export function useBriefEditing(options: Options): BriefEditing {
     buttonRef.current?.focus();
   }, []);
 
-  if (brief === undefined || editable === undefined) return { actions: null, editor: null };
+  if (brief === undefined || editable === undefined) {
+    return { actions: null, editor: null, open: false };
+  }
   return {
+    open: launched,
     actions: (
       <Button
         ref={buttonRef}

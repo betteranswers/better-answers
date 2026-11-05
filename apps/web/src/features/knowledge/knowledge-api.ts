@@ -209,6 +209,25 @@ export const useSaveBrief = () => {
   return (asked: BriefAsked): Promise<BriefSaved> => saving.mutateAsync(asked);
 };
 
+export type BriefCopied = inferOutput<Api["knowledge"]["briefCopy"]>;
+
+export const useBriefCopy = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  const recording = useMutation(api.knowledge.recordCopy.mutationOptions());
+  return {
+    read: (writeUpId: string): Promise<BriefCopied> =>
+      queryClient.query({
+        ...api.knowledge.briefCopy.queryOptions({ writeUpId }),
+        staleTime: 0,
+        gcTime: 0,
+      }),
+    record: async (writeUpId: string, version: number): Promise<void> => {
+      await recording.mutateAsync({ writeUpId, version });
+    },
+  };
+};
+
 export const useIncludeAvailable = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

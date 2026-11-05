@@ -10,12 +10,14 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import {
+  useBriefCopy,
   useIncludeAvailable,
   type Guide,
   type GuideSection,
   type SectionBrief,
 } from "../knowledge-api.ts";
 import { useBriefEditing } from "./brief-actions.tsx";
+import { copyBrief, copyingWords } from "./brief-clipboard.ts";
 import type { Say } from "./brief-editing.ts";
 import { Coverage, type Gaps } from "./guide-coverage.tsx";
 import { failed, said } from "./guide-outcome.ts";
@@ -182,6 +184,60 @@ const useIncluding = (section: GuideSection, say: Say, heading: RefObject<HTMLEl
   };
 };
 
+const useCopying = (section: GuideSection, say: Say, editing: boolean) => {
+  const brief = useBriefCopy();
+  const [copying, setCopying] = useState(false);
+
+  const run = async () => {
+    if (copying) return;
+    if (editing) {
+      say(said(WORDS.closeToCopy));
+      return;
+    }
+    setCopying(true);
+    say(said(WORDS.copying(section.number)));
+    try {
+      const done = await copyBrief(
+        () => brief.read(section.writeUpId),
+        (copy) => brief.record(section.writeUpId, copy.version),
+      );
+      say(said(copyingWords(section.number, done)));
+    } catch (thrown) {
+      say(failed(thrown instanceof Error ? thrown : new Error(String(thrown))));
+    } finally {
+      setCopying(false);
+    }
+  };
+  return {
+    copying,
+    onCopy: () => {
+      void run();
+    },
+  };
+};
+
+function CopyAction(properties: {
+  readonly section: GuideSection;
+  readonly copying: ReturnType<typeof useCopying>;
+}) {
+  const { section, copying } = properties;
+  if (section.copy === "below-action-threshold") {
+    return <p className="text-muted-foreground">{WORDS.belowYourRole}</p>;
+  }
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      {...actionNamed(SECTION_ACTIONS.copyBrief)}
+      aria-disabled={copying.copying}
+      aria-keyshortcuts={KEY.copyBrief.key}
+      onClick={copying.onCopy}
+    >
+      {WORDS.copy}
+    </Button>
+  );
+}
+
 function SectionHead(properties: {
   readonly section: GuideSection;
   readonly headingId: string;
@@ -233,6 +289,7 @@ export function GuideSectionView(properties: SectionProps) {
     say,
     reportUnsaved: properties.reportUnsaved,
   });
+  const copying = useCopying(section, say, editing.open);
   const unmet = section.coverage.facts.filter((fact) => fact.state !== "met");
   const onAdd = (href: string) => {
     void navigate({ href });
@@ -266,6 +323,9 @@ export function GuideSectionView(properties: SectionProps) {
             />
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {editing.actions}
+              {brief.rendered.markdown.trim() === "" ? null : (
+                <CopyAction section={section} copying={copying} />
+              )}
               <Button
                 ref={showDetail}
                 type="button"

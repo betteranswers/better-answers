@@ -202,7 +202,7 @@ export const readKindConcepts = async (
 
 type CitedIris = readonly string[];
 
-const sectionTrustWordsAction = declareAction({
+const sectionTrustsAction = declareAction({
   admits: ANY_ROLE,
   input: z.custom<readonly CitedIris[]>(),
   refuses: ["role-forbids"],
@@ -213,14 +213,13 @@ const TRUST_OF = `SELECT c.iri, c.status, c.frontmatter, c.content_hash, ${LATES
     ${LATEST_VERIFICATION.joins}
    WHERE c.workspace_id = $1 AND ${readableClause("c", 2)} AND c.iri = ANY($4::text[])`;
 
-/** The trust words of each section, in the order given, each section as the concepts it cites. */
-export const readSectionTrustWords = async (
+export const readSectionTrusts = async (
   principal: UserPrincipal,
   tx: Tx,
   sections: readonly CitedIris[],
   judgedAt: Date,
-): Promise<Result<readonly string[], RefusalOf<typeof sectionTrustWordsAction> | Error>> => {
-  const admitted = admit(sectionTrustWordsAction, principal, sections);
+): Promise<Result<readonly Trust[], RefusalOf<typeof sectionTrustsAction> | Error>> => {
+  const admitted = admit(sectionTrustsAction, principal, sections);
   if (!admitted.ok) return err(admitted.error);
   const reader = admitted.value;
   return attempt(async () => {
@@ -230,8 +229,6 @@ export const readSectionTrustWords = async (
       [...new Set(sections.flat())],
     ]);
     const trusts = new Map(rows.map((row) => [row.iri, trustOfRow(row, judgedAt)]));
-    return sections.map((cited) =>
-      trustWords(weakestTrust(cited.flatMap((iri) => trusts.get(iri) ?? []))),
-    );
+    return sections.map((cited) => weakestTrust(cited.flatMap((iri) => trusts.get(iri) ?? [])));
   });
 };

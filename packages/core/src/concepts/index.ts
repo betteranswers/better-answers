@@ -11,7 +11,7 @@ export {
   kindConceptsInput,
   readKindConcepts,
   readKnowledgeTree,
-  readSectionTrustWords,
+  readSectionTrusts,
   type KindConceptsInput,
 } from "./reading/browse.ts";
 export {
@@ -94,6 +94,14 @@ export type {
   OverrideConceptSensitivityRefusal,
 } from "./visibility.ts";
 export { conceptPageOf } from "./reading/read.ts";
+export {
+  briefCopy,
+  briefCopyInput,
+  copyOfferOf,
+  recordCopy,
+  recordCopyInput,
+  type CopyOffer,
+} from "./brief-copy.ts";
 export {
   MAP_MAINTENANCE,
   mapCounts,

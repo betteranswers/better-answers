@@ -58,6 +58,7 @@ describe("what a procedure may answer the wire", () => {
       "inbox.decline",
       "inbox.item",
       "inbox.waiting",
+      "knowledge.briefCopy",
       "knowledge.collections",
       "knowledge.conceptToEdit",
       "knowledge.find",
@@ -67,6 +68,7 @@ describe("what a procedure may answer the wire", () => {
       "knowledge.kindConcepts",
       "knowledge.nameOwner",
       "knowledge.open",
+      "knowledge.recordCopy",
       "knowledge.saveBrief",
       "knowledge.saveConcept",
       "knowledge.tree",
@@ -194,6 +196,8 @@ describe("what a procedure may answer the wire", () => {
       | "knowledge.guide"
       | "knowledge.saveBrief"
       | "knowledge.includeAvailable"
+      | "knowledge.briefCopy"
+      | "knowledge.recordCopy"
       | "inbox.waiting"
       | "inbox.item"
       | "inbox.accept"

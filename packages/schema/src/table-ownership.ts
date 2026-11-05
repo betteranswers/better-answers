@@ -107,7 +107,7 @@ export const TABLE_OWNERS = {
   "public.question_asked": "answering",
   "public.question_content": "answering",
   "public.question_feedback": "answering",
-  "public.usage": "answering",
+  "public.usage": "usage",
 } satisfies Record<string, string>;
 
 export type OwnedTable = keyof typeof TABLE_OWNERS;

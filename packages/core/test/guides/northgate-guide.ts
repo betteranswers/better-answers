@@ -22,6 +22,14 @@ export const seededGuide = async (
   return { ng, guideId };
 };
 
+export const guideSeededOnce = (
+  db: () => MigratedPostgres,
+  arrange: () => Promise<Scenario>,
+): (() => Promise<SeededGuide>) => {
+  let shared: Promise<SeededGuide> | undefined;
+  return () => (shared ??= arrange().then((scenario) => seededGuide(db(), scenario)));
+};
+
 export const editorOutsideFinance = async (
   db: MigratedPostgres,
   guide: SeededGuide,

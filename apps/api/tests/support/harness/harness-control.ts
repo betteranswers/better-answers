@@ -32,6 +32,8 @@ import {
   seedConcepts,
   seedEditSuggestion,
   seedGuide,
+  usageAsking,
+  usageOf,
 } from "./harness-knowledge.ts";
 import {
   accessAsking,
@@ -242,6 +244,11 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
   control.post(`${HARNESS_PREFIX}/guides`, async (context) => {
     const asked = await readBody(context.req.raw, guideSeeding);
     return context.json(await seedGuide(app, asked));
+  });
+
+  control.post(`${HARNESS_PREFIX}/usage`, async (context) => {
+    const asked = await readBody(context.req.raw, usageAsking);
+    return context.json(await usageOf(app, asked));
   });
 
   control.post(`${HARNESS_PREFIX}/suggestions`, async (context) => {

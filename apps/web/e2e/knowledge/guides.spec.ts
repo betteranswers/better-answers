@@ -16,6 +16,7 @@ import {
   signIn,
   skipLinkReachesThePage,
   theActionsLandedWithinTheirBudget,
+  usageOf,
 } from "../harness.ts";
 import { listsItsKeystrokes } from "../knowledge.ts";
 
@@ -37,6 +38,10 @@ const SECTIONS = [
 const FIRST_SECTION = "1. Company overview";
 
 const INSURANCE = "3. Insurance and financial standing";
+
+const INSURANCE_PROMPT = "Insurance and financial standing";
+
+const COPIED_BUDGET_MS = 1000;
 
 const REGISTRATION = "Registered company number";
 
@@ -60,6 +65,8 @@ type Member = { readonly id: string; readonly email: string; readonly name: stri
 
 type Guided = {
   readonly path: string;
+  readonly workspaceId: string;
+  readonly writeUps: ReadonlyMap<string, string>;
   readonly admin: Member;
   readonly editor: Member;
   readonly viewer: Member;
@@ -93,13 +100,26 @@ const aWorkspaceWithAGuide = async (api: APIRequestContext, name: string): Promi
     userId: admin.id,
     owners: [{ collection: "company", personId: admin.id }],
   });
-  return { path: guidePageOf(seeded.guideId), admin, editor, viewer };
+  return {
+    path: guidePageOf(seeded.guideId),
+    workspaceId,
+    writeUps: new Map(seeded.sections.map((section) => [section.prompt, section.writeUpId])),
+    admin,
+    editor,
+    viewer,
+  };
 };
 
 let seededOnce: Promise<Guided> | undefined;
 
 const theGuide = (api: APIRequestContext): Promise<Guided> =>
   (seededOnce ??= aWorkspaceWithAGuide(api, "Tyne Libraries"));
+
+const writeUpOf = (guided: Guided, prompt: string): string => {
+  const found = guided.writeUps.get(prompt);
+  if (found === undefined) throw new Error(`the seeded guide holds no section ${prompt}`);
+  return found;
+};
 
 const signedIn = async (page: Page, api: APIRequestContext, member: Member): Promise<void> => {
   await page.goto("/sign-in");
@@ -188,6 +208,7 @@ test.describe("the guide page", () => {
       "Add the Missing Fact of the Section in Focus",
       "Edit the Brief of the Section in Focus",
       "Save the Brief You Are Editing",
+      "Copy the Brief of the Section in Focus",
     ]);
     await passesTheAccessibilityGate();
   });
@@ -291,6 +312,87 @@ test.describe("the guide page", () => {
     });
   });
 
+  test("acknowledges a copy within its budget", async ({
+    page,
+    request,
+    context,
+    passesTheAccessibilityGate,
+  }) => {
+    test.slow();
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const guided = await theGuide(request);
+    const writeUpId = writeUpOf(guided, INSURANCE_PROMPT);
+    const usage = async () =>
+      (await usageOf(request, { workspaceId: guided.workspaceId, writeUpId })).usage;
+    await signedIn(page, request, guided.editor);
+    await page.goto(guided.path);
+    const insurance = sectionOf(page, INSURANCE);
+    await expect(insurance).toBeVisible();
+    const before = (await usage()).length;
+    const status = page.locator(STATUS_OF_THE_GUIDE);
+
+    const acknowledged: number[] = [];
+    const copied: number[] = [];
+    for (let sample = 1; sample <= ACTION_SAMPLES; sample += 1) {
+      await insurance.getByRole("button", { name: "Copy" }).focus();
+      await clockTheNextKey(page, { at: STATUS_OF_THE_GUIDE, reads: "Copying section 3." });
+      await page.keyboard.press(KEY.copyBrief.key);
+      acknowledged.push(await actionClocked(page));
+
+      const pressedAtMs = Date.now();
+      await expect(status).toContainText("Copied section 3 with 4 footnotes.");
+      copied.push(Date.now() - pressedAtMs);
+      await expect(status).toContainText("Numbers start at 1 in each copy.");
+    }
+    theActionsLandedWithinTheirBudget("copy", acknowledged);
+    test.info().annotations.push({ type: "brief copied", description: `${copied.join(", ")} ms` });
+    expect(Math.max(...copied), "a copy was not shown within its budget").toBeLessThan(
+      COPIED_BUDGET_MS,
+    );
+
+    await test.step("recorded one usage row per copy, naming the version and the person", async () => {
+      const rows = await usage();
+      expect(rows).toHaveLength(before + ACTION_SAMPLES);
+      expect(rows.at(-1)).toMatchObject({
+        act: "copied",
+        actor: `human:${guided.editor.id}`,
+        writeUpId,
+        version: 2,
+        iri: null,
+      });
+    });
+
+    await test.step("put superscripts and Sources on the clipboard, brackets in its text", async () => {
+      const held = await page.evaluate(async () => {
+        const [item] = await navigator.clipboard.read();
+        const textOf = async (type: string) => (await item?.getType(type))?.text();
+        return { html: await textOf("text/html"), text: await textOf("text/plain") };
+      });
+      expect(held.html).toContain("<sup>4</sup>");
+      expect(held.html).toContain("Sources");
+      expect(held.text).toMatch(/\n\nSources\n\[1\] .+\n\[2\] .+\n\[3\] .+\n\[4\] .+$/u);
+      expect(held.text).toContain("Source: Northgate company records, register entry.");
+    });
+
+    await test.step("pasted into a rich field keeps superscripts, into a plain one keeps brackets", async () => {
+      await page.goto(guided.path);
+      await page.setContent(
+        '<div id="rich" contenteditable="true" style="min-height:4em"></div><textarea id="plain"></textarea>',
+      );
+      await page.locator("#rich").focus();
+      await page.keyboard.press("ControlOrMeta+v");
+      await page.locator("#plain").focus();
+      await page.keyboard.press("ControlOrMeta+v");
+      await expect(page.locator("#rich sup")).toHaveCount(4);
+      await expect(page.locator("#rich ol li")).toHaveCount(4);
+      await expect(page.locator("#plain")).toHaveValue(/\n\nSources\n\[1\] /u);
+    });
+
+    await page.goto(guided.path);
+    await expect(sectionOf(page, INSURANCE)).toBeVisible();
+    await passesTheAccessibilityGate();
+  });
+
   test("withholds a section from a Viewer outside its audience", async ({ page, request }) => {
     test.slow();
     const guided = await theGuide(request);
@@ -312,6 +414,11 @@ test.describe("the guide page", () => {
       await expect(insurance.getByRole("list", { name: "Footnotes" })).toHaveCount(0);
       await expect(insurance.getByRole("button", { name: "Show Detail" })).toHaveCount(0);
       await expect(page.getByText(PROFESSIONAL_INDEMNITY)).toHaveCount(0);
+    });
+
+    await test.step("offers no Copy where the Viewer's role asks for more trust", async () => {
+      await expect(page.getByRole("button", { name: "Copy", exact: true })).toHaveCount(0);
+      await expect(first).toContainText("You can’t copy this section yet.");
     });
   });
 });
