@@ -55,7 +55,10 @@ type KindRow = {
   readonly count: number;
 };
 
-const collectionOrder = (one: CollectionCount, other: CollectionCount): number => {
+export const collectionOrder = (
+  one: { readonly collection: string | null },
+  other: { readonly collection: string | null },
+): number => {
   if (one.collection === null) return 1;
   if (other.collection === null) return -1;
   return byCodeUnit(one.collection, other.collection);
@@ -137,7 +140,7 @@ const KIND_CONCEPTS = `SELECT c.iri, c.title, c.kind, c.status, c.frontmatter, c
         ORDER BY c.title COLLATE "C", c.iri
         LIMIT $8`;
 
-type TrustRow = {
+export type TrustRow = {
   readonly iri: string;
   readonly status: string;
   readonly frontmatter: Frontmatter;
@@ -146,7 +149,7 @@ type TrustRow = {
 
 type KindConceptRow = TrustRow & { readonly title: string; readonly kind: string };
 
-const trustOfRow = (row: TrustRow, judgedAt: Date): Trust =>
+export const trustOfRow = (row: TrustRow, judgedAt: Date): Trust =>
   trustOf(
     {
       status: row.status,
