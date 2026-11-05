@@ -491,16 +491,16 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 **Files.**
 
 - [ ] Edit `apps/web/src/features/knowledge/concept-page.tsx`.
-- [ ] Create `apps/web/src/features/knowledge/concept-editor.tsx`.
-- [ ] Create `apps/web/src/features/knowledge/markdown-round-trip.ts`.
+- [ ] Create `apps/web/src/features/knowledge/editing/concept-editor.tsx`.
+- [ ] Create `apps/web/src/features/knowledge/editing/markdown-round-trip.ts`.
 - [ ] Edit `apps/web/src/features/knowledge/knowledge-api.ts`.
 - [ ] Edit `apps/web/src/features/knowledge/knowledge-state.ts`.
 - [ ] Edit `apps/web/src/features/knowledge/knowledge-words.ts`.
 - [ ] Edit `apps/web/src/features/knowledge/search-page.tsx`.
 - [ ] Edit `apps/web/package.json`.
 - [ ] Edit `apps/web/e2e/knowledge/concept.spec.ts`.
-- [ ] Create `apps/web/test/knowledge/markdown-round-trip.test.ts`.
-- [ ] Create `apps/web/test/knowledge/concept-actions.test.tsx`.
+- [ ] Create `apps/web/test/knowledge/editing/markdown-round-trip.test.ts`.
+- [ ] Create `apps/web/test/knowledge/editing/concept-actions.test.tsx`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0015.md`.
 - [ ] Edit `docs/specs/route/s3.md` where this unit moves a page. Edit `docs/solutions/architecture-patterns/adr-0051.md` only if the navigation-list decision itself changes.
 
@@ -517,7 +517,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Keep a client draft in `sessionStorage`, keyed by the IRI, restored when the editor reopens. Confirm before leaving with unsaved changes through `useBlocker` from `@tanstack/react-router` (KTD13).
 - [ ] Add keys to open the editor, switch between visual and source mode, save, and leave a text field that captures Tab. Keep them apart from the back, sources and links keys of `CONCEPT_KEYSTROKES` in `knowledge-state.ts`, and list them under `?`.
 - [ ] Offer a new concept from Search's no-match state in `search-page.tsx`, as `Type it as a new concept`, with the query as the title. `SEARCH_FIELDS` in `knowledge-state.ts` gains `new` (the title), `collection`, `kind`, `tags` and `subject` (an IRI the body links on first render) beside `search`. The five fields open the same editor, prefilled. `ConceptEditor` reads all five, so BA-236's **Add This Fact** can link a missing fact straight to it with its kind, tag, collection and subject. The collection is chosen from `readableCollections`, which the concepts face exports from `packages/core/src/concepts/reading/lookup.ts`, and `standing` comes from `conceptToEdit({ collection })`.
-- [ ] In `apps/web/e2e/knowledge/concept.spec.ts`, add "acknowledges a save within its budget". An Admin edits the title and saves `ACTION_SAMPLES` times. The case clocks each save key to `Saving.` with `clockTheNextKey` and `actionClocked`, and passes the samples to `theActionsLandedWithinTheirBudget` (`apps/web/e2e/locators.ts`). A reload then shows the last title. The editor's other cases are single-screen behaviour, so they go in `apps/web/test/knowledge/concept-actions.test.tsx` and add no spec file.
+- [ ] In `apps/web/e2e/knowledge/concept.spec.ts`, add "acknowledges a save within its budget". An Admin edits the title and saves `ACTION_SAMPLES` times. The case clocks each save key to `Saving.` with `clockTheNextKey` and `actionClocked`, and passes the samples to `theActionsLandedWithinTheirBudget` (`apps/web/e2e/locators.ts`). A reload then shows the last title. The editor's other cases are single-screen behaviour, so they go in `apps/web/test/knowledge/editing/concept-actions.test.tsx` and add no spec file.
 - [ ] Edit ADR 0015 in place to record KTD13. The editor is Tiptap 3 with CodeMirror 6 for source mode, a lossy body opens in source mode, a save is explicit, and a client draft confirms before leaving.
 - [ ] Record that the concept page's actions sit on the concept's own header beside its title, the page head keeps the group's name, and the toolbar carries tabs alone. The rule of 10/10/2026 stands.
 
@@ -529,11 +529,11 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `apps/web/test/knowledge/markdown-round-trip.test.ts` gains `finds a table the visual editor would lose`. Run `pnpm --filter @better-answers/web exec vitest run test/knowledge/markdown-round-trip.test.ts -t "finds a table the visual editor would lose"`.
-- [ ] `apps/web/test/knowledge/markdown-round-trip.test.ts` gains `keeps plain paragraphs and lists in visual mode`. Run `pnpm --filter @better-answers/web exec vitest run test/knowledge/markdown-round-trip.test.ts -t "keeps plain paragraphs and lists in visual mode"`.
-- [ ] `apps/web/test/knowledge/concept-actions.test.tsx` gains `draws Edit for a committer and Suggest for others`, whose two cases differ in `standing` alone. Run `pnpm --filter @better-answers/web exec vitest run test/knowledge/concept-actions.test.tsx -t "draws Edit for a committer and Suggest for others"`.
-- [ ] `apps/web/test/knowledge/concept-actions.test.tsx` gains `asks once when the concept is used twice`. Run `pnpm --filter @better-answers/web exec vitest run test/knowledge/concept-actions.test.tsx -t "asks once when the concept is used twice"`.
-- [ ] `apps/web/test/knowledge/concept-actions.test.tsx` gains `opens prefilled from the address`, which reads `new`, `collection`, `kind`, `tags` and `subject` into the editor's fields. Run `pnpm --filter @better-answers/web exec vitest run test/knowledge/concept-actions.test.tsx -t "opens prefilled from the address"`.
+- [ ] `apps/web/test/knowledge/editing/markdown-round-trip.test.ts` gains `finds a table the visual editor would lose`. Run `pnpm --filter @better-answers/web exec vitest run test/knowledge/editing/markdown-round-trip.test.ts -t "finds a table the visual editor would lose"`.
+- [ ] `apps/web/test/knowledge/editing/markdown-round-trip.test.ts` gains `keeps plain paragraphs and lists in visual mode`. Run `pnpm --filter @better-answers/web exec vitest run test/knowledge/editing/markdown-round-trip.test.ts -t "keeps plain paragraphs and lists in visual mode"`.
+- [ ] `apps/web/test/knowledge/editing/concept-actions.test.tsx` gains `draws Edit for a committer and Suggest for others`, whose two cases differ in `standing` alone. Run `pnpm --filter @better-answers/web exec vitest run test/knowledge/editing/concept-actions.test.tsx -t "draws Edit for a committer and Suggest for others"`.
+- [ ] `apps/web/test/knowledge/editing/concept-actions.test.tsx` gains `asks once when the concept is used twice`. Run `pnpm --filter @better-answers/web exec vitest run test/knowledge/editing/concept-actions.test.tsx -t "asks once when the concept is used twice"`.
+- [ ] `apps/web/test/knowledge/editing/concept-actions.test.tsx` gains `opens prefilled from the address`, which reads `new`, `collection`, `kind`, `tags` and `subject` into the editor's fields. Run `pnpm --filter @better-answers/web exec vitest run test/knowledge/editing/concept-actions.test.tsx -t "opens prefilled from the address"`.
 - [ ] `apps/web/test/shared/page/page-head.test.tsx` passes with no edit. Run `pnpm --filter @better-answers/web exec vitest run test/shared/page/page-head.test.tsx`.
 - [ ] Break each new test once in the production line it guards and see it fail. Record the line and the failure in the PR body.
 
