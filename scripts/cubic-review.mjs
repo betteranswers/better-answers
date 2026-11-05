@@ -13,11 +13,6 @@ const REVIEW_TIMEOUT_MS = 25 * 60 * 1000;
 const GIT_TIMEOUT_MS = 2 * 60 * 1000;
 const OUTPUT_LIMIT_BYTES = 64 * 1024 * 1024;
 
-const finish = (head, review) => {
-  process.stdout.write(report(head, review));
-  process.exit(EXIT[review.kind]);
-};
-
 const git = (...args) => {
   const result = spawnSync("git", args, { encoding: "utf8", timeout: GIT_TIMEOUT_MS });
   if (result.status !== 0) {
@@ -26,34 +21,35 @@ const git = (...args) => {
   return result.stdout.trim();
 };
 
+const runCubic = () => {
+  const ran = spawnSync(
+    "cubic",
+    ["review", "--base", "origin/main...HEAD", "--output-format", "json"],
+    {
+      encoding: "utf8",
+      env: cubicEnvironment(process.env),
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: REVIEW_TIMEOUT_MS,
+      maxBuffer: OUTPUT_LIMIT_BYTES,
+    },
+  );
+  return reviewFrom({
+    stdout: ran.stdout,
+    stderr: ran.stderr,
+    status: ran.status,
+    spawnError: ran.error?.code,
+  });
+};
+
 let head = "unknown";
+let review;
 try {
   git("fetch", "--quiet", "origin", "+refs/heads/main:refs/remotes/origin/main");
   head = git("rev-parse", "HEAD");
+  review = runCubic();
 } catch (cause) {
-  finish(head, couldNot(cause.message));
+  review = couldNot(cause.message);
 }
 
-const ran = spawnSync(
-  "cubic",
-  ["review", "--base", "origin/main...HEAD", "--output-format", "json"],
-  {
-    encoding: "utf8",
-    env: cubicEnvironment(process.env),
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: REVIEW_TIMEOUT_MS,
-    maxBuffer: OUTPUT_LIMIT_BYTES,
-  },
-);
-
-const output = ran.error === undefined ? ran : { stdout: "", stderr: "" };
-
-finish(
-  head,
-  reviewFrom({
-    stdout: output.stdout,
-    stderr: output.stderr,
-    status: ran.status,
-    spawnError: ran.error?.code,
-  }),
-);
+process.stdout.write(report(head, review));
+process.exitCode = EXIT[review.kind];
