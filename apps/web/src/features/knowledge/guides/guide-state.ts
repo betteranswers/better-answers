@@ -4,7 +4,7 @@ import { ULID } from "@better-answers/schema/ulid";
 
 import { ADDRESS_QUERY } from "@/shared/address/address-query.ts";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
-import { BROWSE, searchAt } from "@/shared/knowledge/concept-address.ts";
+import { BROWSE, SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import { detailAt, pageNamed } from "@/shared/navigation.ts";
 
 import type { Guide, SectionFact } from "../knowledge-api.ts";
@@ -57,4 +57,4 @@ const keyedBySearch = (held: NewConceptHeld): Readonly<Record<string, string>> =
   );
 
 export const addFactAt = (guide: Titled, fact: SectionFact): string =>
-  searchAt(ADDRESS_QUERY.stringifySearch(keyedBySearch(heldFor(guide, fact))));
+  `${SEARCH_PAGE.path}${ADDRESS_QUERY.stringifySearch(keyedBySearch(heldFor(guide, fact)))}`;
