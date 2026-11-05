@@ -1,11 +1,15 @@
 import type pg from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { FULL_REBUILD_KIND, ULID } from "../../src/index.ts";
+import { DERIVED_FROM_LABEL, FULL_REBUILD_KIND, ULID } from "../../src/index.ts";
 import { testData } from "../support/factory.ts";
 import { type MigratedPostgres, withRollback } from "../support/harness.ts";
 import { openMigratedPostgres } from "../support/warm-postgres.ts";
-import { asTheMigrationOwnerOf, migrationStatementSaying } from "./journal-statements.ts";
+import {
+  asTheMigrationOwnerOf,
+  migrationStatementSaying,
+  migrationStatements,
+} from "./journal-statements.ts";
 
 let db: MigratedPostgres;
 
@@ -20,7 +24,17 @@ const UNMAPPED = "01J6RSSSSSSSSSSSSSSSSSSSSS";
 const MAPPED = "01J6RRRRRRRRRRRRRRRRRRRRRR";
 const ALSO_MAPPED = "01J6RTTTTTTTTTTTTTTTTTTTTT";
 
-const THE_MIGRATION = "the-unresolved-references.sql";
+type QueuingMigration = { readonly tag: string; readonly owns: readonly string[] };
+
+const THE_MAPS_FIRST_UPGRADE: QueuingMigration = {
+  tag: "the-unresolved-references.sql",
+  owns: ["TABLE public.job", "TABLE public.map_generation"],
+};
+
+const THE_LINEAGE_UPGRADE: QueuingMigration = {
+  tag: "the-lineage-rebuilds.sql",
+  owns: ["TABLE public.job", "TABLE public.map_edge", "TABLE public.map_unresolved_reference"],
+};
 
 type Migrator = "the bound owner" | "a superuser";
 
@@ -28,22 +42,18 @@ const queuingTheUpgradeRebuilds = async (
   client: pg.PoolClient,
   migrator: Migrator,
   runs: number,
+  { tag, owns }: QueuingMigration,
 ): Promise<void> => {
   const theBlock = async () => {
-    await client.query(migrationStatementSaying(THE_MIGRATION, "FUNCTION pg_temp.new_ulid"));
-    await client.query(
-      migrationStatementSaying(THE_MIGRATION, "FUNCTION pg_temp.queue_the_upgrade_rebuilds"),
-    );
+    for (const statement of migrationStatements(tag)) {
+      if (statement.includes("FUNCTION pg_temp.")) await client.query(statement);
+    }
     for (let run = 0; run < runs; run += 1) {
-      await client.query(migrationStatementSaying(THE_MIGRATION, "SELECT pg_temp."));
+      await client.query(migrationStatementSaying(tag, "SELECT pg_temp."));
     }
   };
   if (migrator === "a superuser") return theBlock();
-  return asTheMigrationOwnerOf(
-    client,
-    ["TABLE public.job", "TABLE public.map_generation"],
-    theBlock,
-  );
+  return asTheMigrationOwnerOf(client, owns, theBlock);
 };
 
 const rebuildsWaitingIn = async (
@@ -74,7 +84,7 @@ describe.each<Migrator>(["the bound owner", "a superuser"])(
   (migrator) => {
     it("queues one upgrade rebuild for each workspace with a map", async () => {
       await withTheUnmappedWorkspaceFirst(async (client) => {
-        await queuingTheUpgradeRebuilds(client, migrator, 1);
+        await queuingTheUpgradeRebuilds(client, migrator, 1, THE_MAPS_FIRST_UPGRADE);
 
         const queued = await rebuildsWaitingIn(client, MAPPED);
         expect(queued.map(({ reason }) => reason)).toEqual(["upgrade"]);
@@ -85,7 +95,7 @@ describe.each<Migrator>(["the bound owner", "a superuser"])(
 
     it("queues no second rebuild while one still waits", async () => {
       await withTheUnmappedWorkspaceFirst(async (client) => {
-        await queuingTheUpgradeRebuilds(client, migrator, 2);
+        await queuingTheUpgradeRebuilds(client, migrator, 2, THE_MAPS_FIRST_UPGRADE);
 
         expect(await rebuildsWaitingIn(client, MAPPED)).toHaveLength(1);
       });
@@ -100,7 +110,7 @@ describe.each<Migrator>(["the bound owner", "a superuser"])(
         await seed.mapGeneration({ workspaceId: ALSO_MAPPED });
         await seed.job({ workspaceId: MAPPED, kind: FULL_REBUILD_KIND, reason: "first-build" });
 
-        await queuingTheUpgradeRebuilds(client, migrator, 1);
+        await queuingTheUpgradeRebuilds(client, migrator, 1, THE_MAPS_FIRST_UPGRADE);
 
         expect((await rebuildsWaitingIn(client, MAPPED)).map(({ reason }) => reason)).toEqual([
           "first-build",
@@ -108,6 +118,55 @@ describe.each<Migrator>(["the bound owner", "a superuser"])(
         expect((await rebuildsWaitingIn(client, ALSO_MAPPED)).map(({ reason }) => reason)).toEqual([
           "upgrade",
         ]);
+      });
+    });
+  },
+);
+
+const LINKED_ONLY = "01J6RKKKKKKKKKKKKKKKKKKKKK";
+const WITH_LINEAGE = "01J6RNNNNNNNNNNNNNNNNNNNNN";
+const DERIVED = "01J6RDDDDDDDDDDDDDDDDDDDDD";
+
+const withThreeMaps = async (fn: (client: pg.PoolClient) => Promise<void>): Promise<void> => {
+  await withRollback(db.pool, async (client) => {
+    const seed = testData(client);
+    await seed.workspace({ id: LINKED_ONLY, name: "The workspace of links only" });
+    await seed.workspace({ id: WITH_LINEAGE, name: "The workspace with a lineage row" });
+    await seed.workspace({ id: DERIVED, name: "The workspace with a derived edge" });
+    await seed.mapEdge({ workspaceId: LINKED_ONLY });
+    await seed.mapUnresolvedReference({ workspaceId: LINKED_ONLY, relation: "link" });
+    await seed.mapUnresolvedReference({
+      workspaceId: WITH_LINEAGE,
+      relation: "lineage",
+      targetPath: "knowledge/The handbook",
+    });
+    await seed.mapEdge({ workspaceId: DERIVED, label: DERIVED_FROM_LABEL });
+    await fn(client);
+  });
+};
+
+describe.each<Migrator>(["the bound owner", "a superuser"])(
+  "the lineage rebuilds migration 0099 queues, run by %s",
+  (migrator) => {
+    it("queues a rebuild only for a map holding lineage", async () => {
+      await withThreeMaps(async (client) => {
+        await queuingTheUpgradeRebuilds(client, migrator, 1, THE_LINEAGE_UPGRADE);
+
+        for (const workspaceId of [WITH_LINEAGE, DERIVED]) {
+          const queued = await rebuildsWaitingIn(client, workspaceId);
+          expect(queued.map(({ reason }) => reason)).toEqual(["upgrade"]);
+          expect(queued[0]?.id).toMatch(ULID);
+        }
+        expect(await rebuildsWaitingIn(client, LINKED_ONLY)).toEqual([]);
+      });
+    });
+
+    it("queues no second rebuild when it runs again", async () => {
+      await withThreeMaps(async (client) => {
+        await queuingTheUpgradeRebuilds(client, migrator, 2, THE_LINEAGE_UPGRADE);
+
+        expect(await rebuildsWaitingIn(client, WITH_LINEAGE)).toHaveLength(1);
+        expect(await rebuildsWaitingIn(client, DERIVED)).toHaveLength(1);
       });
     });
   },
