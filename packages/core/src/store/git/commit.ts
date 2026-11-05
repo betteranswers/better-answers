@@ -44,7 +44,7 @@ export type CommitRequest = {
 
   readonly expectedHead: string | null | typeof ANY_HEAD;
 
-  readonly parentRecorded?: ((parent: string) => Promise<boolean>) | undefined;
+  readonly parentRecorded: (parent: string) => Promise<boolean>;
 
   readonly at: Date;
 };
@@ -136,7 +136,7 @@ const parentRefusal = async (
   parent: string | null,
 ): Promise<"stale-precondition" | "unrecorded-head" | undefined> => {
   if (!meetsExpectedHead(request.expectedHead, parent)) return "stale-precondition";
-  if (parent === null || request.parentRecorded === undefined) return undefined;
+  if (parent === null) return undefined;
   return (await request.parentRecorded(parent)) ? undefined : "unrecorded-head";
 };
 

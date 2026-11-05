@@ -1003,6 +1003,7 @@ describe("what a governed write refuses", () => {
       author: { name: "Ada Editor", email: "ada@acme.invalid" },
       trailers: { actor: `human:${scenario.editor.userId}`, audit: `${ulid()}\nRun: forged` },
       expectedHead: null,
+      parentRecorded: () => Promise.resolve(true),
       at: new Date(),
     });
 
@@ -1383,6 +1384,7 @@ describe("a write on a head the rows have not recorded", () => {
       author: first.author,
       trailers: { actor: `human:${scenario.editor.userId}`, audit: ulid() },
       expectedHead: written.sha,
+      parentRecorded: () => Promise.resolve(true),
       at: new Date(),
     });
     assert(forged.ok, "the forged commit was refused");

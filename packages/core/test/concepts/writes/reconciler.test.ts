@@ -452,6 +452,7 @@ const handMadeFirstAndReplayed = async (
     author: { name: "Grace Editor", email: "grace@acme.invalid" },
     trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
     expectedHead: null,
+    parentRecorded: () => Promise.resolve(true),
     at: new Date(),
   });
   if (!made.ok) throw new Error(`the hand-made commit was refused: ${String(made.error)}`);
@@ -562,6 +563,7 @@ const committedByHand = async (
     author: { name: "Grace Admin", email: "grace@acme.invalid" },
     trailers: { actor: actorIdOf(scenario.admin), audit: ulid(), projection: change.projection },
     expectedHead,
+    parentRecorded: () => Promise.resolve(true),
     at: new Date(),
   });
   if (!made.ok) throw new Error(`the hand-made commit was refused: ${String(made.error)}`);
@@ -1358,6 +1360,7 @@ describe("a commit the rows cannot take", () => {
       author: first.author,
       trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
       expectedHead: landing.sha,
+      parentRecorded: () => Promise.resolve(true),
       at: new Date(),
     });
     assert(clash.ok, inspect(clash));
@@ -1394,22 +1397,20 @@ describe("a commit the rows cannot take", () => {
     const input = guideline("Bridges");
     const landing = await landed(scenario, scenario.editor, input);
 
-    const moved = await commit(scenario.editor, scenario.git, {
-      path: "knowledge/guidelines/bridges-moved.md",
-      content: await fileAtCommit(scenario.git, scenario.workspaceId, landing.sha, input.path),
-      message: "Move the bridges guideline by hand",
-      author: { name: "Grace Editor", email: "grace@acme.invalid" },
-      trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
-      expectedHead: landing.sha,
-      at: new Date(),
-    });
-    assert(moved.ok, inspect(moved));
+    const moved = await committedByHand(
+      scenario,
+      {
+        path: "knowledge/guidelines/bridges-moved.md",
+        content: await fileAtCommit(scenario.git, scenario.workspaceId, landing.sha, input.path),
+      },
+      landing.sha,
+    );
 
     const run = await reconciled(scenario);
 
     expect(run).toMatchObject({
       replayed: [],
-      stopped: { sha: moved.value.sha, reason: "rename-refused" },
+      stopped: { sha: moved, reason: "rename-refused" },
     });
     expect(await conceptRow(scenario.workspaceId, landing.iri)).toMatchObject({
       path: input.path,

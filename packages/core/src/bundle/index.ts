@@ -91,7 +91,7 @@ const isRecorded = async (principal: Principal, tx: Tx, sha: string): Promise<bo
 export const commitAndLandAsMember = async <Refused extends string = never>(
   principal: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
-  request: CommitRequest,
+  request: Omit<CommitRequest, "parentRecorded">,
   land: (fresh: UserPrincipal, tx: Tx, committed: Committed) => Promise<void>,
   admits: (fresh: UserPrincipal, tx: Tx) => Promise<Refused | undefined>,
 ): Promise<Result<Committed, CommitRefusal | Refused | PrincipalRefusal | Error>> => {

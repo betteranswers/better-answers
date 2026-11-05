@@ -298,6 +298,7 @@ const committingInTurn = async (
       author,
       trailers: { actor: actorIdOfPerson(principal.userId), audit: ulid() },
       expectedHead: shas[at - 1] ?? null,
+      parentRecorded: () => Promise.resolve(true),
       at: new Date(`2026-04-0${at + 2}T11:00:00.000Z`),
     });
     if (!written.ok) throw new Error(`the commit was refused: ${String(written.error)}`);
@@ -3467,6 +3468,7 @@ describe("a commit made as the person while the routine runs", () => {
       author: { name: "Acme Bot", email: "bot@acme.invalid" },
       trailers: { actor: actorIdOfPerson(principal.userId), audit: ulid() },
       expectedHead: null,
+      parentRecorded: () => Promise.resolve(true),
       at: new Date("2026-04-02T11:00:00.000Z"),
     });
     expect(made.ok).toBe(true);
