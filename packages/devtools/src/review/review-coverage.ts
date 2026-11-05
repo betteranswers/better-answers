@@ -10,7 +10,7 @@ const CODERABBIT_FILE_LIMIT = 100;
 /** A run still going after this long did not run, so the verdict rule decides. */
 const RUNNING_LIMIT_MINUTES = 20;
 
-/** A bot asked for a review, by comment or by the label, shows a check run within this long or did not start. */
+/** Cubic, asked by comment, shows a check run within this long or did not start. Only that wait is timed. The label's wait is advice. */
 const START_WAIT_MINUTES = 10;
 
 const minutes = (count: number): number => count * 60 * 1000;
@@ -119,12 +119,20 @@ const describeState = (state: BotState): string => {
 /** Cubic words the limit in a check run title ("line limit reached") and in its reply to an ask ("monthly review limit"). */
 const LIMIT_TEXT = /(?:line|review) limit/iu;
 
-const CUBIC_REQUEST = /^\s*@cubic-dev-ai\s+review\b/iu;
+const CUBIC_REQUEST = /^\s*@cubic-dev-ai\s+(?:please\s+)?review\b/iu;
+
+/** Cubic opens a reply by quoting the comment it answers, and the quote can name a limit that is not Cubic's. */
+const unquoted = (body: string): string =>
+  body
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith(">"))
+    .join("\n");
 
 const CUBIC_LOGIN = "cubic-dev-ai";
 
 type Facts = {
-  readonly pending: boolean;
+  readonly running: boolean;
+  readonly blocking: boolean;
   readonly reviewed: boolean;
   readonly cubicReviewed: boolean;
   readonly limited: boolean;
@@ -142,11 +150,13 @@ const factsOf = (judged: readonly Judged[], pullRequest: PullRequest, now: numbe
   const limited =
     (cubic?.kind === "not reviewed" && LIMIT_TEXT.test(cubic.title)) ||
     pullRequest.comments.some(
-      (comment) => comment.author?.login === CUBIC_LOGIN && LIMIT_TEXT.test(comment.body),
+      (comment) => comment.author?.login === CUBIC_LOGIN && LIMIT_TEXT.test(unquoted(comment.body)),
     );
+  const reviewed = judged.some(({ bot, state }) => bot.ai && state.kind === "reviewed");
   return {
-    pending: judged.some(({ state }) => state.kind === "pending"),
-    reviewed: judged.some(({ bot, state }) => bot.ai && state.kind === "reviewed"),
+    running: judged.some(({ state }) => state.kind === "pending"),
+    blocking: judged.some(({ bot, state }) => state.kind === "pending" && (bot.ai || !reviewed)),
+    reviewed,
     cubicReviewed: pullRequest.reviews.some((review) => review.author?.login === CUBIC_LOGIN),
     limited,
     asked: asks.length > 0,
@@ -173,7 +183,7 @@ const addLabel = (pr: string): string => `gh pr edit ${pr} --add-label ${REVIEW_
 
 const RULES: readonly Rule[] = [
   {
-    when: (facts) => facts.pending,
+    when: (facts) => facts.blocking,
     exit: 3,
     next: (pr) =>
       `wait for the running bot, then run pnpm run review-coverage ${pr} again. After ${String(RUNNING_LIMIT_MINUTES)} minutes this treats a bot still running as one that did not run`,
@@ -224,7 +234,7 @@ export const assess = (
     `head ${pullRequest.headRefOid}`,
     ...judged.map(({ bot, state }) => `${bot.name}\t${describeState(state)}`),
     `ai reviewers on this head: ${String(reviewers.length)} of ${String(BOTS.filter((bot) => bot.ai).length)}`,
-    ...(facts.pending ? ["a bot is still running, so this is not final"] : []),
+    ...(facts.running ? ["a bot is still running, so this is not final"] : []),
     `pull request: ${String(pullRequest.changedFiles)} files, label ${REVIEW_LABEL} ${facts.labelled ? "set" : "not set"}, Cubic reviewed it: ${yesNo(facts.cubicReviewed)}, Cubic hit its limit: ${yesNo(facts.limited)}, Cubic asked: ${yesNo(facts.asked)}`,
     `next: ${rule.next(pr)}`,
   ];

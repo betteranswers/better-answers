@@ -161,6 +161,18 @@ describe("the next step", () => {
     );
   });
 
+  it("waits on a scanner only until an AI review", () => {
+    const scanning = run("CodeQL", null, "", ago(5), "in_progress");
+    const reviewed = assessed("7", [REVIEWED, scanning]);
+    const unreviewed = assessed("7", [NOT_STARTED, scanning]);
+
+    expect(lines(reviewed.report)).toContain("codeql\tpending (in_progress)");
+    expect(reviewed.exitCode).toBe(0);
+    expect(lines(reviewed.report)).toContain("a bot is still running, so this is not final");
+    expect(nextOf(reviewed.report)).toBe("next: none");
+    expect(unreviewed.exitCode).toBe(3);
+  });
+
   it("treats a bot running over 20 minutes as not run", () => {
     const result = assessed("7", [cubic(null, "", ago(30), "in_progress")]);
 
@@ -187,6 +199,15 @@ describe("the next step", () => {
 
     expect(result.exitCode).toBe(1);
     expect(nextOf(result.report)).toBe(addLabel("5"));
+  });
+
+  it("ignores a limit that Cubic only quotes from another comment", () => {
+    const quoting = "> cubic hit its line limit on #12\n\n@liam-jons starting the review now.";
+    const result = assessed("5", [NOT_STARTED, SKIPPED], {
+      comments: [comment(ASK, 3), comment(quoting, 3, "cubic-dev-ai")],
+    });
+
+    expect(result.exitCode).toBe(3);
   });
 
   it("ignores a limit named by anyone but Cubic", () => {
@@ -250,6 +271,12 @@ describe("the next step", () => {
   it.each([
     ["only quotes the request", `Run it. Then comment ${ASK} if it fails.`, askCubic("5")],
     ["spells the request in any case", "@Cubic-Dev-AI Review", addLabel("5")],
+    ["asks politely, as #750 did", "@cubic-dev-ai please review this pull request", addLabel("5")],
+    [
+      "is Cubic quoting a polite request",
+      "> @cubic-dev-ai please review this pull request\n\n@liam-jons cubic is on it.",
+      askCubic("5"),
+    ],
   ])("reads a comment that %s", (_case, body, expected) => {
     const result = assessed("5", [NOT_STARTED, SKIPPED], { comments: [comment(body)] });
 
