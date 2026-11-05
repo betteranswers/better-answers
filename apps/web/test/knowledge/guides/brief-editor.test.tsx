@@ -330,6 +330,67 @@ describe("a Brief saved after you opened it", () => {
       });
     });
   });
+
+  describe("and reloaded over", () => {
+    const EARLIER = "Your unsaved text from before the reload";
+
+    const reloaded = async () => {
+      const api = await refused();
+      fireEvent.click(screen.getByRole("button", { name: "Reload the Brief" }));
+      await waitFor(() => {
+        expect(textField().textContent).toContain("Someone else's words");
+      });
+      return api;
+    };
+
+    const earlierField = (): HTMLTextAreaElement => {
+      const field = screen.getByRole("textbox", { name: EARLIER });
+      if (!(field instanceof HTMLTextAreaElement)) throw new Error("the earlier draft is no field");
+      return field;
+    };
+
+    it("keeps the unsaved text beside the Brief to copy", async () => {
+      await reloaded();
+
+      expect(earlierField().value).toBe(
+        `Pallets are racked[Footnote: ${RACKING_TITLE}] by row. my words`,
+      );
+      expect(earlierField().readOnly).toBe(true);
+      expect(status().textContent).toBe(
+        "Loaded the latest Brief. Your unsaved text is kept below it.",
+      );
+    });
+
+    it("selects the text when the reader moves into it", async () => {
+      await reloaded();
+      const field = earlierField();
+
+      fireEvent.focus(field);
+
+      expect([field.selectionStart, field.selectionEnd]).toEqual([0, field.value.length]);
+    });
+
+    it("goes when discarded, and focus stays in the editor", async () => {
+      await reloaded();
+
+      fireEvent.click(screen.getByRole("button", { name: "Discard this text" }));
+
+      expect(screen.queryByRole("textbox", { name: EARLIER })).toBeNull();
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save Brief" }));
+    });
+
+    it("goes once the Brief is saved", async () => {
+      const api = await reloaded();
+      api.set(SAVE_BRIEF, savedAt(4));
+
+      saveBrief();
+
+      await waitFor(() => {
+        expect(screen.queryByRole("textbox", { name: EARLIER })).toBeNull();
+      });
+      expect(screen.queryByRole("textbox", { name: LABEL })).toBeNull();
+    });
+  });
 });
 
 describe("a Brief refused for another reason", () => {

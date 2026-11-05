@@ -92,6 +92,61 @@ describe("the Brief editor's stages", () => {
     expect(after(editing, { type: "reload", open: latest })).toBe(editing);
   });
 
+  it("keeps an unsaved draft beside the reloaded Brief", () => {
+    const latest = openedWith(3, "Pallets are binned.", undefined);
+    const drafted = after(
+      editing,
+      { type: "edit", markdown: "Pallets are stacked." },
+      { type: "save" },
+      { type: "stale" },
+    );
+
+    expect(after(drafted, { type: "reload", open: latest })).toStrictEqual({
+      stage: "editing",
+      open: { ...latest, earlier: "Pallets are stacked." },
+    });
+  });
+
+  it("keeps no earlier draft when the draft was never changed", () => {
+    const latest = openedWith(3, "Pallets are binned.", undefined);
+
+    expect(after(stale, { type: "reload", open: latest })).toStrictEqual({
+      stage: "editing",
+      open: latest,
+    });
+  });
+
+  it("keeps the earlier draft through a reload with nothing new", () => {
+    const latest = openedWith(3, "Pallets are binned.", undefined);
+    const reloaded = after(
+      editing,
+      { type: "edit", markdown: "Pallets are stacked." },
+      { type: "save" },
+      { type: "stale" },
+      { type: "reload", open: latest },
+      { type: "save" },
+      { type: "stale" },
+      { type: "reload", open: openedWith(4, "Pallets are stored.", undefined) },
+    );
+
+    expect(reloaded).toStrictEqual({
+      stage: "editing",
+      open: { ...openedWith(4, "Pallets are stored.", undefined), earlier: "Pallets are stacked." },
+    });
+  });
+
+  it("drops the earlier draft on request, and only while editing", () => {
+    const latest = openedWith(3, "Pallets are binned.", undefined);
+    const kept: BriefState = { stage: "editing", open: { ...latest, earlier: "Old words" } };
+
+    expect(after(kept, { type: "discard" })).toStrictEqual({ stage: "editing", open: latest });
+    expect(after(editing, { type: "discard" })).toBe(editing);
+    expect(after({ stage: "saving", open: kept.open }, { type: "discard" })).toStrictEqual({
+      stage: "saving",
+      open: kept.open,
+    });
+  });
+
   it("does not close while saving", () => {
     expect(after(saving, { type: "close" })).toBe(saving);
     expect(after(editing, { type: "close" })).toBe(CLOSED);
@@ -101,10 +156,11 @@ describe("the Brief editor's stages", () => {
 
 describe("the draft", () => {
   it("opens on a kept draft when there is one", () => {
-    expect(openedWith(2, "Pallets are racked.", "Kept words")).toEqual({
+    expect(openedWith(2, "Pallets are racked.", "Kept words")).toStrictEqual({
       base: 2,
       original: "Pallets are racked.",
       markdown: "Kept words",
+      earlier: undefined,
     });
   });
 

@@ -12,6 +12,7 @@ export type Opened = {
   readonly base: number;
   readonly original: string;
   readonly markdown: string;
+  readonly earlier: string | undefined;
 };
 
 export type BriefState =
@@ -28,6 +29,7 @@ export type BriefEvent =
   | { readonly type: "refused" }
   | { readonly type: "stale" }
   | { readonly type: "reload"; readonly open: Opened }
+  | { readonly type: "discard" }
   | { readonly type: "close" };
 
 export const CLOSED: BriefState = { stage: "closed" };
@@ -40,6 +42,9 @@ type Handlers = {
 
 const editingFrom = (open: Opened): BriefState => ({ stage: "editing", open });
 
+const unsavedOf = (open: Opened): string | undefined =>
+  open.markdown === open.original ? undefined : open.markdown;
+
 const HANDLERS: Handlers = {
   open: (state, event) => (state.stage === "closed" ? editingFrom(event.open) : state),
   edit: (state, event) =>
@@ -51,7 +56,14 @@ const HANDLERS: Handlers = {
   },
   refused: (state) => (state.stage === "saving" ? editingFrom(state.open) : state),
   stale: (state) => (state.stage === "saving" ? { stage: "stale", open: state.open } : state),
-  reload: (state, event) => (state.stage === "stale" ? editingFrom(event.open) : state),
+  reload: (state, event) =>
+    state.stage === "stale"
+      ? editingFrom({ ...event.open, earlier: unsavedOf(state.open) ?? state.open.earlier })
+      : state,
+  discard: (state) =>
+    state.stage === "editing" && state.open.earlier !== undefined
+      ? editingFrom({ ...state.open, earlier: undefined })
+      : state,
   close: (state) => (state.stage === "editing" || state.stage === "stale" ? CLOSED : state),
 };
 
@@ -67,6 +79,7 @@ export const openedWith = (base: number, original: string, kept: string | undefi
   base,
   original,
   markdown: kept ?? original,
+  earlier: undefined,
 });
 
 export const isLocked = (state: BriefState): boolean =>

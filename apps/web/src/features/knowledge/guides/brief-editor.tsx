@@ -18,6 +18,7 @@ import {
   type BriefState,
   type Say,
 } from "./brief-editing.ts";
+import { EarlierDraft } from "./earlier-draft.tsx";
 import { failed, said, type Failure } from "./guide-outcome.ts";
 import { GUIDE_KEYSTROKES, IN_THE_TEXT } from "./guide-state.ts";
 import { BRIEF_WORDS as WORDS } from "./guide-words.ts";
@@ -53,6 +54,7 @@ type Session = {
   readonly draftKey: string | undefined;
   readonly save: () => Promise<void>;
   readonly reload: () => void;
+  readonly discard: () => void;
   readonly edit: (markdown: string) => void;
   readonly close: () => void;
   readonly generation: number;
@@ -116,11 +118,14 @@ const useSession = (properties: BriefSessionProps): Session => {
     reload: () => {
       forgetBrief(draftKey);
       setGeneration((current) => current + 1);
-      say(undefined);
+      say(hasUnsaved(state) ? said(WORDS.reloaded) : undefined);
       dispatch({
         type: "reload",
         open: openedWith(properties.version, properties.editable.markdown, undefined),
       });
+    },
+    discard: () => {
+      dispatch({ type: "discard" });
     },
     close: () => {
       if (state.stage === "saving") return;
@@ -207,6 +212,16 @@ export function BriefSession(properties: BriefSessionProps) {
         />
       </div>
       <Actions state={state} saveRef={saveRef} session={session} />
+      {state.open.earlier === undefined ? null : (
+        <EarlierDraft
+          markdown={state.open.earlier}
+          includes={editable.footnotes}
+          onDiscard={() => {
+            saveRef.current?.focus();
+            session.discard();
+          }}
+        />
+      )}
     </section>
   );
 }

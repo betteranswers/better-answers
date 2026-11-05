@@ -66,6 +66,11 @@ export const BRIEF_WORDS = {
   unchanged: (version: number): string => `No changes to save. Version ${String(version)} stands.`,
   stale: "Someone saved this Brief after you opened it.",
   reload: "Reload the Brief",
+  reloaded: "Loaded the latest Brief. Your unsaved text is kept below it.",
+  earlier: "Your unsaved text from before the reload",
+  earlierDetail:
+    "This text is not saved. It is selected when you move into it, so you can copy it and put what you need into the Brief above.",
+  discardEarlier: "Discard this text",
   leaving: "You have changes to a Brief that are not saved.",
   leavingDetail: "Your changes stay in this tab, and Edit Brief opens them again if you come back.",
   leave: "Leave",
