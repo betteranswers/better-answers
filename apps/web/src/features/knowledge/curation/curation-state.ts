@@ -1,8 +1,141 @@
 import { z } from "zod";
 
+import { PAGE_NUMBER, searchText } from "@/shared/address/list-address.ts";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 
-export const ALL_KNOWLEDGE_KEYSTROKES = {} as const satisfies Readonly<Record<string, Keystroke>>;
+import type { AllKnowledgeAsked } from "../knowledge-api.ts";
+
+export const ALL_KNOWLEDGE_KEYSTROKES = {
+  open: { key: "o", action: "Open the Concept in Focus" },
+  tick: { key: "x", action: "Select or Clear the Concept in Focus" },
+  setOwner: { key: "O", action: "Set the Owner of the Selected Concepts" },
+  clearSelection: { key: "Escape", action: "Clear the Selection" },
+  previousPage: { key: "[", action: "Show the Previous Page of Concepts" },
+  nextPage: { key: "]", action: "Show the Next Page of Concepts" },
+} as const satisfies Readonly<Record<string, Keystroke>>;
+
+export const ALL_KNOWLEDGE_LIST = "all";
+
+/** The most concepts one Set Owner names, which `knowledge.setOwners` enforces. */
+export const MOST_SELECTED = 200;
+
+const SORTS = [
+  "title",
+  "-title",
+  "kind",
+  "-kind",
+  "collection",
+  "-collection",
+  "owner",
+  "-owner",
+  "checked",
+  "-checked",
+] as const;
+
+type Sort = (typeof SORTS)[number];
+
+type Sorted = AllKnowledgeAsked["sort"];
+
+const SORTED = {
+  title: { column: "title", desc: false },
+  "-title": { column: "title", desc: true },
+  kind: { column: "kind", desc: false },
+  "-kind": { column: "kind", desc: true },
+  collection: { column: "collection", desc: false },
+  "-collection": { column: "collection", desc: true },
+  owner: { column: "owner", desc: false },
+  "-owner": { column: "owner", desc: true },
+  checked: { column: "checked", desc: false },
+  "-checked": { column: "checked", desc: true },
+} as const satisfies Readonly<Record<Sort, Sorted>>;
+
+export const SORTABLE: ReadonlySet<string> = new Set(
+  Object.values(SORTED).map(({ column }) => column),
+);
+
+/** Each field is held apart from its default, so only a choice the person made is in the address. */
+export const ALL_KNOWLEDGE_FIELDS = {
+  collection: searchText(),
+  kind: searchText(),
+  sort: z.enum(SORTS).optional().catch(undefined),
+  page: PAGE_NUMBER,
+};
+
+export const sortedOf = (sort: Sort | undefined): Sorted =>
+  sort === undefined ? SORTED.title : SORTED[sort];
+
+export const sortOf = (sorted: { readonly id: string; readonly desc: boolean }): Sort | undefined =>
+  SORTS.find((sort) => sort === `${sorted.desc ? "-" : ""}${sorted.id}`);
+
+/** No collection is held when the person has not chosen, so the page decides what that means. */
+const NOTHING_HELD = "";
+
+/** A collection never holds a space, so neither choice below can be a collection's name. */
+const EVERY_COLLECTION_HELD = "every collection";
+
+export const YOUR_COLLECTIONS = "your collections";
+
+export type CollectionScope =
+  | { readonly kind: "every" }
+  | { readonly kind: "owned" }
+  | { readonly kind: "one"; readonly collection: string };
+
+const EVERY: CollectionScope = { kind: "every" };
+
+const OWNED: CollectionScope = { kind: "owned" };
+
+/** An owner who is not an Admin opens on the collections they own, and clearing that is a choice. */
+export const scopeOf = (held: string, ownerOnly: boolean): CollectionScope => {
+  if (held === EVERY_COLLECTION_HELD) return EVERY;
+  if (held !== NOTHING_HELD) return { kind: "one", collection: held };
+  return ownerOnly ? OWNED : EVERY;
+};
+
+export const heldFor = (picked: string | undefined, ownerOnly: boolean): string => {
+  if (picked === undefined) return ownerOnly ? EVERY_COLLECTION_HELD : NOTHING_HELD;
+  return picked === YOUR_COLLECTIONS ? NOTHING_HELD : picked;
+};
+
+const collectionsOf = (scope: CollectionScope, owned: readonly string[]): string[] => {
+  switch (scope.kind) {
+    case "every":
+      return [];
+    case "owned":
+      return [...owned];
+    case "one":
+      return [scope.collection];
+  }
+};
+
+export const choiceOf = (scope: CollectionScope, owned: readonly string[]): string | undefined => {
+  switch (scope.kind) {
+    case "every":
+      return undefined;
+    case "owned":
+      return owned.length === 1 ? owned[0] : YOUR_COLLECTIONS;
+    case "one":
+      return scope.collection;
+  }
+};
+
+export type Held = z.output<z.ZodObject<typeof ALL_KNOWLEDGE_FIELDS>>;
+
+export const allKnowledgeAsked = (
+  held: Held,
+  scope: CollectionScope,
+  owned: readonly string[],
+): AllKnowledgeAsked => {
+  const asked: AllKnowledgeAsked = {
+    collections: collectionsOf(scope, owned),
+    sort: sortedOf(held.sort),
+    page: held.page,
+  };
+  if (held.kind !== "") asked.kind = held.kind;
+  return asked;
+};
+
+export const isNarrowed = (held: Held, scope: CollectionScope): boolean =>
+  scope.kind !== "every" || held.kind !== "";
 
 export const KINDS_KEYSTROKES = {
   tail: { key: "t", action: "Switch Between Every Kind and Kinds With Two or Fewer Concepts" },
@@ -24,14 +157,14 @@ export const KINDS_FIELDS = {
   tail: z.enum(KINDS_TAILS).optional().catch(undefined),
 };
 
-type Sorted = { readonly id: string; readonly desc: boolean };
+type KindsSorted = { readonly id: string; readonly desc: boolean };
 
-export const kindsSortedOf = (sort: KindsSort): Sorted => ({
+export const kindsSortedOf = (sort: KindsSort): KindsSorted => ({
   id: sort.replace(/^-/u, ""),
   desc: sort.startsWith("-"),
 });
 
-export const kindsSortOf = (sorted: Sorted): KindsSort | undefined =>
+export const kindsSortOf = (sorted: KindsSorted): KindsSort | undefined =>
   KINDS_SORTS.find((sort) => sort === `${sorted.desc ? "-" : ""}${sorted.id}`);
 
 export const EXPORTS_KEYSTROKES = {} as const satisfies Readonly<Record<string, Keystroke>>;
