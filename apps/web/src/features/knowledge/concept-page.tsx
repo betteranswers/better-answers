@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
@@ -48,10 +48,11 @@ import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
-import { CONCEPT_KEYSTROKES as KEY } from "./knowledge-state.ts";
+import { useConceptEditing } from "./editing/concept-actions.tsx";
+import { CONCEPT_KEYSTROKES as KEY, EDITOR_KEYSTROKES } from "./knowledge-state.ts";
 import { RELATION_WORDS } from "./knowledge-words.ts";
 
-const LISTED = Object.values(KEY);
+const LISTED = [...Object.values(KEY), ...Object.values(EDITOR_KEYSTROKES)];
 
 const useWayBack = (iri: string | undefined) => {
   const navigate = useNavigate();
@@ -98,7 +99,11 @@ const namesNothing = (failure: Error | ApiError): boolean => {
 
 const SECTION_HEADING = "[font-size:var(--text-md)] font-semibold";
 
-function Header(properties: { readonly concept: Concept; readonly titleId: string }) {
+function Header(properties: {
+  readonly concept: Concept;
+  readonly titleId: string;
+  readonly actions: ReactNode;
+}) {
   const { frontmatter, trustWords } = properties.concept;
   const kind = kindOf(frontmatter);
   const description = descriptionOf(frontmatter);
@@ -109,9 +114,12 @@ function Header(properties: { readonly concept: Concept; readonly titleId: strin
         {kind === undefined ? null : <Pill>{kind}</Pill>}
         <Pill>{trustWords}</Pill>
       </div>
-      <h2 id={properties.titleId} className="mt-3 [font-size:var(--text-2xl)] wrap-anywhere">
-        {titleOf(frontmatter)}
-      </h2>
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <h2 id={properties.titleId} className="min-w-0 [font-size:var(--text-2xl)] wrap-anywhere">
+          {titleOf(frontmatter)}
+        </h2>
+        {properties.actions}
+      </div>
       {description === undefined ? null : (
         <p className="mt-2 text-muted-foreground">{description}</p>
       )}
@@ -283,7 +291,11 @@ const COLUMN = "max-w-measure [font-size:var(--prose-size,var(--text-lg))]";
 
 const INTERFACE = "[font-size:var(--text-base)]";
 
-function ConceptShown(properties: { readonly iri: string; readonly concept: Concept }) {
+function ConceptShown(properties: {
+  readonly iri: string;
+  readonly concept: Concept;
+  readonly standing: "commits" | "suggests" | undefined;
+}) {
   const { iri, concept } = properties;
   useBreadcrumbLastPart(titleOf(concept.frontmatter));
   const titleId = useId();
@@ -292,6 +304,10 @@ function ConceptShown(properties: { readonly iri: string; readonly concept: Conc
   const beside = useRoomBeside();
   const wayBack = useWayBack(iri);
   const [opened, setOpened] = useState<Opened>();
+  const editing = useConceptEditing({
+    target: { kind: "concept", iri },
+    standing: properties.standing,
+  });
 
   usePageKeystrokes(LISTED);
   useKeystroke(KEY.back, wayBack.go);
@@ -335,7 +351,8 @@ function ConceptShown(properties: { readonly iri: string; readonly concept: Conc
           <p>
             <WayBack iri={iri} />
           </p>
-          <Header concept={concept} titleId={titleId} />
+          <Header concept={concept} titleId={titleId} actions={editing.actions} />
+          {editing.editor}
         </div>
         <div className="mt-6">
           <ConceptBody
@@ -385,7 +402,7 @@ function ConceptRead(properties: { readonly iri: string; readonly heading: Headi
       </>
     );
   }
-  return <ConceptShown iri={iri} concept={read} />;
+  return <ConceptShown iri={iri} concept={read} standing={concept.data?.standing} />;
 }
 
 export function ConceptPage(properties: { readonly iri: string | undefined }) {

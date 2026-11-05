@@ -51,14 +51,18 @@ import {
   type PassageMatch,
 } from "./knowledge-api.ts";
 import {
+  EDITOR_KEYSTROKES,
   QUERY_MAX,
   SEARCH_FIELDS,
   SEARCH_KEYSTROKES as KEY,
   SEARCH_LIST,
 } from "./knowledge-state.ts";
 import { SEARCH_WORDS as WORDS } from "./knowledge-words.ts";
+import { NewConcept, NewConceptOffer, type NewConceptHeld } from "./new-concept.tsx";
 
 const LISTED = Object.values(KEY);
+
+const LISTED_WITH_EDITOR = [...LISTED, ...Object.values(EDITOR_KEYSTROKES)];
 
 const keyOf = (match: Match): string =>
   match.layer === "bundles" ? conceptMatchKey(match.iri) : `sources:${match.locator}`;
@@ -438,11 +442,17 @@ const useOpenKey = (query: string, shown: readonly Match[], open: (match: Match)
   return { unopened: unopenedIn === query, open: opening };
 };
 
+const offersANewConcept = (searched: Searched, shown: number, held: NewConceptHeld): boolean =>
+  searched === "listed" && shown === 0 && held.new === "";
+
+const listedFor = (held: NewConceptHeld) => (held.new === "" ? LISTED : LISTED_WITH_EDITOR);
+
 function SearchRegion() {
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const { state, search, setSearch, flush } = useSearchedList(SEARCH_LIST, SEARCH_FIELDS);
+  const { state, search, setSearch, flush, write } = useSearchedList(SEARCH_LIST, SEARCH_FIELDS);
+  usePageKeystrokes(listedFor(state));
   useAsked("search", (asked) => {
     setSearch(asked.slice(0, QUERY_MAX));
   });
@@ -497,6 +507,13 @@ function SearchRegion() {
           {panel.unlisted ? ` ${WORDS.passageLeft}` : null}
           {openKey.unopened ? ` ${WORDS.selectFirst}` : null}
         </output>
+        <NewConceptOffer
+          offered={offersANewConcept(searched, shown.length, state)}
+          onOffer={() => {
+            flush();
+            write({ new: query });
+          }}
+        />
         <Results
           key={query}
           query={query}
@@ -511,13 +528,12 @@ function SearchRegion() {
       {panel.opened === undefined || !beside ? null : (
         <EvidenceSheet opened={panel.opened} onClose={panel.onClose} focusFallback={heading} />
       )}
+      <NewConcept held={state} write={write} />
     </section>
   );
 }
 
 export function SearchPage() {
-  usePageKeystrokes(LISTED);
-
   return (
     <>
       <PageHead heading={BROWSE.name} summary={BROWSE.summary} />
