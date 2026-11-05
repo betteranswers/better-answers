@@ -13,6 +13,7 @@ import {
   overrideConceptSensitivity,
   submitSuggestionSet,
   writeConcept,
+  writeManifest,
 } from "@better-answers/core/concepts";
 import {
   coverageOf,
@@ -20,7 +21,7 @@ import {
   saveBrief,
   seedGuide as seedGuideRows,
 } from "@better-answers/core/guides";
-import { actorIdOfPerson, type UserPrincipal } from "@better-answers/core/kernel";
+import { actorIdOfPerson, ulid, type UserPrincipal } from "@better-answers/core/kernel";
 import { head, initRepository, type GitDoor } from "@better-answers/core/store/git";
 import {
   IMPORTED,
@@ -636,6 +637,40 @@ export const nameOwners = async (
     }
   }
   return { named: asked.owners.length };
+};
+
+export const manifestSeeding = z.strictObject({
+  workspaceId: z.string().min(1),
+  userId: z.string().min(1),
+});
+
+export const seedManifest = async (
+  app: TestApp,
+  asked: z.output<typeof manifestSeeding>,
+): Promise<{ readonly written: boolean }> => {
+  const { workspaceId, userId } = asked;
+  const git = openTestGit(app);
+  await initRepository(git, workspaceId);
+  const principal = await actingIn(app, { workspaceId, userId }, async (resolved) => resolved);
+  const landed = await writeManifest(
+    principal,
+    { git, postgres: app.doors.postgres, clock: app.doors.clock },
+    {
+      manifest: {
+        id: ulid(),
+        origin: "company",
+        ref: "main",
+        owner: "Northgate Surveys",
+        content_version: "1",
+      },
+      message: "Record the knowledge base's manifest",
+      author: await authorOf(app, userId),
+    },
+  );
+  if (!landed.ok) {
+    throw refusedWith([{ path: [], message: `the manifest was refused: ${String(landed.error)}` }]);
+  }
+  return { written: landed.value.written };
 };
 
 export const guideSeeding = z.strictObject({
