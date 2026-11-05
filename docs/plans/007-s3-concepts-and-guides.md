@@ -1475,7 +1475,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 
 ## Close the program
 
-S3 closed on 05/11/2026. Every unit merged under an independent verdict, recorded as the `verdict` commit status on its merged head. The unit boxes above stay unticked: the verdict reports stand in for them, as the owner ruled for plan 009.
+S3 closed on 05/11/2026. Every unit merged under an independent verdict, recorded as the `verdict` commit status on its merged head. The unit boxes above stay unticked. The verdict reports stand in for them, as the owner ruled for plan 009.
 
 - [ ] Every box above is checked with its evidence. Not ticked; see the paragraph above.
 - [x] Every Done when check in the S3 brief holds. An owner's edit commits as that person, and a Viewer's waits as a suggestion and commits as the Viewer on acceptance (#992, #893). A seeded guide's sections fill on Knowledge › Guides, and an unchanged Brief save writes no version and no commit (#1001). An Editor who owns a collection sees the Curation pages, and one who owns nothing does not (#889, #1006).
@@ -1483,7 +1483,7 @@ S3 closed on 05/11/2026. Every unit merged under an independent verdict, recorde
 - [x] BA-95, BA-126, BA-127, BA-12, BA-144 and BA-146's first criterion are closed with the PR that met each.
 - [x] Reply to the operator with the report the execution playbook names.
 
-What S3 still owes is filed under the S3 label: BA-327, BA-328, BA-330 and BA-331.
+What S3 still owes is filed under the S3 label as BA-327, BA-328, BA-330 and BA-331.
 
 ## Appendix A. Prototype evidence
 
