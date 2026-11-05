@@ -76,5 +76,5 @@
     "node": ">=24 <25",
     "pnpm": ">=11"
   },
-  "packageManager": "pnpm@12.14.0"
+  "packageManager": "pnpm@12.16.1"
 }

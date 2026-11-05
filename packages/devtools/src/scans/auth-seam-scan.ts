@@ -1,6 +1,8 @@
 import path from "node:path";
 
-const LIBRARY_NAMED = /@?better-(?:auth|fetch)\b[\w./-]*|[\w./-]*\bauth-client(?:\.ts)?\b/u;
+/** The lookbehind starts the second branch only at a path's first character, so a long path is read once, not once per character. */
+const LIBRARY_NAMED =
+  /@?better-(?:auth|fetch)\b[\w./-]*|(?<![\w./-])[\w./-]*\bauth-client(?:\.ts)?\b/u;
 
 const EXPORTED =
   /^export (?:declare )?(?:(?:const|function|class|type|interface) (\w+)|(?:type )?\{ (\w+))/u;
