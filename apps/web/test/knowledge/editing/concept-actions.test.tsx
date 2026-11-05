@@ -282,6 +282,22 @@ describe("editing a concept on its own page", () => {
     expect(screen.queryByText("This concept changed after you opened it.")).toBeNull();
   });
 
+  it("keeps the draft while an earlier change is still saving", async () => {
+    const api = aConceptApi("commits");
+    api.set(SAVE, () => aRefusalAnswer("unrecorded-head", "precondition", 412));
+    await editorOpened(api);
+
+    retitled("Audit Log Retention");
+    pressed("Save");
+
+    expect(
+      await screen.findByText(
+        "This workspace is still saving an earlier change. Nothing was saved. Please save again in a minute.",
+      ),
+    ).toBeDefined();
+    expect(titleField().value).toBe("Audit Log Retention");
+  });
+
   it("refuses to save an empty body and sends nothing", async () => {
     const api = aConceptApi("commits", { parts: { ...PARTS, body: "" } });
     api.set(SAVE, committed);

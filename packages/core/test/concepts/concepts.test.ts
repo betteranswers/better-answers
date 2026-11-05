@@ -1003,6 +1003,7 @@ describe("what a governed write refuses", () => {
       author: { name: "Ada Editor", email: "ada@acme.invalid" },
       trailers: { actor: `human:${scenario.editor.userId}`, audit: `${ulid()}\nRun: forged` },
       expectedHead: null,
+      parentRecorded: () => Promise.resolve(true),
       at: new Date(),
     });
 
@@ -1371,8 +1372,8 @@ describe("the read a concept's trust is derived from", () => {
   });
 });
 
-describe("a failure after the commit", () => {
-  it("leaves no partial rows, and the head ahead of them", async () => {
+describe("a write on a head the rows have not recorded", () => {
+  it("is refused before it commits, leaving bundle and rows unchanged", async () => {
     const scenario = await arrange();
     const first = writeFor();
     const written = await landed(scenario, first);
@@ -1383,25 +1384,21 @@ describe("a failure after the commit", () => {
       author: first.author,
       trailers: { actor: `human:${scenario.editor.userId}`, audit: ulid() },
       expectedHead: written.sha,
+      parentRecorded: () => Promise.resolve(true),
       at: new Date(),
     });
     assert(forged.ok, "the forged commit was refused");
     const before = await rowsFor(scenario.workspaceId);
 
-    const behind = await write(
-      scenario,
-      scenario.editor,
-      writeFor({ expects: { head: forged.value.sha } }),
-    );
+    const behind = await write(scenario, scenario.editor, writeFor({ expects: { base: null } }));
 
+    expect(behind).toEqual({ ok: false, error: "unrecorded-head" });
     expect(await rowsFor(scenario.workspaceId)).toEqual(before);
-
-    const history = await bundleHistory(scenario.git, scenario.workspaceId);
-    const recorded = await recordedCommits(scenario.workspaceId);
-    expect(history).toHaveLength(3);
-    expect(recorded).toEqual([history[0]]);
-    expect(await head(scenario.editor, scenario.git)).toBe(history[2]);
-    expect(behind).toEqual({ ok: false, error: matching.any(Error) });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([
+      written.sha,
+      forged.value.sha,
+    ]);
+    expect(await recordedCommits(scenario.workspaceId)).toEqual([written.sha]);
   });
 });
 

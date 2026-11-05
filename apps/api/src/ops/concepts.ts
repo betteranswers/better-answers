@@ -78,6 +78,9 @@ const UNSOUND_WORDS = {
 const linksOf = (rewritten: readonly ConceptRewritten[]): number =>
   rewritten.reduce((sum, concept) => sum + concept.links, 0);
 
+const UNRECORDED_HEAD =
+  "the bundle's head is a commit whose rows were lost, and the reconciler has not replayed it yet; nothing was written, so run again in a minute, and if it is refused the same way the replay stopped: RUNBOOK page 10";
+
 const IMPORT_WORDS = {
   "role-forbids": (email: string) =>
     `${email} is not an Admin of this workspace; the import runs as an Admin`,
@@ -86,6 +89,7 @@ const IMPORT_WORDS = {
   "no-such-repository": () => "this workspace has no bundle repository; provision it first",
   "stale-precondition": () =>
     "this workspace's bundle could not be moved while the import was writing its manifest, because another writer moved it or holds its lock; nothing was written, so run the import again, and if it is refused the same way a lock was left on refs/heads/main",
+  "unrecorded-head": () => UNRECORDED_HEAD,
 };
 
 const isWorded = (word: string): word is keyof typeof IMPORT_WORDS =>
@@ -284,6 +288,7 @@ const BODY_WORDS: Partial<
   "stale-precondition": (asked) =>
     `${asked.iri} moved: ${asked.run.base === undefined ? "its" : `it no longer stands at ${asked.run.base}, or its`} file at the bundle's head is ahead of its row; nothing was written. Run with --dry-run again, and if that refuses the same way a minute later, the rows are behind the bundle: RUNBOOK page 10`,
   "no-such-repository": () => "this workspace has no bundle repository; provision it first",
+  "unrecorded-head": () => UNRECORDED_HEAD,
 };
 
 const bodyWordSaid = (

@@ -517,9 +517,9 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   {
     table: "public.bundle_commit",
     by: "bundle",
-    access: "write",
+    access: "read and write",
     reason:
-      "Every commit to the knowledge base lands its row in the transaction that holds the commit, whichever slice's write made it, so the slice that owns the write inserts it; the concepts slice keeps the table, because its reconciler reads the rows and a rewritten history moves them.",
+      "Every commit to the knowledge base lands its row in the transaction that holds the commit, whichever slice's write made it, so the slice that owns the write inserts it, and first reads that the commit it lands on has its row, since a commit on top of one whose rows were lost would stop the reconciler's replay; the concepts slice keeps the table, because its reconciler reads the rows and a rewritten history moves them.",
   },
   {
     table: "public.user",

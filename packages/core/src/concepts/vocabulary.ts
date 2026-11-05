@@ -21,6 +21,7 @@ export const CONCEPT_REFUSALS = {
 
   "no-such-repository": "precondition",
   "history-diverged": "precondition",
+  "unrecorded-head": "precondition",
 
   held: "conflict",
 
@@ -32,5 +33,9 @@ export const CONCEPT_REFUSALS = {
 type ConceptRefusal<W extends RefusalWordFor<typeof CONCEPT_REFUSALS>> = W;
 
 export type PassedOnCommitRefusal = ConceptRefusal<
-  "no-such-repository" | "stale-precondition" | "malformed-path" | "malformed-message"
+  | "no-such-repository"
+  | "stale-precondition"
+  | "malformed-path"
+  | "malformed-message"
+  | "unrecorded-head"
 >;

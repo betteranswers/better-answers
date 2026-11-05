@@ -349,6 +349,7 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
       author: { name: "Grace Editor", email: "grace@acme.invalid" },
       trailers: { actor: actorIdOf(scene.principal), audit: ulid() },
       expectedHead: await head(scene.principal, git),
+      parentRecorded: () => Promise.resolve(true),
       at: IMPORTED_AT,
     });
     expect(inFlight).toMatchObject({ ok: true });

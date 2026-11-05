@@ -46,6 +46,7 @@ import { doorsOf, suiteWithBundles, type Scenario } from "../../fixtures/workspa
 import { inputOf } from "../../support/suite-input.ts";
 import { readingAs } from "../../support/suite-postgres.ts";
 import { rewritingElsewhere } from "../bundle-fence.ts";
+import { recordLostCommitsSoAWriteCanLandOnThem } from "./lost-commits-recorded.ts";
 
 const { db, arrange } = suiteWithBundles();
 
@@ -93,13 +94,16 @@ const openTheWindow = async (): Promise<() => Promise<void>> => {
 };
 
 const inTheWindow = async <T extends { readonly ok: boolean }>(
+  scenario: Scenario,
   action: () => Promise<T>,
 ): Promise<T> => {
+  const loseAgain = await recordLostCommitsSoAWriteCanLandOnThem(db().pool, scenario);
   const close = await openTheWindow();
   try {
     return await action();
   } finally {
     await close();
+    await loseAgain();
   }
 };
 
@@ -108,7 +112,9 @@ const writeInTheWindow = async (
   principal: UserPrincipal,
   input: WriteConceptInput,
 ): Promise<readonly string[]> => {
-  const refused = await inTheWindow(() => writeConcept(principal, doorsOf(scenario), input));
+  const refused = await inTheWindow(scenario, () =>
+    writeConcept(principal, doorsOf(scenario), input),
+  );
   expect(refused.ok).toBe(false);
   return bundleHistory(scenario.git, scenario.workspaceId);
 };
@@ -342,10 +348,12 @@ describe("a commit whose rows were lost", () => {
       guideline("Sickness"),
     );
 
-    const behind = await writeConcept(
-      scenario.editor,
-      doorsOf(scenario),
-      guideline("Overtime", { expects: { head: orphan } }),
+    const behind = await inTheWindow(scenario, () =>
+      writeConcept(
+        scenario.editor,
+        doorsOf(scenario),
+        guideline("Overtime", { expects: { head: orphan } }),
+      ),
     );
 
     const history = await bothReplayedInOrder(scenario, behind);
@@ -382,6 +390,22 @@ describe("a commit whose rows were lost", () => {
 
     expect(misled).toMatchObject({ watermark: first.sha, replayed: [], skipped: [orphan] });
     expect(await rowsOf(scenario.workspaceId)).toEqual(before);
+  });
+
+  it("leaves no partial rows, and the head ahead of them", async () => {
+    const scenario = await arrange();
+    const first = await landed(scenario, scenario.editor, guideline("Pensions"));
+    const before = await rowsOf(scenario.workspaceId);
+
+    const history = await writeInTheWindow(
+      scenario,
+      scenario.editor,
+      guideline("Bonuses", { expects: { head: first.sha } }),
+    );
+
+    expect(await rowsOf(scenario.workspaceId)).toEqual(before);
+    expect(history).toEqual([first.sha, matching.any(String)]);
+    expect(await recordedChain(scenario.workspaceId)).toEqual([[first.sha, null]]);
   });
 });
 
@@ -428,6 +452,7 @@ const handMadeFirstAndReplayed = async (
     author: { name: "Grace Editor", email: "grace@acme.invalid" },
     trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
     expectedHead: null,
+    parentRecorded: () => Promise.resolve(true),
     at: new Date(),
   });
   if (!made.ok) throw new Error(`the hand-made commit was refused: ${String(made.error)}`);
@@ -464,7 +489,7 @@ describe("a manifest commit whose rows were lost", () => {
 
   it("lands its commit row alone, then the concept behind it", async () => {
     const scenario = await arrange();
-    const lost = await inTheWindow(() =>
+    const lost = await inTheWindow(scenario, () =>
       writeManifest(scenario.admin, doorsOf(scenario), {
         manifest,
         message: "Write the bundle's manifest",
@@ -474,7 +499,9 @@ describe("a manifest commit whose rows were lost", () => {
     expect(lost.ok).toBe(false);
     const [first = ""] = await bundleHistory(scenario.git, scenario.workspaceId);
     const input = guideline("Travel", { expects: { head: first } });
-    const behind = await writeConcept(scenario.editor, doorsOf(scenario), input);
+    const behind = await inTheWindow(scenario, () =>
+      writeConcept(scenario.editor, doorsOf(scenario), input),
+    );
 
     const history = await bothReplayedInOrder(scenario, behind);
 
@@ -536,6 +563,7 @@ const committedByHand = async (
     author: { name: "Grace Admin", email: "grace@acme.invalid" },
     trailers: { actor: actorIdOf(scenario.admin), audit: ulid(), projection: change.projection },
     expectedHead,
+    parentRecorded: () => Promise.resolve(true),
     at: new Date(),
   });
   if (!made.ok) throw new Error(`the hand-made commit was refused: ${String(made.error)}`);
@@ -560,6 +588,24 @@ describe("a skeleton commit whose rows were lost", () => {
     expect(await recordedChain(scenario.workspaceId)).toEqual([[sha, null]]);
     expect((await replayedEvents(scenario.workspaceId)).map((event) => event["detail"])).toEqual([
       { commitSha: sha },
+    ]);
+  });
+
+  it("holds a live write back until replayed, then lands it", async () => {
+    const scenario = await arrange();
+    const first = await landed(scenario, scenario.editor, guideline("Mileage"));
+    const stray = await committedByHand(scenario, A_SKELETON, first.sha);
+    const input = guideline("Parking", { expects: { head: stray } });
+
+    const held = await writeConcept(scenario.editor, doorsOf(scenario), input);
+
+    expect(held).toEqual({ ok: false, error: "unrecorded-head" });
+    expect(await reconciled(scenario)).toMatchObject({ replayed: [stray], stopped: undefined });
+    const after = await landed(scenario, scenario.editor, input);
+    expect(await recordedChain(scenario.workspaceId)).toEqual([
+      [first.sha, null],
+      [stray, first.sha],
+      [after.sha, stray],
     ]);
   });
 
@@ -906,7 +952,7 @@ const acceptInTheWindow = async (
   scenario: Scenario,
   item: { readonly suggestionId: string; readonly target: string | null },
 ): Promise<string> => {
-  const outcomes = await inTheWindow(() =>
+  const outcomes = await inTheWindow(scenario, () =>
     acceptSuggestions(scenario.admin, doorsOf(scenario), {
       decisions: [{ suggestionId: item.suggestionId, expectedTarget: item.target }],
     }),
@@ -1066,6 +1112,82 @@ describe("an acceptance whose rows were lost", () => {
     const iri = await iriOfFile(scenario, secondSha, request.path);
     expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({ merge_key: iri });
     expect(await decisionOf(second.suggestionId)).toMatchObject({ status: "accepted" });
+  });
+});
+
+const outcomesOfAccepting = async (
+  scenario: Scenario,
+  item: { readonly suggestionId: string; readonly target: string | null },
+) => {
+  const accepted = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+    decisions: [{ suggestionId: item.suggestionId, expectedTarget: item.target }],
+  });
+  assert(accepted.ok, "the accept was admitted");
+  return accepted.value.map(({ outcome }) => (outcome.ok ? "accepted" : outcome.error));
+};
+
+const neverStopsAfter = async (scenario: Scenario, lost: string) => {
+  expect(await reconciled(scenario)).toMatchObject({ replayed: [lost], stopped: undefined });
+  expect(await reconciled(scenario)).toMatchObject({ replayed: [], stopped: undefined });
+
+  await landed(scenario, scenario.editor, guideline("Fuel", { expects: { head: lost } }));
+  expect(await reconciled(scenario)).toMatchObject({ replayed: [], stopped: undefined });
+};
+
+const acceptedAgainThenReplayed = async (
+  scenario: Scenario,
+  item: { readonly suggestionId: string; readonly target: string | null },
+) => {
+  const lost = await acceptInTheWindow(scenario, item);
+  const again = await outcomesOfAccepting(scenario, item);
+  await neverStopsAfter(scenario, lost);
+  return { again, decision: await decisionOf(item.suggestionId) };
+};
+
+describe("an accept before a lost acceptance is replayed", () => {
+  it("is refused, so an edit cannot stop the reconciler", async () => {
+    const scenario = await arrange();
+    const input = guideline("Expenses");
+    const standing = await landed(scenario, scenario.editor, input);
+    const item = await raised(
+      scenario,
+      requestFor("Expenses", {
+        mergeKey: input.mergeKey,
+        path: input.path,
+        baseContentHash: standing.contentHash,
+        frontmatter: { title: "Expenses", type: "Guideline", tags: ["finance", "travel"] },
+        body: "# Expenses\n\nClaim within two months.",
+      }),
+    );
+
+    expect(await acceptedAgainThenReplayed(scenario, item)).toMatchObject({
+      again: ["unrecorded-head"],
+      decision: { status: "accepted" },
+    });
+  });
+
+  it("is refused, so a new concept cannot stop the reconciler", async () => {
+    const scenario = await arrange();
+    const item = await raised(scenario, requestFor("Remote working"));
+
+    expect(await acceptedAgainThenReplayed(scenario, item)).toMatchObject({
+      again: ["unrecorded-head"],
+      decision: { status: "accepted" },
+    });
+  });
+
+  it("refuses a second create at the lost one's path", async () => {
+    const scenario = await arrange();
+    const request = requestFor("Remote working");
+    const lost = await acceptInTheWindow(scenario, await raised(scenario, request));
+    const second = await raised(scenario, requestFor("Home working", { path: request.path }));
+
+    const beforeReplay = await outcomesOfAccepting(scenario, second);
+
+    await neverStopsAfter(scenario, lost);
+    expect(beforeReplay).toEqual(["unrecorded-head"]);
+    expect(await outcomesOfAccepting(scenario, second)).toEqual(["path-taken"]);
+    expect(await reconciled(scenario)).toMatchObject({ replayed: [], stopped: undefined });
   });
 });
 
@@ -1238,15 +1360,18 @@ describe("a commit the rows cannot take", () => {
       author: first.author,
       trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
       expectedHead: landing.sha,
+      parentRecorded: () => Promise.resolve(true),
       at: new Date(),
     });
     assert(clash.ok, inspect(clash));
     const orphan = clash.value.sha;
 
-    const behind = await writeConcept(
-      scenario.editor,
-      doorsOf(scenario),
-      guideline("Tolls", { expects: { head: orphan } }),
+    const behind = await inTheWindow(scenario, () =>
+      writeConcept(
+        scenario.editor,
+        doorsOf(scenario),
+        guideline("Tolls", { expects: { head: orphan } }),
+      ),
     );
     expect(behind.ok).toBe(false);
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
@@ -1272,22 +1397,20 @@ describe("a commit the rows cannot take", () => {
     const input = guideline("Bridges");
     const landing = await landed(scenario, scenario.editor, input);
 
-    const moved = await commit(scenario.editor, scenario.git, {
-      path: "knowledge/guidelines/bridges-moved.md",
-      content: await fileAtCommit(scenario.git, scenario.workspaceId, landing.sha, input.path),
-      message: "Move the bridges guideline by hand",
-      author: { name: "Grace Editor", email: "grace@acme.invalid" },
-      trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
-      expectedHead: landing.sha,
-      at: new Date(),
-    });
-    assert(moved.ok, inspect(moved));
+    const moved = await committedByHand(
+      scenario,
+      {
+        path: "knowledge/guidelines/bridges-moved.md",
+        content: await fileAtCommit(scenario.git, scenario.workspaceId, landing.sha, input.path),
+      },
+      landing.sha,
+    );
 
     const run = await reconciled(scenario);
 
     expect(run).toMatchObject({
       replayed: [],
-      stopped: { sha: moved.value.sha, reason: "rename-refused" },
+      stopped: { sha: moved, reason: "rename-refused" },
     });
     expect(await conceptRow(scenario.workspaceId, landing.iri)).toMatchObject({
       path: input.path,

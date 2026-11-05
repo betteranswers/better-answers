@@ -61,6 +61,8 @@ export const SAID_OF_EDITING = {
     "This concept is now used in more places than when you pressed Save. Please check how many, then save again.",
   "stale-precondition":
     "This concept changed after you opened it. Please reload it to see the change.",
+  "unrecorded-head":
+    "This workspace is still saving an earlier change. Nothing was saved. Please save again in a minute.",
   "source-label-refused":
     "A source is written as the address of a passage. Please name the document it comes from instead.",
   "body-locator-refused":

@@ -80,10 +80,18 @@ export const tryBundleFenceAs = async <T>(
   return tried.ok ? tried.value : tried;
 };
 
+const isRecorded = async (principal: Principal, tx: Tx, sha: string): Promise<boolean> => {
+  const found = await tx.query(
+    `SELECT 1 FROM bundle_commit WHERE workspace_id = ${scopeClause(1)} AND sha = $2`,
+    [scopeParameter(principal), sha],
+  );
+  return (found.rowCount ?? 0) > 0;
+};
+
 export const commitAndLandAsMember = async <Refused extends string = never>(
   principal: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
-  request: CommitRequest,
+  request: Omit<CommitRequest, "parentRecorded">,
   land: (fresh: UserPrincipal, tx: Tx, committed: Committed) => Promise<void>,
   admits: (fresh: UserPrincipal, tx: Tx) => Promise<Refused | undefined>,
 ): Promise<Result<Committed, CommitRefusal | Refused | PrincipalRefusal | Error>> => {
@@ -91,7 +99,10 @@ export const commitAndLandAsMember = async <Refused extends string = never>(
     withMember(principal, doors.postgres, async (fresh, tx) => {
       const refusal = await admits(fresh, tx);
       if (refusal !== undefined) return err(refusal);
-      const committed = await commit(fresh, doors.git, request);
+      const committed = await commit(fresh, doors.git, {
+        ...request,
+        parentRecorded: (parent) => isRecorded(fresh, tx, parent),
+      });
       if (committed.ok) await land(fresh, tx, committed.value);
       return committed;
     }),

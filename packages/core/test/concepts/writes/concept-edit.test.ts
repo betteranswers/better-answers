@@ -385,6 +385,7 @@ describe("a save around a source whose document is gone", () => {
       author: { name: "Ada Admin", email: "ada@acme.invalid" },
       trailers: { actor: actorIdOf(scenario.admin), audit: ulid() },
       expectedHead: await head(scenario.admin, scenario.git),
+      parentRecorded: () => Promise.resolve(true),
       at: new Date(),
     });
     if (!pushed.ok) throw new Error(`the push was refused: ${String(pushed.error)}`);

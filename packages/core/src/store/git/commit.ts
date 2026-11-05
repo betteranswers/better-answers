@@ -44,6 +44,8 @@ export type CommitRequest = {
 
   readonly expectedHead: string | null | typeof ANY_HEAD;
 
+  readonly parentRecorded: (parent: string) => Promise<boolean>;
+
   readonly at: Date;
 };
 
@@ -57,7 +59,8 @@ export type CommitRefusal =
   | "no-such-repository"
   | "stale-precondition"
   | "malformed-path"
-  | "malformed-message";
+  | "malformed-message"
+  | "unrecorded-head";
 
 const isSubjectLine = (message: string): boolean => message.length > 0 && !/[\r\n]/u.test(message);
 
@@ -128,6 +131,15 @@ const meetsExpectedHead = (
   parent: string | null,
 ): boolean => expectedHead === ANY_HEAD || expectedHead === parent;
 
+const parentRefusal = async (
+  request: CommitRequest,
+  parent: string | null,
+): Promise<"stale-precondition" | "unrecorded-head" | undefined> => {
+  if (!meetsExpectedHead(request.expectedHead, parent)) return "stale-precondition";
+  if (parent === null) return undefined;
+  return (await request.parentRecorded(parent)) ? undefined : "unrecorded-head";
+};
+
 const commitFailure = (cause: unknown): "stale-precondition" | Error => {
   const message = cause instanceof Error ? cause.message : String(cause);
   if (/cannot lock ref|reference already exists|but expected/iu.test(message)) {
@@ -161,7 +173,8 @@ const commitWithin = async (
     if (!standing.ok) return err(standing.error);
 
     const parent = standing.value;
-    if (!meetsExpectedHead(request.expectedHead, parent)) return err("stale-precondition");
+    const refused = await parentRefusal(request, parent);
+    if (refused !== undefined) return err(refused);
 
     const indexFile = path.join(index, "index");
     const sha = await danglingCommit(gitDir, indexFile, parent, request, message, signal);

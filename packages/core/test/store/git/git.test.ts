@@ -69,6 +69,7 @@ const requestFor = (overrides: Partial<CommitRequest> = {}): CommitRequest => ({
   author: AUTHOR,
   trailers: { actor: `human:${ulid()}` satisfies ActorId, audit: ulid() },
   expectedHead: null,
+  parentRecorded: () => Promise.resolve(true),
   at: new Date(),
   ...overrides,
 });
@@ -197,6 +198,29 @@ describe("one commit's index", () => {
 
     expect(first).toEqual({ ok: true, value: { sha: matching.any(String), parent: null } });
     expect(await head(bundle.principal, bundle.door)).toBe(shaOf(first));
+  });
+
+  it("refuses a parent the database has not recorded, committing nothing", async () => {
+    const bundle = await arrange();
+    const first = shaOf(await commit(bundle.principal, bundle.door, requestFor()));
+    const asked: string[] = [];
+
+    const refused = await commit(
+      bundle.principal,
+      bundle.door,
+      requestFor({
+        path: "knowledge/b.md",
+        expectedHead: ANY_HEAD,
+        parentRecorded: (parent) => {
+          asked.push(parent);
+          return Promise.resolve(false);
+        },
+      }),
+    );
+
+    expect(refused).toEqual({ ok: false, error: "unrecorded-head" });
+    expect(asked).toEqual([first]);
+    expect(await bundleHistory(bundle.door, bundle.workspaceId)).toEqual([first]);
   });
 
   it("stages in its own index, leaving the repository without one", async () => {

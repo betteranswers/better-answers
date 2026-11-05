@@ -90,6 +90,7 @@ const conceptFileBy = async (
     author: { name: "Priya Anand", email },
     trailers: { actor: actorIdOfPerson(principal.userId), audit: ulid() },
     expectedHead: null,
+    parentRecorded: () => Promise.resolve(true),
     at: new Date("2026-04-02T11:00:00.000Z"),
   });
   if (!written.ok) throw new Error(`the commit was refused: ${String(written.error)}`);

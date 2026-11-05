@@ -55,4 +55,23 @@ describe("Waiting on You", () => {
       ),
     );
   });
+
+  it("asks the person to wait while an earlier change saves", async () => {
+    const api = adaAnAdmin();
+    api.set("inbox.waiting", () => read({ items: [CLAIMS] }));
+    api.set("inbox.accept", () =>
+      read({ outcomes: [{ suggestionId: CLAIMS.suggestionId, outcome: "unrecorded-head" }] }),
+    );
+    await openAt(WAITING_ON_YOU.path, api);
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: `Select ${CLAIMS.title}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Accept Selected" }));
+
+    await waitFor(() =>
+      expect(mainAlertText()).toContain(
+        "This workspace is still saving an earlier change. If this suggestion is still waiting in a minute, please accept it again.",
+      ),
+    );
+    expect(screen.getAllByRole("checkbox", { name: `Select ${CLAIMS.title}` })).toHaveLength(1);
+  });
 });
