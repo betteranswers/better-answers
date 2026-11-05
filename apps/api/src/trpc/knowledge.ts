@@ -1,5 +1,6 @@
 import { find, findInput, open, openInput, type OpenResult } from "@better-answers/core/answering";
 import {
+  allKnowledgeInput,
   briefCopy,
   briefCopyInput,
   collectionOwnerNamed,
@@ -10,7 +11,11 @@ import {
   kindConceptsInput,
   nameOwner,
   nameOwnerInput,
+  nameOwnerOfEach,
+  nameOwnerOfEachInput,
+  readAllKnowledge,
   readKindConcepts,
+  readKinds,
   readKnowledgeTree,
   readSectionTrusts,
   recordCopy,
@@ -225,6 +230,19 @@ export const knowledgeRouter = router({
     crossing(ctx, collectionsAndOwners.name, collectionsAndOwners(ctx.principal, ctx.tx)),
   ),
   nameOwner: mutationProcedure.input(parsedBy(nameOwnerInput)).mutation(answeredBy(nameOwner)),
+  allKnowledge: queryProcedure.input(parsedBy(allKnowledgeInput)).query(({ ctx, input }) =>
+    crossing(
+      ctx,
+      readAllKnowledge.name,
+      given(input, (asked) => readAllKnowledge(ctx.principal, ctx.tx, asked, ctx.clock.now())),
+    ),
+  ),
+  kinds: queryProcedure.query(({ ctx }) =>
+    crossing(ctx, readKinds.name, readKinds(ctx.principal, ctx.tx)),
+  ),
+  setOwners: mutationProcedure
+    .input(parsedBy(nameOwnerOfEachInput))
+    .mutation(answeredBy(nameOwnerOfEach)),
   conceptToEdit: knowledgeReadProcedure
     .input(parsedBy(conceptToEditInput))
     .query(({ ctx, input }) =>
