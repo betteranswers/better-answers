@@ -1,7 +1,7 @@
 import type pg from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { DERIVED_FROM_LABEL, FULL_REBUILD_KIND, ULID } from "../../src/index.ts";
+import { DERIVED_FROM_LABEL, FULL_REBUILD_KIND, SUPERSEDES_LABEL, ULID } from "../../src/index.ts";
 import { testData } from "../support/factory.ts";
 import { type MigratedPostgres, withRollback } from "../support/harness.ts";
 import { openMigratedPostgres } from "../support/warm-postgres.ts";
@@ -126,13 +126,15 @@ describe.each<Migrator>(["the bound owner", "a superuser"])(
 const LINKED_ONLY = "01J6RKKKKKKKKKKKKKKKKKKKKK";
 const WITH_LINEAGE = "01J6RNNNNNNNNNNNNNNNNNNNNN";
 const DERIVED = "01J6RDDDDDDDDDDDDDDDDDDDDD";
+const SUPERSEDING = "01J6RPPPPPPPPPPPPPPPPPPPPP";
 
-const withThreeMaps = async (fn: (client: pg.PoolClient) => Promise<void>): Promise<void> => {
+const withFourMaps = async (fn: (client: pg.PoolClient) => Promise<void>): Promise<void> => {
   await withRollback(db.pool, async (client) => {
     const seed = testData(client);
     await seed.workspace({ id: LINKED_ONLY, name: "The workspace of links only" });
     await seed.workspace({ id: WITH_LINEAGE, name: "The workspace with a lineage row" });
     await seed.workspace({ id: DERIVED, name: "The workspace with a derived edge" });
+    await seed.workspace({ id: SUPERSEDING, name: "The workspace with a superseding edge" });
     await seed.mapEdge({ workspaceId: LINKED_ONLY });
     await seed.mapUnresolvedReference({ workspaceId: LINKED_ONLY, relation: "link" });
     await seed.mapUnresolvedReference({
@@ -141,6 +143,7 @@ const withThreeMaps = async (fn: (client: pg.PoolClient) => Promise<void>): Prom
       targetPath: "knowledge/The handbook",
     });
     await seed.mapEdge({ workspaceId: DERIVED, label: DERIVED_FROM_LABEL });
+    await seed.mapEdge({ workspaceId: SUPERSEDING, label: SUPERSEDES_LABEL });
     await fn(client);
   });
 };
@@ -149,10 +152,10 @@ describe.each<Migrator>(["the bound owner", "a superuser"])(
   "the lineage rebuilds migration 0099 queues, run by %s",
   (migrator) => {
     it("queues a rebuild only for a map holding lineage", async () => {
-      await withThreeMaps(async (client) => {
+      await withFourMaps(async (client) => {
         await queuingTheUpgradeRebuilds(client, migrator, 1, THE_LINEAGE_UPGRADE);
 
-        for (const workspaceId of [WITH_LINEAGE, DERIVED]) {
+        for (const workspaceId of [WITH_LINEAGE, DERIVED, SUPERSEDING]) {
           const queued = await rebuildsWaitingIn(client, workspaceId);
           expect(queued.map(({ reason }) => reason)).toEqual(["upgrade"]);
           expect(queued[0]?.id).toMatch(ULID);
@@ -162,11 +165,12 @@ describe.each<Migrator>(["the bound owner", "a superuser"])(
     });
 
     it("queues no second rebuild when it runs again", async () => {
-      await withThreeMaps(async (client) => {
+      await withFourMaps(async (client) => {
         await queuingTheUpgradeRebuilds(client, migrator, 2, THE_LINEAGE_UPGRADE);
 
         expect(await rebuildsWaitingIn(client, WITH_LINEAGE)).toHaveLength(1);
         expect(await rebuildsWaitingIn(client, DERIVED)).toHaveLength(1);
+        expect(await rebuildsWaitingIn(client, SUPERSEDING)).toHaveLength(1);
       });
     });
   },
