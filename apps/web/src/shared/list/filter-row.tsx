@@ -164,7 +164,7 @@ function ColumnMenu(properties: { readonly control: ColumnControl }) {
 }
 
 export function FilterRow(properties: {
-  readonly search: Search;
+  readonly search?: Search;
   readonly filters?: readonly Filter[];
   readonly status?: StatusSwitch;
   readonly columns?: ColumnControl;
@@ -172,7 +172,7 @@ export function FilterRow(properties: {
   const { status, columns } = properties;
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
-      <SearchField search={properties.search} />
+      {properties.search === undefined ? null : <SearchField search={properties.search} />}
       {(properties.filters ?? []).map((filter) => (
         <FilterSelect key={filter.label} filter={filter} />
       ))}
