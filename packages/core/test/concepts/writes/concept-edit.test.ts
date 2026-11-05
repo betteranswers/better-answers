@@ -367,6 +367,33 @@ describe("what a save refuses", () => {
     expect(await historyOf(scenario)).toEqual(before);
   });
 
+  it("refuses an empty body from a committer and an outsider", async () => {
+    const scenario = await arrange();
+    const concept = await written(scenario);
+    const before = await historyOf(scenario);
+
+    const { answer: committer } = await editedBy(
+      scenario,
+      scenario.admin,
+      concept.iri,
+      withBody(" \n"),
+    );
+    const { answer: outsider } = await editedBy(
+      scenario,
+      scenario.unowned,
+      concept.iri,
+      withBody(""),
+    );
+
+    expect(committer).toEqual({ ok: false, error: "malformed" });
+    expect(outsider).toEqual({ ok: false, error: "malformed" });
+    expect(await historyOf(scenario)).toEqual(before);
+    const filed = await db().pool.query("SELECT 1 FROM suggestion WHERE workspace_id = $1", [
+      scenario.workspaceId,
+    ]);
+    expect(filed.rows).toEqual([]);
+  });
+
   const usedTwice = async (scenario: Scenario) => {
     const concept = await written(scenario);
     await writeUpIncluding(db(), scenario.workspaceId, [concept.iri]);
