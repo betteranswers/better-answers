@@ -318,7 +318,7 @@ write_env SECOND_CHANNEL "$SECOND_CHANNEL"
 pause "Ping URLs in Coolify env and the drill env?"
 
 stage "First deploy and the probes"
-say "In GitHub → Actions run 'build' (main): three images are pushed and the run summary shows three digests. Put the backup one in the stores resource's env; then run 'release' with blank inputs to promote the api and worker digests to production (the worker is declared, not started — the pipeline profile)."
+say "In GitHub → Actions run 'build' (main): three images are pushed and the run summary shows three digests. Put the backup one in the stores resource's env; then run 'release' with blank inputs to promote the api and worker digests to production (the worker starts with the stack)."
 step "Watch the production deploy log in Coolify. Record in the private coolify.md § Probes: the compose command Coolify ran; whether 'migrate' finished before 'api' started; whether redeploying 'better-answers' left 'better-answers-stores' running; the \\du answer."
 step "Open https://app.$APEX (the shell and sign-in), https://app.$APEX/.well-known/oauth-protected-resource/mcp (resource = https://app.$APEX/mcp), https://agent.$APEX/ (expect 404), https://$APEX/c/test (expect 404). Both uptime paths green (Cloudflare Health Checks on Pro; the healthchecks.io 'uptime' check on Free); one release tag — git fetch --tags && git tag --list 'release/*'."
 if confirm "All three hostnames answered as expected and there is a release/* tag for that promotion"; then
