@@ -569,7 +569,7 @@ describe("restore-production.sh recording a restore", () => {
   it("logs a statement that records the restore once, even rerun", async () => {
     const started = "2026-10-21T14:00:00Z";
     const ran = recordingARestore(started, { objectstore: "yes", git: "yes" }, NOTHING_LISTENS);
-    const logged = new RegExp(`^${UNWRITTEN}; once the database answers, run: (.+)$`, "m").exec(
+    const logged = new RegExp(`^${UNWRITTEN}\\. When the database answers, run: (.+)$`, "m").exec(
       ran.said,
     )?.[1];
 
