@@ -9,7 +9,7 @@ const conceptsCounted = (count: number): string => counted(count, "concept", "co
 
 export const ALL_KNOWLEDGE_WORDS = {
   about:
-    "Every concept you can read, with its owner and who last checked it. An Admin can set the owner of many at once.",
+    "The table lists every concept you can read, with its owner and who last checked it. An Admin can set the owner of many at once.",
   caption: "Every concept you can read, with its kind, collection, owner and last check.",
   loading: "The knowledge base is still loading.",
   none: "No concepts in the knowledge base yet. A concept appears here once it is saved.",
@@ -106,7 +106,7 @@ const listed = (items: readonly string[]): string => {
 
 export const EXPORTS_WORDS = {
   about:
-    "Download a copy of what your company knows. A copy is a moment in time, so it does not change when your knowledge does.",
+    "Download a copy of what your company knows. A copy does not change when your knowledge does.",
   count: (count: number): string => counted(count, "export", "exports"),
   download: "Download",
   preparing: "Preparing",
@@ -115,21 +115,21 @@ export const EXPORTS_WORDS = {
   knowledgeBase: {
     name: "Knowledge Base Snapshot",
     holds:
-      "Every concept file you can read at this moment, in one zip file. The guides are not in it.",
+      "One zip file holds every concept file you can read at this moment. The guides are not in it.",
     saved: (file: string, files: number): string =>
       `Saved ${file}. It holds ${counted(files, "file", "files")} from your knowledge base.`,
   },
   records: {
     name: "Records",
     holds:
-      "The owners, the checks and the uses of your knowledge, as three spreadsheets in one zip file.",
+      "Three spreadsheets in one zip file list the owners, the checks and the uses of your knowledge.",
     saved: (file: string, families: readonly Family[]): string =>
       `Saved ${file}. It holds ${listed(families.map((family) => FAMILY_WORDS[family]))} as ${counted(families.length, "spreadsheet", "spreadsheets")}.`,
   },
   guide: {
     name: "Guide Snapshot",
     holds:
-      "One guide’s Briefs as a single document. It is dated and marked not maintained, so it does not change when the guide does. Downloading it counts as a use of each Brief it holds.",
+      "One document holds a guide’s Briefs. It is dated and marked not maintained, so it does not change when the guide does. Downloading it counts as a use of each Brief it holds.",
     picker: "Guide",
     option: (guide: GuideSummary): string => `${guideTitleOf(guide)} (${guide.kind})`,
     loading: "The guides are still loading.",
