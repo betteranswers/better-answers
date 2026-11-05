@@ -1,7 +1,7 @@
 target-version = "py313"
 
 [lint]
-select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20", "C901"]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20", "C901", "S"]
 
 [lint.mccabe]
 max-complexity = 8

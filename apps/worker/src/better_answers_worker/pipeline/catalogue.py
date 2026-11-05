@@ -110,7 +110,7 @@ def _spans_by_document[Marked](
     if not document_ids:
         return {}
     cursor.execute(
-        "SELECT document_id, rule_id, char_start, char_end FROM finding"
+        "SELECT document_id, rule_id, char_start, char_end FROM finding"  # noqa: S608  # the statements test refuses a fragment that is not a constant
         f" WHERE document_id = ANY(%s) AND {marked}"
         " ORDER BY document_id, char_start, char_end, rule_id",
         (list(document_ids),),

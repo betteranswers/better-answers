@@ -212,7 +212,7 @@ force-exclude = true
 [tool.ruff.lint]
 select = [
     "E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20", "TID251",
-    "PGH003", "PGH004", "FIX001", "FIX002", "FIX003", "FIX004", "RUF100", "C901",
+    "PGH003", "PGH004", "FIX001", "FIX002", "FIX003", "FIX004", "RUF100", "C901", "S",
 ]
 
 [tool.ruff.lint.mccabe]
@@ -232,8 +232,12 @@ max-complexity = 8
 
 [tool.ruff.lint.per-file-ignores]
 # The check runner is a script; it is the one place print-shaped output is allowed,
-# `print` being banned everywhere else in the tier.
-"src/better_answers_worker/check.py" = ["T20"]
+# `print` being banned everywhere else in the tier. It also starts the gate's own fixed
+# commands, which the `S` rules would read as subprocess calls on untrusted input.
+"src/better_answers_worker/check.py" = ["T20", "S603"]
+# Tests assert, hold throwaway credentials and temp paths, build SQL from fragments and
+# table names they own, and start commands by name. None of it ships in the image.
+"tests/**" = ["S101", "S105", "S106", "S108", "S603", "S607", "S608"]
 # The pipeline package, and the one place the cocoindex ban above is lifted: everything
 # beneath this directory is the module that composes the engine (ADR 0036), whose public
 # interface takes and answers plain types so no cocoindex type crosses a seam. One
