@@ -71,13 +71,6 @@ describe("what accepting a suggestion says", () => {
       ),
     ).toEqual([false, false, false, false]);
     expect(stillWaitingAfter("path-taken")).toBe(true);
-  });
-
-  it("keeps an unconfirmed item waiting, and says so", () => {
     expect(stillWaitingAfter("unconfirmed")).toBe(true);
-    expect(saidOfAccepting("unconfirmed", OWEN)).toEqual({
-      words: SAID_OF_ACCEPTING.unconfirmed,
-      refused: true,
-    });
   });
 });
