@@ -43,7 +43,7 @@ try {
       `repos/{owner}/{repo}/commits/${pullRequest.headRefOid}/check-runs`,
     ),
   );
-  assessment = assess(pr, pullRequest, runs);
+  assessment = assess(pr, pullRequest, runs, Date.now());
 } catch (cause) {
   process.stderr.write(`review-coverage: could not read pull request ${pr}: ${String(cause)}\n`);
   process.exit(2);

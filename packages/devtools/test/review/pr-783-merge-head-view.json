@@ -1,0 +1,22 @@
+{
+  "headRefOid": "670ac036bb4b1e9726300bf23909d34efb08977a",
+  "labels": [],
+  "reviews": [],
+  "changedFiles": 18,
+  "comments": [
+    {
+      "author": {
+        "login": "linear-code"
+      },
+      "body": "<!-- linear-linkback -->",
+      "createdAt": "2026-10-19T12:21:56Z"
+    },
+    {
+      "author": {
+        "login": "coderabbitai"
+      },
+      "body": "<!-- This is an auto-generated comment: summarize by coderabbit.ai -->",
+      "createdAt": "2026-10-19T12:23:32Z"
+    }
+  ]
+}
