@@ -4,17 +4,11 @@ import { useCallback, useId, useMemo, useRef, useState, type RefObject } from "r
 
 import { useListAddress } from "@/shared/address/list-address.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
-import {
-  BROWSE,
-  conceptMatchKey,
-  conceptPageOf,
-  KNOWLEDGE_BASE_PAGE,
-  RETURNED_TO,
-} from "@/shared/knowledge/concept-address.ts";
-import { useOpenMatch } from "@/shared/knowledge/open-match.ts";
+import { BROWSE, KNOWLEDGE_BASE_PAGE, RETURNED_TO } from "@/shared/knowledge/concept-address.ts";
+import { ConceptLink } from "@/shared/knowledge/concept-link.tsx";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { useLanding, useLandingLine } from "@/shared/landing.ts";
-import { GridTable, RowLink } from "@/shared/list/grid-table.tsx";
+import { GridTable } from "@/shared/list/grid-table.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
@@ -101,35 +95,12 @@ const features = tableFeatures({});
 
 const column = createColumnHelper<typeof features, KindConcept>();
 
-function TitleCell(properties: {
-  readonly concept: KindConcept;
-  readonly landsHere: boolean;
-  readonly onLanded: () => void;
-}) {
-  const { concept } = properties;
-  const openMatch = useOpenMatch();
-  const land = useLandingLine(properties.landsHere, properties.onLanded);
-  const page = conceptPageOf(concept.iri);
-  if (page === undefined) return <span className="font-medium wrap-anywhere">{concept.title}</span>;
-  return (
-    <RowLink
-      ref={land}
-      href={page}
-      onOpen={() => {
-        openMatch({ key: conceptMatchKey(concept.iri), page });
-      }}
-    >
-      {concept.title}
-    </RowLink>
-  );
-}
-
 const columnsOf = (landAt: number | undefined, onLanded: () => void) =>
   column.columns([
     column.accessor("title", {
       header: WORDS.columns.title,
       cell: ({ row }) => (
-        <TitleCell concept={row.original} landsHere={row.index === landAt} onLanded={onLanded} />
+        <ConceptLink concept={row.original} landsHere={row.index === landAt} onLanded={onLanded} />
       ),
     }),
     column.accessor("kind", {
