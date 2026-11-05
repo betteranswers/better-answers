@@ -31,7 +31,7 @@ import { scopeClause, scopeParameter, type Tx } from "../../store/postgres/index
 import { contentHashOf, parseConceptFile, type Frontmatter } from "../file.ts";
 import type { Acceptance } from "../index.ts";
 import { conceptVisibilityFrom, replaceCitations } from "../visibility.ts";
-import { restsAlsoOnWhenReplayed } from "../writes/reconciler-hit.ts";
+import { restsAlsoOnUnlessEvidenceAgrees } from "../writes/reconciler-hit.ts";
 import { markDeciding } from "../writes/suggestions.ts";
 
 export const mergeKeyOf = (foldedKind: string, title: string): string =>
@@ -175,12 +175,28 @@ export const evidenceOfSources = (
   return [...rows.values()];
 };
 
-export type Citing = {
+export type Catalogued = {
   readonly landed: readonly EvidenceRow[];
   readonly agrees: boolean;
   readonly restsAlsoOn: readonly Visibility[];
-  readonly goneAnew: boolean;
 };
+
+export const cataloguedEvidenceOf = async (
+  principal: Principal,
+  tx: Tx,
+  evidence: readonly EvidenceRow[],
+): Promise<Catalogued> => {
+  const catalogued = await cataloguedOf(
+    principal,
+    tx,
+    evidence.map((piece) => piece.sourceDocumentId),
+  );
+  const landed = evidence.filter((piece) => catalogued.has(piece.sourceDocumentId));
+  const agrees = landed.length === evidence.length;
+  return { landed, agrees, restsAlsoOn: restsAlsoOnUnlessEvidenceAgrees(agrees) };
+};
+
+export type Citing = Catalogued & { readonly goneAnew: boolean };
 
 const citedBefore = async (
   principal: Principal,
@@ -208,22 +224,15 @@ export const citingOf = async (
   iri: string,
   evidence: readonly EvidenceRow[],
 ): Promise<Citing> => {
-  const catalogued = await cataloguedOf(
-    principal,
-    tx,
-    evidence.map((piece) => piece.sourceDocumentId),
-  );
-  const landed = evidence.filter((piece) => catalogued.has(piece.sourceDocumentId));
-  const agrees = landed.length === evidence.length;
-  const restsAlsoOn = restsAlsoOnWhenReplayed(agrees);
-  if (agrees) return { landed, agrees, restsAlsoOn, goneAnew: false };
+  const catalogued = await cataloguedEvidenceOf(principal, tx, evidence);
+  if (catalogued.agrees) return { ...catalogued, goneAnew: false };
   const before = await citedBefore(principal, tx, iri);
-  const gone = evidence.filter((piece) => !catalogued.has(piece.sourceDocumentId));
+  const landed = new Set(catalogued.landed.map((piece) => piece.sourceDocumentId));
   return {
-    landed,
-    agrees,
-    restsAlsoOn,
-    goneAnew: gone.some((piece) => !before.has(piece.sourceDocumentId)),
+    ...catalogued,
+    goneAnew: evidence.some(
+      (piece) => !landed.has(piece.sourceDocumentId) && !before.has(piece.sourceDocumentId),
+    ),
   };
 };
 

@@ -28,7 +28,7 @@ import {
 import { workspaceIds } from "../../workspaces/index.ts";
 import { contentHashOf, parseConceptFile, type Frontmatter } from "../file.ts";
 import {
-  cataloguedOf,
+  cataloguedEvidenceOf,
   evidenceOfSources,
   heldByIri,
   indexRowOf,
@@ -36,13 +36,12 @@ import {
   landRows,
   mergeKeyOf,
   WRITE_CONSTRAINTS,
-  type EvidenceRow,
   type Held,
 } from "../import/landing.ts";
 import { parseBundleManifest } from "../import/manifest.ts";
 import type { Acceptance } from "../index.ts";
 import { acceptedKeyOf } from "./merge-key.ts";
-import { RECONCILER_ACTIONS, restsAlsoOnWhenReplayed } from "./reconciler-hit.ts";
+import { RECONCILER_ACTIONS } from "./reconciler-hit.ts";
 import { payloadFor, targetOfMergeKey } from "./suggestions.ts";
 
 const RECONCILER_ACTOR = processActorId("reconciler");
@@ -188,20 +187,6 @@ const replayedMergeKey = async (
   return holder === undefined || holder === row.iri ? wanted : (held?.mergeKey ?? row.iri);
 };
 
-const catalogued = async (
-  platform: PlatformPrincipal,
-  tx: Tx,
-  evidence: readonly EvidenceRow[],
-): Promise<{ readonly held: readonly EvidenceRow[]; readonly every: boolean }> => {
-  const known = await cataloguedOf(
-    platform,
-    tx,
-    evidence.map((piece) => piece.sourceDocumentId),
-  );
-  const held = evidence.filter((piece) => known.has(piece.sourceDocumentId));
-  return { held, every: held.length === evidence.length };
-};
-
 const lastRecordedCommit = async (platform: PlatformPrincipal, tx: Tx): Promise<string | null> => {
   const found = await tx.query<{ sha: string }>(
     `SELECT sha FROM bundle_commit WHERE workspace_id = ${scopeClause(1)}
@@ -313,12 +298,11 @@ const replayCommit = async (
         const row = replayableOf(workspaceId, facts, held, doors.clock);
         if (row === undefined) return err("unreadable-commit");
         const mergeKey = await replayedMergeKey(platform, tx, row, held, suggested.mergeKey);
-        const evidence = await catalogued(
+        const evidence = await cataloguedEvidenceOf(
           platform,
           tx,
           evidenceOfSources(workspaceId, facts.frontmatter),
         );
-        const evidenceAgrees = evidence.every;
 
         await record(platform, tx, {
           id: facts.auditEventId,
@@ -329,7 +313,7 @@ const replayCommit = async (
             iri: row.iri,
             commitSha: facts.sha,
             contentHash: row.contentHash,
-            evidenceAgrees,
+            evidenceAgrees: evidence.agrees,
           },
         });
         await landRows(platform, tx, {
@@ -338,9 +322,9 @@ const replayCommit = async (
           commit: { sha: facts.sha, parent: facts.parent },
           actor: facts.actor,
           auditEventId: facts.auditEventId,
-          evidence: evidence.held,
+          evidence: evidence.landed,
 
-          restsAlsoOn: restsAlsoOnWhenReplayed(evidenceAgrees),
+          restsAlsoOn: evidence.restsAlsoOn,
           acceptance: suggested.acceptance,
         });
         return ok("landed");

@@ -13,7 +13,7 @@ export const RECONCILER_ACTIONS = declareActions("platform", {
   }),
 });
 
-export const restsAlsoOnWhenReplayed = (evidenceAgrees: boolean): readonly Visibility[] =>
+export const restsAlsoOnUnlessEvidenceAgrees = (evidenceAgrees: boolean): readonly Visibility[] =>
   evidenceAgrees ? [] : [RESTRICTED_TO_ADMINS];
 
 export const EVIDENCE_AGREES = "evidenceAgrees" satisfies keyof DetailOf<
@@ -33,5 +33,5 @@ export const restsAlsoOnItsCommit = async (
       WHERE c.workspace_id = ${scopeClause(1)} AND c.iri = $2`,
     [scopeParameter(principal), iri, EVIDENCE_AGREES],
   );
-  return restsAlsoOnWhenReplayed(hit.rows[0]?.evidence_agrees ?? true);
+  return restsAlsoOnUnlessEvidenceAgrees(hit.rows[0]?.evidence_agrees ?? true);
 };
