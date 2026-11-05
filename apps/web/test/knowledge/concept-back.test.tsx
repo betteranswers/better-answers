@@ -51,6 +51,11 @@ const aKnowledgeBaseApi = () => {
   return api;
 };
 
+const markedInTheMenu = () =>
+  within(screen.getByRole("navigation", { name: "Knowledge" }))
+    .queryAllByRole("link", { current: "page" })
+    .map((link) => link.textContent);
+
 const inTheBreadcrumb = () => within(screen.getByRole("navigation", { name: "Breadcrumb" }));
 
 describe("the concept page's way back", () => {
@@ -67,6 +72,9 @@ describe("the concept page's way back", () => {
       inTheBreadcrumb().queryByRole("link", { name: "Knowledge Base" }),
       "the shell marks another page as the open one",
     ).not.toBeNull();
+    expect(markedInTheMenu(), "the menu tells a screen reader the page it draws").toEqual([
+      "Knowledge Base",
+    ]);
 
     fireEvent.click(main.getByRole("link", { name: "Back to Knowledge Base" }));
 
@@ -90,5 +98,6 @@ describe("the concept page's way back", () => {
     await openAt(`${SEARCH_PAGE.path}/${A_LEASE}`, aKnowledgeBaseApi());
 
     expect(await screen.findByRole("link", { name: "Back to Search" })).toBeDefined();
+    expect(markedInTheMenu()).toEqual(["Search"]);
   });
 });
