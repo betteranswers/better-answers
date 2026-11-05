@@ -33,6 +33,7 @@ import {
   type Scenario,
 } from "../fixtures/workspace-with-bundle.ts";
 import { zipEntries } from "../fixtures/zip-entries.ts";
+import { whileGitPausesAt } from "../store/git/git-starts.ts";
 import { answered, readingAs, seedingWith } from "../support/suite-postgres.ts";
 
 const run = promisify(execFile);
@@ -471,30 +472,28 @@ const FORMULA_TITLE = '=HYPERLINK("https://example.invalid")';
 type ShelfWorld = {
   readonly scenario: Scenario;
   readonly bundle: BundleIndexed;
+  readonly finance: string;
 };
+
+const SHELF: ReadonlyMap<string, string> = new Map([
+  [BUNDLE_MANIFEST_PATH, "owner: Acme\n"],
+  [EXPENSES, "Claim within thirty days.\n"],
+  [VETTING, "Every hire is vetted.\n"],
+  [SALARIES, "Pay bands.\n"],
+  [FORMULA, "A title a spreadsheet would run.\n"],
+  [ORPHAN, "No index row names this file.\n"],
+  ["guides/01K4GUIDE0000000000000000.yaml", "sections: []\n"],
+]);
 
 const shelfOf = async (): Promise<ShelfWorld> => {
   const scenario = await arrange();
   const finance = await groupNamed(db(), scenario, "finance", [scenario.editor]);
-  const bundle = await bundleIndexed(
-    db(),
-    scenario,
-    new Map([
-      [BUNDLE_MANIFEST_PATH, "owner: Acme\n"],
-      [EXPENSES, "Claim within thirty days.\n"],
-      [VETTING, "Every hire is vetted.\n"],
-      [SALARIES, "Pay bands.\n"],
-      [FORMULA, "A title a spreadsheet would run.\n"],
-      [ORPHAN, "No index row names this file.\n"],
-      ["guides/01K4GUIDE0000000000000000.yaml", "sections: []\n"],
-    ]),
-    [
-      { path: EXPENSES, title: "Expenses", sensitivity: "Internal", audienceGroups: null },
-      { path: VETTING, title: "Vetting", sensitivity: "Restricted", audienceGroups: null },
-      { path: SALARIES, title: "Salary bands", sensitivity: "Internal", audienceGroups: [finance] },
-      { path: FORMULA, title: FORMULA_TITLE, sensitivity: "Internal", audienceGroups: null },
-    ],
-  );
+  const bundle = await bundleIndexed(db(), scenario, SHELF, [
+    { path: EXPENSES, title: "Expenses", sensitivity: "Internal", audienceGroups: null },
+    { path: VETTING, title: "Vetting", sensitivity: "Restricted", audienceGroups: null },
+    { path: SALARIES, title: "Salary bands", sensitivity: "Internal", audienceGroups: [finance] },
+    { path: FORMULA, title: FORMULA_TITLE, sensitivity: "Internal", audienceGroups: null },
+  ]);
   const { workspaceId, viewer, editor } = scenario;
   await seedingWith(db().pool, async (seed) => {
     for (const held of [EXPENSES, VETTING, SALARIES, FORMULA]) {
@@ -507,7 +506,7 @@ const shelfOf = async (): Promise<ShelfWorld> => {
     await seed.usage({ workspaceId, iri: bundle.iriOf(EXPENSES), actor: `human:${editor.userId}` });
     await seed.usage({ workspaceId, iri: bundle.iriOf(SALARIES), actor: `human:${editor.userId}` });
   });
-  return { scenario, bundle };
+  return { scenario, bundle, finance };
 };
 
 const shelfWorld = once(shelfOf);
@@ -634,6 +633,80 @@ describe("a knowledge base whose head cannot be exported", () => {
     const admin = await memberAs(scenario, "Admin");
 
     expect(await snapshotOf(admin, scenario)).toEqual({ ok: false, error: "not-found" });
+  });
+});
+
+const FINANCE_ONLY = "FINANCE ONLY: the board approved a 40% cut.\n";
+
+const landedAfter = async (
+  { scenario, bundle }: ShelfWorld,
+  changed: ReadonlyMap<string, string>,
+) => {
+  const { git, workspaceId } = scenario;
+  const sha = await treeCommitted(git, workspaceId, new Map([...SHELF, ...changed]), "Land");
+  await seedingWith(db().pool, (seed) =>
+    seed.bundleCommit({ workspaceId, sha, parentSha: bundle.head }),
+  );
+};
+
+const carried = (zip: Uint8Array): string =>
+  [...zipEntries(zip)].map(([name, bytes]) => `${name}\n${bytes.toString("utf8")}`).join("\n");
+
+describe("an export while a change lands", () => {
+  it("a narrowing landing as the export starts stays out", async () => {
+    const world = await shelfOf();
+    const { scenario, bundle, finance } = world;
+    const admin = await memberAs(scenario, "Admin");
+
+    const snapshot = await whileGitPausesAt(
+      { subcommand: "rev-parse", after: false },
+      () => snapshotOf(admin, scenario),
+      async () => {
+        await db().pool.query(
+          `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
+            WHERE workspace_id = $1 AND iri = $2`,
+          [scenario.workspaceId, bundle.iriOf(EXPENSES), finance],
+        );
+        await landedAfter(world, new Map([[EXPENSES, FINANCE_ONLY]]));
+      },
+    );
+
+    const { zip } = answered(snapshot);
+    expect([...zipEntries(zip).keys()]).toEqual([BUNDLE_MANIFEST_PATH, FORMULA, VETTING]);
+    expect(carried(zip)).not.toContain(FINANCE_ONLY);
+  });
+
+  it("a commit landing after the head is read refuses", async () => {
+    const world = await shelfOf();
+    const { scenario, bundle } = world;
+    const admin = await memberAs(scenario, "Admin");
+    const movedTo = (from: string, to: string) =>
+      db().pool.query("UPDATE concept_index SET path = $3 WHERE workspace_id = $1 AND iri = $2", [
+        scenario.workspaceId,
+        bundle.iriOf(from),
+        to,
+      ]);
+
+    const snapshot = await whileGitPausesAt(
+      { subcommand: "rev-parse", after: true },
+      () => snapshotOf(admin, scenario),
+      async () => {
+        await movedTo(SALARIES, "knowledge/policies/moving.md");
+        await movedTo(EXPENSES, SALARIES);
+        await movedTo(SALARIES, EXPENSES);
+        await landedAfter(
+          world,
+          new Map([
+            [EXPENSES, "Pay bands.\n"],
+            [SALARIES, "Claim within thirty days.\n"],
+          ]),
+        );
+      },
+    );
+
+    expect(snapshot).toEqual({ ok: false, error: "unrecorded-head" });
+    expect(await exportEventsBy(scenario, admin)).toEqual([]);
+    expect(carried(answered(await snapshotOf(admin, scenario)).zip)).not.toContain("Pay bands.");
   });
 });
 

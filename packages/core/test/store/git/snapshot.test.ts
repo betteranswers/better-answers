@@ -22,14 +22,14 @@ const NOT_UTF8 = Uint8Array.of(0xff, 0xfe, 0x00, 0x80, 0x0a, 0xc3);
 type Bundle = {
   readonly door: GitDoor;
   readonly principal: UserPrincipal;
-  readonly head: string | null;
+  readonly head: string;
 };
 
 const bundleHolding = async (files: ReadonlyMap<string, string | Uint8Array>): Promise<Bundle> => {
   const workspaceId = ulid();
   const door = bundles();
   await initRepository(door, workspaceId);
-  const head = files.size === 0 ? null : await treeCommitted(door, workspaceId, files, "Land");
+  const head = await treeCommitted(door, workspaceId, files, "Land");
   const principal: UserPrincipal = {
     kind: "user",
     workspaceId: boundarySchemas.workspace.select.shape.id.parse(workspaceId),
@@ -45,8 +45,8 @@ const bundleHolding = async (files: ReadonlyMap<string, string | Uint8Array>): P
 type Snapshot = Awaited<ReturnType<typeof bundleSnapshot>>;
 
 const filesOf = (snapshot: Snapshot | undefined) => {
-  if (snapshot?.ok !== true || snapshot.value === null) throw new Error("no snapshot was taken");
-  return snapshot.value.files.map(({ path, bytes }) => [path, Buffer.from(bytes)]);
+  if (snapshot?.ok !== true) throw new Error("no snapshot was taken");
+  return snapshot.value.map(({ path, bytes }) => [path, Buffer.from(bytes)]);
 };
 
 const file = (path: string, content: string | Uint8Array) => [path, Buffer.from(content)];
@@ -62,9 +62,8 @@ describe("a snapshot of the bundle", () => {
       ]),
     );
 
-    const snapshot = await bundleSnapshot(principal, door, new Set([OPEN, SKELETON]));
+    const snapshot = await bundleSnapshot(principal, door, head, new Set([OPEN, SKELETON]));
 
-    expect(snapshot).toMatchObject({ ok: true, value: { head } });
     expect(filesOf(snapshot)).toEqual([
       file(MANIFEST, "owner: Acme\n"),
       file(OPEN, "Claim within thirty days.\n"),
@@ -72,9 +71,9 @@ describe("a snapshot of the bundle", () => {
   });
 
   it("carries a file's bytes unchanged, whatever they are", async () => {
-    const { door, principal } = await bundleHolding(new Map([[OPEN, NOT_UTF8]]));
+    const { door, principal, head } = await bundleHolding(new Map([[OPEN, NOT_UTF8]]));
 
-    const snapshot = await bundleSnapshot(principal, door, new Set([OPEN]));
+    const snapshot = await bundleSnapshot(principal, door, head, new Set([OPEN]));
 
     expect(filesOf(snapshot)).toEqual([file(OPEN, NOT_UTF8)]);
   });
@@ -89,20 +88,20 @@ describe("a snapshot of the bundle", () => {
     let snapshot: Snapshot | undefined;
 
     const started = await gitStarts(async () => {
-      snapshot = await bundleSnapshot(principal, door, new Set([OPEN, SKELETON]));
+      snapshot = await bundleSnapshot(principal, door, head, new Set([OPEN, SKELETON]));
     });
 
-    expect(snapshot).toEqual({ ok: true, value: { head, files: [] } });
-    expect(started).toEqual(["rev-parse", "ls-tree"]);
+    expect(snapshot).toEqual({ ok: true, value: [] });
+    expect(started).toEqual(["ls-tree"]);
   });
 
-  it("answers null for a bundle with no commit", async () => {
-    const { door, principal } = await bundleHolding(new Map());
+  it("reads the commit it is given, not the head", async () => {
+    const { door, principal, head } = await bundleHolding(new Map([[OPEN, "Thirty days.\n"]]));
+    await treeCommitted(door, principal.workspaceId, new Map([[OPEN, "A week.\n"]]), "Later");
 
-    expect(await bundleSnapshot(principal, door, new Set([OPEN]))).toEqual({
-      ok: true,
-      value: null,
-    });
+    const snapshot = await bundleSnapshot(principal, door, head, new Set([OPEN]));
+
+    expect(filesOf(snapshot)).toEqual([file(OPEN, "Thirty days.\n")]);
   });
 
   it("refuses past its byte cap before reading a file", async () => {
@@ -110,7 +109,7 @@ describe("a snapshot of the bundle", () => {
       [MANIFEST, "owner: Acme\n"],
       [OPEN, "Claim within thirty days.\n"],
     ]);
-    const { door, principal } = await bundleHolding(files);
+    const { door, principal, head } = await bundleHolding(files);
     const held = [...files.values()].join("").length;
     let refused: Snapshot | undefined;
 
@@ -118,6 +117,7 @@ describe("a snapshot of the bundle", () => {
       refused = await bundleSnapshot(
         principal,
         { ...door, snapshotBytesMax: held - 1 },
+        head,
         new Set([OPEN]),
       );
     });
@@ -126,23 +126,23 @@ describe("a snapshot of the bundle", () => {
     expect(started).not.toContain("cat-file");
     expect(
       filesOf(
-        await bundleSnapshot(principal, { ...door, snapshotBytesMax: held }, new Set([OPEN])),
+        await bundleSnapshot(principal, { ...door, snapshotBytesMax: held }, head, new Set([OPEN])),
       ),
     ).toHaveLength(2);
   });
 
-  it("reads 3,000 files with three git processes", async () => {
+  it("reads 3,000 files with two git processes", async () => {
     const paths = Array.from({ length: 3_000 }, (_unused, at) => `knowledge/wide/node-${at}.md`);
-    const { door, principal } = await bundleHolding(
+    const { door, principal, head } = await bundleHolding(
       new Map(paths.map((path, at) => [path, `Rule ${String(at)}.\n`])),
     );
     let snapshot: Snapshot | undefined;
 
     const started = await gitStarts(async () => {
-      snapshot = await bundleSnapshot(principal, door, new Set(paths));
+      snapshot = await bundleSnapshot(principal, door, head, new Set(paths));
     });
 
-    expect(started).toEqual(["rev-parse", "ls-tree", "cat-file"]);
+    expect(started).toEqual(["ls-tree", "cat-file"]);
     expect(filesOf(snapshot)).toHaveLength(3_000);
     expect(filesOf(snapshot)).toContainEqual(file("knowledge/wide/node-2999.md", "Rule 2999.\n"));
   });

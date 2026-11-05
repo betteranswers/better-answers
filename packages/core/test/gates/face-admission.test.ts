@@ -32,8 +32,6 @@ const STEPS: Readonly<Record<string, string>> = {
   "bundle/authorOf": "an admitted write reads the git author of the person it names",
   "bundle/commitAndLandAsMember":
     "an admitted write commits through it, and it runs that write's own checks",
-  "bundle/isRecorded":
-    "the knowledge base export asks it of the head it read for an admitted Admin",
   "bundle/landBundleCommit": "an admitted write and the reconciler land their commit's row",
   "bundle/withBundleWrite": "takes the lock for a write that admitted its person first",
   "concepts/cascadingVisibility": "runs its caller's write, and that write's own checks",

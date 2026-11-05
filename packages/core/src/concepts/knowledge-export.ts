@@ -5,7 +5,6 @@ import { boundarySchemas } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../access/index.ts";
 import { action, declareActions, record } from "../audit/index.ts";
-import { isRecorded } from "../bundle/index.ts";
 import {
   briefToCopy,
   readGuide,
@@ -32,7 +31,7 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { bundleSnapshot, type GitDoor } from "../store/git/index.ts";
+import { bundleSnapshot, head as headOf, type GitDoor } from "../store/git/index.ts";
 import {
   withMember,
   withMemberUnheld,
@@ -137,22 +136,31 @@ const readUnheldThenRecorded = async <Read, Made>(
 
 type Snapshot = { readonly head: string; readonly files: readonly ZipEntry[] };
 
-const READABLE_PATHS = `SELECT c.path FROM concept_index c
-   WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}`;
+/**
+ * READ COMMITTED gives each statement its own snapshot, so the head check and the paths share
+ * one statement.
+ */
+const READABLE_AT_HEAD = `SELECT
+    EXISTS (SELECT 1 FROM bundle_commit b WHERE b.workspace_id = $1 AND b.sha = $2)
+      AND NOT EXISTS (SELECT 1 FROM bundle_commit b WHERE b.workspace_id = $1 AND b.parent_sha = $2)
+      AS at_head,
+    ARRAY(SELECT c.path FROM concept_index c
+           WHERE c.workspace_id = $1 AND ${readableClause("c", 3)}) AS paths`;
 
 const snapshotRead =
   (git: GitDoor) =>
   async (member: UserPrincipal, tx: Tx): Promise<Result<Snapshot, ExportRefusal>> => {
-    const { rows } = await tx.query<{ path: string }>(READABLE_PATHS, [
+    const commit = await headOf(member, git);
+    if (commit === null) return err(NOT_FOUND);
+    const { rows } = await tx.query<{ at_head: boolean; paths: string[] }>(READABLE_AT_HEAD, [
       member.workspaceId,
+      commit,
       ...readableParameters(member),
     ]);
-    const snapshot = await bundleSnapshot(member, git, new Set(rows.map(({ path }) => path)));
-    if (!snapshot.ok) return snapshot;
-    if (snapshot.value === null) return err(NOT_FOUND);
-    return (await isRecorded(member, tx, snapshot.value.head))
-      ? ok(snapshot.value)
-      : err("unrecorded-head");
+    const readable = rows[0];
+    if (readable?.at_head !== true) return err("unrecorded-head");
+    const files = await bundleSnapshot(member, git, commit, new Set(readable.paths));
+    return files.ok ? ok({ head: commit, files: files.value }) : files;
   };
 
 export const exportBundleSnapshot = async (

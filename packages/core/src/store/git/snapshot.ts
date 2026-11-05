@@ -1,11 +1,9 @@
 import { BUNDLE_MANIFEST_PATH } from "@better-answers/schema";
 
 import { err, ok, type Result, type UserPrincipal } from "../../kernel/index.ts";
-import { bundleOf, git, gitBytes, headOf, type GitDoor } from "./door.ts";
+import { bundleOf, git, gitBytes, type GitDoor } from "./door.ts";
 
 type SnapshotFile = { readonly path: string; readonly bytes: Uint8Array };
-
-type BundleSnapshot = { readonly head: string; readonly files: readonly SnapshotFile[] };
 
 const HELD_IN_MEMORY_BYTES_MAX = 256 * 1024 * 1024;
 
@@ -43,21 +41,20 @@ const blobsIn = (batch: Buffer, kept: readonly Listed[]): readonly SnapshotFile[
 export const bundleSnapshot = async (
   principal: UserPrincipal,
   door: GitDoor,
+  commit: string,
   readable: ReadonlySet<string>,
-): Promise<Result<BundleSnapshot | null, "export-too-large">> => {
+): Promise<Result<readonly SnapshotFile[], "export-too-large">> => {
   const gitDir = bundleOf(door, principal);
-  const head = await headOf(gitDir);
-  if (head === null) return ok(null);
-  const tree = await git(gitDir, ["ls-tree", "-r", "-z", "-l", head, KNOWLEDGE], { raw: true });
+  const tree = await git(gitDir, ["ls-tree", "-r", "-z", "-l", commit, KNOWLEDGE], { raw: true });
   const kept = listedIn(tree).filter(
     ({ path }) => path === BUNDLE_MANIFEST_PATH || readable.has(path),
   );
   const bytes = kept.reduce((sum, { size }) => sum + size, 0);
   if (bytes > (door.snapshotBytesMax ?? HELD_IN_MEMORY_BYTES_MAX)) return err("export-too-large");
-  if (kept.length === 0) return ok({ head, files: [] });
+  if (kept.length === 0) return ok([]);
   const batch = await gitBytes(gitDir, ["cat-file", "--batch", "--buffer"], {
     input: kept.map(({ object }) => `${object}\n`).join(""),
     maxBuffer: bytes + kept.length * BATCH_FRAMING,
   });
-  return ok({ head, files: blobsIn(batch, kept) });
+  return ok(blobsIn(batch, kept));
 };
