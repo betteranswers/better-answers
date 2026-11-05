@@ -9,6 +9,7 @@ import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf, refusedWith } from "@/shared/refusal-outcome.tsx";
 import { stockWait, type OwnSentences } from "@/shared/refusal-words.ts";
+import { saveFile, type FileToSave } from "@/shared/save-file.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -31,7 +32,7 @@ import {
   SAID_OF_EXPORTED_KNOWLEDGE_BASE,
   SAID_OF_EXPORTED_RECORDS,
 } from "./curation-words.ts";
-import { bytesOfBase64, MARKDOWN, saveFile, ZIP, type FileToSave } from "./save-file.ts";
+import { bytesOfBase64, MARKDOWN, ZIP } from "./file-bytes.ts";
 
 const CURATION = menuGroupIn(KNOWLEDGE, "curation");
 

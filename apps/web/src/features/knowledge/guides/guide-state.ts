@@ -41,8 +41,6 @@ export const actionNamed = (action: SectionAction) => ({ "data-action": action }
 
 type Titled = Pick<Guide, "collection" | "subject">;
 
-export const guideTitleOf = (guide: Titled): string => guide.subject?.title ?? guide.collection;
-
 const heldFor = (guide: Titled, fact: SectionFact): NewConceptHeld => ({
   new: fact.name,
   collection: guide.collection,

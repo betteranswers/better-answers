@@ -1,4 +1,5 @@
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
 import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { counted } from "@/shared/words.ts";
 
@@ -130,8 +131,7 @@ export const EXPORTS_WORDS = {
     holds:
       "One guide’s Briefs as a single document. It is dated and marked not maintained, so it does not change when the guide does. Downloading it counts as a use of each Brief it holds.",
     picker: "Guide",
-    option: (guide: GuideSummary): string =>
-      `${guide.subject?.title ?? guide.collection} (${guide.kind})`,
+    option: (guide: GuideSummary): string => `${guideTitleOf(guide)} (${guide.kind})`,
     loading: "The guides are still loading.",
     none: "No guides to show yet. A guide appears here once one is set up for a collection you can read.",
     retry: "Retry",
