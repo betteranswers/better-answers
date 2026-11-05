@@ -160,6 +160,7 @@ const CATALOGUED = {
   "body-locator-refused": "inapplicable by concepts",
   "no-such-repository": "precondition by concepts",
   "history-diverged": "precondition by concepts",
+  "unrecorded-head": "precondition by concepts",
   held: "conflict by concepts",
   "stale-precondition": "conflict by concepts",
   "malformed-path": "malformed by concepts",

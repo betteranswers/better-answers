@@ -91,7 +91,13 @@ type ImportDoors = WriteDoors & {
 const importBundleAction = declareAction({
   admits: ADMIN_ALONE,
   input: z.custom<ImportBundleInput>(),
-  refuses: ["role-forbids", "no-such-repository", "manifest-taken", "stale-precondition"],
+  refuses: [
+    "role-forbids",
+    "no-such-repository",
+    "manifest-taken",
+    "stale-precondition",
+    "unrecorded-head",
+  ],
 });
 
 export type ImportBundleRefusal =

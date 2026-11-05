@@ -335,7 +335,7 @@ The next sync stops the source answering and deletes its object-store originals.
 
 ## 10. A workspace is stuck behind a commit
 
-**Fires.** The api logs `reconciler tick` at warn with a `stopped` entry (`workspace_id`, `commit_sha`, `reason`) every thirty seconds, or `pnpm ops reconcile-watermark --workspace <id>` refuses. The replay of commits the rows missed stopped at a commit the index would not take. Until someone steps in, **every later write to that bundle fails**. Connected sources, write-ups, and members are untouched.
+**Fires.** The api logs `reconciler tick` at warn with a `stopped` entry (`workspace_id`, `commit_sha`, `reason`) every thirty seconds, or `pnpm ops reconcile-watermark --workspace <id>` refuses. The replay of commits the rows missed stopped at a commit the index would not take. Until someone steps in, **every later write to that bundle is refused** (`unrecorded-head`). Connected sources, write-ups, and members are untouched.
 
 **Read the refusal first.** `reconcile-watermark` is the reconciler on demand, step 2 of `BACKUPS.md` § Recovery order. Its refusal reads `reconcile-watermark: REFUSED — stopped at <sha> (<reason>); head <sha>, watermark <sha>, replayed <n>, already landed <n>; …`. *head* is where the repository is. *watermark* is the last commit the rows knew when the run began. *stopped at* is the first commit between them that the index refused.
 

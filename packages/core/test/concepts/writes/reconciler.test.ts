@@ -46,6 +46,7 @@ import { doorsOf, suiteWithBundles, type Scenario } from "../../fixtures/workspa
 import { inputOf } from "../../support/suite-input.ts";
 import { readingAs } from "../../support/suite-postgres.ts";
 import { rewritingElsewhere } from "../bundle-fence.ts";
+import { standInRowsFor } from "./stand-in-rows.ts";
 
 const { db, arrange } = suiteWithBundles();
 
@@ -93,13 +94,16 @@ const openTheWindow = async (): Promise<() => Promise<void>> => {
 };
 
 const inTheWindow = async <T extends { readonly ok: boolean }>(
+  scenario: Scenario,
   action: () => Promise<T>,
 ): Promise<T> => {
+  const loseAgain = await standInRowsFor(db().pool, scenario);
   const close = await openTheWindow();
   try {
     return await action();
   } finally {
     await close();
+    await loseAgain();
   }
 };
 
@@ -108,7 +112,9 @@ const writeInTheWindow = async (
   principal: UserPrincipal,
   input: WriteConceptInput,
 ): Promise<readonly string[]> => {
-  const refused = await inTheWindow(() => writeConcept(principal, doorsOf(scenario), input));
+  const refused = await inTheWindow(scenario, () =>
+    writeConcept(principal, doorsOf(scenario), input),
+  );
   expect(refused.ok).toBe(false);
   return bundleHistory(scenario.git, scenario.workspaceId);
 };
@@ -342,10 +348,12 @@ describe("a commit whose rows were lost", () => {
       guideline("Sickness"),
     );
 
-    const behind = await writeConcept(
-      scenario.editor,
-      doorsOf(scenario),
-      guideline("Overtime", { expects: { head: orphan } }),
+    const behind = await inTheWindow(scenario, () =>
+      writeConcept(
+        scenario.editor,
+        doorsOf(scenario),
+        guideline("Overtime", { expects: { head: orphan } }),
+      ),
     );
 
     const history = await bothReplayedInOrder(scenario, behind);
@@ -382,6 +390,22 @@ describe("a commit whose rows were lost", () => {
 
     expect(misled).toMatchObject({ watermark: first.sha, replayed: [], skipped: [orphan] });
     expect(await rowsOf(scenario.workspaceId)).toEqual(before);
+  });
+
+  it("leaves no partial rows, and the head ahead of them", async () => {
+    const scenario = await arrange();
+    const first = await landed(scenario, scenario.editor, guideline("Pensions"));
+    const before = await rowsOf(scenario.workspaceId);
+
+    const history = await writeInTheWindow(
+      scenario,
+      scenario.editor,
+      guideline("Bonuses", { expects: { head: first.sha } }),
+    );
+
+    expect(await rowsOf(scenario.workspaceId)).toEqual(before);
+    expect(history).toEqual([first.sha, matching.any(String)]);
+    expect(await recordedChain(scenario.workspaceId)).toEqual([[first.sha, null]]);
   });
 });
 
@@ -464,7 +488,7 @@ describe("a manifest commit whose rows were lost", () => {
 
   it("lands its commit row alone, then the concept behind it", async () => {
     const scenario = await arrange();
-    const lost = await inTheWindow(() =>
+    const lost = await inTheWindow(scenario, () =>
       writeManifest(scenario.admin, doorsOf(scenario), {
         manifest,
         message: "Write the bundle's manifest",
@@ -474,7 +498,9 @@ describe("a manifest commit whose rows were lost", () => {
     expect(lost.ok).toBe(false);
     const [first = ""] = await bundleHistory(scenario.git, scenario.workspaceId);
     const input = guideline("Travel", { expects: { head: first } });
-    const behind = await writeConcept(scenario.editor, doorsOf(scenario), input);
+    const behind = await inTheWindow(scenario, () =>
+      writeConcept(scenario.editor, doorsOf(scenario), input),
+    );
 
     const history = await bothReplayedInOrder(scenario, behind);
 
@@ -906,7 +932,7 @@ const acceptInTheWindow = async (
   scenario: Scenario,
   item: { readonly suggestionId: string; readonly target: string | null },
 ): Promise<string> => {
-  const outcomes = await inTheWindow(() =>
+  const outcomes = await inTheWindow(scenario, () =>
     acceptSuggestions(scenario.admin, doorsOf(scenario), {
       decisions: [{ suggestionId: item.suggestionId, expectedTarget: item.target }],
     }),
@@ -1069,15 +1095,15 @@ describe("an acceptance whose rows were lost", () => {
   });
 });
 
-const acceptedAgain = async (
+const outcomesOfAccepting = async (
   scenario: Scenario,
   item: { readonly suggestionId: string; readonly target: string | null },
 ) => {
-  const again = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+  const accepted = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
     decisions: [{ suggestionId: item.suggestionId, expectedTarget: item.target }],
   });
-  assert(again.ok, "the accept was admitted");
-  return again.value.map(({ outcome }) => (outcome.ok ? "accepted" : outcome.error));
+  assert(accepted.ok, "the accept was admitted");
+  return accepted.value.map(({ outcome }) => (outcome.ok ? "accepted" : outcome.error));
 };
 
 const neverStopsAfter = async (scenario: Scenario, lost: string) => {
@@ -1088,7 +1114,17 @@ const neverStopsAfter = async (scenario: Scenario, lost: string) => {
   expect(await reconciled(scenario)).toMatchObject({ replayed: [], stopped: undefined });
 };
 
-describe("a suggestion accepted again before its lost commit is replayed", () => {
+const acceptedAgainThenReplayed = async (
+  scenario: Scenario,
+  item: { readonly suggestionId: string; readonly target: string | null },
+) => {
+  const lost = await acceptInTheWindow(scenario, item);
+  const again = await outcomesOfAccepting(scenario, item);
+  await neverStopsAfter(scenario, lost);
+  return { again, decision: await decisionOf(item.suggestionId) };
+};
+
+describe("an accept before a lost acceptance is replayed", () => {
   it("is refused, so an edit cannot stop the reconciler", async () => {
     const scenario = await arrange();
     const input = guideline("Expenses");
@@ -1103,25 +1139,35 @@ describe("a suggestion accepted again before its lost commit is replayed", () =>
         body: "# Expenses\n\nClaim within two months.",
       }),
     );
-    const lost = await acceptInTheWindow(scenario, item);
 
-    const again = await acceptedAgain(scenario, item);
-
-    await neverStopsAfter(scenario, lost);
-    expect(again).toEqual(["unrecorded-head"]);
-    expect(await decisionOf(item.suggestionId)).toMatchObject({ status: "accepted" });
+    expect(await acceptedAgainThenReplayed(scenario, item)).toMatchObject({
+      again: ["unrecorded-head"],
+      decision: { status: "accepted" },
+    });
   });
 
   it("is refused, so a new concept cannot stop the reconciler", async () => {
     const scenario = await arrange();
     const item = await raised(scenario, requestFor("Remote working"));
-    const lost = await acceptInTheWindow(scenario, item);
 
-    const again = await acceptedAgain(scenario, item);
+    expect(await acceptedAgainThenReplayed(scenario, item)).toMatchObject({
+      again: ["unrecorded-head"],
+      decision: { status: "accepted" },
+    });
+  });
+
+  it("refuses a second create at the lost one's path", async () => {
+    const scenario = await arrange();
+    const request = requestFor("Remote working");
+    const lost = await acceptInTheWindow(scenario, await raised(scenario, request));
+    const second = await raised(scenario, requestFor("Home working", { path: request.path }));
+
+    const beforeReplay = await outcomesOfAccepting(scenario, second);
 
     await neverStopsAfter(scenario, lost);
-    expect(again).toEqual(["unrecorded-head"]);
-    expect(await decisionOf(item.suggestionId)).toMatchObject({ status: "accepted" });
+    expect(beforeReplay).toEqual(["unrecorded-head"]);
+    expect(await outcomesOfAccepting(scenario, second)).toEqual(["path-taken"]);
+    expect(await reconciled(scenario)).toMatchObject({ replayed: [], stopped: undefined });
   });
 });
 
@@ -1299,10 +1345,12 @@ describe("a commit the rows cannot take", () => {
     assert(clash.ok, inspect(clash));
     const orphan = clash.value.sha;
 
-    const behind = await writeConcept(
-      scenario.editor,
-      doorsOf(scenario),
-      guideline("Tolls", { expects: { head: orphan } }),
+    const behind = await inTheWindow(scenario, () =>
+      writeConcept(
+        scenario.editor,
+        doorsOf(scenario),
+        guideline("Tolls", { expects: { head: orphan } }),
+      ),
     );
     expect(behind.ok).toBe(false);
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
