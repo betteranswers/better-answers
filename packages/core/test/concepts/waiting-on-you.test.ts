@@ -17,6 +17,7 @@ import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { parseLocator, passageAt } from "../../src/sources/index.ts";
 import {
   connectedSourceHolding,
+  groupNamed,
   passageUnder,
   writeUpIncluding,
 } from "../fixtures/sourced-concept.ts";
@@ -332,6 +333,44 @@ describe("Waiting on you", () => {
     });
   });
 
+  it("hides a retitle's orphaned edit from deciders outside its audience", async () => {
+    const scenario = await arrange();
+    const standing = await conceptWritten(scenario);
+    const retitle = await proposedBy(scenario, scenario.viewer, standing, {
+      title: "Travel Expenses",
+      frontmatter: { title: "Travel Expenses", type: "Policy" },
+    });
+    const withheld = "The settlement figure is 4.2 million pounds.";
+    const sibling = await proposedBy(scenario, scenario.viewer, standing, { body: withheld });
+    await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+      decisions: [{ suggestionId: retitle.suggestionId, expectedTarget: standing.written.iri }],
+    });
+    const orphaned = await waitingFor(scenario.admin);
+    await db().pool.query(
+      `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
+        WHERE workspace_id = $1 AND iri = $2`,
+      [scenario.workspaceId, standing.written.iri, ulid()],
+    );
+
+    const seen = {
+      admin: await suggestionsWaitingFor(scenario.admin),
+      owner: await suggestionsWaitingFor(scenario.editor),
+      adminOpens: await openedBy(scenario.admin, sibling.suggestionId),
+      ownerOpens: await openedBy(scenario.editor, sibling.suggestionId),
+    };
+
+    expect(orphaned).toEqual([
+      matching.objectContaining({ suggestionId: sibling.suggestionId, target: null }),
+    ]);
+    expect(seen).toEqual({
+      admin: [],
+      owner: [],
+      adminOpens: { ok: false, error: "not-found" },
+      ownerOpens: { ok: false, error: "not-found" },
+    });
+    expect(JSON.stringify(seen)).not.toContain(withheld);
+  });
+
   describe("on a draft concept", () => {
     const draftProposed = (scenario: Scenario) =>
       conceptProposedBy(scenario, scenario.viewer, { status: "draft" });
@@ -357,6 +396,25 @@ describe("Waiting on you", () => {
         ownerOpens: opened,
         admin: [matching.objectContaining({ suggestionId, target: written.iri })],
         adminOpens: opened,
+      });
+    });
+
+    it("opens its edit for an Admin in its audience group", async () => {
+      const scenario = await arrange();
+      const { written, suggestionId } = await draftProposed(scenario);
+      const finance = await groupNamed(db(), scenario, "Finance", [scenario.admin]);
+      await db().pool.query(
+        `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
+          WHERE workspace_id = $1 AND iri = $2`,
+        [scenario.workspaceId, written.iri, finance],
+      );
+
+      expect({
+        admin: await suggestionsWaitingFor(scenario.admin),
+        adminOpens: await openedBy(scenario.admin, suggestionId),
+      }).toEqual({
+        admin: [suggestionId],
+        adminOpens: { ok: true, value: matching.objectContaining({ current: standingText }) },
       });
     });
 
