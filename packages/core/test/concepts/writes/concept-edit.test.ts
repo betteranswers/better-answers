@@ -403,6 +403,16 @@ describe("a save around a source whose document is gone", () => {
     return found.rows[0]?.sensitivity;
   };
 
+  const sensitivityOncePublished = async (
+    scenario: Scenario,
+    iri: ConceptIri,
+    connectedSourceId: string,
+  ) => {
+    const published = await publishedOnceIndexed(db(), scenario.admin, connectedSourceId);
+    expect(published.ok).toBe(true);
+    return sensitivityOf(iri);
+  };
+
   it("saves an edit that carries the gone source in place", async () => {
     const scenario = await arrange();
     const { iri, path, goneLocator } = await replayedCitingAGoneDocument(scenario, new Date());
@@ -435,10 +445,9 @@ describe("a save around a source whose document is gone", () => {
       value: { outcome: "committed", iri, sha: matching.any(String) },
     });
 
-    const published = await publishedOnceIndexed(db(), scenario.admin, handbook.connectedSourceId);
-
-    expect(published.ok).toBe(true);
-    expect(await sensitivityOf(iri)).toBe("Restricted");
+    expect(await sensitivityOncePublished(scenario, iri, handbook.connectedSourceId)).toBe(
+      "Restricted",
+    );
   });
 
   const acceptedEdit = async (scenario: Scenario, iri: ConceptIri, path: string, body: string) => {
@@ -497,9 +506,9 @@ describe("a save around a source whose document is gone", () => {
     const accepted = await acceptedEdit(scenario, iri, path, "Allowances are paid on the 25th.");
 
     expect(accepted).toMatchObject({ ok: true, value: [{ outcome: { ok: true } }] });
-    const published = await publishedOnceIndexed(db(), scenario.admin, handbook.connectedSourceId);
-    expect(published.ok).toBe(true);
-    expect(await sensitivityOf(iri)).toBe("Restricted");
+    expect(await sensitivityOncePublished(scenario, iri, handbook.connectedSourceId)).toBe(
+      "Restricted",
+    );
   });
 });
 
