@@ -1,10 +1,22 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { CONCEPT_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
+import {
+  CONCEPT_KEYSTROKES as KEY,
+  EDITOR_KEYSTROKES,
+} from "@/features/knowledge/knowledge-state.ts";
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 
 import { expect, test } from "../browser.ts";
-import { anAddress, provision, signIn, skipLinkReachesThePage } from "../harness.ts";
+import {
+  ACTION_SAMPLES,
+  actionClocked,
+  anAddress,
+  clockTheNextKey,
+  provision,
+  signIn,
+  skipLinkReachesThePage,
+  theActionsLandedWithinTheirBudget,
+} from "../harness.ts";
 import { conceptsSeeded, isAFind, listsItsKeystrokes, scrolledSideways } from "../knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
@@ -154,6 +166,8 @@ const atTheConcept = async (page: Page, seeded: Workspace, title: string): Promi
   return concept;
 };
 
+const STATUS_OF_THE_CONCEPT = "//article//output";
+
 const edges = (drawn: Locator) =>
   drawn.evaluate((node) => {
     const { top, bottom, left, right } = node.getBoundingClientRect();
@@ -179,6 +193,49 @@ test.describe("the concept page", () => {
 
     await expect(matchOf(page, RETENTION)).toBeVisible();
     await expect(box, "a row from the search left took focus from the box").toBeFocused();
+  });
+
+  test("acknowledges a save within its budget", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    const seeded = await aWorkspaceOfConcepts(request, "Wye Ledgers");
+    await signedInAsTheAdmin(page, request, seeded);
+    await atTheConcept(page, seeded, COMMITTEE);
+
+    await page.keyboard.press(EDITOR_KEYSTROKES.edit.key);
+    const opened = page.getByRole("region", { name: "Edit This Concept" });
+    await expect(opened.getByRole("heading", { name: "Edit This Concept" })).toBeFocused();
+    await passesTheAccessibilityGate();
+    await opened.getByRole("button", { name: "Markdown" }).click();
+    await expect(opened.getByRole("textbox", { name: "Body" })).toContainText(
+      "The committee meets each quarter.",
+    );
+    await passesTheAccessibilityGate();
+    await opened.getByRole("button", { name: "Close editor" }).click();
+    await expect(opened).toHaveCount(0);
+
+    const samples: number[] = [];
+    let title = COMMITTEE;
+    for (let sample = 1; sample <= ACTION_SAMPLES; sample += 1) {
+      title = `${COMMITTEE} ${String(sample)}`;
+      await page.keyboard.press(EDITOR_KEYSTROKES.edit.key);
+      const editor = page.getByRole("region", { name: "Edit This Concept" });
+      await editor.getByRole("textbox", { name: "Title" }).fill(title);
+
+      await page.keyboard.down("Control");
+      await clockTheNextKey(page, { at: STATUS_OF_THE_CONCEPT, reads: "Saving." });
+      await page.keyboard.press("Enter");
+      await page.keyboard.up("Control");
+
+      samples.push(await actionClocked(page));
+      await expect(conceptOf(page, title).getByRole("status")).toHaveText("Saved.");
+    }
+    theActionsLandedWithinTheirBudget("save", samples);
+
+    await page.reload();
+    await expect(conceptOf(page, title)).toBeVisible();
   });
 
   test("renders within its budget, read by keyboard alone", async ({
