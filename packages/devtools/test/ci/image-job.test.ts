@@ -90,6 +90,11 @@ const input = (step: ImageStep, name: string): string => {
   return typeof value === "string" ? value : "";
 };
 
+const runs = (step: ImageStep): string => step.run ?? "";
+
+const builds = (step: ImageStep): boolean =>
+  (step.uses ?? "").startsWith("docker/build-push-action@");
+
 const probeStepAt = (steps: readonly ImageStep[]): number =>
   steps.findIndex((step) => step.env?.[IMAGE_ID_VARIABLE] !== undefined);
 
@@ -140,10 +145,22 @@ describe("the job that probes every image it pushes", () => {
     const steps = imageJob().steps;
     const loadedAt = steps.findIndex((step) => input(step, "outputs").includes("type=docker"));
     const probedAt = probeStepAt(steps);
-    const pushedAt = steps.findIndex((step) => input(step, "outputs").includes("push=true"));
+    const pushedAt = steps.findIndex((step) => runs(step).includes("docker push"));
 
     expect(loadedAt).toBeGreaterThanOrEqual(0);
     expect(probedAt).toBeGreaterThan(loadedAt);
     expect(pushedAt).toBeGreaterThan(probedAt);
+  });
+
+  it("builds each image once and pushes the bytes it probed", () => {
+    const built = imageJob().steps.filter(builds);
+    const [build] = built;
+    assert(build !== undefined, "the image job builds its image");
+
+    expect(
+      built.length,
+      "a second build can run a step again and push bytes the probe never read",
+    ).toBe(1);
+    expect(input(build, "outputs")).toContain("type=docker");
   });
 });
