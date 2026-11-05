@@ -19,7 +19,9 @@ export const SEARCH_PAGE = pageNamed(BROWSE, "Search");
 
 export const KNOWLEDGE_BASE_PAGE = pageNamed(BROWSE, "Knowledge Base");
 
-const OPENED_FROM_PAGES: readonly Page[] = [SEARCH_PAGE, KNOWLEDGE_BASE_PAGE];
+export const ALL_KNOWLEDGE_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "All Knowledge");
+
+const OPENED_FROM_PAGES: readonly Page[] = [SEARCH_PAGE, KNOWLEDGE_BASE_PAGE, ALL_KNOWLEDGE_PAGE];
 
 const iriOf = (segment: string): string => `${CONCEPT_IRI_PREFIX}${segment}`;
 
