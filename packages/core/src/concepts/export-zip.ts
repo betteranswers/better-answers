@@ -9,7 +9,7 @@ export type ZipEntry = { readonly path: string; readonly bytes: Uint8Array };
 /** A zip without its 64-bit extension counts its entries in 16 bits. */
 const ENTRIES_MAX = 0xff_ff;
 
-const ZIP_BYTES_MAX = 64 * 1024 * 1024;
+const ONE_ANSWER_BYTES_MAX = 64 * 1024 * 1024;
 
 const LOCAL = 0x04_03_4b_50;
 const CENTRAL = 0x02_01_4b_50;
@@ -99,7 +99,7 @@ const packedOf = ({ path, bytes }: ZipEntry, offset: number): Packed => {
 export const zipOf = (
   entries: readonly ZipEntry[],
   at: Date,
-  bytesMax = ZIP_BYTES_MAX,
+  bytesMax = ONE_ANSWER_BYTES_MAX,
 ): Result<Uint8Array, "export-too-large"> => {
   if (entries.length > ENTRIES_MAX) return err("export-too-large");
   const stamp = stampOf(at);

@@ -112,7 +112,7 @@ type Steps<Read, Made> = {
   readonly recorded: (member: UserPrincipal, tx: Tx, read: Read) => Promise<void>;
 };
 
-const exported = async <Read, Made>(
+const readUnheldThenRecorded = async <Read, Made>(
   admin: UserPrincipal,
   door: PostgresDoor,
   at: Date,
@@ -172,7 +172,7 @@ export const exportBundleSnapshot = async (
 > => {
   const admitted = admit(exportBundleAction, principal, {});
   if (!admitted.ok) return err(admitted.error);
-  return exported(admitted.value, doors.postgres, input.at, {
+  return readUnheldThenRecorded(admitted.value, doors.postgres, input.at, {
     read: snapshotRead(doors.git),
     made: ({ head, files }) => {
       const zip = zipOf(files, input.at);
@@ -358,7 +358,7 @@ export const exportRecords = async (
 > => {
   const admitted = admit(exportRecordsAction, principal, {});
   if (!admitted.ok) return err(admitted.error);
-  return exported(admitted.value, door, input.at, {
+  return readUnheldThenRecorded(admitted.value, door, input.at, {
     read: recordsRead,
     made: (records) => {
       const zip = zipOf(
@@ -470,7 +470,7 @@ export const exportGuideSnapshot = async (
 > => {
   const admitted = admit(exportGuideAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
-  return exported(admitted.value, door, input.at, {
+  return readUnheldThenRecorded(admitted.value, door, input.at, {
     read: guideRead(input.guideId, input.at),
     made: (carried) =>
       ok({

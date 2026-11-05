@@ -7,7 +7,7 @@ type SnapshotFile = { readonly path: string; readonly bytes: Uint8Array };
 
 type BundleSnapshot = { readonly head: string; readonly files: readonly SnapshotFile[] };
 
-const SNAPSHOT_BYTES_MAX = 256 * 1024 * 1024;
+const HELD_IN_MEMORY_BYTES_MAX = 256 * 1024 * 1024;
 
 const KNOWLEDGE = "knowledge/";
 
@@ -53,7 +53,7 @@ export const bundleSnapshot = async (
     ({ path }) => path === BUNDLE_MANIFEST_PATH || readable.has(path),
   );
   const bytes = kept.reduce((sum, { size }) => sum + size, 0);
-  if (bytes > (door.snapshotBytesMax ?? SNAPSHOT_BYTES_MAX)) return err("export-too-large");
+  if (bytes > (door.snapshotBytesMax ?? HELD_IN_MEMORY_BYTES_MAX)) return err("export-too-large");
   if (kept.length === 0) return ok({ head, files: [] });
   const batch = await gitBytes(gitDir, ["cat-file", "--batch", "--buffer"], {
     input: kept.map(({ object }) => `${object}\n`).join(""),

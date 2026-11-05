@@ -29,7 +29,7 @@ type Floor = {
   readonly postgres: PostgresDoor;
   readonly admin: UserPrincipal;
   readonly owner: UserPrincipal;
-  readonly idle: UserPrincipal;
+  readonly ownsNothing: UserPrincipal;
   readonly viewer: UserPrincipal;
 };
 
@@ -43,7 +43,7 @@ const aFloor = async (): Promise<Floor> => {
     postgres: door,
     admin,
     owner,
-    idle: await joinedAs(db(), workspaceId, "Editor"),
+    ownsNothing: await joinedAs(db(), workspaceId, "Editor"),
     viewer: await joinedAs(db(), workspaceId, "Viewer", { name: "Victor Viewer" }),
   };
 };
@@ -89,7 +89,7 @@ describe("who may read the Curation tables", () => {
     await shelved(floor, [{ path: "knowledge/company/expenses.md" }]);
 
     const owning = await read(floor, floor.owner);
-    const owningNothing = await read(floor, floor.idle);
+    const owningNothing = await read(floor, floor.ownsNothing);
 
     expect(owning).toMatchObject(ADMITTED);
     expect(owningNothing).toEqual(REFUSED);
