@@ -1,7 +1,7 @@
 import { assert, describe, expect, it } from "vitest";
 import type { z } from "zod";
 
-import { ulid } from "@better-answers/schema";
+import { AUDIENCE_GROUPS, CONCEPT_DRAFT_STATUS, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -752,6 +752,66 @@ describe("the audit log's subjects", () => {
         },
       ],
       [handbook, { [STORED_DETAIL_KEYS.connectedSourceId]: handbook }],
+    ]);
+  });
+
+  it("names a concept, draft or not, to its audience alone", async () => {
+    const workspace = await provisionedWorkspace(db(), "Audienced");
+    const { workspaceId, adminUserId } = workspace;
+    const actor = `human:${adminUserId}`;
+    const [board = "", finance = ""] = await groupsMadeBy(workspace, adminUserId, [
+      "Board",
+      "Finance",
+    ]);
+    done(
+      await acting(workspace, adminUserId, (principal, tx) =>
+        addToGroup(principal, tx, { groupId: finance, userId: adminUserId }),
+      ),
+    );
+    await seedingWith(db().pool, async (seed) => {
+      const concepts = [
+        await seed.conceptIndex({
+          workspaceId,
+          title: "Board Pay Secret",
+          audience: AUDIENCE_GROUPS,
+          audienceGroups: [board],
+        }),
+        await seed.conceptIndex({
+          workspaceId,
+          title: "Budget draft",
+          audience: AUDIENCE_GROUPS,
+          audienceGroups: [finance],
+          status: CONCEPT_DRAFT_STATUS,
+          publishedAt: null,
+        }),
+      ];
+      for (const { iri } of concepts) {
+        await seed.auditEvent({
+          workspaceId,
+          action: "knowledge.concept.committed",
+          actor,
+          subjectId: iri,
+          detail: { iri },
+        });
+        await seed.auditEvent({
+          workspaceId,
+          action: "knowledge.owner.named",
+          actor,
+          subjectId: iri,
+          detail: { iri, personId: adminUserId },
+        });
+      }
+    });
+
+    const events = pageOf(await readAs(workspace, adminUserId)).events;
+
+    const withheld = { kind: "withheld", of: "concept" };
+    const draft = { kind: "concept", name: "Budget draft" };
+    expect(events.slice(0, 4).map(({ subject, named }) => [subject, named["iri"]])).toEqual([
+      [null, draft],
+      [draft, draft],
+      [null, withheld],
+      [withheld, withheld],
     ]);
   });
 

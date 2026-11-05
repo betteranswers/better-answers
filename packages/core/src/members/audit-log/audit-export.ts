@@ -86,10 +86,10 @@ const ACTOR_WORDS = {
   "former-member": GONE_WORDS["former-member"],
 } as const satisfies Readonly<Record<Exclude<AuditEventActor["kind"], "person">, string>>;
 
-const REMOVED_WORDS = {
-  "connected-source": "a connected source (removed)",
-  document: "a document (removed)",
-  concept: "a concept (removed)",
+const THING_WORDS = {
+  "connected-source": "a connected source",
+  document: "a document",
+  concept: "a concept",
 } as const satisfies Readonly<
   Record<Extract<AuditEventSubject, { kind: "removed" }>["of"], string>
 >;
@@ -104,7 +104,8 @@ const subjectWords = (subject: AuditEventSubject): string => {
   if ("displayName" in subject) return personWords(subject);
   if ("name" in subject) return subject.name;
   if ("address" in subject) return subject.address;
-  if (subject.kind === "removed") return REMOVED_WORDS[subject.of];
+  if (subject.kind === "removed") return `${THING_WORDS[subject.of]} (removed)`;
+  if (subject.kind === "withheld") return `${THING_WORDS[subject.of]} you cannot read`;
   return GONE_WORDS[subject.kind];
 };
 

@@ -8,7 +8,15 @@ export const THING_NOUNS = {
 
 export type Thing = keyof typeof THING_NOUNS;
 
-export const removedWords = (of: Thing): string => `a ${THING_NOUNS[of]} (removed)`;
+const UNNAMED_BECAUSE = {
+  removed: "(removed)",
+  withheld: "you cannot read",
+} as const;
+
+export const unnamedWords = (thing: {
+  readonly kind: keyof typeof UNNAMED_BECAUSE;
+  readonly of: Thing;
+}): string => `a ${THING_NOUNS[thing.of]} ${UNNAMED_BECAUSE[thing.kind]}`;
 
 export const GONE_WORDS = {
   "former-member": byWords({ kind: "former-member" }),

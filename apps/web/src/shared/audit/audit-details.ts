@@ -1,6 +1,6 @@
 import type { DECLARED_ACTIONS } from "./audit-actions.ts";
 import type { ReadAuditEvent } from "./audit-event.ts";
-import { GONE_WORDS, personSaid, removedWords } from "./audit-subjects.ts";
+import { GONE_WORDS, personSaid, unnamedWords } from "./audit-subjects.ts";
 
 type DeclaredAction = (typeof DECLARED_ACTIONS)[number];
 
@@ -143,13 +143,12 @@ type Said = { readonly value: string; readonly address?: string };
 
 const saidOf = (named: Named): Said => {
   if ("name" in named) return { value: named.name };
+  if ("of" in named) return { value: unnamedWords(named) };
   switch (named.kind) {
     case "person":
       return personSaid(named.displayName, named.address);
     case "invitation":
       return { value: named.address };
-    case "removed":
-      return { value: removedWords(named.of) };
     case "former-member":
     case "deleted-group":
     case "erased-invitation":

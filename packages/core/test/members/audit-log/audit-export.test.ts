@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
+import { AUDIENCE_GROUPS } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
 import type { Result, Role, UserPrincipal } from "../../../src/kernel/index.ts";
@@ -283,6 +284,34 @@ describe("the audit log's export", () => {
 
     expect(linesOf(file)[1]).toContain(`,"Staff handbook",`);
     expect(linesOf(file)[2]).toContain(`,"a connected source (removed)",`);
+  });
+
+  it("writes no title of a concept outside the Admin's audience", async () => {
+    const workspace = await provisionedWorkspace(db(), "ExportWithheld");
+    const { workspaceId } = workspace;
+    await seedingWith(db().pool, async (seed) => {
+      const board = await seed.group({ workspaceId, name: "Board" });
+      const concept = await seed.conceptIndex({
+        workspaceId,
+        title: "Board Pay Secret",
+        audience: AUDIENCE_GROUPS,
+        audienceGroups: [board.id],
+      });
+      await seed.auditEvent({
+        workspaceId,
+        action: "knowledge.concept.committed",
+        actor: `human:${workspace.adminUserId}`,
+        subjectId: concept.iri,
+        detail: { iri: concept.iri },
+      });
+    });
+
+    const file = exported(
+      await exportAs(workspace, workspace.adminUserId, { family: "knowledge" }),
+    );
+
+    expect(linesOf(file)[1]).toContain(`,"a concept you cannot read",`);
+    expect(file.csv).not.toContain("Board Pay Secret");
   });
 
   it("writes a display name starting with = after an apostrophe", async () => {
