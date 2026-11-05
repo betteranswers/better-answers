@@ -180,13 +180,6 @@ describe("the next step", () => {
     );
   });
 
-  it("adds the label once the ask is 10 minutes old", () => {
-    const result = assessed("5", [NOT_STARTED, SKIPPED], { comments: [comment(ASK, 11)] });
-
-    expect(result.exitCode).toBe(1);
-    expect(nextOf(result.report)).toBe(addLabel("5"));
-  });
-
   it("adds the label when Cubic answers with its limit", () => {
     const result = assessed("5", [NOT_STARTED, SKIPPED], {
       comments: [comment(ASK, 3), comment(LIMIT_REPLY, 3, "cubic-dev-ai")],
@@ -207,7 +200,7 @@ describe("the next step", () => {
   it.each([
     ["an earlier Cubic review", [NOT_STARTED, SKIPPED], { reviews: CUBIC_REVIEWED_BEFORE }],
     ["the limit on the head's run", [OVER_LIMIT, SKIPPED], {}],
-    ["an ask for an earlier head", [], { comments: [comment(ASK)] }],
+    ["an ask over 10 minutes old", [], { comments: [comment(ASK, 11)] }],
   ])("adds the label after %s", (_cause, runs, rest) => {
     const result = assessed("5", runs, rest);
 
