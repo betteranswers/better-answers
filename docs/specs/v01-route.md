@@ -1,6 +1,6 @@
 # The v0.1 route
 
-The route is the way from the foundation to a finished v0.1, cut into blocks. This file holds the status table and the rules a session follows to pick a block and keep the table accurate. The table is the one home of each block's strand, status, next marker, waits and plan. Each live block's brief is `docs/specs/route/<id>.md`. `docs/specs/route/seams.md` names the test seams a brief cites.
+Each block's strand, status, next marker, waits and plan live only in this table. A live block's brief is `docs/specs/route/<id>.md`, and `docs/specs/route/seams.md` names the test seams.
 
 ## Where each block stands
 
@@ -22,65 +22,61 @@ The route is the way from the foundation to a finished v0.1, cut into blocks. Th
 | [O1](route/o1.md) | ops | Signals, System's cards, backups, and the Erasure and suppression page | S0 | unplanned | | |
 | [C1](route/c1.md) | customer | The first customer onboarded, and its real answer tests read | S5, S6, P1, O1 | unplanned | | |
 
-Every block gates v0.1 except S8, which is in reserve. Rows are in build order within a strand. The specs of S0, S1 and P2 left the tree in `e19cfb9d4`, and `git show` reads each at that commit's parent.
+Every block gates v0.1 except S8, the reserve. Rows are in build order within a strand.
 
 ## How a session uses the route
 
 ### Pick a block
 
-1. Read the table above. You need nothing else to pick.
-2. If a row on your strand is building, continue it. Open its plan and build the units that have not merged. Do not plan it again.
-3. Otherwise, take the row marked next on your strand. The owner's prompt names the strand. If it names none, take any strand's next row.
-4. If your strand has no next row, take the first row, in table order, that is planned or unplanned and whose Blocked by entries are all met. Build a planned row from its plan.
-5. A parallel session may take a second row on a strand by rule 4. Two sessions never take one block.
-6. Read the block's brief, `docs/specs/route/<id>.md`. List the open Linear issues that carry the block's label, from the Route Block label group.
+1. If a row on your strand is building, build its unmerged units from its plan without replanning.
+2. Otherwise take the next row on the strand the owner's prompt names, or on any strand if it names none.
+3. If that strand has no next row, take the first planned or unplanned row whose Blocked by entries are all met. Build a planned row from its plan.
+4. A parallel session may take a second row on a strand by rule 3. Two sessions never take one block.
+5. Read the brief and list the block's open Linear issues, labelled from the Route Block group.
 
 ### Read the Blocked by cell
 
 - A bare id, such as `S3`, is met when that row is done.
-- An id followed by bracketed words, such as `S7 (the by-sync filter)`, blocks only the units those words name. Plan the block anyway, and list the entry among those units' dependencies. Remove the entry in the pull request that merges the last unit it names.
-- `trigger` on a reserve row means the row waits on the measure its brief names.
+- An id with bracketed words, such as `S7 (the by-sync filter)`, blocks only the units those words name. Plan the block anyway, list the entry among those units' dependencies, and remove it when the last of them merges.
+- `trigger` means the reserve row waits on its brief's measure.
 
 ### Change the table
 
-Change a row in the pull request that makes the change true. Each fact has one cell, so each change is one edit.
+Edit a row in the pull request that makes the change true.
 
 | When | Edit |
 | --- | --- |
-| The pull request that adds the block's plan | Status to `planned`, and the plan's link in Plan |
-| The first pull request that builds the block | Status to `building`, and Next cleared |
-| The last unit has merged, and every Done when check in the brief holds | Status to `done`, the brief deleted from `docs/specs/route/`, and the Block cell unlinked |
-| A plan or an owner ruling changes what a block waits on | Blocked by |
-| A reserve row's trigger fires | Status to `unplanned` |
-
-Before a row turns done, file what the block still owes as Linear issues under its label. A block is done when its Done when checks hold, not when every issue on its label has closed. Work that lands ahead of its block, with the owner's agreement, leaves the status alone. That pull request moves the work's line from the brief's Must carry to its Builds on.
+| The pull request adding the plan | Status `planned`, and the plan linked in Plan |
+| The first building pull request | Status `building`, and Next cleared |
+| The last unit merges and every Done when check holds | Status `done`, the brief deleted, the Block cell unlinked, and what the block still owes filed as issues under its label |
+| A plan or owner ruling changes a block's waits | Blocked by |
+| A reserve row's trigger fires | Status `unplanned` |
+| Work lands ahead of its block, with the owner's agreement | Status unchanged, and the work's line moves from Must carry to Builds on |
 
 ### Keep a brief current
 
-- A brief states what is true now and what the block still owes. It holds no date, no struck text and no account of who ruled when.
-- When the owner rules, rewrite the statement the ruling changes. Cite the ruling's ADR, plan or issue if it has one. Otherwise the statement stands on its own.
-- If a brief disagrees with an ADR, the glossary or the tree, rewrite the brief's line to match, in the pull request that found the disagreement. The ADR wins first, then the glossary, then the tree.
-- A brief lists no issues, because the Linear label does. It cites a `BA-N` only inside the obligation whose detail that issue holds.
-- A plan edits its block's brief only to remove an obligation that no longer stands or to add one that is missing. The plan's own design stays in the plan.
+- A brief states what is true now and what the block still owes, with no dates, struck text or ruling history.
+- When the owner rules, rewrite what the ruling changes and cite its ADR, plan or issue if any.
+- An ADR, then the glossary, then the tree win over a brief. Fix the brief in the pull request that finds the disagreement.
+- A brief cites a `BA-N` only inside the obligation whose detail that issue holds. The Linear label lists the issues.
+- A plan edits its brief only to drop an obligation that no longer stands or add a missing one.
 
 ### Put everything else in its place
 
 | What | Where |
 | --- | --- |
-| A measurement, such as a recall reading | A row under its measure in `docs/operations/readings.md` |
-| Work not yet planned, or a finding put off for later | A Linear issue, with a block's label where it belongs to one |
+| A measurement | A row under its measure in `docs/operations/readings.md` |
+| Unplanned work, or a finding put off | A Linear issue, with its block's label if it has one |
 | A decision that is hard to reverse | Its ADR under `docs/solutions/architecture-patterns/` |
 | A user story | `docs/specs/v01-stories.md` |
 | What happened, and when | git, and `docs/archive/plans/` for a complete plan |
 
 ## Not in v0.1
 
-- The bids-and-proposals stage, and the Then and Later stages of `VISION.md`. S5 and S6 fix the knowledge-side contract the next stage consumes.
-- Agent capabilities beyond the four read entries: `action:*` scopes, Agent Auth, the approval layer and the packaged client-side plugin.
-- An MCP App that shows a concept file inside Claude. It gets its own plan.
-- Imported and vendor bundles, the sensitivity-filtered bundle export, a read-only clone endpoint, and scheduled exports.
+- The bids-and-proposals stage, and `VISION.md`'s Then and Later stages. S5 and S6 fix the knowledge-side contract the next stage consumes.
+- Agent capabilities beyond the four read entries: `action:*` scopes, Agent Auth, the approval layer and the packaged client-side plugin. An MCP App showing a concept file inside Claude gets its own plan.
+- Imported and vendor bundles, the sensitivity-filtered bundle export, a read-only clone endpoint and scheduled exports.
 - A `.docx` response set with real footnotes, JavaScript-rendered pages in the website connector, and local embedding on the first estate.
-- A metrics store, SLOs, tracing and a status page.
-- Ontology curation beyond the Kinds list.
-- Multi-process repository locking, a second api process, and a resize of the estate.
-- Desktop Safari and Firefox. v0.1 supports Chromium on the desktop, which is Chrome and Microsoft Edge, and WebKit on the iPhone, which is every iOS browser. The browser suite runs Chromium only, and C1 adds the iPhone run.
+- A metrics store, SLOs, tracing, a status page, and ontology curation beyond the Kinds list.
+- Multi-process repository locking, a second api process, and an estate resize.
+- Desktop Safari and Firefox. v0.1 supports desktop Chromium and iPhone WebKit, and C1 adds the iPhone run to the browser suite.
