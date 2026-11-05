@@ -70,6 +70,7 @@ export const aSection = (changes: Changes = {}) => ({
   hidden: false,
   needsReview: null,
   trustWords: "Verified automatically",
+  copy: "offered",
   coverage: { met: 3, of: 4, facts: [aFact()] },
   brief: aBrief(),
   ...changes,
@@ -105,5 +106,17 @@ export const aGuideApi = (role: "Admin" | "Editor" | "Viewer", guide = aGuide())
 };
 
 export const SAVE_BRIEF = "knowledge.saveBrief";
+
+export const BRIEF_COPY = "knowledge.briefCopy";
+
+export const RECORD_COPY = "knowledge.recordCopy";
+
+export const aBriefCopy = (changes: Changes = {}) => ({
+  version: 2,
+  html: "<p>Pallets are racked<sup>1</sup> by row.</p>",
+  text: "Pallets are racked[1] by row.\n\nSources\n[1] Racking plan. No source recorded.",
+  footnotes: 1,
+  ...changes,
+});
 
 export const INCLUDE = "knowledge.includeAvailable";

@@ -47,6 +47,18 @@ export const GUIDE_WORDS = {
   included: (number: string): string => `Included in section ${number}.`,
   selectFirst: "Please select a section first.",
   nothingToAdd: "No fact is missing from this section, so there is nothing to add.",
+  copy: "Copy",
+  copying: (number: string): string => `Copying section ${number}.`,
+  copied: (number: string, footnotes: number): string =>
+    footnotes === 0
+      ? `Copied section ${number}. It has no footnotes.`
+      : `Copied section ${number} with ${counted(footnotes, "footnote", "footnotes")}. Numbers start at 1 in each copy.`,
+  notRecorded: "The copy was not recorded.",
+  notAllowed: "Your browser did not allow copying. Nothing was copied.",
+  belowYourRole:
+    "You can’t copy this section yet. The concepts it rests on are not verified enough for your role.",
+  nothingToCopy: "Copy isn’t available for this section.",
+  closeToCopy: "Close the editor before you copy this section. Copy takes the saved Brief.",
 } as const;
 
 export const BRIEF_WORDS = {
@@ -83,4 +95,5 @@ export const SAID_OF_GUIDES = {
     "A footnote in the Brief points at a concept this section no longer includes. Please remove it, then save again.",
   "stale-precondition": BRIEF_WORDS.stale,
   "role-forbids": "Only an Editor or an Admin can change a guide.",
+  "below-action-threshold": GUIDE_WORDS.belowYourRole,
 } satisfies OwnSentences;

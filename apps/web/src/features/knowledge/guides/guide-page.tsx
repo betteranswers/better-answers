@@ -26,7 +26,7 @@ import {
 } from "./guide-state.ts";
 import { GUIDE_WORDS as WORDS, SAID_OF_GUIDES } from "./guide-words.ts";
 
-const READING = [KEY.showDetail, KEY.addFact];
+const READING = [KEY.showDetail, KEY.addFact, KEY.copyBrief];
 
 const EDITING = [...READING, KEY.editBrief, KEY.saveBrief, KEY.leave];
 
@@ -41,6 +41,11 @@ const controlOf = (row: Element, action: SectionAction): HTMLElement | null => {
   return fact?.querySelector<HTMLElement>(wanted) ?? row.querySelector<HTMLElement>(wanted);
 };
 
+const NOTHING_TO_DO: ReadonlyMap<SectionAction, string> = new Map([
+  [SECTION_ACTIONS.addFact, WORDS.nothingToAdd],
+  [SECTION_ACTIONS.copyBrief, WORDS.nothingToCopy],
+]);
+
 const useSectionKeys = (guide: Guide, say: Say) => {
   const editor = canEdit(guide);
   const press = (action: SectionAction) => () => {
@@ -50,12 +55,17 @@ const useSectionKeys = (guide: Guide, say: Say) => {
       return;
     }
     const control = controlOf(row, action);
-    if (control !== null) control.click();
-    else if (action === SECTION_ACTIONS.addFact) say(said(WORDS.nothingToAdd));
+    if (control !== null) {
+      control.click();
+      return;
+    }
+    const nothing = NOTHING_TO_DO.get(action);
+    if (nothing !== undefined) say(said(nothing));
   };
   useKeystroke(KEY.showDetail, press(SECTION_ACTIONS.showDetail));
   useKeystroke(KEY.addFact, press(SECTION_ACTIONS.addFact));
   useKeystroke(KEY.editBrief, press(SECTION_ACTIONS.editBrief));
+  useKeystroke(KEY.copyBrief, press(SECTION_ACTIONS.copyBrief));
 };
 
 function NoSuchGuide() {
