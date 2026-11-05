@@ -8,8 +8,13 @@ export const SEARCH_KEYSTROKES = {
   more: { key: "m", action: "Show More Matches" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
+export const wayBackKeystroke = (page: string): Keystroke => ({
+  key: "b",
+  action: `Go Back to ${page}`,
+});
+
 export const CONCEPT_KEYSTROKES = {
-  back: { key: "b", action: "Go Back to Search" },
+  back: wayBackKeystroke("Search"),
   sources: { key: "s", action: "Go to the Concept’s Sources" },
   links: { key: "l", action: "Go to the Concept’s Links" },
 } as const satisfies Readonly<Record<string, Keystroke>>;

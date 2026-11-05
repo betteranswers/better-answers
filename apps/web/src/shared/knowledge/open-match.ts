@@ -1,13 +1,21 @@
-import { useNavigate, useRouter } from "@tanstack/react-router";
+import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useCallback } from "react";
 
-type Opening = { readonly key: string; readonly page: string; readonly searchQuery?: string };
+import { OPENED_FROM } from "@/shared/knowledge/concept-address.ts";
+
+type Opening = { readonly key: string; readonly page: string };
+
+export const useOpenedFrom = (): string | undefined =>
+  useRouterState({
+    select: (state) => OPENED_FROM.safeParse(state.location.state).data?.openedFrom,
+  });
 
 export const useOpenMatch = (): ((opening: Opening) => void) => {
   const router = useRouter();
   const navigate = useNavigate();
   return useCallback(
-    ({ key, page, searchQuery }) => {
+    ({ key, page }) => {
+      const { pathname, searchStr } = router.latestLocation;
       void navigate({
         to: ".",
         search: true,
@@ -18,7 +26,11 @@ export const useOpenMatch = (): ((opening: Opening) => void) => {
       router.history.flush();
       void navigate({
         href: page,
-        state: (held) => ({ ...held, openedMatch: undefined, searchQuery }),
+        state: (held) => ({
+          ...held,
+          openedMatch: undefined,
+          openedFrom: `${pathname}${searchStr}`,
+        }),
       });
     },
     [router, navigate],

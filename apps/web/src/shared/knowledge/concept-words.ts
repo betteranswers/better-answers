@@ -6,7 +6,7 @@ export const EVIDENCE_WORDS = {
 export const CONCEPT_WORDS = {
   loading: "The concept is still loading.",
   untitled: "Untitled Concept",
-  toSearch: "Back to Search",
+  backTo: (page: string): string => `Back to ${page}`,
   sources: "Sources",
   verification: "Verification",
   links: "Links",
