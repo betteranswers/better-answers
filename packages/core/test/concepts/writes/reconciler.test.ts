@@ -982,6 +982,29 @@ describe("an acceptance whose rows were lost", () => {
       merge_key: "Guideline:hot desking",
     });
   });
+
+  it("re-keys a retitle to its new title, as accepting does", async () => {
+    const scenario = await arrange();
+    const input = guideline("Expenses");
+    const standing = await landed(scenario, scenario.editor, input);
+    const item = await raised(
+      scenario,
+      requestFor("Travel expenses", {
+        mergeKey: input.mergeKey,
+        path: input.path,
+        baseContentHash: standing.contentHash,
+      }),
+    );
+    const sha = await acceptInTheWindow(scenario, item);
+
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({ replayed: [sha], stopped: undefined });
+    expect(await conceptRow(scenario.workspaceId, standing.iri)).toMatchObject({
+      title: "Travel expenses",
+      merge_key: "Guideline:travel expenses",
+    });
+  });
 });
 
 describe("a concept carrying a __proto__ front-matter key", () => {
