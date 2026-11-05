@@ -3,7 +3,7 @@ import { inspect } from "node:util";
 import { assert, beforeAll, describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
-import { ids, type ConceptIri } from "@better-answers/schema";
+import { ids, passageLocatorOf, ulid, type ConceptIri } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
 import { open, renderOpen } from "../../../src/answering/index.ts";
@@ -28,6 +28,7 @@ import {
   suiteWithBundles,
   type Scenario,
 } from "../../fixtures/workspace-with-bundle.ts";
+import { documentLanded } from "../../support/suite-documents.ts";
 import {
   addressOf,
   holdingTable,
@@ -152,6 +153,21 @@ const soundBundle = (verifiers: Verifiers): BundleTree => {
     }),
   });
 };
+
+const MINUTED = "company/answers/minuted.md";
+
+const MINUTES = { title: "Board minutes", text: "Pay rises in March." };
+
+const citingIn = (verifiers: Verifiers, locator: string): BundleTree =>
+  treeOf({
+    "manifest.yaml": MANIFEST,
+    [MINUTED]: conceptFile({
+      title: "Minuted",
+      verified: [{ by: humanOf(verifiers.mona), at: VERIFIED_AT }],
+      sources: `  - title: Board minutes\n    resource: minutes\n    locator: "${locator}"\n`,
+      body: "Pay rises in March.",
+    }),
+  });
 
 const PATHS_IN_ORDER = [
   "knowledge/company/answers/data-retention-period.md",
@@ -859,6 +875,20 @@ describe("importing the bundle", () => {
       new Set((await indexRows(scenario.workspaceId)).map((row) => row["sensitivity"])),
     ).toEqual(new Set(["Restricted"]));
   });
+
+  it("lands a citation of a document this workspace holds", async () => {
+    const { scenario, verifiers } = await arranged();
+    const minutes = await documentLanded(db().pool, scenario.workspaceId, MINUTES);
+
+    const run = await imported(scenario, citingIn(verifiers, minutes.locator));
+
+    expect(run.landed).toEqual([`knowledge/${MINUTED}`]);
+    const cited = await db().pool.query(
+      "SELECT source_document_id FROM concept_evidence WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(cited.rows).toEqual([{ source_document_id: minutes.documentId }]);
+  });
 });
 
 describe("the second pass: each relative link becomes its concept's iri", () => {
@@ -1255,6 +1285,25 @@ describe("what the import refuses before it writes anything", () => {
       ok: false,
       error: { kind: "unsound", ...unsound },
     });
+    await nothingWritten(scenario);
+  });
+
+  it("refuses another workspace's document as it refuses none", async () => {
+    const { scenario, verifiers } = await arranged();
+    const elsewhere = await arrange();
+    const theirs = await documentLanded(db().pool, elsewhere.workspaceId, MINUTES);
+    const nowhere = passageLocatorOf(ulid(), 0, 4);
+
+    const refusals = [
+      await importing(scenario, scenario.admin, { tree: citingIn(verifiers, theirs.locator) }),
+      await importing(scenario, scenario.admin, { tree: citingIn(verifiers, nowhere) }),
+    ];
+
+    const uncatalogued = (about: string) => ({
+      ok: false,
+      error: { kind: "unsound", file: MINUTED, reason: "document-not-catalogued", about },
+    });
+    expect(refusals).toEqual([uncatalogued(theirs.locator), uncatalogued(nowhere)]);
     await nothingWritten(scenario);
   });
 
