@@ -8,9 +8,10 @@ import {
   type SUGGESTION_KINDS,
 } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
+import { MOST_OWNERS_AT_ONCE } from "@better-answers/schema/concept-file";
 
 import { readableClause, readableParameters } from "../access/index.ts";
-import { action, declareActions, record } from "../audit/index.ts";
+import { action, declareActions, record, recordEach } from "../audit/index.ts";
 import {
   admit,
   ADMIN_ALONE,
@@ -221,7 +222,7 @@ const OWNS_A_COLLECTION = `SELECT 1 FROM concept_owner
     WHERE workspace_id = $1 AND person_id = $2 AND collection IS NOT NULL
     LIMIT 1`;
 
-const collectionOwnerAdmits = async (
+export const collectionOwnerAdmits = async (
   reader: UserPrincipal,
   tx: Tx,
 ): Promise<OwnerRefusal | undefined> => {
@@ -364,4 +365,95 @@ export const nameOwner = async (
     detail: personId === null ? subject : { ...subject, personId },
   });
   return ok({ auditEventId, personId });
+};
+
+export const nameOwnerOfEachInput = z.strictObject({
+  iris: z.array(ids.conceptIri).min(1).max(MOST_OWNERS_AT_ONCE),
+  personId: boundarySchemas.conceptOwner.insert.shape.personId,
+});
+
+export type NameOwnerOfEachInput = z.input<typeof nameOwnerOfEachInput>;
+
+const nameOwnerOfEachAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: z.custom<NameOwnerOfEachInput>(),
+  refuses: ["role-forbids", "malformed", "no-such-member", "no-such-concept"],
+});
+
+export type NameOwnerOfEachRefusal = RefusalOf<typeof nameOwnerOfEachAction> | Error;
+
+export type OwnersNamed = {
+  readonly named: number;
+  readonly batchId: string | undefined;
+};
+
+const READABLE_CONCEPTS_LOCKED = `SELECT i.iri
+    FROM concept_identity i
+    JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
+   WHERE i.workspace_id = $1 AND i.iri = ANY($2::text[]) AND ${readableClause("c", 3)}
+   ORDER BY i.iri
+     FOR NO KEY UPDATE OF i`;
+
+const refusalBeforeNamingEach = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  iris: readonly string[],
+  personId: string,
+): Promise<RefusalOf<typeof nameOwnerOfEachAction> | undefined> => {
+  const member = await tx.query("SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2", [
+    admin.workspaceId,
+    personId,
+  ]);
+  if (member.rowCount === 0) return "no-such-member";
+  const readable = await tx.query(READABLE_CONCEPTS_LOCKED, [
+    admin.workspaceId,
+    iris,
+    ...readableParameters(admin),
+  ]);
+  return readable.rowCount === iris.length ? undefined : "no-such-concept";
+};
+
+const OVERRIDE_EACH = `INSERT INTO concept_owner (workspace_id, id, iri, person_id)
+    SELECT $1::text, minted.id, minted.iri, $4::text
+      FROM unnest($2::text[], $3::text[]) AS minted(iri, id)
+    ON CONFLICT (workspace_id, iri) WHERE iri IS NOT NULL
+    DO UPDATE SET person_id = EXCLUDED.person_id`;
+
+const checkedAndWrittenForEach = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  iris: readonly string[],
+  personId: string,
+): Promise<RefusalOf<typeof nameOwnerOfEachAction> | undefined> => {
+  const refusal = await refusalBeforeNamingEach(admin, tx, iris, personId);
+  if (refusal === undefined) {
+    await tx.query(OVERRIDE_EACH, [admin.workspaceId, iris, iris.map(() => ulid()), personId]);
+  }
+  return refusal;
+};
+
+export const nameOwnerOfEach = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: NameOwnerOfEachInput,
+): Promise<Result<OwnersNamed, NameOwnerOfEachRefusal>> => {
+  const admitted = admit(nameOwnerOfEachAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const admin = admitted.value;
+  const parsed = nameOwnerOfEachInput.safeParse(input);
+  if (!parsed.success) return err("malformed");
+  const { personId } = parsed.data;
+  const iris = [...new Set(parsed.data.iris)].toSorted(byCodeUnit);
+
+  const written = await attempt(() => checkedAndWrittenForEach(admin, tx, iris, personId));
+  if (!written.ok) return err(written.error);
+  if (written.value !== undefined) return err(written.value);
+
+  const batchId = await recordEach(
+    admin,
+    tx,
+    OWNER_ACTIONS.named,
+    iris.map((iri) => ({ subjectId: iri, detail: { iri, personId } })),
+  );
+  return ok({ named: iris.length, batchId });
 };

@@ -3,12 +3,7 @@ import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
-import {
-  BROWSE,
-  conceptMatchKey,
-  conceptPageOf,
-  wayBackOf,
-} from "@/shared/knowledge/concept-address.ts";
+import { conceptMatchKey, conceptPageOf, wayBackOf } from "@/shared/knowledge/concept-address.ts";
 import { ConceptBody, LINK, type MarkOpening } from "@/shared/knowledge/concept-body.tsx";
 import {
   dayOf,
@@ -40,6 +35,7 @@ import { RowLink } from "@/shared/list/grid-table.tsx";
 import { keyed } from "@/shared/list/keyed.ts";
 import { ListState } from "@/shared/list/list-pages.tsx";
 import { SummaryRow } from "@/shared/list/summary-row.tsx";
+import { headingOf } from "@/shared/navigation.ts";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { useRoomBeside } from "@/shared/page/wide-layout.ts";
@@ -416,10 +412,11 @@ function ConceptRead(properties: { readonly iri: string; readonly heading: Headi
 export function ConceptPage(properties: { readonly iri: string | undefined }) {
   const { iri } = properties;
   const heading = useRef<HTMLHeadingElement>(null);
+  const group = headingOf(wayBackOf(useOpenedFrom()).page);
 
   return (
     <>
-      <PageHead heading={BROWSE.name} headingRef={heading} />
+      <PageHead heading={group} headingRef={heading} />
       {iri === undefined ? (
         <NoSuchConcept />
       ) : (

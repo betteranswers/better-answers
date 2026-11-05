@@ -1,5 +1,6 @@
 import { find, findInput, open, openInput, type OpenResult } from "@better-answers/core/answering";
 import {
+  allKnowledgeInput,
   briefCopy,
   briefCopyInput,
   collectionOwnerNamed,
@@ -7,10 +8,20 @@ import {
   collectionsAndOwners,
   conceptToEdit,
   conceptToEditInput,
+  exportBundleInput,
+  exportBundleSnapshot,
+  exportGuideInput,
+  exportGuideSnapshot,
+  exportRecords,
+  exportRecordsInput,
   kindConceptsInput,
   nameOwner,
   nameOwnerInput,
+  nameOwnerOfEach,
+  nameOwnerOfEachInput,
+  readAllKnowledge,
   readKindConcepts,
+  readKinds,
   readKnowledgeTree,
   readSectionTrusts,
   recordCopy,
@@ -46,13 +57,14 @@ import {
 import { passageAt } from "@better-answers/core/sources";
 import type { Tx } from "@better-answers/core/store/postgres";
 
-import { MCP_TOKEN_RULE } from "../auth/constants.ts";
+import { KNOWLEDGE_EXPORT_PERSON_RULE, MCP_TOKEN_RULE } from "../auth/constants.ts";
 import { doorTold, type Doors } from "../doors.ts";
 import {
   answeredBy,
   crossing,
   given,
   mutationProcedure,
+  ownTransactionCeiling,
   ownTransactionProcedure,
   parsedBy,
   queryCeiling,
@@ -142,6 +154,16 @@ const writingGuide = <Value, Refused>(
   return write({ git: bundle.value, postgres: doors.postgres, clock: doors.clock });
 };
 
+const asBase64 = <Held extends { readonly zip: Uint8Array }>({
+  zip,
+  ...rest
+}: Held): Omit<Held, "zip"> & { readonly base64: string } => ({
+  ...rest,
+  base64: Buffer.from(zip).toString("base64"),
+});
+
+const exportingFrom = ownTransactionCeiling(KNOWLEDGE_EXPORT_PERSON_RULE);
+
 export const KNOWLEDGE_CEILING: RoadCeiling = { budget: "knowledge", rule: MCP_TOKEN_RULE };
 
 export const knowledgeReadProcedure = queryCeiling(KNOWLEDGE_CEILING);
@@ -225,6 +247,56 @@ export const knowledgeRouter = router({
     crossing(ctx, collectionsAndOwners.name, collectionsAndOwners(ctx.principal, ctx.tx)),
   ),
   nameOwner: mutationProcedure.input(parsedBy(nameOwnerInput)).mutation(answeredBy(nameOwner)),
+  allKnowledge: queryProcedure.input(parsedBy(allKnowledgeInput)).query(({ ctx, input }) =>
+    crossing(
+      ctx,
+      readAllKnowledge.name,
+      given(input, (asked) => readAllKnowledge(ctx.principal, ctx.tx, asked, ctx.clock.now())),
+    ),
+  ),
+  kinds: queryProcedure.query(({ ctx }) =>
+    crossing(ctx, readKinds.name, readKinds(ctx.principal, ctx.tx)),
+  ),
+  setOwners: mutationProcedure
+    .input(parsedBy(nameOwnerOfEachInput))
+    .mutation(answeredBy(nameOwnerOfEach)),
+  exportBundle: exportingFrom.input(parsedBy(exportBundleInput)).mutation(({ ctx, input }) =>
+    crossing(
+      ctx,
+      exportBundleSnapshot.name,
+      given(input, async () => {
+        const bundle = doorTold(ctx.doors.git, "no bundle store is configured");
+        if (!bundle.ok) return err(new Error(bundle.error));
+        const exported = await exportBundleSnapshot(
+          ctx.principal,
+          { git: bundle.value, postgres: ctx.doors.postgres },
+          { at: ctx.clock.now() },
+        );
+        return exported.ok ? ok(asBase64(exported.value)) : exported;
+      }),
+    ),
+  ),
+  exportRecords: exportingFrom.input(parsedBy(exportRecordsInput)).mutation(({ ctx, input }) =>
+    crossing(
+      ctx,
+      exportRecords.name,
+      given(input, async () => {
+        const exported = await exportRecords(ctx.principal, ctx.doors.postgres, {
+          at: ctx.clock.now(),
+        });
+        return exported.ok ? ok(asBase64(exported.value)) : exported;
+      }),
+    ),
+  ),
+  exportGuide: exportingFrom.input(parsedBy(exportGuideInput)).mutation(({ ctx, input }) =>
+    crossing(
+      ctx,
+      exportGuideSnapshot.name,
+      given(input, (asked) =>
+        exportGuideSnapshot(ctx.principal, ctx.doors.postgres, { ...asked, at: ctx.clock.now() }),
+      ),
+    ),
+  ),
   conceptToEdit: knowledgeReadProcedure
     .input(parsedBy(conceptToEditInput))
     .query(({ ctx, input }) =>

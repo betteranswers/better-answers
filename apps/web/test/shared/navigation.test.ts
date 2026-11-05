@@ -130,7 +130,7 @@ describe("the one navigation list", () => {
     ]);
   });
 
-  it("calls only today's seventeen pages built", () => {
+  it("calls only today's twenty-one pages built", () => {
     expect(
       pagesOf([...AREAS, CONSOLE])
         .filter((each) => each.built)
@@ -142,7 +142,10 @@ describe("the one navigation list", () => {
       "/knowledge/search",
       "/knowledge/guides",
       "/knowledge/knowledge-base",
+      "/knowledge/all-knowledge",
+      "/knowledge/kinds",
       "/knowledge/collections-and-owners",
+      "/knowledge/exports",
       "/inbox/waiting-on-you",
       "/sources/connected-sources",
       "/models/models-and-spend",
@@ -186,11 +189,21 @@ describe("the one navigation list", () => {
 
 const ASK_OUTLINE = ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]];
 
-const KNOWLEDGE_WITH_CURATION = [
+const OWNER_CURATION = ["All Knowledge", "Kinds", "Collections and Owners"];
+
+const KNOWLEDGE_WITH_OWNER_CURATION = [
   "Knowledge",
   [
     ["Browse", ["Search", "Guides", "Knowledge Base"]],
-    ["Curation", ["Collections and Owners"]],
+    ["Curation", OWNER_CURATION],
+  ],
+];
+
+const KNOWLEDGE_WITH_ADMIN_CURATION = [
+  "Knowledge",
+  [
+    ["Browse", ["Search", "Guides", "Knowledge Base"]],
+    ["Curation", [...OWNER_CURATION, "Exports"]],
   ],
 ];
 
@@ -215,7 +228,7 @@ describe("what each person is shown", () => {
 
     expect(outline(shown.areas)).toEqual([
       ASK_OUTLINE,
-      KNOWLEDGE_WITH_CURATION,
+      KNOWLEDGE_WITH_ADMIN_CURATION,
       INBOX_OUTLINE,
       [
         "Control Centre",
@@ -301,9 +314,19 @@ describe("what each person is shown", () => {
 
     expect(outline(visibleTo(owner, AREAS).areas)).toEqual([
       ASK_OUTLINE,
-      KNOWLEDGE_WITH_CURATION,
+      KNOWLEDGE_WITH_OWNER_CURATION,
       INBOX_OUTLINE,
     ]);
+  });
+
+  it("shows an owning Editor Curation without Exports", () => {
+    const owner = readerOf("Editor", { collections: ["policy"], concepts: 0 });
+    const exports = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Exports");
+    const shown = visibleTo(owner, AREAS);
+
+    expect(pagesOf(shown.areas).map((each) => each.name)).not.toContain("Exports");
+    expect(hides(shown, exports.path)).toBe(true);
+    expect(hides(visibleTo(readerOf("Admin"), AREAS), exports.path)).toBe(false);
   });
 
   it("shows Waiting on you to an owner and Admins", () => {

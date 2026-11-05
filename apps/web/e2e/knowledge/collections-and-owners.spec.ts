@@ -11,11 +11,10 @@ import {
   person,
   provision,
   seedConcepts,
-  signIn,
   signOutFromTheShell,
   skipLinkReachesThePage,
 } from "../harness.ts";
-import { knowledgeMenuOpened, listsItsKeystrokes } from "../knowledge.ts";
+import { knowledgeMenuOpened, listsItsKeystrokes, signedIn } from "../knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -80,11 +79,6 @@ const aCuratedWorkspace = async (api: APIRequestContext, name: string): Promise<
 const ownersNamed = (api: APIRequestContext, at: Curated, owners: readonly Owned[]) =>
   nameOwners(api, { workspaceId: at.workspaceId, userId: at.admin.id, owners });
 
-const signedIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
-  await page.goto("/sign-in");
-  await signIn(page, api, email);
-};
-
 const collections = (page: Page): Locator =>
   page.getByRole("region", { name: "Collections and Owners" });
 
@@ -133,6 +127,10 @@ test.describe("Collections and Owners", () => {
             - link "Knowledge Base"
         - heading "Curation" [level=3]
         - list:
+          - listitem:
+            - link "All Knowledge"
+          - listitem:
+            - link "Kinds"
           - listitem:
             - link "Collections and Owners"
     `);

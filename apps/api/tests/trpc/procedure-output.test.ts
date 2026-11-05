@@ -58,19 +58,25 @@ describe("what a procedure may answer the wire", () => {
       "inbox.decline",
       "inbox.item",
       "inbox.waiting",
+      "knowledge.allKnowledge",
       "knowledge.briefCopy",
       "knowledge.collections",
       "knowledge.conceptToEdit",
+      "knowledge.exportBundle",
+      "knowledge.exportGuide",
+      "knowledge.exportRecords",
       "knowledge.find",
       "knowledge.guide",
       "knowledge.guides",
       "knowledge.includeAvailable",
       "knowledge.kindConcepts",
+      "knowledge.kinds",
       "knowledge.nameOwner",
       "knowledge.open",
       "knowledge.recordCopy",
       "knowledge.saveBrief",
       "knowledge.saveConcept",
+      "knowledge.setOwners",
       "knowledge.tree",
       "members.activity",
       "members.addToGroup",
@@ -188,6 +194,12 @@ describe("what a procedure may answer the wire", () => {
       | "knowledge.open"
       | "knowledge.collections"
       | "knowledge.nameOwner"
+      | "knowledge.allKnowledge"
+      | "knowledge.kinds"
+      | "knowledge.setOwners"
+      | "knowledge.exportBundle"
+      | "knowledge.exportRecords"
+      | "knowledge.exportGuide"
       | "knowledge.tree"
       | "knowledge.kindConcepts"
       | "knowledge.conceptToEdit"

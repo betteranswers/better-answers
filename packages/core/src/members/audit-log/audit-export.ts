@@ -5,6 +5,7 @@ import {
   admit,
   ADMIN_ALONE,
   attempt,
+  csvOf,
   declareAction,
   err,
   ok,
@@ -65,16 +66,6 @@ export type AuditExport = {
   readonly searchTooBroad: boolean;
 };
 
-/** A spreadsheet runs a cell starting so as a formula; spaces before the sign do not stop it. */
-const FORMULA_START = /^ *[=+\-@\t\r]/u;
-
-const cellOf = (value: string): string => {
-  const inert = FORMULA_START.test(value) ? `'${value}` : value;
-  return `"${inert.replaceAll('"', '""')}"`;
-};
-
-const lineOf = (cells: readonly string[]): string => cells.map(cellOf).join(",");
-
 const GONE_WORDS = {
   "former-member": "a former member",
   "deleted-group": "a deleted group",
@@ -133,15 +124,13 @@ const STOPPED = `The export stopped at ${EXPORT_CAP.toLocaleString("en-GB")} eve
 const TOO_BROAD =
   "The search named more than 100 people or groups. Only the first 100 were read; narrow it for the rest.";
 
-const csvOf = (read: Read): string =>
-  [
+const csvOfRead = (read: Read): string =>
+  csvOf([
     HEADER,
     ...read.events.map(cellsOf),
     ...(read.capped ? [[STOPPED]] : []),
     ...(read.searchTooBroad ? [[TOO_BROAD]] : []),
-  ]
-    .map((cells) => `${lineOf(cells)}\r\n`)
-    .join("");
+  ]);
 
 type ExportedDetail = {
   -readonly [Key in keyof DetailOf<typeof EXPORT_ACTIONS.exported.detail>]: DetailOf<
@@ -220,5 +209,5 @@ export const exportAuditLog = async (
   if (!recorded.ok) return err(recorded.error);
   if (!recorded.value.ok) return err(recorded.value.error);
   const { events, capped, searchTooBroad } = exported;
-  return ok({ csv: csvOf(exported), count: events.length, capped, searchTooBroad });
+  return ok({ csv: csvOfRead(exported), count: events.length, capped, searchTooBroad });
 };

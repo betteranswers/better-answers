@@ -158,6 +158,7 @@ const CATALOGUED = {
   "reuse-unconfirmed": "inapplicable by concepts",
   "source-label-refused": "inapplicable by concepts",
   "body-locator-refused": "inapplicable by concepts",
+  "export-too-large": "inapplicable by concepts",
   "no-such-repository": "precondition by concepts",
   "history-diverged": "precondition by concepts",
   "unrecorded-head": "precondition by concepts",

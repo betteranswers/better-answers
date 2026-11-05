@@ -14,6 +14,15 @@ export {
   readSectionTrusts,
   type KindConceptsInput,
 } from "./reading/browse.ts";
+export { allKnowledgeInput, readAllKnowledge, readKinds } from "./curation.ts";
+/** @public S3 */
+export type {
+  AllKnowledge,
+  AllKnowledgeInput,
+  AllKnowledgeRow,
+  CurationRefusal,
+  KindCounted,
+} from "./curation.ts";
 export {
   conceptToEdit,
   conceptToEditInput,
@@ -45,12 +54,15 @@ export {
   collectionsAndOwners,
   nameOwner,
   nameOwnerInput,
+  nameOwnerOfEach,
+  nameOwnerOfEachInput,
   ownedBy,
   ownerOf,
   type NameOwnerInput,
+  type NameOwnerOfEachInput,
 } from "./owners.ts";
 /** @public S3 */
-export type { OwnedConcept, OwnerNamed } from "./owners.ts";
+export type { NameOwnerOfEachRefusal, OwnedConcept, OwnerNamed, OwnersNamed } from "./owners.ts";
 export {
   RECONCILER,
   reconcile,
@@ -168,3 +180,11 @@ export {
   waitingEditInput,
   waitingOnYou,
 } from "./waiting.ts";
+export {
+  exportBundleInput,
+  exportBundleSnapshot,
+  exportGuideInput,
+  exportGuideSnapshot,
+  exportRecords,
+  exportRecordsInput,
+} from "./knowledge-export.ts";

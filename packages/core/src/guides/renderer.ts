@@ -55,9 +55,19 @@ const clipboard = (markdown: string, footnotes: readonly SourcedFootnote[]): Cli
   return { ...clipboardOf(text, cited.map(sourceLineOf)), footnotes: cited.length };
 };
 
+/** One document holds many Briefs, each numbering from one, so a markdown footnote would collide. */
+const snapshot = (markdown: string, footnotes: readonly SourcedFootnote[]): string => {
+  const { text, cited } = numbering(markdown, footnotes, (number) => `[${String(number)}]`);
+  const sources = cited.map((entry) => `${String(entry.number)}. ${sourceLineOf(entry)}`);
+  return sources.length === 0
+    ? text.trimEnd()
+    : `${text.trimEnd()}\n\n**Sources**\n\n${sources.join("\n")}`;
+};
+
 type Renderings = {
   readonly page: { readonly footnote: Footnote; readonly rendered: RenderedBrief };
   readonly clipboard: { readonly footnote: SourcedFootnote; readonly rendered: ClipboardBrief };
+  readonly snapshot: { readonly footnote: SourcedFootnote; readonly rendered: string };
 };
 
 type Profile = keyof Renderings;
@@ -69,7 +79,7 @@ type Profiles = {
   ) => Renderings[P]["rendered"];
 };
 
-const PROFILES: Profiles = { page, clipboard };
+const PROFILES: Profiles = { page, clipboard, snapshot };
 
 export const renderBrief = <P extends Profile>(
   markdown: string,

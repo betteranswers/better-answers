@@ -26,12 +26,14 @@ import {
   conceptsSeeding,
   editSuggesting,
   guideSeeding,
+  manifestSeeding,
   nameOwners,
   ownersNaming,
   seedConceptIndex,
   seedConcepts,
   seedEditSuggestion,
   seedGuide,
+  seedManifest,
   usageAsking,
   usageOf,
 } from "./harness-knowledge.ts";
@@ -239,6 +241,11 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
   control.post(`${HARNESS_PREFIX}/owners`, async (context) => {
     const asked = await readBody(context.req.raw, ownersNaming);
     return context.json(await nameOwners(app, asked));
+  });
+
+  control.post(`${HARNESS_PREFIX}/manifest`, async (context) => {
+    const asked = await readBody(context.req.raw, manifestSeeding);
+    return context.json(await seedManifest(app, asked));
   });
 
   control.post(`${HARNESS_PREFIX}/guides`, async (context) => {

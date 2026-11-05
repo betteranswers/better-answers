@@ -21,17 +21,18 @@ const aWorkspaceHoldingPolicy = async () => {
   const workspace = await app().provision();
   const editor = await memberAt(workspace.workspaceId, "Editor");
   const viewer = await memberAt(workspace.workspaceId, "Viewer");
-  await seedConcepts(
+  const { concepts } = await seedConcepts(
     app(),
     conceptsSeeding.parse({
       workspaceId: workspace.workspaceId,
       userId: workspace.admin.id,
       concepts: [
         { title: "Expenses", collection: "policy", body: "Claims are made within a month." },
+        { title: "Leave", collection: "policy", body: "Leave is booked a fortnight ahead." },
       ],
     }),
   );
-  return { workspace, editor, viewer };
+  return { workspace, editor, viewer, iris: concepts.map(({ iri }) => iri) };
 };
 
 describe("collections and owners through the api", () => {
@@ -105,5 +106,40 @@ describe("collections and owners through the api", () => {
         { collection: "policy", owner: { id: viewer.id, name: viewer.name }, overrides: 0 },
       ],
     });
+  });
+});
+
+describe("naming one owner on many concepts through the api", () => {
+  it("names the owner of each concept as an Admin alone", async () => {
+    const { workspace, editor, viewer, iris } = await aWorkspaceHoldingPolicy();
+    const asTheEditor = await webSignedIn(app(), editor.email);
+    const asTheAdmin = await webSignedIn(app(), workspace.admin.email);
+    const asked = { iris, personId: viewer.id };
+    const ask = { collections: [], sort: { column: "title" as const, desc: false }, page: 1 };
+
+    const refused = await refusalOfCall(asTheEditor.api.knowledge.setOwners.mutate(asked));
+    const named = await asTheAdmin.api.knowledge.setOwners.mutate(asked);
+    const read = await asTheAdmin.api.knowledge.allKnowledge.query(ask);
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 403, refusal: { word: "role-forbids", class: "forbidden" } },
+    });
+    expect(named.named).toBe(2);
+    expect(read.rows.map(({ owner }) => owner)).toEqual([
+      { id: viewer.id, name: viewer.name, own: true },
+      { id: viewer.id, name: viewer.name, own: true },
+    ]);
+  });
+
+  it("refuses a batch naming a person outside the workspace", async () => {
+    const { workspace, iris } = await aWorkspaceHoldingPolicy();
+    const { api } = await webSignedIn(app(), workspace.admin.email);
+    const stranger = await app().person();
+
+    const refused = await refusalOfCall(
+      api.knowledge.setOwners.mutate({ iris, personId: stranger.id }),
+    );
+
+    expect(refused).toMatchObject({ data: { refusal: { word: "no-such-member" } } });
   });
 });

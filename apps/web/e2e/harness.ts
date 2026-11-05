@@ -314,6 +314,13 @@ export const nameOwners = (
   input: { workspaceId: string; userId: string; owners: readonly SeedOwner[] },
 ) => ask(api, "/owners", input, ownersNamed);
 
+const manifestSeeded = z.object({ written: z.boolean() });
+
+export const seedManifest = (
+  api: APIRequestContext,
+  input: { workspaceId: string; userId: string },
+) => ask(api, "/manifest", input, manifestSeeded);
+
 const guideSeeded = z.object({
   guideId: z.string(),
   groupId: z.string(),

@@ -18,6 +18,7 @@ import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { stockWait } from "@/shared/refusal-words.ts";
+import { saveFile } from "@/shared/save-file.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
@@ -226,17 +227,6 @@ function Events(properties: {
 
 const fileName = (): string => `audit-log-${new Date().toLocaleDateString("en-CA")}.csv`;
 
-const save = (csv: string, name: string): void => {
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  link.click();
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 0);
-};
-
 const exportFailed = (failure: Error | ApiError): Outcome => {
   const liftsInSeconds = ceilingLiftsIn(failure);
   return liftsInSeconds === undefined
@@ -257,7 +247,7 @@ function ExportAction(properties: {
     exporting.exportFor(asked).then(
       (exported) => {
         const name = fileName();
-        save(exported.csv, name);
+        saveFile({ name, type: "text/csv;charset=utf-8", content: exported.csv });
         say({ tone: "said", words: WORDS.saved(exported, name) });
       },
       (failure: Error | ApiError) => {

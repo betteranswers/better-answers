@@ -10,6 +10,7 @@ export const FACTORY_MODULES = [
   "apps/worker/tests/support/factories.py",
   "apps/worker/tests/support/pg_harness.py",
   "packages/core/test/concepts/writes/lost-commits-recorded.ts",
+  "packages/core/test/fixtures/usage-rows.ts",
   "packages/core/test/members/audit-log/audit-rows.ts",
   "packages/core/test/support/identity-rows.ts",
   "packages/schema/test/knowledge/concept-index-rows.ts",

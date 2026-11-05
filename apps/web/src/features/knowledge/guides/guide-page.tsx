@@ -5,6 +5,7 @@ import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { BROWSE, conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { LINK } from "@/shared/knowledge/concept-body.tsx";
+import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { ListState } from "@/shared/list/list-pages.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
@@ -20,7 +21,6 @@ import { GuideSectionView } from "./guide-section.tsx";
 import {
   GUIDE_KEYSTROKES as KEY,
   GUIDES_PAGE,
-  guideTitleOf,
   SECTION_ACTIONS,
   type SectionAction,
 } from "./guide-state.ts";

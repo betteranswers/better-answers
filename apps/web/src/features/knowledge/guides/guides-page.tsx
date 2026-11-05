@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useId, useRef } from "react";
 
 import { BROWSE } from "@/shared/knowledge/concept-address.ts";
+import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
@@ -9,7 +10,7 @@ import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { useGuides, type GuideSummary } from "../knowledge-api.ts";
-import { GUIDES_PAGE, guidePageOf, guideTitleOf } from "./guide-state.ts";
+import { GUIDES_PAGE, guidePageOf } from "./guide-state.ts";
 import { GUIDES_WORDS as WORDS } from "./guide-words.ts";
 
 const NONE: readonly GuideSummary[] = [];

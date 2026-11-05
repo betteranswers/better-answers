@@ -168,3 +168,43 @@ describe("rendering a Brief for the clipboard", () => {
     );
   });
 });
+
+describe("rendering a Brief for a snapshot", () => {
+  it("numbers markers and lists each cited concept's sources", () => {
+    const rendered = renderBrief(
+      "We are **insured**[^b] and audited[^a].\n",
+      [
+        sourced("a", "Filed accounts", {
+          sources: [{ resource: "Companies House", locator: "2025 filing", id: null }],
+        }),
+        sourced("b", "Public liability cover", { wording: "Limits of cover" }),
+      ],
+      "snapshot",
+    );
+
+    expect(rendered).toBe(
+      "We are **insured**[1] and audited[2].\n\n**Sources**\n\n" +
+        "1. Public liability cover. Source: Public liability cover schedule, page 2. " +
+        "Wording: Limits of cover.\n" +
+        "2. Filed accounts. Source: Companies House, 2025 filing.",
+    );
+  });
+
+  it("drops a marker and title the reader may not read", () => {
+    const rendered = renderBrief(
+      "One[^a] two[^withheld] three[^a].",
+      [sourced("a", "Alpha")],
+      "snapshot",
+    );
+
+    expect(rendered).toBe(
+      "One[1] two three[1].\n\n**Sources**\n\n1. Alpha. Source: Alpha schedule, page 2.",
+    );
+  });
+
+  it("writes no Sources list when nothing is cited", () => {
+    expect(renderBrief("No markers here.\n\n", [sourced("a", "Alpha")], "snapshot")).toBe(
+      "No markers here.",
+    );
+  });
+});

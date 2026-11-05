@@ -337,13 +337,16 @@ const threeNotesAskingTheBoard = async () => {
   };
 };
 
+const aWorkspaceOfBirds = () =>
+  aWorkspaceHolding([
+    { ...FEEDING_WRITTEN, collection: "birds" },
+    { ...RINGING_WRITTEN, collection: "birds" },
+    { title: SURVEY, body: "Heron counts are taken each June.", kind: "Procedure" },
+  ]);
+
 describe("the knowledge tree over tRPC", () => {
   it("reads the knowledge tree through the knowledge router", async () => {
-    const { workspace, viewer } = await aWorkspaceHolding([
-      { ...FEEDING_WRITTEN, collection: "birds" },
-      { ...RINGING_WRITTEN, collection: "birds" },
-      { title: SURVEY, body: "Heron counts are taken each June.", kind: "Procedure" },
-    ]);
+    const { workspace, viewer } = await aWorkspaceOfBirds();
     await seedConceptIndex(
       app(),
       conceptIndexSeeding.parse({
@@ -386,6 +389,66 @@ describe("the knowledge tree over tRPC", () => {
 
     expect(refused).toMatchObject(MALFORMED);
     expect(answered).toEqual({ concepts: [], nextCursor: null });
+  });
+});
+
+describe("the Curation reads over tRPC", () => {
+  it("reads Kinds through the knowledge router", async () => {
+    const { workspace, viewer } = await aWorkspaceOfBirds();
+    const owner = await app().person();
+    await app().addMember(workspace.workspaceId, owner.id, "Editor");
+    await nameOwners(
+      app(),
+      ownersNaming.parse({
+        workspaceId: workspace.workspaceId,
+        userId: workspace.admin.id,
+        owners: [{ collection: "birds", personId: owner.id }],
+      }),
+    );
+    const asTheViewer = await webSignedIn(app(), viewer.email);
+    const asTheOwner = await webSignedIn(app(), owner.email);
+    const asTheAdmin = await webSignedIn(app(), workspace.admin.email);
+
+    const refused = await refusalOfCall(asTheViewer.api.knowledge.kinds.query());
+    const ownerSees = await asTheOwner.api.knowledge.kinds.query();
+    const adminSees = await asTheAdmin.api.knowledge.kinds.query();
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 403, refusal: { word: "owner-forbids", class: "forbidden" } },
+    });
+    expect(ownerSees).toEqual({
+      kinds: [
+        { kind: "Answer", count: 1, collections: [{ collection: "birds", count: 1 }] },
+        { kind: "Procedure", count: 1, collections: [{ collection: null, count: 1 }] },
+      ],
+    });
+    expect(adminSees.kinds.map(({ kind, count }) => [kind, count])).toEqual([
+      ["Answer", 2],
+      ["Procedure", 1],
+    ]);
+  });
+
+  it("reads All Knowledge sorted, filtered and paged", async () => {
+    const { workspace } = await aWorkspaceHolding([
+      { ...FEEDING_WRITTEN, collection: "birds" },
+      { title: SURVEY, body: "Heron counts are taken each June.", collection: "surveys" },
+    ]);
+    const asTheAdmin = await webSignedIn(app(), workspace.admin.email);
+    const ask = { collections: [], sort: { column: "title" as const, desc: false }, page: 1 };
+
+    const all = await asTheAdmin.api.knowledge.allKnowledge.query(ask);
+    const birds = await asTheAdmin.api.knowledge.allKnowledge.query({
+      ...ask,
+      collections: ["birds"],
+    });
+    const refused = await refusalOfCall(
+      asTheAdmin.api.knowledge.allKnowledge.query({ ...ask, page: 0 }),
+    );
+
+    expect(all.rows.map(({ title }) => title)).toEqual([FEEDING, SURVEY]);
+    expect([all.total, all.pageSize]).toEqual([2, 50]);
+    expect(birds.rows.map(({ title }) => title)).toEqual([FEEDING]);
+    expect(refused).toMatchObject(MALFORMED);
   });
 });
 

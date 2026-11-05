@@ -11,6 +11,8 @@ import {
 
 export const CONCEPT_IRI_PREFIX = "https://better-answers.com/c/";
 
+export const MOST_OWNERS_AT_ONCE = 200;
+
 export const IRI = new RegExp(
   `^${CONCEPT_IRI_PREFIX.replaceAll(".", String.raw`\.`)}${ULID_CHARACTERS}$`,
   "u",

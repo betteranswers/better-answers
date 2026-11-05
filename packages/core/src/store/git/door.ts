@@ -21,6 +21,7 @@ export type GitDoor = {
   readonly root: string;
 
   readonly commitBudgetMs?: number;
+  readonly snapshotBytesMax?: number;
 };
 
 export type GitRootRefusal = "root-not-absolute" | "no-such-root";
@@ -104,6 +105,20 @@ export const git = async (
     if (options.signal?.aborted === true) await exitedWithin(running.child, EXIT_GRACE_MS);
     throw cause;
   }
+};
+
+export const gitBytes = async (
+  gitDir: string,
+  arguments_: readonly string[],
+  options: { readonly input: string; readonly maxBuffer: number },
+): Promise<Buffer> => {
+  const running = run("git", ["--git-dir", gitDir, ...arguments_], {
+    encoding: "buffer",
+    env: childEnvironment(),
+    maxBuffer: options.maxBuffer,
+  });
+  feeding(running.child, options.input);
+  return (await running).stdout;
 };
 
 export const exitStatusOf = (cause: unknown): number | null => {

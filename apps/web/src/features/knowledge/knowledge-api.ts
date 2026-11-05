@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   skipToken,
   useInfiniteQuery,
   useMutation,
@@ -238,4 +239,60 @@ export const useIncludeAvailable = () => {
   );
   return (writeUpId: string): Promise<{ readonly included: number }> =>
     including.mutateAsync({ writeUpId });
+};
+
+export type AllKnowledgeAsked = inferInput<Api["knowledge"]["allKnowledge"]>;
+
+export type AllKnowledge = inferOutput<Api["knowledge"]["allKnowledge"]>;
+
+export type AllKnowledgeRow = AllKnowledge["rows"][number];
+
+export const useAllKnowledge = (asked: AllKnowledgeAsked) => {
+  const api = useTRPC();
+  return useQuery(
+    api.knowledge.allKnowledge.queryOptions(asked, { placeholderData: keepPreviousData }),
+  );
+};
+
+export type KindCounted = inferOutput<Api["knowledge"]["kinds"]>["kinds"][number];
+
+export const useKinds = () => {
+  const api = useTRPC();
+  return useQuery(api.knowledge.kinds.queryOptions());
+};
+
+export const useSetOwners = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    api.knowledge.setOwners.mutationOptions({
+      onSettled: () =>
+        Promise.all([
+          queryClient.invalidateQueries(api.knowledge.allKnowledge.pathFilter()),
+          queryClient.invalidateQueries({ queryKey: api.knowledge.collections.queryKey() }),
+          queryClient.invalidateQueries({ queryKey: memberOptions(api).queryKey }),
+        ]),
+    }),
+  );
+};
+
+export type KnowledgeBaseExported = inferOutput<Api["knowledge"]["exportBundle"]>;
+
+export type RecordsExported = inferOutput<Api["knowledge"]["exportRecords"]>;
+
+export type GuideExported = inferOutput<Api["knowledge"]["exportGuide"]>;
+
+export const useExportKnowledgeBase = (saved: (answer: KnowledgeBaseExported) => void) => {
+  const api = useTRPC();
+  return useMutation(api.knowledge.exportBundle.mutationOptions({ onSuccess: saved }));
+};
+
+export const useExportRecords = (saved: (answer: RecordsExported) => void) => {
+  const api = useTRPC();
+  return useMutation(api.knowledge.exportRecords.mutationOptions({ onSuccess: saved }));
+};
+
+export const useExportGuide = (saved: (answer: GuideExported) => void) => {
+  const api = useTRPC();
+  return useMutation(api.knowledge.exportGuide.mutationOptions({ onSuccess: saved }));
 };

@@ -98,6 +98,7 @@ const included = (detail: Slots["detail"]): string => {
 };
 
 const SENTENCES = {
+  "knowledge.bundle.exported": ({ by }) => `${by} exported a snapshot of the knowledge base`,
   "knowledge.check.imported": ({ by, named }) =>
     `${by} imported a verification of ${conceptNamed(namedIn(named, "iri"))}`,
   "knowledge.concept.class_overridden": ({ by, subject }) =>
@@ -105,6 +106,7 @@ const SENTENCES = {
   "knowledge.concept.committed": ({ by, subject }) => `${by} saved ${conceptNamed(subject)}`,
   "knowledge.feedback.closed": ({ by }) => `${by} closed a flag on an answer`,
   "knowledge.guide.brief_saved": ({ by }) => `${by} saved the Brief of a guide section`,
+  "knowledge.guide.exported": ({ by }) => `${by} exported a snapshot of a guide`,
   "knowledge.guide.included": ({ by, detail }) =>
     `${by} included ${included(detail)} in a section of a guide`,
   "knowledge.guide.seeded": ({ by }) => `${by} seeded a guide from a template`,
@@ -113,6 +115,7 @@ const SENTENCES = {
     "personId" in detail
       ? `${by} named ${person(namedIn(named, "personId"))} owner of ${ownedSubject(detail, named)}`
       : `${by} cleared the owner of ${ownedSubject(detail, named)}`,
+  "knowledge.records.exported": ({ by }) => `${by} exported the knowledge base’s records`,
   "knowledge.suggestion.accepted": ({ by, named }) =>
     `${by} accepted a suggestion, saved as ${conceptNamed(namedIn(named, "iri"))}`,
   "knowledge.suggestion.declined": ({ by }) => `${by} declined a suggestion`,

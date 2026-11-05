@@ -29,8 +29,11 @@ comment there says why it is not `pnpm run`. A spec builds its state through the
 `apps/web/e2e/harness.ts`, each of which calls `/__harness`, which
 `apps/api/tests/support/harness/harness-control.ts` mounts. Search both before adding an action.
 The actions include `provision`, `addMember`, `endEverySignInAndToken`, `markTheOperator`,
-`invite`, `seedModelChoices`, `seedConnectedSources`, `nameOwners`, `seedQuestions`,
+`invite`, `seedModelChoices`, `seedConnectedSources`, `nameOwners`, `seedConceptIndex`, `seedGuide` (the
+Northgate guide and its concepts), `seedManifest` (the knowledge base's manifest, which a typed knowledge
+base lacks until an import writes one), `seedQuestions`,
 `makeGroups`, `scriptAsking` (scripts the model a question meets) and `releaseTheModel` (releases a model call it held).
+The knowledge specs share their steps in `apps/web/e2e/knowledge.ts`, among them `signedIn` (opens the sign-in page and signs a seeded person in).
 
 ## The fixture module
 

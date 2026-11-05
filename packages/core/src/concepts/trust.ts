@@ -90,7 +90,7 @@ const verificationWords = (trust: Trust): string => {
   }
 };
 
-const verifierWords = (verifiedBy: string): string =>
+export const verifierWords = (verifiedBy: string): string =>
   isActorId(verifiedBy) && isPersonActor(verifiedBy) ? "a former member" : verifiedBy;
 
 export const ukLongDate = (iso: string): string => {

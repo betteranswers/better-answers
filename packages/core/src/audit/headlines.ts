@@ -1,15 +1,18 @@
 import type { STORED_ACT_NAMES } from "./stored-names.ts";
 
 export const ACTION_HEADLINES = {
+  "knowledge.bundle.exported": "Knowledge base exported",
   "knowledge.check.imported": "Verification imported",
   "knowledge.concept.class_overridden": "Sensitivity overridden",
   "knowledge.concept.committed": "Concept saved",
   "knowledge.feedback.closed": "Flag on an answer closed",
   "knowledge.guide.brief_saved": "Brief saved",
+  "knowledge.guide.exported": "Guide exported",
   "knowledge.guide.included": "Concepts included in a section",
   "knowledge.guide.seeded": "Guide seeded",
   "knowledge.manifest.written": "Knowledge base description updated",
   "knowledge.owner.named": "Owner named",
+  "knowledge.records.exported": "Records exported",
   "knowledge.suggestion.accepted": "Suggestion accepted",
   "knowledge.suggestion.declined": "Suggestion declined",
   "knowledge.suggestion.returned": "Suggestion sent back",

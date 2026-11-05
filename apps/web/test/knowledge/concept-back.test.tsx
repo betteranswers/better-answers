@@ -4,8 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 import { CONCEPT_IRI_PREFIX } from "@better-answers/schema/concept-file";
 
 import { KNOWLEDGE_BASE_LIST } from "@/features/knowledge/knowledge-state.ts";
-import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
+import { ALL_KNOWLEDGE_PAGE, SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import {
+  aConceptRow,
+  ALL_KNOWLEDGE,
+  anAllKnowledgeApi,
+  knowledgeAsks,
+} from "@test/knowledge/all-knowledge-answers.ts";
 import {
   aConceptRead,
   aSearchApi,
@@ -92,6 +98,52 @@ describe("the concept page's way back", () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe(KNOWLEDGE_BASE));
     expect(router.state.location.searchStr).toContain(`${KNOWLEDGE_BASE_LIST}.kind=lease`);
+  });
+
+  it("goes back to All Knowledge with its address", async () => {
+    const many = Array.from({ length: 60 }, (_, index) =>
+      aConceptRow(index + 1, `Policy ${String(index + 1).padStart(2, "0")}`),
+    );
+    const held = `${ALL_KNOWLEDGE}?all.sort=-title&all.kind=policy&all.page=2`;
+    const router = await openAt(
+      held,
+      anAllKnowledgeApi(() => many),
+    );
+
+    fireEvent.click(await screen.findByRole("link", { name: "Policy 05" }));
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Policy 05" })).toBeDefined();
+    expect(markedInTheMenu()).toEqual(["All Knowledge"]);
+    const main = within(screen.getByRole("main"));
+    expect(main.queryByRole("link", { name: "Back to Search" })).toBeNull();
+    expect(
+      main.getByRole("heading", { level: 1 }).textContent,
+      "the page titles itself for the group it was opened from",
+    ).toBe("Curation");
+
+    fireEvent.click(main.getByRole("link", { name: "Back to All Knowledge" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(ALL_KNOWLEDGE_PAGE.path));
+    expect(router.state.location.search).toMatchObject({
+      "all.sort": "-title",
+      "all.kind": "policy",
+      "all.page": 2,
+    });
+    const returned = await screen.findByRole("link", { name: "Policy 05" });
+    await waitFor(() => expect(document.activeElement).toBe(returned));
+    expect(
+      new Set(knowledgeAsks().map((ask) => JSON.stringify(ask))),
+      "a read asked for a page the address does not hold",
+    ).toEqual(
+      new Set([
+        JSON.stringify({
+          collections: [],
+          kind: "policy",
+          sort: { column: "title", desc: true },
+          page: 2,
+        }),
+      ]),
+    );
   });
 
   it("keeps naming Search for a concept opened by its address", async () => {
