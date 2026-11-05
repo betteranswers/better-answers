@@ -15,6 +15,7 @@ import { doorTold, type Doors } from "../doors.ts";
 import {
   crossing,
   given,
+  logFailure,
   ownTransactionProcedure,
   parsedBy,
   queryProcedure,
@@ -23,7 +24,7 @@ import {
 
 type Decided = {
   readonly suggestionId: string;
-  readonly outcome: "accepted" | AcceptSuggestionRefusal;
+  readonly outcome: "accepted" | "unconfirmed" | AcceptSuggestionRefusal;
 };
 
 const bundleOf = (doors: Doors) => {
@@ -60,12 +61,12 @@ export const inboxRouter = router({
           asked,
         );
         if (!accepted.ok) return accepted;
-        const outcomes: Decided[] = [];
-        for (const { suggestionId, outcome } of accepted.value) {
-          if (outcome.ok) outcomes.push({ suggestionId, outcome: "accepted" });
-          else if (outcome.error instanceof Error) return err(outcome.error);
-          else outcomes.push({ suggestionId, outcome: outcome.error });
-        }
+        const outcomes = accepted.value.map(({ suggestionId, outcome }): Decided => {
+          if (outcome.ok) return { suggestionId, outcome: "accepted" };
+          if (!(outcome.error instanceof Error)) return { suggestionId, outcome: outcome.error };
+          logFailure(ctx.log, acceptSuggestions.name, outcome.error);
+          return { suggestionId, outcome: "unconfirmed" };
+        });
         return ok({ outcomes });
       }),
     ),

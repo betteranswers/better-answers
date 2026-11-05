@@ -8,3 +8,9 @@ export const mergeKeyMovedBy = (
   const proposedKey = mergeKeyOf(foldKind(proposed.kind), proposed.title);
   return proposedKey === mergeKeyOf(held.kind, held.title) ? undefined : proposedKey;
 };
+
+export const acceptedKeyOf = (
+  suggested: string,
+  held: Pick<Held, "kind" | "title"> | undefined,
+  proposed: { readonly kind: string; readonly title: string },
+): string => (held === undefined ? undefined : mergeKeyMovedBy(held, proposed)) ?? suggested;

@@ -99,8 +99,12 @@ const refused = (log: Logger, action: string, answered: RefusalAnswer): TRPCErro
   });
 };
 
-const failed = (log: Logger, action: string, cause: Error): TRPCError => {
+export const logFailure = (log: Logger, action: string, cause: Error): void => {
   log.error({ event: "trpc.failed", action, err: cause }, "failed");
+};
+
+const failed = (log: Logger, action: string, cause: Error): TRPCError => {
+  logFailure(log, action, cause);
   return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `${action} failed`, cause });
 };
 

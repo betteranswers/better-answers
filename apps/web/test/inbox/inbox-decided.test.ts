@@ -71,5 +71,6 @@ describe("what accepting a suggestion says", () => {
       ),
     ).toEqual([false, false, false, false]);
     expect(stillWaitingAfter("path-taken")).toBe(true);
+    expect(stillWaitingAfter("unconfirmed")).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import {
   commitAuthorsOf,
@@ -54,6 +54,28 @@ const suggestionRow = async (suggestionId: string) => {
     [suggestionId],
   );
   return found.rows[0];
+};
+
+const withTheStoreFailingToAccept = async <T>(
+  suggestionId: string,
+  action: () => Promise<T>,
+): Promise<T> => {
+  const { superuser } = app().database;
+  await superuser.query(
+    `CREATE FUNCTION fail_the_acceptance() RETURNS trigger LANGUAGE plpgsql AS $$
+       BEGIN RAISE EXCEPTION 'the store failed to record the acceptance'; END $$`,
+  );
+  await superuser.query(
+    `CREATE TRIGGER fail_the_acceptance BEFORE UPDATE ON suggestion FOR EACH ROW
+       WHEN (NEW.id = '${suggestionId}' AND NEW.status = 'accepted')
+       EXECUTE FUNCTION fail_the_acceptance()`,
+  );
+  try {
+    return await action();
+  } finally {
+    await superuser.query("DROP TRIGGER fail_the_acceptance ON suggestion");
+    await superuser.query("DROP FUNCTION fail_the_acceptance()");
+  }
 };
 
 describe("Waiting on you through the api", () => {
@@ -124,5 +146,45 @@ describe("Waiting on you through the api", () => {
     });
     expect(await suggestionRow(stale.suggestionId)).toMatchObject({ status: "returned" });
     expect(await authorsOf()).toEqual(before);
+  });
+
+  it("answers each item when the store fails partway through", async () => {
+    const { workspace, proposer, owner, concept, suggestionId } =
+      await aSuggestionWaitingOnAViewer();
+    const seeded = await seedConcepts(
+      app(),
+      conceptsSeeding.parse({
+        workspaceId: workspace.workspaceId,
+        userId: workspace.admin.id,
+        concepts: [{ ...EXPENSES, title: "Mileage" }],
+      }),
+    );
+    const [other] = seeded.concepts;
+    assert(other !== undefined, "the second concept was seeded");
+    const failing = await seedEditSuggestion(app(), {
+      workspaceId: workspace.workspaceId,
+      userId: proposer.id,
+      iri: other.iri,
+      body: "Mileage is paid at 45p a mile.",
+    });
+    const { api } = await webSignedIn(app(), owner.email);
+
+    const decided = await withTheStoreFailingToAccept(failing.suggestionId, () =>
+      api.inbox.accept.mutate({
+        decisions: [
+          { suggestionId, expectedTarget: concept.iri },
+          { suggestionId: failing.suggestionId, expectedTarget: other.iri },
+        ],
+      }),
+    );
+
+    expect(decided).toEqual({
+      outcomes: [
+        { suggestionId, outcome: "accepted" },
+        { suggestionId: failing.suggestionId, outcome: "unconfirmed" },
+      ],
+    });
+    expect(await suggestionRow(suggestionId)).toMatchObject({ status: "accepted" });
+    expect(await suggestionRow(failing.suggestionId)).toMatchObject({ status: "waiting" });
   });
 });

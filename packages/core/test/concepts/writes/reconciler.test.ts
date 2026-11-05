@@ -982,6 +982,91 @@ describe("an acceptance whose rows were lost", () => {
       merge_key: "Guideline:hot desking",
     });
   });
+
+  it("re-keys a retitle to its new title, as accepting does", async () => {
+    const scenario = await arrange();
+    const input = guideline("Expenses");
+    const standing = await landed(scenario, scenario.editor, input);
+    const item = await raised(
+      scenario,
+      requestFor("Travel expenses", {
+        mergeKey: input.mergeKey,
+        path: input.path,
+        baseContentHash: standing.contentHash,
+      }),
+    );
+    const sha = await acceptInTheWindow(scenario, item);
+
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({ replayed: [sha], stopped: undefined });
+    expect(await conceptRow(scenario.workspaceId, standing.iri)).toMatchObject({
+      title: "Travel expenses",
+      merge_key: "Guideline:travel expenses",
+    });
+  });
+
+  it("a retitle into a taken key keeps its held key", async () => {
+    const scenario = await arrange();
+    const input = guideline("Expenses");
+    const standing = await landed(scenario, scenario.editor, input);
+    const create = await raised(
+      scenario,
+      requestFor("Travel expenses", { mergeKey: "Guideline:travel expenses" }),
+    );
+    const created = await acceptInTheWindow(scenario, create);
+    const retitle = await raised(
+      scenario,
+      requestFor("Travel expenses", {
+        mergeKey: input.mergeKey,
+        path: input.path,
+        baseContentHash: standing.contentHash,
+      }),
+    );
+    const retitled = await acceptInTheWindow(scenario, retitle);
+    const later = await writeInTheWindow(
+      scenario,
+      scenario.editor,
+      guideline("Fuel", { expects: { head: retitled } }),
+    );
+
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({ replayed: [created, retitled, later.at(-1)], stopped: undefined });
+    expect(await conceptRow(scenario.workspaceId, standing.iri)).toMatchObject({
+      title: "Travel expenses",
+      merge_key: input.mergeKey,
+    });
+    expect(await decisionOf(create.suggestionId)).toMatchObject({ status: "accepted" });
+    expect(await decisionOf(retitle.suggestionId)).toMatchObject({ status: "accepted" });
+  });
+
+  it("a create into a taken key lands at its IRI", async () => {
+    const scenario = await arrange();
+    const first = await raised(
+      scenario,
+      requestFor("Travel expenses", { mergeKey: "Guideline:travel expenses" }),
+    );
+    const firstSha = await acceptInTheWindow(scenario, first);
+    const request = requestFor("Travel expenses", { mergeKey: "Guideline:travel expenses" });
+    const second = await raised(scenario, request);
+    const secondSha = await acceptInTheWindow(scenario, second);
+    const later = await writeInTheWindow(
+      scenario,
+      scenario.editor,
+      guideline("Fuel", { expects: { head: secondSha } }),
+    );
+
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({
+      replayed: [firstSha, secondSha, later.at(-1)],
+      stopped: undefined,
+    });
+    const iri = await iriOfFile(scenario, secondSha, request.path);
+    expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({ merge_key: iri });
+    expect(await decisionOf(second.suggestionId)).toMatchObject({ status: "accepted" });
+  });
 });
 
 describe("a concept carrying a __proto__ front-matter key", () => {
