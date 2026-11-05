@@ -80,7 +80,7 @@ export const tryBundleFenceAs = async <T>(
   return tried.ok ? tried.value : tried;
 };
 
-const isRecorded = async (principal: Principal, tx: Tx, sha: string): Promise<boolean> => {
+export const isRecorded = async (principal: Principal, tx: Tx, sha: string): Promise<boolean> => {
   const found = await tx.query(
     `SELECT 1 FROM bundle_commit WHERE workspace_id = ${scopeClause(1)} AND sha = $2`,
     [scopeParameter(principal), sha],

@@ -88,6 +88,11 @@ const VALUE_LABELS = new Map(
     sessions: "Sessions signed out",
     included: "Concepts included",
     version: "Version",
+    files: "Files",
+    owners: "Owners",
+    verifications: "Verifications",
+    usage: "Uses",
+    sections: "Sections",
   }),
 );
 
@@ -97,10 +102,12 @@ export const LABELLED_DETAIL_KEYS: readonly string[] = [
 ];
 
 export const KEPT_OFF_DETAIL_KEYS: Readonly<Partial<Record<DeclaredAction, readonly string[]>>> = {
+  "knowledge.bundle.exported": ["commitSha"],
   "knowledge.check.imported": ["verificationId"],
   "knowledge.concept.committed": ["commitSha", "contentHash", "fromContentHash"],
   "knowledge.feedback.closed": ["recordId"],
   "knowledge.guide.brief_saved": ["guideId", "writeUpId"],
+  "knowledge.guide.exported": ["guideId"],
   "knowledge.guide.included": ["guideId", "writeUpId", "commitSha"],
   "knowledge.guide.seeded": ["guideId", "commitSha"],
   "knowledge.manifest.written": ["bundleId", "commitSha"],

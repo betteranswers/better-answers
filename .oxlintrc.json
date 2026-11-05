@@ -565,7 +565,7 @@
     {
       "files": ["packages/schema/src/table-ownership.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 628, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 642, "skipBlankLines": true, "skipComments": true }]
       }
     }
   ],

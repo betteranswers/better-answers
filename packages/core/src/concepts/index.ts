@@ -180,3 +180,12 @@ export {
   waitingEditInput,
   waitingOnYou,
 } from "./waiting.ts";
+export {
+  exportBundleInput,
+  exportBundleSnapshot,
+  exportGuideInput,
+  exportGuideSnapshot,
+  exportRecords,
+  exportRecordsInput,
+  type ExportRefusal,
+} from "./knowledge-export.ts";

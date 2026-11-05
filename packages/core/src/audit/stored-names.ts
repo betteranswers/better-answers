@@ -74,6 +74,9 @@ export const STORED_ACT_NAMES = [
   "knowledge.guide.seeded",
   "knowledge.guide.included",
   "knowledge.guide.brief_saved",
+  "knowledge.bundle.exported",
+  "knowledge.records.exported",
+  "knowledge.guide.exported",
 ] as const;
 
 export const STORED_DETAIL_KEYS = {
@@ -157,4 +160,9 @@ export const STORED_DETAIL_KEYS = {
   writeUpId: "writeUpId",
   included: "included",
   version: "version",
+  files: "files",
+  owners: "owners",
+  verifications: "verifications",
+  usage: "usage",
+  sections: "sections",
 } as const;

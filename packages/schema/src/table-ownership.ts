@@ -653,4 +653,18 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     reason:
       "A write-up's sensitivity is the most restrictive among its includes, read off the concepts' rows; the footnote read applies the concept's own predicate to every include, so a write-up's citation is never a side door to a concept its reader may not see.",
   },
+  {
+    table: "public.usage",
+    by: "concepts",
+    access: "read",
+    reason:
+      "The records export lists every use of a concept or a write-up the Admin may read in one statement, so a large workspace's uses cost one query. Writing a use stays with the usage slice's `recordUsage`.",
+  },
+  {
+    table: "public.write_up",
+    by: "concepts",
+    access: "read",
+    reason:
+      "The records export keeps a use of a write-up only when the Admin may read that write-up, so its one statement applies the read predicate to the write-up's own row.",
+  },
 ] as const satisfies readonly CrossOwnerAccess[];

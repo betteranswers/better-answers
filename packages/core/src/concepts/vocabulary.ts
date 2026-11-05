@@ -18,6 +18,7 @@ export const CONCEPT_REFUSALS = {
   "reuse-unconfirmed": "inapplicable",
   "source-label-refused": "inapplicable",
   "body-locator-refused": "inapplicable",
+  "export-too-large": "inapplicable",
 
   "no-such-repository": "precondition",
   "history-diverged": "precondition",

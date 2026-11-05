@@ -1,15 +1,18 @@
 // Generated, never edited: pnpm --filter @better-answers/core run generate:audit-actions
 
 export const DECLARED_ACTIONS = [
+  "knowledge.bundle.exported",
   "knowledge.check.imported",
   "knowledge.concept.class_overridden",
   "knowledge.concept.committed",
   "knowledge.feedback.closed",
   "knowledge.guide.brief_saved",
+  "knowledge.guide.exported",
   "knowledge.guide.included",
   "knowledge.guide.seeded",
   "knowledge.manifest.written",
   "knowledge.owner.named",
+  "knowledge.records.exported",
   "knowledge.suggestion.accepted",
   "knowledge.suggestion.declined",
   "knowledge.suggestion.returned",
@@ -79,15 +82,18 @@ export const DECLARED_ACTIONS = [
 ] as const;
 
 export const HEADLINES = {
+  "knowledge.bundle.exported": "Knowledge base exported",
   "knowledge.check.imported": "Verification imported",
   "knowledge.concept.class_overridden": "Sensitivity overridden",
   "knowledge.concept.committed": "Concept saved",
   "knowledge.feedback.closed": "Flag on an answer closed",
   "knowledge.guide.brief_saved": "Brief saved",
+  "knowledge.guide.exported": "Guide exported",
   "knowledge.guide.included": "Concepts included in a section",
   "knowledge.guide.seeded": "Guide seeded",
   "knowledge.manifest.written": "Knowledge base description updated",
   "knowledge.owner.named": "Owner named",
+  "knowledge.records.exported": "Records exported",
   "knowledge.suggestion.accepted": "Suggestion accepted",
   "knowledge.suggestion.declined": "Suggestion declined",
   "knowledge.suggestion.returned": "Suggestion sent back",
@@ -157,6 +163,8 @@ export const HEADLINES = {
 } as const satisfies Readonly<Record<(typeof DECLARED_ACTIONS)[number], string>>;
 
 export const DETAIL_KEYS = [
+  ["knowledge.bundle.exported", "commitSha"],
+  ["knowledge.bundle.exported", "files"],
   ["knowledge.check.imported", "iri"],
   ["knowledge.check.imported", "verificationId"],
   ["knowledge.concept.class_overridden", "audience"],
@@ -173,6 +181,8 @@ export const DETAIL_KEYS = [
   ["knowledge.guide.brief_saved", "guideId"],
   ["knowledge.guide.brief_saved", "version"],
   ["knowledge.guide.brief_saved", "writeUpId"],
+  ["knowledge.guide.exported", "guideId"],
+  ["knowledge.guide.exported", "sections"],
   ["knowledge.guide.included", "commitSha"],
   ["knowledge.guide.included", "guideId"],
   ["knowledge.guide.included", "included"],
@@ -184,6 +194,9 @@ export const DETAIL_KEYS = [
   ["knowledge.owner.named", "collection"],
   ["knowledge.owner.named", "iri"],
   ["knowledge.owner.named", "personId"],
+  ["knowledge.records.exported", "owners"],
+  ["knowledge.records.exported", "usage"],
+  ["knowledge.records.exported", "verifications"],
   ["knowledge.suggestion.accepted", "commitSha"],
   ["knowledge.suggestion.accepted", "contentHash"],
   ["knowledge.suggestion.accepted", "evidenceAgrees"],
