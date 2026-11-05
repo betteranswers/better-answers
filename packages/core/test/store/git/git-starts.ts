@@ -96,10 +96,7 @@ const exists = (file: string): Promise<boolean> =>
     () => false,
   );
 
-/**
- * Holds the first git naming `subcommand`, before it runs or after it answers, while
- * `meanwhile` runs. PATH is process-wide, as for gitStarts.
- */
+/** PATH is process-wide, as for gitStarts. */
 export const whileGitPausesAt = async <T>(
   pause: { readonly subcommand: string; readonly after: boolean },
   started: () => Promise<T>,
