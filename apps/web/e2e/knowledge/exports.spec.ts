@@ -78,9 +78,9 @@ const aWorkspaceToExport = async (api: APIRequestContext, name: string): Promise
   };
 };
 
-const signedIn = async (page: Page, api: APIRequestContext, member: Member): Promise<void> => {
+const signedIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
   await page.goto("/sign-in");
-  await signIn(page, api, member.email);
+  await signIn(page, api, email);
 };
 
 const exportsRegion = (page: Page): Locator => page.getByRole("region", { name: "Exports" });
@@ -117,7 +117,7 @@ test.describe("Exports", () => {
     const at = await aWorkspaceToExport(request, "Teme Valley Surveys");
 
     await test.step("an Editor owning a collection finds no Exports", async () => {
-      await signedIn(page, request, at.editor);
+      await signedIn(page, request, at.editor.email);
       await expect(await knowledgeMenuOpened(page)).toMatchAriaSnapshot(`
         - navigation "Knowledge":
           - /children: deep-equal
@@ -143,7 +143,7 @@ test.describe("Exports", () => {
       await signOutFromTheShell(page, EDITOR);
     });
 
-    await signedIn(page, request, at.admin);
+    await signedIn(page, request, at.admin.email);
     await test.step("an Admin finds Exports under Curation", async () => {
       const menu = await knowledgeMenuOpened(page);
       await expect(menu.getByRole("link", { name: "Exports" })).toBeVisible();
