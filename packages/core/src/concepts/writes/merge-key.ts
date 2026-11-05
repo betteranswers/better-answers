@@ -9,7 +9,6 @@ export const mergeKeyMovedBy = (
   return proposedKey === mergeKeyOf(held.kind, held.title) ? undefined : proposedKey;
 };
 
-/** The writer and the reconciler's replay both land an accepted suggestion at this key. */
 export const acceptedKeyOf = (
   suggested: string,
   held: Pick<Held, "kind" | "title"> | undefined,

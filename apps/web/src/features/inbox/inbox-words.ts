@@ -94,6 +94,8 @@ export const SAID_OF_ACCEPTING = {
   "not-a-member": "You’re no longer a member of this workspace.",
   "role-unknown": `Your role here couldn’t be read. ${RELOAD}`,
   "role-disagrees": `Your role has changed. ${RELOAD}`,
+  unconfirmed:
+    "This suggestion couldn’t be confirmed as saved. If it’s still waiting in a minute, please accept it again.",
   "no-such-suggestion": "This suggestion is no longer waiting.",
   "already-decided": "Someone has already decided this suggestion.",
   "no-such-concept": "The concept this suggestion changes no longer exists.",
