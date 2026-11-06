@@ -634,6 +634,31 @@ describe("a knowledge base whose head cannot be exported", () => {
 
     expect(await snapshotOf(admin, scenario)).toEqual({ ok: false, error: "not-found" });
   });
+
+  it("reports a knowledge base with nothing readable as not found", async () => {
+    const scenario = await arrange();
+    const finance = await groupNamed(db(), scenario, "finance", [scenario.editor]);
+    await bundleIndexed(
+      db(),
+      scenario,
+      new Map([
+        [BUNDLE_MANIFEST_PATH, "owner: Acme\n"],
+        [SALARIES, "Pay bands.\n"],
+      ]),
+      [
+        {
+          path: SALARIES,
+          title: "Salary bands",
+          sensitivity: "Internal",
+          audienceGroups: [finance],
+        },
+      ],
+    );
+    const admin = await memberAs(scenario, "Admin");
+
+    expect(await snapshotOf(admin, scenario)).toEqual({ ok: false, error: "not-found" });
+    expect(await exportEventsBy(scenario, admin)).toEqual([]);
+  });
 });
 
 const FINANCE_ONLY = "FINANCE ONLY: the board approved a 40% cut.\n";

@@ -1,7 +1,7 @@
 import type pg from "pg";
 import { z } from "zod";
 
-import { boundarySchemas } from "@better-answers/schema";
+import { boundarySchemas, BUNDLE_MANIFEST_PATH } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../access/index.ts";
 import { action, declareActions, record } from "../audit/index.ts";
@@ -161,6 +161,7 @@ const snapshotRead =
     if (readable?.at_head !== true) return err("unrecorded-head");
     const files = await bundleSnapshot(member, git, commit, new Set(readable.paths));
     if (!files.ok) return err(files.error === "commit-gone" ? "unrecorded-head" : files.error);
+    if (files.value.every(({ path }) => path === BUNDLE_MANIFEST_PATH)) return err(NOT_FOUND);
     return ok({ head: commit, files: files.value });
   };
 

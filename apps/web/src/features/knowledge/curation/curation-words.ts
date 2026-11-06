@@ -145,7 +145,8 @@ export const EXPORTS_WORDS = {
 
 export const SAID_OF_EXPORTED_KNOWLEDGE_BASE = {
   "role-forbids": "You don’t have permission to download the knowledge base.",
-  "not-found": "Your knowledge base has no saved version yet, so there is nothing to download.",
+  "not-found":
+    "There is nothing in your knowledge base you can download yet. Nothing was downloaded.",
   "unrecorded-head":
     "A change to your knowledge base is still being saved. Nothing was downloaded. Please try again in a minute.",
   "export-too-large":
