@@ -771,10 +771,12 @@ describe("a concept's relations", () => {
         "bodyLinks",
         "frontmatter",
         "iri",
+        "owner",
         "pane",
         "relations",
         "trust",
         "trustWords",
+        "verifications",
       ].toSorted(),
     );
   });
@@ -872,7 +874,10 @@ describe("a body's links", () => {
     const seen: string[] = [];
     for (const { iri } of [toWithheld, toUnwritten, outOfTheBundle]) {
       seen.push(
-        JSON.stringify(await readFor(scenario.viewer, iri)).replaceAll(iri, "this concept"),
+        JSON.stringify({ ...(await readFor(scenario.viewer, iri)), owner: undefined }).replaceAll(
+          iri,
+          "this concept",
+        ),
       );
     }
 

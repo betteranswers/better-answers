@@ -516,3 +516,19 @@ export const closeFlag = async (
   }
   return ok({ feedbackId, recordId: flag.record_id, closedAs });
 };
+
+const ANSWERS_USING = `SELECT count(*)::int AS answers
+    FROM question_asked
+   WHERE workspace_id = $1 AND completed_at IS NOT NULL
+     AND concepts @> jsonb_build_array(jsonb_build_object('iri', $2::text))
+     AND ($3::text IS NULL OR asked_by = $3)`;
+
+/** How many answered questions returned the concept, among the records the reader can read. */
+export const answersUsing = async (reader: UserPrincipal, tx: Tx, iri: string): Promise<number> => {
+  const counted = await tx.query<{ answers: number }>(ANSWERS_USING, [
+    reader.workspaceId,
+    iri,
+    reader.role === "Admin" ? null : actorIdOf(reader),
+  ]);
+  return counted.rows[0]?.answers ?? 0;
+};

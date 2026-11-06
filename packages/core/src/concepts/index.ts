@@ -58,6 +58,8 @@ export {
   nameOwnerOfEachInput,
   ownedBy,
   ownerOf,
+  OWNED_VIA,
+  type ConceptOwner,
   type NameOwnerInput,
   type NameOwnerOfEachInput,
 } from "./owners.ts";
@@ -130,8 +132,11 @@ export {
   trustOf,
   trustWords,
   ukLongDate,
+  VERIFIED_TIERS,
+  verifierWords,
   type Trust,
   type TrustStatus,
+  type VerificationEvent,
 } from "./trust.ts";
 export { CONCEPT_REFUSALS } from "./vocabulary.ts";
 export {

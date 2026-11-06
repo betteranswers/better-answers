@@ -88,11 +88,23 @@ const openedOnTheWire = (opened: OpenResult<string>) => {
   if (!opened.found) return opened;
   const { concept, ...rest } = opened;
   if (concept === undefined) return rest;
-  const { iri, frontmatter, body, relations, bodyLinks, trustWords, evidence } = concept;
-  const trusted = wireTrust(concept.trust);
+  const { iri, frontmatter, body, relations, bodyLinks, trustWords } = concept;
+  const { verifications, owner, usedIn, evidence } = concept;
   return {
     ...rest,
-    concept: { iri, frontmatter, body, relations, bodyLinks, trust: trusted, trustWords, evidence },
+    concept: {
+      iri,
+      frontmatter,
+      body,
+      relations,
+      bodyLinks,
+      trust: wireTrust(concept.trust),
+      trustWords,
+      verifications,
+      owner,
+      usedIn,
+      evidence,
+    },
   };
 };
 

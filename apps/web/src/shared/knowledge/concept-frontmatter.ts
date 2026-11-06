@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { dayWords } from "@/shared/words.ts";
-
 import { CONCEPT_WORDS as WORDS } from "./concept-words.ts";
 import type { Concept } from "./knowledge-reads.ts";
 
@@ -25,22 +23,6 @@ const TAGS = z.array(z.string()).catch([]);
 
 export const tagsOf = (frontmatter: Frontmatter): readonly string[] =>
   TAGS.parse(frontmatter["tags"] ?? []);
-
-const VERIFIED = z.array(z.object({ by: z.string(), at: z.string() })).catch([]);
-
-/** OKF's prefix for a person's actor id; any other verifier is a process. */
-const A_PERSON = "human:";
-
-type VerifiedEvent = { readonly at: string; readonly byAPerson: boolean };
-
-export const verifiedEventsOf = (frontmatter: Frontmatter): readonly VerifiedEvent[] =>
-  VERIFIED.parse(frontmatter["verified"] ?? []).map(({ by, at }) => ({
-    at,
-    byAPerson: by.startsWith(A_PERSON),
-  }));
-
-export const dayOf = (event: VerifiedEvent): string =>
-  Number.isNaN(Date.parse(event.at)) ? event.at : dayWords(event.at);
 
 const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([
   "title",

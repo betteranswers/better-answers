@@ -470,6 +470,16 @@ describe("the MCP endpoint under either protocol version", () => {
     expect(entry?.description).toContain("`bodyLinks`");
   });
 
+  it("includes verifications, owner and use in open's output schema", async () => {
+    const entry = (await listTools(inProcess(), FULL_TOKEN)).find(
+      (listed) => listed.name === "open",
+    );
+
+    for (const field of ["verifications", "owner", "usedIn"]) {
+      expect(JSON.stringify(entry?.outputSchema)).toContain(`"${field}"`);
+    }
+  });
+
   it("describes find and open with glossary terms", async () => {
     const described = new Map(
       (await listTools(inProcess(), FULL_TOKEN)).map((entry) => [entry.name, entry.description]),

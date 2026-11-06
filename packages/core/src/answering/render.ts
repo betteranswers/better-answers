@@ -1,6 +1,6 @@
 import type { JudgeState, QuestionVerdict } from "@better-answers/schema";
 
-import { ukLongDate } from "../concepts/index.ts";
+import { ukLongDate, verifierWords, type VerificationEvent } from "../concepts/index.ts";
 import type { Evidence, PassageView } from "./boundary.ts";
 import {
   ANSWER_KIND,
@@ -72,6 +72,26 @@ const evidenceLines = (evidence: readonly Evidence<string>[]): readonly string[]
     return opens === undefined ? `- ${named}` : `- ${named} (${opens})`;
   });
 
+const verificationLine = ({ tier, actor, name, at }: VerificationEvent): string =>
+  tier === "human-reviewed"
+    ? `- Verified by ${name ?? verifierWords(actor)} · ${ukLongDate(at)}`
+    : `- Verified automatically · ${ukLongDate(at)}`;
+
+const ownerLines = ({ owner }: ConceptView<string>): readonly string[] => {
+  if (owner === null) return [];
+  return [
+    owner.via === "concept" ? `Owner: ${owner.name}` : `Owner: ${owner.name}, for its collection`,
+  ];
+};
+
+const counted = (count: number, noun: string): string =>
+  `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+const usedInLines = ({ usedIn: { guides, answers } }: ConceptView<string>): readonly string[] =>
+  guides + answers === 0
+    ? []
+    : [`Used in ${counted(guides, "guide")} and ${counted(answers, "answer")}.`];
+
 const conceptText = (concept: ConceptView<string>): string => {
   const title =
     typeof concept.frontmatter["title"] === "string" ? concept.frontmatter["title"] : concept.iri;
@@ -86,6 +106,9 @@ const conceptText = (concept: ConceptView<string>): string => {
     concept.body.trimEnd(),
     "",
     `_${concept.trustWords}_`,
+    ...ownerLines(concept),
+    ...usedInLines(concept),
+    ...listed("Verifications, newest first:", concept.verifications.map(verificationLine)),
     ...listed("Evidence:", evidence),
     ...listed("Related:", related),
     ...listed(

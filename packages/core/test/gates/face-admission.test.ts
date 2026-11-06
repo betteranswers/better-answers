@@ -44,6 +44,7 @@ const STEPS: Readonly<Record<string, string>> = {
   "concepts/standingOnConcept": "open calls it with the reader it admitted, and it decides nothing",
   "concepts/readConcept": "open calls it with the reader it admitted",
   "guides/flagWriteUpsCiting": "a landed write and its replay call it in their own transaction",
+  "guides/guidesCiting": "open calls it with the reader it admitted, and it decides nothing",
   "guides/recomputeWriteUpsIncluding":
     "a visibility change and a landed write call it in their own transaction",
   "guides/writeSkeleton": "runs inside the withBundleWrite of an act that admitted its person",

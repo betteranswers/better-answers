@@ -622,6 +622,72 @@ describe("knowledge.open over tRPC", () => {
   });
 });
 
+const aNestingTheAdminVerified = async () => {
+  const held = await aWorkspaceHolding([
+    { title: NESTING, body: NESTING_BODY, trust: "human-reviewed", collection: "birds" },
+  ]);
+  const { workspace, viewer } = held;
+  await nameOwners(
+    app(),
+    ownersNaming.parse({
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      owners: [{ collection: "birds", personId: viewer.id }],
+    }),
+  );
+  return {
+    ...held,
+    kept: {
+      verifications: [
+        {
+          tier: "human-reviewed",
+          actor: `human:${workspace.admin.id}`,
+          name: workspace.admin.name,
+          at: matching.any(String),
+        },
+      ],
+      owner: { personId: viewer.id, name: viewer.name, via: "collection" },
+      usedIn: { guides: 0, answers: 0 },
+    },
+  };
+};
+
+const OPENED_BEFORE = [
+  "iri",
+  "frontmatter",
+  "body",
+  "relations",
+  "bodyLinks",
+  "trust",
+  "trustWords",
+  "evidence",
+];
+
+describe("a concept's verifications, owner and use", () => {
+  it("answers them over tRPC, the trust taken from the newest", async () => {
+    const held = await aNestingTheAdminVerified();
+    const signedIn = await webSignedIn(app(), held.viewer.email);
+
+    const { concept } = await signedIn.api.knowledge.open.query({ iri: held.iriOf(NESTING) });
+
+    expect(concept).toMatchObject(held.kept);
+    assert(concept !== undefined);
+    expect(concept.verifications).toHaveLength(1);
+    expect(concept.trust.verifiedAt).toBe(concept.verifications[0]?.at);
+  });
+
+  it("adds them over MCP beside every field open answered before", async () => {
+    const { viewer, iriOf, kept } = await aNestingTheAdminVerified();
+
+    const concept = rpcOf(structured(await mcpOpenedBy(viewer, iriOf(NESTING)))["concept"]);
+
+    expect(concept).toMatchObject(kept);
+    expect(Object.keys(concept).toSorted()).toEqual(
+      [...OPENED_BEFORE, ...Object.keys(kept)].toSorted(),
+    );
+  });
+});
+
 describe("the knowledge router, signed out", () => {
   it("refuses find and open with no session", async () => {
     const { api } = webClientOf(app().client());

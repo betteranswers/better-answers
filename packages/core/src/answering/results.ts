@@ -1,6 +1,12 @@
 import type { ConceptIri } from "@better-answers/schema";
 
-import type { ConceptRead, Frontmatter, Trust } from "../concepts/index.ts";
+import type {
+  ConceptOwner,
+  ConceptRead,
+  Frontmatter,
+  Trust,
+  VerificationEvent,
+} from "../concepts/index.ts";
 import type { Evidence, PassageView } from "./boundary.ts";
 import type { PlannedAnswer } from "./plan.ts";
 
@@ -37,6 +43,9 @@ export type FindResult<Iri extends string = ConceptIri> = {
   readonly nextCursor?: string;
 };
 
+/** Counts only the guides and answers the reader can read. */
+type UsedIn = { readonly guides: number; readonly answers: number };
+
 export type ConceptView<Iri extends string> = {
   readonly iri: Iri;
   readonly frontmatter: Frontmatter;
@@ -53,6 +62,9 @@ export type ConceptView<Iri extends string> = {
   }[];
   readonly trust: Trust;
   readonly trustWords: string;
+  readonly verifications: readonly VerificationEvent[];
+  readonly owner: ConceptOwner | null;
+  readonly usedIn: UsedIn;
   readonly evidence: readonly Evidence<Iri>[];
 };
 
