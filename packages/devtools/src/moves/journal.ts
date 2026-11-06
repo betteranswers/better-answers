@@ -28,13 +28,12 @@ const journal = z.object({
 
 type Journal = z.infer<typeof journal>;
 
-const journalPath = (root: string): string =>
-  path.join(
-    execFileSync("git", ["-C", root, "rev-parse", "--absolute-git-dir"], {
-      encoding: "utf8",
-    }).trim(),
-    "move-files-journal.json",
-  );
+export const gitDirOf = (root: string): string =>
+  execFileSync("git", ["-C", root, "rev-parse", "--absolute-git-dir"], {
+    encoding: "utf8",
+  }).trim();
+
+const journalPath = (root: string): string => path.join(gitDirOf(root), "move-files-journal.json");
 
 const messageOf = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);

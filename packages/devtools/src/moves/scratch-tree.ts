@@ -5,12 +5,19 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   readdirSync,
+  readFileSync,
   readlinkSync,
+  realpathSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
+
+import { gitDirOf } from "./journal.ts";
 
 const GIT_OUTPUT_LIMIT_BYTES = 256 * 1024 * 1024;
 
@@ -83,4 +90,35 @@ export const copyTree = (root: string, into: string): void => {
   writeFileSync(path.join(into, ".git/objects/info/alternates"), `${objects}\n`);
   git(into, ["update-index", "-z", "--index-info"], git(root, ["ls-files", "-z", "--stage"]));
   git(into, ["update-ref", "HEAD", git(root, ["rev-parse", "HEAD"]).trim()]);
+};
+
+/** The temp folder is shared, so a scratch path that is a link or another user's folder is refused. */
+const ownedFolder = (folder: string): string => {
+  const found = lstatSync(folder);
+  if (!found.isDirectory() || found.uid !== process.getuid?.()) {
+    throw new Error(`refusing the scratch folder ${folder}: it is not a folder this user owns`);
+  }
+  return folder;
+};
+
+const pointerOf = (root: string): string => path.join(gitDirOf(root), "move-files-scratch");
+
+/** Removes the scratch folder a killed run left, which the git folder names, then makes a new one. */
+export const openScratch = (root: string): string => {
+  const pointer = pointerOf(root);
+  if (existsSync(pointer)) {
+    const left = readFileSync(pointer, "utf8");
+    if (lstatSync(left, { throwIfNoEntry: false }) !== undefined) {
+      rmSync(ownedFolder(left), { recursive: true });
+    }
+    rmSync(pointer);
+  }
+  const folder = ownedFolder(mkdtempSync(path.join(realpathSync(tmpdir()), "move-files-")));
+  writeFileSync(pointer, folder);
+  return folder;
+};
+
+export const closeScratch = (root: string, folder: string): void => {
+  rmSync(folder, { recursive: true, force: true });
+  rmSync(pointerOf(root), { force: true });
 };

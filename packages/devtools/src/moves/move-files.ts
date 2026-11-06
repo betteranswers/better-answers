@@ -1,7 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { z } from "zod";
@@ -9,7 +7,7 @@ import { z } from "zod";
 import { trackedFiles } from "../paths.ts";
 import { applyChange, hasInterrupted, undoInterrupted } from "./journal.ts";
 import type { Edit } from "./journal.ts";
-import { copyTree } from "./scratch-tree.ts";
+import { closeScratch, copyTree, openScratch } from "./scratch-tree.ts";
 import { inventoryAcross } from "./test-inventory.ts";
 import type { Inventory } from "./test-inventory.ts";
 
@@ -37,8 +35,6 @@ const TSCONFIG = /^(?:apps|packages)\/[^/]+\/tsconfig\.json$/u;
 const LEFTOVER_WIDTH = 220;
 
 const GREP_OUTPUT_LIMIT_BYTES = 256 * 1024 * 1024;
-
-const SCRATCH_ID_LENGTH = 12;
 
 const isNeverRewritten = (file: string): boolean => NEVER_REWRITTEN.some((skip) => skip.test(file));
 
@@ -297,13 +293,6 @@ const editsOf = (
   return { edits, unresolved };
 };
 
-/** One scratch folder per working tree, cleared at the start of each run, so a stopped run leaves nothing for long. */
-const scratchFolderOf = (root: string): string =>
-  path.join(
-    realpathSync(tmpdir()),
-    `move-files-${createHash("sha256").update(root).digest("hex").slice(0, SCRATCH_ID_LENGTH)}`,
-  );
-
 /** Moves the files in a copy first, so a run stopped while it lists leaves `root` untouched. */
 export const moveFiles = async (
   root: string,
@@ -322,8 +311,7 @@ export const moveFiles = async (
   const { edits, unresolved } = editsOf(planOf(root, moves, tracked), tracked);
   const found = { moved: moves.size, rewritten: edits.map(({ file }) => file), unresolved };
   if (dryRun) return { ...found, leftovers: leftoversOf(root, moves), dryRun: true };
-  const work = scratchFolderOf(root);
-  rmSync(work, { recursive: true, force: true });
+  const work = openScratch(root);
   try {
     const copy = path.join(work, "tree");
     copyTree(root, copy);
@@ -333,7 +321,7 @@ export const moveFiles = async (
     if (inventory.kind === "unchanged") applyChange(root, { edits, moves });
     return { ...found, leftovers, recovered, dryRun: false, inventory };
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    closeScratch(root, work);
   }
 };
 

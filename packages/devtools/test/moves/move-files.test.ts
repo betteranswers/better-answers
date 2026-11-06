@@ -826,6 +826,25 @@ describe("the test inventory a move holds", () => {
     );
   });
 
+  it("refuses a link planted at the scratch folder", () => {
+    const root = coreRepositoryOf();
+    const victim = path.join(scratch, `victim-${String(counter)}`);
+    const planted = path.join(scratch, `planted-${String(counter)}`);
+    writeUnder(victim, "kept.txt", "kept\n");
+    symlinkSync(victim, planted);
+    writeFileSync(
+      path.join(gitIn(root, "rev-parse", "--absolute-git-dir").trim(), "move-files-scratch"),
+      planted,
+    );
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain(`refusing the scratch folder ${planted}`);
+    expect(read(victim, "kept.txt")).toBe("kept\n");
+    expect(status(root)).toBe("");
+  });
+
   it("moves nothing when the inventory cannot be taken", () => {
     const root = repositoryOf({
       [CORE_SOURCE]: "export const thing = 1;\n",
