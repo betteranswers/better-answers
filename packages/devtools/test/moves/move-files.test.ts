@@ -85,6 +85,9 @@ const read = (root: string, file: string): string => readFileSync(path.join(root
 
 const status = (root: string): string => gitIn(root, "status", "--porcelain");
 
+const pointerIn = (root: string): string =>
+  path.join(gitIn(root, "rev-parse", "--absolute-git-dir").trim(), "move-files-scratch");
+
 describe("the specifiers a move rewrites", () => {
   it.each([
     [
@@ -887,16 +890,26 @@ describe("the test inventory a move holds", () => {
     });
     writeUnder(victim, "kept.txt", "kept\n");
     symlinkSync(victim, planted);
-    writeFileSync(
-      path.join(gitIn(root, "rev-parse", "--absolute-git-dir").trim(), "move-files-scratch"),
-      planted,
-    );
+    const finished = spawnSync("true").pid;
+    writeFileSync(pointerIn(root), JSON.stringify({ pid: finished, folder: planted }));
 
     const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
 
     expect(ran.status).toBe(1);
     expect(ran.stderr).toContain(`refusing the scratch folder ${planted}`);
     expect(read(victim, "kept.txt")).toBe("kept\n");
+    expect(status(root)).toBe("");
+  });
+
+  it("refuses to run while another run holds the tree", () => {
+    const root = coreRepositoryOf();
+    writeFileSync(pointerIn(root), JSON.stringify({ pid: process.pid, folder: scratch }));
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain(`another move-files run (pid ${String(process.pid)})`);
+    expect(existsSync(scratch)).toBe(true);
     expect(status(root)).toBe("");
   });
 

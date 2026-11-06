@@ -17,6 +17,8 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { z } from "zod";
+
 import { gitDirOf } from "./journal.ts";
 
 const GIT_OUTPUT_LIMIT_BYTES = 256 * 1024 * 1024;
@@ -109,20 +111,45 @@ const isScratchPath = (folder: string): boolean =>
 
 const pointerOf = (root: string): string => path.join(gitDirOf(root), "move-files-scratch");
 
-/** Removes the scratch folder a killed run left, which the git folder names, then makes a new one. */
+const claim = z.object({ pid: z.number(), folder: z.string() });
+
+const isRunning = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const claimOf = (pointer: string): z.infer<typeof claim> | undefined => {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(pointer, "utf8"));
+    return claim.parse(parsed);
+  } catch {
+    return undefined;
+  }
+};
+
+/** A live run refuses a second one. A dead run's folder is removed only if it is ours. */
 export const openScratch = (root: string): string => {
   const pointer = pointerOf(root);
   if (existsSync(pointer)) {
-    const left = readFileSync(pointer, "utf8");
-    if (!isScratchPath(left))
-      throw new Error(`refusing the scratch folder ${left}: it is not a move-files temp folder`);
-    if (lstatSync(left, { throwIfNoEntry: false }) !== undefined) {
-      rmSync(ownedFolder(left), { recursive: true });
+    const held = claimOf(pointer);
+    if (held !== undefined && isRunning(held.pid)) {
+      throw new Error(
+        `another move-files run (pid ${String(held.pid)}) is moving files in this tree`,
+      );
+    }
+    if (held !== undefined && isScratchPath(held.folder)) {
+      if (lstatSync(held.folder, { throwIfNoEntry: false }) !== undefined) {
+        rmSync(ownedFolder(held.folder), { recursive: true });
+      }
     }
     rmSync(pointer);
   }
   const folder = ownedFolder(mkdtempSync(path.join(realpathSync(tmpdir()), SCRATCH_PREFIX)));
-  writeFileSync(pointer, folder);
+  writeFileSync(pointer, JSON.stringify({ pid: process.pid, folder }), { flag: "wx" });
   return folder;
 };
 
