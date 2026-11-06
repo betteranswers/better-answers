@@ -79,7 +79,7 @@ Plan 008 owns the folder restructure and is moving files under `packages/*` and 
 - [ ] Triage every review-bot and security-reviewer comment per `../references/bugbot-triage.md`.
 - [ ] Before the code-ready report and babysit, and again after merge prep, record the base and head SHAs prepared by the topology owner under the execution playbook.
 - [ ] Move a file only with `node scripts/move-files.mjs <table.tsv>`, one `<old>\t<new>` row per file. It rewrites the imports and path mentions, then runs `git mv`.
-- [ ] Keep every case title a PR moves. Write `scripts/test-inventory.sh <dir>` output before and after, and paste the `diff` in the PR body. A title that leaves names the test that keeps its claim.
+- [ ] Keep every case title a PR moves. `node scripts/move-files.mjs` lists the tests before and after the move, undoes the move and exits non-zero on any change to a test file's name or a test's title. For a PR that deletes or splits cases, write `scripts/test-inventory.sh <dir>` output before and after, and paste the `diff` in the PR body. A title that leaves names the test that keeps its claim.
 - [ ] Put each new or moved test folder where `AGENTS.md` "Where a file goes" says, and run `pnpm run test-folders` before the push. After BA-287 it runs in `check:gates` and the pre-push hook as well.
 
 ### Verdict and merge, for every PR
@@ -174,7 +174,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 **Build.**
 
-- [ ] Move files only with `node scripts/move-files.mjs <table.tsv>`. Run `scripts/test-inventory.sh` on each tree a file leaves before and after, and paste the `diff` in the PR body. It shows no title change.
+- [ ] Move files only with `node scripts/move-files.mjs <table.tsv>`. It lists the tests before and after the move, undoes the move and exits non-zero on any change to a test file's name or a test's title. Paste its output in the PR body.
 - [ ] Decide each of the 53 root tests once, in this PR. A root test moves to `gates/` when its subject is the repository, meaning a config, a scan, a lint rule, a workflow, a skill, a doc set or the tree. It stays when its subject is the workspace's own code, however the test reaches it.
 - [ ] Write the three bullets of "Where a file goes" as follows.
 
@@ -346,7 +346,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 **Files.**
 
 - [ ] Create `packages/core/vitest.budgets.config.ts`, modelled on `vitest.readings.config.ts`, including `test/budgets/*.budget.ts`. The folder is the rule, and the suffix is how vitest selects it.
-- [ ] Move the core write-budget, edit-budget, find-budget, map-budget and guide-seed-budget tests, the analysed-map test and recall's "reports each set's recall" case to `packages/core/test/budgets/`. At `24d4d18aa` they are `test/answering/find-budget.test.ts`, `test/concepts/map-budget.test.ts`, `test/concepts/writes/edit-budget.test.ts`, `test/concepts/writes/write-budget.test.ts`, `test/guides/guide-seed-budget.test.ts`, `test/answering/analysed-map.test.ts` and the case in `test/answering/recall.test.ts`. Move the files with `node scripts/move-files.mjs`, and paste the `scripts/test-inventory.sh` diff in the PR body.
+- [ ] Move the core write-budget, edit-budget, find-budget, map-budget and guide-seed-budget tests, the analysed-map test and recall's "reports each set's recall" case to `packages/core/test/budgets/`. At `24d4d18aa` they are `test/answering/find-budget.test.ts`, `test/concepts/map-budget.test.ts`, `test/concepts/writes/edit-budget.test.ts`, `test/concepts/writes/write-budget.test.ts`, `test/guides/guide-seed-budget.test.ts`, `test/answering/analysed-map.test.ts` and the case in `test/answering/recall.test.ts`. Move the files with `node scripts/move-files.mjs`, which checks the test inventory, and paste its output in the PR body.
 - [ ] Move the figure and budget tests left in `check` to `packages/core/test/budgets/` as well, since AGENTS.md "Testing" runs them on the schedule. They are `test/concepts/reading/browse-budget.test.ts`, `test/guides/guide-read-budget.test.ts` and `test/store/map/reader-linear.perf.test.ts`, moved whole, and waiting-on-you's "answers 50 waiting suggestions within its budget" case, split into `waiting-on-you.budget.ts`.
 - [ ] Add the row `{ folder: "packages/core/test/budgets", kind: "run", reason: "vitest.budgets.config.ts selects it" }` to `PINS` in `packages/devtools/src/scans/test-folders.ts`.
 - [ ] Edit `packages/core/package.json` to add a `budgets` script.
@@ -464,7 +464,7 @@ Changed 03/11/2026. #967 runs core's suite as one job, so `check:core:suite` tak
 **Files.**
 
 - [ ] Edit `.github/workflows/check.yml` to add a `full-images` job in the full lane, and to add it to the `check` job's legs.
-- [ ] Split `apps/api/tests/deploy/`. Move `backup-image.test.ts`, `image.test.ts`, `image-probe.test.ts` with its helper `image-probe.ts`, `test-postgres.test.ts`, `local-database.test.ts` and `restore.test.ts` to `apps/api/tests/images/`, with `compose-project.ts`, which only `local-database` and `test-postgres` import. Move `apps/api/tests/stop.test.ts` there too. `deploy/` keeps `await-release`, `browse-production` and `browse-role`, which read the compose files and start no image, so its `mirror` row stays. Move the files with `node scripts/move-files.mjs`, and paste the `scripts/test-inventory.sh` diff in the PR body.
+- [ ] Split `apps/api/tests/deploy/`. Move `backup-image.test.ts`, `image.test.ts`, `image-probe.test.ts` with its helper `image-probe.ts`, `test-postgres.test.ts`, `local-database.test.ts` and `restore.test.ts` to `apps/api/tests/images/`, with `compose-project.ts`, which only `local-database` and `test-postgres` import. Move `apps/api/tests/stop.test.ts` there too. `deploy/` keeps `await-release`, `browse-production` and `browse-role`, which read the compose files and start no image, so its `mirror` row stays. Move the files with `node scripts/move-files.mjs`, which checks the test inventory, and paste its output in the PR body.
 - [ ] Add an api script that runs only `tests/images/`.
 - [ ] Add the row `{ folder: "apps/api/tests/images", kind: "run", reason: "the images script and the full-images job select it; check excludes it" }` to `PINS` in `packages/devtools/src/scans/test-folders.ts`.
 - [ ] Edit `apps/api/vitest.config.ts` to exclude that folder from `check`.
@@ -918,7 +918,7 @@ PR 1 deletes 352 of the 367 rows its classification first named. Three rows are 
 
 - [ ] PR 1. Write `delete-cases.mjs` under `/tmp/BA-278-1/` and run it. It matches cases by spec and title through `playwright test --list --reporter=json`, deletes only `1-delete` rows, and leaves a loop whole when any of its expansions is kept. Prune the imports, constants and helpers the deletion leaves unused. Run the `scripts/test-inventory.sh` diff at trunk and head, and paste it in the PR body. The removed Playwright lines are exactly the 352 titles, and no other suite's inventory changes.
 - [ ] PR 2 and PR 3. Write each new test at the lowest layer that sees its claim, per the `holder` column. Break the code the claim guards and see the new test fail. Delete the browser case in the same PR, so no claim lapses between PRs.
-- [ ] PR 4. Give each of the 31 page cases its missing facets, and fold the 41 folded cases and the 12 shared-loop cases into them or delete them as the `reason` column says. Add the three optional detail-page cases, a record, a member and a suggestion, only if the measured wall leaves room. Move spec files with `node scripts/move-files.mjs`, and paste the `scripts/test-inventory.sh` diff for `apps/web/e2e` in the PR body.
+- [ ] PR 4. Give each of the 31 page cases its missing facets, and fold the 41 folded cases and the 12 shared-loop cases into them or delete them as the `reason` column says. Add the three optional detail-page cases, a record, a member and a suggestion, only if the measured wall leaves room. Move spec files with `node scripts/move-files.mjs`, which checks the test inventory, and paste the `scripts/test-inventory.sh` diff for `apps/web/e2e` in the PR body for the cases the PR folds or deletes.
 - [x] PR 5. Measure the one-job wall at three CI attempts and set the shard count by the rule. If the one-job median is over 240 s, try the browser cache first, then merging the five multi-case journeys, before a second shard. Run `full-core` as one job.
 
 **You see.**
