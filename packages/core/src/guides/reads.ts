@@ -394,7 +394,7 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
   const numbers = numberedIn(shown.map(({ row }) => row));
   const shapeOf = new Map(held.shapes.map((shape) => [shape.id, shape]));
   const citedBy = Map.groupBy(held.cited, (row) => row.write_up_id);
-  const everyFact = coverage.sections.flatMap((section) => section.facts);
+  const everyFact = shown.flatMap(({ section }) => section.facts);
   return {
     guideId,
     kind: definition.kind,
