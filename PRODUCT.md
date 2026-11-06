@@ -27,7 +27,7 @@ Success means a person or agent can use the company's knowledge with confidence:
 
 ## Positioning
 
-The knowledge is held in the Open Knowledge Format (OKF v0.2): one portable file per concept that a person can read without the platform and that belongs to the company. Every concept carries five signals a consumer can see: provenance, trust, freshness, lifecycle and attestation. Every answer cites its sources, enforced by the platform rather than optional. Neighbouring products (Guru, Glean, Dust, Onyx, Consilience) index and answer; better-answers curates an explicit, portable, trust-carrying map and closes the loop from use-case outcomes back into the knowledge.
+The knowledge is held in the Open Knowledge Format (OKF v0.2): one portable file per concept that a person can read without the platform and that belongs to the company. Every concept shows a consumer its provenance, trust, freshness and lifecycle, and an attested computation also shows its attestation. Every answer cites its sources, enforced by the platform rather than optional. Neighbouring products (Guru, Glean, Dust, Onyx, Consilience) index and answer; better-answers curates an explicit, portable, trust-carrying map and closes the loop from use-case outcomes back into the knowledge.
 
 ## Operating Context
 
@@ -39,7 +39,7 @@ The knowledge is held in the Open Knowledge Format (OKF v0.2): one portable file
 
 ## Capabilities and Constraints
 
-- v0.1 (single source of truth): product, service and sector guides; bid libraries as `Answer` concepts; search and cited Q&A; answers to a question set drawn from the knowledge with citations; a read-only MCP server; the Control Centre; sensitivity, roles and coverage.
+- v0.1 (single source of truth): product, service and sector guides; bid libraries as `Answer` concepts; search and cited Q&A; answers to a question set drawn from the knowledge with citations; an MCP server whose entries read the knowledge, plus `give_feedback`, which records feedback; the Control Centre; sensitivity, roles and coverage.
 - Next: opportunities, versioned packs, extracted question sets, responses, submissions, outcomes, and the outcome loop. Then: renewal packs, intelligence feeds, proposals and prospecting. Later: marketing campaigns and broader sources.
 - Concepts are not one shape. OKF `type` is a free string and kinds appear as producers write concepts; the bid-library `Answer` concepts in the first deployment are one collection among many that OKF producers will create (sectors, products, policies, certifications, people, systems, datasets and more). Design for any kind, never for one content shape. `docs/okf-v02.md` sets out what OKF gives the platform.
 - Delivery follows the v0.1 route in `docs/specs/v01-route.md` (blocks S0–S8, V1, P1–P2, O1, C1). It is context for what is planned, not a fixed order for design work.
@@ -47,7 +47,7 @@ The knowledge is held in the Open Knowledge Format (OKF v0.2): one portable file
 - Trust never controls who can view a concept; sensitivity does. Role and its threshold control which actions a reader can take.
 - The outcome loop favours a pointer to where to focus, grounded in the company's data, and a pack ready for review over a dashboard of counts.
 - Terminology follows `GLOSSARY.md`. "Tender" is the statutory word; "bid" is colloquial.
-- The platform is not built for one client. The first client's requirements (`.planning/draft-docs/draft-requirements.md`) are the worked example: sector guides and product/service guides with a Brief/Detail layered view, a sales playbook zone and a bid reference zone, controlled corporate data, tag-based intelligence feeds, and a coverage view.
+- The platform is not built for one client. The first client's requirements (`.planning/draft-docs/draft-requirements.md`, local only and gitignored) are the worked example: sector guides and product/service guides with a Brief/Detail layered view, a sales playbook zone and a bid reference zone, controlled corporate data, tag-based intelligence feeds, and a coverage view.
 - Stack: Vite + React SPA in `apps/web`, talking to `apps/api` only over tRPC; TanStack Router/Query/Table; Tiptap and CodeMirror for editing; Phosphor icons. Components were intended to come from shadcn, Kibo UI, Vercel AI Elements, Streamdown and similar registries; adopt them where they earn their place, from first principles.
 - The repository is shedding complexity: prefer the simplest design and implementation that serves the user.
 - Undecided: the shape of later-stage surfaces (renewal packs, intelligence feeds, proposals) beyond the drafts in `.planning/draft-docs/`.
@@ -58,14 +58,14 @@ The knowledge is held in the Open Knowledge Format (OKF v0.2): one portable file
 - British spelling and UK conventions throughout. Dates in UK long form (3 March 2026; with time, 09:41 · 30 August 2026). Money as £1,240.00. Relative time only under a minute.
 - Trust words are a closed set, written verbatim and always as text: Verified by <person> · Verified automatically · Unverified · Changed since verified · Out of date · Draft · Deprecated.
 - Impeccable is the design authority. `packages/design-system` and its `better-answers-design` skill are to be removed entirely; DESIGN.md and the tokens it records replace them.
-- The incumbent look (a quiet, dense "blueprint": hairlines, square corners, one ink-blue accent) is the baseline to improve on, not a ceiling. The shipped app does not yet match the original intent; the cards in `packages/design-system/components/*/*.card.html` and `packages/design-system/guidelines/*.card.html` show that intent, including where colour is used. Treat them as evidence of intent, not as a spec to copy.
+- The incumbent look (a quiet, dense "blueprint": hairlines, square corners, one ink-blue accent) is the baseline to improve on, not a ceiling. The shipped app does not yet match the original intent; the cards in `docs/design/intent/` show that intent, including where colour is used. Treat them as evidence of intent, not as a spec to copy.
 - The bar is a polished, finished product: brand and trust are what set it apart, alongside genuine usefulness to people and agents.
 - Copy is plain, short and direct. The product's UI copy still carries a long-standing over-written prose style; removing it everywhere is open work.
 
 ## Evidence on Hand
 
 - Product truth: `VISION.md`, `GLOSSARY.md`, `docs/specs/`, `docs/personas/personas.md`, `docs/okf-v02.md`.
-- First-client context and future direction: `.planning/draft-docs/` (requirements, vision, context glossary, mapping). The first client works in safeguarding: sectors such as Safeguarding Children Partnerships, Safeguarding Adults Boards and Multi-Academy Trusts; products such as an LMS, safeguarding websites, and audits. Use it as example content, not as the product's audience definition.
+- First-client context and future direction: `.planning/draft-docs/` (local only and gitignored) (requirements, vision, context glossary, mapping). The first client works in safeguarding: sectors such as Safeguarding Children Partnerships, Safeguarding Adults Boards and Multi-Academy Trusts; products such as an LMS, safeguarding websites, and audits. Use it as example content, not as the product's audience definition.
 - No customer testimonials, case studies, published metrics, pricing or logos exist. Do not fabricate them.
 
 ## Product Principles
@@ -79,5 +79,5 @@ The knowledge is held in the Open Knowledge Format (OKF v0.2): one portable file
 ## Accessibility & Inclusion
 
 - WCAG 2.2 AA, enforced by an axe gate in the browser suite (`apps/web/e2e/accessibility-gate.spec.ts`), in light and dark themes.
-- Mobile web is supported: CI runs a WebKit iPhone profile over sign-in, Ask, Connected sources and the accessibility gate.
+- v0.1 supports desktop Chromium and iPhone WebKit. C1 adds the iPhone run to the browser suite (`docs/specs/route/c1.md`).
 - Users are mostly non-technical; never use colour as the only signal, and write trust states as text.
