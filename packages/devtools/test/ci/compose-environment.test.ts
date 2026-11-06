@@ -295,6 +295,15 @@ const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): 
   ...sharedDsns(environmentsIn(source)),
 ];
 
+/** `requireBootstrap` calls `readBootstrap`. */
+const readersCalledIn = (entry: string): string[] => {
+  const source = readFileSync(path.join(repositoryRoot, "apps/api/src", entry), "utf8");
+  const called = [...source.matchAll(/\b(read[A-Z]\w*|requireBootstrap)\(/gu)]
+    .map(([, name]) => (name === "requireBootstrap" ? "readBootstrap" : (name ?? "")))
+    .filter((name) => Object.hasOwn(apiConfig.READER_SCHEMAS, name));
+  return [...new Set(called)].sort();
+};
+
 const compose = readFileSync(path.join(repositoryRoot, COMPOSE), "utf8");
 
 const flagged = (findings: readonly Finding[]): string[] =>
@@ -319,6 +328,13 @@ describe(`${COMPOSE} gives each service the environment its tier's config module
 
     expect(Object.keys(apiConfig.READER_SCHEMAS).sort()).toEqual(exported.sort());
     expect([...apiConfig.PROCESS_READERS.api].sort()).toEqual(exported.sort());
+  });
+
+  it.each([
+    ["migrate", "migrate.ts"],
+    ["ops", "ops.ts"],
+  ] as const)("keeps %s's readers to those its entry calls", (process, entry) => {
+    expect(readersCalledIn(entry)).toEqual([...apiConfig.PROCESS_READERS[process]].sort());
   });
 
   it("counts a default or an optional field as optional", () => {

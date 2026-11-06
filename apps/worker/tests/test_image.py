@@ -435,7 +435,7 @@ def chowned_worker_uid() -> int:
 PROBE = """
 import glob, importlib, json, os, re, shutil, subprocess, sys
 from importlib import metadata
-from better_answers_worker.environment_gate import PROCESSES
+from better_answers_worker.environment_gate import INIT, PROCESSES
 
 SEARCHED = os.pathsep.join(
     [os.environ["PATH"], "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/busybox"]
@@ -559,6 +559,9 @@ sys.stdout.write(json.dumps({
         glob.glob(os.path.join(sys.base_prefix, "**", "*.whl"), recursive=True)
     ),
     "command_interpreter": interpreter_of(PROCESSES["worker"][0]),
+    "init_version": subprocess.run(
+        [INIT[0], "--version"], capture_output=True, text=True
+    ).stdout.strip(),
     "shared_object_count": shared_object_count,
     "unresolved_shared_objects": unresolved_shared_objects,
     "library_file_count": library_file_count,
@@ -831,6 +834,7 @@ class ImageContents:
     tools_present: tuple[str, ...]
     bundled_wheels: tuple[str, ...]
     command_interpreter: str
+    init_version: str
     shared_object_count: int
     unresolved_shared_objects: Mapping[str, tuple[str, ...]]
     library_file_count: int
@@ -858,6 +862,7 @@ def _read_contents(stdout: str) -> ImageContents:
         tools_present=tuple(str(name) for name in parsed["tools_present"]),
         bundled_wheels=tuple(str(path) for path in parsed["bundled_wheels"]),
         command_interpreter=str(parsed["command_interpreter"]),
+        init_version=str(parsed["init_version"]),
         shared_object_count=int(parsed["shared_object_count"]),
         unresolved_shared_objects={
             str(path): tuple(str(name) for name in absent)
@@ -1150,6 +1155,10 @@ def test_the_command_runs_on_the_images_python_not_a_shell(
     major, minor = pinned_python_version()
 
     assert contents.command_interpreter == f"/usr/local/bin/python{major}.{minor}"
+
+
+def test_ships_the_init_the_gate_starts_as_pid_1(contents: ImageContents) -> None:
+    assert contents.init_version.startswith("tini version")
 
 
 def test_a_string_form_healthcheck_or_command_has_no_exec_form() -> None:

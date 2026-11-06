@@ -133,7 +133,7 @@ done
 # <<< the git store
 
 say "## 5 Replay the erasures completed after the dump"
-platform run --rm --no-deps api pnpm --silent ops replay-erasures --since "${dump_at}" | tee -a "${REPORT}"
+platform run --rm --no-deps api node apps/api/src/environment-gate.ts ops replay-erasures --since "${dump_at}" | tee -a "${REPORT}"
 
 say "## 5b Seed the synthetic fixture into the restored copy: its workspace rows, passage partition and an empty repository"
 # No production dump holds the fixture. It is the only workspace the drill may always rebuild, seed a subject into, and erase.
