@@ -411,11 +411,13 @@ At most 6 shards run at once (`max-parallel`). The organisation's plan runs 20 j
 
 ### Each leg's Stryker config names its own vitest config
 
-Both legs' Stryker configs set `vitest.configFile` to `vitest.stryker.config.ts`. That file is the workspace's vitest config with two differences. First, it drops the `github-actions` reporter, so only the leg's `summary` job writes a step summary. Vitest adds that reporter when `GITHUB_ACTIONS` is `true`. Under Stryker, it would append a "Vitest Test Report" per mutant and annotate killed mutants as errors. The workspaces' own suites keep the reporter.
+Both legs' Stryker configs set `vitest.configFile` to `vitest.stryker.config.ts`. That file is the workspace's vitest config with the changes below. Both files change `reporters`, `exclude` and `isolate`. The `packages/core` file also changes `env` and `sequence`. First, it drops the `github-actions` reporter, so only the leg's `summary` job writes a step summary. Vitest adds that reporter when `GITHUB_ACTIONS` is `true`. Under Stryker, it would append a "Vitest Test Report" per mutant and annotate killed mutants as errors. The workspaces' own suites keep the reporter.
 
-Second, it excludes each gate that reads `src` as text and runs none of it. In `packages/core` these are `environment-lint`, `face-admission` and `import-direction`. In `apps/api` it is `no-ambient-clock`. Stryker rewrites `src` in place, so such a gate reads the instrumented text, which can fail the initial test run. It also cannot kill a mutant. The config names each file, so that a gate that also runs `src` stays in the run. `refusal-words` is such a gate, and it is the only test of `src/kernel/refusal.ts`. The workspaces' own suites run every gate.
+Second, it sets `exclude` to leave out each gate that reads `src` as text and runs none of it. In `packages/core` these are `environment-lint`, `face-admission` and `import-direction`. In `apps/api` it is `no-ambient-clock`. Stryker rewrites `src` in place, so such a gate reads the instrumented text, which can fail the initial test run. It also cannot kill a mutant. The config names each file, so that a gate that also runs `src` stays in the run. `refusal-words` is such a gate, and it is the only test of `src/kernel/refusal.ts`. The workspaces' own suites run every gate.
 
-The `vitest.stryker.config.ts` files of `packages/core` and `apps/api` also set `isolate: true`. Stryker runs every file in one worker, and a static mutant is live only in a module evaluated after Stryker activates it.
+Third, both files set `isolate: true`. Stryker runs every file in one worker, and a static mutant is live only in a module evaluated after Stryker activates it. The workspaces' own suites set `isolate: false`.
+
+The two changes left are in `packages/core` only. The `packages/core` file sets `env.GITHUB_STEP_SUMMARY` to an empty string, so that no test writes a step summary under Stryker. It also sets `sequence.sequencer`, which the next section describes.
 
 ### `packages/core` runs its own test order under Stryker
 
