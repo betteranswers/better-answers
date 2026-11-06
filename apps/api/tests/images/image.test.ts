@@ -272,49 +272,72 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
   });
 });
 
-/** Runs in each Node process the gate starts, before its entry, and reports what PID 1 holds. */
+/** Runs before each entry the gate starts. Reports what it and PID 1 hold, and null for an unreadable environment. */
 const pidOneSpy = `
 import { readFileSync } from "node:fs";
 if (!process.argv[1].endsWith("environment-gate.ts")) {
+  const readable = (file) => { try { return readFileSync(file, "utf8"); } catch { return null; } };
   const keysOf = (environ) => environ.split("\\0").filter(Boolean).map((line) => line.split("=")[0]).sort();
+  const initEnviron = readable("/proc/1/environ");
   process.stdout.write(JSON.stringify({
     init: readFileSync("/proc/1/cmdline", "utf8").split("\\0")[0],
-    initKeys: keysOf(readFileSync("/proc/1/environ", "utf8")),
+    initUid: Number(/^Uid:\\s+(\\d+)/m.exec(readFileSync("/proc/1/status", "utf8"))[1]),
+    initKeys: initEnviron === null ? null : keysOf(initEnviron),
     ownKeys: Object.keys(process.env).sort(),
+    uid: process.getuid(),
+    gid: process.getgid(),
+    groups: process.getgroups(),
   }));
   process.exit(0);
 }
 `;
 
-const pidOneSchema = z.object({
+const spiedSchema = z.object({
   init: z.string(),
-  initKeys: z.array(z.string()),
+  initUid: z.number(),
+  initKeys: z.array(z.string()).nullable(),
   ownKeys: z.array(z.string()),
+  uid: z.number(),
+  gid: z.number(),
+  groups: z.array(z.number()),
 });
 
+type Spied = z.infer<typeof spiedSchema>;
+
+const RESOURCE_KEYS = {
+  DATABASE_URL: "postgres://app@db:5432/ba",
+  KEK: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+  MIGRATE_DATABASE_URL: "postgres://owner@db:5432/ba",
+  WORKER_DATABASE_URL: "postgres://worker@db:5432/ba",
+};
+
+const SPY_OPTIONS = `--import=data:text/javascript,${encodeURIComponent(pidOneSpy)}`;
+
+const spiedIn = async (command: readonly string[], spy: string): Promise<Spied> => {
+  const leg = legFor("api");
+  const stdout = await readTheImage(
+    { tier: leg.tier, dockerfile: leg.dockerfile, context: leg.context },
+    { command, environment: { ...RESOURCE_KEYS, [spy]: SPY_OPTIONS } },
+  );
+  return spiedSchema.parse(JSON.parse(stdout));
+};
+
+/** The volume owner in `deploy/stores.compose.yaml`, and the gate's `APP_UID`. */
+const APP_UID = 1000;
+
 describe.skipIf(nothingToProbeHere)("the api image's CMD started with every resource key", () => {
-  let seen: z.infer<typeof pidOneSchema>;
+  let seen: Spied;
 
   beforeAll(async () => {
-    const leg = legFor("api");
-    const stdout = await readTheImage(
-      { tier: leg.tier, dockerfile: leg.dockerfile, context: leg.context },
-      {
-        command: ["node", "apps/api/src/environment-gate.ts", "api"],
-        environment: {
-          NODE_OPTIONS: `--import=data:text/javascript,${encodeURIComponent(pidOneSpy)}`,
-          DATABASE_URL: "postgres://app@db:5432/ba",
-          KEK: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-          MIGRATE_DATABASE_URL: "postgres://owner@db:5432/ba",
-          WORKER_DATABASE_URL: "postgres://worker@db:5432/ba",
-        },
-      },
-    );
-    seen = pidOneSchema.parse(JSON.parse(stdout));
+    seen = await spiedIn(["node", "apps/api/src/environment-gate.ts", "api"], "NODE_OPTIONS");
   }, IMAGE_PROBE_ALLOWANCE);
 
   it("puts tini at PID 1 in place of Docker's init", () => {
     expect(seen.init).toBe("/usr/bin/tini");
+  });
+
+  it("drops root before it starts tini and the api", () => {
+    expect(seen).toMatchObject({ initUid: APP_UID, uid: APP_UID, gid: APP_UID, groups: [APP_UID] });
   });
 
   it("leaves PID 1 holding only the keys the api reads", () => {
@@ -329,6 +352,30 @@ describe.skipIf(nothingToProbeHere)("the api image's CMD started with every reso
       "PORT",
     ]);
     expect(seen.ownKeys).toEqual(seen.initKeys);
+  });
+});
+
+/** Starts the gate as a child of a root PID 1, as `docker exec api pnpm ops` does. */
+const opsUnderRoot = `require("node:child_process").execFileSync(
+  process.execPath,
+  ["apps/api/src/environment-gate.ts", "ops", "help"],
+  { stdio: "inherit", env: { ...process.env, NODE_OPTIONS: process.env.SPY } },
+);`;
+
+describe.skipIf(nothingToProbeHere)("the api gate started as root, not as PID 1", () => {
+  let seen: Spied;
+
+  beforeAll(async () => {
+    seen = await spiedIn(["node", "-e", opsUnderRoot], "SPY");
+  }, IMAGE_PROBE_ALLOWANCE);
+
+  it("drops root before it starts ops", () => {
+    expect(seen).toMatchObject({ initUid: 0, uid: APP_UID, gid: APP_UID, groups: [APP_UID] });
+  });
+
+  it("leaves ops unable to read the root process's environment", () => {
+    expect(seen.initKeys).toBeNull();
+    expect(seen.ownKeys).not.toContain("MIGRATE_DATABASE_URL");
   });
 });
 

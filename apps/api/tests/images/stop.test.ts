@@ -55,7 +55,7 @@ afterAll(async () => {
 
 const startApi = async (stopDeadlineMs?: number): Promise<Running> => {
   const port = await freePort();
-  const child = spawn(process.execPath, ["src/main.ts"], {
+  const child = spawn(process.execPath, ["src/environment-gate.ts", "api"], {
     cwd: workspaceRoot,
     env: {
       PATH: process.env["PATH"],

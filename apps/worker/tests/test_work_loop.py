@@ -1542,7 +1542,7 @@ import sys
 from better_answers_worker import loop
 from better_answers_worker.config import read_bootstrap
 
-loop.STOP.install(float(sys.argv[1]))
+loop.STOP.install({finish_within_seconds})
 sys.exit(loop.run(read_bootstrap(), once=False))
 """
 
@@ -1555,12 +1555,25 @@ EXIT_AFTER_STOP_SECONDS = 5
 def a_worker_process(
     database: psycopg.Connection, tmp_path: Path, *, finish_within_seconds: float
 ) -> Iterator[subprocess.Popen[str]]:
+    """Starts the worker through the environment gate. The gate runs the loop from PATH
+    without the detectors' warm-up, which can take minutes."""
+    entries = tmp_path / "bin"
+    entries.mkdir()
+    entry = entries / "better-answers-worker"
+    entry.write_text(
+        f"#!{sys.executable}\n"
+        + LOOPING_WORKER_SOURCE.format(finish_within_seconds=finish_within_seconds)
+    )
+    entry.chmod(0o755)
     with database.cursor() as cursor:
         stamp_contract_as_migrate_does(cursor, digest=CONTRACT_DIGEST)
     database.commit()
     with subprocess.Popen(
-        [sys.executable, "-c", LOOPING_WORKER_SOURCE, str(finish_within_seconds)],
-        env=worker_environment(bootstrap_for(database, tmp_path)),
+        [sys.executable, "-m", "better_answers_worker.environment_gate", "worker"],
+        env={
+            **worker_environment(bootstrap_for(database, tmp_path)),
+            "PATH": str(entries),
+        },
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,

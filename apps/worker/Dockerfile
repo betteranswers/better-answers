@@ -19,8 +19,7 @@ FROM ghcr.io/astral-sh/uv:0.13.0@sha256:cdc6093146eb3ff6a40107b38f008b789e050e77
 
 # The `tree` stage reads this image's account files, so it is named before that stage. The
 # runtime uses `cc`, not Distroless's `python3-debian13`, because that image carries Debian's
-# older 3.13 at a path the venv does not point to. `nonroot` keeps the worker off root even if
-# the `USER` line is lost.
+# older 3.13 at a path the venv does not point to.
 FROM gcr.io/distroless/cc-debian13:nonroot@sha256:08476c244888bfb425bae1ae4dd7c17f093e972aab8426883d97f3c6f280f7c1 AS distroless
 
 # This is the only pin of the Python image. The build stage creates the venv with this
@@ -141,7 +140,12 @@ ENV HF_HOME=/data/worker/hf-cache \
 # instruction below the first changed input. A source edit then rebuilds only this layer.
 COPY src src
 
-USER worker
+# The image starts as root, and `environment_gate` drops to uid 1000 before it starts any
+# process. Docker runs health checks and `docker exec` as this user, and each one holds every
+# variable the orchestrator hands the container. As root, the worker's uid cannot read them.
+# Docker would set `HOME` to root's, so `ENV` names the worker's.
+ENV HOME=/home/worker
+USER root
 
 # The worker serves no HTTP, so the probe runs a Python module. The probe passes while the
 # worker holds a lease with a fresh heartbeat, or while no job has waited longer than a lease.

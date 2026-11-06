@@ -188,8 +188,13 @@ COPY --from=web /app/apps/web/dist apps/web/dist
 
 # `init` in `deploy/stores.compose.yaml` chowns `/data/git` to uid 1000, which is the `node`
 # user in this base image. `HOME` gives pnpm a writable cache directory.
+#
+# The image starts as root, and `apps/api/src/environment-gate.ts` drops to uid 1000 before it
+# starts any process. Docker runs health checks and `docker exec` as this user, and each one holds
+# every variable the orchestrator hands the container. As root, the app's uid cannot read them.
+# Run `docker exec -u node` for a command that writes files the api reads, such as `git`.
 ENV HOME=/home/node
-USER node
+USER root
 
 EXPOSE 3000
 
