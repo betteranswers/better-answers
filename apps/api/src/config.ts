@@ -115,6 +115,17 @@ const envelopeKeySchema = z.object({
   KEK: z.string().regex(new RegExp(`^[0-9a-fA-F]{${String(ENVELOPE_KEY_BYTES * 2)}}$`, "u")),
 });
 
+export const READER_SCHEMAS = {
+  readBootstrap: bootstrapSchema,
+  readIdentityBootstrap: identityBootstrapSchema,
+  readObjectStore: objectStoreSchema,
+  readSweeps: sweepsSchema,
+  readHeadCheck: headCheckSchema,
+  readStop: stopSchema,
+  readRunningImage: runningImageSchema,
+  readEnvelopeKey: envelopeKeySchema,
+};
+
 const NO_ENVELOPE_KEY = `KEK must be set to the envelope key: ${String(ENVELOPE_KEY_BYTES * 2)} hexadecimal characters, encoding ${String(ENVELOPE_KEY_BYTES)} bytes`;
 
 export type Bootstrap = {
