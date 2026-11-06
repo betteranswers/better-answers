@@ -5,7 +5,11 @@ import { environmentOf, type TierProcess } from "./config.ts";
 const ENTRIES = {
   api: "main.ts",
   migrate: "migrate.ts",
+  ops: "ops.ts",
 } satisfies Record<TierProcess, string>;
+
+/** Docker's `init` would hold every container variable at PID 1, readable by the app's uid. tini at PID 1 holds the kept keys. */
+const INIT = "/usr/bin/tini";
 
 const isTierProcess = (name: string | undefined): name is TierProcess =>
   name !== undefined && Object.hasOwn(ENTRIES, name);
@@ -23,4 +27,6 @@ if (process.execve === undefined) {
 }
 
 const entry = fileURLToPath(new URL(ENTRIES[named], import.meta.url));
-process.execve(process.execPath, [process.execPath, entry], environmentOf(named));
+const argv = [process.execPath, entry, ...process.argv.slice(3)];
+const [file, args] = process.pid === 1 ? [INIT, [INIT, "--", ...argv]] : [process.execPath, argv];
+process.execve(file, args, environmentOf(named));

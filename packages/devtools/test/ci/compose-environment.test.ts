@@ -107,6 +107,7 @@ const composeSchema = z.object({
     z.string(),
     z.object({
       image: z.string(),
+      init: z.boolean().optional(),
       command: argvSchema.optional(),
       environment: z.record(z.string(), z.unknown()),
       healthcheck: z.object({ test: argvSchema }).optional(),
@@ -249,7 +250,17 @@ const tierFindings = (
     keys === undefined
       ? [ungated(name, "command", command, tier)]
       : keyFindings(name, Object.keys(service.environment), keys, excused);
-  return [...started, ...probeFindings(name, service, tier)];
+  const init =
+    service.init === true
+      ? [
+          finding(
+            name,
+            "init",
+            `${name} sets init, so Docker's init runs as PID 1 with every variable of the container, and the app's user can read it from /proc/1/environ. Delete the line. Started as PID 1, the gate puts tini there with only the kept keys`,
+          ),
+        ]
+      : [];
+  return [...started, ...init, ...probeFindings(name, service, tier)];
 };
 
 const serviceFindings = (
@@ -517,6 +528,15 @@ describe("the check fails on a planted file", () => {
     );
 
     expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["api"]);
+  });
+
+  it("refuses Docker's init in front of the gate", () => {
+    const planted = edited(
+      "    stop_grace_period: 30s\n    <<: [*restart, *logging]\n",
+      "    init: true\n    stop_grace_period: 30s\n    <<: [*restart, *logging]\n",
+    );
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["worker init"]);
   });
 
   it("refuses a worker healthcheck that runs Python without the gate", () => {

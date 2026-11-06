@@ -78,11 +78,17 @@ RUN --mount=type=cache,target=/tldextract-cache,uid=0 \
 # Distroless keeps its own records, so a scanner can name it. The curses, readline, dbm, and Tk
 # modules are deleted, not shipped unable to load. The worker uses none of them.
 #
+# tini comes the same way. `environment_gate` starts it as PID 1 in place of Docker's `init`,
+# which would hold every variable the orchestrator hands the container.
+#
 # `init` in `deploy/stores.compose.yaml` chowns /data/worker/lmdb and /data/worker/trees to
 # uid 1000. The user has a home directory because libraries write caches under `~`.
 FROM interpreter AS tree
 COPY --from=distroless /etc/passwd /etc/group /runtime/etc/
 RUN set -eu \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends tini \
+ && rm -rf /var/lib/apt/lists/* \
  && cp -a --parents /usr/local/bin/python3 /usr/local/bin/python3.13 \
       /usr/local/lib/libpython3.13.so.1.0 /usr/local/lib/python3.13 /runtime \
  && rm -rf /runtime/usr/local/lib/python3.13/site-packages/* \
@@ -91,7 +97,7 @@ RUN set -eu \
       rm /runtime/usr/local/lib/python3.13/lib-dynload/"$module".cpython-313-*.so; \
     done \
  && mkdir -p /runtime/var/lib/dpkg/status.d \
- && for package in libbz2-1.0 libffi8 liblzma5 libsqlite3-0 libuuid1; do \
+ && for package in libbz2-1.0 libffi8 liblzma5 libsqlite3-0 libuuid1 tini; do \
       dpkg-query --listfiles "$package" | while read -r path; do \
         if [ -f "$path" ] || [ -L "$path" ]; then cp -a --parents "$path" /runtime; fi; \
       done; \

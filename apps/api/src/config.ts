@@ -134,10 +134,18 @@ const EVERY_READER = Object.keys(READER_SCHEMAS).filter((name): name is Reader =
 
 const BOOTSTRAP_ONLY: readonly Reader[] = ["readBootstrap"];
 
+const OPS_READERS: readonly Reader[] = [
+  "readBootstrap",
+  "readIdentityBootstrap",
+  "readObjectStore",
+  "readEnvelopeKey",
+];
+
 /** The readers each process of this tier starts. `environment-gate.ts` passes a process the keys they read and no other. */
 export const PROCESS_READERS = {
   api: EVERY_READER,
   migrate: BOOTSTRAP_ONLY,
+  ops: OPS_READERS,
 };
 
 export type TierProcess = keyof typeof PROCESS_READERS;

@@ -23,6 +23,7 @@ const ORCHESTRATOR = {
   S3_SECRET_KEY: "dummysecret",
   OBJECTSTORE_ROOT_SECRET: "dummysecret",
   NODE_ENV: "production",
+  UPLOAD_SWEEP: "list",
   HF_HOME: "/data/worker/hf-cache",
   LMDB_DIR: "/data/worker/lmdb",
   SERVICE_FQDN_API: "app.example.com",
@@ -41,14 +42,14 @@ describe("apps/api/src/environment-gate.ts", () => {
   writeFileSync(
     spy,
     `if (!process.argv[1].endsWith("environment-gate.ts")) {
-  process.stdout.write(JSON.stringify(Object.keys(process.env)));
+  process.stdout.write(JSON.stringify([...Object.keys(process.env), ...process.argv.slice(2).map((arg) => "argv " + arg)]));
   process.exit(0);
 }
 `,
   );
 
-  const started = (named: string) =>
-    spawnSync(process.execPath, ["apps/api/src/environment-gate.ts", named], {
+  const started = (...named: string[]) =>
+    spawnSync(process.execPath, ["apps/api/src/environment-gate.ts", ...named], {
       cwd: repositoryRoot,
       encoding: "utf8",
       env: { ...ORCHESTRATOR, PATH: process.env["PATH"], NODE_OPTIONS: `--import=${spy}` },
@@ -84,6 +85,28 @@ describe("apps/api/src/environment-gate.ts", () => {
       "PATH",
       "S3_SECRET_KEY",
       "TZ",
+      "UPLOAD_SWEEP",
+    ]);
+  });
+
+  it("starts ops with its readers' keys and its arguments", () => {
+    const run = started("ops", "map-sweep", "--workspace", "w1");
+
+    expect(run.stderr).toBe("");
+    expect(keysPrinted(run.stdout)).toEqual([
+      "AUTH_SECRET",
+      "DATABASE_URL",
+      "HOME",
+      "KEK",
+      "LC_ALL",
+      "NODE_ENV",
+      "NODE_OPTIONS",
+      "PATH",
+      "S3_SECRET_KEY",
+      "TZ",
+      "argv --workspace",
+      "argv map-sweep",
+      "argv w1",
     ]);
   });
 
@@ -91,7 +114,7 @@ describe("apps/api/src/environment-gate.ts", () => {
     const run = started("seed");
 
     expect(run.status).toBe(2);
-    expect(run.stderr).toContain("one of api, migrate");
+    expect(run.stderr).toContain("one of api, migrate, ops");
   });
 });
 

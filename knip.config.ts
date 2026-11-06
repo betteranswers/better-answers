@@ -20,8 +20,9 @@ const config: KnipConfig = {
     },
 
     "apps/api": {
-      // The image's `CMD` and the `migrate` service start the gate by path, so nothing imports it.
-      entry: ["src/environment-gate.ts"],
+      // The image's `CMD`, `migrate` and the `ops` script start the gate by path, and the gate
+      // starts `ops.ts` by path.
+      entry: ["src/environment-gate.ts", "src/ops.ts"],
 
       vitest: {
         config: ["vitest.config.ts", "vitest.stryker.config.ts", "vitest.images.config.ts"],

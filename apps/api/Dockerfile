@@ -117,6 +117,9 @@ FROM base AS runtime
 # The api is the only process that writes a workspace's git repository, so it needs git. The
 # erasure routine rewrites history with `git filter-repo`, which needs Python.
 #
+# `apps/api/src/environment-gate.ts` starts tini as PID 1 in place of Docker's `init`, which would
+# hold every variable the orchestrator hands the container.
+#
 # git-filter-repo comes from PyPI at an exact version, not from apt, so the image, the CI runner,
 # and developer machines run the same tested version. `.github/actions/git-filter-repo` and
 # `scripts/cloud-setup.sh` read the version from the `ARG` line below.
@@ -132,7 +135,7 @@ ARG GIT_FILTER_REPO_VERSION=2.47.0
 # `apt-get upgrade` applies its security updates.
 RUN apt-get update \
  && apt-get upgrade -y \
- && apt-get install -y --no-install-recommends wget git python3 python3-pip \
+ && apt-get install -y --no-install-recommends wget git python3 python3-pip tini \
  && pip3 install --no-cache-dir --break-system-packages \
       "git-filter-repo==${GIT_FILTER_REPO_VERSION}" \
  && apt-get purge -y python3-pip \

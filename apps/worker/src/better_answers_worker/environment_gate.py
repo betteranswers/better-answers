@@ -8,6 +8,10 @@ PROCESSES = {
     "health": ("python", "-m", "better_answers_worker.health"),
 }
 
+# Docker's `init` would hold every container variable at PID 1, readable by the app's
+# uid. tini at PID 1 holds the kept keys.
+INIT = ("/usr/bin/tini", "--")
+
 
 def main() -> None:
     named = sys.argv[1] if len(sys.argv) == 2 else ""
@@ -19,6 +23,8 @@ def main() -> None:
             + "\n"
         )
         sys.exit(2)
+    if os.getpid() == 1:
+        argv = (*INIT, *argv)
     os.execvpe(argv[0], argv, environment_of())  # noqa: S606  # argv comes from PROCESSES, not input
 
 
