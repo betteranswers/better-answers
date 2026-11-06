@@ -86,10 +86,12 @@ const composeSchema = z.object({
   services: z.record(z.string(), z.object({ environment: z.record(z.string(), z.unknown()) })),
 });
 
-const environmentsIn = (source: string): Readonly<Record<string, readonly string[]>> =>
+type Environments = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+
+const environmentsIn = (source: string): Environments =>
   Object.fromEntries(
     Object.entries(composeSchema.parse(parse(source, { merge: true })).services).map(
-      ([name, service]) => [name, Object.keys(service.environment)],
+      ([name, service]) => [name, service.environment],
     ),
   );
 
@@ -98,6 +100,30 @@ const finding = (service: string, key: string, message: string): Finding => ({
   key,
   message,
 });
+
+const variablesIn = (value: unknown): string[] =>
+  typeof value === "string"
+    ? [...value.matchAll(/\$\{?(\w+)/gu)].flatMap(([, name]) => name ?? [])
+    : [];
+
+const sharedDsns = (environments: Environments): Finding[] => {
+  const dsns = Object.entries(environments).map(([service, environment]) => ({
+    service,
+    variables: variablesIn(environment["DATABASE_URL"]),
+  }));
+  return dsns.flatMap(({ service, variables }) => {
+    const shared = variables.filter((variable) =>
+      dsns.some((other) => other.service !== service && other.variables.includes(variable)),
+    );
+    return shared.map((variable) =>
+      finding(
+        service,
+        "DATABASE_URL",
+        `${service} takes DATABASE_URL from ${variable}, as another service does. Each service connects as its own database role, so set ${service}'s DATABASE_URL from a variable of its own`,
+      ),
+    );
+  });
+};
 
 const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): Finding[] => {
   const environments = environmentsIn(source);
@@ -113,7 +139,7 @@ const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): 
 
   const perService = Object.entries(SERVICES).flatMap(([name, { tier, starts }]) => {
     const readers = TIERS[tier] ?? {};
-    const set = environments[name] ?? [];
+    const set = Object.keys(environments[name] ?? {});
     const read = new Set(
       starts.flatMap((reader) => [
         ...(readers[reader]?.required ?? []),
@@ -156,7 +182,7 @@ const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): 
     return [...lacking, ...unread, ...stale];
   });
 
-  return [...unlisted, ...perService];
+  return [...unlisted, ...perService, ...sharedDsns(environments)];
 };
 
 const compose = readFileSync(path.join(repositoryRoot, COMPOSE), "utf8");
@@ -269,6 +295,45 @@ describe("the check fails on a planted file", () => {
       "migrate S3_ENDPOINT",
       "migrate S3_REGION",
       "migrate S3_SECRET_KEY",
+    ]);
+  });
+
+  it("refuses a worker that takes the api's database URL", () => {
+    const removed = edited("      DATABASE_URL: ${WORKER_DATABASE_URL:?}\n", "");
+
+    expect(flagged(findingsIn(removed, EXCUSED))).toEqual([
+      "api DATABASE_URL",
+      "worker DATABASE_URL",
+    ]);
+  });
+
+  it("refuses a worker that names the api's variable without braces", () => {
+    const planted = edited("${WORKER_DATABASE_URL:?}", "$DATABASE_URL");
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual([
+      "api DATABASE_URL",
+      "worker DATABASE_URL",
+    ]);
+  });
+
+  it("refuses a worker that falls back to the api's variable", () => {
+    const planted = edited("${WORKER_DATABASE_URL:?}", "${WORKER_DATABASE_URL:-${DATABASE_URL}}");
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual([
+      "api DATABASE_URL",
+      "worker DATABASE_URL",
+    ]);
+  });
+
+  it("refuses a migrate that takes the api's database URL", () => {
+    const planted = edited(
+      "${MIGRATE_DATABASE_URL:?set it to the owner DSN, which only migrate uses}",
+      "${DATABASE_URL:?}",
+    );
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual([
+      "api DATABASE_URL",
+      "migrate DATABASE_URL",
     ]);
   });
 
