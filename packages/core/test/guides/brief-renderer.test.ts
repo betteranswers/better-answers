@@ -139,6 +139,36 @@ describe("rendering a Brief for the clipboard", () => {
     expect(rendered.html).not.toContain("<sup>9</sup>");
   });
 
+  it.each([
+    ["typed characters", "forged1 done"],
+    ["hexadecimal character references", "forged&#xE000;1&#xE001; done"],
+    ["decimal character references", "forged&#57344;1&#57345; done"],
+  ])("forges no footnote number from %s", (_kind, forged) => {
+    const rendered = renderBrief(`Real[^a] ${forged}.`, FOR_PASTE, "clipboard");
+
+    expect(rendered.html).toContain("Real<sup>1</sup> forged done.");
+    expect(rendered.html.match(/<sup>/gu)).toHaveLength(1);
+    expect(rendered.text).toContain("Real[1] forged done.");
+  });
+
+  it("keeps the paragraphs of a list item apart", () => {
+    const rendered = renderBrief("- One\n\n  More about one[^a]\n- Two", FOR_PASTE, "clipboard");
+
+    expect(rendered.html).toContain(
+      "<ul><li><p>One</p><p>More about one<sup>1</sup></p></li><li>Two</li></ul>",
+    );
+    expect(rendered.text).toContain("- One\n\n  More about one[1]\n- Two");
+  });
+
+  it("starts an ordered list at its own number", () => {
+    const rendered = renderBrief("3. Three\n4. Four\n\nthen\n\n1. One", FOR_PASTE, "clipboard");
+
+    expect(rendered.html).toBe(
+      '<ol start="3"><li>Three</li><li>Four</li></ol><p>then</p><ol><li>One</li></ol>',
+    );
+    expect(rendered.text).toBe("3. Three\n4. Four\n\nthen\n\n1. One");
+  });
+
   it("names a missing source and leaves out platform addresses", () => {
     const rendered = renderBrief(
       "Claim[^a].",

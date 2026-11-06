@@ -1,7 +1,13 @@
 import type { CitedSource } from "@better-answers/schema";
 import { replaceMarkers } from "@better-answers/schema/brief-marker";
 
-import { carrierOf, clipboardOf, sourceLineOf, type Clipboard } from "./clipboard.ts";
+import {
+  carrierOf,
+  clipboardOf,
+  sourceLineOf,
+  withoutCarriers,
+  type Clipboard,
+} from "./clipboard.ts";
 
 export type Footnote = {
   readonly label: string;
@@ -51,7 +57,7 @@ const page = (markdown: string, footnotes: readonly Footnote[]): RenderedBrief =
 };
 
 const clipboard = (markdown: string, footnotes: readonly SourcedFootnote[]): ClipboardBrief => {
-  const { text, cited } = numbering(markdown, footnotes, carrierOf);
+  const { text, cited } = numbering(withoutCarriers(markdown), footnotes, carrierOf);
   return { ...clipboardOf(text, cited.map(sourceLineOf)), footnotes: cited.length };
 };
 

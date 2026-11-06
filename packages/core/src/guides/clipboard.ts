@@ -15,6 +15,14 @@ const CARRIED_ANYWHERE = new RegExp(`${OPENS}\\d+${CLOSES}`, "gu");
 
 export const carrierOf = (number: number): string => `${OPENS}${String(number)}${CLOSES}`;
 
+const OPENING = `${OPENS}|&#(?:x0*e000|0*57344);`;
+
+const CLOSING = `${CLOSES}|&#(?:x0*e001|0*57345);`;
+
+const FORGED = new RegExp(`(?:${OPENING})\\d*(?:${CLOSING})|${OPENING}|${CLOSING}`, "giu");
+
+export const withoutCarriers = (words: string): string => words.replaceAll(FORGED, "");
+
 export type Clipboard = { readonly html: string; readonly text: string };
 
 const NOTHING: Clipboard = { html: "", text: "" };
@@ -130,21 +138,26 @@ const flowOf = (nodes: readonly RootContent[], footnotes: number): Clipboard =>
 
 const itemOf = (node: RootContent, footnotes: number): Clipboard => {
   if (node.type !== "listItem") return NOTHING;
+  const spread = node.spread === true;
   const parts = node.children.map((child) =>
-    child.type === "paragraph" ? phrasingOf(child.children, footnotes) : flowOf([child], footnotes),
+    child.type === "paragraph" && !spread
+      ? phrasingOf(child.children, footnotes)
+      : flowOf([child], footnotes),
   );
-  return gathered(parts, "\n");
+  return gathered(parts, spread ? "\n\n" : "\n");
 };
 
-const listedOf = (ordered: boolean, items: readonly Clipboard[]): Clipboard => {
+type Listing = { readonly ordered: boolean; readonly start: number };
+
+const indented = (text: string): string => text.replaceAll(/\n(?=.)/gu, "\n  ");
+
+const listedOf = ({ ordered, start }: Listing, items: readonly Clipboard[]): Clipboard => {
   const tag = ordered ? "ol" : "ul";
+  const opening = ordered && start !== 1 ? `<ol start="${String(start)}">` : `<${tag}>`;
   return {
-    html: `<${tag}>${items.map((item) => `<li>${item.html}</li>`).join("")}</${tag}>`,
+    html: `${opening}${items.map((item) => `<li>${item.html}</li>`).join("")}</${tag}>`,
     text: items
-      .map(
-        (item, at) =>
-          `${ordered ? `${String(at + 1)}.` : "-"} ${item.text.replaceAll("\n", "\n  ")}`,
-      )
+      .map((item, at) => `${ordered ? `${String(start + at)}.` : "-"} ${indented(item.text)}`)
       .join("\n"),
   };
 };
@@ -172,7 +185,7 @@ const FLOW: FlowReaders = {
   html: (node, footnotes) => around(wordsOf(node.value, footnotes), "p"),
   list: (node, footnotes) =>
     listedOf(
-      node.ordered === true,
+      { ordered: node.ordered === true, start: node.start ?? 1 },
       node.children.map((item) => itemOf(item, footnotes)),
     ),
   blockquote: (node, footnotes) => quotedOf(flowOf(node.children, footnotes)),
