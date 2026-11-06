@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
@@ -365,7 +366,9 @@ describe("the move itself", () => {
 
     const ran = moved(root, [[THING, GROUPED]]);
 
-    expect(ran.stdout).toBe("moved 1 files; rewrote 2 files\n");
+    expect(ran.stdout).toBe(
+      "moved 1 files; rewrote 2 files\ntest inventory unchanged; titles listed: 0\n",
+    );
   });
 
   it("changes nothing under --dry-run, and says what it would do", () => {
@@ -426,7 +429,9 @@ describe("the findings a move reports", () => {
   it("reports no finding when no old path remains", () => {
     const root = repositoryOf({});
 
-    expect(moved(root, [[THING, GROUPED]]).stdout).toBe("moved 1 files; rewrote 0 files\n");
+    expect(moved(root, [[THING, GROUPED]]).stdout).toBe(
+      "moved 1 files; rewrote 0 files\ntest inventory unchanged; titles listed: 0\n",
+    );
   });
 });
 
@@ -544,6 +549,92 @@ describe("the moves it refuses", () => {
 
     expect(ran.status).toBe(1);
     expect(ran.stderr).toContain("move-files: ENOENT");
+  });
+});
+
+describe("the test inventory a move holds", () => {
+  const CORE_SOURCE = "packages/core/src/thing.ts";
+  const CORE_TEST = "packages/core/test/thing.test.ts";
+  const TITLE = "reads packages/core/src/thing.ts";
+  const VITEST = path.dirname(createRequire(import.meta.url).resolve("vitest/package.json"));
+
+  const coreRepositoryOf = (extra: Tree = {}): string => {
+    const root = repositoryOf({
+      [CORE_SOURCE]: "export const thing = 1;\n",
+      [CORE_TEST]: `import { it } from "vitest";\n\nit("${TITLE}", () => {});\n`,
+      ...extra,
+    });
+    const modules = path.join(root, "packages/core/node_modules");
+    mkdirSync(modules, { recursive: true });
+    symlinkSync(VITEST, path.join(modules, "vitest"));
+    return root;
+  };
+
+  it("passes a move that keeps every test name and title", () => {
+    const root = coreRepositoryOf();
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toBe(
+      "moved 1 files; rewrote 0 files\ntest inventory unchanged; titles listed: 1\n",
+    );
+  });
+
+  it("fails a move that rewrites a path in a title", () => {
+    const root = coreRepositoryOf();
+
+    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stdout).toContain("the move changed a test file's name or a test's title");
+    expect(ran.stdout).toContain(`  vitest-core.txt: removed thing.test.ts :: ${TITLE}\n`);
+    expect(ran.stdout).toContain(
+      "  vitest-core.txt: added thing.test.ts :: reads packages/core/src/group/thing.ts\n",
+    );
+  });
+
+  it("fails a move that renames a test file", () => {
+    const root = coreRepositoryOf();
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/renamed.test.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stdout).toContain(`  vitest-core.txt: removed thing.test.ts :: ${TITLE}\n`);
+    expect(ran.stdout).toContain(`  vitest-core.txt: added renamed.test.ts :: ${TITLE}\n`);
+  });
+
+  it("fails a move after which the tests cannot be listed", () => {
+    const root = coreRepositoryOf({
+      "packages/core/vitest.config.ts": `import { readFileSync } from "node:fs";\n\nreadFileSync("src/thing.ts");\n\nexport default {};\n`,
+    });
+
+    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stdout).toContain("moved 1 files");
+    expect(ran.stdout).toContain("the tests could not be listed after it");
+    expect(ran.stdout).toContain("ENOENT");
+    expect(ran.stdout).toContain("packages/core/vitest.config.ts:3:readFileSync");
+  });
+
+  it("moves nothing when the inventory cannot be taken", () => {
+    const root = repositoryOf({ [CORE_SOURCE]: "export const thing = 1;\n" });
+
+    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain("test-inventory.sh failed before the move, so nothing moved");
+    expect(status(root)).toBe("");
+  });
+
+  it("takes no inventory under --dry-run", () => {
+    const root = repositoryOf({ [CORE_SOURCE]: "export const thing = 1;\n" });
+
+    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]], "--dry-run");
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toBe("would move 1 files; rewrote 0 files\n");
   });
 });
 

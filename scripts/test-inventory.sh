@@ -10,21 +10,29 @@ out=$(cd "$1" && pwd)
 
 for w in packages/core packages/schema packages/devtools apps/api apps/web; do
   name=$(basename "$w")
-  (cd "$root/$w" && node ./node_modules/vitest/vitest.mjs list --json 2>/dev/null) |
+  : > "$out/vitest-$name.txt"
+  [ -d "$root/$w" ] || continue
+  (cd "$root/$w" && node ./node_modules/vitest/vitest.mjs list --json) |
     python3 -c '
 import json, os, sys
 for t in json.load(sys.stdin):
     print(os.path.basename(t["file"]), "::", t["name"])' | sort > "$out/vitest-$name.txt"
 done
 
-(cd "$root/apps/worker" && uv run --frozen pytest --collect-only -q -o addopts= 2>/dev/null) |
-  grep '::' | python3 -c '
+: > "$out/pytest-worker.txt"
+if [ -d "$root/apps/worker" ]; then
+  (cd "$root/apps/worker" && uv run --frozen pytest --collect-only -q -o addopts=) |
+    grep '::' | python3 -c '
 import os, sys
 for line in sys.stdin:
     path, _, rest = line.rstrip("\n").partition("::")
     print(os.path.basename(path), "::", rest)' | sort > "$out/pytest-worker.txt"
+fi
 
-(cd "$root/apps/web" && npx playwright test --list 2>/dev/null) |
-  grep ' › ' | sed -E 's#^ *\[[^]]*\] › ##; s#^([^:]*/)?([^/:]+):[0-9]+:[0-9]+ › #\2 :: #' | sort > "$out/playwright-web.txt"
+: > "$out/playwright-web.txt"
+if [ -d "$root/apps/web" ]; then
+  (cd "$root/apps/web" && npx playwright test --list) |
+    grep ' › ' | sed -E 's#^ *\[[^]]*\] › ##; s#^([^:]*/)?([^/:]+):[0-9]+:[0-9]+ › #\2 :: #' | sort > "$out/playwright-web.txt"
+fi
 
 wc -l "$out"/*.txt

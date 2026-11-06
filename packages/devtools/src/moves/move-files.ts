@@ -5,6 +5,8 @@ import path from "node:path";
 import { z } from "zod";
 
 import { trackedFiles } from "../paths.ts";
+import { inventoryAround } from "./test-inventory.ts";
+import type { Inventory } from "./test-inventory.ts";
 
 const NEVER_REWRITTEN: readonly RegExp[] = [
   /^contracts\//u,
@@ -56,12 +58,11 @@ type Plan = {
 };
 
 type MoveReport = {
-  readonly dryRun: boolean;
   readonly moved: number;
   readonly rewritten: readonly string[];
   readonly unresolved: readonly string[];
   readonly leftovers: readonly string[];
-};
+} & ({ readonly dryRun: true } | { readonly dryRun: false; readonly inventory: Inventory });
 
 const rowOf = (line: string): readonly [string, string] => {
   const [from, to] = line.split("\t").map((cell) => cell.trim());
@@ -296,25 +297,49 @@ export const moveFiles = (root: string, tablePath: string, dryRun: boolean): Mov
   const tracked = trackedFiles(root);
   const moves = readMoves(root, new Set(tracked), tablePath);
   const { edits, unresolved } = editsOf(planOf(root, moves, tracked), tracked);
-  if (!dryRun) {
+  const apply = (): void => {
     for (const { file, text } of edits) writeFileSync(path.join(root, file), text);
     for (const [from, to] of moves) gitMove(root, from, to);
-  }
-  return {
-    dryRun,
+  };
+  const inventory = dryRun ? undefined : inventoryAround(root, apply);
+  const found = {
     moved: moves.size,
     rewritten: edits.map(({ file }) => file),
     unresolved,
     leftovers: leftoversOf(root, moves),
   };
+  return inventory === undefined
+    ? { ...found, dryRun: true }
+    : { ...found, dryRun: false, inventory };
 };
 
 const listed = (heading: string, lines: readonly string[]): string =>
   lines.length === 0 ? "" : `\n${heading}\n${lines.map((line) => `  ${line}`).join("\n")}\n`;
 
+export const inventoryFailed = (report: MoveReport): boolean =>
+  !report.dryRun && report.inventory.kind !== "unchanged";
+
+const inventoryOf = (inventory: Inventory): string => {
+  switch (inventory.kind) {
+    case "unchanged":
+      return `test inventory unchanged; titles listed: ${String(inventory.cases)}\n`;
+    case "changed":
+      return listed(
+        "the move changed a test file's name or a test's title, which a move must not:",
+        inventory.changes,
+      );
+    case "unlisted":
+      return listed(
+        "the move is done, but the tests could not be listed after it, so a changed test name or title is not ruled out (a moved file that now fails to import is the usual cause):",
+        inventory.reason.split("\n"),
+      );
+  }
+};
+
 export const reportOf = (report: MoveReport): string =>
   [
     `${report.dryRun ? "would move" : "moved"} ${String(report.moved)} files; rewrote ${String(report.rewritten.length)} files\n`,
+    report.dryRun ? "" : inventoryOf(report.inventory),
     listed(
       "relative specifiers in moved files that resolve to nothing (each is fixture text or a broken import):",
       report.unresolved,

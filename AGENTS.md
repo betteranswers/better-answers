@@ -65,13 +65,7 @@ A folder in a `src`, `test`, `tests`, or `e2e` tree holds at most 15 tracked fil
 
 ### Move files
 
-1. Run `scripts/test-inventory.sh <before-dir>`.
-2. Write a TSV table with one `<old>\t<new>` row for each file.
-3. Run `node scripts/move-files.mjs <table.tsv>`. The script rewrites the imports and the path mentions, then runs `git mv`.
-4. Run `scripts/test-inventory.sh <after-dir>`.
-5. Compare the two directories with `diff -r <before-dir> <after-dir>`.
-
-A move changes no test file's name and no test's title.
+Write a TSV table with one `<old>\t<new>` row for each file, then run `node scripts/move-files.mjs <table.tsv>`. The script rewrites the imports and the path mentions, then runs `git mv`. A move changes no test file's name and no test's title, so the script lists the tests before and after, and exits non-zero on any difference.
 
 ## Coding
 
