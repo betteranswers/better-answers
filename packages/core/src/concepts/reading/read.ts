@@ -139,11 +139,13 @@ const opensFor = (doors: Doors, opening: Opening): Promise<Result<boolean>> =>
 
 const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "iu");
 
+export const namesADocument = (locator: string): boolean => NAMES_A_DOCUMENT.test(locator);
+
 const placeOf = (doors: Doors, locator: string | null): string | undefined =>
   locator === null ||
   locator.trim() === "" ||
   doors.namesPassage(locator) ||
-  NAMES_A_DOCUMENT.test(locator)
+  namesADocument(locator)
     ? undefined
     : locator;
 
