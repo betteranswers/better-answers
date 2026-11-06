@@ -324,8 +324,8 @@ describe("the any-word rule over concept rows", () => {
     expect({
       threeStrong: await titles("audit log retention", "strong"),
       threeWeak: await titles("audit log retention", "weak"),
-      fourStrong: await titles("audit log retention policy", "strong"),
-      fourWeak: await titles("audit log retention policy", "weak"),
+      fourStrong: await titles("audit log retention period", "strong"),
+      fourWeak: await titles("audit log retention period", "weak"),
     }).toEqual({
       threeStrong: ["Audit Logs Retention", "Audit Logs"],
       threeWeak: ["Audit"],

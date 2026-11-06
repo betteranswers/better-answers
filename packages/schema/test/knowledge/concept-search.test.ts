@@ -81,10 +81,10 @@ describe("the concept's search column", () => {
     });
   });
 
-  it("weights tags at B, whether a list or one string", async () => {
+  it("weights tags in either form and the kind at B", async () => {
     await withACommit(async (client, seed) => {
-      const weighedB = async (frontmatter: Record<string, string | string[]>) => {
-        const row = await seed.conceptIndex({ workspaceId: WS_A, frontmatter });
+      const weighedB = async (frontmatter: Record<string, string | string[]>, kind = "Policy") => {
+        const row = await seed.conceptIndex({ workspaceId: WS_A, kind, frontmatter });
         const read = await client.query<{ lexemes: string[] }>(
           `SELECT array(SELECT lexeme FROM unnest(ts_filter(search, '{b}'))) AS lexemes
              FROM concept_index WHERE iri = $1`,
@@ -97,7 +97,13 @@ describe("the concept's search column", () => {
         list: await weighedB({ title: "Expenses", tags: ["finance"] }),
         string: await weighedB({ title: "Expenses", tags: "finance" }),
         none: await weighedB({ title: "Expenses" }),
-      }).toEqual({ list: ["financ"], string: ["financ"], none: [] });
+        kind: await weighedB({ title: "Expenses" }, "Insurance Policy"),
+      }).toEqual({
+        list: ["financ", "polici"],
+        string: ["financ", "polici"],
+        none: ["polici"],
+        kind: ["insur", "polici"],
+      });
     });
   });
 });
