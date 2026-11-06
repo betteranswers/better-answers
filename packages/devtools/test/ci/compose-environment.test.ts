@@ -60,18 +60,11 @@ const SERVICES: Readonly<Record<string, Service>> = {
 
 type Excuse = { readonly services: readonly string[]; readonly reason: string };
 
-const EVERY_SERVICE = Object.keys(SERVICES);
-
 const EXCUSED: Readonly<Record<string, Excuse>> = {
   EMBEDDINGS_URL: {
-    services: EVERY_SERVICE,
+    services: ["api", "worker"],
     reason:
       "reserved for the model host that docs/operations/coolify.md documents. No code reads it yet",
-  },
-  OTEL_TRACES_EXPORTER: {
-    services: EVERY_SERVICE,
-    reason:
-      "the standard OpenTelemetry switch that turns trace export off. Neither lockfile holds an OpenTelemetry SDK that would read it",
   },
   NODE_ENV: {
     services: ["api"],
@@ -93,10 +86,12 @@ const composeSchema = z.object({
   services: z.record(z.string(), z.object({ environment: z.record(z.string(), z.unknown()) })),
 });
 
-const environmentsIn = (source: string): Readonly<Record<string, readonly string[]>> =>
+type Environments = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+
+const environmentsIn = (source: string): Environments =>
   Object.fromEntries(
     Object.entries(composeSchema.parse(parse(source, { merge: true })).services).map(
-      ([name, service]) => [name, Object.keys(service.environment)],
+      ([name, service]) => [name, service.environment],
     ),
   );
 
@@ -105,6 +100,30 @@ const finding = (service: string, key: string, message: string): Finding => ({
   key,
   message,
 });
+
+const variablesIn = (value: unknown): string[] =>
+  typeof value === "string"
+    ? [...value.matchAll(/\$\{?(\w+)/gu)].flatMap(([, name]) => name ?? [])
+    : [];
+
+const sharedDsns = (environments: Environments): Finding[] => {
+  const dsns = Object.entries(environments).map(([service, environment]) => ({
+    service,
+    variables: variablesIn(environment["DATABASE_URL"]),
+  }));
+  return dsns.flatMap(({ service, variables }) => {
+    const shared = variables.filter((variable) =>
+      dsns.some((other) => other.service !== service && other.variables.includes(variable)),
+    );
+    return shared.map((variable) =>
+      finding(
+        service,
+        "DATABASE_URL",
+        `${service} takes DATABASE_URL from ${variable}, as another service does. Each service connects as its own database role, so set ${service}'s DATABASE_URL from a variable of its own`,
+      ),
+    );
+  });
+};
 
 const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): Finding[] => {
   const environments = environmentsIn(source);
@@ -120,9 +139,12 @@ const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): 
 
   const perService = Object.entries(SERVICES).flatMap(([name, { tier, starts }]) => {
     const readers = TIERS[tier] ?? {};
-    const set = environments[name] ?? [];
+    const set = Object.keys(environments[name] ?? {});
     const read = new Set(
-      Object.values(readers).flatMap((keys) => [...keys.required, ...keys.optional]),
+      starts.flatMap((reader) => [
+        ...(readers[reader]?.required ?? []),
+        ...(readers[reader]?.optional ?? []),
+      ]),
     );
     const excusedHere = Object.entries(excused)
       .filter(([, excuse]) => excuse.services.includes(name))
@@ -135,7 +157,7 @@ const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): 
           finding(
             name,
             key,
-            `${name} lacks ${key}, which ${reader} requires. Set it in the service's environment or in x-bootstrap`,
+            `${name} lacks ${key}, which ${reader} requires. Set it in the service's environment, or in an anchor that the service merges`,
           ),
         ),
     );
@@ -145,7 +167,7 @@ const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): 
         finding(
           name,
           key,
-          `${name} sets ${key}, which no reader of the ${tier} tier's config module reads. Delete it from ${COMPOSE}, or name it in EXCUSED with the library that reads it`,
+          `${name} sets ${key}, which no reader that ${name} starts reads. Delete it from ${name}'s environment in ${COMPOSE}. If an anchor supplies it, stop merging the anchor into ${name} and list ${name}'s keys. If a library reads it, name it in EXCUSED with that library`,
         ),
       );
     const stale = excusedHere
@@ -154,13 +176,13 @@ const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): 
         finding(
           name,
           key,
-          `EXCUSED names ${key} for ${name}, which ${read.has(key) ? "the config module reads now" : "does not set it"}. Delete the entry`,
+          `EXCUSED names ${key} for ${name}, but ${read.has(key) ? `a reader that ${name} starts reads it now` : `${name} does not set it`}. Delete the entry`,
         ),
       );
     return [...lacking, ...unread, ...stale];
   });
 
-  return [...unlisted, ...perService];
+  return [...unlisted, ...perService, ...sharedDsns(environments)];
 };
 
 const compose = readFileSync(path.join(repositoryRoot, COMPOSE), "utf8");
@@ -215,7 +237,6 @@ describe("the check fails on a planted file", () => {
 
     expect(flagged(findingsIn(planted, EXCUSED))).toEqual([
       "api PLANTED_KEY",
-      "migrate PLANTED_KEY",
       "worker PLANTED_KEY",
     ]);
   });
@@ -247,6 +268,72 @@ describe("the check fails on a planted file", () => {
     expect(flagged(findingsIn(removed, EXCUSED))).toEqual([
       "api S3_SECRET_KEY",
       "worker S3_SECRET_KEY",
+    ]);
+  });
+
+  it("refuses a secret planted on migrate, and names the fix", () => {
+    const planted = edited(
+      "      # The owner DSN",
+      "      S3_SECRET_KEY: ${OBJECTSTORE_ROOT_SECRET:?}\n      # The owner DSN",
+    );
+    const findings = findingsIn(planted, EXCUSED);
+
+    expect(flagged(findings)).toEqual(["migrate S3_SECRET_KEY"]);
+    expect(findings[0]?.message).toContain("stop merging the anchor into migrate");
+  });
+
+  it("refuses the anchor merged back into migrate", () => {
+    const planted = edited(
+      "    environment:\n      # The owner DSN",
+      "    environment:\n      <<: *bootstrap\n      # The owner DSN",
+    );
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual([
+      "migrate EMBEDDINGS_URL",
+      "migrate S3_ACCESS_KEY",
+      "migrate S3_BUCKET",
+      "migrate S3_ENDPOINT",
+      "migrate S3_REGION",
+      "migrate S3_SECRET_KEY",
+    ]);
+  });
+
+  it("refuses a worker that takes the api's database URL", () => {
+    const removed = edited("      DATABASE_URL: ${WORKER_DATABASE_URL:?}\n", "");
+
+    expect(flagged(findingsIn(removed, EXCUSED))).toEqual([
+      "api DATABASE_URL",
+      "worker DATABASE_URL",
+    ]);
+  });
+
+  it("refuses a worker that names the api's variable without braces", () => {
+    const planted = edited("${WORKER_DATABASE_URL:?}", "$DATABASE_URL");
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual([
+      "api DATABASE_URL",
+      "worker DATABASE_URL",
+    ]);
+  });
+
+  it("refuses a worker that falls back to the api's variable", () => {
+    const planted = edited("${WORKER_DATABASE_URL:?}", "${WORKER_DATABASE_URL:-${DATABASE_URL}}");
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual([
+      "api DATABASE_URL",
+      "worker DATABASE_URL",
+    ]);
+  });
+
+  it("refuses a migrate that takes the api's database URL", () => {
+    const planted = edited(
+      "${MIGRATE_DATABASE_URL:?set it to the owner DSN, which only migrate uses}",
+      "${DATABASE_URL:?}",
+    );
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual([
+      "api DATABASE_URL",
+      "migrate DATABASE_URL",
     ]);
   });
 
