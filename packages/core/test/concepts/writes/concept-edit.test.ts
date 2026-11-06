@@ -819,6 +819,14 @@ describe("a retitle or a rekind", () => {
   const mileage = async (scenario: Scenario) =>
     committedIri(await saved(scenario, scenario.admin, newPolicy("Mileage Allowance")));
 
+  const retitledToRates = async (scenario: Scenario) => {
+    const iri = await mileage(scenario);
+    await editedBy(scenario, scenario.admin, iri, (seed) => ({
+      parts: { ...seed.parts, title: "Mileage Rates" },
+    }));
+    return iri;
+  };
+
   it("re-keys a concept after a retitle and a rekind", async () => {
     const scenario = await arrange();
     const iri = await mileage(scenario);
@@ -839,10 +847,7 @@ describe("a retitle or a rekind", () => {
 
   it("frees the old title and refuses a taken one", async () => {
     const scenario = await arrange();
-    const iri = await mileage(scenario);
-    await editedBy(scenario, scenario.admin, iri, (seed) => ({
-      parts: { ...seed.parts, title: "Mileage Rates" },
-    }));
+    await retitledToRates(scenario);
 
     const fuel = committedIri(await saved(scenario, scenario.admin, newPolicy("Fuel")));
 
@@ -861,10 +866,7 @@ describe("a retitle or a rekind", () => {
 
   it("lands a new concept under a title a retitle vacated", async () => {
     const scenario = await arrange();
-    const iri = await mileage(scenario);
-    await editedBy(scenario, scenario.admin, iri, (seed) => ({
-      parts: { ...seed.parts, title: "Mileage Rates" },
-    }));
+    const iri = await retitledToRates(scenario);
 
     const again = await saved(scenario, scenario.admin, newPolicy("Mileage Allowance"));
 
