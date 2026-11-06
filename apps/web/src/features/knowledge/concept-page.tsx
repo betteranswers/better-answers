@@ -288,7 +288,6 @@ function ConceptShown(properties: {
   readonly iri: string;
   readonly concept: Concept;
   readonly standing: "commits" | "suggests" | undefined;
-  readonly heading: Heading;
 }) {
   const { iri, concept } = properties;
   const title = titleOf(concept.frontmatter);
@@ -341,7 +340,6 @@ function ConceptShown(properties: {
       aria-label={title}
       className={cn("mt-6", opened !== undefined && beside && "pr-[var(--container-md)]")}
     >
-      <PageHead title={title} headingRef={properties.heading} />
       <div className={COLUMN}>
         <div className={INTERFACE}>
           <p>
@@ -394,26 +392,23 @@ function ConceptUnread(properties: {
 function ConceptRead(properties: {
   readonly iri: string;
   readonly heading: Heading;
-  readonly unread: ReactNode;
+  readonly unreadTitle: string;
 }) {
   const { iri } = properties;
   const concept = useConcept(iri);
-  const read = concept.data?.concept;
+  const shown = concept.error === null ? concept.data?.concept : undefined;
 
-  if (concept.error === null && read !== undefined) {
-    return (
-      <ConceptShown
-        iri={iri}
-        concept={read}
-        standing={concept.data?.standing}
-        heading={properties.heading}
-      />
-    );
-  }
   return (
     <>
-      {properties.unread}
-      <ConceptUnread concept={concept} heading={properties.heading} />
+      <PageHead
+        title={shown === undefined ? properties.unreadTitle : titleOf(shown.frontmatter)}
+        headingRef={properties.heading}
+      />
+      {shown === undefined ? (
+        <ConceptUnread concept={concept} heading={properties.heading} />
+      ) : (
+        <ConceptShown iri={iri} concept={shown} standing={concept.data?.standing} />
+      )}
     </>
   );
 }
@@ -421,14 +416,14 @@ function ConceptRead(properties: {
 export function ConceptPage(properties: { readonly iri: string | undefined }) {
   const { iri } = properties;
   const heading = useRef<HTMLHeadingElement>(null);
-  const unread = <PageHead title={wayBackOf(useOpenedFrom()).page.name} headingRef={heading} />;
+  const unreadTitle = wayBackOf(useOpenedFrom()).page.name;
 
   return iri === undefined ? (
     <>
-      {unread}
+      <PageHead title={unreadTitle} headingRef={heading} />
       <NoSuchConcept />
     </>
   ) : (
-    <ConceptRead key={iri} iri={iri} heading={heading} unread={unread} />
+    <ConceptRead key={iri} iri={iri} heading={heading} unreadTitle={unreadTitle} />
   );
 }

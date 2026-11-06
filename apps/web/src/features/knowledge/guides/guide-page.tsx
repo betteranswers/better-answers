@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useRef, useState, type ReactNode, type RefObject } from "react";
+import { useRef, useState, type RefObject } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
@@ -109,10 +109,7 @@ function GuideHeader(properties: { readonly guide: Guide }) {
   );
 }
 
-function GuideShown(properties: {
-  readonly guide: Guide;
-  readonly heading: RefObject<HTMLHeadingElement | null>;
-}) {
+function GuideShown(properties: { readonly guide: Guide }) {
   const { guide } = properties;
   const title = guideTitleOf(guide);
   useBreadcrumbLastPart(title);
@@ -123,7 +120,6 @@ function GuideShown(properties: {
 
   return (
     <article aria-label={title} className="mt-6">
-      <PageHead title={title} headingRef={properties.heading} />
       <GuideHeader guide={guide} />
       <OutcomeLine outcome={outcome} className={outcome === undefined ? "" : STATUS_BAR} />
       <LeavingAsk leaving={guard.leaving} />
@@ -166,16 +162,20 @@ function GuideUnread(properties: {
 function GuideRead(properties: {
   readonly guideId: string;
   readonly heading: RefObject<HTMLHeadingElement | null>;
-  readonly unread: ReactNode;
 }) {
   const read = useGuide(properties.guideId);
-  if (read.error === null && read.data !== undefined) {
-    return <GuideShown guide={read.data} heading={properties.heading} />;
-  }
+  const shown = read.error === null ? read.data : undefined;
   return (
     <>
-      {properties.unread}
-      <GuideUnread read={read} heading={properties.heading} />
+      <PageHead
+        title={shown === undefined ? GUIDES_PAGE.name : guideTitleOf(shown)}
+        headingRef={properties.heading}
+      />
+      {shown === undefined ? (
+        <GuideUnread read={read} heading={properties.heading} />
+      ) : (
+        <GuideShown guide={shown} />
+      )}
     </>
   );
 }
@@ -183,14 +183,13 @@ function GuideRead(properties: {
 export function GuidePage(properties: { readonly guideId: string | undefined }) {
   const { guideId } = properties;
   const heading = useRef<HTMLHeadingElement>(null);
-  const unread = <PageHead title={GUIDES_PAGE.name} headingRef={heading} />;
 
   return guideId === undefined ? (
     <>
-      {unread}
+      <PageHead title={GUIDES_PAGE.name} headingRef={heading} />
       <NoSuchGuide />
     </>
   ) : (
-    <GuideRead key={guideId} guideId={guideId} heading={heading} unread={unread} />
+    <GuideRead key={guideId} guideId={guideId} heading={heading} />
   );
 }

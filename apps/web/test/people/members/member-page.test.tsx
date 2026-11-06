@@ -16,7 +16,7 @@ import {
   thePage,
 } from "@test/people/member-pages.ts";
 import { server } from "@test/stub-server.ts";
-import { GRACE, openAt, read, tickOf } from "@test/two-workspaces.ts";
+import { GRACE, LOST, openAt, read, tickOf } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
@@ -118,6 +118,19 @@ describe("a member's own page", () => {
     expect(reloaded.state.location.pathname).toBe(priyasPage);
     expect(crumbs().at(-1)?.textContent).toBe("Priya Shah");
     expect(screen.getByRole("heading", { level: 1, name: "Priya Shah" })).toBeDefined();
+  });
+
+  it("keeps focus on its title once Retry reads the member", async () => {
+    const api = aWorkspaceOfThree();
+    api.set("members.list", () => LOST);
+    await openAt(memberPageOf(PRIYA.personId), api);
+
+    const retry = await waitFor(() => thePage().getByRole("button", { name: "Retry" }));
+    api.set("members.list", () => read([PRIYA, SAM, TEST_PERSON, UNNAMED]));
+    fireEvent.click(focused(retry));
+
+    const title = await personHeading(PRIYA.displayName);
+    expect(document.activeElement).toBe(title);
   });
 
   it("describes a role change only after another role is picked", async () => {

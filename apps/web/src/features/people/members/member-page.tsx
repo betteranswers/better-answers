@@ -6,7 +6,6 @@ import {
   useState,
   type ComponentType,
   type MouseEvent,
-  type ReactNode,
   type RefObject,
 } from "react";
 
@@ -174,8 +173,7 @@ function SectionNav() {
   );
 }
 
-const useLandings = () => {
-  const title = useRef<HTMLHeadingElement>(null);
+const useLandings = (title: RefObject<HTMLHeadingElement | null>) => {
   const landings: Landings = {
     role: useRef<HTMLDivElement>(null),
     groups: useRef<HTMLDivElement>(null),
@@ -197,7 +195,7 @@ const useLandings = () => {
     (controlAt[at]() ?? title.current)?.focus();
   };
 
-  return { title, landings, landOn };
+  return { landings, landOn };
 };
 
 function SectionShown(properties: {
@@ -225,9 +223,10 @@ function MemberShown(properties: {
   readonly member: ListedMember;
   readonly openedAt: OpenedAt | undefined;
   readonly removal: Removal;
+  readonly heading: RefObject<HTMLHeadingElement | null>;
 }) {
   const { member, openedAt, removal } = properties;
-  const { title, landings, landOn } = useLandings();
+  const { landings, landOn } = useLandings(properties.heading);
   useBreadcrumbLastPart(nameOf(member));
 
   usePageKeystrokes(KEYSTROKES);
@@ -256,7 +255,6 @@ function MemberShown(properties: {
 
   return (
     <>
-      <PageHead title={nameOf(member)} headingRef={title} />
       <MemberHeader member={member} />
       <SectionNav />
       <div className="mt-6 grid gap-6">
@@ -268,26 +266,44 @@ function MemberShown(properties: {
   );
 }
 
+const memberShown = (
+  members: ReturnType<typeof useMembers>,
+  personId: string,
+  leaving: ListedMember | undefined,
+): ListedMember | undefined => {
+  if (members.error !== null || members.data === undefined) return undefined;
+  return (
+    members.data.find((each) => each.personId === personId) ??
+    (leaving?.personId === personId ? leaving : undefined)
+  );
+};
+
 function MemberRead(properties: {
   readonly personId: string;
   readonly heading: RefObject<HTMLHeadingElement | null>;
-  readonly unread: ReactNode;
 }) {
   const members = useMembers();
   const { openedAt, membersQuery } = useOpening();
   const [leaving, setLeaving] = useState<ListedMember>();
   const removal = useRemoval(membersQuery, setLeaving);
 
-  const member =
-    members.data?.find((each) => each.personId === properties.personId) ??
-    (leaving?.personId === properties.personId ? leaving : undefined);
-  if (members.error === null && members.data !== undefined && member !== undefined) {
-    return <MemberShown member={member} openedAt={openedAt} removal={removal} />;
-  }
+  const shown = memberShown(members, properties.personId, leaving);
   return (
     <>
-      {properties.unread}
-      <MemberUnread members={members} heading={properties.heading} />
+      <PageHead
+        title={shown === undefined ? MEMBERS_PAGE.name : nameOf(shown)}
+        headingRef={properties.heading}
+      />
+      {shown === undefined ? (
+        <MemberUnread members={members} heading={properties.heading} />
+      ) : (
+        <MemberShown
+          member={shown}
+          openedAt={openedAt}
+          removal={removal}
+          heading={properties.heading}
+        />
+      )}
     </>
   );
 }
@@ -320,14 +336,13 @@ function MemberUnread(properties: {
 export function MemberPage(properties: { readonly personId: string | undefined }) {
   const { personId } = properties;
   const heading = useRef<HTMLHeadingElement>(null);
-  const unread = <PageHead title={MEMBERS_PAGE.name} headingRef={heading} />;
 
   return personId === undefined ? (
     <>
-      {unread}
+      <PageHead title={MEMBERS_PAGE.name} headingRef={heading} />
       <NoSuchMember />
     </>
   ) : (
-    <MemberRead key={personId} personId={personId} heading={heading} unread={unread} />
+    <MemberRead key={personId} personId={personId} heading={heading} />
   );
 }
