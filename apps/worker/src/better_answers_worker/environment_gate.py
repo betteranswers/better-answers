@@ -12,6 +12,9 @@ PROCESSES = {
 # uid. tini at PID 1 holds the kept keys.
 INIT = ("/usr/bin/tini", "--")
 
+# The image's `worker` user, which owns the worker's volumes.
+APP_UID = 1000
+
 
 def main() -> None:
     named = sys.argv[1] if len(sys.argv) == 2 else ""
@@ -23,6 +26,12 @@ def main() -> None:
             + "\n"
         )
         sys.exit(2)
+    # Docker runs health checks and `docker exec` as the image's user, root, so the
+    # worker's uid cannot read their environment.
+    if os.getuid() == 0:
+        os.setgroups([])
+        os.setgid(APP_UID)
+        os.setuid(APP_UID)
     if os.getpid() == 1:
         argv = (*INIT, *argv)
     os.execvpe(argv[0], argv, environment_of())  # noqa: S606  # argv comes from PROCESSES, not input

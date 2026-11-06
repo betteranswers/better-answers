@@ -9,6 +9,7 @@ import posixpath
 import re
 import subprocess
 import tempfile
+import time
 import tomllib
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -538,7 +539,6 @@ def pipeline(name):
 
 shared_object_count, unresolved_shared_objects = unresolved()
 library_file_count, unrecorded_library_files = unrecorded()
-home = os.path.expanduser("~")
 sys.stdout.write(json.dumps({
     "development": [
         n
@@ -547,9 +547,6 @@ sys.stdout.write(json.dumps({
     ],
     "version": list(sys.version_info[:3]),
     "base_prefix": sys.base_prefix,
-    "uid": os.getuid(),
-    "home": home,
-    "home_is_writable": os.path.isdir(home) and os.access(home, os.W_OK),
     "tools_present": [
         n
         for n in json.loads(os.environ["PROBE_TOOLS"])
@@ -828,9 +825,6 @@ class ImageContents:
     development: tuple[str, ...]
     version: tuple[int, int, int]
     base_prefix: str
-    uid: int
-    home: str
-    home_is_writable: bool
     tools_present: tuple[str, ...]
     bundled_wheels: tuple[str, ...]
     command_interpreter: str
@@ -856,9 +850,6 @@ def _read_contents(stdout: str) -> ImageContents:
         development=tuple(str(name) for name in parsed["development"]),
         version=(int(major), int(minor), int(patch)),
         base_prefix=str(parsed["base_prefix"]),
-        uid=int(parsed["uid"]),
-        home=str(parsed["home"]),
-        home_is_writable=bool(parsed["home_is_writable"]),
         tools_present=tuple(str(name) for name in parsed["tools_present"]),
         bundled_wheels=tuple(str(path) for path in parsed["bundled_wheels"]),
         command_interpreter=str(parsed["command_interpreter"]),
@@ -1501,13 +1492,202 @@ def test_both_converters_hold_on_the_image_under_the_engines_runtime(
     )
 
 
-def test_runs_as_the_volume_owner_uid_with_a_writable_home(
-    contents: ImageContents,
+# Stands in for the worker, which needs a database. It reports what it and PID 1 hold,
+# orphans a grandchild, and waits for SIGTERM.
+STAND_IN = r"""
+import json, os, signal, sys
+
+def status_uid(pid):
+    with open(f"/proc/{pid}/status") as status:
+        return next(int(line.split()[1]) for line in status if line.startswith("Uid:"))
+
+def keys_of(pid):
+    try:
+        with open(f"/proc/{pid}/environ", "rb") as environ:
+            entries = environ.read().split(b"\0")
+    except PermissionError:
+        return None
+    return sorted(entry.split(b"=", 1)[0].decode() for entry in entries if entry)
+
+def zombies():
+    found = []
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        try:
+            with open(f"/proc/{pid}/stat") as stat:
+                if stat.read().rsplit(")", 1)[1].split()[0] == "Z":
+                    found.append(int(pid))
+        except FileNotFoundError:
+            pass
+    return found
+
+def said(**seen):
+    print(json.dumps(seen), flush=True)
+
+def stopped(_signal, _frame):
+    said(event="stopped", zombies=zombies())
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, stopped)
+if os.fork() == 0:
+    if os.fork() == 0:
+        os._exit(0)
+    os._exit(0)
+os.wait()
+home = os.environ.get("HOME", "")
+with open("/proc/1/cmdline", "rb") as cmdline:
+    init = cmdline.read().split(b"\0")[0].decode()
+said(
+    event="started",
+    uid=os.getuid(),
+    gid=os.getgid(),
+    groups=os.getgroups(),
+    home_is_writable=os.access(home, os.W_OK),
+    init=init,
+    init_uid=status_uid(1),
+    init_keys=keys_of(1),
+    own_keys=sorted(os.environ),
+)
+if sys.argv[1:] == ["once"]:
+    sys.exit(0)
+while True:
+    signal.pause()
+"""
+
+
+def _gate_with_stand_in(process: str, *arguments: str) -> str:
+    return (
+        "import sys\n"
+        "from better_answers_worker import environment_gate\n"
+        f"environment_gate.PROCESSES[{process!r}] ="
+        f" ('python', '-c', {STAND_IN!r}, *{arguments!r})\n"
+        f"sys.argv = ['environment_gate', {process!r}]\n"
+        "environment_gate.main()\n"
+    )
+
+
+RESOURCE_KEYS = {
+    "DATABASE_URL": "postgresql://worker@db:5432/ba",
+    "KEK": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+    "MIGRATE_DATABASE_URL": "postgresql://owner@db:5432/ba",
+}
+
+STOP_WITHIN_SECONDS = 10
+
+
+@dataclass(frozen=True)
+class GatedRun:
+    started: Mapping[str, Any]
+    health: Mapping[str, Any]
+    stopped: Mapping[str, Any]
+    stop_seconds: float
+    exit_code: int
+
+
+def _said(output: str, event: str) -> dict[str, Any] | None:
+    for line in output.splitlines():
+        if line.startswith("{"):
+            parsed: dict[str, Any] = json.loads(line)
+            if parsed.get("event") == event:
+                return parsed
+    return None
+
+
+def _docker(*arguments: str, environment: Mapping[str, str] | None = None) -> str:
+    return subprocess.run(
+        ["docker", *arguments],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env={**os.environ, **(environment or {})},
+    ).stdout
+
+
+@pytest.fixture(scope="module")
+def gated(image: str) -> Iterator[GatedRun]:
+    """Starts the image as the deploy unit does: as root, with resource keys, the gate
+    as PID 1, and a root health check beside it."""
+    passed = [argument for name in RESOURCE_KEYS for argument in ("--env", name)]
+    container = _docker(
+        "run",
+        "--detach",
+        *passed,
+        image,
+        "python",
+        "-c",
+        _gate_with_stand_in("worker"),
+        environment=RESOURCE_KEYS,
+    ).strip()
+    try:
+        deadline = time.monotonic() + 60
+        started = None
+        while started is None and time.monotonic() < deadline:
+            started = _said(_docker("logs", container), "started")
+            time.sleep(0.5)
+        assert started is not None, _docker("logs", container)
+        health = _said(
+            _docker(
+                "exec",
+                container,
+                "python",
+                "-c",
+                _gate_with_stand_in("health", "once"),
+            ),
+            "started",
+        )
+        assert health is not None
+        from_stop = time.monotonic()
+        _docker("stop", "--time", str(STOP_WITHIN_SECONDS), container)
+        stop_seconds = time.monotonic() - from_stop
+        stopped = _said(_docker("logs", container), "stopped")
+        assert stopped is not None, _docker("logs", container)
+        exit_code = int(
+            _docker("inspect", "--format", "{{.State.ExitCode}}", container)
+        )
+        yield GatedRun(started, health, stopped, stop_seconds, exit_code)
+    finally:
+        subprocess.run(
+            ["docker", "rm", "--force", container],
+            check=False,
+            capture_output=True,
+            timeout=120,
+        )
+
+
+def test_tini_runs_at_pid_1_as_the_volume_owner(gated: GatedRun) -> None:
+    assert gated.started["init"] == "/usr/bin/tini"
+    assert gated.started["init_uid"] == chowned_worker_uid()
+
+
+def test_the_gate_drops_root_before_it_starts_the_worker(gated: GatedRun) -> None:
+    uid = chowned_worker_uid()
+
+    assert (gated.started["uid"], gated.started["gid"]) == (uid, uid)
+    assert gated.started["groups"] == []
+    assert gated.started["home_is_writable"] is True
+
+
+def test_pid_1_and_the_worker_hold_only_the_worker_keys(gated: GatedRun) -> None:
+    assert gated.started["init_keys"] == gated.started["own_keys"]
+    assert "DATABASE_URL" in gated.started["own_keys"]
+    assert "KEK" not in gated.started["own_keys"]
+    assert "MIGRATE_DATABASE_URL" not in gated.started["own_keys"]
+
+
+def test_a_root_health_check_probes_as_the_volume_owner(
+    gated: GatedRun,
 ) -> None:
-    assert contents.uid == chowned_worker_uid()
-    assert contents.uid != 0
-    assert contents.home != "/"
-    assert contents.home_is_writable is True
+    assert gated.health["uid"] == chowned_worker_uid()
+    assert gated.health["own_keys"] == gated.started["own_keys"]
+
+
+def test_sigterm_reaches_the_worker_through_tini(gated: GatedRun) -> None:
+    assert gated.exit_code == 0
+    assert gated.stop_seconds < STOP_WITHIN_SECONDS / 2
+
+
+def test_tini_reaps_an_orphaned_grandchild(gated: GatedRun) -> None:
+    assert gated.stopped["zombies"] == []
 
 
 def test_the_image_does_not_contain_the_worker_tests(

@@ -108,6 +108,8 @@ const composeSchema = z.object({
     z.object({
       image: z.string(),
       init: z.boolean().optional(),
+      entrypoint: z.unknown().optional(),
+      user: z.unknown().optional(),
       command: argvSchema.optional(),
       environment: z.record(z.string(), z.unknown()),
       healthcheck: z.object({ test: argvSchema }).optional(),
@@ -127,13 +129,27 @@ const environmentsIn = (source: string): Environments =>
     Object.entries(servicesIn(source)).map(([name, service]) => [name, service.environment]),
   );
 
-const imageCommand = (dockerfile: string): readonly string[] => {
-  const written = /^CMD (?<argv>\[.*\])$/mu.exec(
-    readFileSync(path.join(repositoryRoot, dockerfile), "utf8"),
-  )?.groups?.["argv"];
+type ReadDockerfile = (dockerfile: string) => string;
+
+const fromDisk: ReadDockerfile = (dockerfile) =>
+  readFileSync(path.join(repositoryRoot, dockerfile), "utf8");
+
+const imageCommand = (dockerfile: string, read: ReadDockerfile): readonly string[] => {
+  const written = /^CMD (?<argv>\[.*\])$/mu.exec(read(dockerfile))?.groups?.["argv"];
   assert(written !== undefined, `${dockerfile} has no CMD in exec form`);
   return argvSchema.parse(JSON.parse(written));
 };
+
+/** The image's own health check, which runs when no service overrides it. Empty in shell form. */
+const imageProbe = (dockerfile: string, read: ReadDockerfile): readonly string[] => {
+  const joined = read(dockerfile).replace(/\\\n\s*/gu, " ");
+  const written = /^HEALTHCHECK .*?\bCMD (?<argv>\[.*\])$/mu.exec(joined)?.groups?.["argv"];
+  return written === undefined ? [] : argvSchema.parse(JSON.parse(written));
+};
+
+/** The runtime stage is the last, so its `USER` is the file's last. */
+const imageUser = (dockerfile: string, read: ReadDockerfile): string | undefined =>
+  [...read(dockerfile).matchAll(/^USER (?<user>\S+)\s*$/gmu)].at(-1)?.groups?.["user"];
 
 const finding = (service: string, key: string, message: string): Finding => ({
   service,
@@ -227,46 +243,77 @@ const tierOf = (service: Service): Tier | undefined =>
   Object.values(TIERS).find(({ image }) => service.image.startsWith(`${image}@`));
 
 /** The argv the container starts: the service's own command, or else the image's `CMD`. */
-const commandOf = (service: Service, tier: Tier): readonly string[] =>
-  service.command ?? imageCommand(tier.dockerfile);
+const commandOf = (service: Service, tier: Tier, read: ReadDockerfile): readonly string[] =>
+  service.command ?? imageCommand(tier.dockerfile, read);
 
-const probeFindings = (name: string, service: Service, tier: Tier): Finding[] => {
-  const probe = service.healthcheck?.test.slice(1) ?? [];
-  const runsTierCode = probe[0] === tier.gate[0];
-  return runsTierCode && gatedProcess(probe, tier) === undefined
-    ? [ungated(name, "healthcheck", probe, tier)]
-    : [];
+const probeFindings = (
+  name: string,
+  service: Service,
+  tier: Tier,
+  read: ReadDockerfile,
+): Finding[] => {
+  const probes = [
+    ["healthcheck", service.healthcheck?.test.slice(1) ?? []],
+    [`image's HEALTHCHECK in ${tier.dockerfile}`, imageProbe(tier.dockerfile, read)],
+  ] as const;
+  return probes.flatMap(([what, probe]) =>
+    probe[0] === tier.gate[0] && gatedProcess(probe, tier) === undefined
+      ? [ungated(name, what, probe, tier)]
+      : [],
+  );
 };
+
+/** Compose settings that undo the gate, each with what it undoes and the fix. */
+const REFUSED = [
+  [
+    "init",
+    "Docker's init runs as PID 1 with every variable of the container, and the app's user can read it from /proc/1/environ. Delete the line. Started as PID 1, the gate puts tini there with only the kept keys",
+  ],
+  [
+    "entrypoint",
+    "the container starts its process outside the environment gate, and the process keeps every variable the orchestrator hands the container. Delete the line, and name the process in `command`",
+  ],
+  [
+    "user",
+    "Docker runs health checks and `docker exec` as that user, each with every variable of the container, and an app process of the same uid can read them. Delete the line. The image starts as root, and the gate drops to the app's uid",
+  ],
+] as const;
 
 const tierFindings = (
   name: string,
   service: Service,
   tier: Tier,
   excused: Readonly<Record<string, Excuse>>,
+  read: ReadDockerfile,
 ): Finding[] => {
-  const command = commandOf(service, tier);
+  const command = commandOf(service, tier, read);
   const keys = tier.processes[gatedProcess(command, tier) ?? ""];
   const started =
     keys === undefined
       ? [ungated(name, "command", command, tier)]
       : keyFindings(name, Object.keys(service.environment), keys, excused);
-  const init =
-    service.init === true
-      ? [
+  const refused = REFUSED.filter(([setting]) => service[setting] !== undefined).map(
+    ([setting, why]) => finding(name, setting, `${name} sets ${setting}, so ${why}`),
+  );
+  const user = imageUser(tier.dockerfile, read);
+  const asRoot =
+    user === "root"
+      ? []
+      : [
           finding(
             name,
-            "init",
-            `${name} sets init, so Docker's init runs as PID 1 with every variable of the container, and the app's user can read it from /proc/1/environ. Delete the line. Started as PID 1, the gate puts tini there with only the kept keys`,
+            "USER",
+            `${tier.dockerfile} ends with USER ${user ?? "unset"}, so Docker runs health checks and \`docker exec\` as the app's uid, each with every variable of the container, and the app can read them. End the runtime stage with USER root. The gate drops to the app's uid before it starts a process`,
           ),
-        ]
-      : [];
-  return [...started, ...init, ...probeFindings(name, service, tier)];
+        ];
+  return [...started, ...refused, ...asRoot, ...probeFindings(name, service, tier, read)];
 };
 
 const serviceFindings = (
   name: string,
   service: Service,
   excused: Readonly<Record<string, Excuse>>,
+  read: ReadDockerfile,
 ): Finding[] => {
   const tier = tierOf(service);
   return tier === undefined
@@ -277,20 +324,24 @@ const serviceFindings = (
           `${name} runs ${service.image}, which is the image of no tier in TIERS. Add the tier, with its gate and the keys each of its processes reads`,
         ),
       ]
-    : tierFindings(name, service, tier, excused);
+    : tierFindings(name, service, tier, excused, read);
 };
 
 const startedIn = (source: string): Readonly<Record<string, string | undefined>> =>
   Object.fromEntries(
     Object.entries(servicesIn(source)).map(([name, service]) => {
       const tier = tierOf(service);
-      return [name, tier && gatedProcess(commandOf(service, tier), tier)];
+      return [name, tier && gatedProcess(commandOf(service, tier, fromDisk), tier)];
     }),
   );
 
-const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): Finding[] => [
+const findingsIn = (
+  source: string,
+  excused: Readonly<Record<string, Excuse>>,
+  read: ReadDockerfile = fromDisk,
+): Finding[] => [
   ...Object.entries(servicesIn(source)).flatMap(([name, service]) =>
-    serviceFindings(name, service, excused),
+    serviceFindings(name, service, excused, read),
   ),
   ...sharedDsns(environmentsIn(source)),
 ];
@@ -314,6 +365,17 @@ const edited = (find: string, replacement: string): string => {
   return compose.replace(find, replacement);
 };
 
+const dockerfileEdited = (
+  dockerfile: string,
+  find: string,
+  replacement: string,
+): ReadDockerfile => {
+  const source = fromDisk(dockerfile);
+  assert(source.includes(find), `${dockerfile} no longer contains ${find}`);
+  const planted = source.replace(find, replacement);
+  return (file) => (file === dockerfile ? planted : fromDisk(file));
+};
+
 describe(`${COMPOSE} gives each service the environment its tier's config module reads`, () => {
   it("sets every required key and no unread key", () => {
     expect(findingsIn(compose, EXCUSED).map(({ message }) => message)).toEqual([]);
@@ -321,6 +383,14 @@ describe(`${COMPOSE} gives each service the environment its tier's config module
 
   it("starts each service through its tier's environment gate", () => {
     expect(startedIn(compose)).toEqual({ migrate: "migrate", api: "api", worker: "worker" });
+  });
+
+  it("starts `pnpm ops` through the api's gate", () => {
+    const manifest = z
+      .object({ scripts: z.record(z.string(), z.string()) })
+      .parse(JSON.parse(fromDisk("apps/api/package.json")));
+
+    expect(manifest.scripts["ops"]).toBe("node src/environment-gate.ts ops");
   });
 
   it("registers every reader the api's config module exports", () => {
@@ -562,5 +632,41 @@ describe("the check fails on a planted file", () => {
     );
 
     expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["worker"]);
+  });
+
+  it("refuses an entrypoint that starts the api without the gate", () => {
+    const planted = edited(
+      "    image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?}\n",
+      '    image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?}\n    entrypoint: ["node", "apps/api/src/main.ts"]\n',
+    );
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["api entrypoint"]);
+  });
+
+  it("refuses a user that runs health checks as the app", () => {
+    const planted = edited(
+      "    stop_grace_period: 30s\n    <<: [*restart, *logging]\n",
+      '    user: "1000:1000"\n    stop_grace_period: 30s\n    <<: [*restart, *logging]\n',
+    );
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["worker user"]);
+  });
+
+  it("refuses an api image that no longer starts as root", () => {
+    const read = dockerfileEdited("apps/api/Dockerfile", "\nUSER root\n", "\nUSER node\n");
+
+    expect(flagged(findingsIn(compose, EXCUSED, read))).toEqual(["api USER", "migrate USER"]);
+  });
+
+  it("refuses an image health check that skips the gate", () => {
+    const read = dockerfileEdited(
+      "apps/worker/Dockerfile",
+      '["python", "-m", "better_answers_worker.environment_gate", "health"]',
+      '["python", "-m", "better_answers_worker.health"]',
+    );
+    const findings = findingsIn(compose, EXCUSED, read);
+
+    expect(flagged(findings)).toEqual(["worker"]);
+    expect(findings[0]?.message).toContain("image's HEALTHCHECK in apps/worker/Dockerfile");
   });
 });
