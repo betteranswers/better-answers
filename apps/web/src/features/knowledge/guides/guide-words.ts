@@ -43,8 +43,10 @@ export const GUIDE_WORDS = {
     `${name} isn’t recorded yet. ${owner === undefined ? "It has no owner, so an Admin is responsible for it." : `Owner: ${owner}.`}`,
   available: (name: string): string => `${name} is recorded but not included in this section.`,
   addFact: "Add This Fact",
-  include: "Include",
+  include: "Include All Available Facts",
   included: (number: string): string => `Included in section ${number}.`,
+  nothingIncluded: (number: string): string =>
+    `Nothing more could be included in section ${number}.`,
   selectFirst: "Please select a section first.",
   nothingToAdd: "No fact is missing from this section, so there is nothing to add.",
   copy: "Copy",

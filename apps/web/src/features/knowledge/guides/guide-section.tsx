@@ -167,8 +167,12 @@ const useIncluding = (section: GuideSection, say: Say, heading: RefObject<HTMLEl
     if (including) return;
     setIncluding(true);
     try {
-      await include(section.writeUpId);
-      say(said(WORDS.included(section.number)));
+      const { included } = await include(section.writeUpId);
+      say(
+        said(
+          included === 0 ? WORDS.nothingIncluded(section.number) : WORDS.included(section.number),
+        ),
+      );
       heading.current?.focus();
     } catch (thrown) {
       say(failed(thrown instanceof Error ? thrown : new Error(String(thrown))));
