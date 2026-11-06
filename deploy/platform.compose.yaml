@@ -28,7 +28,6 @@ services:
     # Quoted: a missing `restart` becomes unless-stopped, and bare `no` is YAML false.
     restart: "no"
     environment:
-      <<: *bootstrap
       # The owner DSN, used only by migrate: the api's runtime role cannot run DDL.
       DATABASE_URL: ${MIGRATE_DATABASE_URL:?set it to the owner DSN, which only migrate uses}
     labels: { coolify.exclude_from_hc: "true" }

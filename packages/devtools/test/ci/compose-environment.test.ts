@@ -60,11 +60,9 @@ const SERVICES: Readonly<Record<string, Service>> = {
 
 type Excuse = { readonly services: readonly string[]; readonly reason: string };
 
-const EVERY_SERVICE = Object.keys(SERVICES);
-
 const EXCUSED: Readonly<Record<string, Excuse>> = {
   EMBEDDINGS_URL: {
-    services: EVERY_SERVICE,
+    services: ["api", "worker"],
     reason:
       "reserved for the model host that docs/operations/coolify.md documents. No code reads it yet",
   },
@@ -130,7 +128,7 @@ const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): 
           finding(
             name,
             key,
-            `${name} lacks ${key}, which ${reader} requires. Set it in the service's environment or in x-bootstrap`,
+            `${name} lacks ${key}, which ${reader} requires. Set it in the service's environment, or in an anchor that the service merges`,
           ),
         ),
     );
@@ -210,7 +208,6 @@ describe("the check fails on a planted file", () => {
 
     expect(flagged(findingsIn(planted, EXCUSED))).toEqual([
       "api PLANTED_KEY",
-      "migrate PLANTED_KEY",
       "worker PLANTED_KEY",
     ]);
   });
