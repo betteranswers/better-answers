@@ -5,7 +5,6 @@ import { passkey as passkeyPlugin } from "@better-auth/passkey";
 import { betterAuth, type Session } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { emailOTP, jwt, organization, twoFactor } from "better-auth/plugins";
-import type { BetterAuthPlugin } from "better-auth/types";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type pg from "pg";
 import type { Logger } from "pino";
@@ -100,18 +99,6 @@ import { codeHashOf } from "./sign-in/link-token.ts";
 import { signInEmail } from "./sign-in/sign-in-email.ts";
 import { keepALink } from "./sign-in/sign-in-link.ts";
 import { surfacingUniqueViolations } from "./unique-violations.ts";
-
-type AuthEndpoint = NonNullable<BetterAuthPlugin["endpoints"]>[string];
-
-type WidenedAuthorize<P extends { readonly endpoints: object }> = Omit<P, "endpoints"> & {
-  readonly endpoints: Omit<P["endpoints"], "oauth2Authorize"> & {
-    readonly oauth2Authorize: AuthEndpoint;
-  };
-};
-
-const widenAuthorize = <P extends { readonly endpoints: object }>(plugin: P): WidenedAuthorize<P> =>
-  // oxlint-disable-next-line typescript/consistent-type-assertions, typescript/no-unsafe-type-assertion -- a declaration gap: better-auth types `oauth2Authorize`'s openapi metadata outside `Endpoint`; the runtime value fits
-  plugin as WidenedAuthorize<P>;
 
 type ClientMetadataFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -446,82 +433,80 @@ export const createAuth = (deps: AuthDependencies) => {
           await deps.sendEmail(signInEmail(email, otp, kept.ok ? kept.value : undefined));
         },
       }),
-      widenAuthorize(
-        oauthProvider({
-          /**
-           * The library appends its signed query after a literal ?, so a page URL with its own
-           * query breaks the signature.
-           */
-          loginPage: `${deps.publicUrl}${SIGN_IN_PATH}`,
+      oauthProvider({
+        /**
+         * The library appends its signed query after a literal ?, so a page URL with its own
+         * query breaks the signature.
+         */
+        loginPage: `${deps.publicUrl}${SIGN_IN_PATH}`,
 
-          consentPage: `${deps.publicUrl}/consent`,
-          scopes: [...OAUTH_SCOPES],
-          accessTokenExpiresIn: ACCESS_TOKEN_LIFETIME_SECONDS,
-          refreshTokenExpiresIn: REFRESH_TOKEN_LIFETIME_SECONDS,
+        consentPage: `${deps.publicUrl}/consent`,
+        scopes: [...OAUTH_SCOPES],
+        accessTokenExpiresIn: ACCESS_TOKEN_LIFETIME_SECONDS,
+        refreshTokenExpiresIn: REFRESH_TOKEN_LIFETIME_SECONDS,
 
-          resources: [deps.mcpUrl],
+        resources: [deps.mcpUrl],
 
-          clientRegistrationDefaultScopes: [...OAUTH_SCOPES],
-          clientRegistrationAllowedScopes: [...OAUTH_SCOPES],
+        clientRegistrationDefaultScopes: [...OAUTH_SCOPES],
+        clientRegistrationAllowedScopes: [...OAUTH_SCOPES],
 
-          clientRegistrationDefaultResources: [deps.mcpUrl],
-          clientRegistrationAllowedResources: [deps.mcpUrl],
+        clientRegistrationDefaultResources: [deps.mcpUrl],
+        clientRegistrationAllowedResources: [deps.mcpUrl],
 
-          rateLimit: {
-            authorize: false,
-            token: false,
-            introspect: false,
-            revoke: false,
-            register: false,
-            userinfo: false,
-          },
-          postLogin: {
-            page: `${deps.publicUrl}/choose-workspace`,
+        rateLimit: {
+          authorize: false,
+          token: false,
+          introspect: false,
+          revoke: false,
+          register: false,
+          userinfo: false,
+        },
+        postLogin: {
+          page: `${deps.publicUrl}/choose-workspace`,
 
-            consentReferenceId: async ({ session, user: person }) => {
-              const active = consentedWorkspaceOf(session, await workspacesOf(person.id));
-              if (grantLeftItsWorkspace(active)) {
-                throw new APIError("CONFLICT", {
-                  error: "workspace_moved",
-                  error_description: "the session changed workspace after the consent page opened",
-                });
-              }
-              if (active === undefined) {
-                throw new APIError("BAD_REQUEST", {
-                  error: "set_workspace",
-                  error_description: "choose a workspace before you give consent",
-                });
-              }
-              return active;
-            },
-
-            shouldRedirect: async ({ session, user: person }) => {
-              if (pendingOr(await judged(deps, { id: session.id }))) return true;
-              if (hasNoDisplayName(person.name)) return true;
-              const held = await workspacesOf(person.id);
-              const active = activeWorkspaceOf(session);
-              if (active !== undefined && held.includes(active)) return false;
-
-              const only = soleOf(held);
-              if (only !== undefined) {
-                await withIdentityWrite(IDENTITY_PRINCIPAL, deps.door, (tx) =>
-                  tx.query(
-                    "UPDATE session SET active_workspace_id = $1, updated_at = now() WHERE id = $2",
-                    [only, session.id],
-                  ),
-                );
-                return false;
-              }
-              return true;
-            },
+          consentReferenceId: async ({ session, user: person }) => {
+            const active = consentedWorkspaceOf(session, await workspacesOf(person.id));
+            if (grantLeftItsWorkspace(active)) {
+              throw new APIError("CONFLICT", {
+                error: "workspace_moved",
+                error_description: "the session changed workspace after the consent page opened",
+              });
+            }
+            if (active === undefined) {
+              throw new APIError("BAD_REQUEST", {
+                error: "set_workspace",
+                error_description: "choose a workspace before you give consent",
+              });
+            }
+            return active;
           },
 
-          customAccessTokenClaims: async ({ user: person, referenceId }) => ({
-            workspace: referenceId ?? null,
-            user: person?.id ?? null,
-          }),
+          shouldRedirect: async ({ session, user: person }) => {
+            if (pendingOr(await judged(deps, { id: session.id }))) return true;
+            if (hasNoDisplayName(person.name)) return true;
+            const held = await workspacesOf(person.id);
+            const active = activeWorkspaceOf(session);
+            if (active !== undefined && held.includes(active)) return false;
+
+            const only = soleOf(held);
+            if (only !== undefined) {
+              await withIdentityWrite(IDENTITY_PRINCIPAL, deps.door, (tx) =>
+                tx.query(
+                  "UPDATE session SET active_workspace_id = $1, updated_at = now() WHERE id = $2",
+                  [only, session.id],
+                ),
+              );
+              return false;
+            }
+            return true;
+          },
+        },
+
+        customAccessTokenClaims: async ({ user: person, referenceId }) => ({
+          workspace: referenceId ?? null,
+          user: person?.id ?? null,
         }),
-      ),
+      }),
       twoFactor({
         issuer: PRODUCT_NAME,
         allowPasswordless: true,

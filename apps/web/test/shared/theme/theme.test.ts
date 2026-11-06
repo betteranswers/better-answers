@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { runInThisContext } from "node:vm";
 
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,8 +37,7 @@ const STORED_AND_DEVICE_CASES = ["light", "dark", "anything else", null].flatMap
 );
 
 const runHeadScript = () => {
-  // oxlint-disable-next-line typescript/no-implied-eval, typescript/no-unsafe-call -- the head script is a string by design, run as the page runs it; lib types `new Function` as the bare Function
-  new Function(FIRST_PAINT)();
+  runInThisContext(FIRST_PAINT);
 };
 
 let store: typeof ThemeStore;

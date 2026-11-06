@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { getTableColumns } from "drizzle-orm";
-import { getTableConfig } from "drizzle-orm/pg-core";
+import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import type pg from "pg";
 import type { z } from "zod";
 
@@ -236,12 +236,17 @@ const numberOf = (id: string): string =>
 const hexOfLength = (length: number): string =>
   createHash("sha256").update(ulid()).digest("hex").repeat(2).slice(0, length);
 
-const insertRow = async <TName extends keyof Registry>(
+type TableSchemas<Input, Output> = {
+  readonly table: PgTable;
+  readonly insert: z.ZodType<Readonly<Record<string, unknown>>, Input>;
+  readonly select: z.ZodType<Output>;
+};
+
+const insertRow = async <Input, Output>(
   client: pg.PoolClient,
-  name: TName,
-  values: InsertInput<TName>,
-): Promise<Row<TName>> => {
-  const { table, insert, select } = boundarySchemas[name];
+  { table, insert, select }: TableSchemas<Input, Output>,
+  values: NoInfer<Input>,
+): Promise<Output> => {
   const parsed: Readonly<Record<string, unknown>> = insert.parse(values);
   const columns: Readonly<Record<string, { name: string; getSQLType: () => string }>> =
     getTableColumns(table);
@@ -271,8 +276,7 @@ const insertRow = async <TName extends keyof Registry>(
     fields[key] = typeof value === "string" && value.startsWith("[") ? JSON.parse(value) : value;
   }
 
-  // oxlint-disable-next-line typescript/consistent-type-assertions, typescript/no-unsafe-type-assertion -- TypeScript cannot correlate `select` with `TName` through a generic indexed access
-  return select.parse(fields) as Row<TName>;
+  return select.parse(fields);
 };
 
 const partitionExists = async (client: pg.PoolClient, workspaceId: string): Promise<boolean> => {
@@ -307,7 +311,7 @@ const monthsOn = (from: Date, months: number): Date => {
 export const testData = (client: pg.PoolClient): TestData => {
   const workspace: TestData["workspace"] = (overrides = {}) => {
     const id = overrides.id ?? ulid();
-    return insertRow(client, "workspace", {
+    return insertRow(client, boundarySchemas.workspace, {
       id,
       name: "Test workspace",
       shortName: `ws-${id.toLowerCase()}`,
@@ -317,7 +321,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const user: TestData["user"] = (overrides = {}) => {
     const id = overrides.id ?? ulid();
-    return insertRow(client, "user", {
+    return insertRow(client, boundarySchemas.user, {
       id,
       name: "Test person",
       email: `${numberOf(id)}@example.invalid`,
@@ -330,7 +334,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const id = overrides.id ?? ulid();
     const at = overrides.createdAt ?? new Date();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-    return insertRow(client, "session", {
+    return insertRow(client, boundarySchemas.session, {
       token: `token-${id}`,
       createdAt: at,
       updatedAt: at,
@@ -344,7 +348,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const account: TestData["account"] = async (overrides = {}) => {
     const userId = overrides.userId ?? (await user()).id;
     const id = overrides.id ?? ulid();
-    return insertRow(client, "account", {
+    return insertRow(client, boundarySchemas.account, {
       id,
       accountId: userId,
       providerId: "credential",
@@ -356,7 +360,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const member: TestData["member"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const userId = overrides.userId ?? (await user()).id;
-    return insertRow(client, "member", {
+    return insertRow(client, boundarySchemas.member, {
       id: ulid(),
       role: CREATOR_ROLE,
       createdAt: new Date(),
@@ -370,7 +374,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const inviterId = overrides.inviterId ?? (await user()).id;
     const week = 7 * 24 * 60 * 60 * 1000;
-    return insertRow(client, "invitation", {
+    return insertRow(client, boundarySchemas.invitation, {
       id: ulid(),
       email: `invitee-${ulid().toLowerCase()}@example.invalid`,
       role: CREATOR_ROLE,
@@ -386,7 +390,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const group: TestData["group"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const id = overrides.id ?? ulid();
-    return insertRow(client, "group", {
+    return insertRow(client, boundarySchemas.group, {
       id,
       name: `Group ${numberOf(id)}`,
       origin: CURATED_ORIGIN,
@@ -400,12 +404,17 @@ export const testData = (client: pg.PoolClient): TestData => {
     const groupId = overrides.groupId ?? (await group({ workspaceId })).id;
 
     const userId = overrides.userId ?? (await member({ workspaceId })).userId;
-    return insertRow(client, "groupMember", { ...overrides, workspaceId, groupId, userId });
+    return insertRow(client, boundarySchemas.groupMember, {
+      ...overrides,
+      workspaceId,
+      groupId,
+      userId,
+    });
   };
 
   const workspaceConfig: TestData["workspaceConfig"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "workspaceConfig", {
+    return insertRow(client, boundarySchemas.workspaceConfig, {
       key: "probe",
       value: "probe",
       ...overrides,
@@ -416,7 +425,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const modelChoice: TestData["modelChoice"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const purpose = overrides.purpose ?? "embedding";
-    return insertRow(client, "modelChoice", {
+    return insertRow(client, boundarySchemas.modelChoice, {
       id: `model-choice-${ulid()}`,
       provider: "mistral",
       model: "mistral-embed",
@@ -432,7 +441,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const modelKey: TestData["modelKey"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "modelKey", {
+    return insertRow(client, boundarySchemas.modelKey, {
       provider: "anthropic",
       sealed: new Uint8Array(40).fill(7),
       ...overrides,
@@ -452,7 +461,7 @@ export const testData = (client: pg.PoolClient): TestData => {
         previous.rows[0]?.ws ?? "",
       ]);
     }
-    return insertRow(client, "passage", {
+    return insertRow(client, boundarySchemas.passage, {
       id: `passage-${ulid()}`,
       content: "test content",
       embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0),
@@ -471,7 +480,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const oauthClient: TestData["oauthClient"] = (overrides = {}) => {
     const id = overrides.id ?? `client-${ulid()}`;
-    return insertRow(client, "oauthClient", {
+    return insertRow(client, boundarySchemas.oauthClient, {
       id,
 
       clientId: `https://${id.toLowerCase()}.example.invalid/metadata`,
@@ -484,7 +493,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const clientId = overrides.clientId ?? (await oauthClient()).clientId;
     const userId = overrides.userId ?? (await user()).id;
     const id = overrides.id ?? `refresh-${ulid()}`;
-    return insertRow(client, "oauthRefreshToken", {
+    return insertRow(client, boundarySchemas.oauthRefreshToken, {
       id,
       token: `refresh-token-${id}`,
       expiresAt: new Date(Date.now() + 86_400_000),
@@ -500,7 +509,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const clientId = overrides.clientId ?? (await oauthClient()).clientId;
     const userId = overrides.userId ?? (await user()).id;
     const id = overrides.id ?? `access-${ulid()}`;
-    return insertRow(client, "oauthAccessToken", {
+    return insertRow(client, boundarySchemas.oauthAccessToken, {
       id,
       token: `access-token-${id}`,
       expiresAt: new Date(Date.now() + 3_600_000),
@@ -513,7 +522,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   };
 
   const verification: TestData["verification"] = (overrides = {}) =>
-    insertRow(client, "verification", {
+    insertRow(client, boundarySchemas.verification, {
       id: ulid(),
       identifier: `sign-in-otp-${ulid().toLowerCase()}@example.invalid`,
       value: "hashed-code:0",
@@ -524,7 +533,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const confirmedAuthenticatorOfASealedSecret: TestData["confirmedAuthenticatorOfASealedSecret"] =
     async (overrides) => {
       const userId = overrides.userId ?? (await user()).id;
-      const row = await insertRow(client, "authenticator", {
+      const row = await insertRow(client, boundarySchemas.authenticator, {
         id: ulid(),
         backupCodes: "sealed-codes-nothing-reads",
         verified: true,
@@ -537,7 +546,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const auditEvent: TestData["auditEvent"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "auditEvent", {
+    return insertRow(client, boundarySchemas.auditEvent, {
       id: ulid(),
       action: "platform.probe.seeded",
       actor: "process:better-answers-test",
@@ -550,7 +559,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   };
 
   const identityAuditEvent: TestData["identityAuditEvent"] = (overrides = {}) =>
-    insertRow(client, "identityAuditEvent", {
+    insertRow(client, boundarySchemas.identityAuditEvent, {
       id: ulid(),
       action: "platform.probe.seeded",
       actor: "process:better-answers-test",
@@ -563,7 +572,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const accessRequest: TestData["accessRequest"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const requesterId = overrides.requesterId ?? (await user()).id;
-    return insertRow(client, "accessRequest", {
+    return insertRow(client, boundarySchemas.accessRequest, {
       id: ulid(),
       reason: "I have joined the bids team and need the answer library.",
 
@@ -580,7 +589,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const workspaceLastActive: TestData["workspaceLastActive"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const userId = overrides.userId ?? (await member({ workspaceId })).userId;
-    return insertRow(client, "workspaceLastActive", {
+    return insertRow(client, boundarySchemas.workspaceLastActive, {
       at: new Date(),
       ...overrides,
       workspaceId,
@@ -590,7 +599,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const testWorkspaceMark: TestData["testWorkspaceMark"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "testWorkspaceMark", {
+    return insertRow(client, boundarySchemas.testWorkspaceMark, {
       testingDomain: `${ulid().toLowerCase()}.testing.invalid`,
       ...overrides,
       workspaceId,
@@ -600,7 +609,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const conceptIdentity: TestData["conceptIdentity"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const minted = ulid();
-    return insertRow(client, "conceptIdentity", {
+    return insertRow(client, boundarySchemas.conceptIdentity, {
       iri: conceptIriOf(minted),
       mergeKey: `policy:${minted.toLowerCase()}`,
       ...overrides,
@@ -613,7 +622,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
 
     const commit = overrides.commitSha ?? (await bundleCommit({ workspaceId })).sha;
-    return insertRow(client, "conceptIndex", {
+    return insertRow(client, boundarySchemas.conceptIndex, {
       path: `knowledge/${ulid().toLowerCase()}.md`,
       kind: "Policy",
       title: "Expenses",
@@ -634,7 +643,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const bundleCommit: TestData["bundleCommit"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "bundleCommit", {
+    return insertRow(client, boundarySchemas.bundleCommit, {
       sha: hexOfLength(40),
       parentSha: null,
       auditEventId: ulid(),
@@ -649,7 +658,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
     const sourceDocumentId =
       overrides.sourceDocumentId ?? (await sourceDocument({ workspaceId })).id;
-    return insertRow(client, "evidence", {
+    return insertRow(client, boundarySchemas.evidence, {
       locator: "p.4#para-2",
       resource: "Expenses policy (2026 edition)",
       contentVersion: null,
@@ -662,7 +671,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const conceptVerification: TestData["conceptVerification"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
-    return insertRow(client, "conceptVerification", {
+    return insertRow(client, boundarySchemas.conceptVerification, {
       id: ulid(),
       actor: "process:better-answers-test",
       contentHash: hexOfLength(64),
@@ -675,7 +684,11 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const mapGeneration: TestData["mapGeneration"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "mapGeneration", { liveGen: 1, ...overrides, workspaceId });
+    return insertRow(client, boundarySchemas.mapGeneration, {
+      liveGen: 1,
+      ...overrides,
+      workspaceId,
+    });
   };
 
   const liveGenFor = async (workspaceId: string): Promise<number> => {
@@ -696,7 +709,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const mapNode: TestData["mapNode"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const gen = await genFor(overrides, workspaceId);
-    return insertRow(client, "mapNode", {
+    return insertRow(client, boundarySchemas.mapNode, {
       uid: conceptIriOf(ulid()),
       label: "Concept",
       kind: "Policy",
@@ -726,7 +739,7 @@ export const testData = (client: pg.PoolClient): TestData => {
             sentence: "One policy rests on another.",
           }
         : { fromKind: null, toKind: null, section: null, sentence: null };
-    return insertRow(client, "mapEdge", {
+    return insertRow(client, boundarySchemas.mapEdge, {
       uid: `links_to:${ulid()}`,
       publishedAt: new Date(),
       sensitivity: "Internal",
@@ -744,7 +757,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const mapUnresolvedReference: TestData["mapUnresolvedReference"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "mapUnresolvedReference", {
+    return insertRow(client, boundarySchemas.mapUnresolvedReference, {
       gen: await liveGenFor(workspaceId),
       fromUid: conceptIriOf(ulid()),
       relation: "link",
@@ -758,7 +771,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const job: TestData["job"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
 
-    return insertRow(client, "job", {
+    return insertRow(client, boundarySchemas.job, {
       id: ulid(),
       kind: NIGHTLY_AUDIT_KIND,
 
@@ -780,7 +793,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const suggestion: TestData["suggestion"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "suggestion", {
+    return insertRow(client, boundarySchemas.suggestion, {
       id: ulid(),
       setId: ulid(),
       kind: SUGGESTION_EDIT_KIND,
@@ -799,7 +812,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const conceptWriteRequest: TestData["conceptWriteRequest"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const suggestionId = overrides.suggestionId ?? (await suggestion({ workspaceId })).id;
-    return insertRow(client, "conceptWriteRequest", {
+    return insertRow(client, boundarySchemas.conceptWriteRequest, {
       mergeKey: `policy:${ulid().toLowerCase()}`,
       path: `knowledge/${ulid().toLowerCase()}.md`,
       conceptKind: "Policy",
@@ -815,7 +828,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const connectedSource: TestData["connectedSource"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "connectedSource", {
+    return insertRow(client, boundarySchemas.connectedSource, {
       id: ulid(),
       publishedAt: new Date(),
       sensitivity: "Internal",
@@ -838,7 +851,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const connectedSourceId =
       overrides.connectedSourceId ?? (await connectedSource({ workspaceId })).id;
-    return insertRow(client, "sourceDocument", {
+    return insertRow(client, boundarySchemas.sourceDocument, {
       id: ulid(),
 
       sourceSystemId: `handbook-${ulid().toLowerCase()}.md`,
@@ -873,7 +886,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       [workspaceId, documentId],
     );
     const charStart = furthest.rows[0]?.char_end ?? 0;
-    return insertRow(client, "finding", {
+    return insertRow(client, boundarySchemas.finding, {
       id: ulid(),
       category: "bank-details",
       tier: REDACTION_ALWAYS_TIER,
@@ -915,7 +928,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const receivedAt = overrides.receivedAt ?? new Date();
     const clockStartedAt = overrides.clockStartedAt ?? receivedAt;
 
-    return insertRow(client, "subjectRequest", {
+    return insertRow(client, boundarySchemas.subjectRequest, {
       id: ulid(),
       kind: "access",
 
@@ -941,7 +954,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
     const outFrom = (milliseconds: number) => new Date(anchoredAt.getTime() + milliseconds);
     const hour = 60 * 60 * 1000;
-    return insertRow(client, "erasureRequest", {
+    return insertRow(client, boundarySchemas.erasureRequest, {
       id: ulid(),
       pseudonym: ulid(),
       lockedAt: anchoredAt,
@@ -964,7 +977,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const erasureRequestId =
       overrides.erasureRequestId ?? (await erasureRequest({ workspaceId })).id;
-    return insertRow(client, "suppression", {
+    return insertRow(client, boundarySchemas.suppression, {
       identifiers: { emails: ["subject@example.invalid"], names: [], other: [] },
       ...overrides,
       workspaceId,
@@ -979,7 +992,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       overrides.sourceDocumentId !== undefined && overrides.locator !== undefined
         ? { sourceDocumentId: overrides.sourceDocumentId, locator: overrides.locator }
         : await evidence({ workspaceId, sourceDocumentId: overrides.sourceDocumentId ?? ulid() });
-    return insertRow(client, "conceptEvidence", {
+    return insertRow(client, boundarySchemas.conceptEvidence, {
       ...overrides,
       workspaceId,
       iri,
@@ -993,7 +1006,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   ) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
-    return insertRow(client, "conceptSensitivityOverride", {
+    return insertRow(client, boundarySchemas.conceptSensitivityOverride, {
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,
       audienceGroups: null,
@@ -1010,7 +1023,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const personId =
       overrides.personId ?? (await member({ workspaceId, userId: (await user()).id })).userId;
     const iri = overrides.iri ?? null;
-    return insertRow(client, "conceptOwner", {
+    return insertRow(client, boundarySchemas.conceptOwner, {
       id: ulid(),
       collection: iri === null ? "policy" : null,
       ...overrides,
@@ -1022,7 +1035,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const guideDefinition: TestData["guideDefinition"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "guideDefinition", {
+    return insertRow(client, boundarySchemas.guideDefinition, {
       id: ulid(),
       kind: "bid",
       collection: "bids",
@@ -1036,7 +1049,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const guideRole: TestData["guideRole"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const guideId = overrides.guideId ?? (await guideDefinition({ workspaceId })).id;
-    return insertRow(client, "guideRole", {
+    return insertRow(client, boundarySchemas.guideRole, {
       role: "Editor",
       defaultLayer: "assembled",
       actionThreshold: "human-reviewed",
@@ -1049,7 +1062,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const guideSection: TestData["guideSection"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const guideId = overrides.guideId ?? (await guideDefinition({ workspaceId })).id;
-    return insertRow(client, "guideSection", {
+    return insertRow(client, boundarySchemas.guideSection, {
       id: `s${ulid().toLowerCase()}`,
       parentId: null,
       ordinal: 0,
@@ -1081,7 +1094,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const guideExpectedFact: TestData["guideExpectedFact"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "guideExpectedFact", {
+    return insertRow(client, boundarySchemas.guideExpectedFact, {
       id: ulid(),
       ordinal: 0,
       name: "Insurance cover",
@@ -1098,7 +1111,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const guideDefinitionVersion: TestData["guideDefinitionVersion"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const guideId = overrides.guideId ?? (await guideDefinition({ workspaceId })).id;
-    return insertRow(client, "guideDefinitionVersion", {
+    return insertRow(client, boundarySchemas.guideDefinitionVersion, {
       version: 1,
       actor: `human:${ulid()}`,
       note: null,
@@ -1126,7 +1139,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const writeUp: TestData["writeUp"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const placed = await homeOf(workspaceId, overrides);
-    return insertRow(client, "writeUp", {
+    return insertRow(client, boundarySchemas.writeUp, {
       id: ulid(),
       publishedAt: new Date(),
       sensitivity: "Internal",
@@ -1143,7 +1156,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const writeUpId = overrides.writeUpId ?? (await writeUp({ workspaceId })).id;
     const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
-    return insertRow(client, "writeUpInclude", {
+    return insertRow(client, boundarySchemas.writeUpInclude, {
       id: `i${ulid().toLowerCase()}`,
       ordinal: 0,
       contentHash: hexOfLength(64),
@@ -1160,7 +1173,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const writeUpVersion: TestData["writeUpVersion"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const writeUpId = overrides.writeUpId ?? (await writeUp({ workspaceId })).id;
-    return insertRow(client, "writeUpVersion", {
+    return insertRow(client, boundarySchemas.writeUpVersion, {
       version: 1,
       actor: `human:${ulid()}`,
       note: null,
@@ -1196,7 +1209,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const usage: TestData["usage"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "usage", {
+    return insertRow(client, boundarySchemas.usage, {
       id: ulid(),
       actor: `human:${ulid()}`,
       act: "copied",
@@ -1208,7 +1221,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const questionAsked: TestData["questionAsked"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "questionAsked", {
+    return insertRow(client, boundarySchemas.questionAsked, {
       id: ulid(),
       askedAt: new Date(),
       askedBy: `human:${ulid()}`,
@@ -1234,7 +1247,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       overrides.recordId === undefined
         ? await questionAsked({ workspaceId })
         : { id: overrides.recordId, askedAt: overrides.askedAt };
-    return insertRow(client, "questionContent", {
+    return insertRow(client, boundarySchemas.questionContent, {
       question: "How long are audit logs kept?",
       drafted: null,
       ...overrides,
@@ -1247,7 +1260,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const questionFeedback: TestData["questionFeedback"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const recordId = overrides.recordId ?? (await questionAsked({ workspaceId })).id;
-    return insertRow(client, "questionFeedback", {
+    return insertRow(client, boundarySchemas.questionFeedback, {
       id: ulid(),
       givenAt: new Date(),
       givenBy: `human:${ulid()}`,
@@ -1274,7 +1287,7 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const llmCall: TestData["llmCall"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "llmCall", {
+    return insertRow(client, boundarySchemas.llmCall, {
       id: ulid(),
       calledAt: new Date(),
       purpose: "judging",
@@ -1294,7 +1307,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const spendReservation: TestData["spendReservation"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const takenAt = overrides.takenAt ?? new Date();
-    return insertRow(client, "spendReservation", {
+    return insertRow(client, boundarySchemas.spendReservation, {
       id: ulid(),
       expiresAt: new Date(takenAt.getTime() + 10 * 60_000),
       purpose: "judging",
@@ -1313,7 +1326,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   };
 
   const modelPrice: TestData["modelPrice"] = async (overrides = {}) =>
-    insertRow(client, "modelPrice", {
+    insertRow(client, boundarySchemas.modelPrice, {
       provider: "anthropic",
       model: "claude-sonnet-5-5",
       effectiveFrom: "2026-10-01",
@@ -1323,7 +1336,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
 
   const decisionThreshold: TestData["decisionThreshold"] = async (overrides = {}) =>
-    insertRow(client, "decisionThreshold", {
+    insertRow(client, boundarySchemas.decisionThreshold, {
       provider: "cloudflare",
       model: "clef-flash",
       threshold: 0.7,
