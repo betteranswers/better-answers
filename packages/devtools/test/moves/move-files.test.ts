@@ -10,9 +10,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, onTestFinished } from "vitest";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import {
@@ -877,7 +878,13 @@ describe("the test inventory a move holds", () => {
   it("refuses a link planted at the scratch folder", () => {
     const root = coreRepositoryOf();
     const victim = path.join(scratch, `victim-${String(counter)}`);
-    const planted = path.join(scratch, `planted-${String(counter)}`);
+    const planted = path.join(
+      realpathSync(tmpdir()),
+      `move-files-planted-${String(process.pid)}-${String(counter)}`,
+    );
+    onTestFinished(() => {
+      rmSync(planted, { force: true });
+    });
     writeUnder(victim, "kept.txt", "kept\n");
     symlinkSync(victim, planted);
     writeFileSync(
