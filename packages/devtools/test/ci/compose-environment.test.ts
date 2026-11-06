@@ -115,7 +115,10 @@ const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): 
     const readers = TIERS[tier] ?? {};
     const set = environments[name] ?? [];
     const read = new Set(
-      Object.values(readers).flatMap((keys) => [...keys.required, ...keys.optional]),
+      starts.flatMap((reader) => [
+        ...(readers[reader]?.required ?? []),
+        ...(readers[reader]?.optional ?? []),
+      ]),
     );
     const excusedHere = Object.entries(excused)
       .filter(([, excuse]) => excuse.services.includes(name))
@@ -138,7 +141,7 @@ const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): 
         finding(
           name,
           key,
-          `${name} sets ${key}, which no reader of the ${tier} tier's config module reads. Delete it from ${COMPOSE}, or name it in EXCUSED with the library that reads it`,
+          `${name} sets ${key}, which no reader that ${name} starts reads. Delete it from ${name}'s environment in ${COMPOSE}. If an anchor supplies it, stop merging the anchor into ${name} and list ${name}'s keys. If a library reads it, name it in EXCUSED with that library`,
         ),
       );
     const stale = excusedHere
@@ -147,7 +150,7 @@ const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): 
         finding(
           name,
           key,
-          `EXCUSED names ${key} for ${name}, which ${read.has(key) ? "the config module reads now" : "does not set it"}. Delete the entry`,
+          `EXCUSED names ${key} for ${name}, but ${read.has(key) ? `a reader that ${name} starts reads it now` : `${name} does not set it`}. Delete the entry`,
         ),
       );
     return [...lacking, ...unread, ...stale];
@@ -239,6 +242,33 @@ describe("the check fails on a planted file", () => {
     expect(flagged(findingsIn(removed, EXCUSED))).toEqual([
       "api S3_SECRET_KEY",
       "worker S3_SECRET_KEY",
+    ]);
+  });
+
+  it("refuses a secret planted on migrate, and names the fix", () => {
+    const planted = edited(
+      "      # The owner DSN",
+      "      S3_SECRET_KEY: ${OBJECTSTORE_ROOT_SECRET:?}\n      # The owner DSN",
+    );
+    const findings = findingsIn(planted, EXCUSED);
+
+    expect(flagged(findings)).toEqual(["migrate S3_SECRET_KEY"]);
+    expect(findings[0]?.message).toContain("stop merging the anchor into migrate");
+  });
+
+  it("refuses the anchor merged back into migrate", () => {
+    const planted = edited(
+      "    environment:\n      # The owner DSN",
+      "    environment:\n      <<: *bootstrap\n      # The owner DSN",
+    );
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual([
+      "migrate EMBEDDINGS_URL",
+      "migrate S3_ACCESS_KEY",
+      "migrate S3_BUCKET",
+      "migrate S3_ENDPOINT",
+      "migrate S3_REGION",
+      "migrate S3_SECRET_KEY",
     ]);
   });
 
