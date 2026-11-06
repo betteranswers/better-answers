@@ -1,7 +1,7 @@
 import { useCallback, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 
 import { useKeystroke } from "@/shared/keystrokes.tsx";
-import { ownsNoLonger, useArrivalDecidedAgainOnceUnowned } from "@/shared/member/ownership.ts";
+import { ownsNoLonger, useOwnershipLost } from "@/shared/member/ownership.ts";
 import { selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -62,8 +62,7 @@ type AcceptedList = {
 export const useAccepting = (list: AcceptedList) => {
   const accept = useAccept();
   const [confirming, setConfirming] = useState(false);
-  const [unowned, setUnowned] = useState(false);
-  useArrivalDecidedAgainOnceUnowned(unowned);
+  const ownershipLost = useOwnershipLost();
 
   const chosen = list.items.filter((item) => list.ticked.has(item.suggestionId));
 
@@ -77,12 +76,12 @@ export const useAccepting = (list: AcceptedList) => {
       {
         onSuccess: ({ outcomes }) => {
           list.say(outcomeOfEach(saidOfEach(outcomes, chosen)));
-          setUnowned(ownsNoLongerAny(outcomes));
+          if (ownsNoLongerAny(outcomes)) ownershipLost();
         },
         onError: (failure) => {
           list.tick((now) => new Set([...now, ...chosen.map((item) => item.suggestionId)]));
           list.say(outcomeOfFailure(failure, "action"));
-          setUnowned(ownsNoLonger(failure));
+          if (ownsNoLonger(failure)) ownershipLost();
         },
       },
     );

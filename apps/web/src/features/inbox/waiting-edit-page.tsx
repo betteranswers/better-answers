@@ -6,7 +6,7 @@ import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { RowLink } from "@/shared/list/grid-table.tsx";
 import { ListState } from "@/shared/list/list-pages.tsx";
 import { useRole } from "@/shared/member/member.ts";
-import { ownsNoLonger, useArrivalDecidedAgainOnceUnowned } from "@/shared/member/ownership.ts";
+import { ownsNoLonger, useOwnershipLost } from "@/shared/member/ownership.ts";
 import { headingOf } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
@@ -61,8 +61,7 @@ const useDeciding = (edit: WaitingEdit, title: string) => {
   const toTheList = useToTheList(item.suggestionId);
   const [outcome, say] = useState<Outcome>();
   const [asking, setAsking] = useState<Asking>("nothing");
-  const [unowned, setUnowned] = useState(false);
-  useArrivalDecidedAgainOnceUnowned(unowned);
+  const ownershipLost = useOwnershipLost();
   const acting = accept.isPending || decline.isPending;
 
   const leaveSaying = (said: Said) => {
@@ -71,7 +70,7 @@ const useDeciding = (edit: WaitingEdit, title: string) => {
 
   const refused = (failure: Error | ApiError) => {
     say(outcomeOfFailure(failure, "action"));
-    setUnowned(ownsNoLonger(failure));
+    if (ownsNoLonger(failure)) ownershipLost();
   };
 
   const acceptNow = () => {
@@ -89,7 +88,7 @@ const useDeciding = (edit: WaitingEdit, title: string) => {
             return;
           }
           say({ tone: "refused", words: said.words });
-          setUnowned(word === "owner-forbids");
+          if (word === "owner-forbids") ownershipLost();
         },
         onError: refused,
       },
