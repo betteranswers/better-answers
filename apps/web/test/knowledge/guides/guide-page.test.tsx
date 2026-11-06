@@ -227,9 +227,17 @@ describe("the Detail of a section", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(detail);
     });
-    expect(screen.getByRole("button", { name: "Show Detail" }).getAttribute("aria-expanded")).toBe(
-      "true",
-    );
+    const hide = screen.getByRole("button", { name: "Hide Detail" });
+    expect(hide.getAttribute("aria-expanded")).toBe("true");
+    expect(hide.getAttribute("aria-controls")).toBe(detail.id);
+  });
+
+  it("points at no region while the Detail is closed", async () => {
+    await openGuide("Viewer");
+
+    const show = screen.getByRole("button", { name: "Show Detail" });
+
+    expect(show.hasAttribute("aria-controls")).toBe(false);
   });
 
   it("closes when shown again", async () => {
@@ -241,6 +249,7 @@ describe("the Detail of a section", () => {
     fireEvent.click(button);
 
     expect(screen.queryByRole("region", { name: "Detail of section 1" })).toBeNull();
+    expect(button.textContent).toBe("Show Detail");
   });
 
   it("returns focus to Show Detail when d closes it", async () => {
@@ -265,6 +274,7 @@ describe("the Detail of a section", () => {
     const detail = screen.getByRole("region", { name: "Detail of section 1" });
     expect(within(detail).getByText("Each bay is racked by row.")).toBeDefined();
     expect(document.activeElement).not.toBe(detail);
+    expect(screen.getByRole("button", { name: "Hide Detail" })).toBeDefined();
   });
 
   it("opens on d for the section in focus", async () => {

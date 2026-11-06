@@ -336,11 +336,11 @@ export function GuideSectionView(properties: SectionProps) {
                 variant="outline"
                 {...actionNamed(SECTION_ACTIONS.showDetail)}
                 aria-expanded={detail.open}
-                aria-controls={detailId}
+                aria-controls={detail.open ? detailId : undefined}
                 aria-keyshortcuts={KEY.showDetail.key}
                 onClick={detail.toggle}
               >
-                {WORDS.showDetail}
+                {detail.open ? WORDS.hideDetail : WORDS.showDetail}
               </Button>
             </div>
             {editing.editor}

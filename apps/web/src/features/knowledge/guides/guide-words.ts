@@ -37,6 +37,7 @@ export const GUIDE_WORDS = {
   noBrief: "This section has no text yet.",
   footnotes: "Footnotes",
   showDetail: "Show Detail",
+  hideDetail: "Hide Detail",
   detailOf: (number: string): string => `Detail of section ${number}`,
   noDetail: "No concepts are included in this section yet.",
   missing: (name: string, owner: string | undefined): string =>
