@@ -33,6 +33,7 @@ import {
 } from "../kernel/index.ts";
 import { bundleSnapshot, head as headOf, type GitDoor } from "../store/git/index.ts";
 import {
+  tryWorkspaceFence,
   withMember,
   withMemberUnheld,
   type PostgresDoor,
@@ -160,7 +161,7 @@ const snapshotRead =
     const readable = rows[0];
     if (readable?.at_head !== true) return err("unrecorded-head");
     const files = await bundleSnapshot(member, git, commit, new Set(readable.paths));
-    if (!files.ok) return err(files.error === "commit-gone" ? "unrecorded-head" : files.error);
+    if (!files.ok) return files;
     if (files.value.every(({ path }) => path === BUNDLE_MANIFEST_PATH)) return err(NOT_FOUND);
     return ok({ head: commit, files: files.value });
   };
@@ -182,23 +183,31 @@ export const exportBundleSnapshot = async (
 > => {
   const admitted = admit(exportBundleAction, principal, {});
   if (!admitted.ok) return err(admitted.error);
-  return readUnheldThenRecorded(admitted.value, doors.postgres, input.at, {
-    read: snapshotRead(doors.git),
-    made: ({ head, files }) => {
-      const zip = zipOf(files, input.at);
-      if (!zip.ok) return zip;
-      const name = `knowledge-base-${dayOf(input.at)}.zip`;
-      return ok({ name, zip: zip.value, files: files.length, head });
-    },
-    recorded: async (member, tx, { head, files }) => {
-      await record(member, tx, {
-        id: ulid(),
-        action: EXPORT_ACTIONS.bundle,
-        subjectId: member.workspaceId,
-        detail: { commitSha: head, files: files.length },
-      });
-    },
-  });
+  const admin = admitted.value;
+  // An erasure prunes the commits it replaced while it holds this fence exclusively.
+  const fenced = await attempt(() =>
+    tryWorkspaceFence(admin, doors.postgres, admin.workspaceId, "shared", () =>
+      readUnheldThenRecorded(admin, doors.postgres, input.at, {
+        read: snapshotRead(doors.git),
+        made: ({ head, files }) => {
+          const zip = zipOf(files, input.at);
+          if (!zip.ok) return zip;
+          const name = `knowledge-base-${dayOf(input.at)}.zip`;
+          return ok({ name, zip: zip.value, files: files.length, head });
+        },
+        recorded: async (member, tx, { head, files }) => {
+          await record(member, tx, {
+            id: ulid(),
+            action: EXPORT_ACTIONS.bundle,
+            subjectId: member.workspaceId,
+            detail: { commitSha: head, files: files.length },
+          });
+        },
+      }),
+    ),
+  );
+  if (!fenced.ok) return err(fenced.error);
+  return fenced.value.ok ? fenced.value.value : err("unrecorded-head");
 };
 
 const RECORDS_CAP = 50_000;
