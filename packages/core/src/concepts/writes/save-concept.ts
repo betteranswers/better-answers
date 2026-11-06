@@ -36,7 +36,7 @@ import {
   type FrontmatterSource,
   type FrontmatterValue,
 } from "../file.ts";
-import { heldByIri, mergeKeyOf, type Held } from "../import/landing.ts";
+import { heldByIri, holderOfPath, mergeKeyOf, type Held } from "../import/landing.ts";
 import type { PassageReader } from "../reading/read.ts";
 import {
   openedSourcesOf,
@@ -170,6 +170,19 @@ const newConceptPathOf = (collection: string, title: string): string | undefined
     isPortablePath(path)
     ? path
     : undefined;
+};
+
+const freePathOf = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  collection: string,
+  title: string,
+): Promise<string | undefined> => {
+  for (let tried = 1; ; tried += 1) {
+    const path = newConceptPathOf(collection, tried === 1 ? title : `${title} ${tried}`);
+    // oxlint-disable-next-line eslint/no-await-in-loop -- tries each numbered path until one is free
+    if (path === undefined || (await holderOfPath(principal, tx, path)) === undefined) return path;
+  }
 };
 
 const SOURCE_ENTRY = z.union([
@@ -349,22 +362,34 @@ const savingNew = async (
   input: Parsed,
   collection: string,
 ): Promise<Result<Saving, SaveConceptRefusal | Error>> => {
-  const path = newConceptPathOf(collection, input.parts.title);
   const file = editedFileOf({ frontmatter: {}, body: "" }, input.parts, input.sources);
   const fresh = input.base === null && input.withheld.length === 0;
-  if (path === undefined || file === undefined || !fresh) return err("malformed");
+  if (
+    newConceptPathOf(collection, input.parts.title) === undefined ||
+    file === undefined ||
+    !fresh
+  ) {
+    return err("malformed");
+  }
   const read = await attempt(() =>
-    withMember(principal, doors.postgres, async (member, tx) => ({
-      standing: await routeOf(member, tx, { iri: null, path }),
-      author: await authorOf(member, tx, member.userId),
-    })),
+    withMember(principal, doors.postgres, async (member, tx) => {
+      const path = await freePathOf(member, tx, collection, input.parts.title);
+      return path === undefined
+        ? undefined
+        : {
+            path,
+            standing: await routeOf(member, tx, { iri: null, path }),
+            author: await authorOf(member, tx, member.userId),
+          };
+    }),
   );
   if (!read.ok) return err(read.error);
   if (!read.value.ok) return err(read.value.error);
+  if (read.value.value === undefined) return err("path-taken");
+  const { path } = read.value.value;
   const mergeKey = mergeKeyOf(foldKind(input.parts.kind), input.parts.title);
   return ok({
     iri: undefined,
-    path,
     mergeKey,
     heldKey: mergeKey,
     storedBody: "",
