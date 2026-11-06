@@ -63,6 +63,12 @@ const isEmptyFolderGone = (cause: unknown): boolean =>
 const isMovedOnly = (root: string, from: string, to: string): boolean =>
   existsSync(path.join(root, to)) && !existsSync(path.join(root, from));
 
+/** Where an edited file is now: still at its new path if its move back has not happened. */
+const whereNow = (root: string, written: Journal, file: string): string => {
+  const to = written.moves.find(([from]) => from === file)?.[1];
+  return to !== undefined && isMovedOnly(root, file, to) ? to : file;
+};
+
 /** Each step reads the tree first, so an undo that stopped part way can run again. */
 const undo = (root: string, written: Journal): readonly string[] => {
   const failures: string[] = [];
@@ -73,7 +79,6 @@ const undo = (root: string, written: Journal): readonly string[] => {
       if (!(mayBeGone && isEmptyFolderGone(cause))) failures.push(messageOf(cause));
     }
   };
-  const movedTo = new Map(written.moves);
   for (const [from, to] of [...written.moves].reverse()) {
     attempt(() => {
       if (isMovedOnly(root, from, to)) gitMove(root, to, from);
@@ -81,8 +86,7 @@ const undo = (root: string, written: Journal): readonly string[] => {
   }
   for (const { file, original } of written.edits) {
     // A file whose move back failed gets its text back where it is, so a rerun can move it back.
-    const to = movedTo.get(file);
-    const at = to !== undefined && isMovedOnly(root, file, to) ? to : file;
+    const at = whereNow(root, written, file);
     attempt(() => {
       writeFileSync(path.join(root, at), Buffer.from(original, "base64"));
     });
@@ -97,10 +101,8 @@ const undo = (root: string, written: Journal): readonly string[] => {
 
 /** A file edited by hand after the stopped run is neither its original nor the run's text. */
 const editedSince = (root: string, written: Journal): readonly string[] => {
-  const movedTo = new Map(written.moves);
   return written.edits.flatMap(({ file, original, text }) => {
-    const to = movedTo.get(file);
-    const at = path.join(root, to !== undefined && isMovedOnly(root, file, to) ? to : file);
+    const at = path.join(root, whereNow(root, written, file));
     const now = existsSync(at) ? readFileSync(at) : undefined;
     const kept =
       now !== undefined &&

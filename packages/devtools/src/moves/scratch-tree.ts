@@ -81,6 +81,7 @@ export const copyTree = (root: string, into: string): void => {
       const target = path.join(into, folder, installed);
       // A folder that git does not ignore came over with the files.
       if (!existsSync(source) || existsSync(target)) continue;
+      // test-inventory.sh puts the copy's own src first on PYTHONPATH, ahead of this shared .venv.
       if (installed === ".venv") symlinkSync(source, target);
       else copyModules(source, target);
     }
@@ -134,8 +135,10 @@ const claimOf = (file: string): Claim => {
 const isSameClaim = (one: Claim, other: Claim): boolean =>
   one.pid === other.pid && one.folder === other.folder;
 
-const heldBy = (pid: number): Error =>
-  new Error(`another move-files run (pid ${String(pid)}) is moving files in this tree`);
+const heldBy = (pid: number, pointer: string): Error =>
+  new Error(
+    `another move-files run (pid ${String(pid)}) is moving files in this tree; if none is, delete ${pointer}`,
+  );
 
 /** Takes a dead run's claim aside by rename, so of two runs that find it only one clears it. */
 const clearStale = (pointer: string): void => {
@@ -145,14 +148,14 @@ const clearStale = (pointer: string): void => {
   } catch (cause) {
     throw new Error(`cannot read ${pointer}; delete it if no move-files run is active`, { cause });
   }
-  if (isRunning(held.pid)) throw heldBy(held.pid);
+  if (isRunning(held.pid)) throw heldBy(held.pid, pointer);
   const aside = `${pointer}.${String(process.pid)}`;
   renameSync(pointer, aside);
   const taken = claimOf(aside);
   if (!isSameClaim(taken, held)) {
     linkSync(aside, pointer);
     rmSync(aside);
-    throw heldBy(taken.pid);
+    throw heldBy(taken.pid, pointer);
   }
   if (
     isScratchPath(held.folder) &&
