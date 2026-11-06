@@ -231,6 +231,18 @@ describe("a save that starts from the raw file", () => {
     }
   });
 
+  it("opens a concept citation whose locator holds an id-shaped run", async () => {
+    const scenario = await arrange();
+    const cited = await written(scenario);
+    const citation = { title: "Cited", resource: cited.iri, locator: `section-${ulid()}` };
+    const concept = await written(scenario, { sources: [citation] });
+
+    const seed = await toEdit(scenario, scenario.unowned, concept.iri);
+
+    expect(seed.sources).toEqual([citation]);
+    expect(seed.withheld).toEqual([]);
+  });
+
   it("refuses a save after the withheld sources' positions moved", async () => {
     const scenario = await arrange();
     const restricted = await minutesLanded(scenario);
