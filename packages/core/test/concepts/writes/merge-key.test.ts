@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { foldKind } from "../../../src/bundle/index.ts";
 import { mergeKeyMovedBy } from "../../../src/concepts/writes/merge-key.ts";
 
 describe("the new merge key after an edit", () => {
@@ -21,5 +22,11 @@ describe("the new merge key after an edit", () => {
     expect(mergeKeyMovedBy(held, { kind: "guidelines", title: "Mileage Allowance" })).toBe(
       "Guideline:mileage allowance",
     );
+  });
+
+  it("stays unchanged when given the held kind back", () => {
+    const analysis = { kind: foldKind("Analyses"), title: "Quarterly Margins" };
+
+    expect(mergeKeyMovedBy(analysis, analysis)).toBe(undefined);
   });
 });
