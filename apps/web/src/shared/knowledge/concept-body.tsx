@@ -314,7 +314,7 @@ const FOOTNOTE_LABEL = "footnote-label";
 
 const headingAt = (depth: number) => (properties: ComponentProps<"h1"> & ExtraProps) => {
   const held = useContext(Body);
-  const level = (held?.headingsFrom ?? 3) + Math.max(0, depth - 2);
+  const level = (held?.headingsFrom ?? 2) + Math.max(0, depth - 2);
   const Level = LEVELS[Math.min(level, 6) - 2] ?? "h6";
   const isTheFootnotesLabel = properties.id === FOOTNOTE_LABEL;
   return (
@@ -374,7 +374,7 @@ export function ConceptBody(properties: {
   readonly opening?: MarkOpening;
   readonly headingsFrom?: number;
 }) {
-  const { body, evidence, bodyLinks, opening, headingsFrom = 3 } = properties;
+  const { body, evidence, bodyLinks, opening, headingsFrom = 2 } = properties;
   const baseId = fragmentSafe(useId());
 
   const read = useMemo(() => {

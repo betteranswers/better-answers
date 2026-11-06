@@ -163,7 +163,7 @@ test.describe("Your questions", () => {
       const opened = Date.now();
       await page.keyboard.press("Enter");
       await expect(
-        page.getByRole("heading", { level: 2, name: ANSWERED, exact: true }),
+        page.getByRole("heading", { level: 1, name: ANSWERED, exact: true }),
       ).toBeVisible();
       const drawn = Date.now() - opened;
 

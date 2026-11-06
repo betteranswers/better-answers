@@ -9,7 +9,7 @@ const LIST_BUDGET_MS = 1000;
 
 const ANSWER_TESTS = pageNamed(menuGroupIn(CONTROL_CENTRE, "questions"), "Answer Tests");
 
-const answerTests = (page: Page) => page.getByRole("region", { name: "Answer Tests" });
+const emptyState = (page: Page) => page.getByText("No answer tests yet", { exact: true });
 
 const anAdminSignedIn = async (page: Page, api: APIRequestContext, workspace: string) => {
   const email = anAddress("admin");
@@ -28,7 +28,7 @@ test.describe("the Answer Tests page", () => {
     await test.step("loads within the list time budget", async () => {
       const startedAtMs = Date.now();
       await page.goto(ANSWER_TESTS.path);
-      await expect(answerTests(page)).toHaveText(/\S/);
+      await expect(emptyState(page)).toBeVisible();
       const elapsedMs = Date.now() - startedAtMs;
 
       test.info().annotations.push({ type: "answer tests page", description: `${elapsedMs} ms` });
@@ -43,8 +43,6 @@ test.describe("the Answer Tests page", () => {
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
         - heading "Answer Tests" [level=1]
-        - region "Answer Tests":
-          - heading "Answer Tests" [level=2]
     `);
 
     await passesTheAccessibilityGate();

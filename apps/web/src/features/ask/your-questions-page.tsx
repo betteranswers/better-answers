@@ -192,7 +192,6 @@ function RecordShown(properties: { readonly record: YourRecord }) {
   const shown = shownAnswerOf(record);
   return (
     <>
-      <h2 className="mt-6 max-w-measure wrap-anywhere">{question}</h2>
       <p className="mt-2 text-muted-foreground">{instantWords(record.askedAt)}</p>
       {shown === undefined ? (
         <p className="mt-6">
@@ -235,7 +234,10 @@ function RecordRead(properties: { readonly recordId: string; readonly notFound: 
   if (read.error !== null && namesNoRecord(read.error)) return properties.notFound;
   return (
     <>
-      <PageHead title={YOUR_QUESTIONS.name} headingRef={headingRef} />
+      <PageHead
+        title={read.data === undefined ? YOUR_QUESTIONS.name : questionWords(read.data)}
+        headingRef={headingRef}
+      />
       {read.data === undefined ? (
         <RecordWaiting read={read} headingRef={headingRef} />
       ) : (

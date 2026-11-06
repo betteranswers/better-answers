@@ -207,11 +207,13 @@ function DeclineForm(properties: {
   );
 }
 
+const titleOf = (edit: WaitingEdit): string =>
+  edit.current.state === "shown" ? edit.current.version.title : edit.item.title;
+
 function EditShown(properties: { readonly edit: WaitingEdit }) {
   const { edit } = properties;
   const { item } = edit;
-  const title = edit.current.state === "shown" ? edit.current.version.title : item.title;
-  const titleId = useId();
+  const title = titleOf(edit);
   const acceptButton = useRef<HTMLButtonElement>(null);
   const declineButton = useRef<HTMLButtonElement>(null);
   const deciding = useDeciding(edit, title);
@@ -224,37 +226,32 @@ function EditShown(properties: { readonly edit: WaitingEdit }) {
   useKeystroke(KEY.back, deciding.toTheList);
 
   return (
-    <article aria-labelledby={titleId} className="mt-6">
+    <article aria-label={title} className="mt-6">
       <p>
         <RowLink href={WAITING_ON_YOU.path} onOpen={deciding.toTheList}>
           {WORDS.back}
         </RowLink>
       </p>
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-        <h2 id={titleId} className="min-w-0 wrap-anywhere">
-          {title}
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            ref={acceptButton}
-            aria-keyshortcuts={KEY.accept.key}
-            aria-disabled={deciding.acting}
-            className="aria-disabled:opacity-50"
-            onClick={deciding.accept}
-          >
-            {WORDS.accept}
-          </Button>
-          <Button
-            ref={declineButton}
-            variant="outline"
-            aria-keyshortcuts={KEY.decline.key}
-            aria-disabled={deciding.acting}
-            className="aria-disabled:opacity-50"
-            onClick={deciding.decline}
-          >
-            {WORDS.decline}
-          </Button>
-        </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          ref={acceptButton}
+          aria-keyshortcuts={KEY.accept.key}
+          aria-disabled={deciding.acting}
+          className="aria-disabled:opacity-50"
+          onClick={deciding.accept}
+        >
+          {WORDS.accept}
+        </Button>
+        <Button
+          ref={declineButton}
+          variant="outline"
+          aria-keyshortcuts={KEY.decline.key}
+          aria-disabled={deciding.acting}
+          className="aria-disabled:opacity-50"
+          onClick={deciding.decline}
+        >
+          {WORDS.decline}
+        </Button>
       </div>
       <OutcomeLine outcome={deciding.outcome} className="mt-2" />
       {deciding.asking === "reuse" ? (
@@ -284,7 +281,10 @@ function EditRead(properties: { readonly suggestionId: string; readonly notFound
   if (read.error !== null && namesNothing(read.error)) return properties.notFound;
   return (
     <>
-      <PageHead title={WAITING_ON_YOU.name} headingRef={heading} />
+      <PageHead
+        title={read.data === undefined ? WAITING_ON_YOU.name : titleOf(read.data)}
+        headingRef={heading}
+      />
       {read.data !== undefined ? (
         <EditShown edit={read.data} />
       ) : read.error === null ? (

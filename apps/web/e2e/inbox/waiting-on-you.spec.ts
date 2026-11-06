@@ -253,7 +253,7 @@ test.describe("Waiting on You", () => {
       const started = Date.now();
       await page.keyboard.press("Enter");
       await expect(
-        page.getByRole("heading", { level: 2, name: opened, exact: true }),
+        page.getByRole("heading", { level: 1, name: opened, exact: true }),
       ).toBeVisible();
       const elapsed = Date.now() - started;
       test.info().annotations.push({ type: "suggestion", description: `${String(elapsed)} ms` });
