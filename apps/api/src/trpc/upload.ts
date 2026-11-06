@@ -48,6 +48,18 @@ export const descriptorOf = (headers: Headers): Result<ConnectUploadFields, Malf
   return err({ word: MALFORMED, fields: { ...refused, ...unreadable } });
 };
 
+export const bytesOf = (received: ReadableStream<unknown>): ReadableStream<Uint8Array> =>
+  received.pipeThrough(
+    new TransformStream<unknown, Uint8Array>({
+      transform: (chunk, controller) => {
+        if (!(chunk instanceof Uint8Array)) {
+          throw new TypeError("the request body carried a chunk that is not bytes");
+        }
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+
 export type UploadDoors = { readonly postgres: PostgresDoor; readonly objects: ObjectDoor };
 
 export const uploadDoorsOf = (doors: Doors): Result<UploadDoors> => {
