@@ -1,5 +1,5 @@
 import { Readable } from "node:stream";
-import type { ReadableStream as NodeReadableStream } from "node:stream/web";
+import { ReadableStream as NodeReadableStream } from "node:stream/web";
 
 import {
   DeleteObjectCommand,
@@ -95,11 +95,12 @@ const putInside = async (
 ): Promise<Result<void, KeyRefusal>> => {
   if (!isPortablePath(key)) return err("malformed-key");
 
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- the DOM and `node:stream/web` declare one runtime stream, and `Readable.fromWeb` takes only the second
-  const stream = body as NodeReadableStream<Uint8Array>;
+  if (!(body instanceof NodeReadableStream)) {
+    throw new TypeError("objects: the body is not a Node web stream");
+  }
   await new Upload({
     client: door.client,
-    params: { Bucket: door.bucket, Key: `${prefix}${key}`, Body: Readable.fromWeb(stream) },
+    params: { Bucket: door.bucket, Key: `${prefix}${key}`, Body: Readable.fromWeb(body) },
   }).done();
   return ok(undefined);
 };
