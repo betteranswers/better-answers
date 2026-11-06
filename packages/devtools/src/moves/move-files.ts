@@ -1,10 +1,15 @@
-import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { z } from "zod";
 
 import { trackedFiles } from "../paths.ts";
+import { applyChange, hasInterrupted, undoInterrupted } from "./journal.ts";
+import type { Edit } from "./journal.ts";
+import { closeScratch, copyTree, openScratch } from "./scratch-tree.ts";
+import { inventoryAcross } from "./test-inventory.ts";
+import type { Inventory } from "./test-inventory.ts";
 
 const NEVER_REWRITTEN: readonly RegExp[] = [
   /^contracts\//u,
@@ -56,12 +61,14 @@ type Plan = {
 };
 
 type MoveReport = {
-  readonly dryRun: boolean;
   readonly moved: number;
   readonly rewritten: readonly string[];
   readonly unresolved: readonly string[];
   readonly leftovers: readonly string[];
-};
+} & (
+  | { readonly dryRun: true }
+  | { readonly dryRun: false; readonly recovered: boolean; readonly inventory: Inventory }
+);
 
 const rowOf = (line: string): readonly [string, string] => {
   const [from, to] = line.split("\t").map((cell) => cell.trim());
@@ -268,14 +275,7 @@ const leftoversOf = (root: string, moves: ReadonlyMap<string, string>): readonly
   ];
 };
 
-const gitMove = (root: string, from: string, to: string): void => {
-  mkdirSync(path.dirname(path.join(root, to)), { recursive: true });
-  execFileSync("git", ["-C", root, "mv", from, to], { stdio: "pipe" });
-};
-
 const isRewritable = (file: string): boolean => TEXT.test(file) && !isNeverRewritten(file);
-
-type Edit = { readonly file: string; readonly text: string };
 
 const editsOf = (
   plan: Plan,
@@ -283,38 +283,96 @@ const editsOf = (
 ): { readonly edits: readonly Edit[]; readonly unresolved: readonly string[] } => {
   const edits: Edit[] = [];
   const unresolved: string[] = [];
-  for (const file of tracked.filter(isRewritable)) {
-    const before = readFileSync(path.join(plan.root, file), "utf8");
+  const isLink = (file: string): boolean => lstatSync(path.join(plan.root, file)).isSymbolicLink();
+  for (const file of tracked.filter((one) => isRewritable(one) && !isLink(one))) {
+    const original = readFileSync(path.join(plan.root, file));
+    const before = original.toString("utf8");
     const after = rewrittenFile(plan, file, before);
     unresolved.push(...after.unresolved);
-    if (after.text !== before) edits.push({ file, text: after.text });
+    if (after.text !== before) edits.push({ file, original, text: after.text });
   }
   return { edits, unresolved };
 };
 
-export const moveFiles = (root: string, tablePath: string, dryRun: boolean): MoveReport => {
+const plannedFor = (root: string, tablePath: string) => {
   const tracked = trackedFiles(root);
   const moves = readMoves(root, new Set(tracked), tablePath);
   const { edits, unresolved } = editsOf(planOf(root, moves, tracked), tracked);
-  if (!dryRun) {
-    for (const { file, text } of edits) writeFileSync(path.join(root, file), text);
-    for (const [from, to] of moves) gitMove(root, from, to);
-  }
   return {
-    dryRun,
-    moved: moves.size,
-    rewritten: edits.map(({ file }) => file),
-    unresolved,
-    leftovers: leftoversOf(root, moves),
+    change: { edits, moves },
+    found: { moved: moves.size, rewritten: edits.map(({ file }) => file), unresolved },
   };
+};
+
+/** Moves the files in a copy first, so a run stopped while it lists leaves `root` untouched. */
+export const moveFiles = async (
+  root: string,
+  tablePath: string,
+  dryRun: boolean,
+  signal: AbortSignal,
+): Promise<MoveReport> => {
+  if (dryRun) {
+    if (hasInterrupted(root)) {
+      throw new Error(
+        "a stopped run left a move part done; run move-files without --dry-run to undo it",
+      );
+    }
+    const { change, found } = plannedFor(root, tablePath);
+    return { ...found, leftovers: leftoversOf(root, change.moves), dryRun: true };
+  }
+  const work = openScratch(root);
+  try {
+    const recovered = undoInterrupted(root);
+    const { change, found } = plannedFor(root, tablePath);
+    const copy = path.join(work, "tree");
+    copyTree(root, copy);
+    applyChange(copy, change);
+    const leftovers = leftoversOf(copy, change.moves);
+    const inventory = await inventoryAcross(root, copy, work, signal);
+    if (inventory.kind === "unchanged") applyChange(root, change);
+    return { ...found, leftovers, recovered, dryRun: false, inventory };
+  } finally {
+    closeScratch(root, work);
+  }
 };
 
 const listed = (heading: string, lines: readonly string[]): string =>
   lines.length === 0 ? "" : `\n${heading}\n${lines.map((line) => `  ${line}`).join("\n")}\n`;
 
+export const inventoryFailed = (report: MoveReport): boolean =>
+  !report.dryRun && report.inventory.kind !== "unchanged";
+
+const inventoryOf = (inventory: Inventory): string => {
+  switch (inventory.kind) {
+    case "unchanged":
+      return `test inventory unchanged; titles listed: ${String(inventory.cases)}\n`;
+    case "changed":
+      return listed(
+        "the move changed a test file's name or a test's title, which a move must not:",
+        inventory.changes,
+      );
+    case "unlisted":
+      return listed(
+        "the tests could not be listed after the move, so a changed test name or title is not ruled out (a moved file that now fails to import is the usual cause):",
+        inventory.reason.split("\n"),
+      );
+  }
+};
+
+const headingOf = (report: MoveReport): string => {
+  const moved = String(report.moved);
+  const rewritten = String(report.rewritten.length);
+  if (report.dryRun) return `would move ${moved} files; rewrote ${rewritten} files\n`;
+  return report.inventory.kind === "unchanged"
+    ? `moved ${moved} files; rewrote ${rewritten} files\n`
+    : `did not move ${moved} files or rewrite ${rewritten} files; the tree is as it was before\n`;
+};
+
 export const reportOf = (report: MoveReport): string =>
   [
-    `${report.dryRun ? "would move" : "moved"} ${String(report.moved)} files; rewrote ${String(report.rewritten.length)} files\n`,
+    !report.dryRun && report.recovered ? "undid the move a stopped run left part done\n" : "",
+    headingOf(report),
+    report.dryRun ? "" : inventoryOf(report.inventory),
     listed(
       "relative specifiers in moved files that resolve to nothing (each is fixture text or a broken import):",
       report.unresolved,

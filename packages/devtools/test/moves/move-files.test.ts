@@ -1,8 +1,19 @@
-import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, onTestFinished } from "vitest";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import {
@@ -12,6 +23,8 @@ import {
   writeUnder,
 } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
+
+import { untilTrue } from "./polling.ts";
 
 const SCRIPT = path.join(repositoryRoot, "scripts/move-files.mjs");
 
@@ -71,6 +84,11 @@ const moved = (root: string, rows: readonly Row[], ...flags: readonly string[]) 
 const read = (root: string, file: string): string => readFileSync(path.join(root, file), "utf8");
 
 const status = (root: string): string => gitIn(root, "status", "--porcelain");
+
+const REAL_GIT = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+
+const pointerIn = (root: string): string =>
+  path.join(gitIn(root, "rev-parse", "--absolute-git-dir").trim(), "move-files-scratch");
 
 describe("the specifiers a move rewrites", () => {
   it.each([
@@ -365,7 +383,24 @@ describe("the move itself", () => {
 
     const ran = moved(root, [[THING, GROUPED]]);
 
-    expect(ran.stdout).toBe("moved 1 files; rewrote 2 files\n");
+    expect(ran.stdout).toBe(
+      "moved 1 files; rewrote 2 files\ntest inventory unchanged; titles listed: 0\n",
+    );
+  });
+
+  it("puts the tree back when a move fails halfway", () => {
+    const root = repositoryOf({ [USER]: 'import { thing } from "./thing.ts";\n' });
+
+    const ran = moved(root, [
+      [THING, "packages/probe/src/group/inner.ts"],
+      [USER, "packages/probe/src/group/inner.ts/user.ts"],
+    ]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain("move-files:");
+    expect(status(root)).toBe("");
+    expect(read(root, USER)).toBe('import { thing } from "./thing.ts";\n');
+    expect(existsSync(path.join(root, "packages/probe/src/group"))).toBe(false);
   });
 
   it("changes nothing under --dry-run, and says what it would do", () => {
@@ -426,7 +461,9 @@ describe("the findings a move reports", () => {
   it("reports no finding when no old path remains", () => {
     const root = repositoryOf({});
 
-    expect(moved(root, [[THING, GROUPED]]).stdout).toBe("moved 1 files; rewrote 0 files\n");
+    expect(moved(root, [[THING, GROUPED]]).stdout).toBe(
+      "moved 1 files; rewrote 0 files\ntest inventory unchanged; titles listed: 0\n",
+    );
   });
 });
 
@@ -544,6 +581,377 @@ describe("the moves it refuses", () => {
 
     expect(ran.status).toBe(1);
     expect(ran.stderr).toContain("move-files: ENOENT");
+  });
+});
+
+describe("the test inventory a move holds", () => {
+  const CORE_SOURCE = "packages/core/src/thing.ts";
+  const CORE_TEST = "packages/core/test/thing.test.ts";
+  const TITLE = "reads packages/core/src/thing.ts";
+  const VITEST = path.dirname(createRequire(import.meta.url).resolve("vitest/package.json"));
+
+  const coreRepositoryOf = (extra: Tree = {}): string => {
+    const root = repositoryOf({
+      [CORE_SOURCE]: "export const thing = 1;\n",
+      [CORE_TEST]: `import { it } from "vitest";\n\nit("${TITLE}", () => {});\n`,
+      "packages/core/vitest.config.ts": "export default {};\n",
+      ".gitignore": "node_modules/\n",
+      ...extra,
+    });
+    const modules = path.join(root, "packages/core/node_modules");
+    mkdirSync(modules, { recursive: true });
+    symlinkSync(VITEST, path.join(modules, "vitest"));
+    return root;
+  };
+
+  it("passes a move that keeps every test name and title", () => {
+    const root = coreRepositoryOf();
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toBe(
+      "moved 1 files; rewrote 0 files\ntest inventory unchanged; titles listed: 1\n",
+    );
+  });
+
+  it("fails a move that rewrites a path in a title", () => {
+    const root = coreRepositoryOf();
+
+    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stdout).toContain("the move changed a test file's name or a test's title");
+    expect(ran.stdout).toContain(`  vitest-core.txt: removed thing.test.ts :: ${TITLE}\n`);
+    expect(ran.stdout).toContain(
+      "  vitest-core.txt: added thing.test.ts :: reads packages/core/src/group/thing.ts\n",
+    );
+  });
+
+  it("passes a move between two configs of one workspace", () => {
+    const root = coreRepositoryOf({
+      "packages/core/vitest.config.ts":
+        'export default { test: { include: ["test/**/*.test.ts"] } };\n',
+      "packages/core/vitest.images.config.ts":
+        'import base from "./vitest.config.ts";\n\nexport default { ...base, test: { ...base.test, include: ["images/**/*.test.ts"] } };\n',
+    });
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/images/thing.test.ts"]]);
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toContain("test inventory unchanged; titles listed: 1");
+  });
+
+  it("lists the tests without running a globalSetup", () => {
+    const root = coreRepositoryOf({
+      "packages/core/vitest.config.ts":
+        'export default { test: { globalSetup: ["./setup.ts"] } };\n',
+      "packages/core/setup.ts": 'throw new Error("a globalSetup ran");\n',
+    });
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toContain("test inventory unchanged; titles listed: 1");
+  });
+
+  it("fails a move that renames a test file", () => {
+    const root = coreRepositoryOf();
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/renamed.test.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stdout).toContain(`  vitest-core.txt: removed thing.test.ts :: ${TITLE}\n`);
+    expect(ran.stdout).toContain(`  vitest-core.txt: added renamed.test.ts :: ${TITLE}\n`);
+  });
+
+  it("fails a move that changes a run-time title", () => {
+    const LABEL_FILE = "packages/core/src/label.ts";
+    const root = coreRepositoryOf({
+      [LABEL_FILE]: `export const LABEL = "${CORE_SOURCE}";\n`,
+      [CORE_TEST]: [
+        'import { it } from "vitest";',
+        'import { LABEL } from "../src/label.ts";',
+        `const FILE = "${CORE_SOURCE}";`,
+        `it.skip("skipped ${CORE_SOURCE}", () => {});`,
+        "it(`built from ${FILE}`, () => {});",
+        `it.each([["${CORE_SOURCE}"]])("each of %s", () => {});`,
+        "it(`imported ${LABEL}`, () => {});",
+        "",
+      ].join("\n"),
+    });
+
+    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
+
+    expect(ran.status).toBe(1);
+    for (const lead of ["skipped", "built from", "each of", "imported"]) {
+      expect(ran.stdout).toContain(`: removed thing.test.ts :: ${lead} ${CORE_SOURCE}\n`);
+      expect(ran.stdout).toContain(
+        `: added thing.test.ts :: ${lead} packages/core/src/group/thing.ts\n`,
+      );
+    }
+  });
+
+  it("puts the tree back when it refuses a move", () => {
+    const root = coreRepositoryOf({ "docs/note.md": `${CORE_SOURCE}\n` });
+    writeUnder(root, "docs/note.md", `${CORE_SOURCE}, edited by hand\n`);
+    writeUnder(root, "packages/core/src/staged.ts", "export const staged = 1;\n");
+    gitIn(root, "add", "packages/core/src/staged.ts");
+    const treeOf = (): readonly string[] => [
+      status(root),
+      gitIn(root, "diff"),
+      gitIn(root, "diff", "--cached"),
+    ];
+    const before = treeOf();
+
+    const ran = moved(root, [
+      [CORE_SOURCE, "packages/core/src/new-folder/deeper/thing.ts"],
+      ["packages/core/src/staged.ts", "packages/core/src/new-folder/staged.ts"],
+    ]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stdout).toContain(
+      "did not move 2 files or rewrite 2 files; the tree is as it was before",
+    );
+    expect(treeOf()).toStrictEqual(before);
+    expect(existsSync(path.join(root, "packages/core/src/new-folder"))).toBe(false);
+  });
+
+  it("passes a test's move to another workspace", () => {
+    const root = coreRepositoryOf();
+    const devtools = path.join(root, "packages/devtools");
+    writeUnder(root, "packages/devtools/vitest.config.ts", "export default {};\n");
+    mkdirSync(path.join(devtools, "node_modules"));
+    symlinkSync(VITEST, path.join(devtools, "node_modules/vitest"));
+    gitIn(root, "add", "packages/devtools/vitest.config.ts");
+
+    const ran = moved(root, [[CORE_TEST, "packages/devtools/test/thing.test.ts"]]);
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toContain("test inventory unchanged; titles listed: 1");
+    expect(status(root)).toContain(`R  ${CORE_TEST} -> packages/devtools/test/thing.test.ts\n`);
+  });
+
+  it("puts the tree back when the tests cannot be listed", () => {
+    const root = coreRepositoryOf({
+      "packages/core/vitest.config.ts": `import { readFileSync } from "node:fs";\n\nreadFileSync("src/thing.ts");\n\nexport default {};\n`,
+    });
+    const before = status(root);
+
+    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stdout).toContain("the tree is as it was before");
+    expect(ran.stdout).toContain("the tests could not be listed after the move");
+    expect(ran.stdout).toContain("ENOENT");
+    expect(status(root)).toBe(before);
+  });
+
+  it("leaves the tree untouched when stopped while listing", async () => {
+    const root = coreRepositoryOf({
+      "packages/core/vitest.config.ts": [
+        'import { writeFileSync } from "node:fs";',
+        "",
+        `writeFileSync(${JSON.stringify(path.join(scratch, "listing.started"))}, "");`,
+        "await new Promise(() => setInterval(() => {}, 1000));",
+        "export default {};",
+        "",
+      ].join("\n"),
+    });
+    const tablePath = path.join(scratch, "stopped.tsv");
+    writeFileSync(tablePath, `${CORE_SOURCE}\tpackages/core/src/group/thing.ts\n`);
+
+    const run = spawn(process.execPath, [SCRIPT, tablePath], { cwd: root });
+    let stderr = "";
+    run.stderr.setEncoding("utf8").on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    const exited = new Promise<number | null>((resolve) => run.once("close", resolve));
+    await untilTrue(() => existsSync(path.join(scratch, "listing.started")));
+    run.kill("SIGTERM");
+
+    expect({ code: await exited, stderr }).toStrictEqual({
+      code: 143,
+      stderr: "move-files: stopped by SIGTERM; the tree is as it was before\n",
+    });
+    expect(status(root)).toBe("");
+    expect(read(root, CORE_SOURCE)).toBe("export const thing = 1;\n");
+  });
+
+  it("undoes a killed run's part-done move, then moves", () => {
+    const ONE = "export const one = 1; // packages/core/src/one.ts\n";
+    const root = coreRepositoryOf({
+      "packages/core/src/one.ts": ONE,
+      "packages/core/src/other.ts": "export const other = 2;\n",
+      "docs/note.md": "packages/core/src/one.ts\n",
+    });
+    const bin = path.join(scratch, `stopping-git-${String(counter)}`);
+    const runWithGitThatStopsAt = (moving: string, then: string) => {
+      writeUnder(
+        bin,
+        "git",
+        [
+          "#!/bin/sh",
+          `if [ "$1 $2 $3 $4 $5" = "-C ${realpathSync(root)} mv -- ${moving}" ]; then ${then}; exit 1; fi`,
+          `exec ${REAL_GIT} "$@"`,
+          "",
+        ].join("\n"),
+      );
+      chmodSync(path.join(bin, "git"), 0o755);
+      return spawnSync(process.execPath, [SCRIPT, tablePath], {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${bin}:${String(process.env["PATH"])}` },
+      });
+    };
+    const table = tableOf([
+      ["packages/core/src/one.ts", "packages/core/src/group/one.ts"],
+      ["packages/core/src/other.ts", "packages/core/src/group/other.ts"],
+    ]);
+    const tablePath = path.join(scratch, `killed-${String(counter)}.tsv`);
+    writeFileSync(tablePath, `${table}\n`);
+
+    const killed = runWithGitThatStopsAt("packages/core/src/other.ts", "kill -9 $PPID");
+
+    expect(killed.signal).toBe("SIGKILL");
+    expect(status(root)).toContain(
+      "RM packages/core/src/one.ts -> packages/core/src/group/one.ts\n",
+    );
+    expect(moved(root, [[THING, GROUPED]], "--dry-run").stderr).toContain(
+      "a stopped run left a move part done",
+    );
+    const written = read(root, "docs/note.md");
+    writeUnder(root, "docs/note.md", "fixed by hand\n");
+
+    expect(
+      spawnSync(process.execPath, [SCRIPT, tablePath], { cwd: root, encoding: "utf8" }).stderr,
+    ).toContain("so its move is not undone");
+    expect(read(root, "docs/note.md")).toBe("fixed by hand\n");
+
+    writeUnder(root, "docs/note.md", written);
+
+    const stuck = runWithGitThatStopsAt("packages/core/src/group/one.ts", ":");
+
+    expect(stuck.stderr).toContain("the move could not be undone");
+    expect(existsSync(path.join(root, "packages/core/src/one.ts"))).toBe(false);
+    expect(read(root, "packages/core/src/group/one.ts")).toBe(ONE);
+
+    const rerun = spawnSync(process.execPath, [SCRIPT, tablePath], { cwd: root, encoding: "utf8" });
+
+    expect(rerun.status).toBe(0);
+    expect(rerun.stdout).toContain("undid the move a stopped run left part done\nmoved 2 files");
+    expect(status(root).split("\n").sort()).toStrictEqual(
+      [
+        "",
+        " M docs/note.md",
+        "RM packages/core/src/one.ts -> packages/core/src/group/one.ts",
+        "R  packages/core/src/other.ts -> packages/core/src/group/other.ts",
+      ].sort(),
+    );
+  });
+
+  it("moves nothing when the tree changes while it lists", () => {
+    const root = coreRepositoryOf({
+      "packages/core/src/one.ts": "export const one = 1;\n",
+      "docs/note.md": "packages/core/src/one.ts\n",
+    });
+    const note = path.join(realpathSync(root), "docs/note.md");
+    writeUnder(
+      root,
+      "packages/core/vitest.config.ts",
+      [
+        'import { writeFileSync } from "node:fs";',
+        "",
+        `if (process.cwd().includes("move-files-")) writeFileSync(${JSON.stringify(note)}, "edited\\n");`,
+        "export default {};",
+        "",
+      ].join("\n"),
+    );
+    gitIn(root, "commit", "-qam", "edit while listing");
+
+    const ran = moved(root, [["packages/core/src/one.ts", "packages/core/src/group/one.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain("the tree changed while move-files listed the tests");
+    expect(read(root, "docs/note.md")).toBe("edited\n");
+    expect(existsSync(path.join(root, "packages/core/src/one.ts"))).toBe(true);
+  });
+
+  it("refuses a link planted at the scratch folder", () => {
+    const root = coreRepositoryOf();
+    const victim = path.join(scratch, `victim-${String(counter)}`);
+    const planted = path.join(
+      realpathSync(tmpdir()),
+      `move-files-planted-${String(process.pid)}-${String(counter)}`,
+    );
+    onTestFinished(() => {
+      rmSync(planted, { force: true });
+    });
+    writeUnder(victim, "kept.txt", "kept\n");
+    symlinkSync(victim, planted);
+    const finished = spawnSync("true").pid;
+    writeFileSync(pointerIn(root), JSON.stringify({ pid: finished, folder: planted }));
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain(`refusing the scratch folder ${planted}`);
+    expect(read(victim, "kept.txt")).toBe("kept\n");
+    expect(status(root)).toBe("");
+  });
+
+  it("leaves a live run's move and journal alone", () => {
+    const root = coreRepositoryOf();
+    const gitDir = gitIn(root, "rev-parse", "--absolute-git-dir").trim();
+    gitIn(root, "mv", CORE_SOURCE, "packages/core/src/moving.ts");
+    const journal = JSON.stringify({
+      edits: [],
+      moves: [[CORE_SOURCE, "packages/core/src/moving.ts"]],
+      created: [],
+    });
+    writeFileSync(path.join(gitDir, "move-files-journal.json"), journal);
+    writeFileSync(pointerIn(root), JSON.stringify({ pid: process.pid, folder: scratch }));
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain(`another move-files run (pid ${String(process.pid)})`);
+    expect(existsSync(scratch)).toBe(true);
+    expect(status(root)).toBe(`R  ${CORE_SOURCE} -> packages/core/src/moving.ts\n`);
+    expect(readFileSync(path.join(gitDir, "move-files-journal.json"), "utf8")).toBe(journal);
+  });
+
+  it("refuses a claim on the tree that it cannot read", () => {
+    const root = coreRepositoryOf();
+    writeFileSync(pointerIn(root), "not json");
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain(`cannot read ${pointerIn(root)}`);
+    expect(status(root)).toBe("");
+  });
+
+  it("moves nothing when the inventory cannot be taken", () => {
+    const root = repositoryOf({
+      [CORE_SOURCE]: "export const thing = 1;\n",
+      "packages/core/vitest.config.ts": "export default {};\n",
+    });
+
+    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain("test-inventory.sh failed before the move, so nothing moved");
+    expect(status(root)).toBe("");
+  });
+
+  it("takes no inventory under --dry-run", () => {
+    const root = repositoryOf({ [CORE_SOURCE]: "export const thing = 1;\n" });
+
+    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]], "--dry-run");
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toBe("would move 1 files; rewrote 0 files\n");
   });
 });
 
