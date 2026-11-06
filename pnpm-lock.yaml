@@ -220,9 +220,6 @@ importers:
       '@better-answers/schema':
         specifier: workspace:*
         version: link:../../packages/schema
-      '@better-answers/web':
-        specifier: workspace:*
-        version: link:../web
       '@better-auth/cimd':
         specifier: 1.7.11
         version: 1.7.11(7b51953551f6db2c788dab8cf923ab39)

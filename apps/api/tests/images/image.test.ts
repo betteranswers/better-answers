@@ -204,12 +204,7 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
         environment: {
           PROBE_NAMES: JSON.stringify(developmentOnly),
 
-          PROBE_REQUIRED: JSON.stringify([
-            "@better-answers/core/kernel",
-            "@better-answers/schema",
-            "@better-answers/web/styles/logo.svg",
-            "@better-answers/web/styles/styles.css",
-          ]),
+          PROBE_REQUIRED: JSON.stringify(["@better-answers/core/kernel", "@better-answers/schema"]),
           PROBE_COMMANDS: JSON.stringify(["corepack", "npm", "npx", "pnpm"]),
         },
       },
@@ -222,7 +217,7 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
     expect(contents.resolvable).toEqual([]);
   });
 
-  it("contains the three workspace libraries the api imports", () => {
+  it("contains the workspace libraries the api imports", () => {
     expect(contents.missing).toEqual([]);
   });
 

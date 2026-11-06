@@ -23,7 +23,6 @@
   "dependencies": {
     "@better-answers/core": "workspace:*",
     "@better-answers/schema": "workspace:*",
-    "@better-answers/web": "workspace:*",
     "@better-auth/cimd": "1.7.11",
     "@better-auth/core": "1.7.11",
     "@better-auth/drizzle-adapter": "1.7.11",

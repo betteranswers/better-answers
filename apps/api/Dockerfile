@@ -62,7 +62,7 @@ RUN pnpm --filter @better-answers/web run build
 # The script keeps required peers. `tests/images/image.test.ts` fails on a kept peer, and a
 # person must then declare it or override it away.
 FROM manifests AS prod-deps
-RUN pnpm install --frozen-lockfile --prod --filter @better-answers/api... --filter '!@better-answers/web'
+RUN pnpm install --frozen-lockfile --prod --filter @better-answers/api...
 RUN node --input-type=module <<'JS'
 import { existsSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import path from "node:path";
@@ -176,7 +176,7 @@ COPY packages/schema/migrations packages/schema/migrations
 # The image keeps the repository layout under /app, so the default `WEB_ROOT` in
 # `apps/api/src/config.ts` resolves to this path and the deploy unit sets no variable for it.
 COPY --from=web /app/apps/web/dist apps/web/dist
-COPY apps/web/package.json apps/web/
+# `WEB_STYLES` in `apps/api/src/auth/page-style.ts` reads the sign-in page's tokens and logo here.
 COPY apps/web/src/styles apps/web/src/styles
 
 # `init` in `deploy/stores.compose.yaml` chowns `/data/git` to uid 1000, which is the `node`

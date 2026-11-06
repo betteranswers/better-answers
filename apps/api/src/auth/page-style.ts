@@ -5,7 +5,10 @@ import { fileURLToPath } from "node:url";
 import { serveStatic } from "@hono/node-server/serve-static";
 import type { Hono } from "hono";
 
-const STYLES = fileURLToPath(import.meta.resolve("@better-answers/web/styles/styles.css"));
+/** The web's tokens, read as files the way `WEB_ROOT` serves its build, so the api needs no package edge to the web. */
+export const WEB_STYLES = new URL("../../../web/src/styles/", import.meta.url);
+
+const STYLES = fileURLToPath(new URL("styles.css", WEB_STYLES));
 
 const expanded = (file: string): string =>
   readFileSync(file, "utf8").replace(/^@import "(\.\/[^"]+)";$/gmu, (_line, relative: string) =>
