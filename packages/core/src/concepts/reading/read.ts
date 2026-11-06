@@ -129,9 +129,9 @@ const openingNamed = (
   locator: string | null,
   resource: string,
 ): Opening | undefined => {
+  if (locator !== null && doors.namesPassage(locator)) return { locator };
   const iri = ids.conceptIri.safeParse(resource);
-  if (iri.success) return { iri: iri.data };
-  return locator !== null && doors.namesPassage(locator) ? { locator } : undefined;
+  return iri.success ? { iri: iri.data } : undefined;
 };
 
 const opensFor = (doors: Doors, opening: Opening): Promise<Result<boolean>> =>
