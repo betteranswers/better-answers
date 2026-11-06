@@ -45,7 +45,7 @@ describe("node/no-process-env flags a process.env read in source", () => {
 const EXCUSED: readonly (readonly [string, string])[] = [
   ["the api's config module", "apps/api/src/config.ts"],
   ["the browser suite's configuration", "apps/web/playwright.config.ts"],
-  ["the git store door's pass-through", "packages/core/src/store/git/door.ts"],
+  ["the git store door's allow-list", "packages/core/src/store/git/door.ts"],
   ["a repository script", "scripts/check.mjs"],
   ["the gate tooling", "packages/devtools/src/throwaway-tree.ts"],
   ["a test", "packages/core/test/store/git/git.test.ts"],

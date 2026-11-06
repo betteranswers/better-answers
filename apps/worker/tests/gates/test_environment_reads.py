@@ -25,6 +25,8 @@ ENVIRONMENT_NAMES = frozenset(
     {"environ", "environb", "getenv", "getenvb", "putenv", "unsetenv"}
 )
 
+ENVIRONMENT_MODULES = frozenset({"os", "posix"})
+
 
 @dataclass(frozen=True, slots=True)
 class Access:
@@ -51,12 +53,12 @@ def key_named_by(access: ast.Attribute, parents: dict[ast.AST, ast.AST]) -> str 
 
 def names_bound_to_os(tree: ast.AST) -> set[str]:
     return {
-        alias.asname or "os"
+        alias.asname or alias.name.split(".")[0]
         for node in ast.walk(tree)
         if isinstance(node, ast.Import)
         for alias in node.names
-        if alias.name.split(".")[0] == "os"
-        and (alias.asname is None or alias.name == "os")
+        if alias.name.split(".")[0] in ENVIRONMENT_MODULES
+        and (alias.asname is None or alias.name in ENVIRONMENT_MODULES)
     }
 
 
@@ -65,7 +67,7 @@ def import_accesses(tree: ast.AST) -> list[Access]:
         Access(node.lineno, None)
         for node in ast.walk(tree)
         if isinstance(node, ast.ImportFrom)
-        and node.module == "os"
+        and node.module in ENVIRONMENT_MODULES
         and any(alias.name in ENVIRONMENT_NAMES for alias in node.names)
     ]
 
@@ -87,9 +89,24 @@ def attribute_accesses(tree: ast.AST) -> list[Access]:
     ]
 
 
+def getattr_accesses(tree: ast.AST) -> list[Access]:
+    modules = names_bound_to_os(tree)
+    return [
+        Access(node.lineno, None)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "getattr"
+        and len(node.args) >= 2
+        and isinstance(node.args[0], ast.Name)
+        and node.args[0].id in modules
+        and literal(node.args[1]) in ENVIRONMENT_NAMES
+    ]
+
+
 def accesses_in(source: str) -> list[Access]:
     tree = ast.parse(source)
-    found = import_accesses(tree) + attribute_accesses(tree)
+    found = import_accesses(tree) + attribute_accesses(tree) + getattr_accesses(tree)
     return sorted(found, key=lambda access: access.line)
 
 
@@ -153,6 +170,37 @@ LIBRARY_INIT = "better_answers_worker/__init__.py"
             "from os import getenv as env\n",
         ),
         (
+            "environ named through getattr",
+            ENGINE,
+            'import os\n\nALL = getattr(os, "environ")\n',
+        ),
+        (
+            "getenv named through getattr, with a default",
+            ENGINE,
+            'import os\n\nURL = getattr(os, "getenv", None)("DATABASE_URL")\n',
+        ),
+        (
+            "environ named through getattr on an aliased os",
+            ENGINE,
+            'import os as system\n\nALL = getattr(system, "environ")\n',
+        ),
+        (
+            "environ of posix, which backs os",
+            ENGINE,
+            'import posix\n\nKEK = posix.environ[b"KEK"]\n',
+        ),
+        (
+            "environ of an aliased posix",
+            ENGINE,
+            "import posix as backing\n\nALL = dict(backing.environ)\n",
+        ),
+        ("environ imported by name from posix", ENGINE, "from posix import environ\n"),
+        (
+            "environ named through getattr on posix",
+            ENGINE,
+            'import posix\n\nALL = getattr(posix, "environ")\n',
+        ),
+        (
             "a write of a secret's name",
             ENGINE,
             'import os\n\nos.environ["KEK"] = "x"\n',
@@ -198,6 +246,21 @@ def test_refuses_a_planted_read_and_names_config(
             'os.environ.get("RUST_LOG") or "warn"\n',
         ),
         ("os used for something else", ENGINE, "import os\n\nPID = os.getpid()\n"),
+        (
+            "getattr on os for something else",
+            ENGINE,
+            'import os\n\nPID = getattr(os, "getpid")()\n',
+        ),
+        (
+            "getattr of environ on another object",
+            ENGINE,
+            'settings = object()\nENVIRONMENT = getattr(settings, "environ")\n',
+        ),
+        (
+            "posix used for something else",
+            ENGINE,
+            "import posix\n\nPID = posix.getpid()\n",
+        ),
         (
             "an environ attribute of another object",
             ENGINE,
