@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { refusalOf, useTRPC, type ApiError, type RefusalWord } from "@/shared/api/trpc.ts";
 import { memberChanged } from "@/shared/member/member.ts";
@@ -14,11 +14,19 @@ export const useOwnershipLost = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const here = useRef(true);
+
+  useEffect(() => {
+    here.current = true;
+    return () => {
+      here.current = false;
+    };
+  }, []);
 
   return useCallback(() => {
-    void memberChanged(queryClient, api, { readAgain: true, ifUnread: "keep" }).then(() =>
-      router.invalidate(),
-    );
+    void memberChanged(queryClient, api, { readAgain: true, ifUnread: "keep" }).then(() => {
+      if (here.current) void router.invalidate();
+    });
   }, [queryClient, api, router]);
 };
 
