@@ -166,14 +166,15 @@ const recomputeConceptVisibility = async (
   principal: Principal,
   tx: Tx,
   iri: string,
-): Promise<Visibility | undefined> => {
+): Promise<void> => {
   const held = await tx.query<IndexVisibilityRow>(
     `SELECT workspace_id, kind, sensitivity, audience, audience_groups FROM concept_index
       WHERE workspace_id = ${scopeClause(1)} AND iri = $2 FOR UPDATE`,
     [scopeParameter(principal), iri],
   );
   const row = held.rows[0];
-  if (row === undefined) return undefined;
+  if (row === undefined)
+    throw new Error(`visibility: ${iri} is cited but has no concept_index row`);
   const visibility = await conceptVisibilityFrom(principal, tx, {
     iri,
     kind: row.kind,
@@ -190,7 +191,6 @@ const recomputeConceptVisibility = async (
     iri,
     ...visibility,
   });
-  return visibility;
 };
 
 const recomputeVisibilitySourcedFrom = async (
@@ -210,13 +210,11 @@ const recomputeVisibilitySourcedFrom = async (
       ORDER BY ce.iri`,
     [scopeParameter(principal), input.connectedSourceId, input.documentIds ?? null],
   );
-  const recomputed: string[] = [];
   for (const { iri } of citing.rows) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- every recompute runs on the caller's transaction
-    const visibility = await recomputeConceptVisibility(principal, tx, iri);
-    if (visibility !== undefined) recomputed.push(iri);
+    await recomputeConceptVisibility(principal, tx, iri);
   }
-  return recomputed;
+  return citing.rows.map(({ iri }) => iri);
 };
 
 type CascadeTarget =
