@@ -315,9 +315,10 @@ const overBudget = {
   }),
 };
 
-const withShortBudget = (bundle: Bundle): GitDoor => ({
+const budgetEndingOn = (bundle: Bundle, budgetEnds: () => AbortSignal): GitDoor => ({
   ...bundle.door,
   commitBudgetMs: BUDGET_MS,
+  commitTimeout: budgetEnds,
 });
 
 const stillRunning = (pid: number): boolean => {
@@ -334,8 +335,8 @@ describe("a commit that runs past its time budget", () => {
     const bundle = await arrange();
     let answered: unknown;
 
-    await whileGitHangsAt("rev-parse", async () => {
-      answered = await commit(bundle.principal, withShortBudget(bundle), requestFor());
+    await whileGitHangsAt("rev-parse", async (budgetEnds) => {
+      answered = await commit(bundle.principal, budgetEndingOn(bundle, budgetEnds), requestFor());
     });
 
     expect(answered).toMatchObject(overBudget);
@@ -346,8 +347,8 @@ describe("a commit that runs past its time budget", () => {
     const large = requestFor({ content: "x".repeat(4 * 1024 * 1024) });
     let answered: unknown;
 
-    await whileGitHangsAt("hash-object", async () => {
-      answered = await commit(bundle.principal, withShortBudget(bundle), large);
+    await whileGitHangsAt("hash-object", async (budgetEnds) => {
+      answered = await commit(bundle.principal, budgetEndingOn(bundle, budgetEnds), large);
     });
 
     expect(answered).toMatchObject(overBudget);
@@ -356,8 +357,8 @@ describe("a commit that runs past its time budget", () => {
   it("returns only after the stopped git process has exited", async () => {
     const bundle = await arrange();
 
-    const hung = await whileGitHangsAt("rev-parse", async () => {
-      await commit(bundle.principal, withShortBudget(bundle), requestFor());
+    const hung = await whileGitHangsAt("rev-parse", async (budgetEnds) => {
+      await commit(bundle.principal, budgetEndingOn(bundle, budgetEnds), requestFor());
     });
 
     expect(stillRunning(hung)).toBe(false);

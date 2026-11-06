@@ -154,7 +154,8 @@ type Budget = { readonly ms: number; readonly signal: AbortSignal };
 
 const budgetOf = (door: GitDoor): Budget => {
   const ms = door.commitBudgetMs ?? COMMIT_BUDGET_MS;
-  return { ms, signal: AbortSignal.timeout(ms) };
+  const timeout = door.commitTimeout ?? ((after: number) => AbortSignal.timeout(after));
+  return { ms, signal: timeout(ms) };
 };
 
 const overBudget = (budget: Budget): Error =>
