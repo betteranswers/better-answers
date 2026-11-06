@@ -84,10 +84,13 @@ type IncludeRow = {
 };
 
 const INCLUDES = `
-  SELECT i.id AS label, i.iri, c.title, c.frontmatter, i.wording_heading AS wording
-    FROM write_up_include i
-    JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
-   WHERE i.workspace_id = $1 AND i.write_up_id = $2 AND ${readableClause("c", 3)}
+  SELECT i.id AS label, i.iri, c.title, c.frontmatter, i."wordingHeading" AS wording
+    FROM write_up_version v
+    CROSS JOIN LATERAL jsonb_to_recordset(v.includes)
+      AS i(id text, iri text, ordinal int, "wordingHeading" text)
+    JOIN concept_index c ON c.workspace_id = v.workspace_id AND c.iri = i.iri
+   WHERE v.workspace_id = $1 AND v.write_up_id = $2 AND v.version = $5
+     AND ${readableClause("c", 3)}
    ORDER BY i.ordinal, i.id`;
 
 const sourcedOf = ({ frontmatter, ...footnote }: IncludeRow): SourcedFootnote => {
@@ -121,6 +124,7 @@ export const briefToCopy = async (
       reader.workspaceId,
       input.writeUpId,
       ...readable,
+      brief.version,
     ]);
     return { ...brief, includes: includes.rows.map(sourcedOf) };
   });
