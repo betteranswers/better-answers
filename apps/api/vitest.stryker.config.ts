@@ -8,8 +8,8 @@ export default mergeConfig(base, {
     // and whose annotations would name only killed mutants.
     reporters: ["default"],
 
-    // Run in place, a gate reads Stryker's instrumented src.
-    exclude: ["tests/gates/**"],
+    // This gate reads src as text, which Stryker rewrites in place, and runs none of it.
+    exclude: ["tests/gates/no-ambient-clock.test.ts"],
 
     // Stryker runs every file in one worker, and a static mutant is live only in a module evaluated
     // after Stryker activates it.

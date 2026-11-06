@@ -23,8 +23,13 @@ export default mergeConfig(base, {
     // and whose annotations would name only killed mutants.
     reporters: ["default"],
 
-    // Run in place, a gate reads Stryker's instrumented src and fails the initial run.
-    exclude: [...configDefaults.exclude, "test/gates/**"],
+    // These gates read src as text, which Stryker rewrites in place, and run none of it.
+    exclude: [
+      ...configDefaults.exclude,
+      "test/gates/environment-lint.test.ts",
+      "test/gates/face-admission.test.ts",
+      "test/gates/import-direction.test.ts",
+    ],
 
     env: { GITHUB_STEP_SUMMARY: "" },
 
