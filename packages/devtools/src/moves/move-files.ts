@@ -1,11 +1,16 @@
-import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { z } from "zod";
 
 import { trackedFiles } from "../paths.ts";
-import { holdInventory } from "./test-inventory.ts";
+import { applyChange, hasInterrupted, undoInterrupted } from "./journal.ts";
+import type { Edit } from "./journal.ts";
+import { copyTree } from "./scratch-tree.ts";
+import { inventoryAcross } from "./test-inventory.ts";
 import type { Inventory } from "./test-inventory.ts";
 
 const NEVER_REWRITTEN: readonly RegExp[] = [
@@ -32,6 +37,8 @@ const TSCONFIG = /^(?:apps|packages)\/[^/]+\/tsconfig\.json$/u;
 const LEFTOVER_WIDTH = 220;
 
 const GREP_OUTPUT_LIMIT_BYTES = 256 * 1024 * 1024;
+
+const SCRATCH_ID_LENGTH = 12;
 
 const isNeverRewritten = (file: string): boolean => NEVER_REWRITTEN.some((skip) => skip.test(file));
 
@@ -62,7 +69,10 @@ type MoveReport = {
   readonly rewritten: readonly string[];
   readonly unresolved: readonly string[];
   readonly leftovers: readonly string[];
-} & ({ readonly dryRun: true } | { readonly dryRun: false; readonly inventory: Inventory });
+} & (
+  | { readonly dryRun: true }
+  | { readonly dryRun: false; readonly recovered: boolean; readonly inventory: Inventory }
+);
 
 const rowOf = (line: string): readonly [string, string] => {
   const [from, to] = line.split("\t").map((cell) => cell.trim());
@@ -269,70 +279,7 @@ const leftoversOf = (root: string, moves: ReadonlyMap<string, string>): readonly
   ];
 };
 
-const gitMove = (root: string, from: string, to: string): void => {
-  mkdirSync(path.dirname(path.join(root, to)), { recursive: true });
-  execFileSync("git", ["-C", root, "mv", from, to], { stdio: "pipe" });
-};
-
 const isRewritable = (file: string): boolean => TEXT.test(file) && !isNeverRewritten(file);
-
-type Edit = { readonly file: string; readonly original: Buffer; readonly text: string };
-
-const messageOf = (cause: unknown): string =>
-  cause instanceof Error ? cause.message : String(cause);
-
-const firstMissing = (folder: string): string | undefined => {
-  let missing: string | undefined;
-  for (let at = folder; !existsSync(at); at = path.dirname(at)) missing = at;
-  return missing;
-};
-
-const applyMove = (
-  root: string,
-  edits: readonly Edit[],
-  moves: ReadonlyMap<string, string>,
-): (() => void) => {
-  const undo: (() => void)[] = [];
-  const revert = (): void => {
-    const failures: string[] = [];
-    for (let step = undo.pop(); step !== undefined; step = undo.pop()) {
-      try {
-        step();
-      } catch (cause) {
-        failures.push(messageOf(cause));
-      }
-    }
-    if (failures.length > 0) {
-      throw new Error(
-        `the move could not be undone, so the tree is part moved\n${failures.join("\n")}`,
-      );
-    }
-  };
-  try {
-    for (const { file, original, text } of edits) {
-      writeFileSync(path.join(root, file), text);
-      undo.push(() => {
-        writeFileSync(path.join(root, file), original);
-      });
-    }
-    for (const [from, to] of moves) {
-      const created = firstMissing(path.dirname(path.join(root, to)));
-      gitMove(root, from, to);
-      undo.push(() => {
-        gitMove(root, to, from);
-        if (created !== undefined) rmSync(created, { recursive: true, force: true });
-      });
-    }
-  } catch (cause) {
-    try {
-      revert();
-    } catch (stuck) {
-      throw new Error(`${messageOf(cause)}\n${messageOf(stuck)}`, { cause });
-    }
-    throw cause;
-  }
-  return revert;
-};
 
 const editsOf = (
   plan: Plan,
@@ -350,21 +297,43 @@ const editsOf = (
   return { edits, unresolved };
 };
 
-export const moveFiles = (root: string, tablePath: string, dryRun: boolean): MoveReport => {
+/** One scratch folder per working tree, cleared at the start of each run, so a stopped run leaves nothing for long. */
+const scratchFolderOf = (root: string): string =>
+  path.join(
+    realpathSync(tmpdir()),
+    `move-files-${createHash("sha256").update(root).digest("hex").slice(0, SCRATCH_ID_LENGTH)}`,
+  );
+
+/** Moves the files in a copy first, so a run stopped while it lists leaves `root` untouched. */
+export const moveFiles = async (
+  root: string,
+  tablePath: string,
+  dryRun: boolean,
+  signal: AbortSignal,
+): Promise<MoveReport> => {
+  if (dryRun && hasInterrupted(root)) {
+    throw new Error(
+      "a stopped run left a move part done; run move-files without --dry-run to undo it",
+    );
+  }
+  const recovered = !dryRun && undoInterrupted(root);
   const tracked = trackedFiles(root);
   const moves = readMoves(root, new Set(tracked), tablePath);
   const { edits, unresolved } = editsOf(planOf(root, moves, tracked), tracked);
   const found = { moved: moves.size, rewritten: edits.map(({ file }) => file), unresolved };
   if (dryRun) return { ...found, leftovers: leftoversOf(root, moves), dryRun: true };
-  const retake = holdInventory(root);
-  const revert = applyMove(root, edits, moves);
-  let inventory: Inventory | undefined;
+  const work = scratchFolderOf(root);
+  rmSync(work, { recursive: true, force: true });
   try {
-    const leftovers = leftoversOf(root, moves);
-    inventory = retake();
-    return { ...found, leftovers, dryRun: false, inventory };
+    const copy = path.join(work, "tree");
+    copyTree(root, copy);
+    applyChange(copy, { edits, moves });
+    const leftovers = leftoversOf(copy, moves);
+    const inventory = await inventoryAcross(root, copy, work, signal);
+    if (inventory.kind === "unchanged") applyChange(root, { edits, moves });
+    return { ...found, leftovers, recovered, dryRun: false, inventory };
   } finally {
-    if (inventory?.kind !== "unchanged") revert();
+    rmSync(work, { recursive: true, force: true });
   }
 };
 
@@ -397,11 +366,12 @@ const headingOf = (report: MoveReport): string => {
   if (report.dryRun) return `would move ${moved} files; rewrote ${rewritten} files\n`;
   return report.inventory.kind === "unchanged"
     ? `moved ${moved} files; rewrote ${rewritten} files\n`
-    : `undid the move of ${moved} files and the rewrite of ${rewritten} files; the tree is as it was before\n`;
+    : `did not move ${moved} files or rewrite ${rewritten} files; the tree is as it was before\n`;
 };
 
 export const reportOf = (report: MoveReport): string =>
   [
+    !report.dryRun && report.recovered ? "undid the move a stopped run left part done\n" : "",
     headingOf(report),
     report.dryRun ? "" : inventoryOf(report.inventory),
     listed(

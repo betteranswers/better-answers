@@ -65,9 +65,13 @@ A folder in a `src`, `test`, `tests`, or `e2e` tree holds at most 15 tracked fil
 
 ### Move files
 
-Write a TSV table with one `<old>\t<new>` row for each file, then run `node scripts/move-files.mjs <table.tsv>`. The script rewrites the imports and the path mentions, then runs `git mv`. A move changes no test file's name and no test's title. The script lists every test by file name and title before the move and again after it. If the lists differ, or the second listing fails, the script undoes the move, prints the difference, and exits non-zero.
+Write a TSV table with one `<old>\t<new>` row for each file, then run `node scripts/move-files.mjs <table.tsv>`. The script rewrites the imports and the path mentions, then runs `git mv`. A move changes no test file's name and no test's title.
 
-A listing runs each test module and no test, so it holds the title that the test runs under: a title built at run time, each row of `it.each`, and every skipped and todo case. It covers every vitest config in `packages/*` and `apps/*` except a stryker config, and it also covers the worker's pytest collection and Playwright's list of the web specs. It does not see a `describe` that holds no case. A test that moves to another workspace counts as a change. A listing takes about a minute, and a move takes two.
+The script makes the move in a copy of the working tree first. It lists every test in the tree and in the copy by file name and title, and compares the two lists as one list for the whole repository, so a test can move to another workspace. It moves the tree only when the lists match. If they differ, or a listing fails, it prints the difference, leaves the tree as it was, and exits non-zero.
+
+A listing runs each test module and no test, so it holds the title that the test runs under: a title built at run time, each row of `it.each`, and every skipped and todo case. It covers every vitest config in `packages/*` and `apps/*` except a stryker config, the worker's pytest collection, and Playwright's list of the web specs. It does not see a `describe` that holds no case. A listing keeps the temp folders that test modules make, and answers their `docker info` probes as if Docker were down. A move takes about a minute and a half, about as long as two listings.
+
+If the script stops before it prints its report, run it again with the same table. A run stopped while it lists has not changed the tree. A run killed while it moves the files leaves a journal in the git folder, and the next run undoes that part-done move first.
 
 ## Coding
 

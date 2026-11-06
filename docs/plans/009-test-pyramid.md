@@ -79,7 +79,7 @@ Plan 008 owns the folder restructure and is moving files under `packages/*` and 
 - [ ] Triage every review-bot and security-reviewer comment per `../references/bugbot-triage.md`.
 - [ ] Before the code-ready report and babysit, and again after merge prep, record the base and head SHAs prepared by the topology owner under the execution playbook.
 - [ ] Move a file only with `node scripts/move-files.mjs <table.tsv>`, one `<old>\t<new>` row per file. It rewrites the imports and path mentions, then runs `git mv`.
-- [ ] Keep every case title a PR moves. `node scripts/move-files.mjs` lists the tests before and after the move, undoes the move and exits non-zero on any change to a test file's name or a test's title. For a PR that deletes or splits cases, write `scripts/test-inventory.sh <dir>` output before and after, and paste the `diff` in the PR body. A title that leaves names the test that keeps its claim.
+- [ ] Keep every case title a PR moves. `node scripts/move-files.mjs` lists the tests with and without the move, and moves nothing and exits non-zero on any change to a test file's name or a test's title. For a PR that deletes or splits cases, write `scripts/test-inventory.sh <dir>` output before and after, and paste the `diff` in the PR body. A title that leaves names the test that keeps its claim.
 - [ ] Put each new or moved test folder where `AGENTS.md` "Where a file goes" says, and run `pnpm run test-folders` before the push. After BA-287 it runs in `check:gates` and the pre-push hook as well.
 
 ### Verdict and merge, for every PR
@@ -174,7 +174,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 **Build.**
 
-- [ ] Move files only with `node scripts/move-files.mjs <table.tsv>`. It lists the tests before and after the move, undoes the move and exits non-zero on any change to a test file's name or a test's title. Paste its output in the PR body.
+- [ ] Move files only with `node scripts/move-files.mjs <table.tsv>`. It lists the tests with and without the move, and moves nothing and exits non-zero on any change to a test file's name or a test's title. Paste its output in the PR body.
 - [ ] Decide each of the 53 root tests once, in this PR. A root test moves to `gates/` when its subject is the repository, meaning a config, a scan, a lint rule, a workflow, a skill, a doc set or the tree. It stays when its subject is the workspace's own code, however the test reaches it.
 - [ ] Write the three bullets of "Where a file goes" as follows.
 

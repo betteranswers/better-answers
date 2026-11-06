@@ -1,5 +1,14 @@
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
@@ -13,6 +22,8 @@ import {
   writeUnder,
 } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
+
+import { untilTrue } from "./polling.ts";
 
 const SCRIPT = path.join(repositoryRoot, "scripts/move-files.mjs");
 
@@ -578,6 +589,7 @@ describe("the test inventory a move holds", () => {
       [CORE_SOURCE]: "export const thing = 1;\n",
       [CORE_TEST]: `import { it } from "vitest";\n\nit("${TITLE}", () => {});\n`,
       "packages/core/vitest.config.ts": "export default {};\n",
+      ".gitignore": "node_modules/\n",
       ...extra,
     });
     const modules = path.join(root, "packages/core/node_modules");
@@ -693,10 +705,25 @@ describe("the test inventory a move holds", () => {
 
     expect(ran.status).toBe(1);
     expect(ran.stdout).toContain(
-      "undid the move of 2 files and the rewrite of 2 files; the tree is as it was before",
+      "did not move 2 files or rewrite 2 files; the tree is as it was before",
     );
     expect(treeOf()).toStrictEqual(before);
     expect(existsSync(path.join(root, "packages/core/src/new-folder"))).toBe(false);
+  });
+
+  it("passes a test's move to another workspace", () => {
+    const root = coreRepositoryOf();
+    const devtools = path.join(root, "packages/devtools");
+    writeUnder(root, "packages/devtools/vitest.config.ts", "export default {};\n");
+    mkdirSync(path.join(devtools, "node_modules"));
+    symlinkSync(VITEST, path.join(devtools, "node_modules/vitest"));
+    gitIn(root, "add", "packages/devtools/vitest.config.ts");
+
+    const ran = moved(root, [[CORE_TEST, "packages/devtools/test/thing.test.ts"]]);
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toContain("test inventory unchanged; titles listed: 1");
+    expect(status(root)).toContain(`R  ${CORE_TEST} -> packages/devtools/test/thing.test.ts\n`);
   });
 
   it("puts the tree back when the tests cannot be listed", () => {
@@ -714,30 +741,96 @@ describe("the test inventory a move holds", () => {
     expect(status(root)).toBe(before);
   });
 
-  it("says so when the move cannot be undone", () => {
+  it("leaves the tree untouched when stopped while listing", async () => {
     const root = coreRepositoryOf({
       "packages/core/vitest.config.ts": [
-        'import { existsSync, writeFileSync } from "node:fs";',
+        'import { writeFileSync } from "node:fs";',
         "",
-        'if (existsSync("src/group/thing.ts")) {',
-        '  writeFileSync("src/thing.ts", "in the way");',
-        '  throw new Error("the listing stopped");',
-        "}",
+        `writeFileSync(${JSON.stringify(path.join(scratch, "listing.started"))}, "");`,
+        "await new Promise(() => setInterval(() => {}, 1000));",
         "export default {};",
         "",
       ].join("\n"),
     });
+    const tablePath = path.join(scratch, "stopped.tsv");
+    writeFileSync(tablePath, `${CORE_SOURCE}\tpackages/core/src/group/thing.ts\n`);
 
-    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
+    const run = spawn(process.execPath, [SCRIPT, tablePath], { cwd: root });
+    let stderr = "";
+    run.stderr.setEncoding("utf8").on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    const exited = new Promise<number | null>((resolve) => run.once("close", resolve));
+    await untilTrue(() => existsSync(path.join(scratch, "listing.started")));
+    run.kill("SIGTERM");
 
-    expect(ran.status).toBe(1);
-    expect(ran.stderr).toContain("the move could not be undone, so the tree is part moved");
-    expect(read(root, CORE_TEST)).toContain(`it("${TITLE}"`);
-    expect(existsSync(path.join(root, "packages/core/src/group/thing.ts"))).toBe(true);
+    expect({ code: await exited, stderr }).toStrictEqual({
+      code: 143,
+      stderr: "move-files: stopped by SIGTERM; the tree is as it was before\n",
+    });
+    expect(status(root)).toBe("");
+    expect(read(root, CORE_SOURCE)).toBe("export const thing = 1;\n");
+  });
+
+  it("undoes a killed run's part-done move, then moves", () => {
+    const root = coreRepositoryOf({
+      "packages/core/src/one.ts": "export const one = 1;\n",
+      "packages/core/src/other.ts": "export const other = 2;\n",
+      "docs/note.md": "packages/core/src/one.ts\n",
+    });
+    const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+    const bin = path.join(scratch, `killing-git-${String(counter)}`);
+    writeUnder(
+      bin,
+      "git",
+      [
+        "#!/bin/sh",
+        `if [ "$1 $2 $3 $4" = "-C ${realpathSync(root)} mv packages/core/src/other.ts" ]; then kill -9 $PPID; exit 1; fi`,
+        `exec ${realGit} "$@"`,
+        "",
+      ].join("\n"),
+    );
+    chmodSync(path.join(bin, "git"), 0o755);
+    const table = tableOf([
+      ["packages/core/src/one.ts", "packages/core/src/group/one.ts"],
+      ["packages/core/src/other.ts", "packages/core/src/group/other.ts"],
+    ]);
+    const tablePath = path.join(scratch, `killed-${String(counter)}.tsv`);
+    writeFileSync(tablePath, `${table}\n`);
+
+    const killed = spawnSync(process.execPath, [SCRIPT, tablePath], {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:${String(process.env["PATH"])}` },
+    });
+
+    expect(killed.signal).toBe("SIGKILL");
+    expect(status(root)).toContain(
+      "R  packages/core/src/one.ts -> packages/core/src/group/one.ts\n",
+    );
+    expect(moved(root, [[THING, GROUPED]], "--dry-run").stderr).toContain(
+      "a stopped run left a move part done",
+    );
+
+    const rerun = spawnSync(process.execPath, [SCRIPT, tablePath], { cwd: root, encoding: "utf8" });
+
+    expect(rerun.status).toBe(0);
+    expect(rerun.stdout).toContain("undid the move a stopped run left part done\nmoved 2 files");
+    expect(status(root).split("\n").sort()).toStrictEqual(
+      [
+        "",
+        " M docs/note.md",
+        "R  packages/core/src/one.ts -> packages/core/src/group/one.ts",
+        "R  packages/core/src/other.ts -> packages/core/src/group/other.ts",
+      ].sort(),
+    );
   });
 
   it("moves nothing when the inventory cannot be taken", () => {
-    const root = repositoryOf({ [CORE_SOURCE]: "export const thing = 1;\n" });
+    const root = repositoryOf({
+      [CORE_SOURCE]: "export const thing = 1;\n",
+      "packages/core/vitest.config.ts": "export default {};\n",
+    });
 
     const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+shopt -s nullglob
 if [ $# -ne 1 ]; then
   echo "usage: test-inventory <out-dir>" >&2
   exit 2
@@ -10,15 +11,28 @@ out=$(cd "$1" && pwd)
 work=$(mktemp -d)
 names=()
 pids=()
+watchdog=
 
 # Each listing runs in its own process group, so a signal to this script reaches every tool.
 set -m
 cleanup() {
-  for pid in ${pids[@]+"${pids[@]}"}; do kill -TERM -- "-$pid" 2>/dev/null || true; done
+  for pid in ${pids[@]+"${pids[@]}"} $watchdog; do kill -TERM -- "-$pid" 2>/dev/null || true; done
   rm -rf "$work"
 }
 trap cleanup EXIT
-trap 'exit 143' TERM INT
+trap 'trap "" TERM INT; exit 143' TERM INT
+
+# A caller killed outright cannot stop the listings, so they stop when it is gone.
+caller=$PPID
+(while kill -0 "$caller" 2>/dev/null; do sleep 1; done; kill -TERM $$) &
+watchdog=$!
+
+# Test modules run at import, so the listing keeps what they touch inside $work. They write temp
+# folders under TMPDIR, and the image probes ask `docker info`, which this `docker` answers "down".
+mkdir -p "$work/tmp" "$work/bin"
+printf '#!/bin/sh\nexit 1\n' > "$work/bin/docker"
+chmod +x "$work/bin/docker"
+export TMPDIR="$work/tmp" PATH="$work/bin:$PATH" PYTHONDONTWRITEBYTECODE=1
 
 json_string() {
   python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$1"
@@ -29,7 +43,6 @@ json_string() {
 # generated config drops globalSetup, which starts Postgres and the object store for a test run.
 vitest_titles() {
   local config=$1 key=$2 scratch="$work/$2"
-  [ -f "$config" ] || { echo "$config is missing" >&2; return 1; }
   mkdir -p "$scratch"
   {
     printf 'import base from %s;\n' "$(json_string "$config")"
@@ -52,8 +65,11 @@ for file in json.load(open(sys.argv[1]))["testResults"]:
 ' "$scratch/titles.json" > "$work/$key.titles"
 }
 
+# The worker's own source comes first on the path, so a copy of the tree that shares the .venv
+# imports its own source rather than the source the .venv was installed from.
 pytest_titles() {
-  (cd "$root/apps/worker" && uv run --frozen pytest --collect-only -q -o addopts=) |
+  (cd "$root/apps/worker" && { [ -e .venv ] || uv sync --frozen --quiet; } &&
+    PYTHONPATH=src .venv/bin/python -m pytest --collect-only -q -o addopts= -p no:cacheprovider) |
     grep '::' | python3 -c '
 import os, sys
 for line in sys.stdin:
@@ -62,7 +78,7 @@ for line in sys.stdin:
 }
 
 playwright_titles() {
-  (cd "$root/apps/web" && npx playwright test --list) |
+  (cd "$root/apps/web" && ./node_modules/.bin/playwright test --list) |
     grep ' › ' | sed -E 's#^ *\[[^]]*\] › ##; s#^([^:]*/)?([^/:]+):[0-9]+:[0-9]+ › #\2 :: #' | sort > "$out/playwright-web.txt"
 }
 
@@ -74,19 +90,16 @@ start() {
   pids+=("$!")
 }
 
-workspaces=(packages/core packages/schema packages/devtools apps/api apps/web)
-for w in "${workspaces[@]}"; do
-  name=$(basename "$w")
-  : > "$out/vitest-$name.txt"
-  [ -d "$root/$w" ] || continue
-  start "vitest-$name" vitest_titles "$root/$w/vitest.config.ts" "$name--default"
-  for config in "$root/$w"/vitest.*.config.ts; do
-    [ -f "$config" ] || continue
-    case $config in *.stryker.config.ts) continue ;; esac
-    variant=$(basename "$config" .config.ts)
-    variant=${variant#vitest.}
-    start "vitest-$name-$variant" vitest_titles "$config" "$name--$variant"
-  done
+workspaces=()
+for config in "$root"/apps/*/vitest*.config.ts "$root"/packages/*/vitest*.config.ts; do
+  case $config in *.stryker.config.ts) continue ;; esac
+  name=$(basename "$(dirname "$config")")
+  variant=$(basename "$config" .config.ts)
+  case " ${workspaces[*]-} " in
+    *" $name "*) ;;
+    *) workspaces+=("$name") && : > "$out/vitest-$name.txt" ;;
+  esac
+  start "vitest-$name-$variant" vitest_titles "$config" "$name--$variant"
 done
 
 : > "$out/pytest-worker.txt"
@@ -105,11 +118,8 @@ for i in "${!pids[@]}"; do
 done
 [ "$failed" -eq 0 ] || exit 1
 
-for w in "${workspaces[@]}"; do
-  name=$(basename "$w")
-  if compgen -G "$work/$name--*.titles" > /dev/null; then
-    sort "$work/$name"--*.titles > "$out/vitest-$name.txt"
-  fi
+for name in ${workspaces[@]+"${workspaces[@]}"}; do
+  sort "$work/$name"--*.titles > "$out/vitest-$name.txt"
 done
 
 wc -l "$out"/*.txt
