@@ -20,6 +20,39 @@ OPTIONAL = (
     "MAX_CONCURRENT_RUNS",
 )
 
+# A dependency reads these. `read_bootstrap` does not.
+LIBRARY_KEYS = (
+    "HF_HOME",
+    "HF_HUB_OFFLINE",
+    "TLDEXTRACT_CACHE",
+    "COCOINDEX_DISABLE_USAGE_TRACKING",
+    "RUST_LOG",
+)
+
+# Python and the C library read these in any process. A deployment sets none of them.
+RUNTIME_KEYS = (
+    "PATH",
+    "HOME",
+    "HOSTNAME",
+    "TMPDIR",
+    "TZ",
+    "LANG",
+    "LANGUAGE",
+    "LC_ALL",
+    "PYTHONUNBUFFERED",
+    "PYTHONDONTWRITEBYTECODE",
+    "SSL_CERT_FILE",
+)
+
+
+_KEPT = frozenset((*REQUIRED, *OPTIONAL, *LIBRARY_KEYS, *RUNTIME_KEYS))
+
+
+def environment_of() -> dict[str, str]:
+    """Coolify hands every service every variable of the resource. This keeps the keys
+    that `read_bootstrap`, the libraries and the runtime read."""
+    return {key: value for key, value in environ.items() if key in _KEPT}
+
 
 LMDB_MAP_BYTES = 4_294_967_296
 

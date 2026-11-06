@@ -272,6 +272,66 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
   });
 });
 
+/** Runs in each Node process the gate starts, before its entry, and reports what PID 1 holds. */
+const pidOneSpy = `
+import { readFileSync } from "node:fs";
+if (!process.argv[1].endsWith("environment-gate.ts")) {
+  const keysOf = (environ) => environ.split("\\0").filter(Boolean).map((line) => line.split("=")[0]).sort();
+  process.stdout.write(JSON.stringify({
+    init: readFileSync("/proc/1/cmdline", "utf8").split("\\0")[0],
+    initKeys: keysOf(readFileSync("/proc/1/environ", "utf8")),
+    ownKeys: Object.keys(process.env).sort(),
+  }));
+  process.exit(0);
+}
+`;
+
+const pidOneSchema = z.object({
+  init: z.string(),
+  initKeys: z.array(z.string()),
+  ownKeys: z.array(z.string()),
+});
+
+describe.skipIf(nothingToProbeHere)("the api image's CMD started with every resource key", () => {
+  let seen: z.infer<typeof pidOneSchema>;
+
+  beforeAll(async () => {
+    const leg = legFor("api");
+    const stdout = await readTheImage(
+      { tier: leg.tier, dockerfile: leg.dockerfile, context: leg.context },
+      {
+        command: ["node", "apps/api/src/environment-gate.ts", "api"],
+        environment: {
+          NODE_OPTIONS: `--import=data:text/javascript,${encodeURIComponent(pidOneSpy)}`,
+          DATABASE_URL: "postgres://app@db:5432/ba",
+          KEK: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+          MIGRATE_DATABASE_URL: "postgres://owner@db:5432/ba",
+          WORKER_DATABASE_URL: "postgres://worker@db:5432/ba",
+        },
+      },
+    );
+    seen = pidOneSchema.parse(JSON.parse(stdout));
+  }, IMAGE_PROBE_ALLOWANCE);
+
+  it("puts tini at PID 1 in place of Docker's init", () => {
+    expect(seen.init).toBe("/usr/bin/tini");
+  });
+
+  it("leaves PID 1 holding only the keys the api reads", () => {
+    expect(seen.initKeys).toEqual([
+      "DATABASE_URL",
+      "HOME",
+      "HOSTNAME",
+      "KEK",
+      "NODE_ENV",
+      "NODE_OPTIONS",
+      "PATH",
+      "PORT",
+    ]);
+    expect(seen.ownKeys).toEqual(seen.initKeys);
+  });
+});
+
 describe("the api leg of the image job", () => {
   it("lists this file as its probe", () => {
     const api = legFor("api");

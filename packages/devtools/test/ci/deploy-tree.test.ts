@@ -287,7 +287,7 @@ describe("the deploy tree", () => {
     expect(script).not.toMatch(/wipe_staging|trap .*EXIT|PROD_DATABASE_URL/);
     expect(script).not.toMatch(/rm -rf \/data/);
 
-    expect(script).toContain("pnpm ops replay-erasures --since");
+    expect(script).toContain("environment-gate.ts ops replay-erasures --since");
     expect(read(`${operationsDocuments}/RUNBOOK.md`)).toContain("restore-production.sh");
   });
 
@@ -352,7 +352,9 @@ describe("the deploy tree", () => {
 
       expect({ file, line }).toEqual({
         file,
-        line: matching.stringContaining("run --rm --no-deps api pnpm"),
+        line: matching.stringContaining(
+          "run --rm --no-deps api node apps/api/src/environment-gate.ts ops",
+        ),
       });
     }
   });

@@ -14,7 +14,12 @@ const COMPOSE = "deploy/platform.compose.yaml";
 
 type Keys = { readonly required: readonly string[]; readonly optional: readonly string[] };
 
-type Tier = Readonly<Record<string, Keys>>;
+type Tier = {
+  readonly image: string;
+  readonly dockerfile: string;
+  readonly gate: readonly string[];
+  readonly processes: Readonly<Record<string, Keys>>;
+};
 
 const keysOf = (schema: z.ZodObject<Record<string, z.ZodType>>): Keys => {
   const fields = Object.entries(schema.shape);
@@ -26,36 +31,61 @@ const keysOf = (schema: z.ZodObject<Record<string, z.ZodType>>): Keys => {
 };
 
 const WORKER_KEYS = `import json
-from better_answers_worker.config import OPTIONAL, REQUIRED
+from better_answers_worker.config import LIBRARY_KEYS, OPTIONAL, REQUIRED
+from better_answers_worker.environment_gate import PROCESSES
 
-print(json.dumps({"required": REQUIRED, "optional": OPTIONAL}))
+print(json.dumps({
+    "required": REQUIRED,
+    "optional": OPTIONAL,
+    "library": LIBRARY_KEYS,
+    "processes": list(PROCESSES),
+}))
 `;
 
-const workerKeys = (): Keys =>
-  z.object({ required: z.array(z.string()), optional: z.array(z.string()) }).parse(
-    JSON.parse(
-      execFileSync("uv", ["run", "--frozen", "python", "-I", "-c", WORKER_KEYS], {
-        cwd: path.join(repositoryRoot, "apps", "worker"),
-        encoding: "utf8",
-      }),
-    ),
-  );
+const workerListsSchema = z.object({
+  required: z.array(z.string()),
+  optional: z.array(z.string()),
+  library: z.array(z.string()),
+  processes: z.array(z.string()),
+});
 
-const apiTier: Tier = Object.fromEntries(
-  Object.entries(apiConfig.READER_SCHEMAS).map(([reader, schema]) => [reader, keysOf(schema)]),
+const workerLists = workerListsSchema.parse(
+  JSON.parse(
+    execFileSync("uv", ["run", "--frozen", "python", "-I", "-c", WORKER_KEYS], {
+      cwd: path.join(repositoryRoot, "apps", "worker"),
+      encoding: "utf8",
+    }),
+  ),
 );
 
-const TIERS: Readonly<Record<string, Tier>> = {
-  api: apiTier,
-  worker: { read_bootstrap: workerKeys() },
+const workerKeys: Keys = {
+  required: workerLists.required,
+  optional: [...workerLists.optional, ...workerLists.library],
 };
 
-type Service = { readonly tier: string; readonly starts: readonly string[] };
+const apiKeys = (readers: readonly (keyof typeof apiConfig.READER_SCHEMAS)[]): Keys => {
+  const read = readers.map((reader) => keysOf(apiConfig.READER_SCHEMAS[reader]));
+  return {
+    required: read.flatMap(({ required }) => required),
+    optional: [...read.flatMap(({ optional }) => optional), ...apiConfig.LIBRARY_KEYS],
+  };
+};
 
-const SERVICES: Readonly<Record<string, Service>> = {
-  migrate: { tier: "api", starts: ["readBootstrap"] },
-  api: { tier: "api", starts: Object.keys(apiTier) },
-  worker: { tier: "worker", starts: ["read_bootstrap"] },
+const TIERS: Readonly<Record<string, Tier>> = {
+  api: {
+    image: "ghcr.io/betteranswers/api",
+    dockerfile: "apps/api/Dockerfile",
+    gate: ["node", "apps/api/src/environment-gate.ts"],
+    processes: Object.fromEntries(
+      Object.entries(apiConfig.PROCESS_READERS).map(([name, readers]) => [name, apiKeys(readers)]),
+    ),
+  },
+  worker: {
+    image: "ghcr.io/betteranswers/worker",
+    dockerfile: "apps/worker/Dockerfile",
+    gate: ["python", "-m", "better_answers_worker.environment_gate"],
+    processes: Object.fromEntries(workerLists.processes.map((name) => [name, workerKeys])),
+  },
 };
 
 type Excuse = { readonly services: readonly string[]; readonly reason: string };
@@ -66,34 +96,44 @@ const EXCUSED: Readonly<Record<string, Excuse>> = {
     reason:
       "reserved for the model host that docs/operations/coolify.md documents. No code reads it yet",
   },
-  NODE_ENV: {
-    services: ["api"],
-    reason: "the mode switch that Node dependencies read. The api's own code never does",
-  },
-  HF_HOME: { services: ["worker"], reason: "read by huggingface_hub" },
-  HF_HUB_OFFLINE: { services: ["worker"], reason: "read by huggingface_hub" },
-  TLDEXTRACT_CACHE: { services: ["worker"], reason: "read by tldextract" },
-  COCOINDEX_DISABLE_USAGE_TRACKING: {
-    services: ["worker"],
-    reason: "read by the cocoindex engine",
-  },
-  RUST_LOG: { services: ["worker"], reason: "read by the cocoindex engine" },
 };
 
 type Finding = { readonly service: string; readonly key: string; readonly message: string };
 
+const argvSchema = z.array(z.string());
+
 const composeSchema = z.object({
-  services: z.record(z.string(), z.object({ environment: z.record(z.string(), z.unknown()) })),
+  services: z.record(
+    z.string(),
+    z.object({
+      image: z.string(),
+      init: z.boolean().optional(),
+      command: argvSchema.optional(),
+      environment: z.record(z.string(), z.unknown()),
+      healthcheck: z.object({ test: argvSchema }).optional(),
+    }),
+  ),
 });
+
+type Services = z.infer<typeof composeSchema>["services"];
 
 type Environments = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
+const servicesIn = (source: string): Services =>
+  composeSchema.parse(parse(source, { merge: true })).services;
+
 const environmentsIn = (source: string): Environments =>
   Object.fromEntries(
-    Object.entries(composeSchema.parse(parse(source, { merge: true })).services).map(
-      ([name, service]) => [name, service.environment],
-    ),
+    Object.entries(servicesIn(source)).map(([name, service]) => [name, service.environment]),
   );
+
+const imageCommand = (dockerfile: string): readonly string[] => {
+  const written = /^CMD (?<argv>\[.*\])$/mu.exec(
+    readFileSync(path.join(repositoryRoot, dockerfile), "utf8"),
+  )?.groups?.["argv"];
+  assert(written !== undefined, `${dockerfile} has no CMD in exec form`);
+  return argvSchema.parse(JSON.parse(written));
+};
 
 const finding = (service: string, key: string, message: string): Finding => ({
   service,
@@ -125,64 +165,143 @@ const sharedDsns = (environments: Environments): Finding[] => {
   });
 };
 
-const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): Finding[] => {
-  const environments = environmentsIn(source);
-  const unlisted = Object.keys(environments)
-    .filter((name) => SERVICES[name] === undefined)
-    .map((name) =>
+/** The process that the argv starts through the tier's gate, or undefined when it bypasses the gate. */
+const gatedProcess = (argv: readonly string[], tier: Tier): string | undefined => {
+  const named = argv.at(-1);
+  const gated =
+    argv.length === tier.gate.length + 1 && tier.gate.every((word, index) => argv[index] === word);
+  return gated && named !== undefined && Object.hasOwn(tier.processes, named) ? named : undefined;
+};
+
+const ungated = (name: string, what: string, argv: readonly string[], tier: Tier): Finding =>
+  finding(
+    name,
+    "",
+    `${name}'s ${what} runs ${JSON.stringify(argv)}, which does not start through the environment gate, so the process keeps every variable the orchestrator hands the container. Run ${JSON.stringify([...tier.gate, "<process>"])} with one of ${Object.keys(tier.processes).join(", ")}`,
+  );
+
+const keyFindings = (
+  name: string,
+  set: readonly string[],
+  keys: Keys,
+  excused: Readonly<Record<string, Excuse>>,
+): Finding[] => {
+  const read = new Set([...keys.required, ...keys.optional]);
+  const excusedHere = Object.entries(excused)
+    .filter(([, excuse]) => excuse.services.includes(name))
+    .map(([key]) => key);
+
+  const lacking = keys.required
+    .filter((key) => !set.includes(key))
+    .map((key) =>
       finding(
         name,
-        "",
-        `${name} is a service of ${COMPOSE} that SERVICES does not name. Add it, with its tier and the readers it starts`,
+        key,
+        `${name} lacks ${key}, which the process ${name} starts requires. Set it in the service's environment, or in an anchor that the service merges`,
       ),
     );
-
-  const perService = Object.entries(SERVICES).flatMap(([name, { tier, starts }]) => {
-    const readers = TIERS[tier] ?? {};
-    const set = Object.keys(environments[name] ?? {});
-    const read = new Set(
-      starts.flatMap((reader) => [
-        ...(readers[reader]?.required ?? []),
-        ...(readers[reader]?.optional ?? []),
-      ]),
+  const unread = set
+    .filter((key) => !read.has(key) && !excusedHere.includes(key))
+    .map((key) =>
+      finding(
+        name,
+        key,
+        `${name} sets ${key}, which the process ${name} starts does not read, so the environment gate drops it. Delete it from ${name}'s environment in ${COMPOSE}. If an anchor supplies it, stop merging the anchor into ${name} and list ${name}'s keys. If a library reads it, add it to the library keys of the tier's config module`,
+      ),
     );
-    const excusedHere = Object.entries(excused)
-      .filter(([, excuse]) => excuse.services.includes(name))
-      .map(([key]) => key);
+  const stale = excusedHere
+    .filter((key) => !set.includes(key) || read.has(key))
+    .map((key) =>
+      finding(
+        name,
+        key,
+        `EXCUSED names ${key} for ${name}, but ${read.has(key) ? `the process ${name} starts reads it now` : `${name} does not set it`}. Delete the entry`,
+      ),
+    );
+  return [...lacking, ...unread, ...stale];
+};
 
-    const lacking = starts.flatMap((reader) =>
-      (readers[reader]?.required ?? [])
-        .filter((key) => !set.includes(key))
-        .map((key) =>
+type Service = Services[string];
+
+const tierOf = (service: Service): Tier | undefined =>
+  Object.values(TIERS).find(({ image }) => service.image.startsWith(`${image}@`));
+
+/** The argv the container starts: the service's own command, or else the image's `CMD`. */
+const commandOf = (service: Service, tier: Tier): readonly string[] =>
+  service.command ?? imageCommand(tier.dockerfile);
+
+const probeFindings = (name: string, service: Service, tier: Tier): Finding[] => {
+  const probe = service.healthcheck?.test.slice(1) ?? [];
+  const runsTierCode = probe[0] === tier.gate[0];
+  return runsTierCode && gatedProcess(probe, tier) === undefined
+    ? [ungated(name, "healthcheck", probe, tier)]
+    : [];
+};
+
+const tierFindings = (
+  name: string,
+  service: Service,
+  tier: Tier,
+  excused: Readonly<Record<string, Excuse>>,
+): Finding[] => {
+  const command = commandOf(service, tier);
+  const keys = tier.processes[gatedProcess(command, tier) ?? ""];
+  const started =
+    keys === undefined
+      ? [ungated(name, "command", command, tier)]
+      : keyFindings(name, Object.keys(service.environment), keys, excused);
+  const init =
+    service.init === true
+      ? [
           finding(
             name,
-            key,
-            `${name} lacks ${key}, which ${reader} requires. Set it in the service's environment, or in an anchor that the service merges`,
+            "init",
+            `${name} sets init, so Docker's init runs as PID 1 with every variable of the container, and the app's user can read it from /proc/1/environ. Delete the line. Started as PID 1, the gate puts tini there with only the kept keys`,
           ),
-        ),
-    );
-    const unread = set
-      .filter((key) => !read.has(key) && !excusedHere.includes(key))
-      .map((key) =>
-        finding(
-          name,
-          key,
-          `${name} sets ${key}, which no reader that ${name} starts reads. Delete it from ${name}'s environment in ${COMPOSE}. If an anchor supplies it, stop merging the anchor into ${name} and list ${name}'s keys. If a library reads it, name it in EXCUSED with that library`,
-        ),
-      );
-    const stale = excusedHere
-      .filter((key) => !set.includes(key) || read.has(key))
-      .map((key) =>
-        finding(
-          name,
-          key,
-          `EXCUSED names ${key} for ${name}, but ${read.has(key) ? `a reader that ${name} starts reads it now` : `${name} does not set it`}. Delete the entry`,
-        ),
-      );
-    return [...lacking, ...unread, ...stale];
-  });
+        ]
+      : [];
+  return [...started, ...init, ...probeFindings(name, service, tier)];
+};
 
-  return [...unlisted, ...perService, ...sharedDsns(environments)];
+const serviceFindings = (
+  name: string,
+  service: Service,
+  excused: Readonly<Record<string, Excuse>>,
+): Finding[] => {
+  const tier = tierOf(service);
+  return tier === undefined
+    ? [
+        finding(
+          name,
+          "",
+          `${name} runs ${service.image}, which is the image of no tier in TIERS. Add the tier, with its gate and the keys each of its processes reads`,
+        ),
+      ]
+    : tierFindings(name, service, tier, excused);
+};
+
+const startedIn = (source: string): Readonly<Record<string, string | undefined>> =>
+  Object.fromEntries(
+    Object.entries(servicesIn(source)).map(([name, service]) => {
+      const tier = tierOf(service);
+      return [name, tier && gatedProcess(commandOf(service, tier), tier)];
+    }),
+  );
+
+const findingsIn = (source: string, excused: Readonly<Record<string, Excuse>>): Finding[] => [
+  ...Object.entries(servicesIn(source)).flatMap(([name, service]) =>
+    serviceFindings(name, service, excused),
+  ),
+  ...sharedDsns(environmentsIn(source)),
+];
+
+/** `requireBootstrap` calls `readBootstrap`. */
+const readersCalledIn = (entry: string): string[] => {
+  const source = readFileSync(path.join(repositoryRoot, "apps/api/src", entry), "utf8");
+  const called = [...source.matchAll(/\b(read[A-Z]\w*|requireBootstrap)\(/gu)]
+    .map(([, name]) => (name === "requireBootstrap" ? "readBootstrap" : (name ?? "")))
+    .filter((name) => Object.hasOwn(apiConfig.READER_SCHEMAS, name));
+  return [...new Set(called)].sort();
 };
 
 const compose = readFileSync(path.join(repositoryRoot, COMPOSE), "utf8");
@@ -200,14 +319,22 @@ describe(`${COMPOSE} gives each service the environment its tier's config module
     expect(findingsIn(compose, EXCUSED).map(({ message }) => message)).toEqual([]);
   });
 
-  it("names every service of the file", () => {
-    expect(Object.keys(environmentsIn(compose)).sort()).toEqual(Object.keys(SERVICES).sort());
+  it("starts each service through its tier's environment gate", () => {
+    expect(startedIn(compose)).toEqual({ migrate: "migrate", api: "api", worker: "worker" });
   });
 
   it("registers every reader the api's config module exports", () => {
     const exported = Object.keys(apiConfig).filter((name) => /^read[A-Z]/u.test(name));
 
-    expect(Object.keys(apiTier).sort()).toEqual(exported.sort());
+    expect(Object.keys(apiConfig.READER_SCHEMAS).sort()).toEqual(exported.sort());
+    expect([...apiConfig.PROCESS_READERS.api].sort()).toEqual(exported.sort());
+  });
+
+  it.each([
+    ["migrate", "migrate.ts"],
+    ["ops", "ops.ts"],
+  ] as const)("keeps %s's readers to those its entry calls", (process, entry) => {
+    expect(readersCalledIn(entry)).toEqual([...apiConfig.PROCESS_READERS[process]].sort());
   });
 
   it("counts a default or an optional field as optional", () => {
@@ -220,11 +347,11 @@ describe(`${COMPOSE} gives each service the environment its tier's config module
     expect(keysOf(schema)).toEqual({ required: ["A"], optional: ["B", "C"] });
   });
 
-  it("reads the worker's lists from its config module", () => {
-    const keys = TIERS["worker"]?.["read_bootstrap"];
-
-    expect(keys?.required).toContain("DATABASE_URL");
-    expect(keys?.optional).toContain("WORKER_ID");
+  it("reads the worker's keys and processes from its own modules", () => {
+    expect(workerKeys.required).toContain("DATABASE_URL");
+    expect(workerKeys.optional).toContain("WORKER_ID");
+    expect(workerKeys.optional).toContain("HF_HOME");
+    expect(workerLists.processes.sort()).toEqual(["health", "worker"]);
   });
 });
 
@@ -262,7 +389,7 @@ describe("the check fails on a planted file", () => {
     expect(flagged(findingsIn(removed, EXCUSED))).toEqual(["api KEK"]);
   });
 
-  it("asks only the services that start the reader", () => {
+  it("asks only the services whose process reads the key", () => {
     const removed = edited("  S3_SECRET_KEY: ${OBJECTSTORE_ROOT_SECRET:?}\n", "");
 
     expect(flagged(findingsIn(removed, EXCUSED))).toEqual([
@@ -349,7 +476,7 @@ describe("the check fails on a planted file", () => {
     expect(findingsIn(removed, EXCUSED)).toEqual([]);
   });
 
-  it("refuses an excused key in another service", () => {
+  it("refuses a library key the tier does not read", () => {
     const planted = edited(
       "      MAX_CONCURRENT_RUNS:",
       "      NODE_ENV: production\n      MAX_CONCURRENT_RUNS:",
@@ -358,10 +485,22 @@ describe("the check fails on a planted file", () => {
     expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["worker NODE_ENV"]);
   });
 
-  it("refuses an excuse for a key no longer set", () => {
-    const removed = edited("      HF_HOME: /data/worker/hf-cache\n", "");
+  it("refuses an excused key in another service", () => {
+    const planted = edited(
+      "      # The owner DSN",
+      "      EMBEDDINGS_URL: http://model\n      # The owner DSN",
+    );
 
-    expect(flagged(findingsIn(removed, EXCUSED))).toEqual(["worker HF_HOME"]);
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["migrate EMBEDDINGS_URL"]);
+  });
+
+  it("refuses an excuse for a key no longer set", () => {
+    const removed = edited("  EMBEDDINGS_URL: ${EMBEDDINGS_URL:-}\n", "");
+
+    expect(flagged(findingsIn(removed, EXCUSED))).toEqual([
+      "api EMBEDDINGS_URL",
+      "worker EMBEDDINGS_URL",
+    ]);
   });
 
   it("refuses an excuse for a key now read", () => {
@@ -370,9 +509,58 @@ describe("the check fails on a planted file", () => {
     expect(flagged(findingsIn(compose, excusedButRead))).toEqual(["api KEK"]);
   });
 
-  it("refuses a service that SERVICES omits", () => {
+  it("refuses a service whose image belongs to no tier", () => {
     const planted = `${compose}  planted:\n    image: x\n    environment:\n      A: b\n`;
 
     expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["planted"]);
+  });
+
+  it("refuses a migrate started without the gate", () => {
+    const planted = edited(
+      '["node", "apps/api/src/environment-gate.ts", "migrate"]',
+      '["pnpm", "migrate"]',
+    );
+    const findings = findingsIn(planted, EXCUSED);
+
+    expect(flagged(findings)).toEqual(["migrate"]);
+    expect(findings[0]?.message).toContain(
+      '["node","apps/api/src/environment-gate.ts","<process>"]',
+    );
+  });
+
+  it("refuses a gate asked for a process of no tier", () => {
+    const planted = edited(
+      '["node", "apps/api/src/environment-gate.ts", "migrate"]',
+      '["node", "apps/api/src/environment-gate.ts", "seed"]',
+    );
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["migrate"]);
+  });
+
+  it("refuses an api command that bypasses the gate", () => {
+    const planted = edited(
+      "    image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?}\n",
+      '    image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?}\n    command: ["node", "apps/api/src/main.ts"]\n',
+    );
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["api"]);
+  });
+
+  it("refuses Docker's init in front of the gate", () => {
+    const planted = edited(
+      "    stop_grace_period: 30s\n    <<: [*restart, *logging]\n",
+      "    init: true\n    stop_grace_period: 30s\n    <<: [*restart, *logging]\n",
+    );
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["worker init"]);
+  });
+
+  it("refuses a worker healthcheck that runs Python without the gate", () => {
+    const planted = edited(
+      '["CMD", "python", "-m", "better_answers_worker.environment_gate", "health"]',
+      '["CMD", "python", "-m", "better_answers_worker.health"]',
+    );
+
+    expect(flagged(findingsIn(planted, EXCUSED))).toEqual(["worker"]);
   });
 });

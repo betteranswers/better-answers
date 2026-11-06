@@ -107,7 +107,7 @@ cleanup_work
 
 say "## 6 Replay the erasures completed after ${stamp}. This step is mandatory; if it fails, api and the backup service stay stopped."
 # Runs in api, not migrate: only api mounts the git directory and object store that the replay reads.
-platform run --rm --no-deps api pnpm ops replay-erasures --since "${stamp}" | tee -a "${LOG}"
+platform run --rm --no-deps api node apps/api/src/environment-gate.ts ops replay-erasures --since "${stamp}" | tee -a "${LOG}"
 
 say "## 7 Start api and smoke test it"
 platform up -d --wait api
