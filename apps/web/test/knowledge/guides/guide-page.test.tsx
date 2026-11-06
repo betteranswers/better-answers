@@ -178,6 +178,30 @@ describe("a section the reader cannot read", () => {
   });
 });
 
+describe("a section hidden from other readers", () => {
+  const hiding = aGuide({
+    sections: [
+      aSection({ hidden: true }),
+      aSection({ sectionId: idOf(22), number: "2", prompt: "Insurance" }),
+    ],
+  });
+
+  it("is marked for the Admin who can see it", async () => {
+    await openGuide("Admin", hiding);
+
+    expect(within(sectionNamed(SECTION_ONE)).getByText("Hidden from other readers")).toBeDefined();
+    expect(
+      within(sectionNamed("2. Insurance")).queryByText("Hidden from other readers"),
+    ).toBeNull();
+  });
+
+  it("is marked nowhere else", async () => {
+    await openGuide("Editor", aGuide());
+
+    expect(screen.queryByText("Hidden from other readers")).toBeNull();
+  });
+});
+
 describe("a section that needs review", () => {
   const REASONS = [
     "concept-changed",

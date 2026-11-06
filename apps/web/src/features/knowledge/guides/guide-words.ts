@@ -27,6 +27,7 @@ export const GUIDE_WORDS = {
   noFacts: "No facts are expected in this section.",
   heading: (number: string, prompt: string): string => `${number}. ${prompt}`,
   needsReview: "Needs review",
+  hidden: "Hidden from other readers",
   reasons: {
     "concept-changed": "Cites a concept that changed",
     "concept-removed": "Cites a concept that was removed",

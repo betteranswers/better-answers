@@ -261,6 +261,7 @@ function SectionHead(properties: {
       </Heading>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
         <Pill>{section.trustWords}</Pill>
+        {section.hidden ? <Pill variant="outline">{WORDS.hidden}</Pill> : null}
         {section.needsReview === null ? null : (
           <>
             <Pill variant="outline">{WORDS.needsReview}</Pill>

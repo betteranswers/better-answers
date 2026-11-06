@@ -228,6 +228,8 @@ export type SectionRead = {
   readonly roleLabel: RoleLabel;
   readonly usageNote: string | null;
   readonly layers: readonly GuideLayer[];
+
+  /** Withheld from every reader but an Admin, because it or a section above it is hidden. */
   readonly hidden: boolean;
   readonly needsReview: NeedsReview | null;
   readonly coverage: SectionFacts;
@@ -331,15 +333,14 @@ type FactShapeRow = {
 const FACT_SHAPES = `SELECT id, kind, tags FROM guide_expected_fact
    WHERE workspace_id = $1 AND guide_id = $2`;
 
-const hiddenFrom = (reader: UserPrincipal, rows: readonly SectionRow[]): ReadonlySet<string> => {
-  const hidden = new Set<string>();
-  if (reader.role === "Admin") return hidden;
+const withheldAmong = (rows: readonly SectionRow[]): ReadonlySet<string> => {
+  const withheld = new Set<string>();
   for (const row of rows) {
-    if (row.hidden || (row.parent_id !== null && hidden.has(row.parent_id))) {
-      hidden.add(row.section_id);
+    if (row.hidden || (row.parent_id !== null && withheld.has(row.parent_id))) {
+      withheld.add(row.section_id);
     }
   }
-  return hidden;
+  return withheld;
 };
 
 const numberedIn = (rows: readonly SectionRow[]): ReadonlyMap<string, string> => {
@@ -392,11 +393,9 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
     const row = rowOf.get(section.sectionId);
     return row === undefined ? [] : [{ section, row }];
   });
-  const hidden = hiddenFrom(
-    reader,
-    ordered.map(({ row }) => row),
-  );
-  const shown = ordered.filter(({ row }) => !hidden.has(row.section_id));
+  const withheld = withheldAmong(ordered.map(({ row }) => row));
+  const shown =
+    reader.role === "Admin" ? ordered : ordered.filter(({ row }) => !withheld.has(row.section_id));
   const numbers = numberedIn(shown.map(({ row }) => row));
   const shapeOf = new Map(held.shapes.map((shape) => [shape.id, shape]));
   const citedBy = Map.groupBy(held.cited, (row) => row.write_up_id);
@@ -420,7 +419,7 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
         roleLabel: row.role_label,
         usageNote: row.usage_note,
         layers: row.layers,
-        hidden: row.hidden,
+        hidden: withheld.has(row.section_id),
         needsReview: row.needs_review,
         coverage: {
           met: metIn(section.facts),

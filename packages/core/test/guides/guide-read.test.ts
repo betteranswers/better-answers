@@ -182,6 +182,22 @@ describe("reading a guide", () => {
     expect(admin.sections.map((section) => section.number)).toContain("6.1");
   });
 
+  it("marks each section that other readers cannot see", async () => {
+    const seeded = await freshGuide();
+    await db().pool.query(
+      "UPDATE guide_section SET hidden = true WHERE guide_id = $1 AND prompt = 'Information security'",
+      [seeded.guideId],
+    );
+
+    const admin = await guideAs(seeded, seeded.ng.admin);
+    const editor = await guideAs(seeded, seeded.ng.editor);
+
+    expect(
+      admin.sections.filter((section) => section.hidden).map((section) => section.prompt),
+    ).toEqual(["Information security", "Security testing"]);
+    expect(editor.sections.some((section) => section.hidden)).toBe(false);
+  });
+
   it("gives no Brief to a reader outside the write-up's audience", async () => {
     const seeded = await freshGuide();
 
