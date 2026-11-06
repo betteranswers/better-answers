@@ -32,9 +32,17 @@ if (process.execve === undefined) {
 // Docker runs health checks and `docker exec` as the image's user, root, so the app's uid
 // cannot read their environment.
 if (process.getuid?.() === 0) {
-  process.setgroups?.([]);
-  process.setgid?.(APP_UID);
-  process.setuid?.(APP_UID);
+  if (
+    process.setgroups === undefined ||
+    process.setgid === undefined ||
+    process.setuid === undefined
+  ) {
+    process.stderr.write("environment-gate: this platform cannot drop root\n");
+    process.exit(1);
+  }
+  process.setgroups([]);
+  process.setgid(APP_UID);
+  process.setuid(APP_UID);
 }
 
 const entry = fileURLToPath(new URL(ENTRIES[named], import.meta.url));
