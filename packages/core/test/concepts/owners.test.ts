@@ -673,6 +673,19 @@ describe("naming one owner for many concepts", () => {
     expect(events.rows.filter(({ detail }) => !("personId" in detail))).toHaveLength(2);
   });
 
+  it("leaves a concept unowned when its collection has no owner", async () => {
+    const scenario = await arrange();
+    const drills = "knowledge/safety/drills.md";
+    const iri = await shelveOne(db().pool, scenario.workspaceId, { path: drills });
+    await namingEach(scenario, scenario.admin, { iris: [iri], personId: scenario.viewer.userId });
+
+    const named = await namingEach(scenario, scenario.admin, { iris: [iri], personId: null });
+
+    expect(named).toMatchObject({ ok: true, value: { ok: true, value: { named: 1 } } });
+    expect(await overridesOf(scenario)).toEqual([]);
+    expect(await ownerRead(scenario, { iri, path: drills })).toBeUndefined();
+  });
+
   it("refuses the batch when one concept is unreadable", async () => {
     const scenario = await arrange();
     const group = await seedingWith(db().pool, (seed) =>

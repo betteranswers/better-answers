@@ -277,7 +277,9 @@ describe("the All Knowledge page for an Admin", () => {
         { iris: [THE_LEAVE.iri, THE_EXPENSES.iri], personId: null },
       ]),
     );
-    await waitFor(() => expect(outcome.textContent).toContain("collections’ owners"));
+    await waitFor(() =>
+      expect(outcome.textContent).toBe("2 concepts no longer have their own owner."),
+    );
   });
 
   it("selects and sets an owner by keystroke alone", async () => {

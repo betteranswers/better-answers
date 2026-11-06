@@ -51,9 +51,9 @@ export const ALL_KNOWLEDGE_WORDS = {
       `Setting ${name} as the owner of ${conceptsCounted(count)}.`,
     done: (name: string, count: number): string => `${name} now owns ${conceptsCounted(count)}.`,
     returning: (count: number): string =>
-      `Returning ${conceptsCounted(count)} to ${count === 1 ? "its collection’s owner" : "their collections’ owners"}.`,
+      `Removing the ${count === 1 ? "owner" : "owners"} set for ${conceptsCounted(count)}.`,
     returned: (count: number): string =>
-      `${conceptsCounted(count)} ${count === 1 ? "is now owned by its collection’s owner" : "are now owned by their collections’ owners"}.`,
+      `${conceptsCounted(count)} no longer ${count === 1 ? "has its" : "have their"} own owner.`,
     stillGoing: "The owner is still being set. Please wait.",
     tooMany: (most: number): string => `Please select ${most} concepts or fewer.`,
   },
