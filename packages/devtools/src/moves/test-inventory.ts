@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import type { SpawnSyncReturns } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -21,6 +21,10 @@ export type Inventory =
   | { readonly kind: "changed"; readonly changes: readonly string[] }
   | { readonly kind: "unlisted"; readonly reason: string };
 
+type Lists = ReadonlyMap<string, readonly string[]>;
+
+type Listing = { readonly lists: Lists } | { readonly failure: string };
+
 const failureOf = (taken: SpawnSyncReturns<string>): string | undefined => {
   if (taken.error !== undefined) return taken.error.message;
   if (taken.status === 0) return undefined;
@@ -39,17 +43,25 @@ const takeInventory = (root: string, into: string): string | undefined =>
   );
 
 const linesOf = (file: string): readonly string[] =>
-  existsSync(file)
-    ? readFileSync(file, "utf8")
-        .split("\n")
-        .filter((line) => line !== "")
-    : [];
+  readFileSync(file, "utf8")
+    .split("\n")
+    .filter((line) => line !== "");
 
-const casesIn = (directory: string): number =>
-  readdirSync(directory).reduce(
-    (total, file) => total + linesOf(path.join(directory, file)).length,
-    0,
-  );
+const listingOf = (root: string): Listing => {
+  const scratch = mkdtempSync(path.join(tmpdir(), "move-files-inventory-"));
+  try {
+    const failure = takeInventory(root, scratch);
+    if (failure !== undefined) return { failure };
+    const lists = new Map<string, readonly string[]>();
+    for (const file of readdirSync(scratch)) lists.set(file, linesOf(path.join(scratch, file)));
+    return { lists };
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+};
+
+const casesIn = (lists: Lists): number =>
+  [...lists.values()].reduce((total, lines) => total + lines.length, 0);
 
 const without = (lines: readonly string[], others: readonly string[]): readonly string[] => {
   const remaining = new Map<string, number>();
@@ -62,35 +74,29 @@ const without = (lines: readonly string[], others: readonly string[]): readonly 
   });
 };
 
-const changesBetween = (before: string, after: string): readonly string[] =>
-  [...new Set([...readdirSync(before), ...readdirSync(after)])].sort(byCodeUnit).flatMap((file) => {
-    const was = linesOf(path.join(before, file));
-    const now = linesOf(path.join(after, file));
+const changesBetween = (before: Lists, after: Lists): readonly string[] =>
+  [...new Set([...before.keys(), ...after.keys()])].sort(byCodeUnit).flatMap((file) => {
+    const was = before.get(file) ?? [];
+    const now = after.get(file) ?? [];
     return [
       ...without(was, now).map((line) => `${file}: removed ${line}`),
       ...without(now, was).map((line) => `${file}: added ${line}`),
     ];
   });
 
-export const inventoryAround = (root: string, move: () => void): Inventory => {
-  const scratch = mkdtempSync(path.join(tmpdir(), "move-files-inventory-"));
-  const before = path.join(scratch, "before");
-  const after = path.join(scratch, "after");
-  try {
-    const refused = takeInventory(root, before);
-    if (refused !== undefined) {
-      throw new Error(
-        `scripts/test-inventory.sh failed before the move, so nothing moved\n${refused}`,
-      );
-    }
-    move();
-    const reason = takeInventory(root, after);
-    if (reason !== undefined) return { kind: "unlisted", reason };
-    const changes = changesBetween(before, after);
-    return changes.length === 0
-      ? { kind: "unchanged", cases: casesIn(after) }
-      : { kind: "changed", changes };
-  } finally {
-    rmSync(scratch, { recursive: true, force: true });
+export const holdInventory = (root: string): (() => Inventory) => {
+  const before = listingOf(root);
+  if ("failure" in before) {
+    throw new Error(
+      `scripts/test-inventory.sh failed before the move, so nothing moved\n${before.failure}`,
+    );
   }
+  return () => {
+    const after = listingOf(root);
+    if ("failure" in after) return { kind: "unlisted", reason: after.failure };
+    const changes = changesBetween(before.lists, after.lists);
+    return changes.length === 0
+      ? { kind: "unchanged", cases: casesIn(after.lists) }
+      : { kind: "changed", changes };
+  };
 };

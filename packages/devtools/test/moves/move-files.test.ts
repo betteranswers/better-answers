@@ -371,6 +371,21 @@ describe("the move itself", () => {
     );
   });
 
+  it("puts the tree back when a move fails halfway", () => {
+    const root = repositoryOf({ [USER]: 'import { thing } from "./thing.ts";\n' });
+
+    const ran = moved(root, [
+      [THING, "packages/probe/src/group/inner.ts"],
+      [USER, "packages/probe/src/group/inner.ts/user.ts"],
+    ]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain("move-files:");
+    expect(status(root)).toBe("");
+    expect(read(root, USER)).toBe('import { thing } from "./thing.ts";\n');
+    expect(existsSync(path.join(root, "packages/probe/src/group"))).toBe(false);
+  });
+
   it("changes nothing under --dry-run, and says what it would do", () => {
     const root = repositoryOf({ [USER]: 'import { thing } from "./thing.ts";\n' });
 
@@ -562,6 +577,7 @@ describe("the test inventory a move holds", () => {
     const root = repositoryOf({
       [CORE_SOURCE]: "export const thing = 1;\n",
       [CORE_TEST]: `import { it } from "vitest";\n\nit("${TITLE}", () => {});\n`,
+      "packages/core/vitest.config.ts": "export default {};\n",
       ...extra,
     });
     const modules = path.join(root, "packages/core/node_modules");
@@ -594,6 +610,33 @@ describe("the test inventory a move holds", () => {
     );
   });
 
+  it("passes a move between two configs of one workspace", () => {
+    const root = coreRepositoryOf({
+      "packages/core/vitest.config.ts":
+        'export default { test: { include: ["test/**/*.test.ts"] } };\n',
+      "packages/core/vitest.images.config.ts":
+        'import base from "./vitest.config.ts";\n\nexport default { ...base, test: { ...base.test, include: ["images/**/*.test.ts"] } };\n',
+    });
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/images/thing.test.ts"]]);
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toContain("test inventory unchanged; titles listed: 1");
+  });
+
+  it("lists the tests without running a globalSetup", () => {
+    const root = coreRepositoryOf({
+      "packages/core/vitest.config.ts":
+        'export default { test: { globalSetup: ["./setup.ts"] } };\n',
+      "packages/core/setup.ts": 'throw new Error("a globalSetup ran");\n',
+    });
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toContain("test inventory unchanged; titles listed: 1");
+  });
+
   it("fails a move that renames a test file", () => {
     const root = coreRepositoryOf();
 
@@ -604,18 +647,93 @@ describe("the test inventory a move holds", () => {
     expect(ran.stdout).toContain(`  vitest-core.txt: added renamed.test.ts :: ${TITLE}\n`);
   });
 
-  it("fails a move after which the tests cannot be listed", () => {
+  it("fails a move that changes a run-time title", () => {
+    const LABEL_FILE = "packages/core/src/label.ts";
     const root = coreRepositoryOf({
-      "packages/core/vitest.config.ts": `import { readFileSync } from "node:fs";\n\nreadFileSync("src/thing.ts");\n\nexport default {};\n`,
+      [LABEL_FILE]: `export const LABEL = "${CORE_SOURCE}";\n`,
+      [CORE_TEST]: [
+        'import { it } from "vitest";',
+        'import { LABEL } from "../src/label.ts";',
+        `const FILE = "${CORE_SOURCE}";`,
+        `it.skip("skipped ${CORE_SOURCE}", () => {});`,
+        "it(`built from ${FILE}`, () => {});",
+        `it.each([["${CORE_SOURCE}"]])("each of %s", () => {});`,
+        "it(`imported ${LABEL}`, () => {});",
+        "",
+      ].join("\n"),
     });
 
     const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
 
     expect(ran.status).toBe(1);
-    expect(ran.stdout).toContain("moved 1 files");
-    expect(ran.stdout).toContain("the tests could not be listed after it");
+    for (const lead of ["skipped", "built from", "each of", "imported"]) {
+      expect(ran.stdout).toContain(`: removed thing.test.ts :: ${lead} ${CORE_SOURCE}\n`);
+      expect(ran.stdout).toContain(
+        `: added thing.test.ts :: ${lead} packages/core/src/group/thing.ts\n`,
+      );
+    }
+  });
+
+  it("puts the tree back when it refuses a move", () => {
+    const root = coreRepositoryOf({ "docs/note.md": `${CORE_SOURCE}\n` });
+    writeUnder(root, "docs/note.md", `${CORE_SOURCE}, edited by hand\n`);
+    writeUnder(root, "packages/core/src/staged.ts", "export const staged = 1;\n");
+    gitIn(root, "add", "packages/core/src/staged.ts");
+    const treeOf = (): readonly string[] => [
+      status(root),
+      gitIn(root, "diff"),
+      gitIn(root, "diff", "--cached"),
+    ];
+    const before = treeOf();
+
+    const ran = moved(root, [
+      [CORE_SOURCE, "packages/core/src/new-folder/deeper/thing.ts"],
+      ["packages/core/src/staged.ts", "packages/core/src/new-folder/staged.ts"],
+    ]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stdout).toContain(
+      "undid the move of 2 files and the rewrite of 2 files; the tree is as it was before",
+    );
+    expect(treeOf()).toStrictEqual(before);
+    expect(existsSync(path.join(root, "packages/core/src/new-folder"))).toBe(false);
+  });
+
+  it("puts the tree back when the tests cannot be listed", () => {
+    const root = coreRepositoryOf({
+      "packages/core/vitest.config.ts": `import { readFileSync } from "node:fs";\n\nreadFileSync("src/thing.ts");\n\nexport default {};\n`,
+    });
+    const before = status(root);
+
+    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stdout).toContain("the tree is as it was before");
+    expect(ran.stdout).toContain("the tests could not be listed after the move");
     expect(ran.stdout).toContain("ENOENT");
-    expect(ran.stdout).toContain("packages/core/vitest.config.ts:3:readFileSync");
+    expect(status(root)).toBe(before);
+  });
+
+  it("says so when the move cannot be undone", () => {
+    const root = coreRepositoryOf({
+      "packages/core/vitest.config.ts": [
+        'import { existsSync, writeFileSync } from "node:fs";',
+        "",
+        'if (existsSync("src/group/thing.ts")) {',
+        '  writeFileSync("src/thing.ts", "in the way");',
+        '  throw new Error("the listing stopped");',
+        "}",
+        "export default {};",
+        "",
+      ].join("\n"),
+    });
+
+    const ran = moved(root, [[CORE_SOURCE, "packages/core/src/group/thing.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain("the move could not be undone, so the tree is part moved");
+    expect(read(root, CORE_TEST)).toContain(`it("${TITLE}"`);
+    expect(existsSync(path.join(root, "packages/core/src/group/thing.ts"))).toBe(true);
   });
 
   it("moves nothing when the inventory cannot be taken", () => {

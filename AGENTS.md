@@ -65,7 +65,9 @@ A folder in a `src`, `test`, `tests`, or `e2e` tree holds at most 15 tracked fil
 
 ### Move files
 
-Write a TSV table with one `<old>\t<new>` row for each file, then run `node scripts/move-files.mjs <table.tsv>`. The script rewrites the imports and the path mentions, then runs `git mv`. A move changes no test file's name and no test's title, so the script lists the tests before and after, and exits non-zero on any difference.
+Write a TSV table with one `<old>\t<new>` row for each file, then run `node scripts/move-files.mjs <table.tsv>`. The script rewrites the imports and the path mentions, then runs `git mv`. A move changes no test file's name and no test's title. The script lists every test by file name and title before the move and again after it. If the lists differ, or the second listing fails, the script undoes the move, prints the difference, and exits non-zero.
+
+A listing runs each test module and no test, so it holds the title that the test runs under: a title built at run time, each row of `it.each`, and every skipped and todo case. It covers every vitest config in `packages/*` and `apps/*` except a stryker config, and it also covers the worker's pytest collection and Playwright's list of the web specs. It does not see a `describe` that holds no case. A test that moves to another workspace counts as a change. A listing takes about a minute, and a move takes two.
 
 ## Coding
 

@@ -1,11 +1,11 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { z } from "zod";
 
 import { trackedFiles } from "../paths.ts";
-import { inventoryAround } from "./test-inventory.ts";
+import { holdInventory } from "./test-inventory.ts";
 import type { Inventory } from "./test-inventory.ts";
 
 const NEVER_REWRITTEN: readonly RegExp[] = [
@@ -276,7 +276,63 @@ const gitMove = (root: string, from: string, to: string): void => {
 
 const isRewritable = (file: string): boolean => TEXT.test(file) && !isNeverRewritten(file);
 
-type Edit = { readonly file: string; readonly text: string };
+type Edit = { readonly file: string; readonly original: Buffer; readonly text: string };
+
+const messageOf = (cause: unknown): string =>
+  cause instanceof Error ? cause.message : String(cause);
+
+const firstMissing = (folder: string): string | undefined => {
+  let missing: string | undefined;
+  for (let at = folder; !existsSync(at); at = path.dirname(at)) missing = at;
+  return missing;
+};
+
+const applyMove = (
+  root: string,
+  edits: readonly Edit[],
+  moves: ReadonlyMap<string, string>,
+): (() => void) => {
+  const undo: (() => void)[] = [];
+  const revert = (): void => {
+    const failures: string[] = [];
+    for (let step = undo.pop(); step !== undefined; step = undo.pop()) {
+      try {
+        step();
+      } catch (cause) {
+        failures.push(messageOf(cause));
+      }
+    }
+    if (failures.length > 0) {
+      throw new Error(
+        `the move could not be undone, so the tree is part moved\n${failures.join("\n")}`,
+      );
+    }
+  };
+  try {
+    for (const { file, original, text } of edits) {
+      writeFileSync(path.join(root, file), text);
+      undo.push(() => {
+        writeFileSync(path.join(root, file), original);
+      });
+    }
+    for (const [from, to] of moves) {
+      const created = firstMissing(path.dirname(path.join(root, to)));
+      gitMove(root, from, to);
+      undo.push(() => {
+        gitMove(root, to, from);
+        if (created !== undefined) rmSync(created, { recursive: true, force: true });
+      });
+    }
+  } catch (cause) {
+    try {
+      revert();
+    } catch (stuck) {
+      throw new Error(`${messageOf(cause)}\n${messageOf(stuck)}`, { cause });
+    }
+    throw cause;
+  }
+  return revert;
+};
 
 const editsOf = (
   plan: Plan,
@@ -285,10 +341,11 @@ const editsOf = (
   const edits: Edit[] = [];
   const unresolved: string[] = [];
   for (const file of tracked.filter(isRewritable)) {
-    const before = readFileSync(path.join(plan.root, file), "utf8");
+    const original = readFileSync(path.join(plan.root, file));
+    const before = original.toString("utf8");
     const after = rewrittenFile(plan, file, before);
     unresolved.push(...after.unresolved);
-    if (after.text !== before) edits.push({ file, text: after.text });
+    if (after.text !== before) edits.push({ file, original, text: after.text });
   }
   return { edits, unresolved };
 };
@@ -297,20 +354,18 @@ export const moveFiles = (root: string, tablePath: string, dryRun: boolean): Mov
   const tracked = trackedFiles(root);
   const moves = readMoves(root, new Set(tracked), tablePath);
   const { edits, unresolved } = editsOf(planOf(root, moves, tracked), tracked);
-  const apply = (): void => {
-    for (const { file, text } of edits) writeFileSync(path.join(root, file), text);
-    for (const [from, to] of moves) gitMove(root, from, to);
-  };
-  const inventory = dryRun ? undefined : inventoryAround(root, apply);
-  const found = {
-    moved: moves.size,
-    rewritten: edits.map(({ file }) => file),
-    unresolved,
-    leftovers: leftoversOf(root, moves),
-  };
-  return inventory === undefined
-    ? { ...found, dryRun: true }
-    : { ...found, dryRun: false, inventory };
+  const found = { moved: moves.size, rewritten: edits.map(({ file }) => file), unresolved };
+  if (dryRun) return { ...found, leftovers: leftoversOf(root, moves), dryRun: true };
+  const retake = holdInventory(root);
+  const revert = applyMove(root, edits, moves);
+  let inventory: Inventory | undefined;
+  try {
+    const leftovers = leftoversOf(root, moves);
+    inventory = retake();
+    return { ...found, leftovers, dryRun: false, inventory };
+  } finally {
+    if (inventory?.kind !== "unchanged") revert();
+  }
 };
 
 const listed = (heading: string, lines: readonly string[]): string =>
@@ -330,15 +385,24 @@ const inventoryOf = (inventory: Inventory): string => {
       );
     case "unlisted":
       return listed(
-        "the move is done, but the tests could not be listed after it, so a changed test name or title is not ruled out (a moved file that now fails to import is the usual cause):",
+        "the tests could not be listed after the move, so a changed test name or title is not ruled out (a moved file that now fails to import is the usual cause):",
         inventory.reason.split("\n"),
       );
   }
 };
 
+const headingOf = (report: MoveReport): string => {
+  const moved = String(report.moved);
+  const rewritten = String(report.rewritten.length);
+  if (report.dryRun) return `would move ${moved} files; rewrote ${rewritten} files\n`;
+  return report.inventory.kind === "unchanged"
+    ? `moved ${moved} files; rewrote ${rewritten} files\n`
+    : `undid the move of ${moved} files and the rewrite of ${rewritten} files; the tree is as it was before\n`;
+};
+
 export const reportOf = (report: MoveReport): string =>
   [
-    `${report.dryRun ? "would move" : "moved"} ${String(report.moved)} files; rewrote ${String(report.rewritten.length)} files\n`,
+    headingOf(report),
     report.dryRun ? "" : inventoryOf(report.inventory),
     listed(
       "relative specifiers in moved files that resolve to nothing (each is fixture text or a broken import):",
