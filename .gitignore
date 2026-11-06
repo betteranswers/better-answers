@@ -50,3 +50,8 @@ deploy/wizard-41.env
 .claude/worktrees/
 .claude/tmp/
 .claude/settings.local.json
+
+# Impeccable runtime output
+.impeccable/mocks/
+.impeccable/critique/*
+!.impeccable/critique/ignore.md
