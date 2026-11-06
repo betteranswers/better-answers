@@ -92,13 +92,13 @@ const heldUploadOf = (text: string) => {
 
 const A_MEGABYTE = 1024 * 1024;
 
-const pastTheCap = () => {
+const bodyOf = (total: number) => {
   const block = new Uint8Array(A_MEGABYTE);
   let sent = 0;
   return new ReadableStream<Uint8Array>(
     {
       pull: (controller) => {
-        const left = UPLOAD_BYTE_CAP + 1 - sent;
+        const left = total - sent;
         if (left <= 0) {
           controller.close();
           return;
@@ -403,38 +403,43 @@ describe("an Admin connects an upload", () => {
     expect(await leftBehindBy(scenario.admin, upload)).toEqual({ bodyRead: false, stored: [] });
   });
 
-  it("accepts a file exactly at the cap", async () => {
-    const scenario = await arrange();
-    const { input } = handbookOffered({ byteSize: UPLOAD_BYTE_CAP });
-
-    const bound = await connectUpload(scenario.admin, doorsOf(scenario), input);
-
-    expect(bound.ok).toEqual(true);
-  });
-
   it.each([
-    ["more", HANDBOOK_BYTES * 1000],
-    ["fewer", 1],
-  ])("records the bytes received, not %s bytes declared", async (_case, byteSize) => {
+    ["a file at the cap", UPLOAD_BYTE_CAP],
+    ["an empty file", 0],
+  ])("accepts %s that declares its size", async (_case, size) => {
     const scenario = await arrange();
-    const { input } = handbookOffered({ byteSize });
+    const input = {
+      ...inputOf(connectUploadFields, handbookAsked({ byteSize: size })),
+      body: bodyOf(size),
+    };
 
     const bound = await connectUpload(scenario.admin, doorsOf(scenario), input);
     assert(bound.ok, `the connect was refused: ${inspect(bound)}`);
 
     const row = await documentRowOf(db().pool, scenario.workspaceId, bound.value.documentId);
-    expect(row?.["byte_size"]).toEqual(HANDBOOK_BYTES);
+    expect(row?.["byte_size"]).toEqual(size);
   });
 
-  it("refuses a body over the cap, whatever size it declares", async () => {
+  it.each([
+    [
+      "shorter than its declared size",
+      () => handbookOffered({ byteSize: HANDBOOK_BYTES * 1000 }).input,
+    ],
+    ["longer than its declared size", () => handbookOffered({ byteSize: 1 }).input],
+    [
+      "one byte past a cap-sized declaration",
+      () => ({
+        ...inputOf(connectUploadFields, handbookAsked({ byteSize: UPLOAD_BYTE_CAP })),
+        body: bodyOf(UPLOAD_BYTE_CAP + 1),
+      }),
+    ],
+  ])("refuses a body %s", async (_case, offered) => {
     const scenario = await arrange();
-    const asked = handbookAsked();
-    const input = { ...inputOf(connectUploadFields, asked), body: pastTheCap() };
 
-    const bound = await connectUpload(scenario.admin, doorsOf(scenario), input);
+    const bound = await connectUpload(scenario.admin, doorsOf(scenario), offered());
 
-    expect(bound).toEqual({ ok: false, error: "too-large" });
-    expect(await listObjects(scenario.admin, store().door, "")).toEqual({ ok: true, value: [] });
+    expect(bound).toEqual({ ok: false, error: "malformed" });
+    expect(await storedFor(scenario.admin)).toEqual([]);
     expect(await countsIn(db().pool, scenario.workspaceId)).toEqual({
       connectedSources: 0,
       documents: 0,
@@ -472,7 +477,7 @@ describe("an Admin connects an upload", () => {
     const connectedSourceId = ulid();
     const asked = inputOf(connectUploadFields, handbookAsked({ connectedSourceId }));
     const winner = heldUploadOf(HANDBOOK);
-    const loser = heldUploadOf("A body no row describes.");
+    const loser = heldUploadOf("A body no row describes.".padEnd(HANDBOOK_BYTES, "."));
 
     const first = connectUpload(scenario.admin, doorsOf(scenario), { ...asked, body: winner.body });
     const second = connectUpload(scenario.admin, doorsOf(scenario), { ...asked, body: loser.body });

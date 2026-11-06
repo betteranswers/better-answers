@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { UPLOAD_BYTE_CAP } from "@better-answers/core/sources";
-import { getObject } from "@better-answers/core/store/objects";
+import { getObject, listObjects } from "@better-answers/core/store/objects";
 import { objectStoreForSuite, textOf } from "@better-answers/core/testing/objects";
 import { until } from "@better-answers/core/testing/postgres";
 import { ulid } from "@better-answers/schema";
@@ -167,6 +167,11 @@ const uploadRaw = (
     duplex: "half",
   });
 
+const storedIn = (workspace: Awaited<ReturnType<typeof anAdmin>>["workspace"]) =>
+  actingIn(app, { workspaceId: workspace.workspaceId, userId: workspace.admin.id }, (admin) =>
+    listObjects(admin, store().door, ""),
+  );
+
 const refusalResponse = z.object({ error: z.object({ data: z.object({ refusal: z.unknown() }) }) });
 
 const refusalIn = async (response: Response) =>
@@ -314,16 +319,50 @@ describe("uploading through sources.connect over tRPC's split link", () => {
     expect(await connectedSourcesIn(admin.workspace.workspaceId)).toBe(0);
   });
 
-  it("refuses a body that exceeds the cap before it ends", async () => {
+  it.each([
+    ["a body of the size it declares", HANDBOOK, HANDBOOK_BYTES],
+    ["an empty body that declares no bytes", "", 0],
+  ])("accepts %s", async (_case, text, byteSize) => {
+    const admin = await anAdmin();
+    const described = handbookDescribed({ byteSize });
+
+    const response = await uploadRaw(admin, described, new Blob([text]).stream());
+
+    expect(response.status).toBe(200);
+    expect(await rowsFor(admin.workspace.workspaceId, described.connectedSourceId)).toMatchObject([
+      { byte_size: byteSize },
+    ]);
+  });
+
+  it.each([
+    ["shorter", "short", HANDBOOK_BYTES],
+    ["longer", HANDBOOK, 3],
+  ])("refuses a body %s than its declared size", async (_case, text, byteSize) => {
+    const admin = await anAdmin();
+
+    const response = await uploadRaw(
+      admin,
+      handbookDescribed({ byteSize }),
+      new Blob([text]).stream(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await refusalIn(response)).toEqual({ word: "malformed", class: "malformed" });
+    expect(await connectedSourcesIn(admin.workspace.workspaceId)).toBe(0);
+    expect(await storedIn(admin.workspace)).toEqual([]);
+  });
+
+  it("stops reading a body past its declared size", async () => {
     const admin = await anAdmin();
     const { body, sent, total } = pastTheCap();
 
     const response = await uploadRaw(admin, handbookDescribed(), body);
 
-    expect(response.status).toBe(422);
-    expect(await refusalIn(response)).toEqual({ word: "too-large", class: "inapplicable" });
+    expect(response.status).toBe(400);
+    expect(await refusalIn(response)).toEqual({ word: "malformed", class: "malformed" });
     expect(sent.bytes).toBeLessThan(total);
     expect(await connectedSourcesIn(admin.workspace.workspaceId)).toBe(0);
+    expect(await storedIn(admin.workspace)).toEqual([]);
   }, 180_000);
 
   it("refuses missing or unreadable upload headers, naming each field", async () => {
