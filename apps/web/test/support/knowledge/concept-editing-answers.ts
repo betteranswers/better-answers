@@ -4,6 +4,7 @@ import { CONCEPT_IRI_PREFIX } from "@better-answers/schema/concept-file";
 
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import { detailAt } from "@/shared/navigation.ts";
+import { anOpenedConcept } from "@test/knowledge/search-answers.ts";
 import { server } from "@test/stub-server.ts";
 import type { Api } from "@test/stubbed-api.ts";
 import { adaAnAdmin, read } from "@test/two-workspaces.ts";
@@ -39,19 +40,7 @@ export const aConceptToEdit = (changes: Readonly<Record<string, unknown>> = {}) 
 const aConceptOpened = (standing: Standing) =>
   read({
     found: true,
-    concept: {
-      iri: A_CONCEPT_IRI,
-      frontmatter: { title: PARTS.title, type: PARTS.kind },
-      body: PARTS.body,
-      relations: [],
-      bodyLinks: [],
-      trust: { status: "unverified" },
-      trustWords: "Unverified",
-      evidence: [],
-      access: "You can read this concept.",
-      lead: "This concept answers from what the company has recorded.",
-      next: "Ask a question to use it.",
-    },
+    concept: anOpenedConcept(A_CONCEPT_IRI, { title: PARTS.title, type: PARTS.kind }, PARTS.body),
     standing,
   });
 

@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  dayOf,
-  furtherKeysOf,
-  kindOf,
-  tagsOf,
-  titleOf,
-  verifiedEventsOf,
-} from "@/shared/knowledge/concept-frontmatter.ts";
+import { furtherKeysOf, kindOf, tagsOf, titleOf } from "@/shared/knowledge/concept-frontmatter.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 describe("concept frontmatter parsing", () => {
@@ -24,34 +17,6 @@ describe("concept frontmatter parsing", () => {
       "retention",
     ]);
     expect(tagsOf({ type: "Answer", tags: "audit" })).toEqual([]);
-  });
-
-  it("records whether a person verified, without their identity", () => {
-    const events = verifiedEventsOf({
-      type: "Answer",
-      verified: [
-        { by: "human:01JBZ6Q2V7Y9K3M5N8P0R2T4W6", at: "2026-03-03T09:41:00Z" },
-        { by: "process:records-verifier", at: "2026-04-01T08:00:00Z" },
-      ],
-    });
-
-    expect(events).toEqual([
-      { at: "2026-03-03T09:41:00Z", byAPerson: true },
-      { at: "2026-04-01T08:00:00Z", byAPerson: false },
-    ]);
-  });
-
-  it("formats an event's date in UK long form", () => {
-    expect(dayOf({ at: "2026-03-03T09:41:00Z", byAPerson: true })).toBe("3 March 2026");
-  });
-
-  it("returns an unparseable date unchanged", () => {
-    expect(dayOf({ at: "last Tuesday", byAPerson: false })).toBe("last Tuesday");
-  });
-
-  it("returns no events for a malformed verified list", () => {
-    expect(verifiedEventsOf({ type: "Answer", verified: "yesterday" })).toEqual([]);
-    expect(verifiedEventsOf({ type: "Answer", verified: [{ by: "human:x" }] })).toEqual([]);
   });
 
   it("lists only the keys the page does not already show", () => {

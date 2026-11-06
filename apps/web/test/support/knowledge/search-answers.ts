@@ -106,22 +106,31 @@ export const AUDIT_COMMITTEE = aConcept("Audit Committee", 2);
 
 export const FORKLIFT_LICENCES = aConcept("Forklift Licences", 4);
 
+export const anOpenedConcept = (
+  iri: string,
+  frontmatter: Readonly<Record<string, unknown>>,
+  body: string,
+) => ({
+  iri,
+  frontmatter,
+  body,
+  relations: [],
+  bodyLinks: [],
+  trust: { status: "unverified" },
+  trustWords: "Unverified",
+  verifications: [],
+  owner: null,
+  usedIn: { guides: 0, answers: 0 },
+  evidence: [],
+  access: "You can read this concept.",
+  lead: "This concept answers from what the company has recorded.",
+  next: "Ask a question to use it.",
+});
+
 export const aConceptRead = (title: string, number: number) =>
   read({
     found: true,
-    concept: {
-      iri: iriOf(number),
-      frontmatter: { title, type: "Answer" },
-      body: `${title} is kept.`,
-      relations: [],
-      bodyLinks: [],
-      trust: { status: "unverified" },
-      trustWords: "Unverified",
-      evidence: [],
-      access: "You can read this concept.",
-      lead: "This concept answers from what the company has recorded.",
-      next: "Ask a question to use it.",
-    },
+    concept: anOpenedConcept(iriOf(number), { title, type: "Answer" }, `${title} is kept.`),
   });
 
 const aDocument = (title: string, locator: string, openingLine: string): Match => ({

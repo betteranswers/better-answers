@@ -6,13 +6,11 @@ import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { conceptMatchKey, conceptPageOf, wayBackOf } from "@/shared/knowledge/concept-address.ts";
 import { ConceptBody, LINK, type MarkOpening } from "@/shared/knowledge/concept-body.tsx";
 import {
-  dayOf,
   descriptionOf,
   furtherKeysOf,
   kindOf,
   tagsOf,
   titleOf,
-  verifiedEventsOf,
 } from "@/shared/knowledge/concept-frontmatter.ts";
 import { CONCEPT_WORDS as WORDS } from "@/shared/knowledge/concept-words.ts";
 import {
@@ -43,6 +41,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
+import { dayWords } from "@/shared/words.ts";
 
 import { useConceptEditing } from "./editing/concept-actions.tsx";
 import {
@@ -210,7 +209,7 @@ function Sources(properties: {
 
 function Verification(properties: { readonly concept: Concept }) {
   const headingId = useId();
-  const events = verifiedEventsOf(properties.concept.frontmatter);
+  const events = properties.concept.verifications;
   return (
     <section aria-labelledby={headingId} className="mt-8">
       <h3 id={headingId} className={SECTION_HEADING}>
@@ -221,7 +220,9 @@ function Verification(properties: { readonly concept: Concept }) {
       ) : (
         <ul className="mt-2 grid gap-1">
           {keyed(events, ({ at }) => at).map(({ key, item: event }) => (
-            <li key={key}>{WORDS.verifiedOn(dayOf(event), event.byAPerson)}</li>
+            <li key={key}>
+              {WORDS.verifiedOn(dayWords(event.at), event.tier === "human-reviewed")}
+            </li>
           ))}
         </ul>
       )}
