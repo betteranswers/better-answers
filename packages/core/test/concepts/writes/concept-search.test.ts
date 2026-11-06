@@ -67,6 +67,7 @@ describe("the search vector `writeConcept` stores", () => {
       { lexeme: "complianc", weights: ["B"] },
       { lexeme: "invoic", weights: ["B"] },
       { lexeme: "kept", weights: ["B"] },
+      { lexeme: "polici", weights: ["B"] },
       { lexeme: "retent", weights: ["A"] },
       { lexeme: "schedul", weights: ["A"] },
       { lexeme: "seven", weights: ["C"] },
@@ -91,6 +92,7 @@ describe("the search vector `writeConcept` stores", () => {
     expect(await weighed(scenario, first.iri)).toEqual([
       { lexeme: "complianc", weights: ["B"] },
       { lexeme: "invoic", weights: ["C"] },
+      { lexeme: "polici", weights: ["B"] },
       { lexeme: "retent", weights: ["A"] },
       { lexeme: "schedul", weights: ["A"] },
       { lexeme: "six", weights: ["C"] },

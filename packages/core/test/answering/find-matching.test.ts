@@ -6,6 +6,7 @@ import { matching } from "@better-answers/schema/testing/matching";
 import { find, findCursor, type FindPosition, type FindResult } from "../../src/answering/index.ts";
 import type { Result, UserPrincipal } from "../../src/kernel/index.ts";
 import type { Tx } from "../../src/store/postgres/index.ts";
+import { IMPORTED } from "../fixtures/northgate-concepts.ts";
 import {
   connectedSourceHolding,
   passageUnder,
@@ -25,19 +26,21 @@ const UNRELATED = "Nothing here bears on it.";
 type ConceptShape = {
   readonly title: string;
   readonly body?: string;
+  readonly kind?: string;
   readonly sensitivity?: string;
 };
 
 const conceptLanded = (
   workspaceId: string,
-  { title, body, sensitivity }: ConceptShape,
+  { title, body, kind = "Policy", sensitivity }: ConceptShape,
 ): Promise<ConceptIri> =>
   seededBy(db(), async (seed) => {
     const row = await seed.conceptIndex({
       workspaceId,
       title,
+      kind,
       body: body ?? UNRELATED,
-      frontmatter: { title, type: "Policy" },
+      frontmatter: { title, type: kind },
       ...(sensitivity === undefined ? {} : { sensitivity }),
     });
     return ids.conceptIri.parse(row.iri);
@@ -66,6 +69,8 @@ const titlesOf = (result: FindResult): readonly string[] =>
 const AUDIT_LOGS_RETENTION = "Audit Logs Retention";
 
 const QUESTION = "how long do we keep audit logs";
+
+const [PUBLIC_LIABILITY] = IMPORTED;
 
 describe("find matches any of the query's words", () => {
   it("ranks a several-word match above a one-word match", async () => {
@@ -111,6 +116,23 @@ describe("find matches any of the query's words", () => {
     ]);
 
     expect(titlesOf(await searching(viewer, "audit logs"))).toEqual(["Audit Logs", "Records"]);
+  });
+
+  it("finds a concept by a word only in its kind", async () => {
+    const { workspaceId, viewer } = await arrange();
+    await conceptsLanded(workspaceId, [PUBLIC_LIABILITY, { title: "Fire drills" }]);
+
+    expect(titlesOf(await searching(viewer, "insurance"))).toEqual([PUBLIC_LIABILITY.title]);
+  });
+
+  it("ranks title words above the same words in a kind", async () => {
+    const { workspaceId, viewer } = await arrange();
+    await conceptsLanded(workspaceId, [PUBLIC_LIABILITY, { title: "Insurance renewals" }]);
+
+    expect(titlesOf(await searching(viewer, "insurance"))).toEqual([
+      "Insurance renewals",
+      PUBLIC_LIABILITY.title,
+    ]);
   });
 
   it("returns strong concepts, then passages, then weak concepts", async () => {
