@@ -6,7 +6,12 @@ export type PostgresDoor = {
 
 export const openPostgres = (pool: pg.Pool): PostgresDoor => ({ pool });
 
-export type Tx = Pick<pg.PoolClient, "query">;
+export type Tx = {
+  readonly query: <Row extends pg.QueryResultRow = pg.QueryResultRow>(
+    text: string,
+    values?: unknown[],
+  ) => Promise<pg.QueryResult<Row>>;
+};
 
 export type TxRow = pg.QueryResultRow;
 

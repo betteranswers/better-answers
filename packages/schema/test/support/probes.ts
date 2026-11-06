@@ -11,7 +11,12 @@ import { type MigratedPostgres } from "./harness.ts";
 import { matching } from "./matching.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
-type Writer = Pick<pg.PoolClient, "query">;
+type Writer = {
+  readonly query: <Row extends pg.QueryResultRow = pg.QueryResultRow>(
+    text: string,
+    values?: unknown[],
+  ) => Promise<pg.QueryResult<Row>>;
+};
 
 export const postgresForSuite = (): (() => MigratedPostgres) => {
   let opened: MigratedPostgres | undefined;
