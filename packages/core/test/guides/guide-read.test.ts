@@ -216,6 +216,20 @@ describe("reading a guide", () => {
     expect(said).not.toContain(seeded.ng.iri("professionalIndemnity"));
   });
 
+  it("shows a concept the reader cannot read as unrecorded", async () => {
+    const seeded = await seededOnce();
+
+    const viewer = await guideAs(seeded, seeded.ng.viewer);
+
+    const facts = sectionOf(viewer, INSURANCE).coverage.facts;
+    const unreadable = facts.find((fact) => fact.name === "Professional indemnity insurance");
+    const unrecorded = facts.find((fact) => fact.name === "Employers' liability insurance");
+    expect(unreadable?.state).toBe("missing");
+    expect(unreadable?.available).toEqual([]);
+    expect(unreadable?.state).toBe(unrecorded?.state);
+    expect(unreadable?.available).toEqual(unrecorded?.available);
+  });
+
   it("names a withheld section's readable cited concepts", async () => {
     const seeded = await seededOnce();
 

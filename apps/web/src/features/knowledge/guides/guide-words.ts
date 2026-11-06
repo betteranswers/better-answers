@@ -31,7 +31,7 @@ export const GUIDE_WORDS = {
   reasons: {
     "concept-changed": "Cites a concept that changed",
     "concept-removed": "Cites a concept that was removed",
-    "expectation-unmet": "Expects a fact that is not yet recorded",
+    "expectation-unmet": "Expects a fact that is not in this section yet",
     "review-finding": "A review found something to check",
   } satisfies Record<NeedsReview, string>,
   withheld: "You can’t read the text of this section.",
@@ -42,7 +42,7 @@ export const GUIDE_WORDS = {
   detailOf: (number: string): string => `Detail of section ${number}`,
   noDetail: "No concepts are included in this section yet.",
   missing: (name: string, owner: string | undefined): string =>
-    `${name} isn’t recorded yet. ${owner === undefined ? "It has no owner, so an Admin is responsible for it." : `Owner: ${owner}.`}`,
+    `No concept you can read covers ${name} yet. ${owner === undefined ? "The collection has no owner, so an Admin is responsible for it." : `Owner: ${owner}.`}`,
   available: (name: string): string => `${name} is recorded but not included in this section.`,
   addFact: "Add This Fact",
   include: "Include All Available Facts",

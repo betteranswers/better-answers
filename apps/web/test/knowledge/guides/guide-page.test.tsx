@@ -353,6 +353,17 @@ describe("the coverage of a section", () => {
     expect(describedBy(add)).toContain("Dana Example");
   });
 
+  it("claims only what the reader can read", async () => {
+    await openGuide("Viewer");
+
+    const add = screen.getByRole("link", { name: "Add This Fact" });
+
+    expect(describedBy(add)).toBe(
+      `No concept you can read covers ${LIABILITY_TITLE} yet. Owner: Dana Example.`,
+    );
+    expect(describedBy(add), "the line claimed a fact is unrecorded").not.toMatch(/recorded/iu);
+  });
+
   it("names no owner for a fact in an unowned collection", async () => {
     await openGuide("Viewer", aGuide({ owner: null }));
 
