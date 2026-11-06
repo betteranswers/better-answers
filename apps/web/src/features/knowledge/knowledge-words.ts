@@ -77,7 +77,7 @@ export const KNOWLEDGE_BASE_WORDS = {
   concepts: "Concepts",
   openAKind: "Select a kind to see its concepts.",
   kindIn: (kind: string, collection: string | null): string =>
-    collection === null ? `${kind} without a collection` : `${kind} in ${collection}`,
+    collection === null ? `${kind}, ${CONCEPT_WORDS.noCollection}` : `${kind} in ${collection}`,
   conceptsLoading: "The concepts are still loading.",
   noneOfTheKind: "No concepts of this kind yet.",
   columns: { title: "Title", kind: "Kind", trust: "Trust" },
