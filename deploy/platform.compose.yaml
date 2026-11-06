@@ -54,7 +54,6 @@ services:
       SMTP_URL: ${SMTP_URL:?}
       AGENT_HOSTNAME: ${AGENT_HOSTNAME:?}
       APEX_HOSTNAME: ${APEX_HOSTNAME:?}
-      AGENT_MAX_FILE_BYTES: "104857600"
       HEALTHCHECKS_PING_URL_SCHEDULER: ${HEALTHCHECKS_PING_URL_SCHEDULER:?}
       HEALTHCHECKS_PING_URL_SWEEPS: ${HEALTHCHECKS_PING_URL_SWEEPS:?}
       # `remove` stays a manual choice, because a wrong join deletes live data for good. RUNBOOK.md, The daily sweeps, says when to switch.

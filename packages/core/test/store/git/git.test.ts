@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -247,16 +247,35 @@ describe("the index a commit builds", () => {
   });
 });
 
+const namesGitSeesAtRefUpdate = async (bundle: Bundle): Promise<string> => {
+  const gitDir = path.join(bundle.door.root, `${bundle.workspaceId}.git`);
+  const hooks = path.join(gitDir, "hooks");
+  const seen = path.join(gitDir, "seen-environment");
+  await mkdir(hooks, { recursive: true });
+  await writeFile(path.join(hooks, "reference-transaction"), `#!/bin/sh\nenv > '${seen}'\n`, {
+    mode: 0o755,
+  });
+  await appendFile(path.join(gitDir, "config"), `[core]\n\thooksPath = ${hooks}\n`);
+  return seen;
+};
+
 describe("a commit made while the platform holds its secrets", () => {
-  it("lands with none of them in git's environment", async () => {
+  it("shows git's processes none of the platform's secrets", async () => {
     vi.stubEnv("KEK", "0".repeat(64));
     vi.stubEnv("AUTH_SECRET", "a".repeat(32));
     try {
       const bundle = await arrange();
+      const seen = await namesGitSeesAtRefUpdate(bundle);
 
       const committed = await commit(bundle.principal, bundle.door, requestFor());
 
       expect(await head(bundle.principal, bundle.door)).toBe(shaOf(committed));
+      const names = (await readFile(seen, "utf8"))
+        .split("\n")
+        .map((line) => line.slice(0, line.indexOf("=")));
+      expect(names).toContain("PATH");
+      expect(names).not.toContain("KEK");
+      expect(names).not.toContain("AUTH_SECRET");
     } finally {
       vi.unstubAllEnvs();
     }
