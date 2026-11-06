@@ -141,7 +141,7 @@ export type ConnectUploadInput = ConnectUploadFields & {
 const connectUploadAction = declareAction({
   admits: ADMIN_ALONE,
   input: connectUploadFields,
-  refuses: ["role-forbids", "no-such-group", "media-type-refused", "too-large"],
+  refuses: ["role-forbids", "no-such-group", "media-type-refused", "too-large", "malformed"],
 });
 
 export type ConnectUploadRefusal =
@@ -191,34 +191,36 @@ const inTransaction = async <T>(
   return ran.ok ? folded<T>(ran.value) : err(ran.error);
 };
 
-type CappedBody = {
+type SizedBody = {
   readonly body: ReadableStream<Uint8Array>;
-  readonly passedTheCap: () => boolean;
-  readonly bytesStreamed: () => number;
+  readonly disagreed: () => boolean;
 };
 
-const cappedAt = (body: ReadableStream<Uint8Array>): CappedBody => {
-  const counted = { bytes: 0, passed: false };
+const sizedAs = (body: ReadableStream<Uint8Array>, declared: number): SizedBody => {
+  const counted = { bytes: 0, disagreed: false };
+  const disagree = (controller: TransformStreamDefaultController<Uint8Array>) => {
+    counted.disagreed = true;
+    controller.error(
+      new Error(`sources: the upload does not hold the ${String(declared)} bytes it declared`),
+    );
+  };
   return {
     body: body.pipeThrough(
       new TransformStream<Uint8Array, Uint8Array>({
         transform: (passage, controller) => {
           counted.bytes += passage.byteLength;
-          if (counted.bytes > UPLOAD_BYTE_CAP) {
-            counted.passed = true;
-            controller.error(
-              new Error(
-                `sources: the upload is larger than the ${String(UPLOAD_BYTE_CAP)}-byte cap`,
-              ),
-            );
+          if (counted.bytes > declared) {
+            disagree(controller);
             return;
           }
           controller.enqueue(passage);
         },
+        flush: (controller) => {
+          if (counted.bytes !== declared) disagree(controller);
+        },
       }),
     ),
-    passedTheCap: () => counted.passed,
-    bytesStreamed: () => counted.bytes,
+    disagreed: () => counted.disagreed,
   };
 };
 
@@ -281,22 +283,23 @@ const storeOriginal = async (
   objects: ObjectDoor,
   originalKey: string,
   body: ReadableStream<Uint8Array>,
-): Promise<Result<number, SourceRefusal<"too-large">>> => {
-  const capped = cappedAt(body);
-  const put = await attempt(() => putObject(admin, objects, originalKey, capped.body));
+  declared: number,
+): Promise<Result<undefined, SourceRefusal<"malformed">>> => {
+  const sized = sizedAs(body, declared);
+  const put = await attempt(() => putObject(admin, objects, originalKey, sized.body));
   if (!put.ok) {
-    if (capped.passedTheCap()) return err("too-large");
+    if (sized.disagreed()) return err("malformed");
     throw put.error;
   }
   if (!put.value.ok) {
     throw new Error(`sources: storing the original failed (${put.value.error})`);
   }
-  return ok(capped.bytesStreamed());
+  return ok(undefined);
 };
 
 /**
- * After the first connect commits, a repeat returns that outcome and reads no bytes. A declared
- * size or streamed body over the cap returns `too-large`.
+ * A repeat of a committed connect returns its outcome. A declared size over the cap is `too-large`;
+ * a body of another length is `malformed`.
  */
 export const connectUpload = async (
   principal: UserPrincipal,
@@ -324,9 +327,14 @@ export const connectUpload = async (
   const auditEventId = ulid();
   const originalKey = originalKeyOf(connectedSourceId, documentId);
 
-  const stored = await storeOriginal(admin.value, doors.objects, originalKey, input.body);
+  const stored = await storeOriginal(
+    admin.value,
+    doors.objects,
+    originalKey,
+    input.body,
+    input.byteSize,
+  );
   if (!stored.ok) return err(stored.error);
-  const bytesStreamed = stored.value;
 
   return inTransaction(principal, doors.postgres, async (fresh, tx) => {
     const landed = await tx.query(INSERT_CONNECTED_SOURCE, [
@@ -354,7 +362,7 @@ export const connectUpload = async (
       input.fileName,
       input.fileName,
       input.mediaType,
-      bytesStreamed,
+      input.byteSize,
       originalKey,
     ]);
     await record(fresh, tx, {

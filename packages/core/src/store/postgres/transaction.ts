@@ -27,13 +27,8 @@ const SETTLED =
 
 const lent = async <T>(client: pg.PoolClient, work: (tx: Tx) => Promise<T>): Promise<T> => {
   let settled = false;
-  const query = new Proxy(client.query.bind(client), {
-    apply: (target, thisArg, args) =>
-      // oxlint-disable-next-line typescript/no-unsafe-return -- lib types ProxyHandler.apply as any; the Proxy hands the call back as pg's own overloaded query type
-      settled
-        ? Promise.reject(new Error(SETTLED))
-        : Function.prototype.apply.call(target, thisArg, args),
-  });
+  const query: Tx["query"] = <Row extends pg.QueryResultRow>(text: string, values?: unknown[]) =>
+    settled ? Promise.reject(new Error(SETTLED)) : client.query<Row>(text, values);
   try {
     return await work({ query });
   } finally {

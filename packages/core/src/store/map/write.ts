@@ -21,7 +21,12 @@ import { SCHEMED } from "@better-answers/schema/scan";
 import type { Principal } from "../../kernel/index.ts";
 import { sectionAt, sentenceAt } from "./sentence.ts";
 
-export type Tx = Pick<pg.PoolClient, "query">;
+export type Tx = {
+  readonly query: <Row extends pg.QueryResultRow = pg.QueryResultRow>(
+    text: string,
+    values?: unknown[],
+  ) => Promise<pg.QueryResult<Row>>;
+};
 
 type Frontmatter = z.infer<typeof conceptFrontmatter>;
 
