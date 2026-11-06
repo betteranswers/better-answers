@@ -101,6 +101,12 @@ const ownedFolder = (folder: string): string => {
   return folder;
 };
 
+const SCRATCH_PREFIX = "move-files-";
+
+const isScratchPath = (folder: string): boolean =>
+  path.dirname(folder) === realpathSync(tmpdir()) &&
+  path.basename(folder).startsWith(SCRATCH_PREFIX);
+
 const pointerOf = (root: string): string => path.join(gitDirOf(root), "move-files-scratch");
 
 /** Removes the scratch folder a killed run left, which the git folder names, then makes a new one. */
@@ -108,12 +114,14 @@ export const openScratch = (root: string): string => {
   const pointer = pointerOf(root);
   if (existsSync(pointer)) {
     const left = readFileSync(pointer, "utf8");
+    if (!isScratchPath(left))
+      throw new Error(`refusing the scratch folder ${left}: it is not a move-files temp folder`);
     if (lstatSync(left, { throwIfNoEntry: false }) !== undefined) {
       rmSync(ownedFolder(left), { recursive: true });
     }
     rmSync(pointer);
   }
-  const folder = ownedFolder(mkdtempSync(path.join(realpathSync(tmpdir()), "move-files-")));
+  const folder = ownedFolder(mkdtempSync(path.join(realpathSync(tmpdir()), SCRATCH_PREFIX)));
   writeFileSync(pointer, folder);
   return folder;
 };

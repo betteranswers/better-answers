@@ -773,8 +773,9 @@ describe("the test inventory a move holds", () => {
   });
 
   it("undoes a killed run's part-done move, then moves", () => {
+    const ONE = "export const one = 1; // packages/core/src/one.ts\n";
     const root = coreRepositoryOf({
-      "packages/core/src/one.ts": "export const one = 1;\n",
+      "packages/core/src/one.ts": ONE,
       "packages/core/src/other.ts": "export const other = 2;\n",
       "docs/note.md": "packages/core/src/one.ts\n",
     });
@@ -785,7 +786,7 @@ describe("the test inventory a move holds", () => {
       "git",
       [
         "#!/bin/sh",
-        `if [ "$1 $2 $3 $4" = "-C ${realpathSync(root)} mv packages/core/src/other.ts" ]; then kill -9 $PPID; exit 1; fi`,
+        `if [ "$1 $2 $3 $4 $5" = "-C ${realpathSync(root)} mv -- packages/core/src/other.ts" ]; then kill -9 $PPID; exit 1; fi`,
         `exec ${realGit} "$@"`,
         "",
       ].join("\n"),
@@ -806,11 +807,31 @@ describe("the test inventory a move holds", () => {
 
     expect(killed.signal).toBe("SIGKILL");
     expect(status(root)).toContain(
-      "R  packages/core/src/one.ts -> packages/core/src/group/one.ts\n",
+      "RM packages/core/src/one.ts -> packages/core/src/group/one.ts\n",
     );
     expect(moved(root, [[THING, GROUPED]], "--dry-run").stderr).toContain(
       "a stopped run left a move part done",
     );
+    writeUnder(
+      bin,
+      "git",
+      [
+        "#!/bin/sh",
+        `if [ "$1 $2 $3 $4 $5" = "-C ${realpathSync(root)} mv -- packages/core/src/group/one.ts" ]; then exit 1; fi`,
+        `exec ${realGit} "$@"`,
+        "",
+      ].join("\n"),
+    );
+
+    const stuck = spawnSync(process.execPath, [SCRIPT, tablePath], {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:${String(process.env["PATH"])}` },
+    });
+
+    expect(stuck.stderr).toContain("the move could not be undone");
+    expect(existsSync(path.join(root, "packages/core/src/one.ts"))).toBe(false);
+    expect(read(root, "packages/core/src/group/one.ts")).toBe(ONE);
 
     const rerun = spawnSync(process.execPath, [SCRIPT, tablePath], { cwd: root, encoding: "utf8" });
 
@@ -820,10 +841,37 @@ describe("the test inventory a move holds", () => {
       [
         "",
         " M docs/note.md",
-        "R  packages/core/src/one.ts -> packages/core/src/group/one.ts",
+        "RM packages/core/src/one.ts -> packages/core/src/group/one.ts",
         "R  packages/core/src/other.ts -> packages/core/src/group/other.ts",
       ].sort(),
     );
+  });
+
+  it("moves nothing when the tree changes while it lists", () => {
+    const root = coreRepositoryOf({
+      "packages/core/src/one.ts": "export const one = 1;\n",
+      "docs/note.md": "packages/core/src/one.ts\n",
+    });
+    const note = path.join(realpathSync(root), "docs/note.md");
+    writeUnder(
+      root,
+      "packages/core/vitest.config.ts",
+      [
+        'import { writeFileSync } from "node:fs";',
+        "",
+        `if (process.cwd().includes("move-files-")) writeFileSync(${JSON.stringify(note)}, "edited\\n");`,
+        "export default {};",
+        "",
+      ].join("\n"),
+    );
+    gitIn(root, "commit", "-qam", "edit while listing");
+
+    const ran = moved(root, [["packages/core/src/one.ts", "packages/core/src/group/one.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain("the tree changed while move-files listed the tests");
+    expect(read(root, "docs/note.md")).toBe("edited\n");
+    expect(existsSync(path.join(root, "packages/core/src/one.ts"))).toBe(true);
   });
 
   it("refuses a link planted at the scratch folder", () => {

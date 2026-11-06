@@ -40,7 +40,7 @@ const messageOf = (cause: unknown): string =>
 
 const gitMove = (root: string, from: string, to: string): void => {
   mkdirSync(path.dirname(path.join(root, to)), { recursive: true });
-  execFileSync("git", ["-C", root, "mv", from, to], { stdio: "pipe" });
+  execFileSync("git", ["-C", root, "mv", "--", from, to], { stdio: "pipe" });
 };
 
 /** The folders a move creates, deepest first, so an undo can remove each once it is empty. */
@@ -60,32 +60,37 @@ const isEmptyFolderGone = (cause: unknown): boolean =>
   "code" in cause &&
   (cause.code === "ENOENT" || cause.code === "ENOTEMPTY");
 
-/** Each step checks the tree first, so an undo that stopped part way can run again. */
+const isMovedOnly = (root: string, from: string, to: string): boolean =>
+  existsSync(path.join(root, to)) && !existsSync(path.join(root, from));
+
+/** Each step reads the tree first, so an undo that stopped part way can run again. */
 const undo = (root: string, written: Journal): readonly string[] => {
   const failures: string[] = [];
-  const attempt = (step: () => void): void => {
+  const attempt = (step: () => void, mayBeGone = false): void => {
     try {
       step();
     } catch (cause) {
-      if (!isEmptyFolderGone(cause)) failures.push(messageOf(cause));
+      if (!(mayBeGone && isEmptyFolderGone(cause))) failures.push(messageOf(cause));
     }
   };
+  const movedTo = new Map(written.moves);
   for (const [from, to] of [...written.moves].reverse()) {
     attempt(() => {
-      if (existsSync(path.join(root, to)) && !existsSync(path.join(root, from))) {
-        gitMove(root, to, from);
-      }
+      if (isMovedOnly(root, from, to)) gitMove(root, to, from);
     });
   }
   for (const { file, original } of written.edits) {
+    // A file whose move back failed gets its text back where it is, so a rerun can move it back.
+    const to = movedTo.get(file);
+    const at = to !== undefined && isMovedOnly(root, file, to) ? to : file;
     attempt(() => {
-      writeFileSync(path.join(root, file), Buffer.from(original, "base64"));
+      writeFileSync(path.join(root, at), Buffer.from(original, "base64"));
     });
   }
   for (const folder of written.created) {
     attempt(() => {
       rmdirSync(path.join(root, folder));
-    });
+    }, true);
   }
   return failures;
 };
@@ -110,7 +115,24 @@ export const undoInterrupted = (root: string): boolean => {
 
 export const hasInterrupted = (root: string): boolean => existsSync(journalPath(root));
 
-export const applyChange = (root: string, { edits, moves }: Change): void => {
+/** The listings take a minute or more, so a file edited meanwhile stops the move instead of being lost. */
+const changedSince = (root: string, { edits, moves }: Change): readonly string[] => [
+  ...edits
+    .filter(({ file, original }) => !readFileSync(path.join(root, file)).equals(original))
+    .map(({ file }) => file),
+  ...[...moves]
+    .filter(([from, to]) => !existsSync(path.join(root, from)) || existsSync(path.join(root, to)))
+    .map(([from]) => from),
+];
+
+export const applyChange = (root: string, change: Change): void => {
+  const { edits, moves } = change;
+  const changed = changedSince(root, change);
+  if (changed.length > 0) {
+    throw new Error(
+      `the tree changed while move-files listed the tests, so nothing moved:\n${changed.join("\n")}`,
+    );
+  }
   const file = journalPath(root);
   const written: Journal = {
     edits: edits.map(({ file: edited, original }) => ({

@@ -57,9 +57,9 @@ const listingOf = (tree: string, into: string, signal: AbortSignal): Promise<Lis
 type Entry = { readonly list: string; readonly line: string };
 
 const entriesOf = (lists: Lists): readonly Entry[] =>
-  [...lists.keys()]
-    .sort(byCodeUnit)
-    .flatMap((list) => (lists.get(list) ?? []).map((line) => ({ list, line })));
+  [...lists]
+    .sort(([one], [other]) => byCodeUnit(one, other))
+    .flatMap(([list, lines]) => lines.map((line) => ({ list, line })));
 
 const unmatched = (entries: readonly Entry[], others: readonly Entry[]): readonly Entry[] => {
   const remaining = new Map<string, number>();
