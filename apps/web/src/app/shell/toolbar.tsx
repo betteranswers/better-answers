@@ -26,13 +26,11 @@ export function PageTabsRoot(properties: {
 
   const openTab = openTabIn(properties.tabs, picked)?.id;
 
-  const spanned = <ViewStateSlot>{properties.children}</ViewStateSlot>;
-
-  if (openTab === undefined) return spanned;
-
   return (
-    <Tabs value={openTab} onValueChange={setPicked} className="contents">
-      <OpenTabProvider openTab={openTab}>{spanned}</OpenTabProvider>
+    <Tabs value={openTab ?? ""} onValueChange={setPicked} className="contents">
+      <OpenTabProvider openTab={openTab}>
+        <ViewStateSlot>{properties.children}</ViewStateSlot>
+      </OpenTabProvider>
     </Tabs>
   );
 }

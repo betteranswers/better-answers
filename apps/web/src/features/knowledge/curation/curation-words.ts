@@ -8,8 +8,6 @@ import type { GuideSummary, RecordsExported } from "../knowledge-api.ts";
 const conceptsCounted = (count: number): string => counted(count, "concept", "concepts");
 
 export const ALL_KNOWLEDGE_WORDS = {
-  about:
-    "Every concept you can read, with its owner and who last verified it. An Admin can set the owner of several concepts at once.",
   caption: "Every concept you can read, with its kind, collection, owner and last verification.",
   loading: "The knowledge base is still loading.",
   none: "No concepts in the knowledge base yet. A concept appears here once it is saved.",
@@ -75,8 +73,6 @@ export const ALL_KNOWLEDGE_WORDS = {
 const kindsCounted = (count: number): string => counted(count, "kind", "kinds");
 
 export const KINDS_WORDS = {
-  about:
-    "A kind is the type of a concept, chosen by the person who wrote it. Counts include only the concepts you can read.",
   loading: "The kinds are still loading.",
   none: "No kinds to show yet. A kind appears here once it holds a concept you can read.",
   noneSmall: "No kinds have two or fewer concepts.",
@@ -110,8 +106,6 @@ const listed = (items: readonly string[]): string => {
 };
 
 export const EXPORTS_WORDS = {
-  about:
-    "Download a copy of your company’s knowledge. The copy won’t update when your knowledge changes.",
   count: (count: number): string => counted(count, "export", "exports"),
   download: "Download",
   preparing: "Preparing",

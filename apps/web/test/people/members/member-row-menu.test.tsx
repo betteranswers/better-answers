@@ -47,7 +47,7 @@ describe("a member row's menu", () => {
 
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Change Role" }));
 
-    await screen.findByRole("heading", { level: 2, name: SAM.displayName });
+    await screen.findByRole("heading", { level: 1, name: SAM.displayName });
     expect(router.state.location.pathname).toMatch(/\/people\/members\/[0-9A-HJKMNP-TV-Z]{26}$/v);
     await waitFor(() => {
       expect(document.activeElement).toBe(thePage().getByRole("radio", { name: "Viewer" }));
@@ -81,7 +81,7 @@ describe("a member row's menu", () => {
 
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Add to Group" }));
 
-    await screen.findByRole("heading", { level: 2, name: SAM.displayName });
+    await screen.findByRole("heading", { level: 1, name: SAM.displayName });
     const box = await thePage().findByRole("checkbox", { name: "Site leads" });
     await waitFor(() => {
       expect(document.activeElement).toBe(box);

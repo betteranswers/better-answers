@@ -145,9 +145,9 @@ export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<
 };
 
 const HOME_NAMES = {
-  Admin: { heading: "People", link: "Go to Members" },
-  Editor: { heading: "Ask", link: "Go to New Question" },
-  Viewer: { heading: "Ask", link: "Go to New Question" },
+  Admin: { heading: "Members", link: "Go to Members" },
+  Editor: { heading: "New Question", link: "Go to New Question" },
+  Viewer: { heading: "New Question", link: "Go to New Question" },
 } as const satisfies Readonly<Record<Role, { readonly heading: string; readonly link: string }>>;
 
 export const landedAtHome = async (page: Page, role: Role): Promise<void> => {

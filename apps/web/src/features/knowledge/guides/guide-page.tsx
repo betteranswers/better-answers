@@ -1,17 +1,17 @@
 import { Link } from "@tanstack/react-router";
-import { useId, useRef, useState, type RefObject } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
-import { BROWSE, conceptPageOf } from "@/shared/knowledge/concept-address.ts";
+import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { LINK } from "@/shared/knowledge/concept-body.tsx";
 import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
+import { KindLine } from "@/shared/knowledge/kind-line.tsx";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
-import { ListState } from "@/shared/list/list-pages.tsx";
+import { ListState, RecordLoading } from "@/shared/list/list-pages.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
-import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { useGuide, type Guide } from "../knowledge-api.ts";
 import { LeavingAsk, useLeavingGuard } from "./brief-actions.tsx";
@@ -89,19 +89,13 @@ const namesNothing = (failure: Error | ApiError): boolean => {
   return word === "not-found" || word === "malformed";
 };
 
-function GuideHeader(properties: { readonly guide: Guide; readonly titleId: string }) {
+function GuideHeader(properties: { readonly guide: Guide }) {
   const { guide } = properties;
   const subject = guide.subject;
   const subjectPage = subject === null ? undefined : conceptPageOf(subject.iri);
   return (
     <header className="mt-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Pill>{guide.kind}</Pill>
-        <Pill variant="outline">{guide.collection}</Pill>
-      </div>
-      <h2 id={properties.titleId} className="mt-3 [font-size:var(--text-2xl)] wrap-anywhere">
-        {guideTitleOf(guide)}
-      </h2>
+      <KindLine kind={guide.kind} collection={guide.collection} />
       {subject === null || subjectPage === undefined ? null : (
         <p className="mt-2">
           <span className="text-muted-foreground">{WORDS.subject} </span>
@@ -115,18 +109,22 @@ function GuideHeader(properties: { readonly guide: Guide; readonly titleId: stri
   );
 }
 
-function GuideShown(properties: { readonly guide: Guide }) {
+function GuideShown(properties: {
+  readonly guide: Guide;
+  readonly heading: RefObject<HTMLHeadingElement | null>;
+}) {
   const { guide } = properties;
-  useBreadcrumbLastPart(guideTitleOf(guide));
-  const titleId = useId();
+  const title = guideTitleOf(guide);
+  useBreadcrumbLastPart(title);
   const [outcome, say] = useState<Outcome>();
   const guard = useLeavingGuard();
   usePageKeystrokes(canEdit(guide) ? EDITING : READING);
   useSectionKeys(guide, say);
 
   return (
-    <article aria-labelledby={titleId} className="mt-6">
-      <GuideHeader guide={guide} titleId={titleId} />
+    <article aria-label={title} className="mt-6">
+      <PageHead title={title} headingRef={properties.heading} />
+      <GuideHeader guide={guide} />
       <OutcomeLine outcome={outcome} className={outcome === undefined ? "" : STATUS_BAR} />
       <LeavingAsk leaving={guard.leaving} />
       <ol className="mt-6 grid gap-8">
@@ -144,49 +142,55 @@ function GuideShown(properties: { readonly guide: Guide }) {
   );
 }
 
+function GuideUnread(properties: {
+  readonly read: ReturnType<typeof useGuide>;
+  readonly heading: RefObject<HTMLHeadingElement | null>;
+}) {
+  const { read } = properties;
+  if (read.error === null) return <RecordLoading words={WORDS.loading} />;
+  if (namesNothing(read.error)) return <NoSuchGuide />;
+  return (
+    <ListState
+      state={{
+        kind: "failed",
+        words: failedReadWords(read.error),
+        onRetry: () => {
+          void read.refetch();
+        },
+        focusAfterRetry: properties.heading,
+      }}
+    />
+  );
+}
+
 function GuideRead(properties: {
   readonly guideId: string;
   readonly heading: RefObject<HTMLHeadingElement | null>;
+  readonly unread: ReactNode;
 }) {
   const read = useGuide(properties.guideId);
-  if (read.error !== null) {
-    if (namesNothing(read.error)) return <NoSuchGuide />;
-    return (
-      <ListState
-        state={{
-          kind: "failed",
-          words: failedReadWords(read.error),
-          onRetry: () => {
-            void read.refetch();
-          },
-          focusAfterRetry: properties.heading,
-        }}
-      />
-    );
+  if (read.error === null && read.data !== undefined) {
+    return <GuideShown guide={read.data} heading={properties.heading} />;
   }
-  if (read.data === undefined) {
-    return (
-      <>
-        <div aria-hidden className="mt-6 min-h-24" />
-        <ListState state={{ kind: "loading", words: WORDS.loading }} />
-      </>
-    );
-  }
-  return <GuideShown guide={read.data} />;
+  return (
+    <>
+      {properties.unread}
+      <GuideUnread read={read} heading={properties.heading} />
+    </>
+  );
 }
 
 export function GuidePage(properties: { readonly guideId: string | undefined }) {
   const { guideId } = properties;
   const heading = useRef<HTMLHeadingElement>(null);
+  const unread = <PageHead title={GUIDES_PAGE.name} headingRef={heading} />;
 
-  return (
+  return guideId === undefined ? (
     <>
-      <PageHead heading={BROWSE.name} headingRef={heading} />
-      {guideId === undefined ? (
-        <NoSuchGuide />
-      ) : (
-        <GuideRead key={guideId} guideId={guideId} heading={heading} />
-      )}
+      {unread}
+      <NoSuchGuide />
     </>
+  ) : (
+    <GuideRead key={guideId} guideId={guideId} heading={heading} unread={unread} />
   );
 }

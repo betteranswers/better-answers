@@ -6,7 +6,6 @@ import { ALL_KNOWLEDGE_PAGE } from "@/shared/knowledge/concept-address.ts";
 import { ListRead } from "@/shared/list/list-pages.tsx";
 import { useMember } from "@/shared/member/member.ts";
 import { ownsNoLonger, useArrivalDecidedAgainOnceUnowned } from "@/shared/member/ownership.ts";
-import { KNOWLEDGE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
@@ -22,8 +21,6 @@ import { Concepts, NOTHING_TICKED } from "./all-knowledge-table.tsx";
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "./curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "./curation-words.ts";
 import { SetOwnerDialog, useSetOwner } from "./set-owner.tsx";
-
-const CURATION = menuGroupIn(KNOWLEDGE, "curation");
 
 const { outcomeOfFailure } = refusalsOf(WORDS.refusedOnRead);
 
@@ -70,7 +67,6 @@ function Review(properties: { readonly standing: Standing }) {
         heading={ALL_KNOWLEDGE_PAGE.name}
         headingId={headingId}
         headingRef={heading}
-        description={WORDS.about}
         count={countOf(read.data, address.narrowed)}
       />
       <OutcomeLine outcome={outcome} className="mt-2" />
@@ -116,7 +112,7 @@ export function AllKnowledgePage() {
 
   return (
     <>
-      <PageHead heading={CURATION.name} summary={CURATION.summary} />
+      <PageHead title={ALL_KNOWLEDGE_PAGE.name} />
       {standing === undefined ? null : <Review standing={standing} />}
     </>
   );

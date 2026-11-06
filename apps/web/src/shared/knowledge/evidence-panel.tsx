@@ -18,8 +18,10 @@ import { conceptPageOf } from "./concept-address.ts";
 import { ConceptBody, LINK } from "./concept-body.tsx";
 import { kindOf, titleOf } from "./concept-frontmatter.ts";
 import { CONCEPT_WORDS, EVIDENCE_WORDS } from "./concept-words.ts";
+import { KindLine } from "./kind-line.tsx";
 import { useConcept, usePassage, type Opening } from "./knowledge-reads.ts";
 import { failedReadWords } from "./refusal.tsx";
+import { TrustMark } from "./trust-mark.tsx";
 
 type OpenedSource =
   | (Extract<Opening, { readonly kind: "passage" }> & { readonly unmapped?: true })
@@ -127,11 +129,9 @@ function CitedConcept(properties: {
     >
       {read === undefined ? null : (
         <>
-          <div className="flex flex-wrap gap-2">
-            {kindOf(read.frontmatter) === undefined ? null : (
-              <Pill>{kindOf(read.frontmatter)}</Pill>
-            )}
-            <Pill>{read.trustWords}</Pill>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <TrustMark words={read.trustWords} />
+            <KindLine kind={kindOf(read.frontmatter)} />
           </div>
           {titleOf(read.frontmatter) === opened.title ? null : (
             <p className="font-medium wrap-anywhere">{titleOf(read.frontmatter)}</p>

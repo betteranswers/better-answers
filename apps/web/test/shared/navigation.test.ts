@@ -597,7 +597,7 @@ describe("a path the person cannot access", () => {
     await openApp(`${MEMBERS.path}/not-a-person`);
     await screen.findByText(MEMBER_PAGE_WORDS.noSuchMember);
 
-    expect(pageHeading()).toBe("People");
+    expect(pageHeading()).toBe("Members");
     expect(screen.getByRole("link", { name: "Go to Members" })).toBeDefined();
     expect(requested.filter((path) => path.includes("members."))).toEqual([]);
   });
@@ -618,14 +618,14 @@ describe("a role change while a page is open", () => {
   it("keeps the page until the next navigation, then hides it", async () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
     const { router, clients } = await openApp("/people/groups");
-    expect(pageHeading()).toBe("People");
+    expect(pageHeading()).toBe("Groups");
 
     vi.stubGlobal("fetch", answeringAs("Editor"));
     await clients.queryClient.invalidateQueries();
     const rail = screen.getByRole("navigation", { name: "Areas" });
     await within(rail).findByRole("link", { name: "Ask" });
 
-    expect(pageHeading()).toBe("People");
+    expect(pageHeading()).toBe("Groups");
     expect(screen.getByRole("main").textContent).not.toContain(NOT_FOUND);
 
     await router.navigate({ href: HOMES.Editor.path });

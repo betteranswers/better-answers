@@ -1,4 +1,5 @@
 import {
+  ArchiveIcon,
   BookOpenIcon,
   BroadcastIcon,
   BuildingsIcon,
@@ -8,6 +9,9 @@ import {
   CaretUpIcon,
   CaretUpDownIcon,
   ChatTextIcon,
+  CheckCircleIcon,
+  CircleDashedIcon,
+  ClockCountdownIcon,
   ClockCounterClockwiseIcon,
   CloudArrowUpIcon,
   ColumnsIcon,
@@ -29,10 +33,12 @@ import {
   MagnifyingGlassIcon,
   NotePencilIcon,
   PathIcon,
+  PencilSimpleLineIcon,
   PlugsConnectedIcon,
   PulseIcon,
   QuestionIcon,
   ScrollIcon,
+  SealCheckIcon,
   ShapesIcon,
   ShieldCheckIcon,
   SidebarSimpleIcon,
@@ -47,6 +53,7 @@ import {
   UserPlusIcon,
   UsersIcon,
   UsersThreeIcon,
+  WarningCircleIcon,
   WarningIcon,
   XIcon,
   type Icon as PhosphorGlyph,
@@ -60,6 +67,7 @@ export type IconName =
   | "backups"
   | "caret-down"
   | "caret-right"
+  | "changed-since-verified"
   | "spending-limit"
   | "columns"
   | "conflicts"
@@ -67,6 +75,8 @@ export type IconName =
   | "console"
   | "control-centre"
   | "database"
+  | "deprecated"
+  | "draft"
   | "erasure"
   | "exports"
   | "flag"
@@ -82,6 +92,7 @@ export type IconName =
   | "log"
   | "map"
   | "names"
+  | "out-of-date"
   | "navigation"
   | "new-question"
   | "overview"
@@ -104,7 +115,10 @@ export type IconName =
   | "token"
   | "tray"
   | "unsorted"
+  | "unverified"
   | "verification"
+  | "verified-automatically"
+  | "verified-by"
   | "workspaces";
 
 const GLYPHS = {
@@ -113,6 +127,7 @@ const GLYPHS = {
   backups: CloudArrowUpIcon,
   "caret-down": CaretDownIcon,
   "caret-right": CaretRightIcon,
+  "changed-since-verified": WarningCircleIcon,
   "spending-limit": GaugeIcon,
   columns: ColumnsIcon,
   conflicts: WarningIcon,
@@ -120,6 +135,8 @@ const GLYPHS = {
   console: GlobeIcon,
   "control-centre": SlidersHorizontalIcon,
   database: DatabaseIcon,
+  deprecated: ArchiveIcon,
+  draft: PencilSimpleLineIcon,
   erasure: EraserIcon,
   exports: ExportIcon,
   flag: FlagIcon,
@@ -135,6 +152,7 @@ const GLYPHS = {
   log: ScrollIcon,
   map: GraphIcon,
   names: IdentificationCardIcon,
+  "out-of-date": ClockCountdownIcon,
   navigation: ListIcon,
   "new-question": NotePencilIcon,
   overview: SquaresFourIcon,
@@ -157,7 +175,10 @@ const GLYPHS = {
   token: KeyIcon,
   tray: TrayIcon,
   unsorted: CaretUpDownIcon,
+  unverified: CircleDashedIcon,
   verification: CalendarCheckIcon,
+  "verified-automatically": CheckCircleIcon,
+  "verified-by": SealCheckIcon,
   workspaces: BuildingsIcon,
 } satisfies Readonly<Record<IconName, PhosphorGlyph>>;
 

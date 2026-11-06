@@ -59,7 +59,7 @@ const openedByName = async (name: string) => {
   await waitFor(() =>
     expect(
       thePage()
-        .getAllByRole("heading", { level: 2 })
+        .getAllByRole("heading", { level: 1 })
         .map((each) => each.textContent),
     ).toContain(name),
   );
@@ -89,7 +89,7 @@ describe("a member's Activity", () => {
     fireEvent.click(await screen.findByRole("menuitemradio", { name: `${HOLME.name} Admin` }));
     await switcher(HOLME);
     await waitFor(() => expect(router.state.location.pathname).toBe(MEMBERS_PAGE));
-    expect(screen.getByRole("heading", { level: 1, name: "People" })).toBeDefined();
+    expect(screen.getByRole("heading", { level: 1, name: "Members" })).toBeDefined();
     const activity = holdProcedure(api, "members.activity", readOf());
     await openedByName(ADA.displayName);
 

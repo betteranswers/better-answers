@@ -5,8 +5,6 @@ import { counted } from "@/shared/words.ts";
 const quoted = (query: string): string => `“${query}”`;
 
 export const COLLECTIONS_WORDS = {
-  about:
-    "A collection is one part of the company’s knowledge, such as a product, a service or a sector. Its owner keeps its concepts verified and up to date. A concept can also have an owner of its own.",
   loading: "The collections are still loading.",
   none: "No collections to show yet. A collection appears here once it holds a concept you can read.",
   count: (count: number): string => counted(count, "collection", "collections"),
@@ -67,7 +65,6 @@ const collectionNamed = (collection: string | null): string =>
   collection ?? CONCEPT_WORDS.noCollection;
 
 export const KNOWLEDGE_BASE_WORDS = {
-  about: "Every concept you can read, by collection and kind.",
   tree: "Collections and Kinds",
   collection: collectionNamed,
   labelled: (name: string, count: number): string => `${name}, ${conceptsCounted(count)}`,

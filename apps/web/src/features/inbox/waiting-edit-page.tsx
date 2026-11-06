@@ -7,7 +7,6 @@ import { RowLink } from "@/shared/list/grid-table.tsx";
 import { ListState } from "@/shared/list/list-pages.tsx";
 import { useRole } from "@/shared/member/member.ts";
 import { ownsNoLonger, useOwnershipLost } from "@/shared/member/ownership.ts";
-import { headingOf } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
@@ -285,7 +284,7 @@ function EditRead(properties: { readonly suggestionId: string; readonly notFound
   if (read.error !== null && namesNothing(read.error)) return properties.notFound;
   return (
     <>
-      <PageHead heading={headingOf(WAITING_ON_YOU)} headingRef={heading} />
+      <PageHead title={WAITING_ON_YOU.name} headingRef={heading} />
       {read.data !== undefined ? (
         <EditShown edit={read.data} />
       ) : read.error === null ? (

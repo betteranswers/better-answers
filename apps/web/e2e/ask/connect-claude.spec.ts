@@ -40,7 +40,10 @@ test("shows only app-wide shortcuts on Connect Claude and unknown pages", async 
 }) => {
   await aViewerSignedIn(page, request);
   await landedAtHome(page, "Viewer");
-  await page.getByRole("main").getByRole("link", { name: "connect Claude" }).click();
+  await page
+    .getByRole("navigation", { name: "Ask" })
+    .getByRole("link", { name: "Connect Claude" })
+    .click();
   await expect(page).toHaveURL(new RegExp(`${CONNECT_CLAUDE.path}$`));
   const appWideShortcuts = ["Show This List", "Jump To"];
   const extraLineMessage = "Keyboard Shortcuts added a line for a page with no shortcuts";

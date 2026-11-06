@@ -8,7 +8,7 @@ import { usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { FilterRow } from "@/shared/list/filter-row.tsx";
 import { GridTable } from "@/shared/list/grid-table.tsx";
 import { NothingListed } from "@/shared/list/list-pages.tsx";
-import { CONSOLE, menuGroupIn } from "@/shared/navigation.ts";
+import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -26,6 +26,8 @@ type ListedWorkspace = inferOutput<
 >[number];
 
 const workspaces = menuGroupIn(CONSOLE, "workspaces");
+
+const THIS_PAGE = pageNamed(workspaces, "Every Workspace");
 
 const LISTED = Object.values(WORKSPACES_KEYSTROKES);
 
@@ -130,7 +132,6 @@ function WorkspacesList() {
       <ListHead
         heading={WORDS.heading}
         headingId={headingId}
-        description={WORDS.description}
         count={read === undefined ? "" : countOf(WORDS, read.length, narrowed)}
       />
       <ReadSaid read={listed} loading={WORDS.loading} />
@@ -173,7 +174,7 @@ export function WorkspacesPage() {
 
   return (
     <>
-      <PageHead heading={workspaces.name} summary={workspaces.summary} />
+      <PageHead title={THIS_PAGE.name} />
       <WorkspacesList />
     </>
   );

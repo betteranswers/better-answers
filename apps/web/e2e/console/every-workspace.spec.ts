@@ -78,7 +78,7 @@ test.describe("the console's Workspaces page", () => {
       assert.ok(desktop !== null, "the page has no viewport");
       await page.setViewportSize({ width: 320, height: 720 });
       await page.goto(EVERY_WORKSPACE);
-      await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Every Workspace" })).toBeVisible();
       await expect(ours).toBeVisible();
 
       await expect(listOf(page).getByRole("columnheader")).toHaveText(["Workspace", "Short Name"]);
@@ -141,11 +141,9 @@ test.describe("the console's Workspaces page", () => {
     await expect(workspaceRows(page)).toHaveCount(1);
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
-        - heading "Workspaces" [level=1]
-        - paragraph
+        - heading "Every Workspace" [level=1]
         - region "Every Workspace":
           - heading "Every Workspace" [level=2]
-          - paragraph
           - status: /\\b1\\b/
           - searchbox "Search by name or short name": ${JSON.stringify(workspace.name)}
           - table:

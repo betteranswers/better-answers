@@ -112,7 +112,7 @@ const openGuide = async (copy: "offered" | "below-action-threshold" = "offered")
   api.set(BRIEF_COPY, () => read(COPIED));
   api.set(RECORD_COPY, () => read({ id: "01JUSAGE0000000000000000A" }));
   await openAt(A_GUIDE_PAGE, api);
-  await screen.findByRole("heading", { level: 2, name: "Northgate Ltd" });
+  await screen.findByRole("heading", { level: 1, name: "Northgate Ltd" });
   return api;
 };
 

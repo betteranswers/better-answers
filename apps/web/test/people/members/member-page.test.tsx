@@ -117,7 +117,7 @@ describe("a member's own page", () => {
     await personHeading("Priya Shah");
     expect(reloaded.state.location.pathname).toBe(priyasPage);
     expect(crumbs().at(-1)?.textContent).toBe("Priya Shah");
-    expect(screen.getByRole("heading", { level: 1, name: "People" })).toBeDefined();
+    expect(screen.getByRole("heading", { level: 1, name: "Priya Shah" })).toBeDefined();
   });
 
   it("describes a role change only after another role is picked", async () => {
@@ -150,7 +150,7 @@ describe("a member's own page", () => {
 
     await waitFor(() => expect(outcome()?.textContent).toMatch(/\S/));
     expect(router.state.location.pathname, "the key opened another page").toBe(MEMBERS_PAGE);
-    expect(screen.queryByRole("heading", { level: 2, name: "Priya Shah" })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 1, name: "Priya Shah" })).toBeNull();
     expect(screen.queryByRole("toolbar", { name: "Selected Members" })).toBeNull();
   });
 

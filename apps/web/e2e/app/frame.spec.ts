@@ -52,7 +52,7 @@ const PAGE_NAMES = [
 
 const AREA_NAMES = ["Ask", "Knowledge", "Inbox", "Control Centre"];
 
-const MODELS_HEADING = "Models";
+const MODELS_HEADING = "Models and Spend";
 
 const NARROW = { width: 320, height: 720 };
 
@@ -365,7 +365,7 @@ test("the shell's header, rail, and menu work by keyboard", async ({
     await expect(page.getByRole("alert")).toHaveCount(0);
 
     await navigation.getByRole("link", { name: "Members" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Members" })).toBeVisible();
     await expect(page.getByRole("alert")).toHaveCount(0);
   });
 });

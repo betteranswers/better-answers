@@ -155,7 +155,6 @@ test.describe("Exports", () => {
     await expect(exportsRegion(page)).toMatchAriaSnapshot(`
       - region "Exports":
         - heading "Exports" [level=2]
-        - paragraph
         - status: /\\b3\\b/
         - status
         - list:

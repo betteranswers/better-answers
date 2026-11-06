@@ -145,12 +145,6 @@ const inDocumentOrder = (nodes: readonly Node[]): boolean =>
     );
   });
 
-const paragraphAfter = (heading: HTMLElement): HTMLElement => {
-  const next = heading.nextElementSibling;
-  assert(next instanceof HTMLParagraphElement, `no paragraph follows ${heading.textContent}`);
-  return next;
-};
-
 const countIn = (list: HTMLElement): HTMLElement => {
   const [count] = within(list).getAllByRole("status");
   assert(count !== undefined, "the list shows no count");
@@ -296,24 +290,15 @@ describe("the console's lists", () => {
       "2 members",
       "3 March 2026",
     ]);
-    const pageHeading = screen.getByRole("heading", { level: 1, name: "Workspaces" });
+    const pageHeading = screen.getByRole("heading", { level: 1, name: WORKSPACES_LIST.heading });
     const listHeading = within(list).getByRole("heading", {
       level: 2,
       name: WORKSPACES_LIST.heading,
     });
-    expect(paragraphAfter(pageHeading).textContent).toMatch(/\S/);
-    expect(paragraphAfter(listHeading).textContent).toMatch(/\S/);
     expect(countIn(list).textContent).toMatch(/\b2\b/);
     expect(
-      inDocumentOrder([
-        pageHeading,
-        paragraphAfter(pageHeading),
-        listHeading,
-        paragraphAfter(listHeading),
-        countIn(list),
-        acme,
-      ]),
-      "the headings, descriptions, count and rows are out of order",
+      inDocumentOrder([pageHeading, listHeading, countIn(list), acme]),
+      "the headings, count and rows are out of order",
     ).toBe(true);
 
     expect(within(list).queryByText(ACME.id)).toBeNull();
@@ -455,35 +440,17 @@ describe("the console's lists", () => {
     expect(screen.queryByRole("dialog"), "c opened a dialog with no row in focus").toBeNull();
   });
 
-  it("does not show Everyone's description on Flagged Names", async () => {
-    const everyone = await listAt(EVERYONE_PAGE, EVERYONE_LIST.heading, {
-      "console.people.list": { people: [PRIYA], total: 1 },
-    });
-    const everyoneSays = paragraphAfter(
-      within(everyone).getByRole("heading", { level: 2 }),
-    ).textContent;
-    cleanup();
-
+  it("titles Flagged Names with its own name, then the count", async () => {
     const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_LIST.heading, {
       "console.people.namesWaiting": NAMES_WAITING,
     });
-    const pageHeading = screen.getByRole("heading", { level: 1, name: "People" });
-    const listHeading = within(list).getByRole("heading", {
-      level: 2,
-      name: NAMES_WAITING_LIST.heading,
-    });
+    const pageHeading = screen.getByRole("heading", { level: 1, name: NAMES_WAITING_LIST.heading });
 
-    expect(paragraphAfter(listHeading).textContent).toMatch(/\S/);
     expect(countIn(list).textContent).toMatch(/\b2\b/);
-    expect(
-      inDocumentOrder([pageHeading, listHeading, paragraphAfter(listHeading), countIn(list)]),
-      "the headings, description and count are out of order",
-    ).toBe(true);
-    expect(everyoneSays, "Everyone has no description").toMatch(/\S/);
-    expect(screen.getByRole("main").textContent).not.toContain(everyoneSays);
+    expect(inDocumentOrder([pageHeading, countIn(list)])).toBe(true);
   });
 
-  it("shows Everyone's description once, above its search", async () => {
+  it("shows Everyone's search with its label as the placeholder", async () => {
     vi.stubGlobal(
       "fetch",
       answering(THE_OPERATOR, { "console.people.list": { people: [], total: 0 } }),
@@ -492,11 +459,7 @@ describe("the console's lists", () => {
     const { heading, search: label } = EVERYONE_LIST;
     const list = await screen.findByRole("region", { name: heading });
     const search = await within(list).findByRole("searchbox", { name: label });
-    const description = paragraphAfter(within(list).getByRole("heading", { level: 2 }));
 
-    expect(description.textContent).toMatch(/\S/);
-    expect(screen.getByRole("main").textContent.split(description.textContent)).toHaveLength(2);
-    expect(inDocumentOrder([description, search])).toBe(true);
     expect(search.getAttribute("placeholder")).toBe(label);
     expect(within(list).queryByText(label)).toBeNull();
   });

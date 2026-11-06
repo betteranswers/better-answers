@@ -199,7 +199,6 @@ export function NamesWaitingList() {
         heading={WORDS.heading}
         headingId={headingId}
         headingRef={headingRef}
-        description={WORDS.description}
         count={waiting === undefined ? "" : countOf(WORDS, names.length, narrowed)}
       />
       <ReadSaid read={listed} loading={WORDS.loading} />

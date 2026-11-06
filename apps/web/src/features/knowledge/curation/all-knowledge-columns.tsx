@@ -3,7 +3,7 @@ import { createContext, useContext } from "react";
 
 import { conceptMatchKey } from "@/shared/knowledge/concept-address.ts";
 import { ConceptLink } from "@/shared/knowledge/concept-link.tsx";
-import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
+import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
 
 import type { AllKnowledgeRow } from "../knowledge-api.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "./curation-words.ts";
@@ -92,7 +92,7 @@ export const allKnowledgeColumns = column.columns([
   column.accessor("trustWords", {
     id: "trust",
     header: WORDS.columns.trust,
-    cell: ({ getValue }) => <Pill>{getValue()}</Pill>,
+    cell: ({ getValue }) => <TrustMark words={getValue()} />,
   }),
   column.accessor("owner", {
     id: "owner",

@@ -187,7 +187,6 @@ export function EveryoneList() {
       <ListHead
         heading={WORDS.heading}
         headingId={headingId}
-        description={WORDS.description}
         count={page === undefined ? "" : countSaid(listed.isPlaceholderData, total, asked.search)}
       />
       <ReadSaid read={listed} loading={WORDS.loading} />

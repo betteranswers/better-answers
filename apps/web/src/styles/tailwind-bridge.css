@@ -1,5 +1,5 @@
 /* Points the CSS variable names that shadcn, Kibo UI, AI Elements, and Magic UI read at
-   this design system's tokens. A component from those registries then needs no edits.
+   these tokens. A component from those registries then needs no edits.
    `styles.css` does not import this file, because it needs Tailwind v4. Import it after
    `tailwindcss`, as `apps/web/src/index.css` does. */
 :root {
@@ -76,8 +76,8 @@
 }
 
 /* The accessible reading mode for dyslexic readers. Set data-reading-mode="accessible" on
-   <html>. It works with either theme. Nothing in this package defines --font-accessible, so
-   the family stays on the default face until an app defines it. --measure-prose does not
+   <html>. It works with either theme. Nothing here defines --font-accessible yet, so the
+   family stays on the default face. --measure-prose does not
    change, because it counts characters. */
 [data-reading-mode="accessible"] {
   --font-sans: var(--font-accessible, var(--font-sans-default));

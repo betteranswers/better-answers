@@ -8,11 +8,6 @@ import type { Phase } from "./ask-api.ts";
 type Unwritten = "refused" | "failed" | "paused";
 
 export const ASK_WORDS = {
-  lead: {
-    before: "Ask a question, or ",
-    link: "connect Claude",
-    after: " to ask questions from Claude.",
-  },
   heading: "New Question",
   question: "Question",
   questionNeeded: "Please enter a question.",

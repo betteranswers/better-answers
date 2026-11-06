@@ -42,8 +42,7 @@ test.describe("the Answer Tests page", () => {
 
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
-        - heading "Questions" [level=1]
-        - paragraph
+        - heading "Answer Tests" [level=1]
         - region "Answer Tests":
           - heading "Answer Tests" [level=2]
     `);

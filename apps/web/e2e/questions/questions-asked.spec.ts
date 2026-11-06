@@ -74,14 +74,6 @@ const signedInAtTheQuestions = async (page: Page, api: APIRequestContext, at: At
   await expect(page).toHaveURL(new RegExp(`${QUESTIONS_ASKED}$`));
 };
 
-const lineUnderHeading = async (page: Page, name: string, path: string) => {
-  await page.goto(path);
-  await expect(page.getByRole("heading", { level: 1, name: "Questions" })).toBeVisible();
-  const lead = page.getByRole("main").locator("h1 + p");
-  await expect(lead, `${name} shows no line of text under its heading`).toHaveText(/\S/);
-  return lead.innerText();
-};
-
 const fiftyOneQuestionsOpened = async (page: Page, api: APIRequestContext, name: string) => {
   const at = await aWorkspaceWithConcepts(api, name);
   const records = Array.from({ length: 51 }, (_, nth): SeedRecord => ({
@@ -100,14 +92,11 @@ test.describe("the Questions Asked page", () => {
   }) => {
     await fiftyOneQuestionsOpened(page, request, "Wharfe Pages");
 
-    await test.step("each Questions page shows the same line under its heading and passes the accessibility checks", async () => {
-      const lines = new Set<string>();
+    await test.step("each Questions page is titled by its own name, with no line under it", async () => {
       for (const [name, path] of QUESTIONS_PAGES) {
-        lines.add(await lineUnderHeading(page, name, path));
-        expect(
-          lines.size,
-          `${name} shows a different line under its heading from the other Questions pages`,
-        ).toBe(1);
+        await page.goto(path);
+        await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText(name);
+        await expect(page.getByRole("main").locator("h1 + p")).toHaveCount(0);
         await passesTheAccessibilityGate();
       }
     });

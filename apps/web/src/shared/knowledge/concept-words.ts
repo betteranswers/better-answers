@@ -21,6 +21,8 @@ export const CONCEPT_WORDS = {
   place: (at: string): string => `· ${at}`,
   noLinks: "No links you have access to",
   ownPage: "Open This Concept’s Page",
+  kind: "Kind",
+  collection: "Collection",
   noCollection: "No collection",
   notCompanyKnowledge: "Not company knowledge",
 } as const;

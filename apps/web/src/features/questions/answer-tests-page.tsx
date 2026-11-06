@@ -19,9 +19,11 @@ export function AnswerTestsPage() {
 
   return (
     <>
-      <PageHead heading={questions.name} summary={questions.summary} />
+      <PageHead title={ANSWER_TESTS.name} />
       <section aria-labelledby={headingId} className="mt-6">
-        <h2 id={headingId}>{ANSWER_TESTS.name}</h2>
+        <h2 id={headingId} className="sr-only">
+          {ANSWER_TESTS.name}
+        </h2>
         <Card className="mt-2">
           <EmptyAction title={ANSWER_TESTS_WORDS.empty} description={ANSWER_TESTS_WORDS.why} />
         </Card>

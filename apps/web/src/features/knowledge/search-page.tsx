@@ -13,7 +13,6 @@ import {
 import { useAsked } from "@/shared/address/address-ask.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import {
-  BROWSE,
   conceptMatchKey,
   conceptPageOf,
   RETURNED_TO,
@@ -27,8 +26,10 @@ import {
   type Heading,
   type Opened,
 } from "@/shared/knowledge/evidence-panel.tsx";
+import { KindLine } from "@/shared/knowledge/kind-line.tsx";
 import { useOpenMatch } from "@/shared/knowledge/open-match.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
+import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
 import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { FilterRow } from "@/shared/list/filter-row.tsx";
@@ -40,7 +41,6 @@ import { PageHead } from "@/shared/page/page-head.tsx";
 import { useRoomBeside } from "@/shared/page/wide-layout.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
-import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import {
   asksNothing,
@@ -153,8 +153,7 @@ function ConceptLine(properties: {
   const page = conceptPageOf(match.iri);
   const land = useLandingLine(keyOf(match) === reading.returning.key, reading.returning.landed);
   return (
-    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <Pill>{match.kind}</Pill>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {page === undefined ? (
         <span className={TITLE}>{match.title}</span>
       ) : (
@@ -169,8 +168,12 @@ function ConceptLine(properties: {
           {match.title}
         </RowLink>
       )}
-      <Pill>{match.collection ?? CONCEPT_WORDS.noCollection}</Pill>
-      <Pill>{match.trustWords}</Pill>
+      <TrustMark words={match.trustWords} />
+      <KindLine
+        kind={match.kind}
+        collection={match.collection ?? CONCEPT_WORDS.noCollection}
+        className="basis-full"
+      />
     </div>
   );
 }
@@ -190,7 +193,6 @@ function PassageLine(properties: { readonly match: PassageMatch; readonly openin
   return (
     <>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <Pill>{WORDS.document}</Pill>
         <Button
           id={openerIdOf(key)}
           variant="link"
@@ -203,6 +205,7 @@ function PassageLine(properties: { readonly match: PassageMatch; readonly openin
           {match.title}
         </Button>
         <SensitivityTag sensitivity={match.sensitivity} />
+        <KindLine kind={WORDS.document} className="basis-full" />
       </div>
       <p className="mt-1 break-words text-muted-foreground">{match.openingLine}</p>
       {opened === undefined || opening.beside ? null : (
@@ -487,7 +490,7 @@ function SearchRegion() {
       aria-labelledby={headingId}
       className={cn("mt-6", panel.opened !== undefined && beside && "pr-[var(--container-md)]")}
     >
-      <h2 ref={heading} id={headingId} tabIndex={-1}>
+      <h2 ref={heading} id={headingId} tabIndex={-1} className="sr-only">
         {SEARCH_PAGE.name}
       </h2>
       <Card marks className="mt-4">
@@ -535,7 +538,7 @@ function SearchRegion() {
 export function SearchPage() {
   return (
     <>
-      <PageHead heading={BROWSE.name} summary={BROWSE.summary} />
+      <PageHead title={SEARCH_PAGE.name} />
       <SearchRegion />
     </>
   );

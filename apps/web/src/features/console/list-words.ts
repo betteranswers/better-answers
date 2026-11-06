@@ -13,7 +13,6 @@ const WORKSPACES: Noun = ["workspace", "workspaces"];
 
 export const EVERYONE_WORDS = {
   heading: "Everyone",
-  description: "See every person on the platform.",
   search: "Search by name or address",
   caption: "Every person on the platform.",
   loading: "The people are still loading.",
@@ -35,7 +34,6 @@ const namesCounted = (count: number): string => {
 
 export const NAMES_WAITING_WORDS = {
   heading: "Flagged Names",
-  description: "Review display names flagged by Admins.",
   search: "Search by name or workspace",
   caption: "Display names waiting to be corrected.",
   loading: "The names are still loading.",
@@ -48,7 +46,6 @@ export const NAMES_WAITING_WORDS = {
 
 export const WORKSPACES_WORDS = {
   heading: "Every Workspace",
-  description: "Sorted by name.",
   search: "Search by name or short name",
   columns: {
     workspace: "Workspace",

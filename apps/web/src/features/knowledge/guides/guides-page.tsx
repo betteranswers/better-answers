@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useId, useRef } from "react";
 
-import { BROWSE } from "@/shared/knowledge/concept-address.ts";
 import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
+import { KindLine } from "@/shared/knowledge/kind-line.tsx";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
@@ -20,13 +20,13 @@ function GuideRow(properties: { readonly guide: GuideSummary }) {
   return (
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <Pill>{guide.kind}</Pill>
         <Link
           to={guidePageOf(guide.guideId)}
           className="min-w-0 grow basis-48 font-medium break-words text-foreground underline-offset-4 hover:underline"
         >
           {guideTitleOf(guide)}
         </Link>
+        <KindLine kind={guide.kind} />
         <span className="text-muted-foreground">{WORDS.sections(guide.sections)}</span>
         {guide.needsReview === 0 ? null : (
           <Pill variant="outline">{WORDS.needReview(guide.needsReview)}</Pill>
@@ -62,7 +62,6 @@ function GuidesRegion() {
         heading={GUIDES_PAGE.name}
         headingId={headingId}
         headingRef={heading}
-        description={WORDS.about}
         count={listed === undefined ? "" : WORDS.count(listed.length)}
       />
       <Card marks className="mt-4">
@@ -82,7 +81,7 @@ function GuidesRegion() {
 export function GuidesPage() {
   return (
     <>
-      <PageHead heading={BROWSE.name} summary={BROWSE.summary} />
+      <PageHead title={GUIDES_PAGE.name} />
       <GuidesRegion />
     </>
   );

@@ -50,15 +50,18 @@
   }
 
   h1 {
-    font-size: var(--text-xl);
+    font-size: var(--text-title);
     font-weight: var(--weight-semibold);
-    letter-spacing: var(--tracking-heading);
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-display);
+    text-wrap: balance;
     color: var(--text-primary);
   }
 
   h2 {
-    font-size: var(--text-md);
+    font-size: var(--text-section);
     font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-heading);
     color: var(--text-primary);
   }

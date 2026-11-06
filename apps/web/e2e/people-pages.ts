@@ -36,7 +36,7 @@ export const memberLink = (page: Page, name: string): Locator =>
 export const thePage = (page: Page): Locator => page.getByRole("main");
 
 export const personHeading = (page: Page, name: string): Locator =>
-  thePage(page).getByRole("heading", { level: 2, name, exact: true });
+  thePage(page).getByRole("heading", { level: 1, name, exact: true });
 
 export const openedByName = async (page: Page, name: string): Promise<void> => {
   await memberLink(page, name).click();

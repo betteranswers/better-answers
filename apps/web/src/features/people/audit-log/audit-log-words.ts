@@ -32,7 +32,6 @@ const savedHeld = (saved: Saved, name: string): string =>
 
 export const AUDIT_LOG_WORDS = {
   heading: "Audit Log",
-  summary: "See every action in this workspace except answers.",
   search: "Search by person, group or action",
   family: "Family",
   everyFamily: "All Families",

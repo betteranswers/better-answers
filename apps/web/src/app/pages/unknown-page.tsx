@@ -17,7 +17,7 @@ export function UnknownPage(properties: { readonly home?: Page | undefined }) {
 
   return (
     <>
-      <PageHead heading={UNKNOWN_PAGE.heading} />
+      <PageHead title={UNKNOWN_PAGE.heading} />
       <GoHome home={properties.home} className="mt-6" />
     </>
   );
@@ -26,7 +26,7 @@ export function UnknownPage(properties: { readonly home?: Page | undefined }) {
 function UnknownSignedOut() {
   return (
     <>
-      <PageHead heading={UNKNOWN_PAGE.heading} />
+      <PageHead title={UNKNOWN_PAGE.heading} />
       <p className="mt-6">
         <Button asChild variant="link" className="px-0">
           <Link to="/sign-in">{UNKNOWN_PAGE.signIn}</Link>

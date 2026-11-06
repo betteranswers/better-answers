@@ -6,6 +6,7 @@ import {
   useState,
   type ComponentType,
   type MouseEvent,
+  type ReactNode,
   type RefObject,
 } from "react";
 
@@ -15,7 +16,6 @@ import { cn } from "@/shared/lib/utils.ts";
 import { ListState } from "@/shared/list/list-pages.tsx";
 import { Address } from "@/shared/member/address.tsx";
 import { initialsOf } from "@/shared/member/initials.ts";
-import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
@@ -36,8 +36,6 @@ import {
   type Removed,
 } from "./members-address.ts";
 import { useSelfActionHome } from "./self-action.tsx";
-
-const people = menuGroupIn(CONTROL_CENTRE, "people");
 
 const KEYSTROKES: readonly Keystroke[] = Object.values(KEY);
 
@@ -134,25 +132,17 @@ function NoSuchMember() {
   );
 }
 
-function MemberHeader(properties: {
-  readonly member: ListedMember;
-  readonly titleRef: RefObject<HTMLHeadingElement | null>;
-}) {
-  const { member, titleRef } = properties;
+function MemberHeader(properties: { readonly member: ListedMember }) {
+  const { member } = properties;
 
   return (
     <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
       <Avatar aria-hidden className="size-10">
         <AvatarFallback>{initialsOf(nameOf(member))}</AvatarFallback>
       </Avatar>
-      <div className="flex min-w-0 flex-1 flex-col leading-tight">
-        <h2 ref={titleRef} tabIndex={-1} className="wrap-anywhere">
-          {nameOf(member)}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          <Address address={member.address} />
-        </p>
-      </div>
+      <p className="min-w-0 flex-1 text-muted-foreground">
+        <Address address={member.address} />
+      </p>
     </div>
   );
 }
@@ -266,7 +256,8 @@ function MemberShown(properties: {
 
   return (
     <>
-      <MemberHeader member={member} titleRef={title} />
+      <PageHead title={nameOf(member)} headingRef={title} />
+      <MemberHeader member={member} />
       <SectionNav />
       <div className="mt-6 grid gap-6">
         {SECTIONS.map((section) => (
@@ -280,12 +271,32 @@ function MemberShown(properties: {
 function MemberRead(properties: {
   readonly personId: string;
   readonly heading: RefObject<HTMLHeadingElement | null>;
+  readonly unread: ReactNode;
 }) {
   const members = useMembers();
   const { openedAt, membersQuery } = useOpening();
   const [leaving, setLeaving] = useState<ListedMember>();
   const removal = useRemoval(membersQuery, setLeaving);
 
+  const member =
+    members.data?.find((each) => each.personId === properties.personId) ??
+    (leaving?.personId === properties.personId ? leaving : undefined);
+  if (members.error === null && members.data !== undefined && member !== undefined) {
+    return <MemberShown member={member} openedAt={openedAt} removal={removal} />;
+  }
+  return (
+    <>
+      {properties.unread}
+      <MemberUnread members={members} heading={properties.heading} />
+    </>
+  );
+}
+
+function MemberUnread(properties: {
+  readonly members: ReturnType<typeof useMembers>;
+  readonly heading: RefObject<HTMLHeadingElement | null>;
+}) {
+  const { members } = properties;
   if (members.error !== null) {
     return (
       <ListState
@@ -303,25 +314,20 @@ function MemberRead(properties: {
   if (members.data === undefined) {
     return <ListState state={{ kind: "loading", words: WORDS.loading }} />;
   }
-  const member =
-    members.data.find((each) => each.personId === properties.personId) ??
-    (leaving?.personId === properties.personId ? leaving : undefined);
-  if (member === undefined) return <NoSuchMember />;
-  return <MemberShown member={member} openedAt={openedAt} removal={removal} />;
+  return <NoSuchMember />;
 }
 
 export function MemberPage(properties: { readonly personId: string | undefined }) {
   const { personId } = properties;
   const heading = useRef<HTMLHeadingElement>(null);
+  const unread = <PageHead title={MEMBERS_PAGE.name} headingRef={heading} />;
 
-  return (
+  return personId === undefined ? (
     <>
-      <PageHead heading={people.name} headingRef={heading} />
-      {personId === undefined ? (
-        <NoSuchMember />
-      ) : (
-        <MemberRead key={personId} personId={personId} heading={heading} />
-      )}
+      {unread}
+      <NoSuchMember />
     </>
+  ) : (
+    <MemberRead key={personId} personId={personId} heading={heading} unread={unread} />
   );
 }

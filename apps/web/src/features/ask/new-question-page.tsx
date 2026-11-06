@@ -1,11 +1,9 @@
-import { Link } from "@tanstack/react-router";
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { ceilingLiftsIn, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
-import { LINK } from "@/shared/knowledge/concept-body.tsx";
 import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
-import { ASK, headingOf, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
@@ -24,8 +22,6 @@ import { ASK_WORDS as WORDS } from "./ask-words.ts";
 const ASKING = menuGroupIn(ASK, "ask");
 
 const NEW_QUESTION = pageNamed(ASKING, "New Question");
-
-const CONNECT_CLAUDE = pageNamed(ASKING, "Connect Claude");
 
 const LISTED = Object.values(KEY);
 
@@ -179,20 +175,11 @@ export function NewQuestionPage() {
 
   return (
     <>
-      <PageHead
-        heading={headingOf(NEW_QUESTION)}
-        summary={
-          <>
-            {WORDS.lead.before}
-            <Link to={CONNECT_CLAUDE.path} className={LINK}>
-              {WORDS.lead.link}
-            </Link>
-            {WORDS.lead.after}
-          </>
-        }
-      />
+      <PageHead title={NEW_QUESTION.name} />
       <section aria-labelledby={headingId} className="mt-6">
-        <h2 id={headingId}>{WORDS.heading}</h2>
+        <h2 id={headingId} className="sr-only">
+          {WORDS.heading}
+        </h2>
         <Card marks className="mt-4">
           <QuestionForm answering={answering} readable={readable} />
         </Card>

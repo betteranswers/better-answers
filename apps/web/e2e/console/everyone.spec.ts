@@ -57,11 +57,9 @@ test.describe("the console's Everyone page", () => {
 
     await expect(thePage(page)).toMatchAriaSnapshot(`
       - main "Page":
-        - heading "People" [level=1]
-        - paragraph
+        - heading "Everyone" [level=1]
         - region "Everyone":
           - heading "Everyone" [level=2]
-          - paragraph
           - status: /\\b2\\b/
           - searchbox "Search by name or address": ${tag}
           - table:

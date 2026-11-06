@@ -92,7 +92,7 @@ const jumpedToMember = async (words: string, name: string): Promise<void> => {
   const input = await screen.findByRole("combobox", { name: JUMP_TO.name });
   await userEvent.setup().type(input, words);
   fireEvent.click(await screen.findByRole("option", { name: new RegExp(name) }));
-  await screen.findByRole("heading", { level: 2, name });
+  await screen.findByRole("heading", { level: 1, name });
 };
 
 const stopAt = (target: EventTarget | null): string | null => {
@@ -140,7 +140,7 @@ describe("removing a member opened from Jump To", () => {
     await openAt(MEMBERS, aTeamPriyaCanBeRemovedFrom());
     const menu = await rowMenuOpened(PRIYA.displayName);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Remove" }));
-    await screen.findByRole("heading", { level: 2, name: PRIYA.displayName });
+    await screen.findByRole("heading", { level: 1, name: PRIYA.displayName });
     await removedOnTheirPage();
     await waitFor(() => expect(namesShown()).toEqual([ADA.displayName, TOM.displayName]));
 

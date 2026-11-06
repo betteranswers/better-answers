@@ -114,8 +114,7 @@ test.describe("the People group's Groups page", () => {
       );
       await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
         - main "Page":
-          - heading "People" [level=1]
-          - paragraph
+          - heading "Groups" [level=1]
           - region "Groups":
             - heading "Groups" [level=2]
             - status: /\\b2\\b/

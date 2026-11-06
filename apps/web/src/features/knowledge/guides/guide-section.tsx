@@ -3,7 +3,9 @@ import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "rea
 
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { ConceptBody, LINK } from "@/shared/knowledge/concept-body.tsx";
+import { KindLine } from "@/shared/knowledge/kind-line.tsx";
 import type { Evidence } from "@/shared/knowledge/knowledge-reads.ts";
+import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { keyedRow } from "@/shared/list/row-focus.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -31,13 +33,13 @@ export type SectionProps = {
   readonly reportUnsaved: (sectionId: string, unsaved: boolean) => void;
 };
 
-const HEADINGS = ["h3", "h4", "h5", "h6"] as const;
+const HEADINGS = ["h2", "h3", "h4", "h5"] as const;
 
 const INDENTS = ["", "pl-4", "pl-8", "pl-12"] as const;
 
 const depthOf = (number: string): number => Math.min(number.split(".").length, HEADINGS.length) - 1;
 
-const headingsBelow = (level: number): number => Math.min(level + 4, 6);
+const headingsBelow = (level: number): number => Math.min(level + 3, 6);
 
 const NO_EVIDENCE: readonly Evidence[] = [];
 
@@ -123,7 +125,7 @@ function Detail(properties: {
                   </Link>
                 )}
               </Title>
-              <Pill>{concept.kind}</Pill>
+              <KindLine kind={concept.kind} />
             </div>
             <div className="mt-2">
               <ConceptBody
@@ -256,7 +258,7 @@ function SectionHead(properties: {
         {WORDS.heading(section.number, section.prompt)}
       </Heading>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Pill>{section.trustWords}</Pill>
+        <TrustMark words={section.trustWords} />
         {section.needsReview === null ? null : (
           <>
             <Pill variant="outline">{WORDS.needsReview}</Pill>

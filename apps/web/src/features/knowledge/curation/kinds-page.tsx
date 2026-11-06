@@ -252,7 +252,6 @@ function KindsRegion() {
         heading={KINDS.name}
         headingId={headingId}
         headingRef={heading}
-        description={WORDS.about}
         count={read.data === undefined ? "" : WORDS.count(shown.length, listed.length)}
       />
       <OutcomeLine outcome={outcome} className="mt-2" />
@@ -290,7 +289,7 @@ function KindsRegion() {
 export function KindsPage() {
   return (
     <>
-      <PageHead heading={CURATION.name} summary={CURATION.summary} />
+      <PageHead title={KINDS.name} />
       <KindsRegion />
     </>
   );

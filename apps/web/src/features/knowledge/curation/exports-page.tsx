@@ -317,7 +317,6 @@ function ExportsRegion() {
       <ListHead
         heading={EXPORTS_PAGE.name}
         headingId={headingId}
-        description={WORDS.about}
         count={WORDS.count(EXPORTS.length)}
       />
       <OutcomeLine outcome={outcome} className="mt-2" />
@@ -337,7 +336,7 @@ export function ExportsPage() {
 
   return (
     <>
-      <PageHead heading={CURATION.name} summary={CURATION.summary} />
+      <PageHead title={EXPORTS_PAGE.name} />
       <ExportsRegion />
     </>
   );

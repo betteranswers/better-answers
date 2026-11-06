@@ -46,7 +46,6 @@ export type Page = {
 export type MenuGroup = {
   readonly id: string;
   readonly name?: string;
-  readonly summary?: string;
   readonly pages: readonly Page[];
   readonly movedFrom?: readonly string[];
 };
@@ -108,7 +107,6 @@ export const KNOWLEDGE = {
     {
       id: "browse",
       name: "Browse",
-      summary: "Search or browse this workspace.",
       pages: [
         {
           name: "Search",
@@ -138,7 +136,6 @@ export const KNOWLEDGE = {
     {
       id: "curation",
       name: "Curation",
-      summary: "Manage knowledge.",
       pages: [
         {
           name: "All Knowledge",
@@ -222,7 +219,6 @@ export const CONTROL_CENTRE = {
     {
       id: "overview",
       name: "Overview",
-      summary: "See what needs attention.",
       pages: [
         { name: "Overview", path: "/overview", icon: "overview", built: false, seenBy: ADMINS },
       ],
@@ -230,7 +226,6 @@ export const CONTROL_CENTRE = {
     {
       id: "suggestions",
       name: "Suggestions",
-      summary: "Review suggested changes.",
       pages: [
         {
           name: "To Decide",
@@ -244,7 +239,6 @@ export const CONTROL_CENTRE = {
     {
       id: "sources",
       name: "Sources",
-      summary: "Manage documents.",
       movedFrom: ["/sources"],
       pages: [
         {
@@ -295,7 +289,6 @@ export const CONTROL_CENTRE = {
     {
       id: "models",
       name: "Models",
-      summary: "Manage models and spend.",
       pages: [
         {
           name: "Models and Spend",
@@ -317,7 +310,6 @@ export const CONTROL_CENTRE = {
     {
       id: "questions",
       name: "Questions",
-      summary: "Review questions and answers.",
       pages: [
         {
           name: "Questions Asked",
@@ -338,7 +330,6 @@ export const CONTROL_CENTRE = {
     {
       id: "people",
       name: "People",
-      summary: "Manage members.",
       movedFrom: ["/people"],
       pages: [
         {
@@ -363,7 +354,6 @@ export const CONTROL_CENTRE = {
     {
       id: "personal-data",
       name: "Personal Data",
-      summary: "Manage personal data.",
       pages: [
         {
           name: "Erasure and Suppression",
@@ -377,7 +367,6 @@ export const CONTROL_CENTRE = {
     {
       id: "system",
       name: "System",
-      summary: "View status and activity.",
       movedFrom: ["/system"],
       pages: [
         {
@@ -416,7 +405,6 @@ export const CONSOLE = {
     {
       id: "people",
       name: "People",
-      summary: "Manage people.",
       movedFrom: ["/console/people"],
       pages: [
         {
@@ -438,7 +426,6 @@ export const CONSOLE = {
     {
       id: "workspaces",
       name: "Workspaces",
-      summary: "View all workspaces.",
       movedFrom: ["/console/workspaces"],
       pages: [
         {
