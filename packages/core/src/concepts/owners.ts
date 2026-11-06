@@ -48,6 +48,14 @@ const OWNER_OF = `SELECT person_id
     ORDER BY iri IS NULL
     LIMIT 1`;
 
+const OWNER_NAMED = `SELECT o.person_id, u.name, o.iri IS NOT NULL AS by_concept
+     FROM concept_owner o
+     JOIN "user" u ON u.id = o.person_id
+    WHERE o.workspace_id = ${scopeClause(1)}
+      AND (o.iri = $2 OR o.collection = ${collectionOf("$3::text")})
+    ORDER BY o.iri IS NULL
+    LIMIT 1`;
+
 const OWNER_HELD = `${OWNER_OF} FOR SHARE`;
 
 const readOwner = async (
@@ -69,6 +77,33 @@ export const ownerOf = (
   tx: Tx,
   concept: OwnedConcept,
 ): Promise<UserId | undefined> => readOwner(principal, tx, concept, false);
+
+export const OWNED_VIA = ["concept", "collection"] as const;
+
+export type ConceptOwner = {
+  readonly personId: UserId;
+  readonly name: string;
+  readonly via: (typeof OWNED_VIA)[number];
+};
+
+export const ownerNamed = async (
+  principal: Principal,
+  tx: Tx,
+  concept: OwnedConcept,
+): Promise<ConceptOwner | null> => {
+  const found = await tx.query<{ person_id: UserId; name: string; by_concept: boolean }>(
+    OWNER_NAMED,
+    [scopeParameter(principal), concept.iri, concept.path],
+  );
+  const owner = found.rows[0];
+  return owner === undefined
+    ? null
+    : {
+        personId: owner.person_id,
+        name: owner.name,
+        via: owner.by_concept ? "concept" : "collection",
+      };
+};
 
 const COLLECTION_OWNER = `SELECT o.person_id, u.name
     FROM concept_owner o

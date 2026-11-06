@@ -9,6 +9,7 @@ import {
   type ConceptIri,
 } from "@better-answers/schema";
 
+import { OWNED_VIA, VERIFIED_TIERS } from "../concepts/index.ts";
 import { findCursor } from "./cursor.ts";
 
 const FIND_LIMIT_AT_MOST = 20;
@@ -283,6 +284,34 @@ export const openOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
               ),
             trust,
             trustWords: z.string(),
+            verifications: z
+              .array(
+                z.object({
+                  tier: z.enum(VERIFIED_TIERS),
+                  actor: z.string(),
+                  name: z.string().nullable(),
+                  at: z.string(),
+                }),
+              )
+              .describe(
+                "Every verification of the concept, newest first. The newest one sets `trust`. `name` is the person who verified it, and is null for an agent.",
+              ),
+            owner: z
+              .object({
+                personId: z.string(),
+                name: z.string(),
+                via: z.enum(OWNED_VIA),
+              })
+              .nullable()
+              .describe(
+                "The person answerable for keeping the concept verified: its own owner, or its collection's owner when `via` is `collection`. Null when nobody owns it.",
+              ),
+            usedIn: z
+              .object({
+                guides: z.number().int().nonnegative(),
+                answers: z.number().int().nonnegative(),
+              })
+              .describe("How many guides and answered questions you can read use the concept."),
             evidence: z.array(evidenceItem),
           })
           .optional(),

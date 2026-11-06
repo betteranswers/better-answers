@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { weakestTrust, type Trust } from "../../src/concepts/trust.ts";
+import { trustOf, trustWords, weakestTrust, type Trust } from "../../src/concepts/trust.ts";
 
 const verifiedBy = (at: string): Trust => ({
   tier: "human-reviewed",
@@ -72,5 +72,40 @@ describe("the trust a section shows", () => {
 
     expect(weakestTrust([later, earlier])).toEqual(earlier);
     expect(weakestTrust([earlier, later])).toEqual(earlier);
+  });
+});
+
+const HASH = "a".repeat(64);
+
+const verifiedConcept = (status: string, frontmatter: Readonly<Record<string, string>> = {}) => ({
+  status,
+  frontmatter,
+  contentHash: HASH,
+  verification: {
+    actor: "human:01JBZ6Q2V7Y9K3M5N8P0R2T4W6" as const,
+    at: new Date("2026-05-12T09:00:00Z"),
+    contentHash: HASH,
+    verifierName: "Dana Example",
+  },
+});
+
+describe("a concept's trust status", () => {
+  const now = new Date("2026-06-01T09:00:00Z");
+
+  it("reads a verified draft as Draft", () => {
+    const trust = trustOf(verifiedConcept("draft"), now);
+
+    expect(trust).toMatchObject({ tier: "human-reviewed", status: "draft" });
+    expect(trustWords(trust)).toBe("Draft");
+  });
+
+  it("puts out of date before draft", () => {
+    expect(trustOf(verifiedConcept("draft", { stale_after: "2026-05-01" }), now).status).toBe(
+      "out-of-date",
+    );
+  });
+
+  it("reads a stable concept as current", () => {
+    expect(trustOf(verifiedConcept("stable"), now).status).toBe("current");
   });
 });

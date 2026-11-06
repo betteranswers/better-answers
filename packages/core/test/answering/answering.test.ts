@@ -109,6 +109,12 @@ const unverified: Trust = {
   rider: null,
 };
 
+const UNOWNED_AND_UNUSED = {
+  verifications: [],
+  owner: null,
+  usedIn: { guides: 0, answers: 0 },
+} as const;
+
 const A_RECORD = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
 
 const trust = z.custom<Trust>();
@@ -572,6 +578,7 @@ describe("renderOpen and renderFeedback", () => {
           relations: [],
           trust: unverified,
           trustWords: "Unverified",
+          ...UNOWNED_AND_UNUSED,
           evidence: [
             { locator: "p.4", source: "Handbook" },
             { locator: "p.9", source: "Travel policy" },
@@ -610,6 +617,7 @@ describe("renderOpen and renderFeedback", () => {
           ],
           trust: unverified,
           trustWords: "Unverified",
+          ...UNOWNED_AND_UNUSED,
           evidence: [
             { id: "T-1", source: "Travel policy", iri: "https://better-answers.com/c/01B" },
             { id: "M-2", source: "The board's minutes" },
@@ -653,6 +661,7 @@ describe("renderOpen and renderFeedback", () => {
             rider: null,
           },
           trustWords: "Verified by Priya Shah · 3 March 2026",
+          ...UNOWNED_AND_UNUSED,
           evidence: [],
         },
       }),
@@ -663,6 +672,70 @@ describe("renderOpen and renderFeedback", () => {
         "Travel is booked in advance.",
         "",
         "_Verified by Priya Shah · 3 March 2026_",
+      ].join("\n"),
+    );
+  });
+
+  it("renders owner, use and every verification under the trust caption", () => {
+    expect(
+      renderOpen({
+        found: true,
+        concept: {
+          iri: "https://better-answers.com/c/01B",
+          frontmatter: { title: "Travel", type: "Policy" },
+          body: "Travel is booked in advance.",
+          relations: [],
+          trust: {
+            tier: "human-reviewed",
+            status: "current",
+            verifiedBy: "Priya Shah",
+            verifiedAt: "2026-03-03T09:00:00.000Z",
+            rider: null,
+          },
+          trustWords: "Verified by Priya Shah · 3 March 2026",
+          verifications: [
+            {
+              tier: "human-reviewed",
+              actor: "human:01J6ZZZZZZZZZZZZZZZZZZZZZA",
+              name: "Priya Shah",
+              at: "2026-03-03T09:00:00.000Z",
+            },
+            {
+              tier: "human-reviewed",
+              actor: "human:01J6ZZZZZZZZZZZZZZZZZZZZZB",
+              name: null,
+              at: "2026-02-01T09:00:00.000Z",
+            },
+            {
+              tier: "machine-confirmed",
+              actor: "process:better-answers-records-verifier",
+              name: null,
+              at: "2026-01-05T09:00:00.000Z",
+            },
+          ],
+          owner: {
+            personId: ids.userId.parse("01J6ZZZZZZZZZZZZZZZZZZZZZA"),
+            name: "Priya Shah",
+            via: "collection",
+          },
+          usedIn: { guides: 1, answers: 2 },
+          evidence: [],
+        },
+      }),
+    ).toBe(
+      [
+        "# Travel",
+        "",
+        "Travel is booked in advance.",
+        "",
+        "_Verified by Priya Shah · 3 March 2026_",
+        "Owner: Priya Shah, for its collection",
+        "Used in 1 guide and 2 answers.",
+        "",
+        "Verifications, newest first:",
+        "- Verified by Priya Shah · 3 March 2026",
+        "- Verified by a former member · 1 February 2026",
+        "- Verified automatically · 5 January 2026",
       ].join("\n"),
     );
   });
@@ -1181,6 +1254,7 @@ describe("parsing the find, open and ask inputs", () => {
           relations: [],
           trust: unverified,
           trustWords: "Unverified",
+          ...UNOWNED_AND_UNUSED,
           evidence: [],
         },
         passage: {
@@ -2190,6 +2264,7 @@ describe("find and open across concepts and source passages", () => {
           bodyLinks: [],
           trust: unverified,
           trustWords: "Unverified",
+          ...UNOWNED_AND_UNUSED,
           evidence: [
             { id: "S-1", source: "The covered handbook", locator: handbook.locator },
             { source: "Bid library", at: "p.4" },
@@ -2408,6 +2483,7 @@ describe("the links in an opened concept's body", () => {
           bodyLinks: [],
           trust: unverified,
           trustWords: "Unverified",
+          ...UNOWNED_AND_UNUSED,
           evidence: [],
         },
       }),

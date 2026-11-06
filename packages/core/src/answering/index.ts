@@ -1,9 +1,11 @@
 import type { ConceptIri } from "@better-answers/schema";
 
 import { readConcept } from "../concepts/index.ts";
+import { guidesCiting } from "../guides/index.ts";
 import {
   admit,
   ANY_ROLE,
+  attempt,
   declareAction,
   err,
   NOT_FOUND,
@@ -24,6 +26,7 @@ import {
   type ReadStep,
 } from "./plan.ts";
 import type { RecordCompletion, RecordOpening } from "./record.ts";
+import { answersUsing } from "./records.ts";
 import type { OpenResult, AnswerResult } from "./results.ts";
 
 export { NOT_COMPANY_KNOWLEDGE } from "./results.ts";
@@ -133,6 +136,11 @@ const conceptOpened = async (
   });
   if (!concept.ok) return err(concept.error);
   if (concept.value === undefined) return ok({ found: false, iri: named });
+  const usedIn = await attempt(async () => ({
+    guides: await guidesCiting(reader, tx, named),
+    answers: await answersUsing(reader, tx, named),
+  }));
+  if (!usedIn.ok) return err(usedIn.error);
 
   const {
     iri,
@@ -142,6 +150,8 @@ const conceptOpened = async (
     bodyLinks,
     trust,
     trustWords: words,
+    verifications,
+    owner,
     pane,
   } = concept.value;
   return ok({
@@ -154,6 +164,9 @@ const conceptOpened = async (
       bodyLinks,
       trust,
       trustWords: words,
+      verifications,
+      owner,
+      usedIn: usedIn.value,
       evidence: pane.evidence,
       access: pane.access,
       lead: pane.lead,

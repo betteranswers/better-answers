@@ -14,6 +14,7 @@ export {
   type SectionRead,
 } from "./reads.ts";
 export { renderBrief, type ClipboardBrief } from "./renderer.ts";
+export { guidesCiting } from "./citing.ts";
 export { seedGuide } from "./seed.ts";
 export { SKELETON_PROJECTION, writeSkeleton } from "./skeleton.ts";
 export { TEMPLATES } from "./templates/index.ts";

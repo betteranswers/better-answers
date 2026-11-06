@@ -1,4 +1,4 @@
-import type { UNREVIEWED_TIERS } from "@better-answers/schema";
+import { CONCEPT_DRAFT_STATUS, type UNREVIEWED_TIERS } from "@better-answers/schema";
 
 import { isActorId, isPersonActor, type ActorId } from "../kernel/index.ts";
 import type { Frontmatter, FrontmatterValue } from "./file.ts";
@@ -63,6 +63,22 @@ export const verificationOf = (row: VerificationRow): ConceptVerification | unde
   };
 };
 
+export const VERIFIED_TIERS = ["machine-confirmed", "human-reviewed"] as const;
+
+export type VerificationEvent = {
+  readonly tier: (typeof VERIFIED_TIERS)[number];
+  readonly actor: ActorId;
+  readonly name: string | null;
+  readonly at: string;
+};
+
+export const verificationEventOf = (verification: ConceptVerification): VerificationEvent => ({
+  tier: isPersonActor(verification.actor) ? "human-reviewed" : "machine-confirmed",
+  actor: verification.actor,
+  name: verification.verifierName,
+  at: verification.at.toISOString(),
+});
+
 const RIDER_WORDS = {
   imported: " · imported",
   "source-moved-on": " · source moved on",
@@ -110,19 +126,23 @@ export const trustOf = (concept: Trusted, now: Date): Trust => ({
   status: trustStatusOf(concept, now),
 });
 
-const trustOfVerification = (verification: Trusted["verification"]): Verification =>
-  verification === undefined
-    ? { tier: "unverified", verifiedBy: null, verifiedAt: null, rider: null }
-    : {
-        tier: isPersonActor(verification.actor) ? "human-reviewed" : "machine-confirmed",
-        verifiedBy: verification.verifierName ?? verification.actor,
-        verifiedAt: verification.at.toISOString(),
-        rider: verification.contentHash === null ? "imported" : null,
-      };
+const trustOfVerification = (verification: Trusted["verification"]): Verification => {
+  if (verification === undefined) {
+    return { tier: "unverified", verifiedBy: null, verifiedAt: null, rider: null };
+  }
+  const { tier, actor, name, at } = verificationEventOf(verification);
+  return {
+    tier,
+    verifiedBy: name ?? actor,
+    verifiedAt: at,
+    rider: verification.contentHash === null ? "imported" : null,
+  };
+};
 
 const trustStatusOf = (concept: Trusted, now: Date): TrustStatus => {
   if (concept.status === "deprecated") return "deprecated";
   if (pastShelfLife(concept.frontmatter["stale_after"], now)) return "out-of-date";
+  if (concept.status === CONCEPT_DRAFT_STATUS) return "draft";
   const verifiedHash = concept.verification?.contentHash;
   return verifiedHash != null && verifiedHash !== concept.contentHash
     ? "changed-since-checked"

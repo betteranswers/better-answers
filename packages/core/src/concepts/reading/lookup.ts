@@ -25,15 +25,18 @@ import {
 } from "../../kernel/index.ts";
 import { type Tx } from "../../store/postgres/index.ts";
 import { type Frontmatter } from "../file.ts";
+import { ownerNamed, type ConceptOwner } from "../owners.ts";
 import {
   trustOf,
   trustWords,
+  verificationEventOf,
   verificationOf,
   type ConceptVerification,
   type Trust,
+  type VerificationEvent,
   type VerificationRow,
 } from "../trust.ts";
-import { latestVerificationOf } from "./latest-verification.ts";
+import { latestVerificationOf, verificationsOf } from "./latest-verification.ts";
 import {
   bodyLinksOf,
   paneOf,
@@ -169,6 +172,8 @@ export type ConceptRead = {
   readonly body: string;
   readonly trust: Trust;
   readonly trustWords: string;
+  readonly verifications: readonly VerificationEvent[];
+  readonly owner: ConceptOwner | null;
   readonly pane: EvidencePane;
   readonly relations: readonly Relation[];
   readonly bodyLinks: readonly BodyLink[];
@@ -206,13 +211,21 @@ export const readConcept = async (
   if (!relations.ok) return err(relations.error);
   const bodyLinks = await bodyLinksOf(principal, tx, concept);
   if (!bodyLinks.ok) return err(bodyLinks.error);
-  const trust = trustOf(concept, reads.now);
+  const kept = await attempt(async () => ({
+    verifications: await verificationsOf(principal, tx, concept.iri),
+    owner: await ownerNamed(principal, tx, concept),
+  }));
+  if (!kept.ok) return err(kept.error);
+  const { verifications, owner } = kept.value;
+  const trust = trustOf({ ...concept, verification: verifications[0] }, reads.now);
   return ok({
     iri: concept.iri,
     frontmatter: projectedFrontmatter(concept.frontmatter, sources.value),
     body: concept.body,
     trust,
     trustWords: trustWords(trust),
+    verifications: verifications.map(verificationEventOf),
+    owner,
     pane: paneOf(sources.value, sharerOfRow(row)),
     relations: relations.value,
     bodyLinks: bodyLinks.value,
