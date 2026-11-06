@@ -18,6 +18,7 @@ import type { Tx } from "../store/postgres/index.ts";
 import { matchesTheFact, metBy } from "./match.ts";
 import { renderBrief, type Footnote, type RenderedBrief } from "./renderer.ts";
 import type { GuideLayer, RoleLabel } from "./templates/index.ts";
+import { shownClause } from "./withheld.ts";
 import { SECTION_HOME } from "./write-ups.ts";
 
 const footnotesOfAction = declareAction({
@@ -488,14 +489,6 @@ type SummaryRow = {
 };
 
 const GUIDES = `
-  WITH RECURSIVE withheld (guide_id, id) AS (
-    SELECT guide_id, id FROM guide_section WHERE workspace_id = $1 AND hidden
-    UNION
-    SELECT s.guide_id, s.id
-      FROM guide_section s
-      JOIN withheld h ON h.guide_id = s.guide_id AND h.id = s.parent_id
-     WHERE s.workspace_id = $1
-  )
   SELECT g.id, g.kind, g.collection, g.subject_iri, c.title AS subject_title,
          count(s.id)::int AS sections,
          count(*) FILTER (WHERE ${readableClause("w", 2)} AND w.needs_review IS NOT NULL)::int
@@ -504,9 +497,7 @@ const GUIDES = `
     LEFT JOIN concept_index c ON c.workspace_id = g.workspace_id AND c.iri = g.subject_iri
                              AND ${readableClause("c", 2)}
     LEFT JOIN guide_section s ON s.workspace_id = g.workspace_id AND s.guide_id = g.id
-                             AND ($2 = 'Admin' OR NOT EXISTS (
-                                   SELECT 1 FROM withheld h
-                                    WHERE h.guide_id = s.guide_id AND h.id = s.id))
+                             AND ${shownClause({ guide: "s.guide_id", section: "s.id" }, 2)}
     LEFT JOIN write_up w ON w.workspace_id = s.workspace_id AND w.home = '${SECTION_HOME}'
                         AND w.guide_id = s.guide_id AND w.section_id = s.id
    WHERE g.workspace_id = $1
