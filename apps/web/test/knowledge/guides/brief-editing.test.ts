@@ -187,7 +187,9 @@ describe("the draft", () => {
   });
 
   it("names the footnotes already placed in the draft", () => {
-    const placed = placedIn("Pallets[^a1] are racked[^b-2] by row[^a1]. A note[^c]: not a marker.");
+    const placed = placedIn(
+      "Pallets[^a1] are racked[^b-2] by row[^a1]. A note[^c]: is one.\n\n[^d]: is not.",
+    );
 
     expect([...placed]).toEqual(["a1", "b-2"]);
   });

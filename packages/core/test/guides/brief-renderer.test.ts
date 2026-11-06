@@ -61,6 +61,24 @@ describe("rendering a Brief for the page", () => {
 
     expect(rendered.markdown).toBe("Claim[^1].\n\n[^a]: injected");
   });
+
+  it("leaves a marker inside code as typed", () => {
+    const rendered = renderBrief(
+      "Write `[^a]` to cite.\n\n```\n[^b]\n```\n\nThen cite[^c].",
+      FOOTNOTES,
+      "page",
+    );
+
+    expect(rendered.markdown).toBe("Write `[^a]` to cite.\n\n```\n[^b]\n```\n\nThen cite[^1].");
+    expect(rendered.footnotes.map((each) => each.title)).toEqual(["Gamma"]);
+  });
+
+  it("numbers a marker that a colon follows mid-line", () => {
+    const rendered = renderBrief("As the policy[^a]: cover is held[^b]:", FOOTNOTES, "page");
+
+    expect(rendered.markdown).toBe("As the policy[^1]: cover is held[^2]:");
+    expect(rendered.footnotes.map((each) => each.title)).toEqual(["Alpha", "Beta"]);
+  });
 });
 
 describe("rendering a Brief for the clipboard", () => {

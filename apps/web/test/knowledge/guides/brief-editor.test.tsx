@@ -112,6 +112,23 @@ describe("moving among a Brief's footnote chips", () => {
     expect(chip?.textContent).toBe(`Footnote: ${RACKING_TITLE}`);
   });
 
+  it("draws a chip that a colon follows", () => {
+    render(
+      <BriefBody
+        label={LABEL}
+        value={`Pallets[^${AN_INCLUDE_ID}]: are racked.`}
+        includes={INCLUDES}
+        placed={new Set([AN_INCLUDE_ID])}
+        onChange={vi.fn<(markdown: string) => void>()}
+      />,
+    );
+
+    const chip = textField().querySelector("[data-footnote-reference]");
+    expect(chip?.getAttribute("data-footnote-reference")).toBe(AN_INCLUDE_ID);
+    expect(textField().textContent).toContain(": are racked.");
+    expect(textField().textContent).not.toContain(AN_INCLUDE_ID);
+  });
+
   it("moves past a footnote chip with one arrow key", async () => {
     const onChange = draw();
 

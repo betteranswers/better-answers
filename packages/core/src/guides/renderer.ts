@@ -1,5 +1,5 @@
 import type { CitedSource } from "@better-answers/schema";
-import { BRIEF_MARKER } from "@better-answers/schema/brief-marker";
+import { replaceMarkers } from "@better-answers/schema/brief-marker";
 
 import { carrierOf, clipboardOf, sourceLineOf, type Clipboard } from "./clipboard.ts";
 
@@ -35,7 +35,7 @@ const numbering = <Cited extends Footnote>(
 ): Numbering<Cited> => {
   const byLabel = new Map(footnotes.map((footnote) => [footnote.label, footnote]));
   const numbered = new Map<string, Numbered<Cited>>();
-  const text = markdown.replaceAll(BRIEF_MARKER, (_marker, label: string) => {
+  const text = replaceMarkers(markdown, (label) => {
     const footnote = byLabel.get(label);
     if (footnote === undefined) return "";
     const cited = numbered.get(label) ?? { ...footnote, number: numbered.size + 1 };
