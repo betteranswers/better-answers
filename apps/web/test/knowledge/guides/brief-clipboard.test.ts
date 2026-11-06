@@ -8,6 +8,7 @@ import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
 import {
   A_GUIDE_PAGE,
   A_WRITE_UP_ID,
+  aBrief,
   aBriefCopy,
   aGuide,
   aGuideApi,
@@ -107,8 +108,13 @@ describe("copying a Brief to the clipboard", () => {
   });
 });
 
-const openGuide = async (copy: "offered" | "below-action-threshold" = "offered") => {
-  const api = aGuideApi("Editor", aGuide({ sections: [aSection({ copy })] }));
+const openGuide = async (
+  copy: "offered" | "below-action-threshold" = "offered",
+  markdown?: string,
+) => {
+  const brief =
+    markdown === undefined ? aBrief() : aBrief({ rendered: { markdown, footnotes: [] } });
+  const api = aGuideApi("Editor", aGuide({ sections: [aSection({ copy, brief })] }));
   api.set(BRIEF_COPY, () => read(COPIED));
   api.set(RECORD_COPY, () => read({ id: "01JUSAGE0000000000000000A" }));
   await openAt(A_GUIDE_PAGE, api);
@@ -117,6 +123,12 @@ const openGuide = async (copy: "offered" | "below-action-threshold" = "offered")
 };
 
 const copyButton = () => screen.getByRole("button", { name: "Copy" });
+
+const pressCOnTheFirstSection = () => {
+  const heading = screen.getByRole("heading", { name: "1. Warehouse racking" });
+  heading.focus();
+  fireEvent.keyDown(heading, { key: "c" });
+};
 
 const status = () => within(screen.getByRole("article")).getByRole("status");
 
@@ -204,15 +216,26 @@ describe("copying a section on the guide page", () => {
     expect(screen.getByRole("textbox", { name: "Brief of section 1" })).toBeDefined();
   });
 
-  it("announces that c has nothing to copy without Copy", async () => {
+  it("says why c copies nothing below the role's threshold", async () => {
     await openGuide("below-action-threshold");
 
-    const heading = screen.getByRole("heading", { name: "1. Warehouse racking" });
-    heading.focus();
-    fireEvent.keyDown(heading, { key: "c" });
+    pressCOnTheFirstSection();
 
     await waitFor(() => {
-      expect(status().textContent, "c with no Copy said nothing").toMatch(/\S/u);
+      expect(status().textContent).toBe(
+        "You can’t copy this section yet. Some of its concepts aren’t verified enough for your role.",
+      );
+    });
+    expect(asksOf(BRIEF_COPY)).toEqual([]);
+  });
+
+  it("says c has nothing to copy in an empty Brief", async () => {
+    await openGuide("offered", "");
+
+    pressCOnTheFirstSection();
+
+    await waitFor(() => {
+      expect(status().textContent).toBe("Copy isn’t available for this section.");
     });
     expect(asksOf(BRIEF_COPY)).toEqual([]);
   });
