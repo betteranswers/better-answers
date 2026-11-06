@@ -113,7 +113,9 @@ const openGuide = async (
   markdown?: string,
 ) => {
   const brief =
-    markdown === undefined ? aBrief() : aBrief({ rendered: { markdown, footnotes: [] } });
+    markdown === undefined
+      ? aBrief()
+      : aBrief({ rendered: { markdown, footnotes: [], marks: [] } });
   const api = aGuideApi("Editor", aGuide({ sections: [aSection({ copy, brief })] }));
   api.set(BRIEF_COPY, () => read(COPIED));
   api.set(RECORD_COPY, () => read({ id: "01JUSAGE0000000000000000A" }));

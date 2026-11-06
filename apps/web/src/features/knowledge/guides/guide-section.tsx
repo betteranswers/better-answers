@@ -78,6 +78,15 @@ function BriefText(properties: {
       })),
     [rendered.footnotes],
   );
+  const marks = useMemo(
+    () =>
+      rendered.marks.map(({ at, number }) => ({
+        at,
+        mark: `[^${String(number)}]`,
+        source: number - 1,
+      })),
+    [rendered.marks],
+  );
   if (rendered.markdown.trim() === "") {
     return properties.assembled ? (
       <p className="mt-4 text-muted-foreground">{WORDS.noBrief}</p>
@@ -85,7 +94,12 @@ function BriefText(properties: {
   }
   return (
     <div className="mt-4">
-      <ConceptBody body={rendered.markdown} evidence={evidence} headingsFrom={properties.below} />
+      <ConceptBody
+        body={rendered.markdown}
+        evidence={evidence}
+        marks={marks}
+        headingsFrom={properties.below}
+      />
       <Footnotes footnotes={rendered.footnotes} />
     </div>
   );

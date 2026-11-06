@@ -43,6 +43,7 @@ export const aBrief = (changes: Changes = {}) => ({
   rendered: {
     markdown: "Pallets are racked[^1] by row.",
     footnotes: [{ number: 1, label: AN_INCLUDE_ID, iri: RACKING_IRI, title: RACKING_TITLE }],
+    marks: [{ at: 18, number: 1 }],
   },
   detail: [
     { iri: RACKING_IRI, title: RACKING_TITLE, kind: "Policy", body: "Each bay is racked by row." },

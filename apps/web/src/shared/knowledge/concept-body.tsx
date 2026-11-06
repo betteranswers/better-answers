@@ -11,7 +11,7 @@ import {
 import Markdown, { type Components, type ExtraProps } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { linksAndMarksOf, uriDecoded } from "@better-answers/schema/concept-file";
+import { linksAndMarksOf, uriDecoded, type BodyReading } from "@better-answers/schema/concept-file";
 
 import { cn } from "@/shared/lib/utils.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -373,17 +373,21 @@ export function ConceptBody(properties: {
   readonly bodyLinks?: readonly AnsweredLink[];
   readonly opening?: MarkOpening;
   readonly headingsFrom?: number;
+  /** Marks a caller has already read, in place of the concept body's own reading. */
+  readonly marks?: BodyReading["marks"];
 }) {
   const { body, evidence, bodyLinks, opening, headingsFrom = 3 } = properties;
   const baseId = fragmentSafe(useId());
 
   const read = useMemo(() => {
-    const { marks } = linksAndMarksOf(
-      body,
-      evidence.map((item) => ({ resource: item.source, locator: null, id: item.id ?? null })),
-    );
+    const marks =
+      properties.marks ??
+      linksAndMarksOf(
+        body,
+        evidence.map((item) => ({ resource: item.source, locator: null, id: item.id ?? null })),
+      ).marks;
     return { text: carrying(body, marks), marks };
-  }, [body, evidence]);
+  }, [body, evidence, properties.marks]);
 
   const pages = useMemo(() => pagesByAddress(bodyLinks ?? []), [bodyLinks]);
 

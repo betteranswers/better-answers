@@ -53,7 +53,7 @@ describe("rendering a Brief for the page", () => {
   it("lists no footnote for an include the prose never cites", () => {
     const rendered = renderBrief("No markers here.", FOOTNOTES, "page");
 
-    expect(rendered).toEqual({ markdown: "No markers here.", footnotes: [] });
+    expect(rendered).toEqual({ markdown: "No markers here.", footnotes: [], marks: [] });
   });
 
   it("leaves a footnote definition line as it is", () => {
@@ -78,6 +78,88 @@ describe("rendering a Brief for the page", () => {
 
     expect(rendered.markdown).toBe("As the policy[^1]: cover is held[^2]:");
     expect(rendered.footnotes.map((each) => each.title)).toEqual(["Alpha", "Beta"]);
+  });
+
+  it("marks where each number stands, colon or not", () => {
+    const rendered = renderBrief("Policy[^a]: cover[^gone] held[^b]:\n\n`[^c]`", FOOTNOTES, "page");
+
+    expect(rendered.marks).toEqual([
+      { at: 6, number: 1 },
+      { at: 22, number: 2 },
+    ]);
+    expect(rendered.marks.map(({ at }) => rendered.markdown.slice(at, at + 4))).toEqual([
+      "[^1]",
+      "[^2]",
+    ]);
+  });
+});
+
+const HIDDEN = "[^withheld]";
+
+/** Each spells a footnote number the page or the copy would show, were it read from text. */
+const FORGERIES = [
+  ["typed carriers", "\uE0001\uE001"],
+  ["hex references", "&#xE000;1&#xE001;"],
+  ["padded hex references", "&#x0e000;1&#x0E001;"],
+  ["decimal references", "&#57344;1&#57345;"],
+  ["a page marker", "[^1]"],
+  ["a marker in named references", "&lbrack;&Hat;1&rsqb;"],
+  ["a marker in numeric references", "&#91;^1&#x5D;"],
+] as const;
+
+/** The forgery whole, and split by a marker the reader cannot read at one place or two. */
+const splitsOf = (forged: string): readonly string[] => {
+  const places = Array.from({ length: forged.length - 1 }, (_, at) => at + 1);
+  const once = places.map((at) => forged.slice(0, at) + HIDDEN + forged.slice(at));
+  const twice = places.flatMap((first) =>
+    places
+      .filter((second) => second > first)
+      .map(
+        (second) =>
+          forged.slice(0, first) +
+          HIDDEN +
+          forged.slice(first, second) +
+          HIDDEN +
+          forged.slice(second),
+      ),
+  );
+  return [forged, ...once, ...twice];
+};
+
+/** Each forgery, whole and split, beside the reading it must give: the one real citation. */
+const readEach = <Reading>(forged: string, read: (brief: string) => Reading, real: Reading) => {
+  const briefs = splitsOf(forged);
+  return {
+    read: Object.fromEntries(briefs.map((brief) => [brief, read(`Real[^a] ${brief} end.`)])),
+    real: Object.fromEntries(briefs.map((brief) => [brief, real])),
+  };
+};
+
+describe("a Brief that spells a footnote number in its text", () => {
+  const READABLE = [sourced("a", "Alpha")];
+
+  it.each(FORGERIES)("forges no copied number from %s", (_kind, forged) => {
+    const { read, real } = readEach(
+      forged,
+      (brief) => {
+        const { html, text } = renderBrief(brief, READABLE, "clipboard");
+        return {
+          html: Array.from(html.matchAll(/<sup>(\d+)<\/sup>/gu), ([, number]) => number),
+          text: text.split("\n\nSources")[0]?.match(/\[\d+\]/gu),
+        };
+      },
+      { html: ["1"], text: ["[1]"] },
+    );
+
+    expect(read).toEqual(real);
+  });
+
+  it.each(FORGERIES)("forges no page number from %s", (_kind, forged) => {
+    const { read, real } = readEach(forged, (brief) => renderBrief(brief, READABLE, "page").marks, [
+      { at: 4, number: 1 },
+    ]);
+
+    expect(read).toEqual(real);
   });
 });
 
@@ -130,25 +212,6 @@ describe("rendering a Brief for the clipboard", () => {
         "[2] Alpha. Source: Alpha schedule, page 2.\n" +
         "[3] Beta. Source: Beta schedule, page 2.",
     );
-  });
-
-  it("drops a typed number that has no footnote behind it", () => {
-    const rendered = renderBrief("Real[^a] forged&#xE000;9&#xE001; done.", FOR_PASTE, "clipboard");
-
-    expect(rendered.html).toContain("Real<sup>1</sup> forged done.");
-    expect(rendered.html).not.toContain("<sup>9</sup>");
-  });
-
-  it.each([
-    ["typed characters", "forged1 done"],
-    ["hexadecimal character references", "forged&#xE000;1&#xE001; done"],
-    ["decimal character references", "forged&#57344;1&#57345; done"],
-  ])("forges no footnote number from %s", (_kind, forged) => {
-    const rendered = renderBrief(`Real[^a] ${forged}.`, FOR_PASTE, "clipboard");
-
-    expect(rendered.html).toContain("Real<sup>1</sup> forged done.");
-    expect(rendered.html.match(/<sup>/gu)).toHaveLength(1);
-    expect(rendered.text).toContain("Real[1] forged done.");
   });
 
   it("keeps the paragraphs of a list item apart", () => {

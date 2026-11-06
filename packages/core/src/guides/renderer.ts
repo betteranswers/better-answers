@@ -1,13 +1,7 @@
 import type { CitedSource } from "@better-answers/schema";
 import { replaceMarkers } from "@better-answers/schema/brief-marker";
 
-import {
-  carrierOf,
-  clipboardOf,
-  sourceLineOf,
-  withoutCarriers,
-  type Clipboard,
-} from "./clipboard.ts";
+import { carrierOf, clipboardOf, sourceLineOf, type Clipboard } from "./clipboard.ts";
 
 export type Footnote = {
   readonly label: string;
@@ -22,14 +16,20 @@ export type SourcedFootnote = Footnote & {
 
 type Numbered<Cited extends Footnote> = Cited & { readonly number: number };
 
+/** Where in the rendered text a footnote number stands. */
+type Mark = { readonly at: number; readonly number: number };
+
 type Numbering<Cited extends Footnote> = {
   readonly text: string;
   readonly cited: readonly Numbered<Cited>[];
+  readonly marks: readonly Mark[];
 };
 
+/** The page reads its footnote numbers from `marks`, so text a dropped marker joins cites nothing. */
 export type RenderedBrief = {
   readonly markdown: string;
   readonly footnotes: readonly Numbered<Footnote>[];
+  readonly marks: readonly Mark[];
 };
 
 export type ClipboardBrief = Clipboard & { readonly footnotes: number };
@@ -41,23 +41,30 @@ const numbering = <Cited extends Footnote>(
 ): Numbering<Cited> => {
   const byLabel = new Map(footnotes.map((footnote) => [footnote.label, footnote]));
   const numbered = new Map<string, Numbered<Cited>>();
-  const text = replaceMarkers(markdown, (label) => {
+  const marks: Mark[] = [];
+  let shift = 0;
+  const text = replaceMarkers(markdown, (label, at) => {
     const footnote = byLabel.get(label);
+    const placedAt = at + shift;
+    shift -= `[^${label}]`.length;
     if (footnote === undefined) return "";
     const cited = numbered.get(label) ?? { ...footnote, number: numbered.size + 1 };
     numbered.set(label, cited);
-    return marked(cited.number);
+    const replaced = marked(cited.number);
+    marks.push({ at: placedAt, number: cited.number });
+    shift += replaced.length;
+    return replaced;
   });
-  return { text, cited: [...numbered.values()] };
+  return { text, cited: [...numbered.values()], marks };
 };
 
 const page = (markdown: string, footnotes: readonly Footnote[]): RenderedBrief => {
-  const { text, cited } = numbering(markdown, footnotes, (number) => `[^${String(number)}]`);
-  return { markdown: text, footnotes: cited };
+  const { text, cited, marks } = numbering(markdown, footnotes, (number) => `[^${String(number)}]`);
+  return { markdown: text, footnotes: cited, marks };
 };
 
 const clipboard = (markdown: string, footnotes: readonly SourcedFootnote[]): ClipboardBrief => {
-  const { text, cited } = numbering(withoutCarriers(markdown), footnotes, carrierOf);
+  const { text, cited } = numbering(markdown, footnotes, carrierOf);
   return { ...clipboardOf(text, cited.map(sourceLineOf)), footnotes: cited.length };
 };
 

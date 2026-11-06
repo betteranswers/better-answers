@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { BlockContent, DefinitionContent, PhrasingContent, RootContent } from "mdast";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
@@ -5,23 +7,16 @@ import { unified } from "unified";
 
 import { IRI, quotedPassageOf, type CitedSource } from "@better-answers/schema";
 
-const OPENS = "";
+/** No copy holds the nonce, so no text in a Brief, typed or as a character reference, forges a carrier. */
+const OPENS = `\uE000${randomUUID()}`;
 
-const CLOSES = "";
+const CLOSES = "\uE001";
 
 const CARRIED = new RegExp(`${OPENS}(\\d+)${CLOSES}`, "u");
 
 const CARRIED_ANYWHERE = new RegExp(`${OPENS}\\d+${CLOSES}`, "gu");
 
 export const carrierOf = (number: number): string => `${OPENS}${String(number)}${CLOSES}`;
-
-const OPENING = `${OPENS}|&#(?:x0*e000|0*57344);`;
-
-const CLOSING = `${CLOSES}|&#(?:x0*e001|0*57345);`;
-
-const FORGED = new RegExp(`(?:${OPENING})\\d*(?:${CLOSING})|${OPENING}|${CLOSING}`, "giu");
-
-export const withoutCarriers = (words: string): string => words.replaceAll(FORGED, "");
 
 export type Clipboard = { readonly html: string; readonly text: string };
 

@@ -111,6 +111,24 @@ describe("the guide page", () => {
     expect(link.getAttribute("href")).toContain(RACKING_IRI.slice(-26));
   });
 
+  it.each([
+    ["a colon after it", "Cited here[^1]: the policy.", "Cited here[1]: the policy."],
+    [
+      "an unplaced marker beside it",
+      "Cited here[^1] and [^1] again.",
+      "Cited here[1] and [^1] again.",
+    ],
+  ])("numbers a placed marker with %s", async (_case, markdown, shown) => {
+    const footnotes = aViewersBrief().rendered.footnotes;
+    const brief = aViewersBrief({
+      rendered: { markdown, footnotes, marks: [{ at: 10, number: 1 }] },
+    });
+    await openGuide("Viewer", aGuide({ sections: [aSection({ brief })] }));
+
+    const section = within(sectionNamed(SECTION_ONE));
+    expect(section.getByText(/Cited here/u).textContent).toBe(shown);
+  });
+
   it("draws no Edit Brief for a Viewer", async () => {
     await openGuide("Viewer", aGuide({ sections: [aSection({ brief: aViewersBrief() })] }));
 
@@ -125,7 +143,7 @@ describe("the guide page", () => {
   });
 
   it("offers Edit Brief but no Copy for an empty Brief", async () => {
-    const empty = aBrief({ rendered: { markdown: "", footnotes: [] } });
+    const empty = aBrief({ rendered: { markdown: "", footnotes: [], marks: [] } });
     await openGuide("Editor", aGuide({ sections: [aSection({ brief: empty })] }));
 
     const section = within(sectionNamed(SECTION_ONE));
