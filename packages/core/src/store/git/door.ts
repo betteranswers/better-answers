@@ -21,6 +21,8 @@ export type GitDoor = {
   readonly root: string;
 
   readonly commitBudgetMs?: number;
+  /** The signal that ends a commit's budget. A test ends it on an event instead of a clock. */
+  readonly commitTimeout?: (ms: number) => AbortSignal;
   readonly snapshotBytesMax?: number;
 };
 

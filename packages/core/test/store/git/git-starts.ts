@@ -23,13 +23,16 @@ const withShimFirst = async (shim: string, searched: string, work: () => Promise
   }
 };
 
-/** Reads no input and, like git clearing its locks, takes a second to exit on SIGTERM. */
+/**
+ * Reads no input and, like git clearing its locks, takes a second to exit on SIGTERM. Writes its
+ * pid once it waits.
+ */
 const HANGING = (subcommand: string, pidFile: string, searched: string): string => `#!/bin/sh
 for word in "$@"; do
   if [ "$word" = ${shellQuoted(subcommand)} ]; then
-    echo $$ > ${shellQuoted(pidFile)}
     trap 'kill $!; sleep 1; exit 143' TERM
     sleep 30 &
+    echo $$ > ${shellQuoted(`${pidFile}.part`)} && mv ${shellQuoted(`${pidFile}.part`)} ${shellQuoted(pidFile)}
     wait
     exit 1
   fi
@@ -37,23 +40,45 @@ done
 PATH=${shellQuoted(searched)} exec git "$@"
 `;
 
-/**
- * Returns the pid of the hung git. Sets PATH for the whole process, so nothing else may start git
- * while `work` runs.
- */
+const exists = (file: string): Promise<boolean> =>
+  access(file).then(
+    () => true,
+    () => false,
+  );
+
+/** Waits until `file` exists or `running` settles, and says whether `file` exists. */
+const appearsWhile = async (file: string, running: Promise<unknown>): Promise<boolean> => {
+  const run = { settled: false };
+  const settle = () => {
+    run.settled = true;
+  };
+  running.then(settle, settle);
+  while (!run.settled && !(await exists(file))) await new Promise((r) => setTimeout(r, 20));
+  return exists(file);
+};
+
+/** Returns the hung git's pid. Sets PATH for the whole process, so nothing else may start git. */
 export const whileGitHangsAt = async (
   subcommand: string,
-  work: () => Promise<void>,
+  work: (budgetEnds: () => AbortSignal) => Promise<void>,
 ): Promise<number> => {
   const shim = await mkdtemp(path.join(tmpdir(), "better-answers-git-hangs-"));
   const searched = process.env["PATH"] ?? "";
   const pidFile = path.join(shim, "pid");
+  const budget = new AbortController();
   try {
     await writeFile(path.join(shim, "git"), HANGING(subcommand, pidFile, searched));
     await chmod(path.join(shim, "git"), 0o755);
-    await withShimFirst(shim, searched, work);
-    return Number((await readFile(pidFile, "utf8")).trim());
+    process.env["PATH"] = `${shim}${path.delimiter}${searched}`;
+    const working = work(() => budget.signal);
+    const hung = await appearsWhile(pidFile, working);
+    budget.abort();
+    await working;
+    if (!hung) throw new Error(`git ${subcommand} never hung`);
+    return Number(await readFile(pidFile, "utf8"));
   } finally {
+    budget.abort();
+    process.env["PATH"] = searched;
     await rm(shim, { recursive: true, force: true });
   }
 };
@@ -76,12 +101,6 @@ done
 PATH=${shellQuoted(searched)} exec git "$@"
 `;
 
-const exists = (file: string): Promise<boolean> =>
-  access(file).then(
-    () => true,
-    () => false,
-  );
-
 /** Sets PATH for the whole process, so nothing else may start git while it runs. */
 export const whileGitPausesAt = async <T>(
   pause: { readonly subcommand: string; readonly after: boolean },
@@ -96,13 +115,10 @@ export const whileGitPausesAt = async <T>(
     await chmod(path.join(shim, "git"), 0o755);
     await writeFile(path.join(shim, "armed"), "");
     process.env["PATH"] = `${shim}${path.delimiter}${searched}`;
-    const run = { settled: false };
-    const answer = started().finally(() => {
-      run.settled = true;
-    });
-    const paused = path.join(shim, "paused");
-    while (!run.settled && !(await exists(paused))) await new Promise((r) => setTimeout(r, 20));
-    if (!(await exists(paused))) throw new Error(`git ${pause.subcommand} never started`);
+    const answer = started();
+    if (!(await appearsWhile(path.join(shim, "paused"), answer))) {
+      throw new Error(`git ${pause.subcommand} never started`);
+    }
     await meanwhile();
     await writeFile(go, "");
     return await answer;
