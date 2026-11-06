@@ -489,8 +489,12 @@ describe("one uploaded document, read back through both tiers", () => {
       const bound = await boundHandbook(scenario);
 
       const running = runTheWorker();
-      // BA-298: if the worker dies, `until` still waits out its timeout before `running` reports why.
-      await until(async () => (await statusOf(scenario.workspaceId, bound.jobId)) === "claimed");
+      await Promise.race([
+        until(async () => (await statusOf(scenario.workspaceId, bound.jobId)) === "claimed"),
+        running.then(() => {
+          throw new Error("the worker's tick ended before the job was claimed");
+        }),
+      ]);
       answered(
         await acting(scenario.admin, (admin, tx) =>
           narrowConnectedSource(
