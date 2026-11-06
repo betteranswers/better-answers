@@ -22,7 +22,7 @@ const variablesDeclared = (sheet: string): ReadonlySet<string> =>
   new Set([...sheet.matchAll(/(--[\w-]+)\s*:/g)].map(([, name]) => name ?? ""));
 
 describe("the api pages' stylesheet", () => {
-  it("inlines every design-system import", () => {
+  it("inlines every import of the web's stylesheet", () => {
     expect(PAGE_STYLE).not.toContain("@import");
     expect(PAGE_STYLE).toContain("[data-marks]::before");
     expect(PAGE_STYLE).toContain("--surface-page:");

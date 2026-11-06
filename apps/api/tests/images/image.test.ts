@@ -138,7 +138,7 @@ for (const entry of readdirSync(store)) {
 }
 const reached = new Set();
 const broken = [];
-const carried = ["apps/api", "packages/core", "packages/design-system", "packages/schema"];
+const carried = ["apps/api", "packages/core", "packages/schema"];
 const pending = carried.flatMap((workspace) => {
   const modules = path.join("/app", workspace, "node_modules");
   return namesIn(modules).map((name) => realpathSync(path.join(modules, name)));
@@ -206,9 +206,9 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
 
           PROBE_REQUIRED: JSON.stringify([
             "@better-answers/core/kernel",
-            "@better-answers/design-system/assets/logo.svg",
-            "@better-answers/design-system/styles.css",
             "@better-answers/schema",
+            "@better-answers/web/styles/logo.svg",
+            "@better-answers/web/styles/styles.css",
           ]),
           PROBE_COMMANDS: JSON.stringify(["corepack", "npm", "npx", "pnpm"]),
         },

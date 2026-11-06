@@ -1,25 +1,22 @@
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { serveStatic } from "@hono/node-server/serve-static";
 import type { Hono } from "hono";
 
-const STYLES = fileURLToPath(import.meta.resolve("@better-answers/design-system/styles.css"));
+const STYLES = fileURLToPath(import.meta.resolve("@better-answers/web/styles/styles.css"));
 
 const expanded = (file: string): string =>
   readFileSync(file, "utf8").replace(/^@import "(\.\/[^"]+)";$/gmu, (_line, relative: string) =>
     expanded(path.resolve(path.dirname(file), relative)),
   );
 
-const fromDesignSystem = createRequire(STYLES);
-
 const FACES = [
-  { pkg: "@fontsource-variable/geist", mount: "/fonts/geist" },
-  { pkg: "@fontsource-variable/geist-mono", mount: "/fonts/geist-mono" },
-].map(({ pkg, mount }) => {
-  const sheet = fromDesignSystem.resolve(pkg);
+  { resolved: import.meta.resolve("@fontsource-variable/geist"), mount: "/fonts/geist" },
+  { resolved: import.meta.resolve("@fontsource-variable/geist-mono"), mount: "/fonts/geist-mono" },
+].map(({ resolved, mount }) => {
+  const sheet = fileURLToPath(resolved);
   return {
     mount,
     files: path.join(path.dirname(sheet), "files"),

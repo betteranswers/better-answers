@@ -19,7 +19,7 @@ A living company knowledge map for UK SMBs, built on the Open Knowledge Format (
 | `apps/worker/` | Python knowledge worker, managed with uv. |
 | `packages/core/` | The business logic that `apps/api` calls: capability slices over four store doors. It does not depend on a transport. |
 | `packages/devtools/` | The tooling for the repository's gates. |
-| `packages/` | The other shared TypeScript packages: `schema` and `design-system`. |
+| `packages/` | The other shared TypeScript package: `schema`. |
 | `contracts/` | The language-neutral fixtures of the tier contract. |
 | `docs/personas/` | Personas for dogfooding. |
 | `docs/operations/` | Public-facing operations documents. The other operations documents are in `.planning/estate/`. |

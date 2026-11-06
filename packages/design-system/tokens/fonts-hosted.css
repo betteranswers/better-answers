@@ -1,4 +1,0 @@
-/* Self-hosts the faces that `tokens/fonts.css` names. Only an app with a bundler can import
-   this file, because it imports package names. */
-@import "@fontsource-variable/geist";
-@import "@fontsource-variable/geist-mono";

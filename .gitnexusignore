@@ -48,7 +48,6 @@ pnpm-workspace.yaml
 jscpd.config.mjs
 knip.config.ts
 
-packages/design-system/
 packages/devtools/
 
 packages/core/node_modules/

@@ -1,6 +1,6 @@
 /*
- * The one stylesheet the app has. Everything below comes from the design system:
- * Tailwind reads its tokens through the bridge, so a colour, a size or a radius on a
+ * The one stylesheet the app has. Everything below comes from the tokens in `styles/`:
+ * Tailwind reads them through the bridge, so a colour, a size or a radius on a
  * page is a theme value and never a local invention (ADR 0033).
  *
  * The tokens come first, because `styles.css` reaches them through nested `@import`s and
@@ -9,10 +9,11 @@
  * every utility and no token values. Then Tailwind, then the bridge that hands the tokens
  * to it, then the faces.
  */
-@import "@better-answers/design-system/styles.css";
+@import "./styles/styles.css";
 @import "tailwindcss";
-@import "@better-answers/design-system/tokens/tailwind-bridge.css";
-@import "@better-answers/design-system/tokens/fonts-hosted.css";
+@import "./styles/tailwind-bridge.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 
 /*
  * The kit's `dark:` utilities follow the theme the tokens follow. Left to Tailwind they follow

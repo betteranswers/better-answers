@@ -29,8 +29,8 @@ RUN corepack enable && corepack install && pnpm --pm-on-fail=ignore --version \
  && chmod -R a+rX "$COREPACK_HOME"
 
 # This stage copies only the workspace manifests, so a source edit does not invalidate the
-# install layer. pnpm checks the lockfile against all six projects in `pnpm-workspace.yaml`, so
-# all six manifests are copied, although the runtime needs four.
+# install layer. pnpm checks the lockfile against all five projects in `pnpm-workspace.yaml`, so
+# all five manifests are copied, although the runtime needs four.
 FROM base AS manifests
 # Every workspace tsconfig extends `tsconfig.base.json`, and vite reads it at build time. The
 # runtime stage builds on `base`, not on this stage, because type stripping reads no tsconfig.
@@ -41,14 +41,12 @@ COPY patches/ patches/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/core/package.json packages/core/
-COPY packages/design-system/package.json packages/design-system/
 COPY packages/devtools/package.json packages/devtools/
 COPY packages/schema/package.json packages/schema/
 
 # The SPA build needs the dev dependencies, so it runs in a stage the runtime does not inherit.
 FROM manifests AS web
 RUN pnpm install --frozen-lockfile
-COPY packages/design-system/ packages/design-system/
 # The SPA imports its id minter from the schema package.
 COPY packages/schema/src packages/schema/src
 COPY apps/web/ apps/web/
@@ -57,7 +55,9 @@ RUN pnpm --filter @better-answers/web run build
 # This stage uses a filtered install, not `pnpm deploy`. `pnpm deploy` copies the workspace
 # packages into `node_modules`, their `exports` maps point at TypeScript source, and Node does
 # not strip types inside `node_modules`. The `...` suffix selects the api and its workspace
-# dependencies: core, schema, and design-system.
+# dependencies: core, schema, and web. The `!` filter then drops the web's own dependencies, which
+# the SPA's build has already bundled. pnpm still links the api to the web, whose stylesheet and
+# logo the api's pages read.
 #
 # `--prod` still installs the optional peers that any workspace brings, so `better-auth`'s
 # peers on drizzle-kit, vitest, and react would ship with their build tools. An `overrides`
@@ -68,7 +68,7 @@ RUN pnpm --filter @better-answers/web run build
 # The script keeps required peers. `tests/images/image.test.ts` fails on a kept peer, and a
 # person must then declare it or override it away.
 FROM manifests AS prod-deps
-RUN pnpm install --frozen-lockfile --prod --filter @better-answers/api...
+RUN pnpm install --frozen-lockfile --prod --filter @better-answers/api... --filter '!@better-answers/web'
 RUN node --input-type=module <<'JS'
 import { existsSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import path from "node:path";
@@ -167,9 +167,6 @@ RUN printf '\n# Set by apps/api/Dockerfile: an image never installs, and corepac
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=prod-deps /app/packages/core/node_modules ./packages/core/node_modules
-# `src/auth/page-style.ts` serves the design system's fonts to the api's pages.
-# `tests/images/image.test.ts` follows this link.
-COPY --from=prod-deps /app/packages/design-system/node_modules ./packages/design-system/node_modules
 COPY --from=prod-deps /app/packages/schema/node_modules ./packages/schema/node_modules
 
 COPY apps/api/package.json apps/api/
@@ -178,10 +175,6 @@ COPY apps/api/src apps/api/src
 COPY apps/api/lifts apps/api/lifts
 COPY packages/core/package.json packages/core/
 COPY packages/core/src packages/core/src
-# The api's pages inline the logo, the stylesheet, and the tokens the stylesheet imports.
-COPY packages/design-system/package.json packages/design-system/styles.css packages/design-system/
-COPY packages/design-system/assets packages/design-system/assets
-COPY packages/design-system/tokens packages/design-system/tokens
 COPY packages/schema/package.json packages/schema/
 COPY packages/schema/src packages/schema/src
 # `src/migrate.ts` reads this directory. `migrationsFolder` in `packages/schema/src/index.ts` names it.
@@ -189,6 +182,10 @@ COPY packages/schema/migrations packages/schema/migrations
 # The image keeps the repository layout under /app, so the default `WEB_ROOT` in
 # `apps/api/src/config.ts` resolves to this path and the deploy unit sets no variable for it.
 COPY --from=web /app/apps/web/dist apps/web/dist
+# The api's pages inline the logo, the stylesheet, and the tokens the stylesheet imports. The web's
+# manifest exports them.
+COPY apps/web/package.json apps/web/
+COPY apps/web/src/styles apps/web/src/styles
 
 # `init` in `deploy/stores.compose.yaml` chowns `/data/git` to uid 1000, which is the `node`
 # user in this base image. `HOME` gives pnpm a writable cache directory.

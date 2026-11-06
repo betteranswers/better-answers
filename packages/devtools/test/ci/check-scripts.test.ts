@@ -40,11 +40,6 @@ const rootCheck = (): string => {
   return check;
 };
 
-const NO_CHECK: Readonly<Record<string, string>> = {
-  "packages/design-system":
-    "CSS tokens, a stylesheet and guideline cards as HTML — nothing executable to lint, type or test; the workspace exists so apps/web can import the stylesheet by name",
-};
-
 describe("the workspaces' scripts", () => {
   it("lists every workspace that pnpm installs", () => {
     const directories = workspacePackages();
@@ -67,19 +62,10 @@ describe("the workspaces' scripts", () => {
     ).toEqual([]);
   });
 
-  it("gives every workspace a check script or a NO_CHECK reason", () => {
-    const withoutCheck = workspacePackages()
-      .filter((directory) => scriptsOf(directory)["check"] === undefined)
-      .sort();
-    const named = Object.keys(NO_CHECK).sort();
-
+  it("gives every workspace a check script", () => {
     expect(
-      withoutCheck.filter((directory) => !named.includes(directory)),
-      "a pnpm workspace has no check script and is not listed in NO_CHECK. Add a check script, or add the workspace to NO_CHECK with the reason it has nothing to check.",
-    ).toEqual([]);
-    expect(
-      named.filter((directory) => !withoutCheck.includes(directory)),
-      "a workspace listed in NO_CHECK now has a check script. Delete its NO_CHECK entry, because its reason is no longer true.",
+      workspacePackages().filter((directory) => scriptsOf(directory)["check"] === undefined),
+      "a pnpm workspace has no check script. Add one that runs its gates through scripts/check.mjs.",
     ).toEqual([]);
   });
 

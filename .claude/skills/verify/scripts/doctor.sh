@@ -31,9 +31,7 @@ harness="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$origin/__harnes
 built="$root/apps/web/dist/index.html"
 [[ -f "$built" ]] || refuse "apps/web has no build; run cleanup.sh $port, then launch.sh $port"
 page="$(find "$root/apps/web/src" "$root/apps/web/index.html" "$root/apps/web/public" "$root/apps/web/vite.config.ts" \
-  "$root/packages/schema/src" "$root/packages/design-system/tokens" "$root/packages/design-system/assets" \
-  "$root/packages/design-system/styles.css" \
-  -type f -newer "$built" 2>/dev/null | head -n 1)"
+  "$root/packages/schema/src" -type f -newer "$built" 2>/dev/null | head -n 1)"
 [[ -z "$page" ]] \
   || refuse "$page changed after the SPA was built; run cleanup.sh $port, then launch.sh $port"
 server="$(find "$root/apps/api/src" "$root/apps/api/tests/serve.ts" "$root/apps/api/tests/support" \

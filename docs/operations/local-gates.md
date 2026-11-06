@@ -31,7 +31,7 @@ Where lefthook is absent or no git working tree exists, `prepare` prints a messa
 - `ruff-format` and `ruff-check` run with `root: apps/worker/`, where `uv` finds ruff's locked environment. `--only-group dev` syncs only the dev group, so a commit never fetches torch. On Linux, torch comes from PyTorch's CPU wheel host, which a sandboxed clone may not reach.
 - `comment-gate-python` runs the checker of root `comment-gate:python` over staged `.py` files. It has no `root:`, because the checker reads a file's place, such as `apps/worker/src/`, from its repository path.
 - `actionlint` runs the command of root `lint:workflows:actionlint` over staged workflows. actionlint, and the shellcheck it runs on each `run:` step, come from the worker's locked dev group, so a commit and CI use the same versions. The first run builds actionlint's Python package, which downloads the release from GitHub and checks its hash. uv caches the build.
-- The five `*-typecheck` commands cover every workspace except `packages/design-system`, which has no `tsconfig.json` and no `scripts` block.
+- The five `*-typecheck` commands cover every workspace.
 
 ## The pre-push hook
 
@@ -119,7 +119,7 @@ On a fresh session, not on a resume, `watch-cap-hook.sh` runs the script with `-
 
 ## The `check` runner
 
-`scripts/check.mjs` is the `check` script of the root and of every workspace except `packages/design-system`. It runs each step named on its command line with `pnpm run`, in order, continues past a failure, and ends by naming every step that failed. Each argument is a script in the manifest of the directory it runs in, so a manifest's `check` lists that workspace's gates.
+`scripts/check.mjs` is the `check` script of the root and of every workspace. It runs each step named on its command line with `pnpm run`, in order, continues past a failure, and ends by naming every step that failed. Each argument is a script in the manifest of the directory it runs in, so a manifest's `check` lists that workspace's gates.
 
 One run reports every failure. A session told only about lint fixes lint, runs `check` again, and only then learns about types.
 

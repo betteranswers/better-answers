@@ -41,8 +41,6 @@ reviews:
       - apps/web/test/**
       - apps/worker/tests/**
       - packages/devtools/test/**
-      - packages/design-system/guidelines/**
-      - packages/design-system/thumbnail.html
       - docs/**
       - .claude/skills/**
       - .claude/agents/**

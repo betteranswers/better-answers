@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
@@ -29,14 +28,11 @@ const LIBRARY_GROUPS = [
   { name: "vendor", test: /node_modules[\\/]/u, priority: 10 },
 ];
 
-const designSystem = (file: string): string =>
-  readFileSync(
-    createRequire(import.meta.url).resolve(`@better-answers/design-system/${file}`),
-    "utf8",
-  );
+const styleFile = (file: string): string =>
+  readFileSync(fileURLToPath(new URL(`./src/styles/${file}`, import.meta.url)), "utf8");
 
 /** In the order `styles.css` imports them, so a later rule wins as it does in the browser. */
-const TOKEN_FILES = ["tokens/colors.css", "tokens/semantic.css"];
+const TOKEN_FILES = ["colors.css", "semantic.css"];
 
 const COMMENT = /\/\*[\s\S]*?\*\//gu;
 
@@ -48,7 +44,7 @@ const REFERENCE = /^var\(\s*(--[\w-]+)\s*\)$/u;
 
 /** A rule inside an at-rule is read as if it stood alone. */
 const tokensUnder = (selectors: readonly string[]): ReadonlyMap<string, string> => {
-  const css = TOKEN_FILES.map(designSystem).join("\n").replaceAll(COMMENT, "");
+  const css = TOKEN_FILES.map(styleFile).join("\n").replaceAll(COMMENT, "");
   const tokens = new Map<string, string>();
   for (const [, selector = "", body = ""] of css.matchAll(RULE)) {
     const named = selector.split(",").map((one) => one.replaceAll(/\s+/gu, " ").trim());
@@ -62,10 +58,10 @@ const tokensUnder = (selectors: readonly string[]): ReadonlyMap<string, string> 
 
 const resolvedIn = (tokens: ReadonlyMap<string, string>, name: string, hops = 0): string => {
   const value = tokens.get(name);
-  if (value === undefined) throw new Error(`the design system sets no ${name}`);
+  if (value === undefined) throw new Error(`the tokens set no ${name}`);
   const next = REFERENCE.exec(value)?.[1];
   if (next === undefined) return value;
-  if (hops > tokens.size) throw new Error(`the design system's ${name} refers back to itself`);
+  if (hops > tokens.size) throw new Error(`the token ${name} refers back to itself`);
   return resolvedIn(tokens, next, hops + 1);
 };
 
@@ -77,9 +73,9 @@ const tabIcon = (): string => {
   const light = textColourOf([":root"]);
   const dark = textColourOf([":root", '[data-theme="dark"]']);
   const style = `<style>svg{color:${light}}@media (prefers-color-scheme:dark){svg{color:${dark}}}</style>`;
-  const logo = designSystem("assets/logo.svg");
+  const logo = styleFile("logo.svg");
   const icon = logo.replace(/<svg\b[^>]*>/u, (opened) => `${opened}${style}`);
-  if (icon === logo) throw new Error("the design system's logo has no <svg> to style");
+  if (icon === logo) throw new Error("the logo has no <svg> to style");
   return `data:image/svg+xml,${encodeURIComponent(icon)}`;
 };
 

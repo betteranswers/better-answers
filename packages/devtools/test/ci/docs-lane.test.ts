@@ -308,12 +308,9 @@ const changedPathIn = (copied: string): string =>
 const COPIED_SOURCE: readonly string[] = [
   "apps/api/src",
   "apps/web",
+  "apps/web/src/styles",
   "apps/worker/src",
   "packages/core/src",
-  "packages/design-system",
-  "packages/design-system/assets",
-  "packages/design-system/styles.css",
-  "packages/design-system/tokens",
   "packages/schema/migrations",
   "packages/schema/src",
 ];
@@ -394,8 +391,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   },
   {
     file: "packages/devtools/test/ci/tracked-skills.test.ts",
-    reads:
-      "packages/design-system/SKILL.md through its symlink, and which of the pixel-perfect plugin's files git tracks",
+    reads: "which of the pixel-perfect plugin's files git tracks",
     inTheLane: "check:docs:devtools",
   },
   {

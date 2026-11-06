@@ -177,14 +177,7 @@ describe("a slice's unused barrel export where entry exports are gated", () => {
   );
 
   it.each(
-    [
-      ".",
-      "apps/api",
-      "packages/core",
-      "packages/design-system",
-      "packages/devtools",
-      "packages/schema",
-    ].map(
+    [".", "apps/api", "packages/core", "packages/devtools", "packages/schema"].map(
       (workspace) =>
         [
           workspace,

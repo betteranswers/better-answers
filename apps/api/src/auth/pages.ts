@@ -9,7 +9,7 @@ import { PAGE_STYLE } from "./page-style.ts";
 
 /** Inline rather than linked, so its `currentColor` is the page's text colour, light or dark. */
 const LOGO = readFileSync(
-  new URL(import.meta.resolve("@better-answers/design-system/assets/logo.svg")),
+  new URL(import.meta.resolve("@better-answers/web/styles/logo.svg")),
   "utf8",
 ).trim();
 
