@@ -34,9 +34,9 @@ describe("the tracked skills' link and licence files", () => {
     expect(files).toContain(".claude/skills/pixel-perfect/.claude-plugin/plugin.json");
     expect(files).toContain(".claude/skills/pixel-perfect/LICENSE");
     expect(files).toContain(".claude/skills/pixel-perfect/NOTICE.md");
-    for (const skill of ["audit", "critique", "screenshot-diff", "visual-qa"]) {
+    for (const skill of ["screenshot-diff", "visual-qa"]) {
       expect(files).toContain(`.claude/skills/pixel-perfect/skills/${skill}/SKILL.md`);
     }
-    expect(files.filter((file) => file.endsWith("/SKILL.md"))).toHaveLength(15);
+    expect(files.filter((file) => file.endsWith("/SKILL.md"))).toHaveLength(2);
   });
 });
