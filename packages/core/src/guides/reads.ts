@@ -15,7 +15,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { matchesTheFact } from "./match.ts";
+import { matchesTheFact, metBy } from "./match.ts";
 import { renderBrief, type Footnote, type RenderedBrief } from "./renderer.ts";
 import type { GuideLayer, RoleLabel } from "./templates/index.ts";
 import { SECTION_HOME } from "./write-ups.ts";
@@ -106,12 +106,7 @@ export type CoverageRow = {
 const COVERAGE = `
   SELECT g.collection, s.id AS section_id, s.parent_id, s.prompt, w.id AS write_up_id,
          f.id AS fact_id, f.name, f.at_least,
-         (SELECT count(*)::int
-            FROM write_up_include i
-            JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
-           WHERE i.workspace_id = w.workspace_id AND i.write_up_id = w.id
-             AND i.expected_fact_id = f.id
-             AND ${readableClause("c", 3)}) AS met_by,
+         ${metBy("w.id", 3)} AS met_by,
          COALESCE((SELECT jsonb_agg(jsonb_build_object('iri', c.iri, 'title', c.title)
                                     ORDER BY c.title, c.iri)
                      FROM concept_index c

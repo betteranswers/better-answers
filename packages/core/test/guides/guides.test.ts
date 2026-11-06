@@ -547,6 +547,30 @@ describe("including an available concept", () => {
     ]);
   });
 
+  it("includes nothing for a fact the section already meets", async () => {
+    const { ng, guideId } = await typedTheMissingPolicy();
+    const { workspaceId } = ng.scenario;
+    const insurance = await writeUpOf(workspaceId, guideId, "Insurance and financial standing");
+    await typedBy(ng.editor, ng.scenario, {
+      key: "secondIndemnity",
+      slug: "second-indemnity-policy",
+      title: "Second indemnity policy",
+      kind: "insurance policy",
+      tags: ["professional-indemnity"],
+      body: "Northgate holds a second professional indemnity policy.",
+    });
+
+    const included = answered(
+      await includeAvailable(ng.editor, doorsOf(ng.scenario), { writeUpId: insurance.id }),
+    );
+
+    expect(included).toMatchObject({ included: 1 });
+    const added = (await includedBySection(workspaceId, guideId))[
+      "Insurance and financial standing"
+    ]?.slice(4);
+    expect(added).toEqual(["Employers' liability insurance: Employers' liability policy"]);
+  });
+
   it("names no withheld concept as available to an outside Viewer", async () => {
     const { ng, guideId, employersLiability } = await typedTheMissingPolicy();
     answered(

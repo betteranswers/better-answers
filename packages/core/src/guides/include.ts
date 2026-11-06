@@ -19,7 +19,7 @@ import {
 import type { Committed } from "../store/git/index.ts";
 import { withMemberUnheld, type Tx } from "../store/postgres/index.ts";
 import { definitionAt, type GuideDefinition } from "./definition.ts";
-import { firstMatchesSql, type FirstMatch } from "./match.ts";
+import { firstMatchesSql, metBy, type FirstMatch } from "./match.ts";
 import {
   renderSkeleton,
   writeSkeleton,
@@ -68,9 +68,10 @@ const SECTION_WRITE_UP = `
    WHERE w.workspace_id = $1 AND w.id = $2 AND w.home = '${SECTION_HOME}'
      AND ${readableClause("w", 3)}`;
 
-const SECTION_FACTS = `(SELECT id, section_id, ordinal, kind, tags, collection
-                          FROM guide_expected_fact
-                         WHERE workspace_id = $1 AND guide_id = $5 AND section_id = $6) f`;
+const UNMET_FACTS = `(SELECT f.id, f.section_id, f.ordinal, f.kind, f.tags, f.collection
+                        FROM guide_expected_fact f
+                       WHERE f.workspace_id = $1 AND f.guide_id = $5 AND f.section_id = $6
+                         AND f.at_least > ${metBy("$7", 2)}) f`;
 
 type GuideIncludeRow = IncludeRow & { readonly sectionId: string };
 
@@ -109,7 +110,7 @@ const availableFor = async (
       scope: 1,
       reader: 2,
       guideCollection: "$4",
-      facts: SECTION_FACTS,
+      facts: UNMET_FACTS,
       besides: 7,
     }),
     [
