@@ -820,6 +820,15 @@ describe("the test inventory a move holds", () => {
     expect(moved(root, [[THING, GROUPED]], "--dry-run").stderr).toContain(
       "a stopped run left a move part done",
     );
+    const written = read(root, "docs/note.md");
+    writeUnder(root, "docs/note.md", "fixed by hand\n");
+
+    expect(
+      spawnSync(process.execPath, [SCRIPT, tablePath], { cwd: root, encoding: "utf8" }).stderr,
+    ).toContain("so its move is not undone");
+    expect(read(root, "docs/note.md")).toBe("fixed by hand\n");
+
+    writeUnder(root, "docs/note.md", written);
 
     const stuck = runWithGitThatStopsAt("packages/core/src/group/one.ts", ":");
 

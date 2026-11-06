@@ -21,7 +21,7 @@ export type Change = {
 
 /** What the tree held before a move, written before the move touches it, so a rerun can undo it. */
 const journal = z.object({
-  edits: z.array(z.object({ file: z.string(), original: z.base64() })),
+  edits: z.array(z.object({ file: z.string(), original: z.base64(), text: z.string() })),
   moves: z.array(z.tuple([z.string(), z.string()])),
   created: z.array(z.string()),
 });
@@ -95,7 +95,27 @@ const undo = (root: string, written: Journal): readonly string[] => {
   return failures;
 };
 
+/** A file edited by hand after the stopped run is neither its original nor the run's text. */
+const editedSince = (root: string, written: Journal): readonly string[] => {
+  const movedTo = new Map(written.moves);
+  return written.edits.flatMap(({ file, original, text }) => {
+    const to = movedTo.get(file);
+    const at = path.join(root, to !== undefined && isMovedOnly(root, file, to) ? to : file);
+    const now = existsSync(at) ? readFileSync(at) : undefined;
+    const kept =
+      now !== undefined &&
+      (now.equals(Buffer.from(original, "base64")) || now.toString("utf8") === text);
+    return kept ? [] : [file];
+  });
+};
+
 const undoOrThrow = (root: string, file: string, written: Journal): void => {
+  const changed = editedSince(root, written);
+  if (changed.length > 0) {
+    throw new Error(
+      `files changed after the stopped run, so its move is not undone; restore or keep each by hand, then delete ${file}:\n${changed.join("\n")}`,
+    );
+  }
   const failures = undo(root, written);
   if (failures.length > 0) {
     throw new Error(
@@ -135,9 +155,10 @@ export const applyChange = (root: string, change: Change): void => {
   }
   const file = journalPath(root);
   const written: Journal = {
-    edits: edits.map(({ file: edited, original }) => ({
+    edits: edits.map(({ file: edited, original, text }) => ({
       file: edited,
       original: original.toString("base64"),
+      text,
     })),
     moves: [...moves],
     created: [...createdBy(root, moves)],
