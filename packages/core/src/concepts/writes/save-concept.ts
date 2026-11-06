@@ -391,9 +391,10 @@ const routed = async (
   if (written.ok)
     return ok({ outcome: "committed", iri: written.value.iri, sha: written.value.sha });
   if (written.error === "unchanged") return unchanged;
-  return written.error === "owner-forbids"
-    ? suggested(principal, doors, saving)
-    : err(written.error);
+  if (written.error !== "owner-forbids") return err(written.error);
+  const asSuggested = { ...saving, standing: "suggests" as const };
+  const refusal = bodyLocatorRefusalOf(saving.file.body, namableBy(asSuggested));
+  return refusal === undefined ? suggested(principal, doors, asSuggested) : err(refusal);
 };
 
 export const committed = (
