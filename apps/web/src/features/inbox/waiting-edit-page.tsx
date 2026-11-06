@@ -211,7 +211,7 @@ function DeclineForm(properties: {
 function EditShown(properties: { readonly edit: WaitingEdit }) {
   const { edit } = properties;
   const { item } = edit;
-  const title = edit.current?.title ?? item.title;
+  const title = edit.current.state === "shown" ? edit.current.version.title : item.title;
   const titleId = useId();
   const acceptButton = useRef<HTMLButtonElement>(null);
   const declineButton = useRef<HTMLButtonElement>(null);

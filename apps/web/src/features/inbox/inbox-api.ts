@@ -16,6 +16,8 @@ export type WaitingEdit = inferOutput<Api["inbox"]["item"]>;
 
 export type ConceptParts = WaitingEdit["proposed"];
 
+export type CurrentVersion = WaitingEdit["current"];
+
 export type Decided = inferOutput<Api["inbox"]["accept"]>["outcomes"][number];
 
 export type DecidedWord = Decided["outcome"];
