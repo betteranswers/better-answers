@@ -20,6 +20,7 @@ import {
 } from "../kernel/index.ts";
 import { folded, withMember, type Tx } from "../store/postgres/index.ts";
 import type { GuideDoors } from "./skeleton.ts";
+import { shownClause } from "./withheld.ts";
 import {
   GUIDE_ACTIONS,
   includeSnapshot,
@@ -55,7 +56,8 @@ const HELD_WRITE_UP = `
   SELECT w.guide_id FROM write_up w
    WHERE w.workspace_id = $1 AND w.id = $2 AND w.home = '${SECTION_HOME}'
      AND ${readableClause("w", 3)}
-     FOR UPDATE`;
+     AND ${shownClause({ guide: "w.guide_id", section: "w.section_id" }, 3)}
+     FOR UPDATE OF w`;
 
 const LATEST_VERSION = `
   SELECT version, markdown, includes FROM write_up_version
