@@ -5,7 +5,7 @@ import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { paragraphsCompared, sourceLinesOf, type Paragraph } from "./edit-compared.ts";
-import type { ConceptParts, WaitingEdit } from "./inbox-api.ts";
+import { suggestsNewConcept, type ConceptParts, type WaitingEdit } from "./inbox-api.ts";
 import { EDIT_WORDS as WORDS } from "./inbox-words.ts";
 
 function ChangedTag() {
@@ -65,7 +65,7 @@ export function EditCompared(properties: { readonly edit: WaitingEdit }) {
   return (
     <div className="mt-6 grid gap-4 md:grid-cols-2">
       {current === null ? (
-        <NoCurrentVersion newConcept={item.target === null} />
+        <NoCurrentVersion newConcept={suggestsNewConcept(item)} />
       ) : (
         <Version
           heading={WORDS.current}

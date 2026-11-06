@@ -22,6 +22,9 @@ export type DecidedWord = Decided["outcome"];
 
 type Decision = inferInput<Api["inbox"]["accept"]>["decisions"][number];
 
+export const suggestsNewConcept = (item: WaitingItem): boolean =>
+  item.target === null && !item.baseMoved;
+
 export const decisionOf = (item: WaitingItem): Decision => ({
   suggestionId: item.suggestionId,
   expectedTarget: item.target,
