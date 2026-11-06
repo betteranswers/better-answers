@@ -40,11 +40,12 @@ Go 1.26.10 and 1.27.3 add a denylist to `crypto/x509`. The denylist refuses inte
 
 ## What each image runs
 
-Every assessment below checks the flawed path against these services. The services have not changed since 24/09/2026.
+Every assessment below checks the flawed path against these services. The services last changed on 06/11/2026, when the api and worker images began to start through an environment gate (#1022, #1023).
 
 ### `image-api`
 
-- The service runs `node apps/api/src/main.ts` as uid 1000. `pnpm migrate` runs from the same image.
+- The `api` service runs `node apps/api/src/environment-gate.ts api`. The `migrate` service runs `node apps/api/src/environment-gate.ts migrate` from the same image, and `pnpm ops` runs `node src/environment-gate.ts ops`.
+- The image ends with `USER root` on purpose. The gate starts as root, removes every environment variable that the named process does not read, and drops to uid 1000. As PID 1 it then starts `tini`, and `tini` starts `node apps/api/src/main.ts`. Docker runs each health check and each `docker exec` as root, so the app's uid 1000 cannot read the environment of those processes, which holds every key of the resource. A scanner reports the root `USER` as a finding. That finding is expected, and the app never runs as root.
 - The api spawns only `git`, through `execFile`, with no shell. `git` runs local plumbing on bare repositories and never contacts a remote (`packages/core/src/store/git/door.ts`).
 - The erasure routine runs `git filter-repo`. It is the only Python the api runs, and it reads git's own fast-export stream.
 - The image's `HEALTHCHECK` runs `wget -qO- http://127.0.0.1:3000/health` through `sh`. `deploy/platform.compose.yaml` replaces it with the exec form.
@@ -63,8 +64,8 @@ Every assessment below checks the flawed path against these services. The servic
 
 ### `image-worker`
 
-- The service is `better-answers-worker` on Distroless.
-- The image has no shell, no binary in `/bin` or `/usr/bin`, no setuid file, no `mount`, no `nsenter`, and no `nscd`.
+- The service runs `python -m better_answers_worker.environment_gate worker` on Distroless. The image ends with `USER root` for the reason given under `image-api`. The gate drops to uid 1000, starts `tini` as PID 1, and `tini` starts `better-answers-worker`. The health check runs `python -m better_answers_worker.environment_gate health`.
+- The image has no shell, no setuid file, no `mount`, no `nsenter`, and no `nscd`. The only binaries in `/bin` and `/usr/bin` are `tini` and `tini-static`, from Debian's `tini` package.
 - The image has no locale directory, and its Python imports no gettext.
 
 ## Assessed 04/11/2026

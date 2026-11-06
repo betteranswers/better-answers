@@ -112,6 +112,8 @@ Until a run completes, `api` and `backup` stay stopped. The two work directories
 7. The object-store deletion reaches the mirror bucket that night.
 8. The report quotes four dates, one per backup tier, each counted from when the routine took the erasure lock (`BACKUPS.md`).
 
+During steps 2 and 3 the routine holds the workspace's lock in exclusive mode. An Admin who downloads the knowledge base in that time gets no file, and the page says "A change to your knowledge base is still being saved. Nothing was downloaded. Please try again in a minute." The download works again when step 3 ends. The page shows the same sentence when every database connection that the api keeps for these locks (`FENCE_HOLDERS_PER_POOL` in `packages/core/src/store/postgres/locks.ts`) is in use.
+
 The routine rewrites what the platform wrote, the actor ids across history. It does **not** rewrite a person's name inside a concept body. The owner edits that forward as a new commit, and the report says so.
 
 **Attach.** The erasure report, the `erasure_request` row, and the last dump's stamp.
@@ -354,11 +356,21 @@ The next sync stops the source answering and deletes its object-store originals.
 **Do, to rewind the ref to the watermark.** A rewind **discards every edit attempted while the workspace was stuck**. **Record who is asked to redo which edit**, from the dropped commits' subjects and `Actor:` trailers.
 
 1. Run `reconcile-watermark` once more, on its own, since its refusal exits non-zero. Use the line that says `replayed 0, already landed 0`. Its *watermark* is the commit to move to. A line that landed anything names a stale watermark.
-2. Run every step below **inside the `api` container as the image's own user**: `docker compose … -p better-answers exec -T api …`. That is the invocation the `platform` helper in `deploy/restore-production.sh` makes, and the private file holds its env file. Never run `git` as root on the host over `/data/git`. One root-owned file under a bare repository blocks every later write the api makes.
-3. Run `git --git-dir /data/git/<workspace>.git rev-parse refs/heads/main`. Write **the old head into the incident record before anything moves.** Nothing else on the box remembers it.
-4. Run `git --git-dir … merge-base --is-ancestor <watermark> refs/heads/main`. Exit 0 with no output means the move only drops commits. If it exits non-zero, **stop** and escalate.
-5. Run `git --git-dir … log --oneline <watermark>..refs/heads/main`, and write the commits it lists into the record.
-6. Run `git --git-dir … update-ref refs/heads/main <watermark> <the old head>`, **with three arguments, always.** The third makes git refuse if a commit reached the ref since step 3. If it refuses, begin again at step 1.
+2. Run each `git` step below **inside the `api` container as uid 1000, with an empty environment**. Define this helper in bash or zsh first:
+
+   ```sh
+   api_git() {
+     docker compose … -p better-answers exec -T api \
+       env -i PATH=/usr/local/bin:/usr/bin:/bin \
+       setpriv --reuid=node --regid=node --clear-groups git "$@"
+   }
+   ```
+
+   `docker compose … -p better-answers` is the invocation that the `platform` helper in `deploy/restore-production.sh` makes, and the private file holds its env file. The image's user is root, so a plain `exec -T api git …` writes root-owned files under `/data/git`. One root-owned file under a bare repository blocks every later write the api makes. Do not use `exec -u node` either. It starts a uid 1000 process with every variable of the resource, and the app's uid can read that process's environment. In the helper, `env -i` clears the environment while the command still runs as root, and `setpriv` then drops to `node`. Never run `git` as root on the host over `/data/git`.
+3. Run `api_git --git-dir /data/git/<workspace>.git rev-parse refs/heads/main`. Write **the old head into the incident record before anything moves.** Nothing else on the box remembers it.
+4. Run `api_git --git-dir … merge-base --is-ancestor <watermark> refs/heads/main`. Exit 0 with no output means the move only drops commits. If it exits non-zero, **stop** and escalate.
+5. Run `api_git --git-dir … log --oneline <watermark>..refs/heads/main`, and write the commits it lists into the record.
+6. Run `api_git --git-dir … update-ref refs/heads/main <watermark> <the old head>`, **with three arguments, always.** The third makes git refuse if a commit reached the ref since step 3. If it refuses, begin again at step 1.
 7. Run `pnpm ops reconcile-watermark --workspace <id>` again. `done — head <sha>, watermark <sha>, replayed 0, already landed 0` with the two shas equal means the workspace is writable again.
 
 **Attach.** The line that fired, with its stop reason, the old head, the dropped commits with their subjects and actors, who was told to redo which edit, and the `reconcile-watermark` line that ended it.
@@ -486,7 +498,14 @@ If `deploy/browse-production.sh` refuses, it names a local port already held, th
 
 Use this procedure to look inside the running worker. Its image has no shell, no package manager, and no `ls` (`apps/worker/Dockerfile` says why), so `exec worker sh` and the orchestrator's terminal both fail. The api's image keeps its shell. Run each way in on VPC 1 against `docker compose … -p better-answers`, the invocation `deploy/restore-production.sh`'s `platform` helper makes. The private file holds its env file.
 
-1. **Use the worker's own Python.** `exec worker python` opens the interpreter as the worker's user, with its virtualenv, environment, and mounts. Ignore the `can't use pyrepl` warning. `os.listdir`, `pathlib.Path(…).read_text()` and `os.environ` replace `ls`, `cat` and `env`. `exec -T worker python -m better_answers_worker.health` runs the health check: exit 0 is healthy, and 1 is not.
+1. **Use the worker's own Python.** The image's user is root, so open the interpreter and drop it to the worker's uid before you do anything else:
+
+   ```sh
+   docker compose … -p better-answers exec worker \
+     python -i -c "import os; os.setgroups([]); os.setgid(1000); os.setuid(1000)"
+   ```
+
+   The interpreter then runs as uid 1000 with the worker's virtualenv and mounts, and a file it writes on the worker's volumes is owned by the worker. Ignore the `can't use pyrepl` warning. `os.listdir` and `pathlib.Path(…).read_text()` replace `ls` and `cat`. `os.environ` in this session lists every variable of the resource, not the worker's. To read the worker's own variables, read `/proc/1/environ`. Do not use `exec -u worker`, because it starts a uid 1000 process with every variable of the resource, and the worker's uid can read that process's environment. A plain root `exec worker python` keeps that environment out of the worker's reach, but every file it writes is owned by root. After the drop, other uid 1000 processes cannot read the session's environment either, because the kernel protects a process that has changed its uid. `exec -T worker python -m better_answers_worker.environment_gate health` runs the health check through the gate, as Docker does: exit 0 is healthy, and 1 is not.
 2. **Copy a file out** with `docker cp <the worker's container>:<path> <here>`. Never copy anything in. A change reaches the worker through a release.
 3. **Run a shell beside it** for `ps`, `top`, `nc` or `wget`. The base's debug variant carries busybox and joins the worker's process and network namespaces as the worker's uid:
 

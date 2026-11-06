@@ -272,7 +272,7 @@ The model server needs 3 to 5 GB. It does not fit on VPC 1 beside the Postgres r
 1. Add `embeddings:1000` to the directory list of that stack's `init` service. `init` then creates `/data/embeddings` and owns it.
 2. Add the service below. Pin the image by digest on the day.
 3. Set the memory limit to fit the model (§ Memory).
-4. In the platform resource's env, set `EMBEDDINGS_URL` to the model host's address. `deploy/platform.compose.yaml` declares `EMBEDDINGS_URL`, unset, in its bootstrap block.
+4. In the platform resource's env, set `EMBEDDINGS_URL` to the model host's address. `deploy/platform.compose.yaml` declares `EMBEDDINGS_URL`, unset, in its bootstrap block. No code reads `EMBEDDINGS_URL` yet, so the environment gate removes it from every process until a config module reads it.
 
 ```yaml
   embeddings:
@@ -316,7 +316,30 @@ The migration creates `app_rt` and `worker_rt` as `NOLOGIN`. The api cannot reac
 2. In the platform resource's env, write the `app_rt` DSN as `DATABASE_URL` and the `worker_rt` DSN as `WORKER_DATABASE_URL`.
 3. Record in the private file how the passwords are held.
 
-On the platform resource, only `migrate` gets the owner DSN, as `MIGRATE_DATABASE_URL`. The stores resource's `DATABASE_URL` is also the owner DSN, because the dump in the `backup` service reads every table.
+The stores resource's `DATABASE_URL` is also the owner DSN, because the dump in the `backup` service reads every table.
+
+## Which keys each process holds
+
+Coolify gives every service of the platform resource every variable of that resource, so the `api`, `worker` and `migrate` containers each receive the owner DSN, `KEK` and the object store's root pair. Each process starts through an environment gate: `apps/api/src/environment-gate.ts` in the api image and `better_answers_worker.environment_gate` in the worker image. The gate starts as root, removes every environment variable except the keys that its process reads, and drops to uid 1000.
+
+- The `migrate` process holds the owner DSN as `DATABASE_URL`. No other process of the platform resource holds the owner DSN.
+- The `api` process holds the `app_rt` DSN, `KEK`, `AUTH_SECRET` and the other keys that `apps/api/src/config.ts` reads.
+- The `worker` process holds the `worker_rt` DSN and the other keys that `apps/worker/src/better_answers_worker/config.py` reads. It holds no `KEK` and no `AUTH_SECRET`.
+- `tini`, at PID 1 in each container, holds the same keys as the process it starts.
+- Health checks and `docker exec` sessions run as root and hold every variable of the resource. The app's uid 1000 cannot read them.
+- `docker inspect` and `docker exec <container> env` show every variable of the resource, because they read the container's configuration, not a running process. Only a change to how Coolify passes the variables can remove them from the configuration.
+
+Run this check after each release. It drops to uid 1000 inside the container and lists each uid 1000 process with the names of the keys it holds. If a key is not on a process's line, that process does not hold it. The check's own process starts as root with every variable, and after it drops to uid 1000 the kernel stops other uid 1000 processes from reading its environment.
+
+```sh
+check="import os;os.setgroups([]);os.setgid(1000);os.setuid(1000);[print(p,open(f'/proc/{p}/cmdline','rb').read().replace(b'\0',b' ').decode(),'|',' '.join(sorted(e.split(b'=')[0].decode() for e in open(f'/proc/{p}/environ','rb').read().split(b'\0') if e))) for p in os.listdir('/proc') if p.isdigit() and p!=str(os.getpid()) and os.stat(f'/proc/{p}').st_uid==1000]"
+for service in api worker; do
+  echo "== $service"
+  docker compose … -p better-answers exec -T "$service" python3 -c "$check"
+done
+```
+
+The output has two lines for each container: PID 1 (`/usr/bin/tini -- …`) and the app. Neither line may show `MIGRATE_DATABASE_URL`, `WORKER_DATABASE_URL` in `api`, `KEK` or `AUTH_SECRET` in `worker`, or any `OBJECTSTORE_ROOT_*`, `SERVICE_FQDN_*` or `COOLIFY_*` key. The check reads `/proc/<pid>/environ` as uid 1000 because root in the container has no `CAP_SYS_PTRACE` and cannot read the environment of a uid 1000 process.
 
 ## Memory
 
