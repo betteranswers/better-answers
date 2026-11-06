@@ -41,13 +41,21 @@ const blobsIn = (batch: Buffer, kept: readonly Listed[]): readonly SnapshotFile[
   });
 };
 
-export const bundleSnapshot = async (
-  principal: UserPrincipal,
+const commitStands = async (gitDir: string, commit: string): Promise<boolean> => {
+  try {
+    await git(gitDir, ["cat-file", "-e", `${commit}^{commit}`]);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const snapshotAt = async (
+  gitDir: string,
   door: GitDoor,
   commit: string,
   readable: ReadonlySet<string>,
 ): Promise<Result<readonly SnapshotFile[], "export-too-large">> => {
-  const gitDir = bundleOf(door, principal);
   const tree = await git(gitDir, ["ls-tree", "-r", "-z", "-l", commit, KNOWLEDGE], { raw: true });
   const kept = listedIn(tree).filter(
     ({ path }) => path === BUNDLE_MANIFEST_PATH || readable.has(path),
@@ -60,4 +68,20 @@ export const bundleSnapshot = async (
     maxBuffer: bytes + kept.length * BATCH_FRAMING,
   });
   return ok(blobsIn(batch, kept));
+};
+
+/** An erasure rewrites the history and prunes the commits it replaced, even mid-read. */
+export const bundleSnapshot = async (
+  principal: UserPrincipal,
+  door: GitDoor,
+  commit: string,
+  readable: ReadonlySet<string>,
+): Promise<Result<readonly SnapshotFile[], "export-too-large" | "commit-gone">> => {
+  const gitDir = bundleOf(door, principal);
+  try {
+    return await snapshotAt(gitDir, door, commit, readable);
+  } catch (cause) {
+    if (await commitStands(gitDir, commit)) throw cause;
+    return err("commit-gone");
+  }
 };

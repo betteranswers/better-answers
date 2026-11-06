@@ -160,7 +160,8 @@ const snapshotRead =
     const readable = rows[0];
     if (readable?.at_head !== true) return err("unrecorded-head");
     const files = await bundleSnapshot(member, git, commit, new Set(readable.paths));
-    return files.ok ? ok({ head: commit, files: files.value }) : files;
+    if (!files.ok) return err(files.error === "commit-gone" ? "unrecorded-head" : files.error);
+    return ok({ head: commit, files: files.value });
   };
 
 export const exportBundleSnapshot = async (

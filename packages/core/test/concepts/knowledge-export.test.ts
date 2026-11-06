@@ -18,7 +18,8 @@ import {
   exportRecords,
 } from "../../src/concepts/index.ts";
 import { readGuide, saveBrief, seedGuide } from "../../src/guides/index.ts";
-import type { Role, UserPrincipal } from "../../src/kernel/index.ts";
+import type { PlatformPrincipal, Role, UserPrincipal } from "../../src/kernel/index.ts";
+import { rewriteHistory } from "../../src/store/git/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit, treeCommitted } from "../fixtures/bundle.ts";
 import { shelveOne } from "../fixtures/concept-shelf.ts";
 import { bundleIndexed, type BundleIndexed } from "../fixtures/indexed-bundle.ts";
@@ -712,7 +713,33 @@ describe("an export while a change is landing", () => {
     expect(await exportEventsBy(scenario, admin)).toEqual([]);
     expect(zipText(answered(await snapshotOf(admin, scenario)).zip)).not.toContain("Pay bands.");
   });
+
+  it("refuses when an erasure prunes the commit it read", async () => {
+    const setup = await knowledgeBaseSetup();
+    const { scenario } = setup;
+    const admin = await memberAs(scenario, "Admin");
+    await landedAfter(setup, new Map([[EXPENSES, `Ask human:${LEAVER} first.\n`]]));
+
+    const snapshot = await whileGitPausesAt(
+      { subcommand: "ls-tree", after: false },
+      () => snapshotOf(admin, scenario),
+      async () => {
+        await rewriteHistory(ERASURE, scenario.git, scenario.workspaceId, {
+          addresses: [LEAVER],
+          people: [],
+          pseudonym: ulid(),
+        });
+      },
+    );
+
+    expect(snapshot).toEqual({ ok: false, error: "unrecorded-head" });
+    expect(await exportEventsBy(scenario, admin)).toEqual([]);
+  });
 });
+
+const ERASURE: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-erasure" };
+
+const LEAVER = "leaver@example.com";
 
 describe("records over their row cap", () => {
   it("keeps a record family's newest 50,000 rows and says so", async () => {

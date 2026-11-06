@@ -2,10 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
 
-import type { UserPrincipal } from "../../../src/kernel/index.ts";
-import { bundleSnapshot, initRepository, type GitDoor } from "../../../src/store/git/index.ts";
+import type { PlatformPrincipal, UserPrincipal } from "../../../src/kernel/index.ts";
+import {
+  bundleSnapshot,
+  initRepository,
+  rewriteHistory,
+  type GitDoor,
+} from "../../../src/store/git/index.ts";
 import { bundlesForSuite, treeCommitted } from "../../fixtures/bundle.ts";
-import { gitStarts } from "./git-starts.ts";
+import { gitStarts, whileGitPausesAt } from "./git-starts.ts";
 
 const bundles = bundlesForSuite();
 
@@ -146,4 +151,35 @@ describe("a snapshot of the bundle", () => {
     expect(filesOf(snapshot)).toHaveLength(3_000);
     expect(filesOf(snapshot)).toContainEqual(file("knowledge/wide/node-2999.md", "Rule 2999.\n"));
   });
+});
+
+const ERASURE: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-erasure" };
+
+const LEAVER = "leaver@example.com";
+
+describe("a snapshot while an erasure rewrites the history", () => {
+  for (const subcommand of ["ls-tree", "cat-file"]) {
+    it(`refuses when the erasure prunes the commit before ${subcommand}`, async () => {
+      const { door, principal, head } = await bundleHolding(
+        new Map([
+          [MANIFEST, "owner: Acme\n"],
+          [OPEN, `Ask human:${LEAVER} about a claim.\n`],
+        ]),
+      );
+
+      const snapshot = await whileGitPausesAt(
+        { subcommand, after: false },
+        () => bundleSnapshot(principal, door, head, new Set([OPEN])),
+        async () => {
+          await rewriteHistory(ERASURE, door, principal.workspaceId, {
+            addresses: [LEAVER],
+            people: [],
+            pseudonym: ulid(),
+          });
+        },
+      );
+
+      expect(snapshot).toEqual({ ok: false, error: "commit-gone" });
+    });
+  }
 });
