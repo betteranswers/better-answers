@@ -72,6 +72,19 @@ const named = async (principal: UserPrincipal, name: string) => {
   return { id: principal.userId, name };
 };
 
+const orphanedByRetitle = async (scenario: Scenario, body: string) => {
+  const standing = await conceptWritten(scenario);
+  const retitle = await proposedBy(scenario, scenario.viewer, standing, {
+    title: "Travel Expenses",
+    frontmatter: { title: "Travel Expenses", type: "Policy" },
+  });
+  const sibling = await proposedBy(scenario, scenario.viewer, standing, { body });
+  await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+    decisions: [{ suggestionId: retitle.suggestionId, expectedTarget: standing.written.iri }],
+  });
+  return { standing, sibling };
+};
+
 describe("Waiting on you", () => {
   it("lists edit suggestions on concepts the reader owns", async () => {
     const scenario = await arrange();
@@ -192,9 +205,12 @@ describe("Waiting on you", () => {
     expect(opened).toEqual({
       item: matching.objectContaining({ suggestionId, target: standing.written.iri }),
       current: {
-        title: "Expenses",
-        body: "Expenses are claimed within thirty days.",
-        sources: undefined,
+        state: "shown",
+        version: {
+          title: "Expenses",
+          body: "Expenses are claimed within thirty days.",
+          sources: undefined,
+        },
       },
       proposed: {
         title: "Expenses",
@@ -260,7 +276,20 @@ describe("Waiting on you", () => {
     expect(items).toEqual([
       matching.objectContaining({ suggestionId, target: null, collection: "policy", places: 0 }),
     ]);
-    expect(opened.current).toBeNull();
+    expect(opened.current).toEqual({ state: "new-concept" });
+  });
+
+  it("opens a retitle's orphaned edit as orphaned, not withheld", async () => {
+    const scenario = await arrange();
+    const { sibling } = await orphanedByRetitle(
+      scenario,
+      "Expenses are claimed within ninety days.",
+    );
+
+    const opened = answered(await openedBy(scenario.editor, sibling.suggestionId));
+
+    expect(opened.item).toMatchObject({ target: null, baseMoved: true });
+    expect(opened.current).toEqual({ state: "orphaned" });
   });
 
   it("withholds a source the owner cannot open from the preview", async () => {
@@ -352,16 +381,8 @@ describe("Waiting on you", () => {
 
   it("hides a retitle's orphaned edit from deciders outside its audience", async () => {
     const scenario = await arrange();
-    const standing = await conceptWritten(scenario);
-    const retitle = await proposedBy(scenario, scenario.viewer, standing, {
-      title: "Travel Expenses",
-      frontmatter: { title: "Travel Expenses", type: "Policy" },
-    });
     const withheld = "The settlement figure is 4.2 million pounds.";
-    const sibling = await proposedBy(scenario, scenario.viewer, standing, { body: withheld });
-    await acceptSuggestions(scenario.admin, doorsOf(scenario), {
-      decisions: [{ suggestionId: retitle.suggestionId, expectedTarget: standing.written.iri }],
-    });
+    const { standing, sibling } = await orphanedByRetitle(scenario, withheld);
     const orphaned = await waitingFor(scenario.admin);
     await db().pool.query(
       `UPDATE concept_index SET audience = 'groups', audience_groups = ARRAY[$3]
@@ -410,9 +431,12 @@ describe("Waiting on you", () => {
       conceptProposedBy(scenario, scenario.viewer, { status: "draft" });
 
     const standingText = {
-      title: "Expenses",
-      body: "Expenses are claimed within thirty days.",
-      sources: undefined,
+      state: "shown",
+      version: {
+        title: "Expenses",
+        body: "Expenses are claimed within thirty days.",
+        sources: undefined,
+      },
     };
 
     it("lists and opens its edit for the owner and Admins", async () => {

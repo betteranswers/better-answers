@@ -107,6 +107,25 @@ const editedBy = async (
   return { seed, answer };
 };
 
+const savedAsOwnershipClears = async (scenario: Scenario, input: SaveConceptInput) => {
+  const parked = await holdingTable(db().pool, "write_up_include", async () => {
+    const saving = saved(scenario, scenario.editor, input);
+    await until(() => isBlockedOnTable(db().pool, "write_up_include"));
+    const clearing = db().pool.query(
+      "DELETE FROM concept_owner WHERE workspace_id = $1 AND collection = 'policy'",
+      [scenario.workspaceId],
+    );
+    await until(async () =>
+      (await statementsWaitingOnALock(db().pool)).some((query) =>
+        query.includes("DELETE FROM concept_owner"),
+      ),
+    );
+    return { saving, clearing };
+  });
+  const [answer, cleared] = await Promise.all([parked.saving, parked.clearing]);
+  return { answer, cleared };
+};
+
 const withBody =
   (body: string) =>
   (seed: ConceptToEdit): Partial<SaveOver> => ({ parts: { ...seed.parts, body } });
@@ -188,6 +207,28 @@ describe("a save that starts from the raw file", () => {
     expect(file).toContain(`"locator": ${JSON.stringify(restricted.locator)}`);
     expect(file).toContain('"resource": "minutes"');
     expect(file).toContain('"title": "Expenses, retitled"');
+  });
+
+  it("shows no outsider the document a malformed locator names", async () => {
+    const scenario = await arrange();
+    const restricted = await minutesLanded(scenario);
+    const [documentId = ""] = restricted.locator.split("/");
+    const malformed = {
+      title: "Board minutes",
+      resource: "minutes",
+      locator: `${documentId}/chars:9-1`,
+    };
+    const concept = await written(scenario, { sources: [malformed] });
+    await overriddenBy(db(), scenario, concept.iri, "Internal");
+
+    for (const outsider of [scenario.editor, scenario.unowned]) {
+      const seed = await toEdit(scenario, outsider, concept.iri);
+
+      expect(inspect(seed, { depth: null }), "the editor's seed names the document").not.toContain(
+        documentId,
+      );
+      expect(seed.withheld).toEqual([{ at: 0, label: "Board minutes" }]);
+    }
   });
 
   it("refuses a save after the withheld sources' positions moved", async () => {
@@ -765,21 +806,7 @@ describe("the author a save commits as", () => {
     const before = await historyOf(scenario);
     const input = { ...saveOf(concept.iri, seed), ...withBody("Claim within a fortnight.")(seed) };
 
-    const parked = await holdingTable(db().pool, "write_up_include", async () => {
-      const saving = saved(scenario, scenario.editor, input);
-      await until(() => isBlockedOnTable(db().pool, "write_up_include"));
-      const clearing = db().pool.query(
-        "DELETE FROM concept_owner WHERE workspace_id = $1 AND collection = 'policy'",
-        [scenario.workspaceId],
-      );
-      await until(async () =>
-        (await statementsWaitingOnALock(db().pool)).some((query) =>
-          query.includes("DELETE FROM concept_owner"),
-        ),
-      );
-      return { saving, clearing };
-    });
-    const [answer, cleared] = await Promise.all([parked.saving, parked.clearing]);
+    const { answer, cleared } = await savedAsOwnershipClears(scenario, input);
 
     expect(seed.standing).toBe("commits");
     expect(cleared.rowCount).toBe(1);
@@ -791,6 +818,14 @@ describe("the author a save commits as", () => {
 describe("a retitle or a rekind", () => {
   const mileage = async (scenario: Scenario) =>
     committedIri(await saved(scenario, scenario.admin, newPolicy("Mileage Allowance")));
+
+  const retitledToRates = async (scenario: Scenario) => {
+    const iri = await mileage(scenario);
+    await editedBy(scenario, scenario.admin, iri, (seed) => ({
+      parts: { ...seed.parts, title: "Mileage Rates" },
+    }));
+    return iri;
+  };
 
   it("re-keys a concept after a retitle and a rekind", async () => {
     const scenario = await arrange();
@@ -812,10 +847,7 @@ describe("a retitle or a rekind", () => {
 
   it("frees the old title and refuses a taken one", async () => {
     const scenario = await arrange();
-    const iri = await mileage(scenario);
-    await editedBy(scenario, scenario.admin, iri, (seed) => ({
-      parts: { ...seed.parts, title: "Mileage Rates" },
-    }));
+    await retitledToRates(scenario);
 
     const fuel = committedIri(await saved(scenario, scenario.admin, newPolicy("Fuel")));
 
@@ -830,6 +862,16 @@ describe("a retitle or a rekind", () => {
     expect(vacated.answer).toMatchObject({ ok: true, value: { outcome: "committed" } });
     expect(ontoAnother.answer).toEqual({ ok: false, error: "merge-key-taken" });
     expect(taken).toEqual({ ok: false, error: "merge-key-taken" });
+  });
+
+  it("lands a new concept under a title a retitle vacated", async () => {
+    const scenario = await arrange();
+    const iri = await retitledToRates(scenario);
+
+    const again = await saved(scenario, scenario.admin, newPolicy("Mileage Allowance"));
+
+    expect(again).toMatchObject({ ok: true, value: { outcome: "committed" } });
+    expect(await pathOf(committedIri(again))).not.toBe(await pathOf(iri));
   });
 
   it("keeps a non-derived key while title and kind are unchanged", async () => {
@@ -863,6 +905,22 @@ describe("what an outsider's body may mention", () => {
       withBody(`${seed.parts.body} See ${locator}.`)(seed),
     );
 
+    expect(answer).toEqual({ ok: false, error: "body-locator-refused" });
+  });
+
+  it("refuses a new withheld body locator when ownership clears", async () => {
+    const scenario = await arrange();
+    const { concept, locator } = await citingMinutes(scenario, "Claims close in March.");
+    const seed = await toEdit(scenario, scenario.editor, concept.iri);
+    const input = {
+      ...saveOf(concept.iri, seed),
+      ...withBody(`${seed.parts.body} See ${locator}.`)(seed),
+    };
+
+    const { answer } = await savedAsOwnershipClears(scenario, input);
+
+    expect(seed.standing).toBe("commits");
+    expect(seed.withheld).toEqual([{ at: 0, label: "Board minutes" }]);
     expect(answer).toEqual({ ok: false, error: "body-locator-refused" });
   });
 

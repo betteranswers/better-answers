@@ -1,11 +1,11 @@
 import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
 import { dayWords } from "@/shared/words.ts";
 
-import type { WaitingItem } from "./inbox-api.ts";
+import { suggestsNewConcept, type WaitingItem } from "./inbox-api.ts";
 import { personShown, WAITING_WORDS as WORDS } from "./inbox-words.ts";
 
 const notesOf = (item: WaitingItem): readonly string[] => [
-  ...(item.target === null ? [WORDS.newConcept] : []),
+  ...(suggestsNewConcept(item) ? [WORDS.newConcept] : []),
   ...(item.baseMoved ? [WORDS.baseMoved] : []),
   ...(item.places > 1 ? [WORDS.places(item.places)] : []),
 ];

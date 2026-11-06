@@ -18,7 +18,7 @@ import type { Tx } from "../../store/postgres/index.ts";
 import type { Frontmatter, FrontmatterSource, FrontmatterValue } from "../file.ts";
 import { heldByIri, placesUsingReadableOrNot, type Held } from "../import/landing.ts";
 import { ownerOf, standingConcept, type OwnedConcept } from "../owners.ts";
-import { resolvedSourcesOf, type PassageReader } from "../reading/read.ts";
+import { namesADocument, resolvedSourcesOf, type PassageReader } from "../reading/read.ts";
 
 export type SourceEntry = string | FrontmatterSource;
 
@@ -98,7 +98,8 @@ export const openedSourcesOf = async (
       principal,
       tx,
       passageAt,
-      namesPassage: (locator) => parsedPassageLocator(locator) !== undefined,
+      namesPassage: (locator) =>
+        parsedPassageLocator(locator) !== undefined || namesADocument(locator),
     },
     frontmatter,
   );

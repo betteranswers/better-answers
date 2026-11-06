@@ -16,11 +16,16 @@ export type WaitingEdit = inferOutput<Api["inbox"]["item"]>;
 
 export type ConceptParts = WaitingEdit["proposed"];
 
+export type CurrentVersion = WaitingEdit["current"];
+
 export type Decided = inferOutput<Api["inbox"]["accept"]>["outcomes"][number];
 
 export type DecidedWord = Decided["outcome"];
 
 type Decision = inferInput<Api["inbox"]["accept"]>["decisions"][number];
+
+export const suggestsNewConcept = (item: WaitingItem): boolean =>
+  item.target === null && !item.baseMoved;
 
 export const decisionOf = (item: WaitingItem): Decision => ({
   suggestionId: item.suggestionId,

@@ -56,9 +56,13 @@ type ConceptParts = {
   readonly sources: FrontmatterValue | undefined;
 };
 
+type CurrentVersion =
+  | { readonly state: "shown"; readonly version: ConceptParts }
+  | { readonly state: "new-concept" | "orphaned" | "withheld" };
+
 export type WaitingEdit = {
   readonly item: WaitingItem;
-  readonly current: ConceptParts | null;
+  readonly current: CurrentVersion;
   readonly proposed: ConceptParts;
 };
 
@@ -203,9 +207,10 @@ const partsOf = async (
 
 const standingOf = async (
   projecting: Projecting,
-  target: ConceptIri | null,
-): Promise<Result<ConceptParts | null>> => {
-  if (target === null) return ok(null);
+  item: WaitingItem,
+): Promise<Result<CurrentVersion>> => {
+  const { target } = item;
+  if (target === null) return ok({ state: item.baseMoved ? "orphaned" : "new-concept" });
   const { principal, tx } = projecting;
   const found = await attempt(() =>
     tx.query<StandingRow>(STANDING, [
@@ -216,7 +221,9 @@ const standingOf = async (
   );
   if (!found.ok) return err(found.error);
   const row = found.value.rows[0];
-  return row === undefined ? ok(null) : partsOf(projecting, row);
+  if (row === undefined) return ok({ state: "withheld" });
+  const version = await partsOf(projecting, row);
+  return version.ok ? ok({ state: "shown", version: version.value }) : err(version.error);
 };
 
 export const waitingEdit = async (
@@ -248,7 +255,7 @@ export const waitingEdit = async (
   const projecting = { principal: reader, tx, ...reads };
   const proposed = await partsOf(projecting, payload);
   if (!proposed.ok) return err(proposed.error);
-  const current = await standingOf(projecting, item.target);
+  const current = await standingOf(projecting, item);
   if (!current.ok) return err(current.error);
   return ok({ item, current: current.value, proposed: proposed.value });
 };

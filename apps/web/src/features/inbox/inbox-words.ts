@@ -58,9 +58,13 @@ export const EDIT_WORDS = {
   noText: "No text.",
   sources: "Suggested Sources",
   noSources: "No sources.",
-  newConcept: "This suggests a new concept, so there is no current version to compare.",
-  currentWithheld:
-    "You can’t read the current version of this concept, so only the suggested version is shown.",
+  noCurrent: {
+    "new-concept": "This suggests a new concept, so there is no current version to compare.",
+    orphaned:
+      "The concept has been renamed or changed since this suggestion was made, so only the suggested version is shown.",
+    withheld:
+      "You can’t read the current version of this concept, so only the suggested version is shown.",
+  },
   places: (places: number): string =>
     `Used in ${places} places. Accepting changes it in every one.`,
   acceptEverywhere: "Accept in Every Place",

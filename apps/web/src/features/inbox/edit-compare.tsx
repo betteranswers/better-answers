@@ -5,7 +5,7 @@ import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { paragraphsCompared, sourceLinesOf, type Paragraph } from "./edit-compared.ts";
-import type { ConceptParts, WaitingEdit } from "./inbox-api.ts";
+import type { ConceptParts, CurrentVersion, WaitingEdit } from "./inbox-api.ts";
 import { EDIT_WORDS as WORDS } from "./inbox-words.ts";
 
 function ChangedTag() {
@@ -47,32 +47,35 @@ function Version(properties: {
   );
 }
 
-function NoCurrentVersion(properties: { readonly newConcept: boolean }) {
+type NotShown = Exclude<CurrentVersion, { readonly state: "shown" }>["state"];
+
+function NoCurrentVersion(properties: { readonly state: NotShown }) {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="min-w-0 border border-border p-4">
       <h3 id={headingId}>{WORDS.current}</h3>
-      <p className="mt-2">{properties.newConcept ? WORDS.newConcept : WORDS.currentWithheld}</p>
+      <p className="mt-2">{WORDS.noCurrent[properties.state]}</p>
     </section>
   );
 }
 
 export function EditCompared(properties: { readonly edit: WaitingEdit }) {
-  const { current, proposed, item } = properties.edit;
+  const { current: standing, proposed } = properties.edit;
+  const current = standing.state === "shown" ? standing.version : null;
   const compared = paragraphsCompared(current?.body ?? null, proposed.body);
   const titleChanged = current !== null && current.title !== proposed.title;
 
   return (
     <div className="mt-6 grid gap-4 md:grid-cols-2">
-      {current === null ? (
-        <NoCurrentVersion newConcept={item.target === null} />
-      ) : (
+      {standing.state === "shown" ? (
         <Version
           heading={WORDS.current}
-          title={current.title}
+          title={standing.version.title}
           titleChanged={titleChanged}
           paragraphs={compared.current}
         />
+      ) : (
+        <NoCurrentVersion state={standing.state} />
       )}
       <Version
         heading={WORDS.proposed}
