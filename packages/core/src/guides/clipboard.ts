@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
 
-import { IRI, quotedPassageOf, type CitedSource } from "@better-answers/schema";
+import { IRI, ULID_CHARACTERS, type CitedSource } from "@better-answers/schema";
 
 /** No copy holds the nonce, so no text in a Brief, typed or as a character reference, forges a carrier. */
 const OPENS = `\uE000${randomUUID()}`;
@@ -203,8 +203,11 @@ const FLOW: FlowReaders = {
 
 const sentence = (part: string): string => (/[.!?]$/u.test(part) ? part : `${part}.`);
 
+/** The read path's test: a locator naming a document, well formed or not, may name one the reader cannot read. */
+const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "iu");
+
 const sourceWords = (source: CitedSource): string =>
-  source.locator === null || quotedPassageOf(source) !== undefined
+  source.locator === null || NAMES_A_DOCUMENT.test(source.locator)
     ? source.resource
     : `${source.resource}, ${source.locator}`;
 

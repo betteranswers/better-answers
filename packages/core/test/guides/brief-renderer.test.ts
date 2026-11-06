@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { citedSourceOf } from "@better-answers/schema";
+
 import { renderBrief, type SourcedFootnote } from "../../src/guides/renderer.ts";
 
 const footnote = (label: string, title: string) => ({ label, iri: `iri:${label}`, title });
@@ -15,6 +17,8 @@ const sourced = (
 });
 
 const TRUST_WORDS = /Verified|Unverified|Changed since verified|Out of date|Draft|Deprecated/u;
+
+const DOCUMENT = "01M6QBZ0S7F0D3YTDGHFA1J0VF";
 
 const FOOTNOTES = [footnote("a", "Alpha"), footnote("b", "Beta"), footnote("c", "Gamma")];
 
@@ -255,6 +259,30 @@ describe("rendering a Brief for the clipboard", () => {
       renderBrief("Claim[^a].", [sourced("a", "Staff headcount", { sources: [] })], "clipboard")
         .text,
     ).toBe("Claim[1].\n\nSources\n[1] Staff headcount. No source recorded.");
+  });
+
+  it.each([
+    [
+      "a reversed span",
+      { title: "Minutes", resource: "minutes", locator: `${DOCUMENT}/chars:9-1` },
+    ],
+    ["a label#locator entry", `minutes#${DOCUMENT}/chars:9-1`],
+    ["a lowercase id", { resource: "minutes", locator: `${DOCUMENT.toLowerCase()}/chars:9-1` }],
+    ["a bare id", { resource: "minutes", locator: DOCUMENT }],
+    ["a trailing path", { resource: "minutes", locator: `${DOCUMENT}/chars:0-5/x` }],
+    ["a negative start", { resource: "minutes", locator: `${DOCUMENT}/chars:-1-5` }],
+    ["a URL form", { resource: "minutes", locator: `https://example.invalid/d/${DOCUMENT}` }],
+    ["a leading space", { resource: "minutes", locator: ` ${DOCUMENT}/chars:9-1 ` }],
+  ])("names no document a malformed locator holds: %s", (_shape, entry) => {
+    const cited = [citedSourceOf(entry)].filter((source) => source !== undefined);
+    const rendered = renderBrief(
+      "Claim[^a].",
+      [sourced("a", "Pay review", { sources: cited })],
+      "clipboard",
+    );
+
+    expect(rendered.text).toBe("Claim[1].\n\nSources\n[1] Pay review. Source: minutes.");
+    expect(rendered.html.toLowerCase()).not.toContain(DOCUMENT.toLowerCase());
   });
 
   it("keeps lists and safe links, rendering raw markup as text", () => {
