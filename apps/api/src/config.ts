@@ -126,6 +126,59 @@ export const READER_SCHEMAS = {
   readEnvelopeKey: envelopeKeySchema,
 };
 
+type Reader = keyof typeof READER_SCHEMAS;
+
+const EVERY_READER = Object.keys(READER_SCHEMAS).filter((name): name is Reader =>
+  Object.hasOwn(READER_SCHEMAS, name),
+);
+
+const BOOTSTRAP_ONLY: readonly Reader[] = ["readBootstrap"];
+
+/** The readers each process of this tier starts. `environment-gate.ts` passes a process the keys they read and no other. */
+export const PROCESS_READERS = {
+  api: EVERY_READER,
+  migrate: BOOTSTRAP_ONLY,
+};
+
+export type TierProcess = keyof typeof PROCESS_READERS;
+
+/** A dependency reads these. No reader of this module does. */
+export const LIBRARY_KEYS = ["NODE_ENV"] as const;
+
+/** Node, git and the C library read these in any process. A deployment sets none of them. */
+const RUNTIME_KEYS = [
+  "PATH",
+  "HOME",
+  "HOSTNAME",
+  "TMPDIR",
+  "TZ",
+  "LANG",
+  "LANGUAGE",
+  "LC_ALL",
+  "NODE_OPTIONS",
+  "NODE_EXTRA_CA_CERTS",
+] as const;
+
+/**
+ * Coolify hands every service every variable of the resource. This keeps the keys that the
+ * process's readers, its libraries and the runtime read.
+ */
+export function environmentOf(
+  tierProcess: TierProcess,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Record<string, string> {
+  const kept = new Set<string>([
+    ...PROCESS_READERS[tierProcess].flatMap((reader) => Object.keys(READER_SCHEMAS[reader].shape)),
+    ...LIBRARY_KEYS,
+    ...RUNTIME_KEYS,
+  ]);
+  return Object.fromEntries(
+    Object.entries(environment).flatMap(([key, value]) =>
+      kept.has(key) && value !== undefined ? [[key, value]] : [],
+    ),
+  );
+}
+
 const NO_ENVELOPE_KEY = `KEK must be set to the envelope key: ${String(ENVELOPE_KEY_BYTES * 2)} hexadecimal characters, encoding ${String(ENVELOPE_KEY_BYTES)} bytes`;
 
 export type Bootstrap = {

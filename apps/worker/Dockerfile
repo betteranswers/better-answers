@@ -142,11 +142,12 @@ USER worker
 # An idle worker is healthy. Eight retries at 15 seconds outlast one lease, so a quiet claimant
 # gets the lease's grace before a restart. The `worker` service in `deploy/platform.compose.yaml`
 # runs the same probe, so change both together. The image has no shell, so the probe and `CMD`
-# use exec form.
+# use exec form. Both start through `environment_gate`, which passes each process only the keys
+# it reads.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=40s --retries=8 \
-  CMD ["python", "-m", "better_answers_worker.health"]
+  CMD ["python", "-m", "better_answers_worker.environment_gate", "health"]
 
 # The work loop refuses to claim jobs while its committed schema view and the database's
 # migration stamp disagree. It logs once and keeps running, because a restarted container would
 # hit the same mismatch.
-CMD ["better-answers-worker"]
+CMD ["python", "-m", "better_answers_worker.environment_gate", "worker"]

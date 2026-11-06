@@ -435,6 +435,7 @@ def chowned_worker_uid() -> int:
 PROBE = """
 import glob, importlib, json, os, re, shutil, subprocess, sys
 from importlib import metadata
+from better_answers_worker.environment_gate import PROCESSES
 
 SEARCHED = os.pathsep.join(
     [os.environ["PATH"], "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/busybox"]
@@ -557,7 +558,7 @@ sys.stdout.write(json.dumps({
     "bundled_wheels": sorted(
         glob.glob(os.path.join(sys.base_prefix, "**", "*.whl"), recursive=True)
     ),
-    "command_interpreter": interpreter_of(os.environ["PROBE_COMMAND"]),
+    "command_interpreter": interpreter_of(PROCESSES["worker"][0]),
     "shared_object_count": shared_object_count,
     "unresolved_shared_objects": unresolved_shared_objects,
     "library_file_count": library_file_count,
@@ -1072,9 +1073,6 @@ def contents(image: str) -> ImageContents:
                 "PROBE_MODEL_IDS": json.dumps(list(pinned_model_ids())),
                 "PROBE_SPACY_PIPELINE": _pin("SPACY_MODEL"),
                 "PROBE_TOOLS": json.dumps(list(ABSENT_TOOLS)),
-                "PROBE_COMMAND": (
-                    exec_form(DOCKERFILE.read_text("utf-8"), "CMD") or [""]
-                )[0],
             },
         )
     )

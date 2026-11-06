@@ -24,7 +24,7 @@ x-bootstrap: &bootstrap
 services:
   migrate:
     image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?set by the release workflow}
-    command: ["pnpm", "migrate"]
+    command: ["node", "apps/api/src/environment-gate.ts", "migrate"]
     # Quoted: a missing `restart` becomes unless-stopped, and bare `no` is YAML false.
     restart: "no"
     environment:
@@ -88,7 +88,7 @@ services:
       LMDB_DIR: /data/worker/lmdb
       RUST_LOG: warn
     healthcheck:
-      test: ["CMD", "python", "-m", "better_answers_worker.health"]
+      test: ["CMD", "python", "-m", "better_answers_worker.environment_gate", "health"]
       interval: 15s
       timeout: 3s
       retries: 8

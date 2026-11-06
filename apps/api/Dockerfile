@@ -1,6 +1,7 @@
-# `deploy/platform.compose.yaml` runs this image twice. The `migrate` service runs `pnpm migrate`,
-# and the `api` service runs `CMD`. The runtime stage keeps pnpm, the root manifest, and
-# `pnpm-workspace.yaml` because `pnpm migrate` is a root script.
+# `deploy/platform.compose.yaml` runs this image twice. The `migrate` service and the `api`
+# service each start `apps/api/src/environment-gate.ts`, which starts the named process with only
+# the keys it reads. The runtime stage keeps pnpm, the root manifest, and `pnpm-workspace.yaml`
+# because `pnpm ops` is a root script.
 #
 # Node 24 strips types as it loads, so no stage compiles `apps/api`. `erasableSyntaxOnly` in
 # `tsconfig.base.json` keeps the source strippable.
@@ -149,7 +150,7 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 # has no lockfile, no registry credential, and no writable /app, so any pnpm install fails here.
 # `verifyDepsBeforeRun: false` stops pnpm from reinstalling before `pnpm run`.
 # `pmOnFail: ignore` stops pnpm 12 from resolving its own version from the registry before each
-# command, which fails `pnpm migrate` after about 70 seconds of retries.
+# command, which fails each pnpm command after about 70 seconds of retries.
 COPY pnpm-workspace.yaml ./
 # pnpm commands read the patch paths in `pnpm-workspace.yaml`, so the files must exist even
 # though nothing installs here.
@@ -176,7 +177,7 @@ COPY packages/design-system/assets packages/design-system/assets
 COPY packages/design-system/tokens packages/design-system/tokens
 COPY packages/schema/package.json packages/schema/
 COPY packages/schema/src packages/schema/src
-# `pnpm migrate` reads this directory. `migrationsFolder` in `packages/schema/src/index.ts` names it.
+# `src/migrate.ts` reads this directory. `migrationsFolder` in `packages/schema/src/index.ts` names it.
 COPY packages/schema/migrations packages/schema/migrations
 # The image keeps the repository layout under /app, so the default `WEB_ROOT` in
 # `apps/api/src/config.ts` resolves to this path and the deploy unit sets no variable for it.
@@ -196,4 +197,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=12 \
   CMD wget -qO- http://127.0.0.1:3000/health || exit 1
 
-CMD ["node", "apps/api/src/main.ts"]
+CMD ["node", "apps/api/src/environment-gate.ts", "api"]
