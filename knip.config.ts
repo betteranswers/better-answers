@@ -13,6 +13,8 @@ const config: KnipConfig = {
     ".": {
       // A plan's measurement script is run by hand, so nothing imports it.
       entry: ["docs/plans/*/*.mjs"],
+      // `packageExtensions` in `pnpm-workspace.yaml` adds it as a peer of the React libraries.
+      ignoreDependencies: ["@types/react"],
 
       // A skill's reference files are samples for other projects, so nothing here imports them.
       // The security-audit skill's validators are vendored scripts it runs by name.

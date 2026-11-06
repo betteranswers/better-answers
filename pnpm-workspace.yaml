@@ -18,3 +18,26 @@ patchedDependencies:
 # `@trpc/server` needs TypeScript for types alone, but as a required peer it lands in the api image.
 overrides:
   '@trpc/server>typescript': '-'
+
+# Every worktree links its `node_modules` to one shared store instead of holding its own copy, so a
+# new worktree adds about 1,200 files rather than about 66,000. The api Dockerfile sets the store
+# back to per-project for the image.
+virtualStoreType: global
+
+# With the shared store, tsc resolves these libraries from their real paths and cannot see the
+# hoisted `@types/react`, so each one declares it as a peer.
+packageExtensions:
+  '@phosphor-icons/react':
+    peerDependencies: { '@types/react': '*' }
+  '@tanstack/react-router':
+    peerDependencies: { '@types/react': '*' }
+  '@tanstack/react-table':
+    peerDependencies: { '@types/react': '*' }
+  '@trpc/tanstack-react-query':
+    peerDependencies: { '@types/react': '*' }
+  cmdk:
+    peerDependencies: { '@types/react': '*' }
+  embla-carousel-react:
+    peerDependencies: { '@types/react': '*' }
+  better-auth:
+    peerDependencies: { '@types/react': '*' }

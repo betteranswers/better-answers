@@ -17,8 +17,12 @@ FROM node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6
 # pnpm 12 fetches its native binary on its first run. `pnpm --version` is that first run, as root,
 # so the binary lands in the cache before the cache becomes read-only. `--pm-on-fail=ignore`
 # stops pnpm 12 from writing a root-owned `pnpm-lock.yaml` under /app that the runtime cannot read.
+# `pnpm-workspace.yaml` sets `virtualStoreType: global` so that local worktrees share one store. In an
+# image that would leave `/app/node_modules` as links to a store outside `/app`, so the image
+# installs with the per-project store.
 ENV COREPACK_HOME=/opt/corepack \
-    COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+    PNPM_CONFIG_VIRTUAL_STORE_TYPE=project
 WORKDIR /app
 COPY package.json ./
 RUN corepack enable && corepack install && pnpm --pm-on-fail=ignore --version \
