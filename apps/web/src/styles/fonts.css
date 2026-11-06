@@ -1,8 +1,3 @@
-/* This file names the families and does not load them. `apps/web/src/index.css` imports the
-   faces, and the api's `src/auth/page-style.ts` serves them to its pages.
-
-   Read --font-sans, not --font-sans-default. The accessible reading mode in
-   `tailwind-bridge.css` changes --font-sans and falls back to the default. */
 :root {
   --font-sans-default:
     "Geist Variable", "Geist", "Geist Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI",

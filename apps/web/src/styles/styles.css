@@ -1,6 +1,3 @@
-/* The one file a consumer links. Every path is explicitly relative, because a bundler
-   reads `colors.css` as a package name and looks for it beside the file that
-   imported this one. */
 @import "./fonts.css";
 @import "./colors.css";
 @import "./typography.css";

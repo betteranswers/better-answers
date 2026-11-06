@@ -1,4 +1,3 @@
-/* Components read the aliases in `semantic.css`, not these values. */
 :root {
   --grey-0: #ffffff;
   --grey-25: #fcfcfd;

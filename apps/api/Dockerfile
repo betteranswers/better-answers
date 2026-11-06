@@ -28,9 +28,6 @@ COPY package.json ./
 RUN corepack enable && corepack install && pnpm --pm-on-fail=ignore --version \
  && chmod -R a+rX "$COREPACK_HOME"
 
-# This stage copies only the workspace manifests, so a source edit does not invalidate the
-# install layer. pnpm checks the lockfile against all five projects in `pnpm-workspace.yaml`, so
-# all five manifests are copied, although the runtime needs four.
 FROM base AS manifests
 # Every workspace tsconfig extends `tsconfig.base.json`, and vite reads it at build time. The
 # runtime stage builds on `base`, not on this stage, because type stripping reads no tsconfig.
@@ -54,10 +51,7 @@ RUN pnpm --filter @better-answers/web run build
 
 # This stage uses a filtered install, not `pnpm deploy`. `pnpm deploy` copies the workspace
 # packages into `node_modules`, their `exports` maps point at TypeScript source, and Node does
-# not strip types inside `node_modules`. The `...` suffix selects the api and its workspace
-# dependencies: core, schema, and web. The `!` filter then drops the web's own dependencies, which
-# the SPA's build has already bundled. pnpm still links the api to the web, whose stylesheet and
-# logo the api's pages read.
+# not strip types inside `node_modules`.
 #
 # `--prod` still installs the optional peers that any workspace brings, so `better-auth`'s
 # peers on drizzle-kit, vitest, and react would ship with their build tools. An `overrides`
@@ -182,8 +176,6 @@ COPY packages/schema/migrations packages/schema/migrations
 # The image keeps the repository layout under /app, so the default `WEB_ROOT` in
 # `apps/api/src/config.ts` resolves to this path and the deploy unit sets no variable for it.
 COPY --from=web /app/apps/web/dist apps/web/dist
-# The api's pages inline the logo, the stylesheet, and the tokens the stylesheet imports. The web's
-# manifest exports them.
 COPY apps/web/package.json apps/web/
 COPY apps/web/src/styles apps/web/src/styles
 

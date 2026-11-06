@@ -1,7 +1,3 @@
-/* Points the CSS variable names that shadcn, Kibo UI, AI Elements, and Magic UI read at
-   these tokens. A component from those registries then needs no edits.
-   `styles.css` does not import this file, because it needs Tailwind v4. Import it after
-   `tailwindcss`, as `apps/web/src/index.css` does. */
 :root {
   --background: var(--surface-page);
   --foreground: var(--text-primary);
@@ -75,10 +71,6 @@
   --chart-5: var(--grey-500);
 }
 
-/* The accessible reading mode for dyslexic readers. Set data-reading-mode="accessible" on
-   <html>. It works with either theme. Nothing here defines --font-accessible yet, so the
-   family stays on the default face. --measure-prose does not
-   change, because it counts characters. */
 [data-reading-mode="accessible"] {
   --font-sans: var(--font-accessible, var(--font-sans-default));
   --text-body-size: 16px;
@@ -137,7 +129,6 @@
   --radius-2xl: 0px;
   --radius-3xl: 0px;
 
-  /* These copy the curve and durations in `motion.css`. Change both together. */
   --ease-standard: cubic-bezier(0.2, 0, 0.13, 1);
   --animate-duration-fast: 120ms;
   --animate-duration-base: 160ms;
@@ -196,9 +187,6 @@
   }
 }
 
-/* The type scale is not mapped here. Tailwind's font-size namespace is `--text-*`, which
-   `typography.css` already uses, so a theme variable here would refer to itself.
-   Write a type step as `var(--text-lg)`. */
 @theme inline {
   /* Tailwind's numeric scale steps by --space-1, so `p-4` equals --space-4. */
   --spacing: var(--space-1);

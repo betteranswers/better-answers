@@ -1,6 +1,3 @@
-/* The type scale: a page title is --text-title, a section --text-section, prose --text-lg,
-   interface text --text-base and a micro-label --text-2xs. `type-scale.test.ts` holds their
-   ratios. */
 :root {
   --text-title: 30px;
   --text-section: 20px;

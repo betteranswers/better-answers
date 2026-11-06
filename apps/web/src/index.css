@@ -1,8 +1,4 @@
 /*
- * The one stylesheet the app has. Everything below comes from the tokens in `styles/`:
- * Tailwind reads them through the bridge, so a colour, a size or a radius on a
- * page is a theme value and never a local invention (ADR 0033).
- *
  * The tokens come first, because `styles.css` reaches them through nested `@import`s and
  * CSS lets an `@import` follow only another `@import`: behind Tailwind's own output those
  * nested imports would sit after a rule, and a build drops them silently — a page with

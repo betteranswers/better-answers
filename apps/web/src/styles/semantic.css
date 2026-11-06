@@ -1,4 +1,3 @@
-/* Components read only these aliases, never the base palette in `colors.css`. */
 :root {
   color-scheme: light;
 
