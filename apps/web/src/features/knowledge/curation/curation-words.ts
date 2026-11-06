@@ -43,12 +43,17 @@ export const ALL_KNOWLEDGE_WORDS = {
     action: "Set Owner",
     title: (count: number): string => `Set the Owner of ${counted(count, "Concept", "Concepts")}`,
     consequence:
-      "The person you choose becomes the owner of each selected concept, instead of its collection’s owner. Each change is recorded in the audit log.",
+      "The person you choose becomes the owner of each selected concept, instead of its collection’s owner. Choose “Its collection’s owner” to undo this. Each change is recorded in the audit log.",
     newOwner: "New Owner",
     choose: "Choose a person",
+    collectionsOwner: "Its collection’s owner",
     pending: (name: string, count: number): string =>
       `Setting ${name} as the owner of ${conceptsCounted(count)}.`,
     done: (name: string, count: number): string => `${name} now owns ${conceptsCounted(count)}.`,
+    returning: (count: number): string =>
+      `Removing the ${count === 1 ? "owner" : "owners"} set for ${conceptsCounted(count)}.`,
+    returned: (count: number): string =>
+      `${conceptsCounted(count)} no longer ${count === 1 ? "has its" : "have their"} own owner.`,
     stillGoing: "The owner is still being set. Please wait.",
     tooMany: (most: number): string => `Please select ${most} concepts or fewer.`,
   },
@@ -140,7 +145,8 @@ export const EXPORTS_WORDS = {
 
 export const SAID_OF_EXPORTED_KNOWLEDGE_BASE = {
   "role-forbids": "You don’t have permission to download the knowledge base.",
-  "not-found": "Your knowledge base has no saved version yet, so there is nothing to download.",
+  "not-found":
+    "There is nothing in your knowledge base you can download yet. Nothing was downloaded.",
   "unrecorded-head":
     "A change to your knowledge base is still being saved. Nothing was downloaded. Please try again in a minute.",
   "export-too-large":

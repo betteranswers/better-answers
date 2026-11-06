@@ -321,7 +321,7 @@ describe("a refused export", () => {
       "precondition",
     ],
     [
-      "a knowledge base with no saved version",
+      "a knowledge base with nothing to download",
       EXPORT_BUNDLE,
       KNOWLEDGE_BASE,
       "not-found",

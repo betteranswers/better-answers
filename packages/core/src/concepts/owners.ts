@@ -367,9 +367,10 @@ export const nameOwner = async (
   return ok({ auditEventId, personId });
 };
 
+/** A null person hands each concept back to its collection's owner. */
 export const nameOwnerOfEachInput = z.strictObject({
   iris: z.array(ids.conceptIri).min(1).max(MOST_OWNERS_AT_ONCE),
-  personId: boundarySchemas.conceptOwner.insert.shape.personId,
+  personId: OWNER_PERSON,
 });
 
 export type NameOwnerOfEachInput = z.input<typeof nameOwnerOfEachInput>;
@@ -398,13 +399,15 @@ const refusalBeforeNamingEach = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   iris: readonly string[],
-  personId: string,
+  personId: string | null,
 ): Promise<RefusalOf<typeof nameOwnerOfEachAction> | undefined> => {
-  const member = await tx.query("SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2", [
-    admin.workspaceId,
-    personId,
-  ]);
-  if (member.rowCount === 0) return "no-such-member";
+  if (personId !== null) {
+    const member = await tx.query("SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2", [
+      admin.workspaceId,
+      personId,
+    ]);
+    if (member.rowCount === 0) return "no-such-member";
+  }
   const readable = await tx.query(READABLE_CONCEPTS_LOCKED, [
     admin.workspaceId,
     iris,
@@ -419,17 +422,22 @@ const OVERRIDE_EACH = `INSERT INTO concept_owner (workspace_id, id, iri, person_
     ON CONFLICT (workspace_id, iri) WHERE iri IS NOT NULL
     DO UPDATE SET person_id = EXCLUDED.person_id`;
 
+const CLEAR_EACH = "DELETE FROM concept_owner WHERE workspace_id = $1 AND iri = ANY($2::text[])";
+
 const checkedAndWrittenForEach = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   iris: readonly string[],
-  personId: string,
+  personId: string | null,
 ): Promise<RefusalOf<typeof nameOwnerOfEachAction> | undefined> => {
   const refusal = await refusalBeforeNamingEach(admin, tx, iris, personId);
-  if (refusal === undefined) {
+  if (refusal !== undefined) return refusal;
+  if (personId === null) {
+    await tx.query(CLEAR_EACH, [admin.workspaceId, iris]);
+  } else {
     await tx.query(OVERRIDE_EACH, [admin.workspaceId, iris, iris.map(() => ulid()), personId]);
   }
-  return refusal;
+  return undefined;
 };
 
 export const nameOwnerOfEach = async (
@@ -453,7 +461,10 @@ export const nameOwnerOfEach = async (
     admin,
     tx,
     OWNER_ACTIONS.named,
-    iris.map((iri) => ({ subjectId: iri, detail: { iri, personId } })),
+    iris.map((iri) => ({
+      subjectId: iri,
+      detail: personId === null ? { iri } : { iri, personId },
+    })),
   );
   return ok({ named: iris.length, batchId });
 };

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -10,15 +10,19 @@ import { describe, expect, it } from "vitest";
 import { BUNDLE_MANIFEST_PATH, ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
+import { withBundleFenceAs } from "../../src/bundle/index.ts";
 import { zipOf, type ZipEntry } from "../../src/concepts/export-zip.ts";
 import {
   exportBundleSnapshot,
   exportGuideInput,
   exportGuideSnapshot,
   exportRecords,
+  moveBundleCommits,
 } from "../../src/concepts/index.ts";
 import { readGuide, saveBrief, seedGuide } from "../../src/guides/index.ts";
-import type { Role, UserPrincipal } from "../../src/kernel/index.ts";
+import type { PlatformPrincipal, Role, UserPrincipal } from "../../src/kernel/index.ts";
+import { rewriteHistory } from "../../src/store/git/index.ts";
+import { withScope } from "../../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit, treeCommitted } from "../fixtures/bundle.ts";
 import { shelveOne } from "../fixtures/concept-shelf.ts";
 import { bundleIndexed, type BundleIndexed } from "../fixtures/indexed-bundle.ts";
@@ -633,6 +637,31 @@ describe("a knowledge base whose head cannot be exported", () => {
 
     expect(await snapshotOf(admin, scenario)).toEqual({ ok: false, error: "not-found" });
   });
+
+  it("reports a knowledge base with nothing readable as not found", async () => {
+    const scenario = await arrange();
+    const finance = await groupNamed(db(), scenario, "finance", [scenario.editor]);
+    await bundleIndexed(
+      db(),
+      scenario,
+      new Map([
+        [BUNDLE_MANIFEST_PATH, "owner: Acme\n"],
+        [SALARIES, "Pay bands.\n"],
+      ]),
+      [
+        {
+          path: SALARIES,
+          title: "Salary bands",
+          sensitivity: "Internal",
+          audienceGroups: [finance],
+        },
+      ],
+    );
+    const admin = await memberAs(scenario, "Admin");
+
+    expect(await snapshotOf(admin, scenario)).toEqual({ ok: false, error: "not-found" });
+    expect(await exportEventsBy(scenario, admin)).toEqual([]);
+  });
 });
 
 const FINANCE_ONLY = "FINANCE ONLY: the board approved a 40% cut.\n";
@@ -651,6 +680,7 @@ const landedAfter = async (
   await seedingWith(db().pool, (seed) =>
     seed.bundleCommit({ workspaceId, sha, parentSha: bundle.head }),
   );
+  return sha;
 };
 
 const zipText = (zip: Uint8Array): string =>
@@ -712,7 +742,55 @@ describe("an export while a change is landing", () => {
     expect(await exportEventsBy(scenario, admin)).toEqual([]);
     expect(zipText(answered(await snapshotOf(admin, scenario)).zip)).not.toContain("Pay bands.");
   });
+
+  it("refuses while an erasure prunes, then exports its rewrite", async () => {
+    const setup = await knowledgeBaseSetup();
+    const { scenario } = setup;
+    const { workspaceId } = scenario;
+    const admin = await memberAs(scenario, "Admin");
+    const erased = await landedAfter(setup, new Map([[EXPENSES, `Ask human:${LEAVER} first.\n`]]));
+    const during: { snapshot?: Awaited<ReturnType<typeof snapshotOf>> } = {};
+
+    await whileGitPausesAt(
+      { subcommand: "filter-repo", after: false },
+      () =>
+        withBundleFenceAs(ERASURE, scenario, workspaceId, "exclusive", async () => {
+          const { moved } = await rewriteHistory(ERASURE, scenario.git, workspaceId, {
+            addresses: [LEAVER],
+            people: [],
+            pseudonym: ulid(),
+          });
+          await withScope(ERASURE, scenario.postgres, workspaceId, (tx) =>
+            moveBundleCommits(ERASURE, tx, moved),
+          );
+        }),
+      async () => {
+        const pruned = await objectPrunedFrom(scenario, `${erased}:knowledge`);
+        during.snapshot = await snapshotOf(admin, scenario);
+        await pruned.restored();
+      },
+    );
+
+    expect(during.snapshot).toEqual({ ok: false, error: "unrecorded-head" });
+    expect(await exportEventsBy(scenario, admin)).toEqual([]);
+    const after = zipText(answered(await snapshotOf(admin, scenario)).zip);
+    expect(after).toContain(EXPENSES);
+    expect(after).not.toContain(LEAVER);
+  });
 });
+
+const ERASURE: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-erasure" };
+
+const LEAVER = "leaver@example.com";
+
+/** `git gc --prune=now` deletes loose objects one at a time, so a commit can outlive its tree. */
+const objectPrunedFrom = async ({ git, workspaceId }: Scenario, revision: string) => {
+  const gitDir = path.join(git.root, `${workspaceId}.git`);
+  const id = (await run("git", ["--git-dir", gitDir, "rev-parse", revision])).stdout.trim();
+  const loose = path.join(gitDir, "objects", id.slice(0, 2), id.slice(2));
+  await rename(loose, `${loose}.pruned`);
+  return { restored: () => rename(`${loose}.pruned`, loose) };
+};
 
 describe("records over their row cap", () => {
   it("keeps a record family's newest 50,000 rows and says so", async () => {

@@ -1,7 +1,7 @@
 import type pg from "pg";
 import { z } from "zod";
 
-import { boundarySchemas } from "@better-answers/schema";
+import { boundarySchemas, BUNDLE_MANIFEST_PATH } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../access/index.ts";
 import { action, declareActions, record } from "../audit/index.ts";
@@ -33,6 +33,7 @@ import {
 } from "../kernel/index.ts";
 import { bundleSnapshot, head as headOf, type GitDoor } from "../store/git/index.ts";
 import {
+  tryWorkspaceFence,
   withMember,
   withMemberUnheld,
   type PostgresDoor,
@@ -105,10 +106,27 @@ const DAY = new Intl.DateTimeFormat("en-CA", {
 
 const dayOf = (at: Date): string => DAY.format(at);
 
+type Fence = <T>(read: () => Promise<T>) => Promise<Result<T, ExportRefusal>>;
+
+const unfenced: Fence = async (read) => ok(await read());
+
 type Steps<Read, Made> = {
   readonly read: (member: UserPrincipal, tx: Tx) => Promise<Result<Read, ExportRefusal>>;
   readonly made: (read: Read) => Result<Made, ExportRefusal>;
   readonly recorded: (member: UserPrincipal, tx: Tx, read: Read) => Promise<void>;
+};
+
+const readUnheld = async <Read>(
+  admin: UserPrincipal,
+  door: PostgresDoor,
+  read: Steps<Read, unknown>["read"],
+  fence: Fence,
+): Promise<Result<Read, ExportRefusal>> => {
+  const fenced = await attempt(() => fence(() => withMemberUnheld(admin, door, read)));
+  if (!fenced.ok) return err(fenced.error);
+  if (!fenced.value.ok) return fenced.value;
+  const opened = fenced.value.value;
+  return opened.ok ? opened.value : err(opened.error);
 };
 
 const readUnheldThenRecorded = async <Read, Made>(
@@ -116,14 +134,13 @@ const readUnheldThenRecorded = async <Read, Made>(
   door: PostgresDoor,
   at: Date,
   steps: Steps<Read, Made>,
+  fence: Fence,
 ): Promise<Result<Made, ExportRefusal>> => {
   const fresh = requireFreshConfirmation(admin, at);
   if (!fresh.ok) return err(fresh.error);
-  const read = await attempt(() => withMemberUnheld(fresh.value, door, steps.read));
-  if (!read.ok) return err(read.error);
-  if (!read.value.ok) return err(read.value.error);
-  if (!read.value.value.ok) return err(read.value.value.error);
-  const held = read.value.value.value;
+  const read = await readUnheld(fresh.value, door, steps.read, fence);
+  if (!read.ok) return read;
+  const held = read.value;
   const made = steps.made(held);
   if (!made.ok) return made;
   const recorded = await attempt(() =>
@@ -160,7 +177,9 @@ const snapshotRead =
     const readable = rows[0];
     if (readable?.at_head !== true) return err("unrecorded-head");
     const files = await bundleSnapshot(member, git, commit, new Set(readable.paths));
-    return files.ok ? ok({ head: commit, files: files.value }) : files;
+    if (!files.ok) return files;
+    if (files.value.every(({ path }) => path === BUNDLE_MANIFEST_PATH)) return err(NOT_FOUND);
+    return ok({ head: commit, files: files.value });
   };
 
 export const exportBundleSnapshot = async (
@@ -180,24 +199,39 @@ export const exportBundleSnapshot = async (
 > => {
   const admitted = admit(exportBundleAction, principal, {});
   if (!admitted.ok) return err(admitted.error);
-  return readUnheldThenRecorded(admitted.value, doors.postgres, input.at, {
-    read: snapshotRead(doors.git),
-    made: ({ head, files }) => {
-      const zip = zipOf(files, input.at);
-      if (!zip.ok) return zip;
-      const name = `knowledge-base-${dayOf(input.at)}.zip`;
-      return ok({ name, zip: zip.value, files: files.length, head });
+  const admin = admitted.value;
+  return readUnheldThenRecorded(
+    admin,
+    doors.postgres,
+    input.at,
+    {
+      read: snapshotRead(doors.git),
+      made: ({ head, files }) => {
+        const zip = zipOf(files, input.at);
+        if (!zip.ok) return zip;
+        const name = `knowledge-base-${dayOf(input.at)}.zip`;
+        return ok({ name, zip: zip.value, files: files.length, head });
+      },
+      recorded: async (member, tx, { head, files }) => {
+        await record(member, tx, {
+          id: ulid(),
+          action: EXPORT_ACTIONS.bundle,
+          subjectId: member.workspaceId,
+          detail: { commitSha: head, files: files.length },
+        });
+      },
     },
-    recorded: async (member, tx, { head, files }) => {
-      await record(member, tx, {
-        id: ulid(),
-        action: EXPORT_ACTIONS.bundle,
-        subjectId: member.workspaceId,
-        detail: { commitSha: head, files: files.length },
-      });
-    },
-  });
+    outsideAnErasure(admin, doors.postgres),
+  );
 };
+
+/** An erasure prunes the commits it replaced while it holds this fence exclusively. */
+const outsideAnErasure =
+  (admin: UserPrincipal, door: PostgresDoor): Fence =>
+  async (read) => {
+    const fenced = await tryWorkspaceFence(admin, door, admin.workspaceId, "shared", read);
+    return fenced.ok ? fenced : err("unrecorded-head");
+  };
 
 const RECORDS_CAP = 50_000;
 
@@ -366,29 +400,39 @@ export const exportRecords = async (
 > => {
   const admitted = admit(exportRecordsAction, principal, {});
   if (!admitted.ok) return err(admitted.error);
-  return readUnheldThenRecorded(admitted.value, door, input.at, {
-    read: recordsRead,
-    made: (records) => {
-      const zip = zipOf(
-        FAMILY_NAMES.map((name) => csvFileOf(name, records[name])),
-        input.at,
-      );
-      if (!zip.ok) return zip;
-      return ok({ name: `records-${dayOf(input.at)}.zip`, zip: zip.value, families: FAMILY_NAMES });
+  return readUnheldThenRecorded(
+    admitted.value,
+    door,
+    input.at,
+    {
+      read: recordsRead,
+      made: (records) => {
+        const zip = zipOf(
+          FAMILY_NAMES.map((name) => csvFileOf(name, records[name])),
+          input.at,
+        );
+        if (!zip.ok) return zip;
+        return ok({
+          name: `records-${dayOf(input.at)}.zip`,
+          zip: zip.value,
+          families: FAMILY_NAMES,
+        });
+      },
+      recorded: async (member, tx, records) => {
+        await record(member, tx, {
+          id: ulid(),
+          action: EXPORT_ACTIONS.records,
+          subjectId: member.workspaceId,
+          detail: {
+            owners: records.owners.lines.length,
+            verifications: records.verifications.lines.length,
+            usage: records.usage.lines.length,
+          },
+        });
+      },
     },
-    recorded: async (member, tx, records) => {
-      await record(member, tx, {
-        id: ulid(),
-        action: EXPORT_ACTIONS.records,
-        subjectId: member.workspaceId,
-        detail: {
-          owners: records.owners.lines.length,
-          verifications: records.verifications.lines.length,
-          usage: records.usage.lines.length,
-        },
-      });
-    },
-  });
+    unfenced,
+  );
 };
 
 type Carried = {
@@ -486,29 +530,35 @@ export const exportGuideSnapshot = async (
 > => {
   const admitted = admit(exportGuideAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
-  return readUnheldThenRecorded(admitted.value, door, input.at, {
-    read: guideRead(input.guideId, input.at),
-    made: (carried) =>
-      ok({
-        name: `guide-${slugOf(titleOf(carried.guide))}-${dayOf(input.at)}.md`,
-        markdown: markdownOf(carried, input.at),
-        sections: carried.sections.length,
-      }),
-    recorded: async (member, tx, { guide, sections }) => {
-      for (const { section, brief } of sections) {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- every usage row is written on the caller's transaction
-        const used = await recordUsage(member, tx, {
-          subject: { writeUpId: section.writeUpId, version: brief.version },
-          act: "exported",
+  return readUnheldThenRecorded(
+    admitted.value,
+    door,
+    input.at,
+    {
+      read: guideRead(input.guideId, input.at),
+      made: (carried) =>
+        ok({
+          name: `guide-${slugOf(titleOf(carried.guide))}-${dayOf(input.at)}.md`,
+          markdown: markdownOf(carried, input.at),
+          sections: carried.sections.length,
+        }),
+      recorded: async (member, tx, { guide, sections }) => {
+        for (const { section, brief } of sections) {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- every usage row is written on the caller's transaction
+          const used = await recordUsage(member, tx, {
+            subject: { writeUpId: section.writeUpId, version: brief.version },
+            act: "exported",
+          });
+          if (!used.ok) throw normalizeError(used.error);
+        }
+        await record(member, tx, {
+          id: ulid(),
+          action: EXPORT_ACTIONS.guide,
+          subjectId: guide.guideId,
+          detail: { guideId: guide.guideId, sections: sections.length },
         });
-        if (!used.ok) throw normalizeError(used.error);
-      }
-      await record(member, tx, {
-        id: ulid(),
-        action: EXPORT_ACTIONS.guide,
-        subjectId: guide.guideId,
-        detail: { guideId: guide.guideId, sections: sections.length },
-      });
+      },
     },
-  });
+    unfenced,
+  );
 };
