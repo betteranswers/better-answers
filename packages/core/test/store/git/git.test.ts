@@ -247,6 +247,22 @@ describe("the index a commit builds", () => {
   });
 });
 
+describe("a commit made while the platform holds its secrets", () => {
+  it("lands with none of them in git's environment", async () => {
+    vi.stubEnv("KEK", "0".repeat(64));
+    vi.stubEnv("AUTH_SECRET", "a".repeat(32));
+    try {
+      const bundle = await arrange();
+
+      const committed = await commit(bundle.principal, bundle.door, requestFor());
+
+      expect(await head(bundle.principal, bundle.door)).toBe(shaOf(committed));
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
 describe("a git failure after the precondition check passes", () => {
   it("refuses as stale when the ref's lock file already exists", async () => {
     const bundle = await arrange();

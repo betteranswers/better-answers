@@ -44,17 +44,23 @@ export const repositoryPath = (door: GitDoor, workspaceId: string): string =>
 export const bundleOf = (door: GitDoor, principal: UserPrincipal): string =>
   repositoryPath(door, principal.workspaceId);
 
+const PASSED_TO_GIT = ["PATH", "HOME", "TMPDIR"] as const;
+
 /**
- * `env` replaces rather than extends, so the spread keeps PATH; `LC_ALL=C` keeps git's messages
- * English for the compare-and-swap match below.
+ * `env` replaces rather than extends, so PATH must be named for git and filter-repo's Python.
+ * `LC_ALL=C` keeps git's messages English for `commit.ts`'s compare-and-swap match.
  */
 export const childEnvironment = (
   added: Readonly<Record<string, string>> = {},
-): NodeJS.ProcessEnv => ({
-  ...process.env,
-  ...added,
-  LC_ALL: "C",
-});
+): NodeJS.ProcessEnv => {
+  const platform = process.env;
+  const inherited: NodeJS.ProcessEnv = {};
+  for (const name of PASSED_TO_GIT) {
+    const value = platform[name];
+    if (value !== undefined) inherited[name] = value;
+  }
+  return { ...inherited, ...added, LC_ALL: "C" };
+};
 
 const feeding = (child: ChildProcess, input: string | undefined): void => {
   if (input === undefined) return;
@@ -158,7 +164,9 @@ export const standingHead = async (
 
 export const initRepository = async (door: GitDoor, workspaceId: string): Promise<string> => {
   const gitDir = repositoryPath(door, workspaceId);
-  await run("git", ["init", "--bare", "--initial-branch", "main", gitDir]);
+  await run("git", ["init", "--bare", "--initial-branch", "main", gitDir], {
+    env: childEnvironment(),
+  });
   return gitDir;
 };
 
