@@ -126,6 +126,7 @@ const useSession = (properties: BriefSessionProps): Session => {
     },
     discard: () => {
       dispatch({ type: "discard" });
+      say(said(WORDS.discarded));
     },
     close: () => {
       if (state.stage === "saving") return;
@@ -137,19 +138,19 @@ const useSession = (properties: BriefSessionProps): Session => {
 
 function Actions(properties: {
   readonly state: BriefState;
-  readonly saveRef: RefObject<HTMLButtonElement | null>;
+  readonly primaryRef: RefObject<HTMLButtonElement | null>;
   readonly session: Session;
 }) {
-  const { state, saveRef, session } = properties;
+  const { state, primaryRef, session } = properties;
   return (
     <div className="mt-4 flex flex-wrap items-center gap-3">
       {state.stage === "stale" ? (
-        <Button type="button" variant="accent" onClick={session.reload}>
+        <Button ref={primaryRef} type="button" variant="accent" onClick={session.reload}>
           {WORDS.reload}
         </Button>
       ) : (
         <Button
-          ref={saveRef}
+          ref={primaryRef}
           type="button"
           aria-disabled={state.stage === "saving"}
           aria-keyshortcuts={GUIDE_KEYSTROKES.saveBrief.key}
@@ -176,9 +177,12 @@ export function BriefSession(properties: BriefSessionProps) {
   const { number, editable } = properties;
   const session = useSession(properties);
   const { state } = session;
-  const saveRef = useRef<HTMLButtonElement>(null);
+  const primaryRef = useRef<HTMLButtonElement>(null);
   useKeptBrief(session.draftKey, state);
   useReportedUnsaved(hasUnsaved(state), properties.onUnsaved);
+  useEffect(() => {
+    if (state.stage === "stale") primaryRef.current?.focus();
+  }, [state.stage]);
 
   const onKeys = (event: KeyboardEvent<HTMLElement>) => {
     const { target } = event;
@@ -189,7 +193,7 @@ export function BriefSession(properties: BriefSessionProps) {
     } else if (event.key === "Escape" && target instanceof Element && target.matches(IN_THE_TEXT)) {
       event.preventDefault();
       event.stopPropagation();
-      saveRef.current?.focus();
+      primaryRef.current?.focus();
     }
   };
 
@@ -211,13 +215,13 @@ export function BriefSession(properties: BriefSessionProps) {
           onChange={session.edit}
         />
       </div>
-      <Actions state={state} saveRef={saveRef} session={session} />
+      <Actions state={state} primaryRef={primaryRef} session={session} />
       {state.open.earlier === undefined ? null : (
         <EarlierDraft
           markdown={state.open.earlier}
           includes={editable.footnotes}
           onDiscard={() => {
-            saveRef.current?.focus();
+            primaryRef.current?.focus();
             session.discard();
           }}
         />

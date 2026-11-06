@@ -15,6 +15,8 @@ export type Opened = {
   readonly earlier: string | undefined;
 };
 
+export type Kept = Pick<Opened, "markdown" | "earlier">;
+
 export type BriefState =
   | { readonly stage: "closed" }
   | { readonly stage: "editing"; readonly open: Opened }
@@ -61,8 +63,8 @@ const HANDLERS: Handlers = {
       ? editingFrom({ ...event.open, earlier: unsavedOf(state.open) ?? state.open.earlier })
       : state,
   discard: (state) =>
-    state.stage === "editing" && state.open.earlier !== undefined
-      ? editingFrom({ ...state.open, earlier: undefined })
+    (state.stage === "editing" || state.stage === "stale") && state.open.earlier !== undefined
+      ? { stage: state.stage, open: { ...state.open, earlier: undefined } }
       : state,
   close: (state) => (state.stage === "editing" || state.stage === "stale" ? CLOSED : state),
 };
@@ -75,18 +77,19 @@ const reduced = <Type extends BriefEvent["type"]>(
 export const briefReducer = (state: BriefState, event: BriefEvent): BriefState =>
   reduced(state, event);
 
-export const openedWith = (base: number, original: string, kept: string | undefined): Opened => ({
+export const openedWith = (base: number, original: string, kept: Kept | undefined): Opened => ({
   base,
   original,
-  markdown: kept ?? original,
-  earlier: undefined,
+  markdown: kept?.markdown ?? original,
+  earlier: kept?.earlier,
 });
 
 export const isLocked = (state: BriefState): boolean =>
   state.stage === "saving" || state.stage === "stale";
 
 export const hasUnsaved = (state: BriefState): boolean =>
-  "open" in state && state.open.markdown !== state.open.original;
+  "open" in state &&
+  (state.open.markdown !== state.open.original || state.open.earlier !== undefined);
 
 export const savedAs = (writeUpId: string, open: Opened): BriefAsked => ({
   writeUpId,

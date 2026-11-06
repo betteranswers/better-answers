@@ -83,6 +83,7 @@ export const BRIEF_WORDS = {
   earlier: "Your unsaved text from before the reload",
   earlierDetail: "This text isn’t saved. Copy what you need from it into the Brief above.",
   discardEarlier: "Discard This Text",
+  discarded: "Discarded the unsaved text from before the reload.",
   leaving: "You have unsaved changes to this Brief.",
   leavingDetail: "Your changes are kept in this tab. Select Edit Brief to go back to them.",
   leave: "Leave",
