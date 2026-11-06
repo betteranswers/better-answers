@@ -68,11 +68,6 @@ const EXCUSED: Readonly<Record<string, Excuse>> = {
     reason:
       "reserved for the model host that docs/operations/coolify.md documents. No code reads it yet",
   },
-  OTEL_TRACES_EXPORTER: {
-    services: EVERY_SERVICE,
-    reason:
-      "the standard OpenTelemetry switch that turns trace export off. Neither lockfile holds an OpenTelemetry SDK that would read it",
-  },
   NODE_ENV: {
     services: ["api"],
     reason: "the mode switch that Node dependencies read. The api's own code never does",
