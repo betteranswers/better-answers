@@ -5,11 +5,13 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  linkSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
   readlinkSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -117,39 +119,61 @@ const isRunning = (pid: number): boolean => {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (cause) {
+    return cause instanceof Error && "code" in cause && cause.code === "EPERM";
   }
 };
 
-const claimOf = (pointer: string): z.infer<typeof claim> | undefined => {
+type Claim = z.infer<typeof claim>;
+
+const claimOf = (file: string): Claim => {
+  const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
+  return claim.parse(parsed);
+};
+
+const isSameClaim = (one: Claim, other: Claim): boolean =>
+  one.pid === other.pid && one.folder === other.folder;
+
+const heldBy = (pid: number): Error =>
+  new Error(`another move-files run (pid ${String(pid)}) is moving files in this tree`);
+
+/** Takes a dead run's claim aside by rename, so of two runs that find it only one clears it. */
+const clearStale = (pointer: string): void => {
+  let held: Claim;
   try {
-    const parsed: unknown = JSON.parse(readFileSync(pointer, "utf8"));
-    return claim.parse(parsed);
-  } catch {
-    return undefined;
+    held = claimOf(pointer);
+  } catch (cause) {
+    throw new Error(`cannot read ${pointer}; delete it if no move-files run is active`, { cause });
   }
+  if (isRunning(held.pid)) throw heldBy(held.pid);
+  const aside = `${pointer}.${String(process.pid)}`;
+  renameSync(pointer, aside);
+  const taken = claimOf(aside);
+  if (!isSameClaim(taken, held)) {
+    linkSync(aside, pointer);
+    rmSync(aside);
+    throw heldBy(taken.pid);
+  }
+  if (
+    isScratchPath(held.folder) &&
+    lstatSync(held.folder, { throwIfNoEntry: false }) !== undefined
+  ) {
+    rmSync(ownedFolder(held.folder), { recursive: true });
+  }
+  rmSync(aside);
 };
 
 /** A live run refuses a second one. A dead run's folder is removed only if it is ours. */
 export const openScratch = (root: string): string => {
   const pointer = pointerOf(root);
-  if (existsSync(pointer)) {
-    const held = claimOf(pointer);
-    if (held !== undefined && isRunning(held.pid)) {
-      throw new Error(
-        `another move-files run (pid ${String(held.pid)}) is moving files in this tree`,
-      );
-    }
-    if (held !== undefined && isScratchPath(held.folder)) {
-      if (lstatSync(held.folder, { throwIfNoEntry: false }) !== undefined) {
-        rmSync(ownedFolder(held.folder), { recursive: true });
-      }
-    }
-    rmSync(pointer);
-  }
+  if (existsSync(pointer)) clearStale(pointer);
   const folder = ownedFolder(mkdtempSync(path.join(realpathSync(tmpdir()), SCRATCH_PREFIX)));
-  writeFileSync(pointer, JSON.stringify({ pid: process.pid, folder }), { flag: "wx" });
+  try {
+    writeFileSync(pointer, JSON.stringify({ pid: process.pid, folder }), { flag: "wx" });
+  } catch (cause) {
+    rmSync(folder, { recursive: true });
+    throw new Error("another move-files run started in this tree at the same moment", { cause });
+  }
   return folder;
 };
 

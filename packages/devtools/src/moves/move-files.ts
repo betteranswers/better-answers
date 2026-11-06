@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { z } from "zod";
@@ -283,7 +283,8 @@ const editsOf = (
 ): { readonly edits: readonly Edit[]; readonly unresolved: readonly string[] } => {
   const edits: Edit[] = [];
   const unresolved: string[] = [];
-  for (const file of tracked.filter(isRewritable)) {
+  const isLink = (file: string): boolean => lstatSync(path.join(plan.root, file)).isSymbolicLink();
+  for (const file of tracked.filter((one) => isRewritable(one) && !isLink(one))) {
     const original = readFileSync(path.join(plan.root, file));
     const before = original.toString("utf8");
     const after = rewrittenFile(plan, file, before);
@@ -293,6 +294,16 @@ const editsOf = (
   return { edits, unresolved };
 };
 
+const plannedFor = (root: string, tablePath: string) => {
+  const tracked = trackedFiles(root);
+  const moves = readMoves(root, new Set(tracked), tablePath);
+  const { edits, unresolved } = editsOf(planOf(root, moves, tracked), tracked);
+  return {
+    change: { edits, moves },
+    found: { moved: moves.size, rewritten: edits.map(({ file }) => file), unresolved },
+  };
+};
+
 /** Moves the files in a copy first, so a run stopped while it lists leaves `root` untouched. */
 export const moveFiles = async (
   root: string,
@@ -300,25 +311,25 @@ export const moveFiles = async (
   dryRun: boolean,
   signal: AbortSignal,
 ): Promise<MoveReport> => {
-  if (dryRun && hasInterrupted(root)) {
-    throw new Error(
-      "a stopped run left a move part done; run move-files without --dry-run to undo it",
-    );
+  if (dryRun) {
+    if (hasInterrupted(root)) {
+      throw new Error(
+        "a stopped run left a move part done; run move-files without --dry-run to undo it",
+      );
+    }
+    const { change, found } = plannedFor(root, tablePath);
+    return { ...found, leftovers: leftoversOf(root, change.moves), dryRun: true };
   }
-  const recovered = !dryRun && undoInterrupted(root);
-  const tracked = trackedFiles(root);
-  const moves = readMoves(root, new Set(tracked), tablePath);
-  const { edits, unresolved } = editsOf(planOf(root, moves, tracked), tracked);
-  const found = { moved: moves.size, rewritten: edits.map(({ file }) => file), unresolved };
-  if (dryRun) return { ...found, leftovers: leftoversOf(root, moves), dryRun: true };
   const work = openScratch(root);
   try {
+    const recovered = undoInterrupted(root);
+    const { change, found } = plannedFor(root, tablePath);
     const copy = path.join(work, "tree");
     copyTree(root, copy);
-    applyChange(copy, { edits, moves });
-    const leftovers = leftoversOf(copy, moves);
+    applyChange(copy, change);
+    const leftovers = leftoversOf(copy, change.moves);
     const inventory = await inventoryAcross(root, copy, work, signal);
-    if (inventory.kind === "unchanged") applyChange(root, { edits, moves });
+    if (inventory.kind === "unchanged") applyChange(root, change);
     return { ...found, leftovers, recovered, dryRun: false, inventory };
   } finally {
     closeScratch(root, work);

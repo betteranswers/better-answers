@@ -85,6 +85,8 @@ const read = (root: string, file: string): string => readFileSync(path.join(root
 
 const status = (root: string): string => gitIn(root, "status", "--porcelain");
 
+const REAL_GIT = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+
 const pointerIn = (root: string): string =>
   path.join(gitIn(root, "rev-parse", "--absolute-git-dir").trim(), "move-files-scratch");
 
@@ -783,19 +785,25 @@ describe("the test inventory a move holds", () => {
       "packages/core/src/other.ts": "export const other = 2;\n",
       "docs/note.md": "packages/core/src/one.ts\n",
     });
-    const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
-    const bin = path.join(scratch, `killing-git-${String(counter)}`);
-    writeUnder(
-      bin,
-      "git",
-      [
-        "#!/bin/sh",
-        `if [ "$1 $2 $3 $4 $5" = "-C ${realpathSync(root)} mv -- packages/core/src/other.ts" ]; then kill -9 $PPID; exit 1; fi`,
-        `exec ${realGit} "$@"`,
-        "",
-      ].join("\n"),
-    );
-    chmodSync(path.join(bin, "git"), 0o755);
+    const bin = path.join(scratch, `stopping-git-${String(counter)}`);
+    const runWithGitThatStopsAt = (moving: string, then: string) => {
+      writeUnder(
+        bin,
+        "git",
+        [
+          "#!/bin/sh",
+          `if [ "$1 $2 $3 $4 $5" = "-C ${realpathSync(root)} mv -- ${moving}" ]; then ${then}; exit 1; fi`,
+          `exec ${REAL_GIT} "$@"`,
+          "",
+        ].join("\n"),
+      );
+      chmodSync(path.join(bin, "git"), 0o755);
+      return spawnSync(process.execPath, [SCRIPT, tablePath], {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${bin}:${String(process.env["PATH"])}` },
+      });
+    };
     const table = tableOf([
       ["packages/core/src/one.ts", "packages/core/src/group/one.ts"],
       ["packages/core/src/other.ts", "packages/core/src/group/other.ts"],
@@ -803,11 +811,7 @@ describe("the test inventory a move holds", () => {
     const tablePath = path.join(scratch, `killed-${String(counter)}.tsv`);
     writeFileSync(tablePath, `${table}\n`);
 
-    const killed = spawnSync(process.execPath, [SCRIPT, tablePath], {
-      cwd: root,
-      encoding: "utf8",
-      env: { ...process.env, PATH: `${bin}:${String(process.env["PATH"])}` },
-    });
+    const killed = runWithGitThatStopsAt("packages/core/src/other.ts", "kill -9 $PPID");
 
     expect(killed.signal).toBe("SIGKILL");
     expect(status(root)).toContain(
@@ -816,22 +820,8 @@ describe("the test inventory a move holds", () => {
     expect(moved(root, [[THING, GROUPED]], "--dry-run").stderr).toContain(
       "a stopped run left a move part done",
     );
-    writeUnder(
-      bin,
-      "git",
-      [
-        "#!/bin/sh",
-        `if [ "$1 $2 $3 $4 $5" = "-C ${realpathSync(root)} mv -- packages/core/src/group/one.ts" ]; then exit 1; fi`,
-        `exec ${realGit} "$@"`,
-        "",
-      ].join("\n"),
-    );
 
-    const stuck = spawnSync(process.execPath, [SCRIPT, tablePath], {
-      cwd: root,
-      encoding: "utf8",
-      env: { ...process.env, PATH: `${bin}:${String(process.env["PATH"])}` },
-    });
+    const stuck = runWithGitThatStopsAt("packages/core/src/group/one.ts", ":");
 
     expect(stuck.stderr).toContain("the move could not be undone");
     expect(existsSync(path.join(root, "packages/core/src/one.ts"))).toBe(false);
@@ -901,8 +891,16 @@ describe("the test inventory a move holds", () => {
     expect(status(root)).toBe("");
   });
 
-  it("refuses to run while another run holds the tree", () => {
+  it("leaves a live run's move and journal alone", () => {
     const root = coreRepositoryOf();
+    const gitDir = gitIn(root, "rev-parse", "--absolute-git-dir").trim();
+    gitIn(root, "mv", CORE_SOURCE, "packages/core/src/moving.ts");
+    const journal = JSON.stringify({
+      edits: [],
+      moves: [[CORE_SOURCE, "packages/core/src/moving.ts"]],
+      created: [],
+    });
+    writeFileSync(path.join(gitDir, "move-files-journal.json"), journal);
     writeFileSync(pointerIn(root), JSON.stringify({ pid: process.pid, folder: scratch }));
 
     const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
@@ -910,6 +908,18 @@ describe("the test inventory a move holds", () => {
     expect(ran.status).toBe(1);
     expect(ran.stderr).toContain(`another move-files run (pid ${String(process.pid)})`);
     expect(existsSync(scratch)).toBe(true);
+    expect(status(root)).toBe(`R  ${CORE_SOURCE} -> packages/core/src/moving.ts\n`);
+    expect(readFileSync(path.join(gitDir, "move-files-journal.json"), "utf8")).toBe(journal);
+  });
+
+  it("refuses a claim on the tree that it cannot read", () => {
+    const root = coreRepositoryOf();
+    writeFileSync(pointerIn(root), "not json");
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
+
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain(`cannot read ${pointerIn(root)}`);
     expect(status(root)).toBe("");
   });
 
