@@ -554,6 +554,9 @@ describe("opening a concept that cites Restricted minutes over MCP", () => {
           rider: null,
         },
         trustWords: "Unverified",
+        verifications: [],
+        owner: null,
+        usedIn: { guides: 0, answers: 0 },
         evidence: [
           { id: "HANDBOOK", source: HANDBOOK_TITLE, locator: handbook.locator },
           { id: "MINUTES", source: MINUTES_LABEL },
