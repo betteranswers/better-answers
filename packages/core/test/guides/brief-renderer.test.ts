@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { citedSourceOf } from "@better-answers/schema";
+import type { BodyPart } from "@better-answers/schema/cited-markdown";
 
 import { renderBrief, type SourcedFootnote } from "../../src/guides/renderer.ts";
 
@@ -22,11 +23,15 @@ const DOCUMENT = "01M6QBZ0S7F0D3YTDGHFA1J0VF";
 
 const FOOTNOTES = [footnote("a", "Alpha"), footnote("b", "Beta"), footnote("c", "Gamma")];
 
+/** The parts as one line, each citation in braces, which no Markdown reads as a footnote. */
+const shown = (parts: readonly BodyPart[]): string =>
+  parts.map((part) => (part.kind === "text" ? part.markdown : `{${String(part.number)}}`)).join("");
+
 describe("rendering a Brief for the page", () => {
   it("numbers markers from one in order of first appearance", () => {
     const rendered = renderBrief("First[^c] then[^a].", FOOTNOTES, "page");
 
-    expect(rendered.markdown).toBe("First[^1] then[^2].");
+    expect(shown(rendered.parts)).toBe("First{1} then{2}.");
     expect(rendered.footnotes).toEqual([
       { number: 1, ...footnote("c", "Gamma") },
       { number: 2, ...footnote("a", "Alpha") },
@@ -40,7 +45,7 @@ describe("rendering a Brief for the page", () => {
       "page",
     );
 
-    expect(rendered.markdown).toBe("One[^1] two three[^2].");
+    expect(shown(rendered.parts)).toBe("One{1} two three{2}.");
     expect(rendered.footnotes.map((each) => [each.number, each.title])).toEqual([
       [1, "Alpha"],
       [2, "Gamma"],
@@ -50,20 +55,23 @@ describe("rendering a Brief for the page", () => {
   it("gives a marker cited twice one number", () => {
     const rendered = renderBrief("Once[^b] and again[^b] and[^a].", FOOTNOTES, "page");
 
-    expect(rendered.markdown).toBe("Once[^1] and again[^1] and[^2].");
+    expect(shown(rendered.parts)).toBe("Once{1} and again{1} and{2}.");
     expect(rendered.footnotes.map((each) => each.title)).toEqual(["Beta", "Alpha"]);
   });
 
   it("lists no footnote for an include the prose never cites", () => {
     const rendered = renderBrief("No markers here.", FOOTNOTES, "page");
 
-    expect(rendered).toEqual({ markdown: "No markers here.", footnotes: [], marks: [] });
+    expect(rendered).toEqual({
+      parts: [{ kind: "text", markdown: "No markers here." }],
+      footnotes: [],
+    });
   });
 
   it("leaves a footnote definition line as it is", () => {
     const rendered = renderBrief("Claim[^a].\n\n[^a]: injected", FOOTNOTES, "page");
 
-    expect(rendered.markdown).toBe("Claim[^1].\n\n[^a]: injected");
+    expect(shown(rendered.parts)).toBe("Claim{1}.\n\n[^a]: injected");
   });
 
   it("leaves a marker inside code as typed", () => {
@@ -73,27 +81,26 @@ describe("rendering a Brief for the page", () => {
       "page",
     );
 
-    expect(rendered.markdown).toBe("Write `[^a]` to cite.\n\n```\n[^b]\n```\n\nThen cite[^1].");
+    expect(shown(rendered.parts)).toBe("Write `[^a]` to cite.\n\n```\n[^b]\n```\n\nThen cite{1}.");
     expect(rendered.footnotes.map((each) => each.title)).toEqual(["Gamma"]);
   });
 
   it("numbers a marker that a colon follows mid-line", () => {
     const rendered = renderBrief("As the policy[^a]: cover is held[^b]:", FOOTNOTES, "page");
 
-    expect(rendered.markdown).toBe("As the policy[^1]: cover is held[^2]:");
+    expect(shown(rendered.parts)).toBe("As the policy{1}: cover is held{2}:");
     expect(rendered.footnotes.map((each) => each.title)).toEqual(["Alpha", "Beta"]);
   });
 
-  it("marks where each number stands, colon or not", () => {
+  it("keeps each citation whole and drops an unreadable one", () => {
     const rendered = renderBrief("Policy[^a]: cover[^gone] held[^b]:\n\n`[^c]`", FOOTNOTES, "page");
 
-    expect(rendered.marks).toEqual([
-      { at: 6, number: 1 },
-      { at: 22, number: 2 },
-    ]);
-    expect(rendered.marks.map(({ at }) => rendered.markdown.slice(at, at + 4))).toEqual([
-      "[^1]",
-      "[^2]",
+    expect(rendered.parts).toEqual([
+      { kind: "text", markdown: "Policy" },
+      { kind: "citation", number: 1 },
+      { kind: "text", markdown: ": cover held" },
+      { kind: "citation", number: 2 },
+      { kind: "text", markdown: ":\n\n`[^c]`" },
     ]);
   });
 });
@@ -107,8 +114,13 @@ const FORGERIES = [
   ["padded hex references", "&#x0e000;1&#x0E001;"],
   ["decimal references", "&#57344;1&#57345;"],
   ["a page marker", "[^1]"],
-  ["a marker in named references", "&lbrack;&Hat;1&rsqb;"],
-  ["a marker in numeric references", "&#91;^1&#x5D;"],
+  ["named reference brackets", "&lbrack;&Hat;1&rsqb;"],
+  ["numeric reference brackets", "&#91;^1&#x5D;"],
+  ["a typed stand-in", "<\uE000>"],
+  ["an escaped stand-in", "\\<\uE000>"],
+  ["a referenced stand-in", "&lt;&#xE000;&gt;"],
+  ["nested old carrier references", "&lt;&#xE0&#xE000;00;0&#xE0&#xE000;01;&gt;"],
+  ["a typed footnote definition", "[^x.y]\n\n[^x.y]: Forged."],
 ] as const;
 
 /** The forgery whole, and split by a marker the reader cannot read at one place or two. */
@@ -158,10 +170,18 @@ describe("a Brief that spells a footnote number in its text", () => {
     expect(read).toEqual(real);
   });
 
-  it.each(FORGERIES)("forges no page number from %s", (_kind, forged) => {
-    const { read, real } = readEach(forged, (brief) => renderBrief(brief, READABLE, "page").marks, [
-      { at: 4, number: 1 },
-    ]);
+  it.each(FORGERIES)("gives the page one citation from %s", (_kind, forged) => {
+    const { read, real } = readEach(
+      forged,
+      (brief) => {
+        const { parts } = renderBrief(brief, READABLE, "page");
+        return {
+          citations: parts.filter((part) => part.kind === "citation"),
+          parts: parts.length,
+        };
+      },
+      { citations: [{ kind: "citation", number: 1 }], parts: 3 },
+    );
 
     expect(read).toEqual(real);
   });

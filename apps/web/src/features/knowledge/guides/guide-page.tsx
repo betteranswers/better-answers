@@ -1,6 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useId, useRef, useState, type RefObject } from "react";
 
+import { isBlank } from "@better-answers/schema/cited-markdown";
+
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { BROWSE, conceptPageOf } from "@/shared/knowledge/concept-address.ts";
@@ -44,7 +46,7 @@ const controlOf = (row: Element, action: SectionAction): HTMLElement | null => {
 
 const copyRefusedWords = (guide: Guide): string => {
   const section = rowInFocus(guide.sections, (each) => each.sectionId);
-  const shown = section?.brief !== undefined && section.brief.rendered.markdown.trim() !== "";
+  const shown = section?.brief !== undefined && !isBlank(section.brief.rendered.parts);
   return shown && section.copy === "below-action-threshold"
     ? WORDS.belowYourRole
     : WORDS.nothingToCopy;

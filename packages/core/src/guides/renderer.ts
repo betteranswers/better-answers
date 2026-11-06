@@ -1,7 +1,8 @@
 import type { CitedSource } from "@better-answers/schema";
-import { replaceMarkers } from "@better-answers/schema/brief-marker";
+import { markersIn } from "@better-answers/schema/brief-marker";
+import type { BodyPart } from "@better-answers/schema/cited-markdown";
 
-import { carrierOf, clipboardOf, sourceLineOf, type Clipboard } from "./clipboard.ts";
+import { clipboardOf, sourceLineOf, type Clipboard } from "./clipboard.ts";
 
 export type Footnote = {
   readonly label: string;
@@ -16,61 +17,64 @@ export type SourcedFootnote = Footnote & {
 
 type Numbered<Cited extends Footnote> = Cited & { readonly number: number };
 
-/** Where in the rendered text a footnote number stands. */
-type Mark = { readonly at: number; readonly number: number };
-
-type Numbering<Cited extends Footnote> = {
-  readonly text: string;
+type Placing<Cited extends Footnote> = {
+  readonly parts: readonly BodyPart[];
   readonly cited: readonly Numbered<Cited>[];
-  readonly marks: readonly Mark[];
 };
 
-/** The page reads its footnote numbers from `marks`, so text a dropped marker joins cites nothing. */
+/** The page draws its numbers from the citation parts, so no text in the Brief is read as one. */
 export type RenderedBrief = {
-  readonly markdown: string;
+  readonly parts: readonly BodyPart[];
   readonly footnotes: readonly Numbered<Footnote>[];
-  readonly marks: readonly Mark[];
 };
 
 export type ClipboardBrief = Clipboard & { readonly footnotes: number };
 
-const numbering = <Cited extends Footnote>(
+/** A marker the reader cannot read leaves no part. The text either side joins into one, or the split would show where it stood. */
+const placing = <Cited extends Footnote>(
   markdown: string,
   footnotes: readonly Cited[],
-  marked: (number: number) => string,
-): Numbering<Cited> => {
+): Placing<Cited> => {
   const byLabel = new Map(footnotes.map((footnote) => [footnote.label, footnote]));
   const numbered = new Map<string, Numbered<Cited>>();
-  const marks: Mark[] = [];
-  let shift = 0;
-  const text = replaceMarkers(markdown, (label, at) => {
+  const parts: BodyPart[] = [];
+  let text = "";
+  let from = 0;
+  for (const { label, at, end } of markersIn(markdown)) {
+    text += markdown.slice(from, at);
+    from = end;
     const footnote = byLabel.get(label);
-    const placedAt = at + shift;
-    shift -= `[^${label}]`.length;
-    if (footnote === undefined) return "";
+    if (footnote === undefined) continue;
     const cited = numbered.get(label) ?? { ...footnote, number: numbered.size + 1 };
     numbered.set(label, cited);
-    const replaced = marked(cited.number);
-    marks.push({ at: placedAt, number: cited.number });
-    shift += replaced.length;
-    return replaced;
-  });
-  return { text, cited: [...numbered.values()], marks };
+    if (text !== "") parts.push({ kind: "text", markdown: text });
+    parts.push({ kind: "citation", number: cited.number });
+    text = "";
+  }
+  text += markdown.slice(from);
+  if (text !== "") parts.push({ kind: "text", markdown: text });
+  return { parts, cited: [...numbered.values()] };
 };
 
 const page = (markdown: string, footnotes: readonly Footnote[]): RenderedBrief => {
-  const { text, cited, marks } = numbering(markdown, footnotes, (number) => `[^${String(number)}]`);
-  return { markdown: text, footnotes: cited, marks };
+  const { parts, cited } = placing(markdown, footnotes);
+  return { parts, footnotes: cited };
 };
 
 const clipboard = (markdown: string, footnotes: readonly SourcedFootnote[]): ClipboardBrief => {
-  const { text, cited } = numbering(markdown, footnotes, carrierOf);
-  return { ...clipboardOf(text, cited.map(sourceLineOf)), footnotes: cited.length };
+  const { parts, cited } = placing(markdown, footnotes);
+  return {
+    ...clipboardOf(parts, cited.map(sourceLineOf)),
+    footnotes: cited.length,
+  };
 };
 
 /** One document holds many Briefs, each numbering from one, so a markdown footnote would collide. */
 const snapshot = (markdown: string, footnotes: readonly SourcedFootnote[]): string => {
-  const { text, cited } = numbering(markdown, footnotes, (number) => `[${String(number)}]`);
+  const { parts, cited } = placing(markdown, footnotes);
+  const text = parts
+    .map((part) => (part.kind === "text" ? part.markdown : `[${String(part.number)}]`))
+    .join("");
   const sources = cited.map((entry) => `${String(entry.number)}. ${sourceLineOf(entry)}`);
   return sources.length === 0
     ? text.trimEnd()

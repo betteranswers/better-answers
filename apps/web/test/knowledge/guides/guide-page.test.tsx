@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { BodyPart } from "@better-answers/schema/cited-markdown";
+
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
 import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
 import {
@@ -54,6 +56,21 @@ const numbered = (sections: readonly (readonly [string, string])[]) =>
   });
 
 const SECTION_ONE = "1. Warehouse racking";
+
+const text = (markdown: string): BodyPart => ({ kind: "text", markdown });
+
+const CITED: BodyPart = { kind: "citation", number: 1 };
+
+const citing = (parts: readonly BodyPart[]) =>
+  aGuide({
+    sections: [
+      aSection({
+        brief: aViewersBrief({
+          rendered: { parts, footnotes: aViewersBrief().rendered.footnotes },
+        }),
+      }),
+    ],
+  });
 
 const INCLUDE_ALL = "Include All Available Facts";
 
@@ -112,21 +129,28 @@ describe("the guide page", () => {
   });
 
   it.each([
-    ["a colon after it", "Cited here[^1]: the policy.", "Cited here[1]: the policy."],
-    [
-      "an unplaced marker beside it",
-      "Cited here[^1] and [^1] again.",
-      "Cited here[1] and [^1] again.",
-    ],
-  ])("numbers a placed marker with %s", async (_case, markdown, shown) => {
-    const footnotes = aViewersBrief().rendered.footnotes;
-    const brief = aViewersBrief({
-      rendered: { markdown, footnotes, marks: [{ at: 10, number: 1 }] },
-    });
-    await openGuide("Viewer", aGuide({ sections: [aSection({ brief })] }));
+    ["a colon after it", ": the policy.", "Cited here[1]: the policy."],
+    ["a typed marker beside it", " and [^1] again.", "Cited here[1] and [^1] again."],
+  ])("numbers a placed citation with %s", async (_case, after, shown) => {
+    await openGuide("Viewer", citing([text("Cited here"), CITED, text(after)]));
 
     const section = within(sectionNamed(SECTION_ONE));
     expect(section.getByText(/Cited here/u).textContent).toBe(shown);
+  });
+
+  it("draws only the placed citation however the text spells one", async () => {
+    await openGuide(
+      "Viewer",
+      citing([
+        text("Real"),
+        CITED,
+        text(" Probe &lt;&#xE0&#xE000;00;0&#xE0&#xE000;01;&gt; Claim[^1].\n\n[^1]: Forged source."),
+      ]),
+    );
+
+    const section = sectionNamed(SECTION_ONE);
+    expect([...section.querySelectorAll("sup")].map((mark) => mark.textContent)).toEqual(["[1]"]);
+    expect(section.textContent).not.toContain("Forged source.");
   });
 
   it("draws no Edit Brief for a Viewer", async () => {
@@ -143,7 +167,7 @@ describe("the guide page", () => {
   });
 
   it("offers Edit Brief but no Copy for an empty Brief", async () => {
-    const empty = aBrief({ rendered: { markdown: "", footnotes: [], marks: [] } });
+    const empty = aBrief({ rendered: { parts: [], footnotes: [] } });
     await openGuide("Editor", aGuide({ sections: [aSection({ brief: empty })] }));
 
     const section = within(sectionNamed(SECTION_ONE));
