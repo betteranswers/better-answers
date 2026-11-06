@@ -648,6 +648,31 @@ describe("naming one owner for many concepts", () => {
     );
   });
 
+  it("hands concepts back to their collection's owner when unnamed", async () => {
+    const scenario = await arrange();
+    const shelved = (path: string) => shelveOne(db().pool, scenario.workspaceId, { path });
+    const leave = await shelved("knowledge/policy/leave.md");
+    const expenses = await shelved("knowledge/policy/expenses.md");
+    const kept = await shelved("knowledge/policy/kept.md");
+    await namingEach(scenario, scenario.admin, {
+      iris: [leave, expenses, kept],
+      personId: scenario.viewer.userId,
+    });
+
+    const named = await namingEach(scenario, scenario.admin, {
+      iris: [leave, expenses],
+      personId: null,
+    });
+
+    expect(named).toMatchObject({ ok: true, value: { ok: true, value: { named: 2 } } });
+    expect(await overridesOf(scenario)).toEqual([`${kept} ${scenario.viewer.userId}`]);
+    expect(await ownerRead(scenario, { iri: leave, path: "knowledge/policy/leave.md" })).toBe(
+      scenario.editor.userId,
+    );
+    const events = await db().pool.query(OWNER_EVENTS, [scenario.workspaceId]);
+    expect(events.rows.filter(({ detail }) => !("personId" in detail))).toHaveLength(2);
+  });
+
   it("refuses the batch when one concept is unreadable", async () => {
     const scenario = await arrange();
     const group = await seedingWith(db().pool, (seed) =>

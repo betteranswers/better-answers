@@ -43,12 +43,17 @@ export const ALL_KNOWLEDGE_WORDS = {
     action: "Set Owner",
     title: (count: number): string => `Set the Owner of ${counted(count, "Concept", "Concepts")}`,
     consequence:
-      "The person you choose becomes the owner of each selected concept, instead of its collection’s owner. Each change is recorded in the audit log.",
+      "The person you choose becomes the owner of each selected concept, instead of its collection’s owner. Choose “Its collection’s owner” to undo this. Each change is recorded in the audit log.",
     newOwner: "New Owner",
     choose: "Choose a person",
+    collectionsOwner: "Its collection’s owner",
     pending: (name: string, count: number): string =>
       `Setting ${name} as the owner of ${conceptsCounted(count)}.`,
     done: (name: string, count: number): string => `${name} now owns ${conceptsCounted(count)}.`,
+    returning: (count: number): string =>
+      `Returning ${conceptsCounted(count)} to ${count === 1 ? "its collection’s owner" : "their collections’ owners"}.`,
+    returned: (count: number): string =>
+      `${conceptsCounted(count)} ${count === 1 ? "is now owned by its collection’s owner" : "are now owned by their collections’ owners"}.`,
     stillGoing: "The owner is still being set. Please wait.",
     tooMany: (most: number): string => `Please select ${most} concepts or fewer.`,
   },

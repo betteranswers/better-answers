@@ -255,6 +255,31 @@ describe("the All Knowledge page for an Admin", () => {
     expect(selectionBar(), "the selection bar stayed after the owner was set").toBeNull();
   });
 
+  it("hands the concepts selected back to their collection's owner", async () => {
+    const api = anAllKnowledgeApi(() => CONCEPTS);
+    api.set("knowledge.setOwners", () => read({ named: 2, batchId: "batch" }));
+    await openAt(ALL_KNOWLEDGE, api);
+    await screen.findByRole("link", { name: "Annual leave" });
+    const outcome = theStatusEmptyOnArrival();
+    fireEvent.click(tickOf("Annual leave"));
+    fireEvent.click(tickOf("Expense claims"));
+    fireEvent.click(setOwnerAction());
+    const dialog = await screen.findByRole("dialog", SET_OWNER_DIALOG(2));
+
+    const returned = within(dialog).getByRole("option", { name: "Its collection’s owner" });
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "New Owner" }), {
+      target: { value: returned.getAttribute("value") },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: SET_OWNER }));
+
+    await waitFor(() =>
+      expect(asked("knowledge.setOwners")).toEqual([
+        { iris: [THE_LEAVE.iri, THE_EXPENSES.iri], personId: null },
+      ]),
+    );
+    await waitFor(() => expect(outcome.textContent).toContain("collections’ owners"));
+  });
+
   it("selects and sets an owner by keystroke alone", async () => {
     const api = anAllKnowledgeApi(() => CONCEPTS);
     api.set("knowledge.setOwners", () => read({ named: 1, batchId: "batch" }));
