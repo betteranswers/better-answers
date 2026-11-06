@@ -203,8 +203,13 @@ test.describe("the guide page", () => {
       const detail = first.getByRole("region", { name: "Detail of section 1" });
       await expect(detail).toBeFocused();
       await expect(detail.getByRole("heading", { name: REGISTRATION })).toBeVisible();
+      await expect(first.getByRole("button", { name: "Hide Detail" })).toHaveAttribute(
+        "aria-controls",
+        /\S/u,
+      );
       await page.keyboard.press(KEY.showDetail.key);
       await expect(detail).toHaveCount(0);
+      await expect(show).toHaveAttribute("aria-expanded", "false");
     });
 
     await listsItsKeystrokes(page, "Guides", KEY, [

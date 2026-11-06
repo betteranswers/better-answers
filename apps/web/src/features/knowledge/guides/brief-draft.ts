@@ -3,9 +3,9 @@ import { z } from "zod";
 
 import { inThisTab, keepInThisTab } from "@/shared/browser-storage.ts";
 
-import type { BriefState } from "./brief-editing.ts";
+import type { BriefState, Kept } from "./brief-editing.ts";
 
-const KEPT_BRIEF = z.object({ markdown: z.string() });
+const KEPT_BRIEF = z.object({ markdown: z.string(), earlier: z.string().optional() });
 
 export const draftKeyOf = (
   person: string | undefined,
@@ -16,12 +16,12 @@ export const draftKeyOf = (
     ? undefined
     : `better-answers.brief-draft.${person}.${writeUpId}.${String(base)}`;
 
-export const keptBriefOf = (key: string | undefined): string | undefined => {
+export const keptBriefOf = (key: string | undefined): Kept | undefined => {
   const raw = key === undefined ? null : inThisTab()?.getItem(key);
   if (raw === null || raw === undefined) return undefined;
   try {
     const kept = KEPT_BRIEF.safeParse(JSON.parse(raw));
-    return kept.success ? kept.data.markdown : undefined;
+    return kept.success ? { markdown: kept.data.markdown, earlier: kept.data.earlier } : undefined;
   } catch {
     return undefined;
   }
@@ -35,9 +35,10 @@ export const useKeptBrief = (key: string | undefined, state: BriefState): void =
   const open = "open" in state ? state.open : undefined;
   const draft = open?.markdown;
   const original = open?.original;
+  const earlier = open?.earlier;
   useEffect(() => {
     if (key === undefined || draft === undefined || original === undefined) return;
-    if (draft === original) forgetBrief(key);
-    else keepInThisTab(key, JSON.stringify({ markdown: draft }));
-  }, [key, draft, original]);
+    if (draft === original && earlier === undefined) forgetBrief(key);
+    else keepInThisTab(key, JSON.stringify({ markdown: draft, earlier }));
+  }, [key, draft, original, earlier]);
 };

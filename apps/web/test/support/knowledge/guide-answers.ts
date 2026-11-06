@@ -41,7 +41,11 @@ export const aFact = (changes: Changes = {}) => ({
 export const aBrief = (changes: Changes = {}) => ({
   version: 2,
   rendered: {
-    markdown: "Pallets are racked[^1] by row.",
+    parts: [
+      { kind: "text", markdown: "Pallets are racked" },
+      { kind: "citation", number: 1 },
+      { kind: "text", markdown: " by row." },
+    ],
     footnotes: [{ number: 1, label: AN_INCLUDE_ID, iri: RACKING_IRI, title: RACKING_TITLE }],
   },
   detail: [

@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { BodyPart } from "@better-answers/schema/cited-markdown";
+
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
 import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
 import {
@@ -54,6 +56,23 @@ const numbered = (sections: readonly (readonly [string, string])[]) =>
   });
 
 const SECTION_ONE = "1. Warehouse racking";
+
+const text = (markdown: string): BodyPart => ({ kind: "text", markdown });
+
+const CITED: BodyPart = { kind: "citation", number: 1 };
+
+const citing = (parts: readonly BodyPart[]) =>
+  aGuide({
+    sections: [
+      aSection({
+        brief: aViewersBrief({
+          rendered: { parts, footnotes: aViewersBrief().rendered.footnotes },
+        }),
+      }),
+    ],
+  });
+
+const INCLUDE_ALL = "Include All Available Facts";
 
 describe("the guide page", () => {
   it("draws the guide's subject, kind and total", async () => {
@@ -109,6 +128,31 @@ describe("the guide page", () => {
     expect(link.getAttribute("href")).toContain(RACKING_IRI.slice(-26));
   });
 
+  it.each([
+    ["a colon after it", ": the policy.", "Cited here[1]: the policy."],
+    ["a typed marker beside it", " and [^1] again.", "Cited here[1] and [^1] again."],
+  ])("numbers a placed citation with %s", async (_case, after, shown) => {
+    await openGuide("Viewer", citing([text("Cited here"), CITED, text(after)]));
+
+    const section = within(sectionNamed(SECTION_ONE));
+    expect(section.getByText(/Cited here/u).textContent).toBe(shown);
+  });
+
+  it("draws only the placed citation however the text spells one", async () => {
+    await openGuide(
+      "Viewer",
+      citing([
+        text("Real"),
+        CITED,
+        text(" Probe &lt;&#xE0&#xE000;00;0&#xE0&#xE000;01;&gt; Claim[^1].\n\n[^1]: Forged source."),
+      ]),
+    );
+
+    const section = sectionNamed(SECTION_ONE);
+    expect([...section.querySelectorAll("sup")].map((mark) => mark.textContent)).toEqual(["[1]"]);
+    expect(section.textContent).not.toContain("Forged source.");
+  });
+
   it("draws no Edit Brief for a Viewer", async () => {
     await openGuide("Viewer", aGuide({ sections: [aSection({ brief: aViewersBrief() })] }));
 
@@ -123,7 +167,7 @@ describe("the guide page", () => {
   });
 
   it("offers Edit Brief but no Copy for an empty Brief", async () => {
-    const empty = aBrief({ rendered: { markdown: "", footnotes: [] } });
+    const empty = aBrief({ rendered: { parts: [], footnotes: [] } });
     await openGuide("Editor", aGuide({ sections: [aSection({ brief: empty })] }));
 
     const section = within(sectionNamed(SECTION_ONE));
@@ -176,6 +220,30 @@ describe("a section the reader cannot read", () => {
   });
 });
 
+describe("a section hidden from other readers", () => {
+  const hiding = aGuide({
+    sections: [
+      aSection({ hidden: true }),
+      aSection({ sectionId: idOf(22), number: "2", prompt: "Insurance" }),
+    ],
+  });
+
+  it("is marked for the Admin who can see it", async () => {
+    await openGuide("Admin", hiding);
+
+    expect(within(sectionNamed(SECTION_ONE)).getByText("Hidden from other readers")).toBeDefined();
+    expect(
+      within(sectionNamed("2. Insurance")).queryByText("Hidden from other readers"),
+    ).toBeNull();
+  });
+
+  it("is marked nowhere else", async () => {
+    await openGuide("Editor", aGuide());
+
+    expect(screen.queryByText("Hidden from other readers")).toBeNull();
+  });
+});
+
 describe("a section that needs review", () => {
   const REASONS = [
     "concept-changed",
@@ -225,9 +293,17 @@ describe("the Detail of a section", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(detail);
     });
-    expect(screen.getByRole("button", { name: "Show Detail" }).getAttribute("aria-expanded")).toBe(
-      "true",
-    );
+    const hide = screen.getByRole("button", { name: "Hide Detail" });
+    expect(hide.getAttribute("aria-expanded")).toBe("true");
+    expect(hide.getAttribute("aria-controls")).toBe(detail.id);
+  });
+
+  it("points at no region while the Detail is closed", async () => {
+    await openGuide("Viewer");
+
+    const show = screen.getByRole("button", { name: "Show Detail" });
+
+    expect(show.hasAttribute("aria-controls")).toBe(false);
   });
 
   it("closes when shown again", async () => {
@@ -239,6 +315,7 @@ describe("the Detail of a section", () => {
     fireEvent.click(button);
 
     expect(screen.queryByRole("region", { name: "Detail of section 1" })).toBeNull();
+    expect(button.textContent).toBe("Show Detail");
   });
 
   it("returns focus to Show Detail when d closes it", async () => {
@@ -263,6 +340,7 @@ describe("the Detail of a section", () => {
     const detail = screen.getByRole("region", { name: "Detail of section 1" });
     expect(within(detail).getByText("Each bay is racked by row.")).toBeDefined();
     expect(document.activeElement).not.toBe(detail);
+    expect(screen.getByRole("button", { name: "Hide Detail" })).toBeDefined();
   });
 
   it("opens on d for the section in focus", async () => {
@@ -317,6 +395,17 @@ describe("the coverage of a section", () => {
     expect(describedBy(add)).toContain("Dana Example");
   });
 
+  it("claims only what the reader can read", async () => {
+    await openGuide("Viewer");
+
+    const add = screen.getByRole("link", { name: "Add This Fact" });
+
+    expect(describedBy(add)).toBe(
+      `No concept you can read covers ${LIABILITY_TITLE} yet. Owner: Dana Example.`,
+    );
+    expect(describedBy(add), "the line claimed a fact is unrecorded").not.toMatch(/recorded/iu);
+  });
+
   it("names no owner for a fact in an unowned collection", async () => {
     await openGuide("Viewer", aGuide({ owner: null }));
 
@@ -342,21 +431,52 @@ describe("the coverage of a section", () => {
     const section = within(sectionNamed(SECTION_ONE));
     expect(section.getByText(/\b1 of 1\b/u)).toBeDefined();
     expect(sectionNamed(SECTION_ONE).textContent).not.toContain(LIABILITY_TITLE);
-    expect(section.queryByRole("button", { name: "Include" })).toBeNull();
+    expect(section.queryByRole("button", { name: INCLUDE_ALL })).toBeNull();
     expect(section.queryByRole("link", { name: "Add This Fact" })).toBeNull();
   });
 
-  it("names an available fact and offers Include to an Editor", async () => {
+  it("offers an Editor one include for the whole section", async () => {
     const available = aGuide({
       sections: [aSection({ coverage: { met: 3, of: 4, facts: [aFact({ state: "available" })] } })],
     });
     await openGuide("Editor", available);
 
     const section = within(sectionNamed(SECTION_ONE));
-    expect(describedBy(section.getByRole("button", { name: "Include" }))).toContain(
-      LIABILITY_TITLE,
-    );
+    expect(
+      section.getByText(`${LIABILITY_TITLE} is recorded but not included in this section.`),
+    ).toBeDefined();
+    expect(section.getByRole("button", { name: INCLUDE_ALL })).toBeDefined();
     expect(section.queryByRole("link", { name: "Add This Fact" })).toBeNull();
+  });
+
+  it("offers the include once, outside any fact's row", async () => {
+    const twoAvailable = aGuide({
+      sections: [
+        aSection({
+          coverage: {
+            met: 2,
+            of: 4,
+            facts: [
+              aFact({ state: "available" }),
+              aFact({ factId: idOf(62), name: "Professional indemnity", state: "available" }),
+            ],
+          },
+        }),
+      ],
+    });
+    await openGuide("Editor", twoAvailable);
+
+    const includes = within(sectionNamed(SECTION_ONE)).getAllByRole("button", {
+      name: INCLUDE_ALL,
+    });
+    expect(includes).toHaveLength(1);
+    expect(includes[0]?.closest("[data-fact]")).toBeNull();
+  });
+
+  it("offers no include where no fact is available", async () => {
+    await openGuide("Editor");
+
+    expect(screen.queryByRole("button", { name: INCLUDE_ALL })).toBeNull();
   });
 
   it("offers no Include to a Viewer", async () => {
@@ -371,7 +491,7 @@ describe("the coverage of a section", () => {
     await openGuide("Viewer", available);
 
     expect(sectionNamed(SECTION_ONE).textContent).toContain(LIABILITY_TITLE);
-    expect(screen.queryByRole("button", { name: "Include" })).toBeNull();
+    expect(screen.queryByRole("button", { name: INCLUDE_ALL })).toBeNull();
   });
 });
 
@@ -410,15 +530,15 @@ describe("including an available fact", () => {
       return read({ included: 1 });
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Include" }));
+    fireEvent.click(screen.getByRole("button", { name: INCLUDE_ALL }));
 
     await waitFor(() => {
-      expect(status().textContent, "the include was not announced").toMatch(/\S/u);
+      expect(status().textContent).toBe("Included in section 3.");
     });
     await waitFor(() => {
       expect(screen.getAllByText(/\b4 of 4\b/u)).toHaveLength(2);
     });
-    expect(screen.queryByRole("button", { name: "Include" })).toBeNull();
+    expect(screen.queryByRole("button", { name: INCLUDE_ALL })).toBeNull();
     expect(asksOf(INCLUDE)).toEqual([{ writeUpId: A_WRITE_UP_ID }]);
     fireEvent.click(screen.getByRole("button", { name: "Show Detail" }));
     expect(await screen.findByText("Cover is £5m.")).toBeDefined();
@@ -428,11 +548,22 @@ describe("including an available fact", () => {
     const { api } = await openGuide("Editor", AVAILABLE);
     api.set(INCLUDE, () => aRefusalAnswer("role-forbids", "forbidden", 403));
 
-    fireEvent.click(screen.getByRole("button", { name: "Include" }));
+    fireEvent.click(screen.getByRole("button", { name: INCLUDE_ALL }));
 
     await waitFor(() => {
       expect(alert().textContent, "the refused include raised no alert").toMatch(/\S/u);
     });
-    expect(screen.getByRole("button", { name: "Include" })).toBeDefined();
+    expect(screen.getByRole("button", { name: INCLUDE_ALL })).toBeDefined();
+  });
+
+  it("says so when the include adds nothing", async () => {
+    const { api } = await openGuide("Editor", AVAILABLE);
+    api.set(INCLUDE, () => read({ included: 0 }));
+
+    fireEvent.click(screen.getByRole("button", { name: INCLUDE_ALL }));
+
+    await waitFor(() => {
+      expect(status().textContent).toBe("Nothing more could be included in section 3.");
+    });
   });
 });

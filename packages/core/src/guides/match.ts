@@ -13,6 +13,15 @@ export const matchesTheFact = (at: MatchAt): string =>
      AND COALESCE(c.frontmatter -> 'tags', '[]'::jsonb) @> to_jsonb(f.tags)
      AND c.collection = COALESCE(f.collection, ${at.guideCollection})`;
 
+/** How many includes of the write-up meet fact `f` with a concept the reader can read. */
+export const metBy = (writeUp: string, reader: number): string =>
+  `(SELECT count(*)::int
+      FROM write_up_include i
+      JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
+     WHERE i.workspace_id = f.workspace_id AND i.write_up_id = ${writeUp}
+       AND i.expected_fact_id = f.id
+       AND ${readableClause("c", reader)})`;
+
 export type FirstMatch = {
   readonly section_id: string;
   readonly fact_id: string;

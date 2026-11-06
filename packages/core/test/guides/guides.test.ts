@@ -459,6 +459,23 @@ const typedTheMissingPolicy = async () => {
   return { ...seed, employersLiability: typed.iri };
 };
 
+const PROMPT_OF_INSURANCE = "Insurance and financial standing";
+
+const ABSENT_WRITE_UP = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
+
+const writtenIn = async (ng: Northgate) => ({
+  includes: await counted("write_up_include", ng.scenario.workspaceId),
+  versions: await counted("write_up_version", ng.scenario.workspaceId),
+  head: await head(ng.admin, ng.scenario.git),
+});
+
+const hidden = async (guideId: string, prompts: readonly string[]) => {
+  await db().pool.query(
+    "UPDATE guide_section SET hidden = true WHERE guide_id = $1 AND prompt = ANY($2)",
+    [guideId, prompts],
+  );
+};
+
 describe("including an available concept", () => {
   it("includes an available concept and re-commits the skeleton", async () => {
     const { ng, guideId, employersLiability } = await typedTheMissingPolicy();
@@ -547,6 +564,30 @@ describe("including an available concept", () => {
     ]);
   });
 
+  it("includes nothing for a fact the section already meets", async () => {
+    const { ng, guideId } = await typedTheMissingPolicy();
+    const { workspaceId } = ng.scenario;
+    const insurance = await writeUpOf(workspaceId, guideId, "Insurance and financial standing");
+    await typedBy(ng.editor, ng.scenario, {
+      key: "secondIndemnity",
+      slug: "second-indemnity-policy",
+      title: "Second indemnity policy",
+      kind: "insurance policy",
+      tags: ["professional-indemnity"],
+      body: "Northgate holds a second professional indemnity policy.",
+    });
+
+    const included = answered(
+      await includeAvailable(ng.editor, doorsOf(ng.scenario), { writeUpId: insurance.id }),
+    );
+
+    expect(included).toMatchObject({ included: 1 });
+    const added = (await includedBySection(workspaceId, guideId))[
+      "Insurance and financial standing"
+    ]?.slice(4);
+    expect(added).toEqual(["Employers' liability insurance: Employers' liability policy"]);
+  });
+
   it("names no withheld concept as available to an outside Viewer", async () => {
     const { ng, guideId, employersLiability } = await typedTheMissingPolicy();
     answered(
@@ -573,18 +614,51 @@ describe("including an available concept", () => {
 
   it("refuses an include by a Viewer", async () => {
     const { ng, guideId } = await seededOnce();
-    const { git, workspaceId } = ng.scenario;
-    const insurance = await writeUpOf(workspaceId, guideId, "Insurance and financial standing");
-    const headBefore = await head(ng.admin, git);
+    const insurance = await writeUpOf(ng.scenario.workspaceId, guideId, PROMPT_OF_INSURANCE);
+    const before = await writtenIn(ng);
 
     const refused = await includeAvailable(ng.viewer, doorsOf(ng.scenario), {
       writeUpId: insurance.id,
     });
 
     expect(refused).toEqual({ ok: false, error: "role-forbids" });
-    expect(await counted("write_up_include", workspaceId)).toBe(24);
-    expect(await counted("write_up_version", workspaceId)).toBe(8);
-    expect(await head(ng.admin, git)).toBe(headBefore);
+    expect(await writtenIn(ng)).toEqual(before);
+    expect(before).toMatchObject({ includes: 24, versions: 8 });
+  });
+
+  it.each([
+    ["a hidden section", PROMPT_OF_INSURANCE, PROMPT_OF_INSURANCE],
+    ["a nested section", "Security testing", "Information security"],
+  ])("answers an Editor on %s as on none", async (_, prompt, hiding) => {
+    const { ng, guideId } = await typedTheMissingPolicy();
+    await hidden(guideId, [hiding]);
+    const writeUp = await writeUpOf(ng.scenario.workspaceId, guideId, prompt);
+    const before = await writtenIn(ng);
+
+    const refused = await includeAvailable(ng.editor, doorsOf(ng.scenario), {
+      writeUpId: writeUp.id,
+    });
+    const missing = await includeAvailable(ng.editor, doorsOf(ng.scenario), {
+      writeUpId: ABSENT_WRITE_UP,
+    });
+
+    expect(refused).toEqual(missing);
+    expect(refused).toEqual({ ok: false, error: "not-found" });
+    expect(await writtenIn(ng)).toEqual(before);
+  });
+
+  it("includes for an Admin in a hidden section", async () => {
+    const { ng, guideId } = await typedTheMissingPolicy();
+    const insurance = await writeUpOf(ng.scenario.workspaceId, guideId, PROMPT_OF_INSURANCE);
+    await hidden(guideId, [PROMPT_OF_INSURANCE]);
+
+    const included = answered(
+      await includeAvailable(ng.admin, doorsOf(ng.scenario), {
+        writeUpId: insurance.id,
+      }),
+    );
+
+    expect(included).toMatchObject({ included: 1 });
   });
 });
 

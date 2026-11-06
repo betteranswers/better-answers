@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { briefCopy, recordCopy } from "../../src/concepts/index.ts";
+import { includeAvailable } from "../../src/guides/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { addToGroup } from "../../src/members/index.ts";
 import { withMember } from "../../src/store/postgres/index.ts";
-import { principalFor, suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
+import { EMPLOYERS_LIABILITY } from "../fixtures/northgate-concepts.ts";
+import { typedBy } from "../fixtures/northgate.ts";
+import { doorsOf, principalFor, suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
 import { answered, readingAs, seedingWith } from "../support/suite-postgres.ts";
 import {
   briefCiting,
@@ -125,6 +128,38 @@ const viewerIn = async (section: Section, group: string): Promise<UserPrincipal>
     ),
   );
   return principalFor(db(), workspaceId, person.id);
+};
+
+type Included = { readonly iri: string; readonly title: string; readonly sensitivity: string };
+
+const firstIncluded = async (writeUpId: string): Promise<Included> => {
+  const found = await db().pool.query<Included>(
+    `SELECT i.iri, c.title, c.sensitivity FROM write_up_include i
+       JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
+      WHERE i.write_up_id = $1 ORDER BY i.ordinal`,
+    [writeUpId],
+  );
+  const [first] = found.rows;
+  if (first === undefined) throw new Error("the section includes nothing");
+  return first;
+};
+
+const copiedWhileRestricted = async (
+  reader: UserPrincipal,
+  writeUpId: string,
+  concept: Included,
+) => {
+  const setSensitivity = (sensitivity: string) =>
+    db().pool.query("UPDATE concept_index SET sensitivity = $1 WHERE iri = $2", [
+      sensitivity,
+      concept.iri,
+    ]);
+  await setSensitivity("Restricted");
+  try {
+    return answered(await copyingAs(reader, writeUpId));
+  } finally {
+    await setSensitivity(concept.sensitivity);
+  }
 };
 
 describe("copying a section's Brief", () => {
@@ -260,5 +295,46 @@ describe("copying a section's Brief", () => {
 
     expect(refused).toEqual({ ok: false, error: "not-found" });
     expect((await usageRows(section.writeUpId)).length).toBe(before);
+  });
+
+  it("leaves out a concept the reader cannot read", async () => {
+    const section = await briefedSection(OFFER);
+    const { editor } = section.guide.ng;
+    const first = await firstIncluded(section.writeUpId);
+    const whole = answered(await copyingAs(editor, section.writeUpId));
+
+    const trimmed = await copiedWhileRestricted(editor, section.writeUpId, first);
+
+    expect(whole.text).toContain(first.title);
+    expect(trimmed.footnotes).toBe(whole.footnotes - 1);
+    expect(trimmed.text).not.toContain(first.title);
+    expect(trimmed.html).not.toContain(first.title);
+  });
+
+  it("checks a recorded copy against its own version's concepts", async () => {
+    const section = await briefedSection(INSURANCE);
+    const { editor } = section.guide.ng;
+    const inFinance = await viewerIn(section, section.guide.ng.finance);
+    const copied = answered(await copyingAs(inFinance, section.writeUpId)).version;
+    await typedBy(editor, section.guide.ng.scenario, EMPLOYERS_LIABILITY);
+    answered(
+      await includeAvailable(editor, doorsOf(section.guide.ng.scenario), {
+        writeUpId: section.writeUpId,
+      }),
+    );
+    const latest = await latestVersionOf(db(), section.writeUpId);
+
+    const recordingTheOlder = await recordingAs(section, inFinance, {
+      writeUpId: section.writeUpId,
+      version: copied,
+    });
+    const recordingTheLatest = await recordingAs(section, inFinance, {
+      writeUpId: section.writeUpId,
+      version: latest,
+    });
+
+    expect(latest).toBeGreaterThan(copied);
+    expect(recordingTheOlder.ok).toBe(true);
+    expect(recordingTheLatest).toEqual({ ok: false, error: "below-action-threshold" });
   });
 });

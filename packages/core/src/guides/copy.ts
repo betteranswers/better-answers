@@ -22,6 +22,7 @@ import {
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import type { SourcedFootnote } from "./renderer.ts";
+import { shownClause } from "./withheld.ts";
 import { SECTION_HOME } from "./write-ups.ts";
 
 type TrustTier = (typeof TRUST_TIERS)[number];
@@ -56,14 +57,6 @@ type BriefRow = {
 };
 
 const BRIEF = `
-  WITH RECURSIVE withheld (guide_id, id) AS (
-    SELECT guide_id, id FROM guide_section WHERE workspace_id = $1 AND hidden
-    UNION
-    SELECT s.guide_id, s.id
-      FROM guide_section s
-      JOIN withheld h ON h.guide_id = s.guide_id AND h.id = s.parent_id
-     WHERE s.workspace_id = $1
-  )
   SELECT w.guide_id AS "guideId", v.version, v.markdown
     FROM write_up w
     JOIN LATERAL (SELECT version, markdown FROM write_up_version
@@ -72,8 +65,7 @@ const BRIEF = `
                    ORDER BY version DESC LIMIT 1) v ON true
    WHERE w.workspace_id = $1 AND w.id = $2 AND w.home = '${SECTION_HOME}'
      AND ${readableClause("w", 3)}
-     AND ($3 = 'Admin' OR NOT EXISTS (SELECT 1 FROM withheld h
-                                       WHERE h.guide_id = w.guide_id AND h.id = w.section_id))`;
+     AND ${shownClause({ guide: "w.guide_id", section: "w.section_id" }, 3)}`;
 
 type IncludeRow = {
   readonly label: string;
@@ -84,10 +76,13 @@ type IncludeRow = {
 };
 
 const INCLUDES = `
-  SELECT i.id AS label, i.iri, c.title, c.frontmatter, i.wording_heading AS wording
-    FROM write_up_include i
-    JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
-   WHERE i.workspace_id = $1 AND i.write_up_id = $2 AND ${readableClause("c", 3)}
+  SELECT i.id AS label, i.iri, c.title, c.frontmatter, i."wordingHeading" AS wording
+    FROM write_up_version v
+    CROSS JOIN LATERAL jsonb_to_recordset(v.includes)
+      AS i(id text, iri text, ordinal int, "wordingHeading" text)
+    JOIN concept_index c ON c.workspace_id = v.workspace_id AND c.iri = i.iri
+   WHERE v.workspace_id = $1 AND v.write_up_id = $2 AND v.version = $5
+     AND ${readableClause("c", 3)}
    ORDER BY i.ordinal, i.id`;
 
 const sourcedOf = ({ frontmatter, ...footnote }: IncludeRow): SourcedFootnote => {
@@ -121,6 +116,7 @@ export const briefToCopy = async (
       reader.workspaceId,
       input.writeUpId,
       ...readable,
+      brief.version,
     ]);
     return { ...brief, includes: includes.rows.map(sourcedOf) };
   });

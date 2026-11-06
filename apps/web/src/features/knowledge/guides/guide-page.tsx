@@ -1,6 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useId, useRef, useState, type RefObject } from "react";
 
+import { isBlank } from "@better-answers/schema/cited-markdown";
+
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { BROWSE, conceptPageOf } from "@/shared/knowledge/concept-address.ts";
@@ -8,6 +10,7 @@ import { LINK } from "@/shared/knowledge/concept-body.tsx";
 import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { ListState } from "@/shared/list/list-pages.tsx";
+import { rowInFocus } from "@/shared/list/row-focus.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
@@ -41,10 +44,18 @@ const controlOf = (row: Element, action: SectionAction): HTMLElement | null => {
   return fact?.querySelector<HTMLElement>(wanted) ?? row.querySelector<HTMLElement>(wanted);
 };
 
-const NOTHING_TO_DO: ReadonlyMap<SectionAction, string> = new Map([
-  [SECTION_ACTIONS.addFact, WORDS.nothingToAdd],
-  [SECTION_ACTIONS.copyBrief, WORDS.nothingToCopy],
-]);
+const copyRefusedWords = (guide: Guide): string => {
+  const section = rowInFocus(guide.sections, (each) => each.sectionId);
+  const shown = section?.brief !== undefined && !isBlank(section.brief.rendered.parts);
+  return shown && section.copy === "below-action-threshold"
+    ? WORDS.belowYourRole
+    : WORDS.nothingToCopy;
+};
+
+const nothingToDo = (guide: Guide, action: SectionAction): string | undefined => {
+  if (action === SECTION_ACTIONS.addFact) return WORDS.nothingToAdd;
+  return action === SECTION_ACTIONS.copyBrief ? copyRefusedWords(guide) : undefined;
+};
 
 const useSectionKeys = (guide: Guide, say: Say) => {
   const editor = canEdit(guide);
@@ -59,7 +70,7 @@ const useSectionKeys = (guide: Guide, say: Say) => {
       control.click();
       return;
     }
-    const nothing = NOTHING_TO_DO.get(action);
+    const nothing = nothingToDo(guide, action);
     if (nothing !== undefined) say(said(nothing));
   };
   useKeystroke(KEY.showDetail, press(SECTION_ACTIONS.showDetail));

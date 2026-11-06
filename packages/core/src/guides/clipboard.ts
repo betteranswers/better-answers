@@ -3,17 +3,12 @@ import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
 
-import { IRI, quotedPassageOf, type CitedSource } from "@better-answers/schema";
-
-const OPENS = "";
-
-const CLOSES = "";
-
-const CARRIED = new RegExp(`${OPENS}(\\d+)${CLOSES}`, "u");
-
-const CARRIED_ANYWHERE = new RegExp(`${OPENS}\\d+${CLOSES}`, "gu");
-
-export const carrierOf = (number: number): string => `${OPENS}${String(number)}${CLOSES}`;
+import { IRI, ULID_CHARACTERS, type CitedSource } from "@better-answers/schema";
+import {
+  citedMarkdownOf,
+  remarkCitations,
+  type BodyPart,
+} from "@better-answers/schema/cited-markdown";
 
 export type Clipboard = { readonly html: string; readonly text: string };
 
@@ -24,7 +19,7 @@ type Tagged = { readonly type: string };
 type Of<Union extends Tagged, Type extends Union["type"]> = Extract<Union, { readonly type: Type }>;
 
 type Readers<Union extends Tagged> = {
-  readonly [Type in Union["type"]]: (node: Of<Union, Type>, footnotes: number) => Clipboard;
+  readonly [Type in Union["type"]]: (node: Of<Union, Type>) => Clipboard;
 };
 
 type Flow = BlockContent | DefinitionContent;
@@ -55,31 +50,16 @@ const gathered = (parts: readonly Clipboard[], between: string): Clipboard => {
   };
 };
 
-const wordsOf = (value: string, footnotes: number): Clipboard =>
-  gathered(
-    value.split(CARRIED).map((piece, at): Clipboard => {
-      if (at % 2 === 0) return { html: escaped(piece), text: piece };
-      const number = Number(piece);
-      return number >= 1 && number <= footnotes
-        ? { html: `<sup>${piece}</sup>`, text: `[${piece}]` }
-        : NOTHING;
-    }),
-    "",
-  );
+const wordsOf = (value: string): Clipboard => ({ html: escaped(value), text: value });
 
 const phrased = <Type extends PhrasingContent["type"]>(
   node: Of<PhrasingContent, Type>,
-  footnotes: number,
-): Clipboard => PHRASING[node.type](node, footnotes);
+): Clipboard => PHRASING[node.type](node);
 
-const phrasingOf = (nodes: readonly PhrasingContent[], footnotes: number): Clipboard =>
-  gathered(
-    nodes.map((node) => phrased(node, footnotes)),
-    "",
-  );
+const phrasingOf = (nodes: readonly PhrasingContent[]): Clipboard =>
+  gathered(nodes.map(phrased), "");
 
-const linkedOf = (url: string, label: Clipboard): Clipboard => {
-  const href = url.replaceAll(CARRIED_ANYWHERE, "");
+const linkedOf = (href: string, label: Clipboard): Clipboard => {
   if (!SAFE_LINK.test(href)) return label;
   return {
     html: `<a href="${escaped(href)}">${label.html}</a>`,
@@ -90,18 +70,22 @@ const linkedOf = (url: string, label: Clipboard): Clipboard => {
 type PhrasingReaders = Readers<PhrasingContent>;
 
 const PHRASING: PhrasingReaders = {
-  text: (node, footnotes) => wordsOf(node.value, footnotes),
-  html: (node, footnotes) => wordsOf(node.value, footnotes),
-  inlineCode: (node, footnotes) => around(wordsOf(node.value, footnotes), "code"),
+  text: (node) => wordsOf(node.value),
+  html: (node) => wordsOf(node.value),
+  inlineCode: (node) => around(wordsOf(node.value), "code"),
   break: () => ({ html: "<br>", text: "\n" }),
-  image: (node, footnotes) => wordsOf(node.alt ?? "", footnotes),
-  imageReference: (node, footnotes) => wordsOf(node.alt ?? "", footnotes),
+  image: (node) => wordsOf(node.alt ?? ""),
+  imageReference: (node) => wordsOf(node.alt ?? ""),
   footnoteReference: () => NOTHING,
-  link: (node, footnotes) => linkedOf(node.url, phrasingOf(node.children, footnotes)),
-  linkReference: (node, footnotes) => phrasingOf(node.children, footnotes),
-  emphasis: (node, footnotes) => around(phrasingOf(node.children, footnotes), "em"),
-  strong: (node, footnotes) => around(phrasingOf(node.children, footnotes), "strong"),
-  delete: (node, footnotes) => around(phrasingOf(node.children, footnotes), "del"),
+  citation: (node) => ({
+    html: `<sup>${String(node.number)}</sup>`,
+    text: `[${String(node.number)}]`,
+  }),
+  link: (node) => linkedOf(node.url, phrasingOf(node.children)),
+  linkReference: (node) => phrasingOf(node.children),
+  emphasis: (node) => around(phrasingOf(node.children), "em"),
+  strong: (node) => around(phrasingOf(node.children), "strong"),
+  delete: (node) => around(phrasingOf(node.children), "del"),
 };
 
 const FLOW_TYPES: ReadonlySet<string> = new Set([
@@ -119,32 +103,32 @@ const FLOW_TYPES: ReadonlySet<string> = new Set([
 
 const isFlow = (node: RootContent): node is Flow => FLOW_TYPES.has(node.type);
 
-const flowing = <Type extends Flow["type"]>(node: Of<Flow, Type>, footnotes: number): Clipboard =>
-  FLOW[node.type](node, footnotes);
+const flowing = <Type extends Flow["type"]>(node: Of<Flow, Type>): Clipboard =>
+  FLOW[node.type](node);
 
-const flowOf = (nodes: readonly RootContent[], footnotes: number): Clipboard =>
-  gathered(
-    nodes.filter(isFlow).map((node) => flowing(node, footnotes)),
-    "\n\n",
-  );
+const flowOf = (nodes: readonly RootContent[]): Clipboard =>
+  gathered(nodes.filter(isFlow).map(flowing), "\n\n");
 
-const itemOf = (node: RootContent, footnotes: number): Clipboard => {
+const itemOf = (node: RootContent): Clipboard => {
   if (node.type !== "listItem") return NOTHING;
+  const spread = node.spread === true;
   const parts = node.children.map((child) =>
-    child.type === "paragraph" ? phrasingOf(child.children, footnotes) : flowOf([child], footnotes),
+    child.type === "paragraph" && !spread ? phrasingOf(child.children) : flowOf([child]),
   );
-  return gathered(parts, "\n");
+  return gathered(parts, spread ? "\n\n" : "\n");
 };
 
-const listedOf = (ordered: boolean, items: readonly Clipboard[]): Clipboard => {
+type Listing = { readonly ordered: boolean; readonly start: number };
+
+const indented = (text: string): string => text.replaceAll(/\n(?=.)/gu, "\n  ");
+
+const listedOf = ({ ordered, start }: Listing, items: readonly Clipboard[]): Clipboard => {
   const tag = ordered ? "ol" : "ul";
+  const opening = ordered && start !== 1 ? `<ol start="${String(start)}">` : `<${tag}>`;
   return {
-    html: `<${tag}>${items.map((item) => `<li>${item.html}</li>`).join("")}</${tag}>`,
+    html: `${opening}${items.map((item) => `<li>${item.html}</li>`).join("")}</${tag}>`,
     text: items
-      .map(
-        (item, at) =>
-          `${ordered ? `${String(at + 1)}.` : "-"} ${item.text.replaceAll("\n", "\n  ")}`,
-      )
+      .map((item, at) => `${ordered ? `${String(start + at)}.` : "-"} ${indented(item.text)}`)
       .join("\n"),
   };
 };
@@ -165,22 +149,18 @@ const rowOf = (cells: readonly Clipboard[], tag: "th" | "td"): Clipboard => ({
 type FlowReaders = Readers<Flow>;
 
 const FLOW: FlowReaders = {
-  paragraph: (node, footnotes) => around(phrasingOf(node.children, footnotes), "p"),
-  heading: (node, footnotes) =>
-    around(phrasingOf(node.children, footnotes), `h${String(node.depth)}`),
-  code: (node, footnotes) => around(around(wordsOf(node.value, footnotes), "code"), "pre"),
-  html: (node, footnotes) => around(wordsOf(node.value, footnotes), "p"),
-  list: (node, footnotes) =>
-    listedOf(
-      node.ordered === true,
-      node.children.map((item) => itemOf(item, footnotes)),
-    ),
-  blockquote: (node, footnotes) => quotedOf(flowOf(node.children, footnotes)),
+  paragraph: (node) => around(phrasingOf(node.children), "p"),
+  heading: (node) => around(phrasingOf(node.children), `h${String(node.depth)}`),
+  code: (node) => around(around(wordsOf(node.value), "code"), "pre"),
+  html: (node) => around(wordsOf(node.value), "p"),
+  list: (node) =>
+    listedOf({ ordered: node.ordered === true, start: node.start ?? 1 }, node.children.map(itemOf)),
+  blockquote: (node) => quotedOf(flowOf(node.children)),
   thematicBreak: () => ({ html: "<hr>", text: "---" }),
-  table: (node, footnotes) => {
+  table: (node) => {
     const rows = node.children.map((row, at) =>
       rowOf(
-        row.children.map((cell) => phrasingOf(cell.children, footnotes)),
+        row.children.map((cell) => phrasingOf(cell.children)),
         at === 0 ? "th" : "td",
       ),
     );
@@ -195,8 +175,11 @@ const FLOW: FlowReaders = {
 
 const sentence = (part: string): string => (/[.!?]$/u.test(part) ? part : `${part}.`);
 
+/** The read path's test: a locator naming a document, well formed or not, may name one the reader cannot read. */
+const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "iu");
+
 const sourceWords = (source: CitedSource): string =>
-  source.locator === null || quotedPassageOf(source) !== undefined
+  source.locator === null || NAMES_A_DOCUMENT.test(source.locator)
     ? source.resource
     : `${source.resource}, ${source.locator}`;
 
@@ -223,8 +206,9 @@ const sourcesOf = (lines: readonly string[]): Clipboard => ({
   text: `${SOURCES}\n${lines.map((line, at) => `[${String(at + 1)}] ${line}`).join("\n")}`,
 });
 
-export const clipboardOf = (markdown: string, lines: readonly string[]): Clipboard => {
-  const tree = unified().use(remarkParse).use(remarkGfm).parse(markdown);
-  const body = flowOf(tree.children, lines.length);
+export const clipboardOf = (parts: readonly BodyPart[], lines: readonly string[]): Clipboard => {
+  const { markdown, citations } = citedMarkdownOf(parts);
+  const processor = unified().use(remarkParse).use(remarkGfm).use(remarkCitations, citations);
+  const body = flowOf(processor.runSync(processor.parse(markdown)).children);
   return lines.length === 0 ? body : gathered([body, sourcesOf(lines)], "\n\n");
 };

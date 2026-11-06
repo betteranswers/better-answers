@@ -1,8 +1,10 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 
+import { isBlank } from "@better-answers/schema/cited-markdown";
+
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
-import { ConceptBody, LINK } from "@/shared/knowledge/concept-body.tsx";
+import { BriefBody, ConceptBody, LINK } from "@/shared/knowledge/concept-body.tsx";
 import type { Evidence } from "@/shared/knowledge/knowledge-reads.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { keyedRow } from "@/shared/list/row-focus.ts";
@@ -78,14 +80,14 @@ function BriefText(properties: {
       })),
     [rendered.footnotes],
   );
-  if (rendered.markdown.trim() === "") {
+  if (isBlank(rendered.parts)) {
     return properties.assembled ? (
       <p className="mt-4 text-muted-foreground">{WORDS.noBrief}</p>
     ) : null;
   }
   return (
     <div className="mt-4">
-      <ConceptBody body={rendered.markdown} evidence={evidence} headingsFrom={properties.below} />
+      <BriefBody parts={rendered.parts} evidence={evidence} headingsFrom={properties.below} />
       <Footnotes footnotes={rendered.footnotes} />
     </div>
   );
@@ -167,8 +169,12 @@ const useIncluding = (section: GuideSection, say: Say, heading: RefObject<HTMLEl
     if (including) return;
     setIncluding(true);
     try {
-      await include(section.writeUpId);
-      say(said(WORDS.included(section.number)));
+      const { included } = await include(section.writeUpId);
+      say(
+        said(
+          included === 0 ? WORDS.nothingIncluded(section.number) : WORDS.included(section.number),
+        ),
+      );
       heading.current?.focus();
     } catch (thrown) {
       say(failed(thrown instanceof Error ? thrown : new Error(String(thrown))));
@@ -257,6 +263,7 @@ function SectionHead(properties: {
       </Heading>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
         <Pill>{section.trustWords}</Pill>
+        {section.hidden ? <Pill variant="outline">{WORDS.hidden}</Pill> : null}
         {section.needsReview === null ? null : (
           <>
             <Pill variant="outline">{WORDS.needsReview}</Pill>
@@ -323,7 +330,7 @@ export function GuideSectionView(properties: SectionProps) {
             />
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {editing.actions}
-              {brief.rendered.markdown.trim() === "" ? null : (
+              {isBlank(brief.rendered.parts) ? null : (
                 <CopyAction section={section} copying={copying} />
               )}
               <Button
@@ -332,11 +339,11 @@ export function GuideSectionView(properties: SectionProps) {
                 variant="outline"
                 {...actionNamed(SECTION_ACTIONS.showDetail)}
                 aria-expanded={detail.open}
-                aria-controls={detailId}
+                aria-controls={detail.open ? detailId : undefined}
                 aria-keyshortcuts={KEY.showDetail.key}
                 onClick={detail.toggle}
               >
-                {WORDS.showDetail}
+                {detail.open ? WORDS.hideDetail : WORDS.showDetail}
               </Button>
             </div>
             {editing.editor}

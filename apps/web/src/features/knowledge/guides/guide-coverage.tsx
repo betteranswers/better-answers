@@ -42,25 +42,20 @@ function Missing(properties: { readonly fact: SectionFact; readonly gaps: Gaps }
   );
 }
 
-function Available(properties: { readonly fact: SectionFact; readonly gaps: Gaps }) {
-  const { fact, gaps } = properties;
-  const textId = useId();
+function IncludeAll(properties: { readonly gaps: Gaps }) {
+  const { gaps } = properties;
+  if (!gaps.canInclude || !gaps.unmet.some((fact) => fact.state === "available")) return null;
   return (
-    <>
-      <span id={textId}>{WORDS.available(fact.name)}</span>
-      {gaps.canInclude ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-describedby={textId}
-          aria-disabled={gaps.including}
-          onClick={gaps.onInclude}
-        >
-          {WORDS.include}
-        </Button>
-      ) : null}
-    </>
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="mt-3"
+      aria-disabled={gaps.including}
+      onClick={gaps.onInclude}
+    >
+      {WORDS.include}
+    </Button>
   );
 }
 
@@ -82,12 +77,13 @@ export function Coverage(properties: { readonly gaps: Gaps }) {
               {fact.state === "missing" ? (
                 <Missing fact={fact} gaps={gaps} />
               ) : (
-                <Available fact={fact} gaps={gaps} />
+                <span>{WORDS.available(fact.name)}</span>
               )}
             </li>
           ))}
         </ul>
       )}
+      <IncludeAll gaps={gaps} />
     </div>
   );
 }

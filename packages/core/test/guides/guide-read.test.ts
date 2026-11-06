@@ -137,20 +137,26 @@ describe("reading a guide", () => {
     ).toEqual(direct?.sections.map((section) => section.facts));
   });
 
-  it("counts a hidden section toward coverage", async () => {
+  it("counts only the sections a reader can see", async () => {
     const seeded = await freshGuide();
     await db().pool.query(
-      "UPDATE guide_section SET hidden = true WHERE guide_id = $1 AND prompt = 'Security testing'",
+      "UPDATE guide_section SET hidden = true WHERE guide_id = $1 AND prompt = 'Information security'",
       [seeded.guideId],
     );
 
-    const editor = await guideAs(seeded, seeded.ng.editor);
-    const admin = await guideAs(seeded, seeded.ng.admin);
+    const readers = [seeded.ng.viewer, seeded.ng.editor, seeded.ng.admin];
+    const guides = await Promise.all(readers.map((reader) => guideAs(seeded, reader)));
+    const summed = (guide: GuideRead) => {
+      const shown = guide.sections.map((section) => section.coverage);
+      return {
+        met: shown.reduce((sum, each) => sum + each.met, 0),
+        of: shown.reduce((sum, each) => sum + each.of, 0),
+      };
+    };
 
-    expect(editor.coverage).toEqual({ met: 20, of: 21 });
-    expect(admin.coverage).toEqual({ met: 20, of: 21 });
-    expect(editor.sections).toHaveLength(7);
-    expect(admin.sections).toHaveLength(8);
+    expect(guides.map((guide) => guide.coverage)).toEqual(guides.map(summed));
+    expect((await guideAs(seeded, seeded.ng.viewer)).coverage.of).toBe(18);
+    expect((await guideAs(seeded, seeded.ng.admin)).coverage).toEqual({ met: 20, of: 21 });
   });
 
   it("never shows a hidden section to a reader", async () => {
@@ -182,6 +188,22 @@ describe("reading a guide", () => {
     expect(admin.sections.map((section) => section.number)).toContain("6.1");
   });
 
+  it("marks each section that other readers cannot see", async () => {
+    const seeded = await freshGuide();
+    await db().pool.query(
+      "UPDATE guide_section SET hidden = true WHERE guide_id = $1 AND prompt = 'Information security'",
+      [seeded.guideId],
+    );
+
+    const admin = await guideAs(seeded, seeded.ng.admin);
+    const editor = await guideAs(seeded, seeded.ng.editor);
+
+    expect(
+      admin.sections.filter((section) => section.hidden).map((section) => section.prompt),
+    ).toEqual(["Information security", "Security testing"]);
+    expect(editor.sections.some((section) => section.hidden)).toBe(false);
+  });
+
   it("gives no Brief to a reader outside the write-up's audience", async () => {
     const seeded = await freshGuide();
 
@@ -198,6 +220,20 @@ describe("reading a guide", () => {
     const said = JSON.stringify(viewer);
     expect(said).not.toContain("Professional indemnity policy");
     expect(said).not.toContain(seeded.ng.iri("professionalIndemnity"));
+  });
+
+  it("shows a concept the reader cannot read as unrecorded", async () => {
+    const seeded = await seededOnce();
+
+    const viewer = await guideAs(seeded, seeded.ng.viewer);
+
+    const facts = sectionOf(viewer, INSURANCE).coverage.facts;
+    const unreadable = facts.find((fact) => fact.name === "Professional indemnity insurance");
+    const unrecorded = facts.find((fact) => fact.name === "Employers' liability insurance");
+    expect(unreadable?.state).toBe("missing");
+    expect(unreadable?.available).toEqual([]);
+    expect(unreadable?.state).toBe(unrecorded?.state);
+    expect(unreadable?.available).toEqual(unrecorded?.available);
   });
 
   it("names a withheld section's readable cited concepts", async () => {

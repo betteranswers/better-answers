@@ -15,9 +15,10 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { matchesTheFact } from "./match.ts";
+import { matchesTheFact, metBy } from "./match.ts";
 import { renderBrief, type Footnote, type RenderedBrief } from "./renderer.ts";
 import type { GuideLayer, RoleLabel } from "./templates/index.ts";
+import { shownClause } from "./withheld.ts";
 import { SECTION_HOME } from "./write-ups.ts";
 
 const footnotesOfAction = declareAction({
@@ -106,12 +107,7 @@ export type CoverageRow = {
 const COVERAGE = `
   SELECT g.collection, s.id AS section_id, s.parent_id, s.prompt, w.id AS write_up_id,
          f.id AS fact_id, f.name, f.at_least,
-         (SELECT count(*)::int
-            FROM write_up_include i
-            JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
-           WHERE i.workspace_id = w.workspace_id AND i.write_up_id = w.id
-             AND i.expected_fact_id = f.id
-             AND ${readableClause("c", 3)}) AS met_by,
+         ${metBy("w.id", 3)} AS met_by,
          COALESCE((SELECT jsonb_agg(jsonb_build_object('iri', c.iri, 'title', c.title)
                                     ORDER BY c.title, c.iri)
                      FROM concept_index c
@@ -228,6 +224,8 @@ export type SectionRead = {
   readonly roleLabel: RoleLabel;
   readonly usageNote: string | null;
   readonly layers: readonly GuideLayer[];
+
+  /** Withheld from every reader but an Admin, because it or a section above it is hidden. */
   readonly hidden: boolean;
   readonly needsReview: NeedsReview | null;
   readonly coverage: SectionFacts;
@@ -331,15 +329,14 @@ type FactShapeRow = {
 const FACT_SHAPES = `SELECT id, kind, tags FROM guide_expected_fact
    WHERE workspace_id = $1 AND guide_id = $2`;
 
-const hiddenFrom = (reader: UserPrincipal, rows: readonly SectionRow[]): ReadonlySet<string> => {
-  const hidden = new Set<string>();
-  if (reader.role === "Admin") return hidden;
+const withheldAmong = (rows: readonly SectionRow[]): ReadonlySet<string> => {
+  const withheld = new Set<string>();
   for (const row of rows) {
-    if (row.hidden || (row.parent_id !== null && hidden.has(row.parent_id))) {
-      hidden.add(row.section_id);
+    if (row.hidden || (row.parent_id !== null && withheld.has(row.parent_id))) {
+      withheld.add(row.section_id);
     }
   }
-  return hidden;
+  return withheld;
 };
 
 const numberedIn = (rows: readonly SectionRow[]): ReadonlyMap<string, string> => {
@@ -392,15 +389,13 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
     const row = rowOf.get(section.sectionId);
     return row === undefined ? [] : [{ section, row }];
   });
-  const hidden = hiddenFrom(
-    reader,
-    ordered.map(({ row }) => row),
-  );
-  const shown = ordered.filter(({ row }) => !hidden.has(row.section_id));
+  const withheld = withheldAmong(ordered.map(({ row }) => row));
+  const shown =
+    reader.role === "Admin" ? ordered : ordered.filter(({ row }) => !withheld.has(row.section_id));
   const numbers = numberedIn(shown.map(({ row }) => row));
   const shapeOf = new Map(held.shapes.map((shape) => [shape.id, shape]));
   const citedBy = Map.groupBy(held.cited, (row) => row.write_up_id);
-  const everyFact = coverage.sections.flatMap((section) => section.facts);
+  const everyFact = shown.flatMap(({ section }) => section.facts);
   return {
     guideId,
     kind: definition.kind,
@@ -420,7 +415,7 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
         roleLabel: row.role_label,
         usageNote: row.usage_note,
         layers: row.layers,
-        hidden: row.hidden,
+        hidden: withheld.has(row.section_id),
         needsReview: row.needs_review,
         coverage: {
           met: metIn(section.facts),
@@ -494,14 +489,6 @@ type SummaryRow = {
 };
 
 const GUIDES = `
-  WITH RECURSIVE withheld (guide_id, id) AS (
-    SELECT guide_id, id FROM guide_section WHERE workspace_id = $1 AND hidden
-    UNION
-    SELECT s.guide_id, s.id
-      FROM guide_section s
-      JOIN withheld h ON h.guide_id = s.guide_id AND h.id = s.parent_id
-     WHERE s.workspace_id = $1
-  )
   SELECT g.id, g.kind, g.collection, g.subject_iri, c.title AS subject_title,
          count(s.id)::int AS sections,
          count(*) FILTER (WHERE ${readableClause("w", 2)} AND w.needs_review IS NOT NULL)::int
@@ -510,9 +497,7 @@ const GUIDES = `
     LEFT JOIN concept_index c ON c.workspace_id = g.workspace_id AND c.iri = g.subject_iri
                              AND ${readableClause("c", 2)}
     LEFT JOIN guide_section s ON s.workspace_id = g.workspace_id AND s.guide_id = g.id
-                             AND ($2 = 'Admin' OR NOT EXISTS (
-                                   SELECT 1 FROM withheld h
-                                    WHERE h.guide_id = s.guide_id AND h.id = s.id))
+                             AND ${shownClause({ guide: "s.guide_id", section: "s.id" }, 2)}
     LEFT JOIN write_up w ON w.workspace_id = s.workspace_id AND w.home = '${SECTION_HOME}'
                         AND w.guide_id = s.guide_id AND w.section_id = s.id
    WHERE g.workspace_id = $1

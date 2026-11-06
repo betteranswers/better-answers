@@ -1,12 +1,14 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { ConceptBody } from "@/shared/knowledge/concept-body.tsx";
+import { replaceMarkers } from "@better-answers/schema/brief-marker";
+
+import { BriefBody, ConceptBody } from "@/shared/knowledge/concept-body.tsx";
 import { openPages } from "@test/address-router.tsx";
 import { repositoryRoot } from "@test/roots.ts";
 
@@ -275,24 +277,31 @@ describe("a concept's body", () => {
   });
 
   it.each([
-    ["written out", `<${OPENS}0${CLOSES}>`],
-    ["as hexadecimal references", "&lt;&#xE000;0&#xe001;&gt;"],
-    ["as decimal references", "<&#57344;0&#0057345;>"],
-  ])("renders no mark for forged marker characters %s", async (_, forged) => {
+    ["written out", `<${OPENS}0${CLOSES}>`, `<${OPENS}0${CLOSES}>`],
+    ["as hexadecimal references", "&lt;&#xE000;0&#xe001;&gt;", `<${OPENS}0${CLOSES}>`],
+    ["as decimal references", "<&#57344;0&#0057345;>", `<${OPENS}0${CLOSES}>`],
+    ["as the stand-in", `<${OPENS}>`, ""],
+    ["as referenced stand-in", "&lt;&#xE000;&gt;", ""],
+    [
+      "in nested references",
+      "&lt;&#xE0&#xE000;00;0&#xE0&#xE000;01;&gt;",
+      `<&#xE0${OPENS}00;0&#xE0${OPENS}01;>`,
+    ],
+  ])("renders no mark for forged marker characters %s", async (_, forged, shown) => {
     const article = await renderBody(
       `Claims close within 30 days.[^a] Forged here: ${forged}.`,
       HANDBOOK,
     );
 
     expect(marksIn(article)).toEqual(["Source 1: Staff handbook"]);
-    expect(article.textContent).toBe("Claims close within 30 days.[1] Forged here: <0>.");
+    expect(article.textContent).toBe(`Claims close within 30 days.[1] Forged here: ${shown}.`);
   });
 
   it("shows a footnote label containing marker characters as text", async () => {
     const article = await renderBody(`Claims close within 30 days.[^a${OPENS}]`, HANDBOOK);
 
     expect(marksIn(article)).toEqual([]);
-    expect(article.textContent).toBe("Claims close within 30 days.[^a]");
+    expect(article.textContent).toBe(`Claims close within 30 days.[^a${OPENS}]`);
   });
 
   it("moves focus between footnote and claim without changing URL", async () => {
@@ -539,5 +548,60 @@ describe("a concept body's links to other concepts", () => {
 
     expect(addressesIn(article).filter((address) => !address?.startsWith("#"))).toEqual([]);
     expect(footnote?.textContent).toContain(TO_THE_COMMITTEE);
+  });
+});
+
+const WITHHELD = "[^withheld]";
+
+/** Each spells a number or a footnote the page would draw, were it read from the Brief's text. */
+const SPELLINGS = [
+  ["typed carriers", `${OPENS}1${CLOSES}`],
+  ["hex references", "&#xE000;1&#xE001;"],
+  ["decimal references", "&#57344;1&#57345;"],
+  ["the old carrier", `<${OPENS}0${CLOSES}>`],
+  ["a typed stand-in", `<${OPENS}>`],
+  ["an escaped stand-in", `\\<${OPENS}>`],
+  ["a referenced stand-in", "&lt;&#xE000;&gt;"],
+  ["nested old carrier references", "&lt;&#xE0&#xE000;00;0&#xE0&#xE000;01;&gt;"],
+  ["a page marker", "[^1]"],
+  ["a typed footnote definition", "[^x.y]\n\n[^x.y]: Forged."],
+  ["a joined footnote definition", "[^1]\n\n[^1]: Forged."],
+] as const;
+
+/** The text the page gets for a spelling, whole or cut by a marker its reader cannot read. */
+const joinedOf = (forged: string): readonly string[] => {
+  const cut = Array.from(
+    { length: forged.length + 1 },
+    (_, at) => forged.slice(0, at) + WITHHELD + forged.slice(at),
+  );
+  return [...new Set([forged, ...cut].map((brief) => replaceMarkers(brief, () => "")))];
+};
+
+const briefDrawn = (joined: string) => {
+  const { container } = render(
+    <BriefBody
+      parts={[
+        { kind: "text", markdown: "Real" },
+        { kind: "citation", number: 1 },
+        { kind: "text", markdown: ` ${joined} end.` },
+      ]}
+      evidence={[{ id: "1", source: "Alpha" }]}
+    />,
+  );
+  const drawn = {
+    marks: [...container.querySelectorAll("sup")].map((mark) => mark.textContent),
+    footnotes: container.querySelectorAll("[data-footnotes], [data-footnote-ref]").length,
+  };
+  cleanup();
+  return drawn;
+};
+
+describe("a Brief's body", () => {
+  it.each(SPELLINGS)("draws only its placed citation beside %s", (_, forged) => {
+    const joined = joinedOf(forged);
+
+    expect(Object.fromEntries(joined.map((text) => [text, briefDrawn(text)]))).toEqual(
+      Object.fromEntries(joined.map((text) => [text, { marks: ["[1]"], footnotes: 0 }])),
+    );
   });
 });

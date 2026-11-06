@@ -8,10 +8,16 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import Markdown, { type Components, type ExtraProps } from "react-markdown";
+import Markdown, { type Components, type ExtraProps, type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { linksAndMarksOf, uriDecoded } from "@better-answers/schema/concept-file";
+import {
+  citedMarkdownOf,
+  remarkCitations,
+  type BodyPart,
+  type Citation,
+} from "@better-answers/schema/cited-markdown";
+import { linksAndMarksOf, uriDecoded, type BodyReading } from "@better-answers/schema/concept-file";
 
 import { cn } from "@/shared/lib/utils.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -40,35 +46,38 @@ export type MarkOpening = {
   readonly inline: ReactNode;
 };
 
-const OPENS = "\uE000";
+type Mark = BodyReading["marks"][number];
 
-const CLOSES = "\uE001";
-
-const carrierOf = (mark: number): string => `<${OPENS}${String(mark)}${CLOSES}>`;
-
-const CARRIED = new RegExp(`<${OPENS}(\\d+)${CLOSES}>`, "u");
-
-const FORGED = new RegExp(`[${OPENS}${CLOSES}]|&#(?:x0*e00[01]|0*5734[45]);`, "giu");
-
-const unforged = (words: string): string => words.replaceAll(FORGED, "");
-
-type Placed = { readonly at: number; readonly mark: string };
-
-const carrying = (body: string, marks: readonly Placed[]): string => {
-  const pieces: string[] = [];
+/** A concept body cut where each of its marks stands, so the page reads no mark from its text. */
+const partsOf = (body: string, marks: readonly Mark[]): readonly BodyPart[] => {
+  const parts: BodyPart[] = [];
   let from = 0;
-  for (const [place, { at, mark }] of marks.entries()) {
-    pieces.push(unforged(body.slice(from, at)), carrierOf(place));
+  for (const { at, mark, source } of marks) {
+    parts.push(
+      { kind: "text", markdown: body.slice(from, at) },
+      { kind: "citation", number: source + 1 },
+    );
     from = at + mark.length;
   }
-  pieces.push(unforged(body.slice(from)));
-  return pieces.join("");
+  parts.push({ kind: "text", markdown: body.slice(from) });
+  return parts;
 };
 
-const CARRIED_IN_AN_ADDRESS = new RegExp(
-  `(?:<|%3C)(?:${OPENS}|%EE%80%80)\\d+(?:${CLOSES}|%EE%80%81)(?:>|%3E)`,
-  "giu",
-);
+type Handlers = NonNullable<NonNullable<Options["remarkRehypeOptions"]>["handlers"]>;
+
+type Handler = NonNullable<Handlers["citation"]>;
+
+/** Markdown's own syntax never makes an element of this name, so only a placed citation is drawn. */
+const CITED = "ba-citation";
+
+const citationDrawnAs: Handler = (_state, node: Citation): Element => ({
+  type: "element",
+  tagName: CITED,
+  properties: { dataPlace: node.place },
+  children: [],
+});
+
+const leftOut: Handler = () => undefined;
 
 type Cited = {
   readonly source: number;
@@ -106,15 +115,11 @@ type Drawn = {
 
 type Within = { readonly drawing: Drawing; readonly inLink: boolean };
 
-const wordsDrawn = (value: string, within: Within): Drawn => {
-  const { drawing, inLink } = within;
-  const pieces = value.split(CARRIED);
-  const marks = pieces.flatMap((piece, at) => (at % 2 === 1 ? [Number(piece)] : []));
+const citationDrawn = (node: Element, { drawing, inLink }: Within): Drawn => {
+  const place = Number(node.properties["dataPlace"]);
   return {
-    nodes: pieces.flatMap((piece, at) =>
-      at % 2 === 1 ? markOf(drawing, Number(piece), inLink) : piece === "" ? [] : [text(piece)],
-    ),
-    holds: !inLink && drawing.inlineUnder !== undefined && marks.includes(drawing.inlineUnder),
+    nodes: markOf(drawing, place, inLink),
+    holds: !inLink && drawing.inlineUnder === place,
     placed: false,
   };
 };
@@ -168,27 +173,15 @@ const childrenDrawn = (children: readonly Child[], within: Within, flows: boolea
   };
 };
 
-const withItsOwnAddress = (link: Element): Element => {
-  const { href } = link.properties;
-  if (typeof href !== "string") return link;
-  return {
-    ...link,
-    properties: { ...link.properties, href: href.replaceAll(CARRIED_IN_AN_ADDRESS, "") },
-  };
-};
-
 const elementDrawn = (node: Element, within: Within): Drawn => {
-  const isALink = node.tagName === "a";
-  const inside = { ...within, inLink: within.inLink || isALink };
+  const inside = { ...within, inLink: within.inLink || node.tagName === "a" };
   const drawn = childrenDrawn(node.children, inside, FLOWS.has(node.tagName));
-  const element = isALink ? withItsOwnAddress(node) : node;
-  return { ...drawn, nodes: [{ ...element, children: [...drawn.nodes] }] };
+  return { ...drawn, nodes: [{ ...node, children: [...drawn.nodes] }] };
 };
 
 const nodeDrawn = (node: Child, within: Within): Drawn => {
-  if (node.type === "element") return elementDrawn(node, within);
-  if (node.type === "text" || node.type === "raw") return wordsDrawn(node.value, within);
-  return { nodes: [node], holds: false, placed: false };
+  if (node.type !== "element") return { nodes: [node], holds: false, placed: false };
+  return node.tagName === CITED ? citationDrawn(node, within) : elementDrawn(node, within);
 };
 
 const marksDrawn =
@@ -352,8 +345,6 @@ const COMPONENTS: Components = {
   td: (properties) => <TableCell {...withoutNode(properties)} />,
 };
 
-const PLUGINS = [remarkGfm];
-
 const PROSE = cn(
   "max-w-measure wrap-anywhere",
   "[font-size:var(--prose-size,var(--text-lg))] [line-height:var(--prose-leading,var(--leading-prose))]",
@@ -367,40 +358,53 @@ const PROSE = cn(
 /** An id is safe in an address's fragment only as letters, digits and dashes. */
 const fragmentSafe = (id: string): string => id.replaceAll(/[^A-Za-z0-9_-]/gu, "");
 
-export function ConceptBody(properties: {
-  readonly body: string;
+type BodyProperties = {
   readonly evidence: readonly Evidence[];
   readonly bodyLinks?: readonly AnsweredLink[];
   readonly opening?: MarkOpening;
   readonly headingsFrom?: number;
-}) {
-  const { body, evidence, bodyLinks, opening, headingsFrom = 3 } = properties;
+};
+
+const citedIn = (
+  parts: readonly BodyPart[],
+  evidence: readonly Evidence[],
+  opening: MarkOpening | undefined,
+): readonly Cited[] =>
+  parts.flatMap((part) => {
+    if (part.kind === "text") return [];
+    const source = part.number - 1;
+    return [
+      {
+        source,
+        label: evidence[source]?.source ?? "",
+        opens: opening !== undefined && openingOf(evidence[source]) !== undefined,
+      },
+    ];
+  });
+
+function CitedBody(
+  properties: BodyProperties & {
+    readonly parts: readonly BodyPart[];
+    readonly handlers: Handlers;
+  },
+) {
+  const { parts, evidence, bodyLinks, opening, headingsFrom = 3 } = properties;
   const baseId = fragmentSafe(useId());
 
-  const read = useMemo(() => {
-    const { marks } = linksAndMarksOf(
-      body,
-      evidence.map((item) => ({ resource: item.source, locator: null, id: item.id ?? null })),
-    );
-    return { text: carrying(body, marks), marks };
-  }, [body, evidence]);
+  const cited = useMemo(() => citedMarkdownOf(parts), [parts]);
 
   const pages = useMemo(() => pagesByAddress(bodyLinks ?? []), [bodyLinks]);
 
   const held = useMemo<Held>(
     () => ({
       pages,
-      cited: read.marks.map(({ source }) => ({
-        source,
-        label: evidence[source]?.source ?? "",
-        opens: opening !== undefined && openingOf(evidence[source]) !== undefined,
-      })),
+      cited: citedIn(parts, evidence, opening),
       idOf: (mark) => `${baseId}-mark-${String(mark)}`,
       opening,
       headingsFrom,
       footnotesId: `${baseId}-footnotes`,
     }),
-    [pages, read.marks, evidence, opening, headingsFrom, baseId],
+    [pages, parts, evidence, opening, headingsFrom, baseId],
   );
 
   const opened = held.cited.findIndex((_, mark) => opening?.openerId === held.idOf(mark));
@@ -413,19 +417,57 @@ export function ConceptBody(properties: {
     <Body value={held}>
       <div className={PROSE}>
         <Markdown
-          remarkPlugins={PLUGINS}
+          remarkPlugins={[remarkGfm, [remarkCitations, cited.citations]]}
           rehypePlugins={[[marksDrawn, drawing]]}
           remarkRehypeOptions={{
             footnoteLabel: WORDS.footnotes,
             footnoteLabelProperties: {},
             footnoteBackContent: WORDS.backToTheClaim,
             clobberPrefix: `${baseId}-`,
+            handlers: properties.handlers,
           }}
           components={COMPONENTS}
         >
-          {read.text}
+          {cited.markdown}
         </Markdown>
       </div>
     </Body>
   );
+}
+
+const CONCEPT_HANDLERS: Handlers = { citation: citationDrawnAs };
+
+export function ConceptBody(properties: BodyProperties & { readonly body: string }) {
+  const { body, evidence } = properties;
+  const parts = useMemo(
+    () =>
+      partsOf(
+        body,
+        linksAndMarksOf(
+          body,
+          evidence.map((item) => ({
+            resource: item.source,
+            locator: null,
+            id: item.id ?? null,
+          })),
+        ).marks,
+      ),
+    [body, evidence],
+  );
+  return <CitedBody {...properties} parts={parts} handlers={CONCEPT_HANDLERS} />;
+}
+
+/** A Brief cites only through its parts. A footnote typed in its text is drawn as nothing, as the copy does. */
+const BRIEF_HANDLERS: Handlers = {
+  citation: citationDrawnAs,
+  footnoteReference: leftOut,
+  footnoteDefinition: leftOut,
+};
+
+export function BriefBody(
+  properties: Pick<BodyProperties, "evidence" | "headingsFrom"> & {
+    readonly parts: readonly BodyPart[];
+  },
+) {
+  return <CitedBody {...properties} handlers={BRIEF_HANDLERS} />;
 }

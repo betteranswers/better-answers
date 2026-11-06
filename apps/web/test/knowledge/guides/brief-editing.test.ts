@@ -135,11 +135,13 @@ describe("the Brief editor's stages", () => {
     });
   });
 
-  it("drops the earlier draft on request, and only while editing", () => {
+  it("drops the earlier draft on request, while editing or stale", () => {
     const latest = openedWith(3, "Pallets are binned.", undefined);
     const kept: BriefState = { stage: "editing", open: { ...latest, earlier: "Old words" } };
+    const keptStale: BriefState = { stage: "stale", open: { ...latest, earlier: "Old words" } };
 
     expect(after(kept, { type: "discard" })).toStrictEqual({ stage: "editing", open: latest });
+    expect(after(keptStale, { type: "discard" })).toStrictEqual({ stage: "stale", open: latest });
     expect(after(editing, { type: "discard" })).toBe(editing);
     expect(after({ stage: "saving", open: kept.open }, { type: "discard" })).toStrictEqual({
       stage: "saving",
@@ -156,11 +158,27 @@ describe("the Brief editor's stages", () => {
 
 describe("the draft", () => {
   it("opens on a kept draft when there is one", () => {
-    expect(openedWith(2, "Pallets are racked.", "Kept words")).toStrictEqual({
+    expect(
+      openedWith(2, "Pallets are racked.", { markdown: "Kept words", earlier: undefined }),
+    ).toStrictEqual({
       base: 2,
       original: "Pallets are racked.",
       markdown: "Kept words",
       earlier: undefined,
+    });
+  });
+
+  it("opens on the earlier draft kept beside the Brief", () => {
+    expect(
+      openedWith(3, "Pallets are binned.", {
+        markdown: "Pallets are binned.",
+        earlier: "Old words",
+      }),
+    ).toStrictEqual({
+      base: 3,
+      original: "Pallets are binned.",
+      markdown: "Pallets are binned.",
+      earlier: "Old words",
     });
   });
 
@@ -176,8 +194,18 @@ describe("the draft", () => {
     expect(hasUnsaved(restored)).toBe(false);
   });
 
+  it("counts an earlier draft kept beside the Brief as unsaved", () => {
+    const kept: BriefState = { stage: "editing", open: { ...OPEN, earlier: "Old words" } };
+
+    expect(hasUnsaved(kept)).toBe(true);
+    expect(hasUnsaved(after(kept, { type: "discard" }))).toBe(false);
+  });
+
   it("saves against the version it opened with", () => {
-    const edited = openedWith(2, "Pallets are racked.", "Changed");
+    const edited = openedWith(2, "Pallets are racked.", {
+      markdown: "Changed",
+      earlier: undefined,
+    });
 
     expect(savedAs("write-up", edited)).toEqual({
       writeUpId: "write-up",
@@ -187,8 +215,10 @@ describe("the draft", () => {
   });
 
   it("names the footnotes already placed in the draft", () => {
-    const placed = placedIn("Pallets[^a1] are racked[^b-2] by row[^a1]. A note[^c]: not a marker.");
+    const placed = placedIn(
+      "Pallets[^a1] are racked[^b-2] by row[^a1]. A note[^c]: is one.\n\n[^d]: is not.",
+    );
 
-    expect([...placed]).toEqual(["a1", "b-2"]);
+    expect([...placed]).toEqual(["a1", "b-2", "c"]);
   });
 });

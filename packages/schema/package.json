@@ -8,6 +8,7 @@
     "./ulid": "./src/ulid.ts",
     "./concept-file": "./src/knowledge/concept-file.ts",
     "./brief-marker": "./src/knowledge/brief-marker.ts",
+    "./cited-markdown": "./src/knowledge/cited-markdown.ts",
     "./scan": "./src/knowledge/scan.ts",
     "./table-ownership": "./src/table-ownership.ts",
     "./code-unit": "./src/code-unit.ts",
@@ -44,9 +45,12 @@
   },
   "devDependencies": {
     "@testcontainers/postgresql": "12.2.1",
+    "@types/mdast": "4.0.4",
     "@types/node": "24.19.2",
     "@types/pg": "8.23.1",
     "drizzle-kit": "0.31.11",
+    "mdast-util-from-markdown": "2.1.0",
+    "micromark-util-types": "2.0.3",
     "pg": "8.23.1",
     "typescript": "7.0.2",
     "vitest": "5.0.5"

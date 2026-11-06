@@ -112,6 +112,23 @@ describe("moving among a Brief's footnote chips", () => {
     expect(chip?.textContent).toBe(`Footnote: ${RACKING_TITLE}`);
   });
 
+  it("draws a chip that a colon follows", () => {
+    render(
+      <BriefBody
+        label={LABEL}
+        value={`Pallets[^${AN_INCLUDE_ID}]: are racked.`}
+        includes={INCLUDES}
+        placed={new Set([AN_INCLUDE_ID])}
+        onChange={vi.fn<(markdown: string) => void>()}
+      />,
+    );
+
+    const chip = textField().querySelector("[data-footnote-reference]");
+    expect(chip?.getAttribute("data-footnote-reference")).toBe(AN_INCLUDE_ID);
+    expect(textField().textContent).toContain(": are racked.");
+    expect(textField().textContent).not.toContain(AN_INCLUDE_ID);
+  });
+
   it("moves past a footnote chip with one arrow key", async () => {
     const onChange = draw();
 
@@ -314,6 +331,12 @@ describe("a Brief saved after you opened it", () => {
     expect(screen.getByRole("button", { name: "Reload the Brief" })).toBeDefined();
   });
 
+  it("moves focus to Reload the Brief", async () => {
+    await refused();
+
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Reload the Brief" }));
+  });
+
   it("reloads onto the latest version on request", async () => {
     const api = await refused();
     api.set(SAVE_BRIEF, savedAt(4));
@@ -373,13 +396,71 @@ describe("a Brief saved after you opened it", () => {
       expect([field.selectionStart, field.selectionEnd]).toEqual([0, field.value.length]);
     });
 
+    const discarded = () => {
+      fireEvent.click(screen.getByRole("button", { name: "Discard This Text" }));
+      expect(screen.queryByRole("textbox", { name: EARLIER })).toBeNull();
+    };
+
     it("goes when discarded, and focus stays in the editor", async () => {
       await reloaded();
 
+      discarded();
+
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save Brief" }));
+    });
+
+    it("stops saying the text is kept once it is discarded", async () => {
+      await reloaded();
+      expect(status().textContent).toContain("kept below");
+
       fireEvent.click(screen.getByRole("button", { name: "Discard This Text" }));
 
-      expect(screen.queryByRole("textbox", { name: EARLIER })).toBeNull();
-      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save Brief" }));
+      expect(status().textContent).toMatch(/Discarded/u);
+      expect(status().textContent).not.toContain("kept below");
+    });
+
+    it("goes when discarded while a later save is stale", async () => {
+      await reloaded();
+      await typedAtTheEnd(" again");
+      saveBrief();
+      await screen.findByRole("button", { name: "Reload the Brief" });
+
+      discarded();
+
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Reload the Brief" }));
+    });
+
+    it("asks before the page is left", async () => {
+      await reloaded();
+
+      fireEvent.click(screen.getByRole("link", { name: "Add This Fact" }));
+
+      expect(await screen.findByRole("alertdialog")).toBeDefined();
+    });
+
+    it("comes back when the editor is closed and opened again", async () => {
+      await reloaded();
+      const kept = earlierField().value;
+
+      fireEvent.click(screen.getByRole("button", { name: "Close Editor" }));
+      fireEvent.click(screen.getByRole("button", { name: "Edit Brief" }));
+
+      await waitFor(() => {
+        expect(earlierField().value).toBe(kept);
+      });
+      expect(textField().textContent).toContain("Someone else's words");
+    });
+
+    it("asks nothing once it is discarded", async () => {
+      await reloaded();
+      fireEvent.click(screen.getByRole("button", { name: "Discard This Text" }));
+
+      fireEvent.click(screen.getByRole("link", { name: "Add This Fact" }));
+
+      await waitFor(() => {
+        expect(screen.queryByRole("link", { name: "Add This Fact" })).toBeNull();
+      });
+      expect(screen.queryByRole("alertdialog")).toBeNull();
     });
 
     it("goes once the Brief is saved", async () => {
