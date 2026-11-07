@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { copiedToTheClipboard } from "@/shared/lib/clipboard.ts";
 import { STOCK, stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { QRCode } from "@/shared/ui/kibo-ui/qr-code.tsx";
@@ -8,7 +9,6 @@ import { QRCode } from "@/shared/ui/kibo-ui/qr-code.tsx";
 import { ACCOUNT_ACTIONS, AUTHENTICATOR_WORDS } from "../account-words.ts";
 import { CodeRefused, SIGNED_OUT, TOO_MANY_REQUESTS } from "../auth-hooks.ts";
 import { Outcome } from "../auth-page.tsx";
-import { copiedToTheClipboard } from "../clipboard.ts";
 import {
   AUTHENTICATOR_CODE_WRONG,
   RESTORE_CODE_NEEDED,

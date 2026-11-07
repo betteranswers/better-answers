@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 
 import { CONNECT_ASSISTANT } from "@/app/words.ts";
-import { copiedToTheClipboard } from "@/features/auth/clipboard.ts";
+import { copiedToTheClipboard } from "@/shared/lib/clipboard.ts";
 import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { PageHead } from "@/shared/page/page-head.tsx";
