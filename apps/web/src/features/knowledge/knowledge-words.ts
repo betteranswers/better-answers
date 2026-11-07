@@ -35,10 +35,13 @@ export const SAID_OF_COLLECTIONS = {
 
 export const SEARCH_WORDS = {
   search: "Search by a word or a question",
-  nothingAsked: "Type to search.",
+  nothingAsked: "Type a word or a question to search your company’s knowledge.",
   searching: (query: string): string => `Searching for ${quoted(query)}.`,
-  noMatches: (query: string): string =>
-    `No results found for ${quoted(query)}. Try a different word or question.`,
+  noMatches: (query: string): string => `Nothing matches ${quoted(query)}.`,
+  askThisQuestion: "Ask this question",
+  browseGuides: "Guides",
+  browseKnowledgeBase: "Knowledge Base",
+  whereNext: "Where to look next",
   matched: (query: string, more: boolean): string =>
     more
       ? `Showing the first matches for ${quoted(query)}.`

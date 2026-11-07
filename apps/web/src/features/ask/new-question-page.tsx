@@ -1,9 +1,10 @@
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
+import { useAsked } from "@/shared/address/address-ask.ts";
 import { ceilingLiftsIn, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
-import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { NEW_QUESTION } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
@@ -18,10 +19,6 @@ import { AnswerView } from "./answer-view.tsx";
 import { useAnswering, type Answering } from "./ask-api.ts";
 import { ASK_KEYSTROKES as KEY, QUESTION_MAX } from "./ask-state.ts";
 import { ASK_WORDS as WORDS } from "./ask-words.ts";
-
-const ASKING = menuGroupIn(ASK, "ask");
-
-const NEW_QUESTION = pageNamed(ASKING, "New Question");
 
 const LISTED = Object.values(KEY);
 
@@ -93,6 +90,9 @@ function QuestionForm(properties: {
   const id = useId();
   const box = useRef<HTMLTextAreaElement>(null);
   const [question, setQuestion] = useState("");
+  useAsked("question", (asked) => {
+    setQuestion(asked.slice(0, QUESTION_MAX));
+  });
   const [named, setNamed] = useState<ReadonlySet<string>>(new Set());
   const [blank, setBlank] = useState(false);
   useKeystroke(KEY.question, () => {

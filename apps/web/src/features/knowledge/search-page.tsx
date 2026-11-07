@@ -12,40 +12,23 @@ import {
 
 import { useAsked } from "@/shared/address/address-ask.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
-import {
-  conceptMatchKey,
-  conceptPageOf,
-  RETURNED_TO,
-  SEARCH_PAGE,
-} from "@/shared/knowledge/concept-address.ts";
-import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
-import {
-  EvidenceInline,
-  EvidenceSheet,
-  SensitivityTag,
-  type Heading,
-  type Opened,
-} from "@/shared/knowledge/evidence-panel.tsx";
-import { KindLine } from "@/shared/knowledge/kind-line.tsx";
+import { conceptPageOf, RETURNED_TO, SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
+import { EvidenceSheet, type Heading, type Opened } from "@/shared/knowledge/evidence-panel.tsx";
 import { useOpenMatch } from "@/shared/knowledge/open-match.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
-import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
 import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { FilterRow } from "@/shared/list/filter-row.tsx";
-import { RowLink } from "@/shared/list/grid-table.tsx";
 import { ListPages, ListState } from "@/shared/list/list-pages.tsx";
 import { keyedRow, rowInFocus } from "@/shared/list/row-focus.ts";
 import { useSearchedList } from "@/shared/list/searched-list.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { useRoomBeside } from "@/shared/page/wide-layout.ts";
-import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 
 import {
   asksNothing,
   useMatches,
-  type ConceptMatch,
   type Match,
   type Matches,
   type PassageMatch,
@@ -59,13 +42,19 @@ import {
 } from "./knowledge-state.ts";
 import { SEARCH_WORDS as WORDS } from "./knowledge-words.ts";
 import { NewConcept, NewConceptOffer, type NewConceptHeld } from "./new-concept.tsx";
+import {
+  ConceptLine,
+  keyOf,
+  openerIdOf,
+  PassageLine,
+  type Opening,
+  type Reading,
+} from "./search-lines.tsx";
+import { WhereNext } from "./search-where-next.tsx";
 
 const LISTED = Object.values(KEY);
 
 const LISTED_WITH_EDITOR = [...LISTED, ...Object.values(EDITOR_KEYSTROKES)];
-
-const keyOf = (match: Match): string =>
-  match.layer === "bundles" ? conceptMatchKey(match.iri) : `sources:${match.locator}`;
 
 const matchesOf = (data: Matches["data"]): readonly Match[] => {
   const seen = new Set<string>();
@@ -123,8 +112,6 @@ const changeOf = (
   return { opened: { ...opened, waited: true }, left: false };
 };
 
-const openerIdOf = (key: string): string => `opener-${encodeURIComponent(key)}`;
-
 const chosenOf = (match: PassageMatch): Omit<Opened, "pressed"> => {
   const key = keyOf(match);
   return {
@@ -134,90 +121,6 @@ const chosenOf = (match: PassageMatch): Omit<Opened, "pressed"> => {
     source: { kind: "passage", locator: match.locator, unmapped: true },
   };
 };
-
-const TITLE = "min-w-0 grow basis-48 font-medium break-words";
-
-type Returning = { readonly key: string | undefined; readonly landed: () => void };
-
-type Reading = {
-  readonly returning: Returning;
-  readonly onRead: (match: ConceptMatch, page: string) => void;
-};
-
-function ConceptLine(properties: {
-  readonly match: ConceptMatch;
-  readonly opening: Opening;
-  readonly reading: Reading;
-}) {
-  const { match, opening, reading } = properties;
-  const page = conceptPageOf(match.iri);
-  const land = useLandingLine(keyOf(match) === reading.returning.key, reading.returning.landed);
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      {page === undefined ? (
-        <span className={TITLE}>{match.title}</span>
-      ) : (
-        <RowLink
-          ref={land}
-          href={page}
-          className={TITLE}
-          onOpen={() => {
-            opening.open(match);
-          }}
-        >
-          {match.title}
-        </RowLink>
-      )}
-      <TrustMark trust={match.trust} words={match.trustWords} />
-      <KindLine
-        kind={match.kind}
-        collection={match.collection ?? CONCEPT_WORDS.noCollection}
-        className="basis-full"
-      />
-    </div>
-  );
-}
-
-type Opening = {
-  readonly opened: Opened | undefined;
-  readonly beside: boolean;
-  readonly focusFromBodyOr: Heading | undefined;
-  readonly open: (match: Match) => void;
-  readonly onClose: () => void;
-};
-
-function PassageLine(properties: { readonly match: PassageMatch; readonly opening: Opening }) {
-  const { match, opening } = properties;
-  const key = keyOf(match);
-  const opened = opening.opened?.key === key ? opening.opened : undefined;
-  return (
-    <>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <Button
-          id={openerIdOf(key)}
-          variant="link"
-          aria-expanded={opened !== undefined}
-          className={`h-auto justify-start px-0 text-left whitespace-normal ${TITLE}`}
-          onClick={() => {
-            opening.open(match);
-          }}
-        >
-          {match.title}
-        </Button>
-        <SensitivityTag sensitivity={match.sensitivity} />
-        <KindLine kind={WORDS.document} className="basis-full" />
-      </div>
-      <p className="mt-1 break-words text-muted-foreground">{match.openingLine}</p>
-      {opened === undefined || opening.beside ? null : (
-        <EvidenceInline
-          opened={opened}
-          onClose={opening.onClose}
-          focusFromBodyOr={opening.focusFromBodyOr}
-        />
-      )}
-    </>
-  );
-}
 
 function MatchLine(properties: {
   readonly match: Match;
@@ -444,8 +347,11 @@ const useOpenKey = (query: string, shown: readonly Match[], open: (match: Match)
   return { unopened: unopenedIn === query, open: opening };
 };
 
+const foundNothing = (searched: Searched, shown: number): boolean =>
+  searched === "listed" && shown === 0;
+
 const offersANewConcept = (searched: Searched, shown: number, held: NewConceptHeld): boolean =>
-  searched === "listed" && shown === 0 && held.new === "";
+  foundNothing(searched, shown) && held.new === "";
 
 const listedFor = (held: NewConceptHeld) => (held.new === "" ? LISTED : LISTED_WITH_EDITOR);
 
@@ -497,6 +403,7 @@ function SearchRegion() {
         <FilterRow
           search={{
             label: WORDS.search,
+            wide: true,
             maxLength: QUERY_MAX,
             value: search,
             onChange: setSearch,
@@ -509,6 +416,7 @@ function SearchRegion() {
           {panel.unlisted ? ` ${WORDS.passageLeft}` : null}
           {openKey.unopened ? ` ${WORDS.selectFirst}` : null}
         </output>
+        {foundNothing(searched, shown.length) ? <WhereNext query={query} /> : null}
         <NewConceptOffer
           offered={offersANewConcept(searched, shown.length, state)}
           onOffer={() => {

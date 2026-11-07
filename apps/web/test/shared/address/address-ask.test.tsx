@@ -109,6 +109,15 @@ describe("encoding a URL parameter", () => {
     expect(askingHere(here, "/members", "action", "invite")).toBe("/members?action=invite");
   });
 
+  it("carries a question to another page and reads it back", () => {
+    const to = askingHere(here, "/ask/new-question", "question", "Can we bill in euros?");
+
+    expect(to).toBe("/ask/new-question?question=Can+we+bill+in+euros%3F");
+    expect(askedIn(new URLSearchParams(to.split("?")[1]), "question")).toBe(
+      "Can we bill in euros?",
+    );
+  });
+
   it("decodes an unquoted value as written", () => {
     expect(askedIn(new URLSearchParams("?search=1.5"), "search")).toBe("1.5");
     expect(askedIn(new URLSearchParams("?search=audit+logs"), "search")).toBe("audit logs");

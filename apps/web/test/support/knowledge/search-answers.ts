@@ -6,6 +6,7 @@ import { CONCEPT_IRI_PREFIX } from "@better-answers/schema/concept-file";
 
 import { MATCHES_A_PAGE, SEARCH_LIST } from "@/features/knowledge/knowledge-state.ts";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
+import type { Concept } from "@/shared/knowledge/knowledge-reads.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { server } from "@test/stub-server.ts";
 import { holdProcedure, type Api } from "@test/stubbed-api.ts";
@@ -89,16 +90,24 @@ const ULID_LENGTH = 26;
 const iriOf = (number: number): string =>
   `${CONCEPT_IRI_PREFIX}${String(number).padStart(ULID_LENGTH, "0")}`;
 
-const aConcept = (title: string, number: number): Match => ({
+export const aConceptMatch = (
+  title: string,
+  number: number,
+  over: Readonly<Record<string, unknown>> = {},
+): Match => ({
   layer: "bundles",
   iri: iriOf(number),
   kind: "Answer",
   title,
+  description: null,
   trust: { tier: "unverified", status: "current", verifiedBy: null, verifiedAt: null, rider: null },
   trustWords: "Unverified",
   collection: null,
   tags: [],
+  ...over,
 });
+
+const aConcept = (title: string, number: number): Match => aConceptMatch(title, number);
 
 export const AUDIT_LOGS_RETENTION = aConcept("Audit Logs Retention", 1);
 
@@ -106,12 +115,20 @@ export const AUDIT_COMMITTEE = aConcept("Audit Committee", 2);
 
 export const FORKLIFT_LICENCES = aConcept("Forklift Licences", 4);
 
+export const aConceptIri = (iri: string) => z.string().brand<"ConceptIri">().parse(iri);
+
+export const aPersonId = (id: string) => z.string().brand<"UserId">().parse(id);
+
+/** A concept as `knowledge.open` answers it: unverified, in no collection, owned by nobody, cited by nothing. */
 export const anOpenedConcept = (
   iri: string,
-  frontmatter: Readonly<Record<string, unknown>>,
+  frontmatter: Concept["frontmatter"],
   body: string,
-) => ({
-  iri,
+  over: Partial<Concept> = {},
+): Concept => ({
+  iri: aConceptIri(iri),
+  path: "knowledge/concept.md",
+  collection: null,
   frontmatter,
   body,
   relations: [],
@@ -122,10 +139,61 @@ export const anOpenedConcept = (
   owner: null,
   usedIn: { guides: 0, answers: 0 },
   evidence: [],
-  access: "You can read this concept.",
+  access: "included",
   lead: "This concept answers from what the company has recorded.",
   next: "Ask a question to use it.",
+  ...over,
 });
+
+export const PRIYA: Concept["verifications"][number] = {
+  tier: "human-reviewed",
+  actor: "human:01JBZ6Q2V7Y9K3M5N8P0R2T4W6",
+  name: "Priya Shah",
+  at: "2026-03-03T14:30:00.000Z",
+};
+
+export const THE_EXTRACTOR: Concept["verifications"][number] = {
+  tier: "machine-confirmed",
+  actor: "process:better-answers-verifier",
+  name: null,
+  at: "2026-02-12T10:00:00.000Z",
+};
+
+export const VERIFIED_BY_PRIYA: Concept["trust"] = {
+  tier: "human-reviewed",
+  status: "current",
+  verifiedBy: "Priya Shah",
+  verifiedAt: PRIYA.at,
+  rider: null,
+};
+
+/** An opened concept with a value in every row of the title block: verified by Priya, with history. */
+export const anIssuedConcept = (over: Partial<Concept> = {}): Concept =>
+  anOpenedConcept(
+    "https://better-answers.com/c/01JRETENTN000000000000000A",
+    {
+      title: "Safeguarding Children Partnerships",
+      type: "Sector",
+      description: "How local partnerships keep children safe, and who buys training and audits.",
+      generated: [{ by: "okf-extract/0.4", at: "2026-02-10" }],
+      stale_after: "2026-09-03",
+    },
+    "Safeguarding Children Partnerships bring the local authority and police together.",
+    {
+      path: "knowledge/sectors/safeguarding-children-partnerships.md",
+      collection: "Sectors",
+      trust: VERIFIED_BY_PRIYA,
+      trustWords: "Verified by Priya Shah · 3 March 2026",
+      verifications: [PRIYA, THE_EXTRACTOR],
+      owner: {
+        personId: aPersonId("01JBZ6Q2V7Y9K3M5N8P0R2T4W7"),
+        name: "Ifan Morgan",
+        via: "collection",
+      },
+      usedIn: { guides: 3, answers: 12 },
+      ...over,
+    },
+  );
 
 export const aConceptRead = (title: string, number: number) =>
   read({
