@@ -1476,6 +1476,8 @@ describe("opening a concept by IRI", () => {
 
     expect(await openedConcept(scenario, written.iri)).toEqual({
       iri: written.iri,
+      path: input.path,
+      collection: "policy",
 
       frontmatter: {
         title: "Expenses",

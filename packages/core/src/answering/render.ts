@@ -14,9 +14,8 @@ import {
   NO_COLLECTION,
   NOT_COMPANY_KNOWLEDGE,
   NOT_ANSWERED,
-  type FindMatch,
-  type FindResult,
-  type OpenView,
+  type FoundForText,
+  type OpenedForText,
   type ConceptView,
   type AnswerResult,
 } from "./results.ts";
@@ -26,12 +25,12 @@ const conceptLine = (
 ): string =>
   `${concept.kind} · ${concept.title} · ${concept.collection ?? NO_COLLECTION} · ${concept.trustWords} · ${concept.iri}`;
 
-const findLine = (match: FindMatch<string>): string =>
+const findLine = (match: FoundForText["matches"][number]): string =>
   match.layer === "bundles"
     ? conceptLine(match)
     : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator} · ${JSON.stringify(match.openingLine)}`;
 
-export const renderFind = (result: FindResult<string>): string => {
+export const renderFind = (result: FoundForText): string => {
   if (result.matches.length === 0) return "Nothing in the company's knowledge matches that.";
   const lines = result.matches.map(findLine);
   return result.nextCursor === undefined
@@ -45,7 +44,7 @@ export const renderFind = (result: FindResult<string>): string => {
 
 const quoted = (text: string): readonly string[] => text.split(/\r?\n/u).map((line) => `> ${line}`);
 
-export const renderOpen = (result: OpenView<string>): string => {
+export const renderOpen = (result: OpenedForText): string => {
   if (!result.found) {
     return result.iri === undefined
       ? `No passage at ${result.locator ?? "that link"}.`
@@ -77,7 +76,7 @@ const verificationLine = ({ tier, actor, name, at }: VerificationEvent): string 
     ? `- Verified by ${name ?? verifierWords(actor)} · ${ukLongDate(at)}`
     : `- Verified automatically · ${ukLongDate(at)}`;
 
-const ownerLines = ({ owner }: ConceptView<string>): readonly string[] => {
+const ownerLines = ({ owner }: Pick<ConceptView<string>, "owner">): readonly string[] => {
   if (owner === null) return [];
   return [
     owner.via === "concept" ? `Owner: ${owner.name}` : `Owner: ${owner.name}, for its collection`,
@@ -87,12 +86,16 @@ const ownerLines = ({ owner }: ConceptView<string>): readonly string[] => {
 const counted = (count: number, noun: string): string =>
   `${count} ${noun}${count === 1 ? "" : "s"}`;
 
-const usedInLines = ({ usedIn: { guides, answers } }: ConceptView<string>): readonly string[] =>
+const usedInLines = ({
+  usedIn: { guides, answers },
+}: Pick<ConceptView<string>, "usedIn">): readonly string[] =>
   guides + answers === 0
     ? []
     : [`Used in ${counted(guides, "guide")} and ${counted(answers, "answer")}.`];
 
-const conceptText = (concept: ConceptView<string>): string => {
+const conceptText = (
+  concept: NonNullable<Extract<OpenedForText, { found: true }>["concept"]>,
+): string => {
   const title =
     typeof concept.frontmatter["title"] === "string" ? concept.frontmatter["title"] : concept.iri;
   const evidence = evidenceLines(concept.evidence);

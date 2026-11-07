@@ -27,12 +27,13 @@ type ConceptShape = {
   readonly title: string;
   readonly body?: string;
   readonly kind?: string;
+  readonly description?: string;
   readonly sensitivity?: string;
 };
 
 const conceptLanded = (
   workspaceId: string,
-  { title, body, kind = "Policy", sensitivity }: ConceptShape,
+  { title, body, kind = "Policy", description, sensitivity }: ConceptShape,
 ): Promise<ConceptIri> =>
   seededBy(db(), async (seed) => {
     const row = await seed.conceptIndex({
@@ -40,7 +41,7 @@ const conceptLanded = (
       title,
       kind,
       body: body ?? UNRELATED,
-      frontmatter: { title, type: kind },
+      frontmatter: { title, type: kind, ...(description === undefined ? {} : { description }) },
       ...(sensitivity === undefined ? {} : { sensitivity }),
     });
     return ids.conceptIri.parse(row.iri);
@@ -116,6 +117,29 @@ describe("find matches any of the query's words", () => {
     ]);
 
     expect(titlesOf(await searching(viewer, "audit logs"))).toEqual(["Audit Logs", "Records"]);
+  });
+
+  it("gives a match its description, or null without one", async () => {
+    const { workspaceId, viewer } = await arrange();
+    await conceptsLanded(workspaceId, [
+      { title: "Audit trail", description: "  How we record who changed what.  " },
+      { title: "Audit plan", description: "   " },
+      { title: "Audit scope" },
+    ]);
+
+    const found = await searching(viewer, "audit");
+
+    expect(found.matches).toHaveLength(3);
+    expect(found.matches).toEqual(
+      matching.arrayContaining([
+        matching.objectContaining({
+          title: "Audit trail",
+          description: "How we record who changed what.",
+        }),
+        matching.objectContaining({ title: "Audit plan", description: null }),
+        matching.objectContaining({ title: "Audit scope", description: null }),
+      ]),
+    );
   });
 
   it("finds a concept by a word only in its kind", async () => {

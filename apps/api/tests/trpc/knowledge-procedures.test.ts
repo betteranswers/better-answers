@@ -193,6 +193,11 @@ const inCoresKeys = (hit: Rpc): Rpc => {
   return { ...hit, trust: { ...trust, verifiedBy: checkedBy, verifiedAt: checkedAt } };
 };
 
+const withoutDescription = (match: Rpc): Rpc => {
+  const { description: _description, ...rest } = match;
+  return rest;
+};
+
 const mcpFoundBy = async (person: { readonly email: string }, args: Rpc) => {
   const client = app().client();
   const { accessToken } = await connectAsHost(app(), client, person, {
@@ -203,14 +208,20 @@ const mcpFoundBy = async (person: { readonly email: string }, args: Rpc) => {
 };
 
 describe("knowledge.find over tRPC", () => {
-  it("matches MCP find's first page at the same limit", async () => {
+  it("matches MCP find's first page, adding a description", async () => {
     const { workspace } = await aWorkspaceOfHerons();
     const { api } = await webSignedIn(app(), workspace.admin.email);
 
     const page = await api.knowledge.find.query({ query: QUERY, limit: 2 });
 
     expect(page.nextCursor).toBeDefined();
-    expect(page).toEqual(await mcpFoundBy(workspace.admin, { query: QUERY, limit: 2 }));
+    expect({ ...page, matches: page.matches.map(withoutDescription) }).toEqual(
+      await mcpFoundBy(workspace.admin, { query: QUERY, limit: 2 }),
+    );
+    expect(page.matches).toEqual([
+      matching.objectContaining({ description: null }),
+      matching.objectContaining({ description: null }),
+    ]);
   });
 
   it("pages with nextCursor to the end without repeating a match", async () => {
@@ -925,6 +936,10 @@ describe("a guide over tRPC", () => {
     for (const answer of [outsiders, editors]) {
       expect(JSON.stringify(answer)).not.toContain("citedIris");
     }
+    expect(sectionOf(editors.sections, INSURANCE)).toMatchObject({
+      trust: { tier: "human-reviewed", status: "current" },
+      trustWords: matching.stringMatching(/^Verified by /u),
+    });
     expect(JSON.stringify(outsiders)).not.toContain(PROFESSIONAL_INDEMNITY);
   });
 

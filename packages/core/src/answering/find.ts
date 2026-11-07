@@ -33,6 +33,11 @@ const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
   return Array.isArray(tags) ? tags.filter((tag) => typeof tag === "string") : [];
 };
 
+const descriptionOf = (frontmatter: Frontmatter): string | null => {
+  const description = frontmatter["description"];
+  return typeof description === "string" && description.trim() !== "" ? description.trim() : null;
+};
+
 type Positioned<Match> = { readonly match: Match; readonly position: FindPosition };
 
 type RunReader<Match> = (
@@ -188,6 +193,7 @@ const conceptMatchOf = (concept: OpenedConcept, now: Date): ConceptMatch<Concept
     iri: concept.iri,
     kind: concept.kind,
     title: concept.title,
+    description: descriptionOf(concept.frontmatter),
     trust,
     trustWords: trustWords(trust),
     collection: concept.collection,

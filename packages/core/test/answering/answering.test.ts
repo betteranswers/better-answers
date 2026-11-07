@@ -1928,6 +1928,7 @@ describe("find and open across concepts and source passages", () => {
             iri,
             kind: "Policy",
             title: CONCEPT_TITLE,
+            description: null,
             trust: unverified,
             trustWords: "Unverified",
             collection: null,
