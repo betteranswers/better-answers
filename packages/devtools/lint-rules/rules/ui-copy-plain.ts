@@ -153,14 +153,17 @@ const longestFirst = (phrases: readonly Phrase[]): readonly Phrase[] =>
     (left, right) => right.length - left.length,
   );
 
-export const ALLOWED_PHRASES: readonly Phrase[] = longestFirst([
-  ...nonEmpty("GLOSSARY.md", "capitalised words inside its definitions", glossaryPhrases()),
-  ...ROLES.map((role): Phrase => [role]),
-  ...nonEmpty("PRODUCT.md", "a list of trust words", trustPhrases()),
-]);
+let allowed: readonly Phrase[] | undefined;
+
+export const allowedPhrases = (): readonly Phrase[] =>
+  (allowed ??= longestFirst([
+    ...nonEmpty("GLOSSARY.md", "capitalised words inside its definitions", glossaryPhrases()),
+    ...ROLES.map((role): Phrase => [role]),
+    ...nonEmpty("PRODUCT.md", "a list of trust words", trustPhrases()),
+  ]));
 
 const phraseAt = (cores: readonly string[], at: number): Phrase | undefined =>
-  ALLOWED_PHRASES.find((phrase) => phrase.every((word, offset) => cores[at + offset] === word));
+  allowedPhrases().find((phrase) => phrase.every((word, offset) => cores[at + offset] === word));
 
 const hasStrayCapital = (cores: readonly string[]): boolean => {
   let at = 0;

@@ -5,7 +5,7 @@ import { oxlintBatchOver } from "@better-answers/devtools/throwaway-tree";
 import type { PlannedLint, Tree } from "@better-answers/devtools/throwaway-tree";
 import { ROLES } from "@better-answers/schema/roles";
 
-import { ALLOWED_PHRASES, BANNED_PATTERNS } from "../../lint-rules/rules/ui-copy-plain.ts";
+import { allowedPhrases, BANNED_PATTERNS } from "../../lint-rules/rules/ui-copy-plain.ts";
 import { wordsOf } from "../support/fixture-text.ts";
 
 const RULE = "better-answers/ui-copy-plain";
@@ -262,21 +262,21 @@ describe("the plain copy rule leaves non-copy alone", () => {
 
 describe("the plain copy rule builds its allow-list from the docs", () => {
   it("holds the proper nouns of the glossary", () => {
-    expect(ALLOWED_PHRASES).toContainEqual(["Control", "Centre"]);
-    expect(ALLOWED_PHRASES).toContainEqual(["Open", "Knowledge", "Format"]);
-    expect(ALLOWED_PHRASES).toContainEqual(["Claude"]);
+    expect(allowedPhrases()).toContainEqual(["Control", "Centre"]);
+    expect(allowedPhrases()).toContainEqual(["Open", "Knowledge", "Format"]);
+    expect(allowedPhrases()).toContainEqual(["Claude"]);
   });
 
   it("leaves out a word that only opens a sentence", () => {
-    expect(ALLOWED_PHRASES).not.toContainEqual(["One"]);
+    expect(allowedPhrases()).not.toContainEqual(["One"]);
   });
 
   it("holds every role", () => {
-    for (const role of ROLES) expect(ALLOWED_PHRASES).toContainEqual([role]);
+    for (const role of ROLES) expect(allowedPhrases()).toContainEqual([role]);
   });
 
   it("holds the seven trust words as written", () => {
-    expect(ALLOWED_PHRASES).toEqual(
+    expect(allowedPhrases()).toEqual(
       expect.arrayContaining([
         ["Verified", "by"],
         ["Verified", "automatically"],
