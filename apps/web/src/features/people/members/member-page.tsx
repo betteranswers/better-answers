@@ -15,7 +15,6 @@ import { cn } from "@/shared/lib/utils.ts";
 import { ListState } from "@/shared/list/list-pages.tsx";
 import { Address } from "@/shared/member/address.tsx";
 import { initialsOf } from "@/shared/member/initials.ts";
-import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
@@ -36,8 +35,6 @@ import {
   type Removed,
 } from "./members-address.ts";
 import { useSelfActionHome } from "./self-action.tsx";
-
-const people = menuGroupIn(CONTROL_CENTRE, "people");
 
 const KEYSTROKES: readonly Keystroke[] = Object.values(KEY);
 
@@ -134,25 +131,17 @@ function NoSuchMember() {
   );
 }
 
-function MemberHeader(properties: {
-  readonly member: ListedMember;
-  readonly titleRef: RefObject<HTMLHeadingElement | null>;
-}) {
-  const { member, titleRef } = properties;
+function MemberHeader(properties: { readonly member: ListedMember }) {
+  const { member } = properties;
 
   return (
     <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
       <Avatar aria-hidden className="size-10">
         <AvatarFallback>{initialsOf(nameOf(member))}</AvatarFallback>
       </Avatar>
-      <div className="flex min-w-0 flex-1 flex-col leading-tight">
-        <h2 ref={titleRef} tabIndex={-1} className="wrap-anywhere">
-          {nameOf(member)}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          <Address address={member.address} />
-        </p>
-      </div>
+      <p className="min-w-0 flex-1 text-muted-foreground">
+        <Address address={member.address} />
+      </p>
     </div>
   );
 }
@@ -184,8 +173,7 @@ function SectionNav() {
   );
 }
 
-const useLandings = () => {
-  const title = useRef<HTMLHeadingElement>(null);
+const useLandings = (title: RefObject<HTMLHeadingElement | null>) => {
   const landings: Landings = {
     role: useRef<HTMLDivElement>(null),
     groups: useRef<HTMLDivElement>(null),
@@ -207,7 +195,7 @@ const useLandings = () => {
     (controlAt[at]() ?? title.current)?.focus();
   };
 
-  return { title, landings, landOn };
+  return { landings, landOn };
 };
 
 function SectionShown(properties: {
@@ -235,9 +223,10 @@ function MemberShown(properties: {
   readonly member: ListedMember;
   readonly openedAt: OpenedAt | undefined;
   readonly removal: Removal;
+  readonly heading: RefObject<HTMLHeadingElement | null>;
 }) {
   const { member, openedAt, removal } = properties;
-  const { title, landings, landOn } = useLandings();
+  const { landings, landOn } = useLandings(properties.heading);
   useBreadcrumbLastPart(nameOf(member));
 
   usePageKeystrokes(KEYSTROKES);
@@ -266,7 +255,7 @@ function MemberShown(properties: {
 
   return (
     <>
-      <MemberHeader member={member} titleRef={title} />
+      <MemberHeader member={member} />
       <SectionNav />
       <div className="mt-6 grid gap-6">
         {SECTIONS.map((section) => (
@@ -277,6 +266,18 @@ function MemberShown(properties: {
   );
 }
 
+const memberShown = (
+  members: ReturnType<typeof useMembers>,
+  personId: string,
+  leaving: ListedMember | undefined,
+): ListedMember | undefined => {
+  if (members.error !== null || members.data === undefined) return undefined;
+  return (
+    members.data.find((each) => each.personId === personId) ??
+    (leaving?.personId === personId ? leaving : undefined)
+  );
+};
+
 function MemberRead(properties: {
   readonly personId: string;
   readonly heading: RefObject<HTMLHeadingElement | null>;
@@ -286,6 +287,32 @@ function MemberRead(properties: {
   const [leaving, setLeaving] = useState<ListedMember>();
   const removal = useRemoval(membersQuery, setLeaving);
 
+  const shown = memberShown(members, properties.personId, leaving);
+  return (
+    <>
+      <PageHead
+        title={shown === undefined ? MEMBERS_PAGE.name : nameOf(shown)}
+        headingRef={properties.heading}
+      />
+      {shown === undefined ? (
+        <MemberUnread members={members} heading={properties.heading} />
+      ) : (
+        <MemberShown
+          member={shown}
+          openedAt={openedAt}
+          removal={removal}
+          heading={properties.heading}
+        />
+      )}
+    </>
+  );
+}
+
+function MemberUnread(properties: {
+  readonly members: ReturnType<typeof useMembers>;
+  readonly heading: RefObject<HTMLHeadingElement | null>;
+}) {
+  const { members } = properties;
   if (members.error !== null) {
     return (
       <ListState
@@ -303,25 +330,19 @@ function MemberRead(properties: {
   if (members.data === undefined) {
     return <ListState state={{ kind: "loading", words: WORDS.loading }} />;
   }
-  const member =
-    members.data.find((each) => each.personId === properties.personId) ??
-    (leaving?.personId === properties.personId ? leaving : undefined);
-  if (member === undefined) return <NoSuchMember />;
-  return <MemberShown member={member} openedAt={openedAt} removal={removal} />;
+  return <NoSuchMember />;
 }
 
 export function MemberPage(properties: { readonly personId: string | undefined }) {
   const { personId } = properties;
   const heading = useRef<HTMLHeadingElement>(null);
 
-  return (
+  return personId === undefined ? (
     <>
-      <PageHead heading={people.name} headingRef={heading} />
-      {personId === undefined ? (
-        <NoSuchMember />
-      ) : (
-        <MemberRead key={personId} personId={personId} heading={heading} />
-      )}
+      <PageHead title={MEMBERS_PAGE.name} headingRef={heading} />
+      <NoSuchMember />
     </>
+  ) : (
+    <MemberRead key={personId} personId={personId} heading={heading} />
   );
 }

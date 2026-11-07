@@ -9,7 +9,7 @@ import { rowInFocus } from "@/shared/list/row-focus.ts";
 import { RowMenu } from "@/shared/list/row-menu.tsx";
 import { RowSheetButton } from "@/shared/list/row-sheet.tsx";
 import { useSearchedList } from "@/shared/list/searched-list.ts";
-import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { Card } from "@/shared/ui/card.tsx";
@@ -35,6 +35,8 @@ import { GROUPS_FIELDS, GROUPS_LIST } from "./groups-address.ts";
 import { RenameGroupDialog } from "./rename-group-dialog.tsx";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
+
+const THIS_PAGE = pageNamed(people, "Groups");
 
 const LISTED = Object.values(GROUPS_KEYSTROKES);
 
@@ -349,7 +351,7 @@ export function GroupsPage() {
 
   return (
     <>
-      <PageHead heading={people.name} summary={people.summary} />
+      <PageHead title={THIS_PAGE.name} />
       <section aria-labelledby={headingId} className="mt-6">
         <GroupsList headingId={headingId} />
       </section>

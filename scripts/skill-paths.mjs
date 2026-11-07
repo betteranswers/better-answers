@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { lstatSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import {
   findingsFor,
   SCOPES,
   SKILLS_FOLDER,
-  SYMLINKED_SKILL,
   withPaths,
 } from "../packages/devtools/src/scans/skill-paths.ts";
 
@@ -28,25 +27,7 @@ const trackedFilesHere = execFileSync("git", ["-C", workingTree, "ls-files", "-z
   .split("\0")
   .filter((file) => file !== "");
 
-const trackedAnywhere = (target) =>
-  execFileSync("git", ["-C", workingTree, "ls-files", "-z", "--", target], {
-    encoding: "utf8",
-  }) !== "";
-
 const tracked = new Set(trackedFilesHere.map((file) => file.split("/")[2]));
-
-const targetTracked = (skill) => {
-  try {
-    const target = path.relative(
-      realpathSync(workingTree),
-      realpathSync(path.join(workingTree, SKILLS_FOLDER, skill)),
-    );
-    if (target === "" || target.startsWith("..") || path.isAbsolute(target)) return false;
-    return trackedAnywhere(target);
-  } catch {
-    return false;
-  }
-};
 
 const textOf = (skill) => {
   try {
@@ -69,7 +50,6 @@ const read = () => {
       lstatSync(path.join(workingTree, SKILLS_FOLDER, skill), {
         throwIfNoEntry: false,
       })?.isSymbolicLink() ?? false,
-    linkTargetTracked: targetTracked(skill),
     text: textOf(skill),
   }));
 };
@@ -78,12 +58,7 @@ if (write) {
   const table = new Map(SCOPES.map((one) => [one.skill, one.paths]));
   for (const one of read()) {
     const paths = table.get(one.skill);
-    if (
-      paths === undefined ||
-      one.text === null ||
-      (one.symlink && !(one.skill === SYMLINKED_SKILL && one.linkTargetTracked))
-    )
-      continue;
+    if (paths === undefined || one.text === null || one.symlink) continue;
     const next = withPaths(one.text, paths);
     if (next === one.text) continue;
     writeFileSync(skillFile(one.skill), next);

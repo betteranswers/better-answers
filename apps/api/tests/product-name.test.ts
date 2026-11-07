@@ -7,10 +7,7 @@ import { consentPage, REFUSAL_PAGES, refusedPage, signInPage } from "../src/auth
 import { senderAt } from "../src/product-name.ts";
 import { repositoryRoot } from "./support/roots/roots.ts";
 
-const LOGO = readFileSync(
-  path.join(repositoryRoot, "packages/design-system/assets/logo.svg"),
-  "utf8",
-).trim();
+const LOGO = readFileSync(path.join(repositoryRoot, "apps/web/src/styles/logo.svg"), "utf8").trim();
 
 const CONSENTING = {
   clientName: "Claude",

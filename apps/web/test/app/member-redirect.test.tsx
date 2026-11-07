@@ -162,7 +162,7 @@ describe("a person whose member read fails", () => {
     const router = await openAt("/people/members", clients);
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
-    expect(heading()).toBe("People");
+    expect(heading()).toBe("Members");
     expect(heading()).not.toBe("Page Not Found");
     expect(screen.getByRole("navigation", { name: "Areas" })).toBeDefined();
     expect(router.state.location.pathname).toBe("/people/members");
@@ -196,7 +196,7 @@ describe("a person whose member read fails", () => {
     await clients.queryClient.refetchQueries({ queryKey: [["session", "member"]] });
     await rail().findByRole("link", { name: "Ask" });
 
-    expect(heading()).toBe("People");
+    expect(heading()).toBe("Members");
     expect(screen.getByRole("tablist")).toBeDefined();
   });
 });
@@ -253,7 +253,7 @@ describe("the index route", () => {
 type Router = Awaited<ReturnType<typeof openApp>>["router"];
 
 const consoleLanding = async (router: Router) => {
-  await screen.findByRole("heading", { level: 1, name: "Workspaces" });
+  await screen.findByRole("heading", { level: 1, name: "Every Workspace" });
   return {
     at: router.state.location.pathname,
     inTheConsole:

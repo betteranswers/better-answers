@@ -8,7 +8,7 @@ import { ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { keyedRow, onTheRowInFocus, rowInFocus, type Saying } from "@/shared/list/row-focus.ts";
 import { SelectionBar } from "@/shared/list/selection-bar.tsx";
 import { useRole } from "@/shared/member/member.ts";
-import { detailAt, headingOf } from "@/shared/navigation.ts";
+import { detailAt } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -262,7 +262,7 @@ function WaitingRegion() {
 export function WaitingOnYouPage() {
   return (
     <>
-      <PageHead heading={headingOf(WAITING_ON_YOU)} summary={WORDS.about} />
+      <PageHead title={WAITING_ON_YOU.name} />
       <WaitingRegion />
     </>
   );

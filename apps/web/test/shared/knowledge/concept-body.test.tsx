@@ -124,6 +124,13 @@ describe("a concept's body", () => {
     );
   });
 
+  it("ranks its own headings directly under the page title", async () => {
+    const article = await renderBody("## Rates\n\nText.\n\n### Mileage\n\nMore.", []);
+
+    expect(within(article).getByRole("heading", { level: 2, name: "Rates" })).toBeDefined();
+    expect(within(article).getByRole("heading", { level: 3, name: "Mileage" })).toBeDefined();
+  });
+
   it("names a mark by its source and opens it", async () => {
     const onOpen = vi.fn<(chosen: { openerId: string; source: number }) => void>();
     const article = await renderBody("Claims close within 30 days.[^a]", HANDBOOK, {

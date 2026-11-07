@@ -2,7 +2,6 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
-import { OpenTabProvider } from "@/shared/page/page-toolbar.tsx";
 import { sourceFiles } from "@test/source-files.ts";
 
 afterEach(cleanup);
@@ -29,22 +28,22 @@ describe("a page's h1", () => {
   });
 });
 
+const follows = (before: Node, after: Node): boolean =>
+  (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
 describe("a page head outside a page frame", () => {
-  it("renders its heading and summary in place", () => {
+  it("the h1 is the page's title, with no subtitle", () => {
     const { container } = render(
       <article>
-        <PageHead heading="People" summary="Who can use this workspace." />
+        <PageHead title="Safeguarding Children Partnerships" />
       </article>,
     );
 
     const article = container.querySelector("article");
-    expect(article?.querySelector("h1")?.textContent).toBe("People");
-    expect(article?.textContent).toContain("Who can use this workspace.");
+    expect(article?.querySelector("h1")?.textContent).toBe("Safeguarding Children Partnerships");
+    expect(article?.textContent).toBe("Safeguarding Children Partnerships");
   });
 });
-
-const follows = (before: Node, after: Node): boolean =>
-  (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 
 describe("a list's head", () => {
   const head = (
@@ -67,14 +66,8 @@ describe("a list's head", () => {
     expect(follows(count, action), "the primary action comes after the count").toBe(true);
   });
 
-  it("shows its heading when no tab is open", () => {
+  it("hides its heading, which the page's h1 already names", () => {
     render(head);
-
-    expect(screen.getByRole("heading", { level: 2 }).className).not.toContain("sr-only");
-  });
-
-  it("visually hides its heading when its tab is open", () => {
-    render(<OpenTabProvider openTab="members">{head}</OpenTabProvider>);
 
     expect(screen.getByRole("heading", { level: 2, name: "Members" }).className).toContain(
       "sr-only",

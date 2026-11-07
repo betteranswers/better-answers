@@ -125,7 +125,7 @@ describe("bulk actions that include you", () => {
     await editorPickedByKeyboard(within(dialog).getByRole("combobox", { name: "Role" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Change Role" }));
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Ask" })).toBeDefined();
+    expect(await screen.findByRole("heading", { level: 1, name: "New Question" })).toBeDefined();
     expect(router.state.location.pathname).toBe(HOMES.Editor.path);
     expect(screen.getAllByRole("status").some((said) => /\bEditor\b/v.test(said.textContent))).toBe(
       true,
@@ -176,7 +176,7 @@ describe("bulk actions that include you", () => {
 
     await removedThroughTheBar("Remove 1 Member");
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Ask" })).toBeDefined();
+    expect(await screen.findByRole("heading", { level: 1, name: "New Question" })).toBeDefined();
     expect(router.state.location.pathname).toBe(HOMES.Viewer.path);
     expect(await switcher(HOLME)).toBeDefined();
   });

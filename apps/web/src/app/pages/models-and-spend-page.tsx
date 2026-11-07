@@ -1,10 +1,12 @@
 import { ModelChoicesCard } from "@/features/model-choices/model-choices-card.tsx";
-import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { useOpenTab, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 
 const models = menuGroupIn(CONTROL_CENTRE, "models");
+
+const THIS_PAGE = pageNamed(models, "Models and Spend");
 
 const SPEND = "spend";
 
@@ -20,7 +22,7 @@ export function ModelsAndSpendPage() {
 
   return (
     <>
-      <PageHead heading={models.name} summary={models.summary} />
+      <PageHead title={THIS_PAGE.name} />
 
       {open === SPEND ? (
         <Card asChild className="mt-6 p-4">

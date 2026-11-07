@@ -1,4 +1,0 @@
-/* Loads the faces that `tokens/fonts.css` names from Google Fonts, for pages opened from disk:
-   the specimen cards in `guidelines/` and `thumbnail.html`. The product must not link this
-   file. It uses `tokens/fonts-hosted.css`, so that no product page requests a third party. */
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;450;500;600;700&family=Geist+Mono:wght@400;500&display=swap");

@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 
 import { usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
-import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { useOpenTab, type PageTab, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 
@@ -11,6 +11,8 @@ import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
 import { RequestsTab } from "./requests/requests-tab.tsx";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
+
+const THIS_PAGE = pageNamed(people, "Members");
 
 type Tab = PageTab & {
   readonly content: ComponentType;
@@ -83,7 +85,7 @@ export function MembersPage() {
 
   return (
     <>
-      <PageHead heading={people.name} summary={people.summary} />
+      <PageHead title={THIS_PAGE.name} />
       <Content />
     </>
   );

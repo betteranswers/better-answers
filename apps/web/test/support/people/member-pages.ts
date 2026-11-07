@@ -47,7 +47,7 @@ export const membersRegion = () => within(screen.getByRole("region", { name: "Me
 export const personHeading = (name: string) =>
   waitFor(() => {
     const heading = thePage()
-      .getAllByRole("heading", { level: 2 })
+      .getAllByRole("heading", { level: 1 })
       .find((each) => each.textContent === name);
     expect(heading, `no heading for ${name}`).toBeDefined();
     return heading ?? document.body;

@@ -1,5 +1,3 @@
-import { useId } from "react";
-
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { Card } from "@/shared/ui/card.tsx";
@@ -15,17 +13,12 @@ const ANSWER_TESTS_WORDS = {
 } as const;
 
 export function AnswerTestsPage() {
-  const headingId = useId();
-
   return (
     <>
-      <PageHead heading={questions.name} summary={questions.summary} />
-      <section aria-labelledby={headingId} className="mt-6">
-        <h2 id={headingId}>{ANSWER_TESTS.name}</h2>
-        <Card className="mt-2">
-          <EmptyAction title={ANSWER_TESTS_WORDS.empty} description={ANSWER_TESTS_WORDS.why} />
-        </Card>
-      </section>
+      <PageHead title={ANSWER_TESTS.name} />
+      <Card className="mt-8">
+        <EmptyAction title={ANSWER_TESTS_WORDS.empty} description={ANSWER_TESTS_WORDS.why} />
+      </Card>
     </>
   );
 }

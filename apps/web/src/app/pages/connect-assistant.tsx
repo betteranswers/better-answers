@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 
 import { CONNECT_ASSISTANT } from "@/app/words.ts";
 import { copiedToTheClipboard } from "@/features/auth/clipboard.ts";
-import { ASK, headingOf, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
@@ -28,7 +28,7 @@ export function ConnectClaudePage() {
 
   return (
     <>
-      <PageHead heading={headingOf(CONNECT_CLAUDE)} />
+      <PageHead title={CONNECT_CLAUDE.name} />
       <h2 className="mt-6">{CONNECT_ASSISTANT.heading}</h2>
       <ol className="mt-3 grid list-decimal gap-3 pl-5">
         <li>

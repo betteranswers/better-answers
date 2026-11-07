@@ -374,7 +374,7 @@ test("signing in after an expired session returns to the page", async ({
   await signIn(page, request, email);
 
   await expect(page).toHaveURL(new RegExp(`${elsewhere.path}$`));
-  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: elsewhere.name })).toBeVisible();
 
   await signOutFromTheShell(page, workspace.admin.name);
   expect(

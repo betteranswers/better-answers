@@ -110,7 +110,7 @@ describe("Waiting on You", () => {
     api.set("inbox.accept", lost(LEAVE));
     await acceptedAlone(LEAVE);
     expect(mainAlertText(), "the first loss said nothing").toMatch(/\S/v);
-    expect(screen.queryByRole("heading", { name: WAITING_ON_YOU.name })).not.toBeNull();
+    expect(screen.queryByRole("heading", { level: 1, name: WAITING_ON_YOU.name })).not.toBeNull();
 
     api.set("session.member", anOwnerOf([]));
     api.set("inbox.accept", lost(CLAIMS));

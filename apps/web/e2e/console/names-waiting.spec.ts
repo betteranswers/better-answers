@@ -161,11 +161,9 @@ test.describe("the console's Flagged Names page", () => {
     await expect(waitingRows(page)).toHaveCount(1);
     await expect(thePage(page)).toMatchAriaSnapshot(`
       - main "Page":
-        - heading "People" [level=1]
-        - paragraph
+        - heading "Flagged Names" [level=1]
         - region "Flagged Names":
           - heading "Flagged Names" [level=2]
-          - paragraph
           - status: /\\b1\\b/
           - searchbox "Search by name or workspace": ${JSON.stringify(name)}
           - table:

@@ -121,7 +121,7 @@ describe("the page toolbar", () => {
     );
     expect(panel.textContent).toMatch(/\S/v);
     expect(screen.queryByRole("region", { name: "Model Choices" })).toBeNull();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models and Spend");
   });
 
   it("opens a different page on that page's first tab", () => {
@@ -160,7 +160,10 @@ describe("the page toolbar", () => {
     await shellAt(MODELS_AND_SPEND);
 
     const page = screen.getByRole("main");
-    const heading = await within(page).findByRole("heading", { level: 1, name: "Models" });
+    const heading = await within(page).findByRole("heading", {
+      level: 1,
+      name: "Models and Spend",
+    });
 
     expect(within(page).getByRole("tablist")).toBe(tabs());
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);

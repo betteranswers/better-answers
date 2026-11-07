@@ -88,7 +88,7 @@ const atSamsPage = async (page: Page, api: APIRequestContext, two: Two): Promise
   const sam = await aMemberOfBoth(api, two, "Sam Okoro", { first: "Editor", second: "Viewer" });
   await page.goto(`${MEMBERS.path}/${sam}`);
   const samsPage = page.getByRole("main");
-  await expect(samsPage.getByRole("heading", { level: 2, name: "Sam Okoro" })).toBeVisible();
+  await expect(samsPage.getByRole("heading", { level: 1, name: "Sam Okoro" })).toBeVisible();
   return samsPage;
 };
 

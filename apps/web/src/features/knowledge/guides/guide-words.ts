@@ -9,8 +9,6 @@ const factsCounted = (met: number, of: number): string =>
   `${String(met)} of ${String(of)} expected ${of === 1 ? "fact" : "facts"} recorded`;
 
 export const GUIDES_WORDS = {
-  about:
-    "A guide sets out what the company knows about one subject, section by section, built from its concepts.",
   loading: "The guides are still loading.",
   none: "No guides to show yet. A guide appears here once one is set up for a collection you can read.",
   count: (count: number): string => counted(count, "Guide", "Guides"),

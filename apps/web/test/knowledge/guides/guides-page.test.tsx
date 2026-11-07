@@ -70,7 +70,7 @@ describe("the Guides list", () => {
       expect(router.state.location.pathname).toBe(A_GUIDE_PAGE);
     });
     expect(A_GUIDE_PAGE.endsWith(A_GUIDE_ID)).toBe(true);
-    expect(await main().findByRole("heading", { level: 2, name: "Northgate Ltd" })).toBeDefined();
+    expect(await main().findByRole("heading", { level: 1, name: "Northgate Ltd" })).toBeDefined();
   });
 
   it("lists no guides and counts zero when there are none", async () => {

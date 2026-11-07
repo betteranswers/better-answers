@@ -1,4 +1,4 @@
-import LOGO from "@better-answers/design-system/assets/logo.svg?raw";
+import LOGO from "@/styles/logo.svg?raw";
 
 export function Logo() {
   return (

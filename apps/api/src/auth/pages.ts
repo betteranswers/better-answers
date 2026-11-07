@@ -5,13 +5,10 @@ import { FIRST_PAINT } from "@better-answers/schema/theme";
 import { escaped } from "../email/email-page.ts";
 import { PRODUCT_NAME } from "../product-name.ts";
 import { OAUTH_SCOPES, type OAuthScope, SIGN_IN_PATH } from "./constants.ts";
-import { PAGE_STYLE } from "./page-style.ts";
+import { PAGE_STYLE, WEB_STYLES } from "./page-style.ts";
 
 /** Inline rather than linked, so its `currentColor` is the page's text colour, light or dark. */
-const LOGO = readFileSync(
-  new URL(import.meta.resolve("@better-answers/design-system/assets/logo.svg")),
-  "utf8",
-).trim();
+const LOGO = readFileSync(new URL("logo.svg", WEB_STYLES), "utf8").trim();
 
 const strong = (value: string): string => `<strong>${escaped(value)}</strong>`;
 

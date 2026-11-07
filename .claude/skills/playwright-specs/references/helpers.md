@@ -46,7 +46,7 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `alertShowsWait` | Asserts an alert names a ceiling's wait, given in seconds as the answer named it, as the page counts it: whole minutes, rounded up, matched by their number. A wait the answer did not name fails |
 | `pageHidesRefusalWord` | Asserts the api's word for a refusal is nowhere on the page: the word is for the logs and the wire |
 | `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
-| `tokenColour` | A design-system token's colour as the browser paints it, so a computed style is compared with the token rather than a copied value |
+| `tokenColour` | A design token's colour as the browser paints it, so a computed style is compared with the token rather than a copied value |
 | `contrastBetween` | WCAG's contrast ratio between two painted `rgb()` colours, as `apps/web/e2e/app/frame.spec.ts` measures each focus edge against the surface behind it |
 | `controlEdges` | Each enabled control found by its edge alone, with its fill, every side it draws and the colour behind it, each composited as painted through fills and every ancestor's opacity. A wordless wrapper with a side within 8px of the control's own lends its fill, and its border on each such side. One with no such side lends nothing, and its own fill is the colour behind the control. The gate measures them with `contrastBetween` |
 | `switched` | Opens the switcher named for where the person is and picks the radio item holding another workspace's name. It waits for nothing after the pick, so the spec asserts where the person landed |
@@ -56,7 +56,7 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `ACTION_SAMPLES` | How many times a spec clocks one action before it judges it, five. A spec seeds `ACTION_SAMPLES - 1` extra rows, so each sample has a row to act on |
 | `actionClocked` | Waits for the clock `clockTheNextKey` started and answers it in milliseconds. It fails when no clock was started, and fails by name when the node had not read its text 2 s after the key while a request was held. A spec collects one per sample for `medianActionWithinBudget` |
 | `medianActionWithinBudget` | Annotates the test with every sample of an action and their median, and asserts the median under the action's 100 ms, which on CI it only annotates. It fails by name when the action was never clocked. `actionWithinBudget` is the same check over one sample |
-| `tokenPainted` | A design-system token's value for a named CSS property as the browser paints it. It is read off a probe element styled with the token. `tokenColour` is this for `color`. `apps/web/e2e/app/frame.spec.ts` reads `--focus-ring` as `box-shadow` with it |
+| `tokenPainted` | A design token's value for a named CSS property as the browser paints it. It is read off a probe element styled with the token. `tokenColour` is this for `color`. `apps/web/e2e/app/frame.spec.ts` reads `--focus-ring` as `box-shadow` with it |
 | `drawnMarks` | The visible elements holding `data-marks` whose `::before` draws, each named by its `data-slot` or its tag. `apps/web/e2e/auth/consent.spec.ts` asserts the card alone draws them |
 
 The sign-in code is read from that capture, with `codeSentTo`, and from nowhere else: the api's

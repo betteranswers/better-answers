@@ -160,7 +160,7 @@ describe("the Knowledge Search page", () => {
         expect(searchAlert()?.textContent, "the alert says nothing").toMatch(/\S/),
       );
       await focusLandsOn(
-        () => screen.getByRole("heading", { name: landsOn }),
+        () => screen.getByRole("heading", { level: 2, name: landsOn }),
         "focus fell to the page body when the list failed",
       );
       api.set("knowledge.find", finding(TABLE));

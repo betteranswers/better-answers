@@ -28,7 +28,7 @@ placedWithoutMeasuring();
 const openGuide = async (role: "Admin" | "Editor" | "Viewer", guide = aGuide()) => {
   const api = aGuideApi(role, guide);
   const router = await openAt(A_GUIDE_PAGE, api);
-  await screen.findByRole("heading", { level: 2, name: "Northgate Ltd" });
+  await screen.findByRole("heading", { level: 1, name: "Northgate Ltd" });
   return { api, router };
 };
 
@@ -88,7 +88,7 @@ describe("the guide page", () => {
 
     const headings = screen.getAllByRole("heading").map((each) => each.textContent);
     expect(headings.slice(-3)).toEqual(["1. Racking", "2. Insurance", "2.1. Cover"]);
-    expect(screen.getByRole("heading", { name: "2.1. Cover" }).tagName).toBe("H4");
+    expect(screen.getByRole("heading", { name: "2.1. Cover" }).tagName).toBe("H3");
   });
 
   it("draws the trust word of each section as text", async () => {

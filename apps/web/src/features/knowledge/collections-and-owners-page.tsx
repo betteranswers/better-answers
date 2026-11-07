@@ -216,7 +216,6 @@ function CollectionsRegion() {
         heading={COLLECTIONS_AND_OWNERS.name}
         headingId={headingId}
         headingRef={heading}
-        description={WORDS.about}
         count={listed === undefined ? "" : WORDS.count(listed.length)}
       />
       <OutcomeLine outcome={outcome} className="mt-2" />
@@ -237,7 +236,7 @@ function CollectionsRegion() {
 export function CollectionsAndOwnersPage() {
   return (
     <>
-      <PageHead heading={CURATION.name} summary={CURATION.summary} />
+      <PageHead title={COLLECTIONS_AND_OWNERS.name} />
       <CollectionsRegion />
     </>
   );

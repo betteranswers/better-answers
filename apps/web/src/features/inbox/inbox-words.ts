@@ -19,8 +19,6 @@ export const personWords = (person: WaitingPerson | null): string => {
 export const personShown = (person: WaitingPerson | null): string => opening(personWords(person));
 
 export const WAITING_WORDS = {
-  about:
-    "These are changes people have suggested to concepts you’re responsible for. Open one to compare it with the current version. Accepting saves the change, with the person who suggested it as its author. Declining sends them your reason.",
   loading: "The suggestions are still loading.",
   none: "No suggestions are waiting for you. When someone suggests a change to a concept you’re responsible for, it appears here.",
   count: (count: number): string => `${counted(count, "suggestion", "suggestions")} waiting`,

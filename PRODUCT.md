@@ -57,7 +57,7 @@ The knowledge is held in the Open Knowledge Format (OKF v0.2): one portable file
 - Name: **better-answers**, always lower case and hyphenated (never "Better Answers"); hosted at `app.better-answers.com`.
 - British spelling and UK conventions throughout. Dates in UK long form (3 March 2026; with time, 09:41 · 30 August 2026). Money as £1,240.00. Relative time only under a minute.
 - Trust words are a closed set, written verbatim and always as text: Verified by <person> · Verified automatically · Unverified · Changed since verified · Out of date · Draft · Deprecated.
-- Impeccable is the design authority. `packages/design-system` and its `better-answers-design` skill are to be removed entirely; DESIGN.md and the tokens it records replace them.
+- Impeccable is the design authority. `packages/design-system` and its `better-answers-design` skill are gone. The tokens are in `apps/web/src/styles/`, and DESIGN.md is to record them.
 - The incumbent look (a quiet, dense "blueprint": hairlines, square corners, one ink-blue accent) is the baseline to improve on, not a ceiling. The shipped app does not yet match the original intent; the cards in `docs/design/intent/` show that intent, including where colour is used. Treat them as evidence of intent, not as a spec to copy.
 - The bar is a polished, finished product: brand and trust are what set it apart, alongside genuine usefulness to people and agents.
 - Copy is plain, short and direct. The product's UI copy still carries a long-standing over-written prose style; removing it everywhere is open work.

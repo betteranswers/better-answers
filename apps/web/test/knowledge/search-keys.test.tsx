@@ -79,7 +79,7 @@ describe("the Knowledge Search page", () => {
     keyPressed(KEY.open.key);
 
     expect(
-      await screen.findByRole("heading", { level: 2, name: "Forklift Licences" }),
+      await screen.findByRole("heading", { level: 1, name: "Forklift Licences" }),
     ).toBeDefined();
     expect(router.state.location.pathname).not.toBe(SEARCH.path);
   });
@@ -135,7 +135,7 @@ describe("the Knowledge Search page", () => {
 
     typed("forklift");
     pressed(within(rowNamed("Audit Committee")).getByRole("link", { name: "Audit Committee" }));
-    expect(await screen.findByRole("heading", { level: 2, name: "Audit Committee" })).toBeDefined();
+    expect(await screen.findByRole("heading", { level: 1, name: "Audit Committee" })).toBeDefined();
     pressed(within(screen.getByRole("main")).getByRole("link", { name: "Back to Search" }));
 
     await waitFor(() =>

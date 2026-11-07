@@ -70,7 +70,7 @@ describe("the concept page's back link", () => {
 
     fireEvent.click(await screen.findByRole("link", { name: "Yard Lease" }));
 
-    expect(await screen.findByRole("heading", { level: 2, name: "Yard Lease" })).toBeDefined();
+    expect(await screen.findByRole("heading", { level: 1, name: "Yard Lease" })).toBeDefined();
     expect(router.state.location.pathname.startsWith(`${SEARCH_PAGE.path}/`)).toBe(true);
     const main = within(screen.getByRole("main"));
     expect(main.queryByRole("link", { name: "Back to Search" })).toBeNull();
@@ -92,7 +92,7 @@ describe("the concept page's back link", () => {
   it("returns to Knowledge Base by its keystroke", async () => {
     const router = await openAt(OPEN_KIND, aKnowledgeBaseApi());
     fireEvent.click(await screen.findByRole("link", { name: "Yard Lease" }));
-    await screen.findByRole("heading", { level: 2, name: "Yard Lease" });
+    await screen.findByRole("heading", { level: 1, name: "Yard Lease" });
 
     fireEvent.keyDown(document.body, { key: "b" });
 
@@ -112,14 +112,10 @@ describe("the concept page's back link", () => {
 
     fireEvent.click(await screen.findByRole("link", { name: "Policy 05" }));
 
-    expect(await screen.findByRole("heading", { level: 2, name: "Policy 05" })).toBeDefined();
+    expect(await screen.findByRole("heading", { level: 1, name: "Policy 05" })).toBeDefined();
     expect(markedInTheMenu()).toEqual(["All Knowledge"]);
     const main = within(screen.getByRole("main"));
     expect(main.queryByRole("link", { name: "Back to Search" })).toBeNull();
-    expect(
-      main.getByRole("heading", { level: 1 }).textContent,
-      "the heading names a different group from the one it opened from",
-    ).toBe("Curation");
 
     fireEvent.click(main.getByRole("link", { name: "Back to All Knowledge" }));
 

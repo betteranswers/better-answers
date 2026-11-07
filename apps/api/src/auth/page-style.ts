@@ -1,25 +1,25 @@
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { serveStatic } from "@hono/node-server/serve-static";
 import type { Hono } from "hono";
 
-const STYLES = fileURLToPath(import.meta.resolve("@better-answers/design-system/styles.css"));
+/** The web's tokens, read as files the way `WEB_ROOT` serves its build, so the api needs no package edge to the web. */
+export const WEB_STYLES = new URL("../../../web/src/styles/", import.meta.url);
+
+const STYLES = fileURLToPath(new URL("styles.css", WEB_STYLES));
 
 const expanded = (file: string): string =>
   readFileSync(file, "utf8").replace(/^@import "(\.\/[^"]+)";$/gmu, (_line, relative: string) =>
     expanded(path.resolve(path.dirname(file), relative)),
   );
 
-const fromDesignSystem = createRequire(STYLES);
-
 const FACES = [
-  { pkg: "@fontsource-variable/geist", mount: "/fonts/geist" },
-  { pkg: "@fontsource-variable/geist-mono", mount: "/fonts/geist-mono" },
-].map(({ pkg, mount }) => {
-  const sheet = fromDesignSystem.resolve(pkg);
+  { resolved: import.meta.resolve("@fontsource-variable/geist"), mount: "/fonts/geist" },
+  { resolved: import.meta.resolve("@fontsource-variable/geist-mono"), mount: "/fonts/geist-mono" },
+].map(({ resolved, mount }) => {
+  const sheet = fileURLToPath(resolved);
   return {
     mount,
     files: path.join(path.dirname(sheet), "files"),

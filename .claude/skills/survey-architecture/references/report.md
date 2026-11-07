@@ -44,13 +44,13 @@ When this host has the `diagram-design` plugin, draw each before-and-after with 
 
 ## The page
 
-The page is self-contained: one file with no local assets. Style it with the design system's tokens. Paste the contents of these files into a `<style>` block, then write plain CSS that uses their variables:
-- `packages/design-system/tokens/fonts-remote.css`
-- `packages/design-system/tokens/colors.css`
-- `packages/design-system/tokens/typography.css`
-- `packages/design-system/tokens/spacing.css`
-- `packages/design-system/tokens/radius.css`
-- `packages/design-system/tokens/semantic.css`
+The page is self-contained: one file with no local assets. Style it with the web app's tokens. Start a `<style>` block with `@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;450;500;600;700&family=Geist+Mono:wght@400;500&display=swap");`. Then paste in the contents of these files, and write plain CSS that uses their variables:
+- `apps/web/src/styles/fonts.css`
+- `apps/web/src/styles/colors.css`
+- `apps/web/src/styles/typography.css`
+- `apps/web/src/styles/spacing.css`
+- `apps/web/src/styles/radius.css`
+- `apps/web/src/styles/semantic.css`
 
 Do not use components or a CSS framework.
 

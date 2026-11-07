@@ -68,7 +68,7 @@ test("invited people join, and their Activity shows only the join", async ({
   await test.step("an Admin invites a person and the invitation is Waiting", async () => {
     await page.goto(MEMBERS_PAGE);
     await signIn(page, request, adminEmail);
-    await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Members" })).toBeVisible();
     await openInvitations(page);
     await expect(invitationRows(page)).toHaveCount(0);
     await expect(emptyStateCell(page)).toHaveText(/\S/);

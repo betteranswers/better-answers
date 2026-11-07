@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { runInThisContext } from "node:vm";
 
 import { act, cleanup, renderHook } from "@testing-library/react";
@@ -185,13 +183,6 @@ describe("choosing a theme", () => {
 
 const files = sourceFiles(/\.(?:tsx?|css)$/);
 
-const bridge = readFileSync(
-  createRequire(import.meta.url).resolve(
-    "@better-answers/design-system/tokens/tailwind-bridge.css",
-  ),
-  "utf8",
-);
-
 describe("the theme switch module", () => {
   it("is the only code that sets data-theme", () => {
     expect(files.length).toBeGreaterThan(0);
@@ -207,7 +198,7 @@ describe("the theme switch module", () => {
     const darkClass = /(?:^|[\s,(])\.dark\b/m;
     const selectsDarkClass = (text: string) =>
       darkClass.test(text.replaceAll(/\/\*[\s\S]*?\*\//g, ""));
+    expect(files.map(({ file }) => file)).toContain("styles/tailwind-bridge.css");
     expect(files.filter(({ text }) => selectsDarkClass(text)).map(({ file }) => file)).toEqual([]);
-    expect(selectsDarkClass(bridge), "the Tailwind bridge selects a `.dark` class").toBe(false);
   });
 });

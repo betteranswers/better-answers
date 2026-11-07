@@ -109,12 +109,12 @@ describe("the Knowledge Search page", () => {
       api.set("session.member", () => adaAt(role));
       const router = await openAt(HOMES[role].path, api);
       expect(router.state.location.pathname).toBe(HOMES[role].path);
-      expect(await screen.findByRole("heading", { level: 1, name: "Ask" })).toBeDefined();
+      expect(await screen.findByRole("heading", { level: 1, name: "New Question" })).toBeDefined();
 
       knowledgeRailPressed();
 
       await waitFor(() => expect(router.state.location.pathname).toBe(SEARCH.path));
-      expect(await screen.findByRole("heading", { level: 1, name: "Browse" })).toBeDefined();
+      expect(await screen.findByRole("heading", { level: 1, name: "Search" })).toBeDefined();
       expect(
         within(screen.getByRole("navigation", { name: "Knowledge" }))
           .getAllByRole("link")

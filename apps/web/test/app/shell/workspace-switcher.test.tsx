@@ -400,7 +400,7 @@ describe("the workspace switcher in the app", () => {
     const api = adaAnAdmin();
     const router = await openAt(GRACES_PAGE, api);
     await within(screen.getByRole("main")).findByRole("heading", {
-      level: 2,
+      level: 1,
       name: GRACE.displayName,
     });
     setActiveLandsInHolme(api);
@@ -409,7 +409,7 @@ describe("the workspace switcher in the app", () => {
     await switchToHolme();
 
     await switcher(HOLME);
-    expect(await findPageHeading("People")).toBeDefined();
+    expect(await findPageHeading("Members")).toBeDefined();
     expect(router.state.location.pathname).toBe(MEMBERS);
     expect(
       document.body.textContent,

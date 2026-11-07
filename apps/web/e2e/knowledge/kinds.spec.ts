@@ -116,7 +116,6 @@ test.describe("Kinds", () => {
       - region "Kinds":
         - /children: equal
         - heading "Kinds" [level=2]
-        - paragraph
         - status: 3 kinds
         - status
         - button "Kinds With Two or Fewer Concepts"

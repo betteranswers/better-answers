@@ -16,7 +16,7 @@ const REPOSITORY: Tree = {
   "package.json": "{}\n",
   "pnpm-workspace.yaml": "packages:\n  - apps/*\n  - packages/*\n",
   "apps/api/package.json": "{}\n",
-  "packages/design-system/package.json": "{}\n",
+  "packages/widgets/package.json": "{}\n",
 };
 
 const SEEDED = "apps/api/tests/deploy/probe.test.ts";
@@ -106,11 +106,11 @@ describe("the no-path-climb rule", () => {
   });
 
   it("says a workspace without a helper needs one", () => {
-    const file = "packages/design-system/test/probe.test.ts";
+    const file = "packages/widgets/test/probe.test.ts";
     const code = 'export const at = path.join(import.meta.dirname, "../..");';
 
     expect(lint.output(reading(file, code))).toContain(
-      '`path.join(import.meta.dirname, "../..")` climbs to the root of `packages/design-system` or above it, so the path breaks when the file moves. `packages/design-system` has no roots helper yet. Add one beside its tests and join the path from there.',
+      '`path.join(import.meta.dirname, "../..")` climbs to the root of `packages/widgets` or above it, so the path breaks when the file moves. `packages/widgets` has no roots helper yet. Add one beside its tests and join the path from there.',
     );
   });
 });
@@ -170,7 +170,7 @@ describe("the no-path-climb rule on the toolchain root", () => {
 
   it.each([
     ["another export of the toolchain module", "workspacePackages", "apps/api"],
-    ["a workspace that has no helper", "repositoryRoot", "packages/design-system"],
+    ["a workspace that has no helper", "repositoryRoot", "packages/widgets"],
   ])("accepts %s", (_what, name, workspace) => {
     const probe = `${workspace}/tests/probe.test.ts`;
     const code = `import { ${name} } from "@better-answers/devtools/paths";\nexport const at = ${name};`;

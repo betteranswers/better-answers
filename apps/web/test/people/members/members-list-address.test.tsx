@@ -100,7 +100,7 @@ describe("the Members list's address", () => {
     expect(within(pages()).getByRole("status").textContent).toMatch(lastFiveOfThirty);
 
     fireEvent.click(memberLink("Person 27"));
-    await screen.findByRole("heading", { level: 2, name: "Person 27" });
+    await screen.findByRole("heading", { level: 1, name: "Person 27" });
     expect(router.state.location.pathname).toMatch(/\/people\/members\/[0-9A-HJKMNP-TV-Z]{26}$/v);
     router.history.back();
 
@@ -161,6 +161,6 @@ describe("keys after paging away from the focused member", () => {
 
     memberLink("Person 01").focus();
     pressed(PEOPLE_KEYSTROKES.open.key);
-    expect(await screen.findByRole("heading", { level: 2, name: "Person 01" })).toBeDefined();
+    expect(await screen.findByRole("heading", { level: 1, name: "Person 01" })).toBeDefined();
   });
 });

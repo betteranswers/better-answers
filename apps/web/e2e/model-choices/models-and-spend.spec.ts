@@ -110,8 +110,7 @@ test.describe("the Model Choices card on the Models and Spend page", () => {
     `);
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
-        - heading "Models" [level=1]
-        - paragraph
+        - heading "Models and Spend" [level=1]
         - tablist "Models and Spend":
           - tab "Model Choices" [selected]
           - tab "Spend"

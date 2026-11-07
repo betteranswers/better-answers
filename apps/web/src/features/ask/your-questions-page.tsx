@@ -9,7 +9,7 @@ import { cn } from "@/shared/lib/utils.ts";
 import { RowLink } from "@/shared/list/grid-table.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
-import { ASK, detailAt, headingOf, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { ASK, detailAt, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
@@ -125,7 +125,7 @@ export function YourQuestionsPage() {
 
   return (
     <>
-      <PageHead heading={headingOf(YOUR_QUESTIONS)} />
+      <PageHead title={YOUR_QUESTIONS.name} />
       <section aria-labelledby={headingId} className="mt-6">
         <ListHead
           heading={YOUR_QUESTIONS.name}
@@ -192,7 +192,6 @@ function RecordShown(properties: { readonly record: YourRecord }) {
   const shown = shownAnswerOf(record);
   return (
     <>
-      <h2 className="mt-6 max-w-measure wrap-anywhere">{question}</h2>
       <p className="mt-2 text-muted-foreground">{instantWords(record.askedAt)}</p>
       {shown === undefined ? (
         <p className="mt-6">
@@ -235,7 +234,10 @@ function RecordRead(properties: { readonly recordId: string; readonly notFound: 
   if (read.error !== null && namesNoRecord(read.error)) return properties.notFound;
   return (
     <>
-      <PageHead heading={headingOf(YOUR_QUESTIONS)} headingRef={headingRef} />
+      <PageHead
+        title={read.data === undefined ? YOUR_QUESTIONS.name : questionWords(read.data)}
+        headingRef={headingRef}
+      />
       {read.data === undefined ? (
         <RecordWaiting read={read} headingRef={headingRef} />
       ) : (

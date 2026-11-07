@@ -259,7 +259,7 @@ function InTheShell(properties: {
 
   return (
     <>
-      <PageHead heading={ACCOUNT_HEADING} />
+      <PageHead title={ACCOUNT_HEADING} />
       {properties.children}
     </>
   );

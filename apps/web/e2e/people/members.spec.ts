@@ -216,7 +216,7 @@ const anAdminAtPeople = async (
   await page.goto("/sign-in");
   await signIn(page, api, admin);
   await nav(page).getByRole("link", { name: "Members" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Members" })).toBeVisible();
   return {
     admin,
     adminId: workspace.admin.id,
@@ -507,8 +507,7 @@ test.describe("the People group's Members page", () => {
 
       await expect(thePage(page)).toMatchAriaSnapshot(`
         - main "Page":
-          - heading "People" [level=1]
-          - heading "Priya Shah" [level=2]
+          - heading "Priya Shah" [level=1]
           - paragraph: /@/
           - navigation "On This Page":
             - list:
@@ -883,8 +882,7 @@ test.describe("the People group's Members page", () => {
     const main = page.getByRole("main", { name: "Page" });
     await expect(main).toMatchAriaSnapshot(`
       - main "Page":
-        - heading "People" [level=1]
-        - paragraph
+        - heading "Members" [level=1]
         - tablist "Members":
           - tab "Members" [selected]
           - tab "Invitations"

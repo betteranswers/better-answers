@@ -7,7 +7,6 @@ import { createAppRouter } from "@/app/router.tsx";
 import { aRole } from "@/features/people/role-meanings.ts";
 import {
   EVERY_AREA,
-  headingOf,
   HOMES,
   movedWithin,
   readerOf,
@@ -337,15 +336,17 @@ describe("routes and navigation built from the navigation list", () => {
     });
   }
 
-  it("opens every built page with its expected heading", async () => {
+  it("opens each built page with one h1, its own name", async () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
 
     for (const each of pagesOf(AREAS).filter((candidate) => candidate.built)) {
       const { rendered } = await openApp(each.path);
       const main = screen.getByRole("main");
-      expect(within(main).getAllByRole("heading", { level: 1 })[0]?.textContent).toBe(
-        headingOf(each),
-      );
+      expect(
+        within(main)
+          .getAllByRole("heading", { level: 1 })
+          .map((heading) => heading.textContent),
+      ).toEqual([each.name]);
       rendered.unmount();
     }
   });

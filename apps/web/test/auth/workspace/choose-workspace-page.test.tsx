@@ -123,7 +123,7 @@ it("shows a member of two workspaces their role in each", async () => {
   fireEvent.click(acme);
 
   await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Admin.path));
-  expect(await screen.findByRole("heading", { level: 1, name: "People" })).toBeDefined();
+  expect(await screen.findByRole("heading", { level: 1, name: "Members" })).toBeDefined();
   expect(await switcher(NORTHERN)).toBeDefined();
   expect(picked, "the button opened a different workspace").toEqual([NORTHERN.id]);
 });
@@ -135,7 +135,7 @@ it("skips the picker for a workspace joined after sign-in", async () => {
   const router = await openPageOutsideShell("/choose-workspace", api, watching);
 
   await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Editor.path));
-  expect(await screen.findByRole("heading", { level: 1, name: "Ask" })).toBeDefined();
+  expect(await screen.findByRole("heading", { level: 1, name: "New Question" })).toBeDefined();
   expect(await switcher(NORTHERN)).toBeDefined();
   const you = within(screen.getByRole("banner")).getByRole("button", { name: ADA.displayName });
   fireEvent.keyDown(you, { key: "Enter" });

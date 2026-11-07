@@ -19,6 +19,7 @@ import {
   type Heading,
   type Opened,
 } from "@/shared/knowledge/evidence-panel.tsx";
+import { KindLine } from "@/shared/knowledge/kind-line.tsx";
 import {
   openingOf,
   useConcept,
@@ -28,12 +29,12 @@ import {
 import { useOpenedFrom } from "@/shared/knowledge/open-match.ts";
 import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
+import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { RowLink } from "@/shared/list/grid-table.tsx";
 import { keyed } from "@/shared/list/keyed.ts";
-import { ListState } from "@/shared/list/list-pages.tsx";
+import { ListState, RecordLoading } from "@/shared/list/list-pages.tsx";
 import { SummaryRow } from "@/shared/list/summary-row.tsx";
-import { headingOf } from "@/shared/navigation.ts";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { useRoomBeside } from "@/shared/page/wide-layout.ts";
@@ -99,32 +100,20 @@ const namesNothing = (failure: Error | ApiError): boolean => {
   return word === "not-found" || word === "malformed";
 };
 
-const SECTION_HEADING = "[font-size:var(--text-md)] font-semibold";
+const SECTION_HEADING = "[font-size:var(--text-section)] font-semibold";
 
-function Header(properties: {
-  readonly concept: Concept;
-  readonly titleId: string;
-  readonly actions: ReactNode;
-}) {
+function Header(properties: { readonly concept: Concept; readonly actions: ReactNode }) {
   const { frontmatter, trustWords } = properties.concept;
-  const kind = kindOf(frontmatter);
   const description = descriptionOf(frontmatter);
   const tags = tagsOf(frontmatter);
   return (
     <header className="mt-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {kind === undefined ? null : <Pill>{kind}</Pill>}
-        <Pill>{trustWords}</Pill>
-      </div>
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <h2 id={properties.titleId} className="min-w-0 [font-size:var(--text-2xl)] wrap-anywhere">
-          {titleOf(frontmatter)}
-        </h2>
+      {description === undefined ? null : <p className="text-muted-foreground">{description}</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <TrustMark words={trustWords} />
+        <KindLine kind={kindOf(frontmatter)} className="grow" />
         {properties.actions}
       </div>
-      {description === undefined ? null : (
-        <p className="mt-2 text-muted-foreground">{description}</p>
-      )}
       {tags.length === 0 ? null : (
         <ul aria-label={WORDS.tags} className="mt-3 flex flex-wrap gap-2">
           {tags.map((tag, at) => (
@@ -185,9 +174,9 @@ function Sources(properties: {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="mt-8">
-      <h3 ref={heading} id={headingId} tabIndex={-1} className={SECTION_HEADING}>
+      <h2 ref={heading} id={headingId} tabIndex={-1} className={SECTION_HEADING}>
         {WORDS.sources}
-      </h3>
+      </h2>
       <Card marks className="mt-3">
         <div className="px-4 py-3">
           <p>{concept.lead}</p>
@@ -212,9 +201,9 @@ function Verification(properties: { readonly concept: Concept }) {
   const events = properties.concept.verifications;
   return (
     <section aria-labelledby={headingId} className="mt-8">
-      <h3 id={headingId} className={SECTION_HEADING}>
+      <h2 id={headingId} className={SECTION_HEADING}>
         {WORDS.verification}
-      </h3>
+      </h2>
       {events.length === 0 ? (
         <p className="mt-2 text-muted-foreground">{WORDS.neverVerified}</p>
       ) : (
@@ -236,9 +225,9 @@ function Links(properties: { readonly concept: Concept; readonly heading: Headin
   const { relations } = concept;
   return (
     <section aria-labelledby={headingId} className="mt-8">
-      <h3 ref={heading} id={headingId} tabIndex={-1} className={SECTION_HEADING}>
+      <h2 ref={heading} id={headingId} tabIndex={-1} className={SECTION_HEADING}>
         {WORDS.links}
-      </h3>
+      </h2>
       {relations.length === 0 ? (
         <p className="mt-2 text-muted-foreground">{WORDS.noLinks}</p>
       ) : (
@@ -301,8 +290,8 @@ function ConceptShown(properties: {
   readonly standing: "commits" | "suggests" | undefined;
 }) {
   const { iri, concept } = properties;
-  useBreadcrumbLastPart(titleOf(concept.frontmatter));
-  const titleId = useId();
+  const title = titleOf(concept.frontmatter);
+  useBreadcrumbLastPart(title);
   const sources = useRef<HTMLHeadingElement>(null);
   const links = useRef<HTMLHeadingElement>(null);
   const beside = useRoomBeside();
@@ -348,7 +337,7 @@ function ConceptShown(properties: {
 
   return (
     <article
-      aria-labelledby={titleId}
+      aria-label={title}
       className={cn("mt-6", opened !== undefined && beside && "pr-[var(--container-md)]")}
     >
       <div className={COLUMN}>
@@ -356,7 +345,7 @@ function ConceptShown(properties: {
           <p>
             <WayBack iri={iri} />
           </p>
-          <Header concept={concept} titleId={titleId} actions={editing.actions} />
+          <Header concept={concept} actions={editing.actions} />
           {editing.editor}
         </div>
         <div className="mt-6">
@@ -379,50 +368,62 @@ function ConceptShown(properties: {
   );
 }
 
-function ConceptRead(properties: { readonly iri: string; readonly heading: Heading }) {
+function ConceptUnread(properties: {
+  readonly concept: ReturnType<typeof useConcept>;
+  readonly heading: Heading;
+}) {
+  const { concept } = properties;
+  if (concept.error === null) return <RecordLoading words={WORDS.loading} />;
+  if (namesNothing(concept.error)) return <NoSuchConcept />;
+  return (
+    <ListState
+      state={{
+        kind: "failed",
+        words: failedReadWords(concept.error),
+        onRetry: () => {
+          void concept.refetch();
+        },
+        focusAfterRetry: properties.heading,
+      }}
+    />
+  );
+}
+
+function ConceptRead(properties: {
+  readonly iri: string;
+  readonly heading: Heading;
+  readonly unreadTitle: string;
+}) {
   const { iri } = properties;
   const concept = useConcept(iri);
+  const shown = concept.error === null ? concept.data?.concept : undefined;
 
-  if (concept.error !== null) {
-    if (namesNothing(concept.error)) return <NoSuchConcept />;
-    return (
-      <ListState
-        state={{
-          kind: "failed",
-          words: failedReadWords(concept.error),
-          onRetry: () => {
-            void concept.refetch();
-          },
-          focusAfterRetry: properties.heading,
-        }}
+  return (
+    <>
+      <PageHead
+        title={shown === undefined ? properties.unreadTitle : titleOf(shown.frontmatter)}
+        headingRef={properties.heading}
       />
-    );
-  }
-  const read = concept.data?.concept;
-  if (read === undefined) {
-    return (
-      <>
-        <div aria-hidden className="mt-6 min-h-24" />
-        <ListState state={{ kind: "loading", words: WORDS.loading }} />
-      </>
-    );
-  }
-  return <ConceptShown iri={iri} concept={read} standing={concept.data?.standing} />;
+      {shown === undefined ? (
+        <ConceptUnread concept={concept} heading={properties.heading} />
+      ) : (
+        <ConceptShown iri={iri} concept={shown} standing={concept.data?.standing} />
+      )}
+    </>
+  );
 }
 
 export function ConceptPage(properties: { readonly iri: string | undefined }) {
   const { iri } = properties;
   const heading = useRef<HTMLHeadingElement>(null);
-  const group = headingOf(wayBackOf(useOpenedFrom()).page);
+  const unreadTitle = wayBackOf(useOpenedFrom()).page.name;
 
-  return (
+  return iri === undefined ? (
     <>
-      <PageHead heading={group} headingRef={heading} />
-      {iri === undefined ? (
-        <NoSuchConcept />
-      ) : (
-        <ConceptRead key={iri} iri={iri} heading={heading} />
-      )}
+      <PageHead title={unreadTitle} headingRef={heading} />
+      <NoSuchConcept />
     </>
+  ) : (
+    <ConceptRead key={iri} iri={iri} heading={heading} unreadTitle={unreadTitle} />
   );
 }

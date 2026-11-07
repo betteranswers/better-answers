@@ -4,7 +4,6 @@ import {
   CONSOLE,
   OWNS_NOTHING,
   OWNING,
-  EVERY_AREA,
   type Area,
   type MenuGroup,
   type Page,
@@ -166,11 +165,6 @@ export const detailAt = (page: Page, value: string): string => {
 
 export const hides = (tree: VisibleTree, path: string): boolean =>
   tree.home !== undefined && placeAt(tree.areas, path) === undefined;
-
-export const headingOf = (page: Page): string => {
-  const place = placeAt(EVERY_AREA, page.path);
-  return place?.menuGroup?.name ?? place?.area.name ?? page.name;
-};
 
 export type Moved = { readonly from: string; readonly to: readonly Page[] };
 

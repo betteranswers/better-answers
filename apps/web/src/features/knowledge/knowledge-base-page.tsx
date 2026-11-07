@@ -4,16 +4,16 @@ import { useCallback, useId, useMemo, useRef, useState, type RefObject } from "r
 
 import { useListAddress } from "@/shared/address/list-address.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
-import { BROWSE, KNOWLEDGE_BASE_PAGE, RETURNED_TO } from "@/shared/knowledge/concept-address.ts";
+import { KNOWLEDGE_BASE_PAGE, RETURNED_TO } from "@/shared/knowledge/concept-address.ts";
 import { ConceptLink } from "@/shared/knowledge/concept-link.tsx";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
+import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
 import { useLanding, useLandingLine } from "@/shared/landing.ts";
 import { GridTable } from "@/shared/list/grid-table.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
 import { Card } from "@/shared/ui/card.tsx";
-import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import {
   useKindConcepts,
@@ -109,7 +109,7 @@ const columnsOf = (landAt: number | undefined, onLanded: () => void) =>
     }),
     column.accessor("trustWords", {
       header: WORDS.columns.trust,
-      cell: ({ getValue }) => <Pill>{getValue()}</Pill>,
+      cell: ({ getValue }) => <TrustMark words={getValue()} />,
     }),
   ]);
 
@@ -252,7 +252,6 @@ function KnowledgeBaseRegion() {
         heading={KNOWLEDGE_BASE_PAGE.name}
         headingId={headingId}
         headingRef={heading}
-        description={WORDS.about}
         count={collections === undefined ? "" : WORDS.count(totalOf(collections))}
       />
       <Card marks className="mt-4">
@@ -274,7 +273,7 @@ export function KnowledgeBasePage() {
 
   return (
     <>
-      <PageHead heading={BROWSE.name} summary={BROWSE.summary} />
+      <PageHead title={KNOWLEDGE_BASE_PAGE.name} />
       <KnowledgeBaseRegion />
     </>
   );

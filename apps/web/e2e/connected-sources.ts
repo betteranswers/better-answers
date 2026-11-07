@@ -66,7 +66,7 @@ export const anAdminAtSources = async (
   await page.goto("/sign-in");
   await signIn(page, api, email);
   await controlCentreNav(page).getByRole("link", { name: "Connected Sources" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Connected Sources" })).toBeVisible();
   return { workspace, seeded };
 };
 

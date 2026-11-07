@@ -148,7 +148,6 @@ test.describe("Collections and Owners", () => {
       - region "Collections and Owners":
         - /children: equal
         - heading "Collections and Owners" [level=2]
-        - paragraph
         - status: /\\b2\\b/
         - status
         - list:

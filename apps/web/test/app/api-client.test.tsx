@@ -67,7 +67,7 @@ describe("the app providers", () => {
       </Providers>,
     );
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models and Spend");
     expect(screen.getByTestId("probe").textContent).toContain("modelChoices");
   });
 });

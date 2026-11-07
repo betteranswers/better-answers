@@ -94,6 +94,15 @@ export function ListState(properties: { readonly state: State }) {
   }
 }
 
+export function RecordLoading(properties: { readonly words: string }) {
+  return (
+    <>
+      <div aria-hidden className="mt-6 min-h-24" />
+      <ListState state={{ kind: "loading", words: properties.words }} />
+    </>
+  );
+}
+
 export function NothingListed(properties: {
   readonly search: string;
   readonly noneMatch: (search: string) => string;
