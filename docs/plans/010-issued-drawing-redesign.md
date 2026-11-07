@@ -16,6 +16,26 @@ The PRs, in order, are BA-339, BA-340, BA-341, BA-342, BA-343, BA-344, BA-345, B
 
 Changed 06/11/2026. The operator asked for less ceremony and fewer PRs. There are no real users yet, so the program ships in six units, each one owner and one PR or one direct push to `main`. Unit A is BA-343 then BA-341, the trust data in core and the api. Unit B is BA-339 with BA-340, the tokens move and the foundation. Unit C is BA-342, BA-344 and BA-345, the concept page, search and `DESIGN.md`, after A and B. Unit D is BA-346 with BA-347, the copy guard and the Knowledge copy, after C. Unit E is BA-348 to BA-351, the rest of the copy, after D. Unit F is BA-352 to BA-355, the remaining Knowledge issues, after D and beside E. Each unit is verified by its unit tests, a green `check`, one live drive through `.claude/skills/verify/SKILL.md` with screenshots posted to the operator, and one independent verifier on another model. The ten-lane swarm, the perf rules and the blocking review gate are retired. Migrations may run beside other work. The boxes below stay as the checklist of what each unit must contain.
 
+Status 07/11/2026. The units ran as the table shows. Three things differ from the paragraph above.
+
+- BA-345 left unit C as unit C2, so the concept page and search reach the operator's review first.
+- Unit D split into D1 (BA-346) and D2 (BA-347), so the copy guard lands before the Knowledge copy.
+- Unit E may start after D1, because ADR 0054 fixes the voice. It waits for C1 to merge, since C1 also edits `features/auth/`, `features/ask/` and `app/pages/`. BA-351's last box, which turns the rule on for all of `apps/web/src/**`, still waits for BA-348, BA-349 and BA-350.
+
+| Unit | Issues | State |
+| --- | --- | --- |
+| A1 | BA-343 | Merged, #1025 (`939fd3a37`) |
+| A2 | BA-341 | Merged, #1026 (`fb3307178`) |
+| B | BA-339, BA-340 | Merged, #1027 (`26b450f84`). `packages/design-system` is gone |
+| C1 | BA-342, BA-344 | #1031 open. It stops at merge-ready for the operator's review |
+| C2 | BA-345 | Waits for C1 |
+| D1 | BA-346 | Merged, #1030 (`fd3050040`). The `ui-copy-plain` rule is on `main` and off for every folder |
+| D2 | BA-347 | Waits for C1 |
+| E | BA-348 to BA-351 | Branch `liam/ba-348-rewrite-the-ask-and-questions-copy-with-clarify` holds only the commit that turns the rule on for its feature folders. It restarts after C1 merges |
+| F | BA-352 to BA-355 | Waits for D2 |
+
+The run paused at 01:13 on 07/11/2026, when the model's usage limit ran out. A new session took it up from the saved worktrees the same day.
+
 ## How to read this
 
 One box is one unit of work. Every box names the evidence that checks it. A nested box is a sub-step of the box above it. Check a box only when its evidence exists, a file, a log line, a screenshot, a test run, or a SHA. The body is a how-to. The appendices explain and record.
