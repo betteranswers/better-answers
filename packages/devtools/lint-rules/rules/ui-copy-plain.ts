@@ -47,7 +47,7 @@ const A_TERM_LINE = /^\*\*[^*]+\*\*:$/u;
 
 const A_TRUST_LINE = /^- Trust words are a closed set[^:\n]*: (?<words>.+)\.$/mu;
 
-const A_PLACEHOLDER = /\s*<[^>]*>/gu;
+const A_PLACEHOLDER = /^<\p{L}+>$/u;
 
 const A_ERROR_CLASS = /Error$/u;
 
@@ -59,7 +59,24 @@ const A_SENTENCE_BREAK = /(?<=[.!?])\s+/u;
 
 const A_STARTS_UPPER = /^[^\p{L}]*\p{Lu}/u;
 
+const A_PRODUCT_NAME = /^- Name: \*\*(?<name>[^*]+)\*\*/mu;
+
+const A_STARTS_LOWER = /^\p{Ll}/u;
+
+const A_PLAIN_WORD = /^[\p{L}’'-]+[,;:!?…]?$/u;
+
 const PLACEHOLDER_WORD = "item";
+
+const LOOKUPS: ReadonlySet<string> = new Set(["pageNamed"]);
+
+const COPY_ATTRIBUTES: ReadonlySet<string> = new Set([
+  "alt",
+  "aria-description",
+  "aria-label",
+  "label",
+  "placeholder",
+  "title",
+]);
 
 export const BANNED_PATTERNS: readonly RegExp[] = [
   /\bis one part of\b/iu,
@@ -136,7 +153,7 @@ const trustPhrases = (): readonly Phrase[] => {
   }
   return line
     .split(" · ")
-    .map((words) => words.replaceAll(A_PLACEHOLDER, "").trim().split(A_SPACES));
+    .map((words) => words.split(A_SPACES).filter((word) => !A_PLACEHOLDER.test(word)));
 };
 
 const nonEmpty = (
@@ -153,6 +170,12 @@ const longestFirst = (phrases: readonly Phrase[]): readonly Phrase[] =>
     (left, right) => right.length - left.length,
   );
 
+const productName = (): Phrase => {
+  const name = A_PRODUCT_NAME.exec(sourceText("PRODUCT.md"))?.groups?.["name"];
+  if (name === undefined) throw unparsed("PRODUCT.md", 'a line that starts "- Name: **"');
+  return [name];
+};
+
 let allowed: readonly Phrase[] | undefined;
 
 export const allowedPhrases = (): readonly Phrase[] =>
@@ -160,6 +183,7 @@ export const allowedPhrases = (): readonly Phrase[] =>
     ...nonEmpty("GLOSSARY.md", "capitalised words inside its definitions", glossaryPhrases()),
     ...ROLES.map((role): Phrase => [role]),
     ...nonEmpty("PRODUCT.md", "a list of trust words", trustPhrases()),
+    productName(),
   ]));
 
 const phraseAt = (cores: readonly string[], at: number): Phrase | undefined =>
@@ -179,6 +203,16 @@ const hasStrayCapital = (cores: readonly string[]): boolean => {
 const isTitleCasedLabel = (text: string): boolean =>
   !A_FULL_STOP.test(text) &&
   text.split(A_SEGMENT_BREAK).some((segment) => hasStrayCapital(wordsOf(segment).map(coreOf)));
+
+const isLowerCaseLabel = (text: string): boolean => {
+  const words = wordsOf(text);
+  return (
+    A_STARTS_LOWER.test(text) &&
+    !A_FULL_STOP.test(text) &&
+    words.every((word) => A_PLAIN_WORD.test(word)) &&
+    phraseAt(words.map(coreOf), 0) === undefined
+  );
+};
 
 const isBanned = (text: string): boolean => BANNED_PATTERNS.some((pattern) => pattern.test(text));
 
@@ -202,7 +236,16 @@ const isSpecifier = (node: Text): boolean => {
 
 const isPropertyKey = (node: Text): boolean => {
   const { parent } = node;
-  return parent.type === "Property" && parent.key === node && !parent.computed;
+  return parent.type === "Property" && parent.key === node;
+};
+
+const isLookupKey = (node: Text): boolean => {
+  const { parent } = node;
+  return (
+    parent.type === "CallExpression" &&
+    parent.callee.type === "Identifier" &&
+    LOOKUPS.has(parent.callee.name)
+  );
 };
 
 const isErrorMessage = (node: Text): boolean => {
@@ -214,7 +257,21 @@ const isErrorMessage = (node: Text): boolean => {
   );
 };
 
-const NOT_COPY: readonly ((node: Text) => boolean)[] = [isSpecifier, isPropertyKey, isErrorMessage];
+const NOT_COPY: readonly ((node: Text) => boolean)[] = [
+  isSpecifier,
+  isPropertyKey,
+  isLookupKey,
+  isErrorMessage,
+];
+
+const isCopyAttribute = (node: Text): boolean => {
+  const { parent } = node;
+  return (
+    parent.type === "JSXAttribute" &&
+    parent.name.type === "JSXIdentifier" &&
+    COPY_ATTRIBUTES.has(parent.name.name)
+  );
+};
 
 const templateText = (node: ESTree.TemplateLiteral): string =>
   node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw).join(PLACEHOLDER_WORD);
@@ -232,10 +289,12 @@ export const uiCopyPlainRule = defineRule({
     },
   },
   createOnce(context) {
-    const check = (node: Text, written: string): void => {
+    const check = (node: Text, written: string, opensWithText: boolean): void => {
       const text = written.replaceAll(A_SPACES, " ").trim();
       if (!isProse(text) || NOT_COPY.some((isNot) => isNot(node))) return;
-      if (REFUSALS.some((refuses) => refuses(text))) context.report({ node, messageId: "plain" });
+      const refused =
+        REFUSALS.some((refuses) => refuses(text)) || (opensWithText && isLowerCaseLabel(text));
+      if (refused) context.report({ node, messageId: "plain" });
     };
 
     return {
@@ -243,13 +302,17 @@ export const uiCopyPlainRule = defineRule({
         return !isTestPath(path.relative(context.cwd, context.filename).split(path.sep).join("/"));
       },
       Literal(node): void {
-        if (typeof node.value === "string") check(node, node.value);
+        if (typeof node.value === "string") check(node, node.value, isCopyAttribute(node));
       },
       TemplateLiteral(node): void {
-        check(node, templateText(node));
+        check(node, templateText(node), false);
       },
       JSXText(node): void {
-        check(node, node.value);
+        const { parent } = node;
+        const first =
+          (parent.type === "JSXElement" || parent.type === "JSXFragment") &&
+          parent.children[0] === node;
+        check(node, node.value, first);
       },
     };
   },

@@ -31,8 +31,8 @@ type Row = readonly [what: string, text: string];
 const plan = (rows: readonly Row[]): readonly (readonly [string, PlannedLint])[] =>
   rows.map(([what, text]) => [what, planned(text)]);
 
-const COLLECTION_DEFINITION =
-  "A collection is one part of the company’s knowledge, such as a product, a service or a sector. Its owner keeps its concepts verified and up to date. A concept can also have an owner of its own.";
+const EXPORT_DESCRIPTION =
+  "A document with a guide’s Briefs, dated and marked as not maintained. It won’t update when the guide changes. Each Brief in it is recorded as used.";
 
 const TAILWIND =
   "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] aria-invalid:border-destructive disabled:pointer-events-none disabled:opacity-50 dark:bg-input/30 [&_svg]:size-4 [&_svg]:shrink-0 font-sans! leading-6! text-xs";
@@ -71,6 +71,26 @@ const SYNTAX: readonly (readonly [string, string, string])[] = [
   ],
   ["a property key", "apps/web/src/d.ts", 'export const keys = { "Some Odd Key": 1 };\n'],
   [
+    "a computed property key",
+    "apps/web/src/f.ts",
+    'export const keys = { ["Some Odd Key"]: 1 };\n',
+  ],
+  [
+    "a page looked up by its menu name",
+    "apps/web/src/g.ts",
+    'export const page = pageNamed(CURATION, "Collections and Owners");\n',
+  ],
+  [
+    "a lower case fragment of a sentence",
+    "apps/web/src/h.ts",
+    'export const gone = "a former member";\n',
+  ],
+  [
+    "the product name opening a label",
+    "apps/web/src/i.tsx",
+    "export const Help = () => <span>better-answers support</span>;\n",
+  ],
+  [
     "a developer error message",
     "apps/web/src/e.ts",
     'export const fail = () => new Error("useCarousel must be used within a <Carousel />");\n',
@@ -84,11 +104,10 @@ const EXEMPT_TESTS: readonly (readonly [string, string])[] = [
 ];
 
 const REFUSED: readonly Row[] = [
-  ["the collection definition", COLLECTION_DEFINITION],
+  ["the export description", EXPORT_DESCRIPTION],
   ["a Title Case detail label", "Details from the File"],
   ["a Title Case action with an alternative", "Edit This Concept, or Suggest an Edit"],
   ["a Title Case heading", "Edit This Concept"],
-  ["an area summary that says Manage", "Manage knowledge."],
   [
     "an explanation of an empty section",
     "No fact is missing from this section, so there is nothing to add.",
@@ -96,7 +115,7 @@ const REFUSED: readonly Row[] = [
 ];
 
 const REWRITES: readonly Row[] = [
-  ["the collection summary", "Each collection has an owner who keeps its concepts verified."],
+  ["the export description", "A dated copy of a guide’s Briefs."],
   ["a sentence case detail label", "Details from the file"],
   ["a sentence case action with an alternative", "Edit or suggest an edit"],
   ["a sentence case heading", "Edit concept"],
@@ -171,6 +190,12 @@ const jsx = lint({
 const jsxSentenceCase = lint({
   "apps/web/src/button.tsx": "export const Button = () => <button>Sign out</button>;\n",
 });
+const jsxLowerCase = lint({
+  "apps/web/src/button.tsx": "export const Button = () => <button>edit concept</button>;\n",
+});
+const attributeLowerCase = lint({
+  "apps/web/src/field.tsx": 'export const Field = () => <input aria-label="edit concept" />;\n',
+});
 const jsxAttribute = lint({
   "apps/web/src/field.tsx": 'export const Field = () => <input title="Sign Out" />;\n',
 });
@@ -237,6 +262,11 @@ describe("the plain copy rule reads every kind of text", () => {
 
   it("reads the text of a JSX attribute", () => {
     expect(jsxAttribute.flagged()).toEqual(["apps/web/src/field.tsx"]);
+  });
+
+  it("refuses a label shown in lower case", () => {
+    expect(jsxLowerCase.flagged()).toEqual(["apps/web/src/button.tsx"]);
+    expect(attributeLowerCase.flagged()).toEqual(["apps/web/src/field.tsx"]);
   });
 
   it("reads a template literal around its placeholders", () => {
