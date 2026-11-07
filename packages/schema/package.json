@@ -13,6 +13,7 @@
     "./code-unit": "./src/code-unit.ts",
     "./email-code": "./src/people/email-code.ts",
     "./email-address": "./src/people/email-address.ts",
+    "./roles": "./src/people/roles.ts",
     "./second-factor": "./src/people/second-factor.ts",
     "./theme": "./src/platform/theme.ts",
     "./tab-workspace": "./src/platform/tab-workspace.ts",
