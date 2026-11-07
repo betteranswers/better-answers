@@ -74,7 +74,7 @@ jobs:
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
           echo "This leg scans \`ghcr.io/${OWNER}/${TIER}@${digest}\`, tagged \`${tag}\`." >> "$GITHUB_STEP_SUMMARY"
       # Stored per host in the Docker config, so the token goes only to ghcr.io, never to the mirror that serves the scanner's database.
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -86,12 +86,12 @@ jobs:
           output: ${{ matrix.tier }}.sarif
           exit-code: "0"
           # Set explicitly, because the action's default lags the scanner's security releases. Renovate updates this input.
-          version: v0.76.1
+          version: v0.76.2
           # Any run on main can write an Actions cache entry, and a database planted there could hide findings from this scan.
           cache: "false"
           # The worker's layers are 1.47 GB compressed, and the five-minute default covers the pull as well as the scan.
           timeout: 15m
-      - uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: ${{ matrix.tier }}.sarif
           category: image-${{ matrix.tier }}
