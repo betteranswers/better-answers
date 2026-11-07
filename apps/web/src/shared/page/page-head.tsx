@@ -6,8 +6,9 @@ export const PageHeadSlot = createContext<HTMLElement | null | undefined>(undefi
 export function PageHead(properties: {
   readonly title: string;
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
+  readonly inPlace?: true;
 }) {
-  const { title, headingRef } = properties;
+  const { title, headingRef, inPlace } = properties;
   const slot = useContext(PageHeadSlot);
 
   const head = (
@@ -20,7 +21,7 @@ export function PageHead(properties: {
     </h1>
   );
 
-  if (slot === undefined) return head;
+  if (inPlace === true || slot === undefined) return head;
   return slot === null ? null : createPortal(head, slot);
 }
 

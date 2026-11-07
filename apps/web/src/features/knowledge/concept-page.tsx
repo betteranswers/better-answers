@@ -5,13 +5,7 @@ import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { conceptMatchKey, conceptPageOf, wayBackOf } from "@/shared/knowledge/concept-address.ts";
 import { ConceptBody, LINK, type MarkOpening } from "@/shared/knowledge/concept-body.tsx";
-import {
-  descriptionOf,
-  furtherKeysOf,
-  kindOf,
-  tagsOf,
-  titleOf,
-} from "@/shared/knowledge/concept-frontmatter.ts";
+import { descriptionOf, kindOf, tagsOf, titleOf } from "@/shared/knowledge/concept-frontmatter.ts";
 import { CONCEPT_WORDS as WORDS } from "@/shared/knowledge/concept-words.ts";
 import {
   EvidenceInline,
@@ -29,20 +23,18 @@ import {
 import { useOpenedFrom } from "@/shared/knowledge/open-match.ts";
 import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
-import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
+import { TitleBlock } from "@/shared/knowledge/title-block.tsx";
+import { copiedToTheClipboard } from "@/shared/lib/clipboard.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { RowLink } from "@/shared/list/grid-table.tsx";
 import { keyed } from "@/shared/list/keyed.ts";
 import { ListState, RecordLoading } from "@/shared/list/list-pages.tsx";
-import { SummaryRow } from "@/shared/list/summary-row.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { useRoomBeside } from "@/shared/page/wide-layout.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
-import { Card } from "@/shared/ui/card.tsx";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { dayWords } from "@/shared/words.ts";
 
 import { useConceptEditing } from "./editing/concept-actions.tsx";
 import {
@@ -56,6 +48,7 @@ const listedWithWayBackTo = (page: string) => [
   wayBackKeystroke(page),
   KEY.sources,
   KEY.links,
+  KEY.copy,
   ...Object.values(EDITOR_KEYSTROKES),
 ];
 
@@ -74,10 +67,18 @@ const useWayBack = (iri: string | undefined) => {
   return { name: page.name, href, go };
 };
 
-function WayBack(properties: { readonly iri: string | undefined }) {
+function WayBack(properties: { readonly iri: string | undefined; readonly quiet?: true }) {
   const wayBack = useWayBack(properties.iri);
   return (
-    <RowLink href={wayBack.href} className={LINK} onOpen={wayBack.go}>
+    <RowLink
+      href={wayBack.href}
+      className={
+        properties.quiet === true
+          ? "[font-size:var(--text-sm)] font-normal text-muted-foreground underline hover:text-foreground"
+          : LINK
+      }
+      onOpen={wayBack.go}
+    >
       {WORDS.backTo(wayBack.name)}
     </RowLink>
   );
@@ -100,19 +101,58 @@ const namesNothing = (failure: Error | ApiError): boolean => {
   return word === "not-found" || word === "malformed";
 };
 
-const SECTION_HEADING = "[font-size:var(--text-section)] font-semibold";
+const SECTION_HEADING = "[font-size:var(--text-lg)] font-semibold";
 
-function Header(properties: { readonly concept: Concept; readonly actions: ReactNode }) {
-  const { frontmatter, trust, trustWords } = properties.concept;
+const useCopy = (text: string) => {
+  const [said, setSaid] = useState<string>();
+  const copy = () => {
+    setSaid(undefined);
+    void copiedToTheClipboard(text).then((copied) => {
+      setSaid(copied ? WORDS.copied : STOCK.copy);
+    });
+  };
+  return { said, copy };
+};
+
+function Header(properties: {
+  readonly concept: Concept;
+  readonly heading: Heading;
+  readonly actions: ReactNode;
+  readonly copying: ReturnType<typeof useCopy>;
+}) {
+  const { concept, heading, actions, copying } = properties;
+  const { frontmatter, collection } = concept;
   const description = descriptionOf(frontmatter);
   const tags = tagsOf(frontmatter);
   return (
-    <header className="mt-4">
-      {description === undefined ? null : <p className="text-muted-foreground">{description}</p>}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <TrustMark trust={trust} words={trustWords} />
-        <KindLine kind={kindOf(frontmatter)} className="grow" />
-        {properties.actions}
+    <>
+      <PageHead title={titleOf(frontmatter)} headingRef={heading} inPlace />
+      {description === undefined ? null : (
+        <p className="mt-1.5 text-muted-foreground [font-size:var(--text-lg)]">{description}</p>
+      )}
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-border pb-5">
+        <KindLine
+          kind={kindOf(frontmatter)}
+          collection={collection ?? WORDS.noCollection}
+          className="min-h-8 items-center [font-size:var(--text-sm)] [&_dd]:text-foreground"
+        />
+        <div className="flex flex-wrap items-start gap-2">
+          <span
+            aria-live="polite"
+            className="flex min-h-8 items-center text-muted-foreground [font-size:var(--text-sm)]"
+          >
+            {copying.said}
+          </span>
+          {actions}
+          <Button
+            type="button"
+            variant="outline"
+            aria-keyshortcuts={KEY.copy.key}
+            onClick={copying.copy}
+          >
+            {WORDS.copy}
+          </Button>
+        </div>
       </div>
       {tags.length === 0 ? null : (
         <ul aria-label={WORDS.tags} className="mt-3 flex flex-wrap gap-2">
@@ -123,7 +163,7 @@ function Header(properties: { readonly concept: Concept; readonly actions: React
           ))}
         </ul>
       )}
-    </header>
+    </>
   );
 }
 
@@ -136,8 +176,8 @@ function SourceLine(properties: {
   const openerId = useId();
   const open = opening.openerId === openerId;
   return (
-    <li className="px-4 py-3">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+    <li className="border-b border-border py-2.5">
+      <div className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-baseline gap-x-2">
         <span className="font-mono [font-size:var(--text-xs)] text-muted-foreground">
           [{source + 1}]
         </span>
@@ -157,11 +197,21 @@ function SourceLine(properties: {
           </Button>
         )}
         {item.at === undefined ? null : (
-          <span className="text-muted-foreground">{WORDS.place(item.at)}</span>
+          <span className="max-w-40 text-right font-mono [font-size:var(--text-sm)] text-muted-foreground wrap-anywhere">
+            {item.at}
+          </span>
         )}
       </div>
       {open ? opening.inline : null}
     </li>
+  );
+}
+
+function Counted(properties: { readonly children: number }) {
+  return (
+    <span className="ml-2 [font-size:var(--text-base)] font-normal text-muted-foreground">
+      {properties.children}
+    </span>
   );
 }
 
@@ -176,45 +226,16 @@ function Sources(properties: {
     <section aria-labelledby={headingId} className="mt-8">
       <h2 ref={heading} id={headingId} tabIndex={-1} className={SECTION_HEADING}>
         {WORDS.sources}
+        <Counted>{concept.evidence.length}</Counted>
       </h2>
-      <Card marks className="mt-3">
-        <div className="px-4 py-3">
-          <p>{concept.lead}</p>
-        </div>
-        {concept.evidence.length === 0 ? null : (
-          <ol className="divide-y divide-border border-t border-border">
-            {keyed(concept.evidence, ({ source }) => source).map(({ key, item }, source) => (
-              <SourceLine key={key} item={item} source={source} opening={opening} />
-            ))}
-          </ol>
-        )}
-        <div className="border-t border-border px-4 py-3">
-          <p className="text-muted-foreground">{concept.next}</p>
-        </div>
-      </Card>
-    </section>
-  );
-}
-
-function Verification(properties: { readonly concept: Concept }) {
-  const headingId = useId();
-  const events = properties.concept.verifications;
-  return (
-    <section aria-labelledby={headingId} className="mt-8">
-      <h2 id={headingId} className={SECTION_HEADING}>
-        {WORDS.verification}
-      </h2>
-      {events.length === 0 ? (
-        <p className="mt-2 text-muted-foreground">{WORDS.neverVerified}</p>
-      ) : (
-        <ul className="mt-2 grid gap-1">
-          {keyed(events, ({ at }) => at).map(({ key, item: event }) => (
-            <li key={key}>
-              {WORDS.verifiedOn(dayWords(event.at), event.tier === "human-reviewed")}
-            </li>
-          ))}
-        </ul>
+      {concept.access === "included" ? null : (
+        <p className="mt-1 text-muted-foreground">{concept.lead}</p>
       )}
+      <ol className="mt-3 border-t border-border">
+        {keyed(concept.evidence, ({ source }) => source).map(({ key, item }, source) => (
+          <SourceLine key={key} item={item} source={source} opening={opening} />
+        ))}
+      </ol>
     </section>
   );
 }
@@ -227,56 +248,31 @@ function Links(properties: { readonly concept: Concept; readonly heading: Headin
     <section aria-labelledby={headingId} className="mt-8">
       <h2 ref={heading} id={headingId} tabIndex={-1} className={SECTION_HEADING}>
         {WORDS.links}
+        <Counted>{relations.length}</Counted>
       </h2>
-      {relations.length === 0 ? (
-        <p className="mt-2 text-muted-foreground">{WORDS.noLinks}</p>
-      ) : (
-        <ul className="mt-2 grid gap-2">
-          {relations.map((relation) => {
-            const page = conceptPageOf(relation.target);
-            const kind = RELATION_WORDS.get(relation.kind);
-            return (
-              <li
-                key={`${relation.kind}:${relation.target}`}
-                className="flex flex-wrap items-baseline gap-x-3 gap-y-1"
-              >
-                {kind === undefined ? null : <Pill>{kind}</Pill>}
-                {page === undefined ? (
-                  <span className="wrap-anywhere">{relation.title}</span>
-                ) : (
-                  <Link to={page} className={cn(LINK, "wrap-anywhere")}>
-                    {relation.title}
-                  </Link>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <ul className="mt-3 border-t border-border">
+        {relations.map((relation) => {
+          const page = conceptPageOf(relation.target);
+          return (
+            <li
+              key={`${relation.kind}:${relation.target}`}
+              className="flex items-baseline justify-between gap-x-4 border-b border-border py-2.5"
+            >
+              {page === undefined ? (
+                <span className="min-w-0 wrap-anywhere">{relation.title}</span>
+              ) : (
+                <Link to={page} className={cn(LINK, "min-w-0 wrap-anywhere")}>
+                  {relation.title}
+                </Link>
+              )}
+              <span className="shrink-0 text-muted-foreground [font-size:var(--text-sm)]">
+                {RELATION_WORDS.get(relation.kind)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </section>
-  );
-}
-
-function Details(properties: { readonly concept: Concept }) {
-  const further = furtherKeysOf(properties.concept.frontmatter);
-  if (further.length === 0) return null;
-  return (
-    <Collapsible className="mt-8">
-      <CollapsibleTrigger asChild>
-        <Button variant="outline" size="sm">
-          {WORDS.details}
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <dl className="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-          {further.map(([key, words]) => (
-            <SummaryRow key={key} term={key}>
-              <span className="wrap-anywhere">{words}</span>
-            </SummaryRow>
-          ))}
-        </dl>
-      </CollapsibleContent>
-    </Collapsible>
   );
 }
 
@@ -284,34 +280,39 @@ const COLUMN = "max-w-measure [font-size:var(--prose-size,var(--text-lg))]";
 
 const INTERFACE = "[font-size:var(--text-base)]";
 
-function ConceptShown(properties: {
-  readonly iri: string;
-  readonly concept: Concept;
-  readonly standing: "commits" | "suggests" | undefined;
-}) {
-  const { iri, concept } = properties;
-  const title = titleOf(concept.frontmatter);
-  useBreadcrumbLastPart(title);
+/** Each class is spelt out because Tailwind finds a class by reading the source. */
+const LAYOUT =
+  "grid grid-cols-[minmax(0,640px)] @min-[880px]:grid-cols-[minmax(0,640px)_352px] @min-[880px]:grid-rows-[auto_auto_1fr] @min-[880px]:gap-x-12 @min-[1056px]:gap-x-16";
+
+const WAY_BACK = "order-1 mb-2 @min-[880px]:col-start-1 @min-[880px]:row-start-1";
+
+const HEAD = "order-2 mb-6 @min-[880px]:col-start-1 @min-[880px]:row-start-2";
+
+const TITLE_BLOCK =
+  "order-3 mb-6 @min-[880px]:col-start-2 @min-[880px]:row-span-2 @min-[880px]:row-start-2 @min-[880px]:mb-0 @min-[880px]:self-start";
+
+const BODY = "order-4 @min-[880px]:col-start-1 @min-[880px]:row-start-3";
+
+const useReadingKeys = (wayBack: ReturnType<typeof useWayBack>, copy: () => void) => {
   const sources = useRef<HTMLHeadingElement>(null);
   const links = useRef<HTMLHeadingElement>(null);
-  const beside = useRoomBeside();
-  const wayBack = useWayBack(iri);
-  const [opened, setOpened] = useState<Opened>();
-  const editing = useConceptEditing({
-    target: { kind: "concept", iri },
-    standing: properties.standing,
-  });
-
   const listed = useMemo(() => listedWithWayBackTo(wayBack.name), [wayBack.name]);
   usePageKeystrokes(listed);
   useKeystroke(wayBackKeystroke(wayBack.name), wayBack.go);
-  useKeystroke(KEY.sources, () => {
+  const goToSources = () => {
     sources.current?.focus();
-  });
+  };
+  useKeystroke(KEY.sources, goToSources);
   useKeystroke(KEY.links, () => {
     links.current?.focus();
   });
+  useKeystroke(KEY.copy, copy);
+  return { sources, links, goToSources };
+};
 
+const useOpening = (concept: Concept) => {
+  const beside = useRoomBeside();
+  const [opened, setOpened] = useState<Opened>();
   const close = () => {
     setOpened(undefined);
   };
@@ -334,37 +335,77 @@ function ConceptShown(properties: {
         <EvidenceInline opened={opened} onClose={close} />
       ),
   };
+  return { opening, close, sheet: opened !== undefined && beside ? opened : undefined };
+};
+
+function Citations(properties: {
+  readonly concept: Concept;
+  readonly opening: MarkOpening;
+  readonly sources: Heading;
+  readonly links: Heading;
+}) {
+  const { concept, opening, sources, links } = properties;
+  return (
+    <div className={INTERFACE}>
+      {concept.evidence.length === 0 ? null : (
+        <Sources concept={concept} opening={opening} heading={sources} />
+      )}
+      {concept.relations.length === 0 ? null : <Links concept={concept} heading={links} />}
+    </div>
+  );
+}
+
+function ConceptShown(properties: {
+  readonly iri: string;
+  readonly concept: Concept;
+  readonly heading: Heading;
+  readonly standing: "commits" | "suggests" | undefined;
+}) {
+  const { iri, concept, heading } = properties;
+  const title = titleOf(concept.frontmatter);
+  useBreadcrumbLastPart(title);
+  const editing = useConceptEditing({
+    target: { kind: "concept", iri },
+    standing: properties.standing,
+  });
+  const copying = useCopy(concept.body);
+  const keys = useReadingKeys(useWayBack(iri), copying.copy);
+  const { opening, close, sheet } = useOpening(concept);
 
   return (
-    <article
-      aria-label={title}
-      className={cn("mt-6", opened !== undefined && beside && "pr-[var(--container-md)]")}
-    >
-      <div className={COLUMN}>
-        <div className={INTERFACE}>
-          <p>
-            <WayBack iri={iri} />
-          </p>
-          <Header concept={concept} actions={editing.actions} />
+    <div className={cn("@container mt-6", sheet !== undefined && "pr-[var(--container-md)]")}>
+      <article aria-label={title} data-grid-mask="reading" className={LAYOUT}>
+        <p className={WAY_BACK}>
+          <WayBack iri={iri} quiet />
+        </p>
+        <header className={cn(HEAD, INTERFACE)}>
+          <Header concept={concept} heading={heading} actions={editing.actions} copying={copying} />
           {editing.editor}
-        </div>
-        <div className="mt-6">
-          <ConceptBody
-            body={concept.body}
-            evidence={concept.evidence}
-            bodyLinks={concept.bodyLinks}
+        </header>
+        <div className={BODY}>
+          <div className={COLUMN}>
+            <ConceptBody
+              body={concept.body}
+              evidence={concept.evidence}
+              bodyLinks={concept.bodyLinks}
+              opening={opening}
+            />
+          </div>
+          <Citations
+            concept={concept}
             opening={opening}
+            sources={keys.sources}
+            links={keys.links}
           />
         </div>
-        <div className={INTERFACE}>
-          <Sources concept={concept} opening={opening} heading={sources} />
-          <Verification concept={concept} />
-          <Links concept={concept} heading={links} />
-          <Details concept={concept} />
-        </div>
-      </div>
-      {opened === undefined || !beside ? null : <EvidenceSheet opened={opened} onClose={close} />}
-    </article>
+        <TitleBlock
+          concept={concept}
+          onGoToSources={keys.goToSources}
+          className={cn(TITLE_BLOCK, INTERFACE)}
+        />
+        {sheet === undefined ? null : <EvidenceSheet opened={sheet} onClose={close} />}
+      </article>
+    </div>
   );
 }
 
@@ -394,21 +435,19 @@ function ConceptRead(properties: {
   readonly heading: Heading;
   readonly unreadTitle: string;
 }) {
-  const { iri } = properties;
+  const { iri, heading } = properties;
   const concept = useConcept(iri);
   const shown = concept.error === null ? concept.data?.concept : undefined;
 
+  if (shown !== undefined) {
+    return (
+      <ConceptShown iri={iri} concept={shown} heading={heading} standing={concept.data?.standing} />
+    );
+  }
   return (
     <>
-      <PageHead
-        title={shown === undefined ? properties.unreadTitle : titleOf(shown.frontmatter)}
-        headingRef={properties.heading}
-      />
-      {shown === undefined ? (
-        <ConceptUnread concept={concept} heading={properties.heading} />
-      ) : (
-        <ConceptShown iri={iri} concept={shown} standing={concept.data?.standing} />
-      )}
+      <PageHead title={properties.unreadTitle} headingRef={heading} />
+      <ConceptUnread concept={concept} heading={heading} />
     </>
   );
 }

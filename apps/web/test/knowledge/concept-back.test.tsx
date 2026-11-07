@@ -13,7 +13,7 @@ import {
   knowledgeAsks,
 } from "@test/knowledge/all-knowledge-answers.ts";
 import {
-  aConceptRead,
+  anOpenedConcept,
   aSearchApi,
   answeringConcepts,
   placedForSearch,
@@ -53,7 +53,12 @@ const aKnowledgeBaseApi = () => {
   );
   api.set(
     "knowledge.open",
-    answeringConcepts(() => aConceptRead("Yard Lease", 5)),
+    answeringConcepts((iri) =>
+      read({
+        found: true,
+        concept: anOpenedConcept(iri, { title: "Yard Lease", type: "lease" }, ""),
+      }),
+    ),
   );
   return api;
 };

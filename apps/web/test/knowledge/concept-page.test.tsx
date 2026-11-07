@@ -1,9 +1,10 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import { detailAt } from "@/shared/navigation.ts";
-import { anOpenedConcept } from "@test/knowledge/search-answers.ts";
+import { clipboardAnswering } from "@test/clipboard-stand-in.ts";
+import { aConceptIri, anIssuedConcept } from "@test/knowledge/search-answers.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { adaAnAdmin, aRefusalAnswer, openAt, read } from "@test/two-workspaces.ts";
 
@@ -13,39 +14,19 @@ placedWithoutMeasuring();
 
 const A_CONCEPT = detailAt(SEARCH_PAGE, "01JRETENTN000000000000000A");
 
-const VERIFIED_BY_ADA = "Verified by Ada Lovelace · 3 March 2026";
+type Opened = Parameters<typeof anIssuedConcept>[0];
 
-const aConceptVerifiedOnce = () =>
-  read({
-    found: true,
-    concept: {
-      ...anOpenedConcept(
-        "https://better-answers.com/c/01JRETENTN000000000000000A",
-        {
-          title: "Audit Logs Retention",
-          type: "Answer",
-          verified: [{ by: "process:better-answers-import", at: "2025-01-01T00:00:00Z" }],
-        },
-        "Audit logs are kept for six years.",
-      ),
-      trust: {
-        tier: "human-reviewed",
-        status: "current",
-        verifiedBy: "Ada Lovelace",
-        verifiedAt: "2026-03-03T09:41:00.000Z",
-        rider: null,
-      },
-      trustWords: VERIFIED_BY_ADA,
-      verifications: [
-        {
-          tier: "human-reviewed",
-          actor: "human:01JBZ6Q2V7Y9K3M5N8P0R2T4W6",
-          name: "Ada Lovelace",
-          at: "2026-03-03T09:41:00.000Z",
-        },
-      ],
-    },
-  });
+const opened = async (changes: Opened = {}) => {
+  const api = adaAnAdmin();
+  api.set("knowledge.open", () => read({ found: true, concept: anIssuedConcept(changes) }));
+  await openAt(A_CONCEPT, api);
+  return within(await screen.findByRole("article"));
+};
+
+const SOURCES = [
+  { source: "SCP tender 2025.pdf", at: "p.4" },
+  { source: "Working Together to Safeguard Children 2023", at: "ch.2" },
+];
 
 describe("the concept page", () => {
   it("shows not found when the api rejects the id", async () => {
@@ -60,17 +41,111 @@ describe("the concept page", () => {
     expect(main.queryAllByRole("status").filter((each) => each.textContent !== "")).toHaveLength(0);
   });
 
-  it("lists the verifications the header trust comes from", async () => {
-    const api = adaAnAdmin();
-    api.set("knowledge.open", aConceptVerifiedOnce);
-    await openAt(A_CONCEPT, api);
+  it("draws the title block, not details from the file", async () => {
+    const article = await opened();
 
-    const article = within(await screen.findByRole("article"));
-    const history = within(article.getByRole("region", { name: "Verification" }));
-    expect(article.getByText(VERIFIED_BY_ADA)).toBeDefined();
-    expect(history.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
-      "3 March 2026 · by a person",
-    ]);
-    expect(article.queryByText(/1 January 2025/u)).toBeNull();
+    const block = within(article.getByRole("complementary", { name: "About this concept" }));
+    expect(block.getByText("Verified by Priya Shah · 3 March 2026")).toBeDefined();
+    expect(block.getByText("Owner of Sectors")).toBeDefined();
+    expect(article.queryByText(/details from the file/iu)).toBeNull();
+    expect(article.queryByRole("region", { name: "Verification" })).toBeNull();
+  });
+
+  it("holds the one title in the page's own column", async () => {
+    const article = await opened();
+
+    expect(article.getByRole("heading", { level: 1 }).textContent).toBe(
+      "Safeguarding Children Partnerships",
+    );
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("names the kind and collection, or no collection", async () => {
+    const article = await opened({ collection: null });
+
+    expect(article.getByText("Kind").nextElementSibling?.textContent).toBe("Sector");
+    expect(article.getByText("Collection").nextElementSibling?.textContent).toBe("No collection");
+  });
+});
+
+describe("the sources of the concept page", () => {
+  it("draws no Sources heading when the concept cites nothing", async () => {
+    const article = await opened({ evidence: [] });
+
+    expect(article.queryByRole("heading", { name: /Sources/u })).toBeNull();
+  });
+
+  it("lists each source with its number and place", async () => {
+    const article = await opened({ evidence: SOURCES });
+
+    const sources = article.getByRole("region", { name: /Sources/u });
+    expect(within(sources).getByRole("heading").textContent).toBe("Sources2");
+    expect(
+      within(sources)
+        .getAllByRole("listitem")
+        .map((line) => line.textContent),
+    ).toEqual(["[1]SCP tender 2025.pdfp.4", "[2]Working Together to Safeguard Children 2023ch.2"]);
+  });
+
+  it("shows no access line when every source is included", async () => {
+    const included = await opened({ evidence: SOURCES, lead: "All of it is yours to read." });
+    expect(included.queryByText("All of it is yours to read.")).toBeNull();
+  });
+
+  it("explains when some sources are withheld", async () => {
+    const article = await opened({
+      evidence: SOURCES,
+      access: "partly-included",
+      lead: "Some sources are not included.",
+    });
+
+    expect(article.getByText("Some sources are not included.")).toBeDefined();
+  });
+});
+
+describe("the links of the concept page", () => {
+  it("draws no Links heading when nothing is linked", async () => {
+    const article = await opened({ relations: [] });
+
+    expect(article.queryByRole("heading", { name: /Links/u })).toBeNull();
+  });
+
+  it("lists each link with the title it leads to", async () => {
+    const article = await opened({
+      relations: [
+        {
+          kind: "REFERENCES",
+          target: aConceptIri("https://better-answers.com/c/01JRETENTN000000000000000B"),
+          title: "Section 11 audit",
+        },
+      ],
+    });
+
+    const links = article.getByRole("region", { name: /Links/u });
+    expect(within(links).getByRole("link", { name: "Section 11 audit" })).toBeDefined();
+    expect(within(links).getByRole("heading").textContent).toBe("Links1");
+  });
+});
+
+describe("copying the concept", () => {
+  it("copies the body and says it is copied", async () => {
+    const written = clipboardAnswering(() => Promise.resolve());
+    const article = await opened({ body: "Audit logs are kept for six years." });
+
+    fireEvent.click(article.getByRole("button", { name: "Copy" }));
+
+    await waitFor(() => expect(article.getByText("Copied")).toBeDefined());
+    expect(written).toEqual(["Audit logs are kept for six years."]);
+    expect(article.getByText("Copied").getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("says when the browser would not copy", async () => {
+    clipboardAnswering(() => Promise.reject(new Error("refused")));
+    const article = await opened();
+
+    fireEvent.click(article.getByRole("button", { name: "Copy" }));
+
+    expect(await article.findByText(/Couldn't copy/u)).toBeDefined();
+    expect(article.queryByText("Copied")).toBeNull();
   });
 });

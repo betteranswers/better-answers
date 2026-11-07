@@ -10,8 +10,11 @@ import { expect, test } from "../browser.ts";
 import {
   ACTION_SAMPLES,
   actionClocked,
+  addMember,
   anAddress,
   clockTheNextKey,
+  nameOwners,
+  person,
   provision,
   signIn,
   skipLinkReachesThePage,
@@ -51,6 +54,12 @@ const MINUTES_PASSAGE = "The board fixed the period in closed session.";
 const CHARTER_PASSAGE = "The committee meets in the first week of each quarter.";
 
 const CLAIM = "We keep audit logs for seven years, then delete them.";
+
+const LEASE = "Yard Lease";
+
+const CONTRACTS = "contracts";
+
+const LEASE_DOCUMENT = "Yard lease 2024.pdf";
 
 const IMAGE_HOST = "images.example.test";
 
@@ -244,6 +253,57 @@ test.describe("the concept page", () => {
 
     await page.reload();
     await expect(conceptOf(page, title)).toBeVisible();
+  });
+
+  test("an Admin reads who checked and owns a concept", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    const adminEmail = anAddress("admin");
+    const workspace = await provision(request, { name: "Tay Leases", adminEmail });
+    const owner = await person(request, anAddress("editor"), { displayName: "Ifan Morgan" });
+    await addMember(request, {
+      workspaceId: workspace.workspaceId,
+      userId: owner.id,
+      role: "Editor",
+    });
+    const writer = { workspaceId: workspace.workspaceId, userId: workspace.admin.id };
+    const seeded = await conceptsSeeded(request, {
+      ...writer,
+      concepts: [
+        {
+          title: LEASE,
+          collection: CONTRACTS,
+          kind: "Contract",
+          body: "The yard lease runs for ten years.",
+          trust: "human-reviewed",
+          sources: [{ title: LEASE_DOCUMENT, at: "p.3" }],
+          frontmatter: { description: "The terms of the yard lease.", stale_after: "2027-03-01" },
+        },
+      ],
+    });
+    await nameOwners(request, {
+      ...writer,
+      owners: [{ collection: CONTRACTS, personId: owner.id }],
+    });
+    await page.goto("/sign-in");
+    await signIn(page, request, adminEmail);
+    await page.goto(pageOf(seeded, LEASE));
+    await expect(conceptOf(page, LEASE)).toBeVisible();
+
+    const rowOf = (label: string): Locator =>
+      page
+        .getByRole("complementary", { name: "About this concept" })
+        .locator(`xpath=.//dt[normalize-space()="${label}"]/following-sibling::dd[1]`);
+    await expect(rowOf("Trust")).toContainText(`Verified by ${workspace.admin.name}`);
+    await expect(rowOf("Checked by")).toContainText(workspace.admin.name);
+    await expect(rowOf("Owner")).toContainText("Ifan Morgan");
+    await expect(rowOf("Owner")).toContainText(`Owner of ${CONTRACTS}`);
+    await expect(rowOf("Review by")).toHaveText("1 March 2027");
+    await expect(rowOf("Sources")).toHaveText("1");
+    await expect(page.getByText(/details from the file/iu)).toHaveCount(0);
+    await passesTheAccessibilityGate();
   });
 
   test("an Admin reads a concept's sources and links by keyboard", async ({

@@ -99,6 +99,19 @@ describe("a trust mark", () => {
   });
 });
 
+describe("a flat trust mark", () => {
+  it("draws no chip, only the words and the icon", () => {
+    const trust: Standing = { tier: "human-reviewed", status: "current" };
+    const { container } = render(<TrustMark trust={trust} words="Verified by Priya Shah" flat />);
+    const mark = container.firstElementChild;
+
+    expect(mark?.textContent).toBe("Verified by Priya Shah");
+    expect(mark?.querySelector("svg[aria-hidden]")).not.toBeNull();
+    expect(mark?.className).not.toContain(TONE_CLASSES[markOf(trust).tone]);
+    expect(mark?.className).not.toContain("border");
+  });
+});
+
 describe("a dated trust mark", () => {
   const CHECKED_AT = "2026-10-03T09:00:00.000Z";
 

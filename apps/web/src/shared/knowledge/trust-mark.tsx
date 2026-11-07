@@ -44,9 +44,15 @@ export const TONE_CLASSES = {
     "border-[var(--trust-draft-border)] bg-[var(--trust-draft-bg)] text-[var(--trust-draft-fg)]",
 } as const satisfies Record<Tone, string>;
 
+const CHIP = "gap-1.5 border px-2 py-0.5 font-medium";
+
+const FLAT = "gap-2 font-semibold text-balance [font-size:var(--text-lg)]";
+
 type TrustMarkProperties = {
   readonly words: string;
   readonly className?: string;
+  /** Draws no chip, for a cell that carries the tone and the text colour itself. */
+  readonly flat?: true;
 } & (
   | { readonly trust: Standing; readonly dated?: undefined }
   | { readonly trust: Standing & Pick<Trust, "verifiedAt">; readonly dated: true }
@@ -64,15 +70,17 @@ const checkedOn = (properties: TrustMarkProperties): string | null => {
 export function TrustMark(properties: TrustMarkProperties) {
   const { tone, icon } = markOf(properties.trust);
   const date = checkedOn(properties);
+  const flat = properties.flat === true;
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center gap-1.5 border px-2 py-0.5 font-medium",
-        TONE_CLASSES[tone],
+        "inline-flex max-w-full items-center",
+        flat ? FLAT : CHIP,
+        flat ? undefined : TONE_CLASSES[tone],
         properties.className,
       )}
     >
-      <Icon name={icon} weight="bold" />
+      <Icon name={icon} weight="bold" className={flat ? "size-4.5" : ""} />
       <span className="min-w-0 wrap-anywhere">
         {properties.words}
         {date === null ? null : (
