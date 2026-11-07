@@ -46,7 +46,7 @@ Build state only through the harness, and act only through the page. Write every
    .claude/skills/verify/scripts/browse.sh 4610 wait --fn "location.pathname === '/people/groups'"
    ```
 
-   Locate by role and accessible name, or by a field's label, never by CSS class, coordinates or tab order. A name matches as a case-insensitive substring unless the command adds `--exact`. Wait on a condition, never for a fixed time. `open <url>` returns before the page's data arrives, so `wait` for a text the loaded page draws before the next `find`.
+   Locate by role and accessible name, never by CSS class, coordinates or tab order. `find role ... --name` matches the name as a case-insensitive substring unless the command adds `--exact`, and acts on the first match in page order when more than one control matches. `find label` and `wait --text` match case-sensitively. So a recipe names a control by a short lowercase part of its name that no other control of that role on the page holds, and quotes no sentence the page shows (ADR 0054). It waits on an address, on seeded data, or on a case-insensitive pattern in `wait --fn`. Wait on a condition, never for a fixed time. `open <url>` returns before the page's data arrives, so `wait` for a text the loaded page draws before the next `find`.
 
 ## Evidence
 

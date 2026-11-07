@@ -10,6 +10,7 @@ import { mcpEntryNoWorkspaceArgumentRule } from "./rules/mcp-entry-no-workspace-
 import { noPathClimbRule } from "./rules/no-path-climb.ts";
 import { parameterNeverMutatedRule } from "./rules/parameter-never-mutated.ts";
 import { stringCitesNothingRule } from "./rules/string-cites-nothing.ts";
+import { uiCopyPlainRule } from "./rules/ui-copy-plain.ts";
 
 const betterAnswersPlugin = eslintCompatPlugin({
   meta: { name: "better-answers" },
@@ -24,6 +25,7 @@ const betterAnswersPlugin = eslintCompatPlugin({
     "no-path-climb": noPathClimbRule,
     "parameter-never-mutated": parameterNeverMutatedRule,
     "string-cites-nothing": stringCitesNothingRule,
+    "ui-copy-plain": uiCopyPlainRule,
   },
 });
 
