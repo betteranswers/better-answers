@@ -15,6 +15,7 @@ export type ConceptRow = {
   readonly title: string;
   readonly kind: string;
   readonly collection: string | null;
+  readonly trust: { readonly tier: string; readonly status: string };
   readonly trustWords: string;
   readonly owner: { readonly id: string; readonly name: string; readonly own: boolean } | null;
   readonly checkedBy: string | null;
@@ -37,6 +38,7 @@ export const aConceptRow = (
   title,
   kind: "policy",
   collection: "policy",
+  trust: { tier: "unverified", status: "current" },
   trustWords: "Unverified",
   owner: null,
   checkedBy: null,

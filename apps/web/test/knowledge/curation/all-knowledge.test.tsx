@@ -26,7 +26,8 @@ const THE_LEAVE = aConceptRow(1, "Annual leave", {
   owner: ADA_OWNS,
   checkedBy: "Rhian Pryce",
   checkedOn: "4 March 2026",
-  trustWords: "Reviewed by a person",
+  trust: { tier: "human-reviewed", status: "current" },
+  trustWords: "Verified by Rhian Pryce · 4 March 2026",
 });
 
 const THE_EXPENSES = aConceptRow(2, "Expense claims", {

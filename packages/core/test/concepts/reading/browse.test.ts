@@ -151,7 +151,15 @@ describe("the knowledge tree", () => {
       { collection: null, count: 1, kinds: [{ kind: "Policy", count: 1 }] },
     ]);
     expect(outside).toEqual({
-      concepts: [{ iri: loose, title: "Loose", kind: "Policy", trustWords: "Unverified" }],
+      concepts: [
+        {
+          iri: loose,
+          title: "Loose",
+          kind: "Policy",
+          trust: { tier: "unverified", status: "current" },
+          trustWords: "Unverified",
+        },
+      ],
       nextCursor: null,
     });
   });

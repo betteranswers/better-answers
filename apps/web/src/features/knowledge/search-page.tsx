@@ -168,7 +168,7 @@ function ConceptLine(properties: {
           {match.title}
         </RowLink>
       )}
-      <TrustMark words={match.trustWords} />
+      <TrustMark trust={match.trust} words={match.trustWords} />
       <KindLine
         kind={match.kind}
         collection={match.collection ?? CONCEPT_WORDS.noCollection}

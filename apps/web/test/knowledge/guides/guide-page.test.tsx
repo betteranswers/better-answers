@@ -92,7 +92,17 @@ describe("the guide page", () => {
   });
 
   it("draws the trust word of each section as text", async () => {
-    await openGuide("Viewer", aGuide({ sections: [aSection({ trustWords: "Verified by Dana" })] }));
+    await openGuide(
+      "Viewer",
+      aGuide({
+        sections: [
+          aSection({
+            trust: { tier: "human-reviewed", status: "current" },
+            trustWords: "Verified by Dana",
+          }),
+        ],
+      }),
+    );
 
     expect(within(sectionNamed(SECTION_ONE)).getByText("Verified by Dana")).toBeDefined();
   });

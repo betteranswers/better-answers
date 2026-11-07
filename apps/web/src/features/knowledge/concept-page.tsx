@@ -103,14 +103,14 @@ const namesNothing = (failure: Error | ApiError): boolean => {
 const SECTION_HEADING = "[font-size:var(--text-section)] font-semibold";
 
 function Header(properties: { readonly concept: Concept; readonly actions: ReactNode }) {
-  const { frontmatter, trustWords } = properties.concept;
+  const { frontmatter, trust, trustWords } = properties.concept;
   const description = descriptionOf(frontmatter);
   const tags = tagsOf(frontmatter);
   return (
     <header className="mt-4">
       {description === undefined ? null : <p className="text-muted-foreground">{description}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <TrustMark words={trustWords} />
+        <TrustMark trust={trust} words={trustWords} />
         <KindLine kind={kindOf(frontmatter)} className="grow" />
         {properties.actions}
       </div>

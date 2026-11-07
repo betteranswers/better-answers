@@ -31,6 +31,7 @@ import {
   standingOnConcept,
   trustWords,
   type CopyOffer,
+  type Trust,
 } from "@better-answers/core/concepts";
 import {
   includeAvailable,
@@ -102,6 +103,7 @@ type GuideAsked = Parameters<typeof readGuide>[2];
 type GuideAnswered = Omit<GuideRead, "sections"> & {
   readonly owner: { readonly id: string; readonly name: string } | null;
   readonly sections: readonly (Omit<SectionRead, "citedIris"> & {
+    readonly trust: Pick<Trust, "tier" | "status">;
     readonly trustWords: string;
     readonly copy: CopyOffer;
   })[];
@@ -136,6 +138,7 @@ const guideAnswered = async (
       if (held === undefined) throw new Error(`no trust was read for section ${section.sectionId}`);
       return {
         ...section,
+        trust: { tier: held.tier, status: held.status },
         trustWords: trustWords(held),
         copy: copyOfferOf(held, threshold.value),
       };

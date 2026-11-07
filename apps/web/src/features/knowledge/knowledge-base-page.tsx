@@ -109,7 +109,7 @@ const columnsOf = (landAt: number | undefined, onLanded: () => void) =>
     }),
     column.accessor("trustWords", {
       header: WORDS.columns.trust,
-      cell: ({ getValue }) => <TrustMark words={getValue()} />,
+      cell: ({ row }) => <TrustMark trust={row.original.trust} words={row.original.trustWords} />,
     }),
   ]);
 

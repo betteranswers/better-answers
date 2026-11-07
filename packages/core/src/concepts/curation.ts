@@ -55,6 +55,7 @@ export type AllKnowledgeRow = {
   readonly title: string;
   readonly kind: string;
   readonly collection: string | null;
+  readonly trust: Pick<Trust, "tier" | "status">;
   readonly trustWords: string;
   readonly owner: { readonly id: UserId; readonly name: string; readonly own: boolean } | null;
   readonly checkedBy: string | null;
@@ -160,6 +161,7 @@ const rowOf = (row: PageRow, now: Date): AllKnowledgeRow => {
     title: row.title,
     kind: row.kind,
     collection: row.collection,
+    trust: { tier: trust.tier, status: trust.status },
     trustWords: trustWords(trust),
     owner:
       row.owner_id === null

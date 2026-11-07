@@ -44,6 +44,7 @@ const aKnowledgeBaseApi = () => {
           iri: `${CONCEPT_IRI_PREFIX}${A_LEASE}`,
           title: "Yard Lease",
           kind: "lease",
+          trust: { tier: "unverified", status: "current" },
           trustWords: "Unverified",
         },
       ],
