@@ -398,6 +398,70 @@ describe("the browser suite's knowledge harness", () => {
       verified: [{ by: "process:synthetic-verifier", at: "2026-03-03T09:41:00Z" }],
     });
   });
+
+  it("seeds verifications whose newest sets the trust", async () => {
+    const workspace = await app().provision({ adminName: "Priya Shah" });
+    const [concept] = await conceptsSeeded({
+      ...seedingBy(workspace),
+      concepts: [
+        {
+          title: "Quarry safety partnerships",
+          body: "Synthetic quarries report to a safety partnership.",
+          verifications: [
+            { at: "2026-02-12T09:00:00Z" },
+            { by: workspace.admin.id, at: "2026-03-03T09:41:00Z" },
+          ],
+        },
+      ],
+    });
+
+    const opened = rpcOf(
+      (await calledBy(workspace.admin, "open", { iri: concept?.iri }))["concept"],
+    );
+
+    expect(rpcOf(opened["trust"])).toMatchObject({
+      tier: "human-reviewed",
+      checkedBy: "Priya Shah",
+      checkedAt: "2026-03-03T09:41:00.000Z",
+    });
+    expect(rpcListOf(opened["verifications"]).map((each) => [each["tier"], each["at"]])).toEqual([
+      ["human-reviewed", "2026-03-03T09:41:00.000Z"],
+      ["machine-confirmed", "2026-02-12T09:00:00.000Z"],
+    ]);
+  });
+
+  it("refuses verifications given together with a trust", async () => {
+    const refused = await seedRefused([
+      {
+        title: "Quarry safety partnerships",
+        body: "Synthetic quarries report to a safety partnership.",
+        trust: "human-reviewed",
+        verifications: [{ at: "2026-02-12T09:00:00Z" }],
+      },
+    ]);
+
+    expect(refused).toEqual({
+      status: 400,
+      said: { fields: [{ field: "concepts.0.trust", rule: matching.any(String) }] },
+    });
+  });
+
+  it("refuses a verification by someone outside the workspace", async () => {
+    const outsider = await app().person();
+
+    const refused = await seedRefused([
+      {
+        title: "Quarry safety partnerships",
+        body: "Synthetic quarries report to a safety partnership.",
+        verifications: [{ by: outsider.id, at: "2026-02-12T09:00:00Z" }],
+      },
+    ]);
+
+    expect(refused).toEqual({
+      status: 400,
+      said: { fields: [{ field: "concepts.0.verifications.0.by", rule: matching.any(String) }] },
+    });
+  });
 });
 
 const askedToSeed = (body: unknown) => askedOfTheHarness(app(), "/__harness/concepts", body);
@@ -907,5 +971,105 @@ describe("guide seeds the harness refuses before writing anything", () => {
 
     expect(answered).toEqual(refusedNaming(["workspaceId", "group named finance"]));
     expect(await guideRowsIn(workspace.workspaceId)).toMatchObject({ concepts: 0, groups: 1 });
+  });
+});
+
+const seededCollectionGuide = z.object({ guideId: z.string(), sections: z.array(seededSection) });
+
+const aWorkspaceWithCorporateConcepts = async () => {
+  const workspace = await app().provision();
+  const concepts = await conceptsSeeded({
+    ...seedingBy(workspace),
+    concepts: [
+      {
+        title: "Registered company number",
+        body: "Synthetic Ltd is registered under company number 00000001.",
+        collection: "corporate",
+        kind: "company fact",
+        frontmatter: { tags: ["registration"] },
+      },
+      {
+        title: "Public liability policy",
+        body: "Synthetic Ltd holds public liability cover.",
+        collection: "corporate",
+        kind: "insurance policy",
+        frontmatter: { tags: ["public-liability"] },
+      },
+      {
+        title: "Registered office",
+        body: "Synthetic Ltd's office is in Leeds.",
+        collection: "elsewhere",
+        kind: "company fact",
+        frontmatter: { tags: ["office"] },
+      },
+    ],
+  });
+  return { workspace, concepts };
+};
+
+describe("the guide the harness seeds over one collection", () => {
+  it("includes the collection's concepts alone and makes no finance group", async () => {
+    const { workspace, concepts } = await aWorkspaceWithCorporateConcepts();
+
+    const seeded = seededCollectionGuide.parse(
+      await harnessPosted("/__harness/guides", {
+        ...seedingBy(workspace),
+        collection: "corporate",
+      }),
+    );
+
+    expect(seeded.sections.map(({ includes }) => includes.map(({ title }) => title))).toEqual([
+      ["Registered company number"],
+      [],
+      ["Public liability policy"],
+      [],
+      [],
+      [],
+      [],
+      [],
+    ]);
+    expect(await guideRowsIn(workspace.workspaceId)).toMatchObject({ guides: 1, groups: 0 });
+    const used = async (title: string) => {
+      const opened = await calledBy(workspace.admin, "open", {
+        iri: concepts.find((each) => each.title === title)?.iri,
+      });
+      return rpcOf(rpcOf(opened["concept"])["usedIn"])["guides"];
+    };
+    expect([await used("Registered company number"), await used("Registered office")]).toEqual([
+      1, 0,
+    ]);
+  });
+
+  it("refuses a collection holding no concept and writes no guide", async () => {
+    const { workspace } = await aWorkspaceWithCorporateConcepts();
+
+    const answered = await askedToSeedAGuide({ ...seedingBy(workspace), collection: "nowhere" });
+
+    expect(answered).toEqual(refusedNaming(["collection", "no concept in nowhere"]));
+    expect(await guideRowsIn(workspace.workspaceId)).toMatchObject({ guides: 0 });
+  });
+
+  it("refuses finance members for a guide over a collection", async () => {
+    const { workspace } = await aWorkspaceWithCorporateConcepts();
+    const finance = await aMemberAt(workspace, "Editor");
+
+    const answered = await askedToSeedAGuide({
+      ...seedingBy(workspace),
+      collection: "corporate",
+      financeUserIds: [finance.userId],
+    });
+
+    expect(answered).toEqual(refusedNaming(["financeUserIds", "no finance group"]));
+  });
+
+  it("refuses a guide over a collection from an Editor", async () => {
+    const { workspace } = await aWorkspaceWithCorporateConcepts();
+
+    const answered = await askedToSeedAGuide({
+      ...(await aMemberAt(workspace, "Editor")),
+      collection: "corporate",
+    });
+
+    expect(answered).toEqual(refusedNaming(["userId", "seeded by an Admin"]));
   });
 });

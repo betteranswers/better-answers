@@ -118,6 +118,19 @@ const heldIn = async (
   return counted.rows[0]?.held ?? 0;
 };
 
+describe("the workspace the browser suite's harness provisions", () => {
+  it("names its Admin as asked", async () => {
+    const provisioned = z.object({ admin: z.object({ name: z.string() }) }).parse(
+      await harnessAnswer("/__harness/workspaces", "", {
+        name: "Northbridge",
+        adminName: "Priya Shah",
+      }),
+    );
+
+    expect(provisioned.admin.name).toBe("Priya Shah");
+  });
+});
+
 describe("seeds the browser suite's harness refuses", () => {
   it("answers 400 naming `kept` on a default-on finding", async () => {
     const { workspaceId } = await app().provision();
