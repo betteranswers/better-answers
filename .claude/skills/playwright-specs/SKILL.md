@@ -83,20 +83,23 @@ signs in by email while the device holds a passkey.
   that asserts its latency budget, the accessibility gate on its end state and keyboard reach by
   native Tab. Each further claim of that page is a named `test.step` inside that case, so a failure
   names it. A second case stays only where a fix names a claim the page case cannot carry.
-- **Locate by role and accessible name, and write the name in the spec.** `getByRole`,
+- **Locate by role and accessible name, and import the name from its words module.** `getByRole`,
   `getByLabel`, `getByText`. A control, a heading, a region, a dialog and a field are each found by
-  the name the page gives them, written as a literal where the spec uses it. A name built from
-  seeded data is a template over that data, such as `` `Remove ${member.name}` ``. Playwright
-  matches a name as a substring in any case, so a name that sits inside another control's name on
-  the same page takes `exact: true`. A check that a name is absent holds only while that name
-  still names the control, so the same spec also finds the control by that name, held once, where
-  the page shows it. Test ids appear nowhere in this suite; adding one adds a handle the reader
-  does not have.
-- **Import none of the web's text.** A spec imports from the SPA only what is not text:
-  a page's address, a wire word, a limit, a count, a key's letter, a type, a function that
-  formats seeded data. A changed label then fails the tests that name that control, at run time,
-  and nothing else. `apps/web/e2e/model-choices/models-and-spend.spec.ts` reads its page's address off
-  `apps/web/src/shared/navigation.ts` and writes each name itself.
+  the name the page gives them. The spec imports that name from the words module the page reads,
+  such as `EDITOR_WORDS.headingEdit` from `@/features/knowledge/editing/editor-words.ts`, and
+  never copies the label as a literal. A rewording then changes one module and breaks no spec
+  (ADR 0054). Where no words module holds the name, add it to the page's words module and import
+  it in both places. A name built from seeded data is a template over that data, such as
+  `` `Remove ${member.name}` ``. Playwright matches a name as a substring in any case, so a name
+  that sits inside another control's name on the same page takes `exact: true`. A check that a
+  name is absent holds only while that name still names the control, so the same spec also finds
+  the control by that name, held once, where the page shows it. Test ids appear nowhere in this
+  suite; adding one adds a handle the reader does not have.
+- **Import labels, never sentences.** A spec imports from the SPA a label it locates by, a
+  page's address, a wire word, a limit, a count, a key's letter, a type, and a function that
+  formats seeded data. It imports no sentence the page shows, because it asserts none (below).
+  `apps/web/e2e/model-choices/models-and-spend.spec.ts` reads its page's address off
+  `apps/web/src/shared/navigation.ts`.
 - **Find the shell by its landmarks:**
   - The top band is the `banner`.
   - The icon rail is the `navigation` named *Areas*, one link per area, which `railOf` finds.
@@ -133,8 +136,8 @@ signs in by email while the device holds a passkey.
   `filter({ hasText: /\S/ })`. `apps/web/e2e/people/groups.spec.ts` finds such a region while it
   is still empty, with `filter({ hasNotText: /\S/ })`, and checks the outcome lands in that same
   region. An aria snapshot keeps roles, names, levels, states and order, and no prose line of any
-  kind, `- text:` lines included. A name in one is a literal, and a name from seeded data goes in
-  through `JSON.stringify`, which quotes it as the snapshot takes it.
+  kind, `- text:` lines included. A name in one comes from its words module or from seeded data,
+  and goes in through `JSON.stringify`, which quotes it as the snapshot takes it.
 - **Tell which refusal happened from where it was decided.** Where the api answered, read its
   answer with `refusalAnswering` or `authAnswering` from `../refused-read.ts`
   (`references/helpers.md` says what each answers), then check the alert with `alertHasText`.
