@@ -8,20 +8,20 @@ export {
   type FrontmatterValue,
 } from "./file.ts";
 export {
-  kindConceptsInput,
-  readKindConcepts,
+  conceptsOfTypeInput,
+  readConceptsOfType,
   readKnowledgeTree,
   readSectionTrusts,
-  type KindConceptsInput,
+  type ConceptsOfTypeInput,
 } from "./reading/browse.ts";
-export { allKnowledgeInput, readAllKnowledge, readKinds } from "./curation.ts";
+export { allKnowledgeInput, readAllKnowledge, readConceptTypes } from "./curation.ts";
 /** @public S3 */
 export type {
   AllKnowledge,
   AllKnowledgeInput,
   AllKnowledgeRow,
   CurationRefusal,
-  KindCounted,
+  ConceptTypeCounted,
 } from "./curation.ts";
 export {
   conceptToEdit,

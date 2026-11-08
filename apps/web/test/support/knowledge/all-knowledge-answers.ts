@@ -95,7 +95,7 @@ const answeringFrom = (listed: () => readonly ConceptRow[]) => (): unknown => {
   });
 };
 
-const KINDS = [
+const CONCEPT_TYPES = [
   {
     conceptType: "policy",
     count: 3,
@@ -129,7 +129,7 @@ export const anAllKnowledgeApi = (listed: () => readonly ConceptRow[]): Api => {
   const api = adaAnAdmin();
   api.set("members.list", () => read([ADA, RHIAN]));
   api.set("knowledge.allKnowledge", answeringFrom(listed));
-  api.set("knowledge.kinds", () => read({ kinds: KINDS }));
+  api.set("knowledge.conceptTypes", () => read({ conceptTypes: CONCEPT_TYPES }));
   api.set(
     "knowledge.open",
     answeringConcepts((iri) =>

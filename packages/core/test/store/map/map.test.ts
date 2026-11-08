@@ -694,7 +694,7 @@ describe("the map delta for a later commit", () => {
     expect(await edgesFrom(scenario, policy.iri)).toEqual([]);
   });
 
-  it("updates an inbound link's stored target kind when it changes", async () => {
+  it("updates an inbound link's stored target type when it changes", async () => {
     const { scenario, product, policy } = await linkedPair();
 
     await land(scenario, deltaOf(product));
@@ -737,7 +737,7 @@ describe("the map delta for a later commit", () => {
     ]);
   });
 
-  it("derives from, not supersedes, a deprecated concept of another kind", async () => {
+  it("derives from, not supersedes, a deprecated concept of another type", async () => {
     const scenario = await arrange();
 
     const retired = await conceptIn(scenario, {

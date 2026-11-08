@@ -141,7 +141,7 @@ test.describe("All Knowledge", () => {
         - status: /\\b64\\b/
         - status
         - combobox "Filter by Collection"
-        - combobox "Filter by ${WORDS.filters.kind.label}"
+        - combobox "Filter by ${WORDS.filters.type.label}"
         - button "Columns"
         - table:
           - rowgroup:
@@ -149,7 +149,7 @@ test.describe("All Knowledge", () => {
               - columnheader "Select every concept on this page":
                 - checkbox "Select every concept on this page"
               - columnheader "Title"
-              - columnheader "${WORDS.columns.kind}"
+              - columnheader "${WORDS.columns.type}"
               - columnheader "Collection"
               - columnheader "Trust"
               - columnheader "Owner"

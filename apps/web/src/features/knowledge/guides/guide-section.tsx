@@ -3,7 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "rea
 
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { ConceptBody, LINK } from "@/shared/knowledge/concept-body.tsx";
-import { KindLine } from "@/shared/knowledge/kind-line.tsx";
+import { TypeLine } from "@/shared/knowledge/kind-line.tsx";
 import type { Evidence } from "@/shared/knowledge/knowledge-reads.ts";
 import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
 import { cn } from "@/shared/lib/utils.ts";
@@ -125,7 +125,7 @@ function Detail(properties: {
                   </Link>
                 )}
               </Title>
-              <KindLine conceptType={concept.conceptType} />
+              <TypeLine type={concept.conceptType} />
             </div>
             <div className="mt-2">
               <ConceptBody

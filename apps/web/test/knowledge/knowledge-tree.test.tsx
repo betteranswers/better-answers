@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { OpenKind } from "@/features/knowledge/knowledge-state.ts";
+import type { OpenConceptType } from "@/features/knowledge/knowledge-state.ts";
 import { initiallyExpanded, KnowledgeTree, toggled } from "@/features/knowledge/knowledge-tree.tsx";
 
 afterEach(cleanup);
@@ -11,19 +11,19 @@ const COLLECTIONS = [
   {
     collection: "company",
     count: 4,
-    kinds: [
+    conceptTypes: [
       { conceptType: "insurance policy", count: 2 },
       { conceptType: "lease", count: 1 },
       { conceptType: "licence", count: 1 },
     ],
   },
-  { collection: "product", count: 1, kinds: [{ conceptType: "datasheet", count: 1 }] },
-  { collection: null, count: 1, kinds: [{ conceptType: "policy", count: 1 }] },
+  { collection: "product", count: 1, conceptTypes: [{ conceptType: "datasheet", count: 1 }] },
+  { collection: null, count: 1, conceptTypes: [{ conceptType: "policy", count: 1 }] },
 ];
 
-type Opened = (collection: string | null, kind: string) => void;
+type Opened = (collection: string | null, conceptType: string) => void;
 
-function Tree(properties: { readonly open: OpenKind; readonly onOpen: Opened }) {
+function Tree(properties: { readonly open: OpenConceptType; readonly onOpen: Opened }) {
   const [expanded, setExpanded] = useState(() => initiallyExpanded(properties.open));
   return (
     <KnowledgeTree
@@ -38,7 +38,7 @@ function Tree(properties: { readonly open: OpenKind; readonly onOpen: Opened }) 
   );
 }
 
-const drawn = (open?: OpenKind) => {
+const drawn = (open?: OpenConceptType) => {
   const onOpen = vi.fn<Opened>();
   render(<Tree open={open} onOpen={onOpen} />);
   return onOpen;
@@ -132,7 +132,7 @@ describe("the knowledge tree", () => {
     expect(item("company").getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("opens a kind with Enter or a click", () => {
+  it("opens a type with Enter or a click", () => {
     const onOpen = drawn({ collection: "company", conceptType: "lease" });
     expect(item("lease").getAttribute("aria-selected")).toBe("true");
     item("insurance policy").focus();
@@ -140,7 +140,7 @@ describe("the knowledge tree", () => {
     pressed("Enter");
     expect(onOpen).toHaveBeenLastCalledWith("company", "insurance policy");
     fireEvent.click(item("product"));
-    expect(onOpen, "a click on a collection opened a kind").toHaveBeenCalledTimes(1);
+    expect(onOpen, "a click on a collection opened a type").toHaveBeenCalledTimes(1);
     fireEvent.click(item("datasheet"));
     expect(onOpen).toHaveBeenLastCalledWith("product", "datasheet");
     expect(focused()).toBe(item("datasheet"));

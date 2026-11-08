@@ -26,7 +26,7 @@ placedForSearch();
 
 const KNOWLEDGE_BASE = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Knowledge Base").path;
 
-const OPEN_KIND = `${KNOWLEDGE_BASE}?${KNOWLEDGE_BASE_LIST}.collection=company&${KNOWLEDGE_BASE_LIST}.kind=lease`;
+const OPEN_CONCEPT_TYPE = `${KNOWLEDGE_BASE}?${KNOWLEDGE_BASE_LIST}.collection=company&${KNOWLEDGE_BASE_LIST}.type=lease`;
 
 const A_LEASE = "00000000000000000000000005";
 
@@ -35,11 +35,11 @@ const aKnowledgeBaseApi = () => {
   api.set("knowledge.tree", () =>
     read({
       collections: [
-        { collection: "company", count: 1, kinds: [{ conceptType: "lease", count: 1 }] },
+        { collection: "company", count: 1, conceptTypes: [{ conceptType: "lease", count: 1 }] },
       ],
     }),
   );
-  api.set("knowledge.kindConcepts", () =>
+  api.set("knowledge.conceptsOfType", () =>
     read({
       concepts: [
         {
@@ -73,8 +73,8 @@ const markedInTheMenu = () =>
 const inTheBreadcrumb = () => within(screen.getByRole("navigation", { name: "Breadcrumb" }));
 
 describe("the concept page's back link", () => {
-  it("goes back to Knowledge Base with its kind open", async () => {
-    const router = await openAt(OPEN_KIND, aKnowledgeBaseApi());
+  it("goes back to Knowledge Base with its type open", async () => {
+    const router = await openAt(OPEN_CONCEPT_TYPE, aKnowledgeBaseApi());
 
     fireEvent.click(await screen.findByRole("link", { name: "Yard Lease" }));
 
@@ -93,26 +93,26 @@ describe("the concept page's back link", () => {
     fireEvent.click(main.getByRole("link", { name: "Back to Knowledge Base" }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe(KNOWLEDGE_BASE));
-    expect(router.state.location.searchStr).toContain(`${KNOWLEDGE_BASE_LIST}.kind=lease`);
+    expect(router.state.location.searchStr).toContain(`${KNOWLEDGE_BASE_LIST}.type=lease`);
     expect(await screen.findByRole("link", { name: "Yard Lease" })).toBeDefined();
   });
 
   it("returns to Knowledge Base by its keystroke", async () => {
-    const router = await openAt(OPEN_KIND, aKnowledgeBaseApi());
+    const router = await openAt(OPEN_CONCEPT_TYPE, aKnowledgeBaseApi());
     fireEvent.click(await screen.findByRole("link", { name: "Yard Lease" }));
     await screen.findByRole("heading", { level: 1, name: "Yard Lease" });
 
     fireEvent.keyDown(document.body, { key: "b" });
 
     await waitFor(() => expect(router.state.location.pathname).toBe(KNOWLEDGE_BASE));
-    expect(router.state.location.searchStr).toContain(`${KNOWLEDGE_BASE_LIST}.kind=lease`);
+    expect(router.state.location.searchStr).toContain(`${KNOWLEDGE_BASE_LIST}.type=lease`);
   });
 
   it("goes back to All Knowledge with its address", async () => {
     const many = Array.from({ length: 60 }, (_, index) =>
       aConceptRow(index + 1, `Policy ${String(index + 1).padStart(2, "0")}`),
     );
-    const held = `${ALL_KNOWLEDGE}?all.sort=-title&all.kind=policy&all.page=2`;
+    const held = `${ALL_KNOWLEDGE}?all.sort=-title&all.type=policy&all.page=2`;
     const router = await openAt(
       held,
       anAllKnowledgeApi(() => many),
@@ -130,7 +130,7 @@ describe("the concept page's back link", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe(ALL_KNOWLEDGE_PAGE.path));
     expect(router.state.location.search).toMatchObject({
       "all.sort": "-title",
-      "all.kind": "policy",
+      "all.type": "policy",
       "all.page": 2,
     });
     const returned = await screen.findByRole("link", { name: "Policy 05" });

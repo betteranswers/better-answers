@@ -26,14 +26,14 @@ import {
 } from "../trust.ts";
 import { latestVerificationOf } from "./latest-verification.ts";
 
-const KIND_PAGE_SIZE = 50;
+const CONCEPT_TYPE_PAGE_SIZE = 50;
 
-type KindCount = { readonly conceptType: string; readonly count: number };
+type ConceptTypeCount = { readonly conceptType: string; readonly count: number };
 
 type CollectionCount = {
   readonly collection: string | null;
   readonly count: number;
-  readonly kinds: readonly KindCount[];
+  readonly conceptTypes: readonly ConceptTypeCount[];
 };
 
 type KnowledgeTree = { readonly collections: readonly CollectionCount[] };
@@ -49,7 +49,7 @@ const KNOWLEDGE_TREE = `SELECT c.collection, c.concept_type, count(*)::int AS co
    WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}
    GROUP BY c.collection, c.concept_type`;
 
-type KindRow = {
+type ConceptTypeRow = {
   readonly collection: string | null;
   readonly concept_type: string;
   readonly count: number;
@@ -64,14 +64,14 @@ export const collectionOrder = (
   return byCodeUnit(one.collection, other.collection);
 };
 
-const treeOf = (rows: readonly KindRow[]): KnowledgeTree => {
-  const kindsIn = Map.groupBy(rows, (row) => row.collection);
+const treeOf = (rows: readonly ConceptTypeRow[]): KnowledgeTree => {
+  const conceptTypesIn = Map.groupBy(rows, (row) => row.collection);
   return {
-    collections: [...kindsIn]
+    collections: [...conceptTypesIn]
       .map(([collection, held]) => ({
         collection,
         count: held.reduce((sum, row) => sum + row.count, 0),
-        kinds: held
+        conceptTypes: held
           .map(({ concept_type: conceptType, count }) => ({ conceptType, count }))
           .toSorted((one, other) => byCodeUnit(one.conceptType, other.conceptType)),
       }))
@@ -87,7 +87,7 @@ export const readKnowledgeTree = async (
   if (!admitted.ok) return err(admitted.error);
   const reader = admitted.value;
   return attempt(async () => {
-    const { rows } = await tx.query<KindRow>(KNOWLEDGE_TREE, [
+    const { rows } = await tx.query<ConceptTypeRow>(KNOWLEDGE_TREE, [
       reader.workspaceId,
       ...readableParameters(reader),
     ]);
@@ -97,20 +97,20 @@ export const readKnowledgeTree = async (
 
 const conceptColumns = boundarySchemas.conceptIndex.select.shape;
 
-const kindCursor = z.strictObject({ title: conceptColumns.title, iri: ids.conceptIri });
+const conceptOfTypeCursor = z.strictObject({ title: conceptColumns.title, iri: ids.conceptIri });
 
-type KindCursor = z.output<typeof kindCursor>;
+type ConceptOfTypeCursor = z.output<typeof conceptOfTypeCursor>;
 
 /** Not strict: tRPC's infinite query sends its `direction` beside the cursor. */
-export const kindConceptsInput = z.object({
+export const conceptsOfTypeInput = z.object({
   collection: z.string().regex(COLLECTION).nullable(),
   conceptType: conceptColumns.conceptType,
-  cursor: kindCursor.nullish(),
+  cursor: conceptOfTypeCursor.nullish(),
 });
 
-export type KindConceptsInput = z.output<typeof kindConceptsInput>;
+export type ConceptsOfTypeInput = z.output<typeof conceptsOfTypeInput>;
 
-type KindConcept = {
+type ConceptOfType = {
   readonly iri: ConceptIri;
   readonly title: string;
   readonly conceptType: string;
@@ -118,20 +118,20 @@ type KindConcept = {
   readonly trustWords: string;
 };
 
-type KindConcepts = {
-  readonly concepts: readonly KindConcept[];
-  readonly nextCursor: KindCursor | null;
+type ConceptsOfType = {
+  readonly concepts: readonly ConceptOfType[];
+  readonly nextCursor: ConceptOfTypeCursor | null;
 };
 
-const readKindConceptsAction = declareAction({
+const readConceptsOfTypeAction = declareAction({
   admits: ANY_ROLE,
-  input: kindConceptsInput,
+  input: conceptsOfTypeInput,
   refuses: ["role-forbids"],
 });
 
 const LATEST_VERIFICATION = latestVerificationOf("c");
 
-const KIND_CONCEPTS = `SELECT c.iri, c.title, c.concept_type, c.status, c.frontmatter, c.content_hash,
+const CONCEPTS_OF_TYPE = `SELECT c.iri, c.title, c.concept_type, c.status, c.frontmatter, c.content_hash,
               ${LATEST_VERIFICATION.columns}
          FROM concept_index c
          ${LATEST_VERIFICATION.joins}
@@ -148,7 +148,7 @@ export type TrustRow = {
   readonly content_hash: string;
 } & VerificationRow;
 
-type KindConceptRow = TrustRow & { readonly title: string; readonly concept_type: string };
+type ConceptOfTypeRow = TrustRow & { readonly title: string; readonly concept_type: string };
 
 export const trustOfRow = (row: TrustRow, judgedAt: Date): Trust =>
   trustOf(
@@ -161,7 +161,7 @@ export const trustOfRow = (row: TrustRow, judgedAt: Date): Trust =>
     judgedAt,
   );
 
-const kindConceptOf = (row: KindConceptRow, judgedAt: Date): KindConcept => {
+const conceptOfTypeFrom = (row: ConceptOfTypeRow, judgedAt: Date): ConceptOfType => {
   const trust = trustOfRow(row, judgedAt);
   return {
     iri: ids.conceptIri.parse(row.iri),
@@ -172,39 +172,39 @@ const kindConceptOf = (row: KindConceptRow, judgedAt: Date): KindConcept => {
   };
 };
 
-const kindConceptsOf = (rows: readonly KindConceptRow[], judgedAt: Date): KindConcepts => {
-  const page = rows.slice(0, KIND_PAGE_SIZE).map((row) => kindConceptOf(row, judgedAt));
+const conceptsOfTypeFrom = (rows: readonly ConceptOfTypeRow[], judgedAt: Date): ConceptsOfType => {
+  const page = rows.slice(0, CONCEPT_TYPE_PAGE_SIZE).map((row) => conceptOfTypeFrom(row, judgedAt));
   const last = page.at(-1);
   return {
     concepts: page,
     nextCursor:
-      rows.length > KIND_PAGE_SIZE && last !== undefined
+      rows.length > CONCEPT_TYPE_PAGE_SIZE && last !== undefined
         ? { title: last.title, iri: last.iri }
         : null,
   };
 };
 
-export const readKindConcepts = async (
+export const readConceptsOfType = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: KindConceptsInput,
+  input: ConceptsOfTypeInput,
   judgedAt: Date,
-): Promise<Result<KindConcepts, RefusalOf<typeof readKindConceptsAction> | Error>> => {
-  const admitted = admit(readKindConceptsAction, principal, input);
+): Promise<Result<ConceptsOfType, RefusalOf<typeof readConceptsOfTypeAction> | Error>> => {
+  const admitted = admit(readConceptsOfTypeAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const reader = admitted.value;
   const { collection, conceptType, cursor } = input;
   return attempt(async () => {
-    const { rows } = await tx.query<KindConceptRow>(KIND_CONCEPTS, [
+    const { rows } = await tx.query<ConceptOfTypeRow>(CONCEPTS_OF_TYPE, [
       reader.workspaceId,
       ...readableParameters(reader),
       collection,
       conceptType,
       cursor?.title ?? null,
       cursor?.iri ?? null,
-      KIND_PAGE_SIZE + 1,
+      CONCEPT_TYPE_PAGE_SIZE + 1,
     ]);
-    return kindConceptsOf(rows, judgedAt);
+    return conceptsOfTypeFrom(rows, judgedAt);
   });
 };
 

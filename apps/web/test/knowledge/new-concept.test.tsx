@@ -57,7 +57,7 @@ const collectionsIn = (...names: readonly string[]) =>
     collections: names.map((collection) => ({
       collection,
       count: 1,
-      kinds: [{ conceptType: "Policy", count: 1 }],
+      conceptTypes: [{ conceptType: "Policy", count: 1 }],
     })),
   });
 
@@ -69,7 +69,7 @@ const firstLate = (late: Promise<unknown>, afterwards: unknown) => {
   };
 };
 
-const kindField = () =>
+const conceptTypeField = () =>
   screen.getByRole<HTMLInputElement>("textbox", { name: EDITOR_WORDS.conceptType });
 
 const titleField = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Title" });
@@ -119,12 +119,12 @@ describe("typing a new concept from Search", () => {
     api.set(SAVE, committed);
     const router = await openedForANewConcept({}, api);
 
-    typedInto(kindField(), "Policy");
+    typedInto(conceptTypeField(), "Policy");
     chose("policies");
 
     await savesAs(EDITOR_WORDS.save);
     expect(leaveAsked()).toBeNull();
-    expect(kindField().value).toBe("Policy");
+    expect(conceptTypeField().value).toBe("Policy");
     expect(router.state.location.searchStr).toContain("knowledge.collection=policies");
     expect(
       screen.getByRole("button", { name: EDITOR_WORDS.save }).getAttribute("aria-disabled"),
@@ -140,7 +140,7 @@ describe("typing a new concept from Search", () => {
   it("asks nothing when a typed form is closed", async () => {
     const router = await openedForANewConcept({ collection: "policies" });
 
-    typedInto(kindField(), "Policy");
+    typedInto(conceptTypeField(), "Policy");
     pressed(EDITOR_WORDS.close);
 
     await newConceptClosed();
@@ -154,7 +154,7 @@ describe("typing a new concept from Search", () => {
     const offer = await searchWithNoMatch("Cyber Essentials Plus certificate");
     fireEvent.click(offer);
     await newConceptHeading();
-    typedInto(kindField(), "Certification");
+    typedInto(conceptTypeField(), "Certification");
     typedInto(titleField(), "Cyber Essentials Plus");
 
     pressed(EDITOR_WORDS.close);
@@ -162,7 +162,7 @@ describe("typing a new concept from Search", () => {
     fireEvent.click(await screen.findByRole("button", { name: NEW_CONCEPT_OFFER }));
 
     await newConceptHeading();
-    expect(kindField().value).toBe("Certification");
+    expect(conceptTypeField().value).toBe("Certification");
     expect(titleField().value).toBe("Cyber Essentials Plus");
   });
 
@@ -178,7 +178,7 @@ describe("typing a new concept from Search", () => {
         new: query,
         subject: A_CONCEPT_IRI,
         collection: "policies",
-        kind: "Certification",
+        type: "Certification",
       }),
     );
     await newConceptHeading();
@@ -226,7 +226,7 @@ describe("typing a new concept from Search", () => {
   it("reports a new concept's suggestion after its form closes", async () => {
     const api = aNewConceptApi("suggests");
     api.set(SAVE, suggested);
-    await openedForANewConcept({ collection: "policies", kind: "Policy" }, api);
+    await openedForANewConcept({ collection: "policies", type: "Policy" }, api);
 
     await savesAs(EDITOR_WORDS.sendSuggestion);
     const quiet = quietStatuses();

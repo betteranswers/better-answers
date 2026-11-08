@@ -10,7 +10,7 @@ import { LAUNCH_WORDS, SEARCH_WORDS as WORDS } from "./knowledge-words.ts";
 export type NewConceptHeld = {
   readonly new: string;
   readonly collection: string;
-  readonly kind: string;
+  readonly type: string;
   readonly tags: string;
   readonly subject: string;
 };
@@ -19,7 +19,7 @@ type Write = (patch: Partial<NewConceptHeld>, options?: WriteOptions) => void;
 
 const OWN_WRITE: WriteOptions = { ignoreBlocker: true };
 
-const CLEARED: NewConceptHeld = { new: "", collection: "", kind: "", tags: "", subject: "" };
+const CLEARED: NewConceptHeld = { new: "", collection: "", type: "", tags: "", subject: "" };
 
 function NewConceptEditor(properties: {
   readonly held: NewConceptHeld;
@@ -32,7 +32,7 @@ function NewConceptEditor(properties: {
     standing: undefined,
     prefill: {
       title: held.new,
-      conceptType: held.kind,
+      conceptType: held.type,
       tags: held.tags,
       subject: held.subject,
     },

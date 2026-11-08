@@ -6,7 +6,7 @@ import { mergeKeyMovedBy } from "../../../src/concepts/writes/merge-key.ts";
 describe("the new merge key after an edit", () => {
   const held = { conceptType: "Policy", title: "Mileage Allowance" };
 
-  it("stays unchanged when kind and title differ only in form", () => {
+  it("stays unchanged when type and title differ only in form", () => {
     expect(
       mergeKeyMovedBy(held, { conceptType: "policies", title: "  mileage   ALLOWANCE " }),
     ).toBe(undefined);
@@ -18,13 +18,13 @@ describe("the new merge key after an edit", () => {
     );
   });
 
-  it("moves to the new kind in its canonical form", () => {
+  it("moves to the new type in its canonical form", () => {
     expect(mergeKeyMovedBy(held, { conceptType: "guidelines", title: "Mileage Allowance" })).toBe(
       "Guideline:mileage allowance",
     );
   });
 
-  it("stays unchanged when given the held kind back", () => {
+  it("stays unchanged when given the held type back", () => {
     const analysis = { conceptType: foldConceptType("Analyses"), title: "Quarterly Margins" };
 
     expect(mergeKeyMovedBy(analysis, analysis)).toBe(undefined);

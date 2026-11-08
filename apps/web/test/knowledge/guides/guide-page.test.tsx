@@ -57,7 +57,7 @@ const numbered = (sections: readonly (readonly [string, string])[]) =>
 const SECTION_ONE = "1. Warehouse racking";
 
 describe("the guide page", () => {
-  it("draws the guide's subject, kind and total", async () => {
+  it("draws the guide's subject, type and total", async () => {
     await openGuide("Editor");
 
     const article = within(screen.getByRole("article"));

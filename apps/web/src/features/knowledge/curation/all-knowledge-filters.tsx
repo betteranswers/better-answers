@@ -1,6 +1,6 @@
 import { FilterRow } from "@/shared/list/filter-row.tsx";
 
-import { useKinds, type KindCounted } from "../knowledge-api.ts";
+import { useConceptTypes, type ConceptTypeCounted } from "../knowledge-api.ts";
 import type { AllKnowledgeAddress, Standing } from "./all-knowledge-address.ts";
 import { HIDEABLE } from "./all-knowledge-columns.tsx";
 import { choiceOf, YOUR_COLLECTIONS } from "./curation-state.ts";
@@ -8,7 +8,7 @@ import { ALL_KNOWLEDGE_WORDS as WORDS } from "./curation-words.ts";
 
 type Choice = { readonly value: string; readonly label: string };
 
-const NO_KINDS: readonly KindCounted[] = [];
+const NO_CONCEPT_TYPES: readonly ConceptTypeCounted[] = [];
 
 const choicesOf = (names: readonly string[], held: string | undefined): readonly Choice[] =>
   [...new Set(held === undefined ? names : [...names, held])]
@@ -28,11 +28,11 @@ export function AllKnowledgeFilters(properties: {
 }) {
   const { standing, address } = properties;
   const { scope, state } = address;
-  const kinds = useKinds().data?.kinds ?? NO_KINDS;
-  const collections = kinds.flatMap((each) =>
+  const conceptTypes = useConceptTypes().data?.conceptTypes ?? NO_CONCEPT_TYPES;
+  const collections = conceptTypes.flatMap((each) =>
     each.collections.flatMap((held) => (held.collection === null ? [] : [held.collection])),
   );
-  const heldKind = state.kind === "" ? undefined : state.kind;
+  const heldConceptType = state.type === "" ? undefined : state.type;
 
   return (
     <FilterRow
@@ -48,14 +48,14 @@ export function AllKnowledgeFilters(properties: {
           onChange: address.chooseCollection,
         },
         {
-          label: WORDS.filters.kind.label,
-          value: heldKind,
-          anyLabel: WORDS.filters.kind.any,
+          label: WORDS.filters.type.label,
+          value: heldConceptType,
+          anyLabel: WORDS.filters.type.any,
           choices: choicesOf(
-            kinds.map((each) => each.conceptType),
-            heldKind,
+            conceptTypes.map((each) => each.conceptType),
+            heldConceptType,
           ),
-          onChange: address.chooseKind,
+          onChange: address.chooseConceptType,
         },
       ]}
       columns={{

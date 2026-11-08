@@ -18,7 +18,7 @@ describe("concept frontmatter parsing", () => {
     expect(titleOf({ type: "Answer", title: "Audit Logs Retention" })).toBe("Audit Logs Retention");
   });
 
-  it("returns the kind and tags unchanged", () => {
+  it("returns the type and tags unchanged", () => {
     expect(tagsOf({ type: "Answer", tags: ["audit", "retention"] })).toEqual([
       "audit",
       "retention",

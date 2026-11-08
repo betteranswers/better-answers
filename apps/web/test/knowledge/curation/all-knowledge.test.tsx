@@ -142,7 +142,7 @@ describe("the All Knowledge page", () => {
 
   it("sorts and filters by what the address holds", async () => {
     const router = await openAt(
-      `${ALL_KNOWLEDGE}?all.sort=-title&all.kind=policy&all.collection=policy`,
+      `${ALL_KNOWLEDGE}?all.sort=-title&all.type=policy&all.collection=policy`,
       anAllKnowledgeApi(() => CONCEPTS),
     );
 
@@ -167,7 +167,7 @@ describe("the All Knowledge page", () => {
     });
     expect(router.state.location.search).toMatchObject({
       "all.sort": "owner",
-      "all.kind": "policy",
+      "all.type": "policy",
     });
     await waitFor(() => {
       expect(lastAsk()?.sort).toEqual({ column: "owner", desc: false });
@@ -176,7 +176,7 @@ describe("the All Knowledge page", () => {
 
   it("offers Clear Filters when no concept matches", async () => {
     await openAt(
-      `${ALL_KNOWLEDGE}?all.kind=nothing`,
+      `${ALL_KNOWLEDGE}?all.type=nothing`,
       anAllKnowledgeApi(() => CONCEPTS),
     );
 

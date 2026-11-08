@@ -19,7 +19,7 @@ it.each([
   ["Bonus", "Bonus"],
   ["Analysis", "Analysis"],
   ["Rate  card", "Rate  Card"],
-])("folds the kind %s to %s", (conceptType, folded) => {
+])("folds the type %s to %s", (conceptType, folded) => {
   expect(foldConceptType(conceptType)).toBe(folded);
 });
 
@@ -50,7 +50,7 @@ it.each([
   "ies",
   "s",
   "ßes",
-])("folds %s to a kind that folds to itself", (conceptType) => {
+])("folds %s to a type that folds to itself", (conceptType) => {
   const folded = foldConceptType(conceptType);
   expect(foldConceptType(folded)).toBe(folded);
 });

@@ -24,7 +24,7 @@ import { trustWords, ukLongDate, verifierWords, type Trust } from "./trust.ts";
 
 const PAGE_SIZE = 50;
 
-const SORT_COLUMNS = ["title", "kind", "collection", "owner", "checked"] as const;
+const SORT_COLUMNS = ["title", "conceptType", "collection", "owner", "checked"] as const;
 
 type SortColumn = (typeof SORT_COLUMNS)[number];
 
@@ -34,7 +34,7 @@ type SortColumn = (typeof SORT_COLUMNS)[number];
  */
 const SORT_KEYS = {
   title: `c.title COLLATE "C"`,
-  kind: `c.concept_type COLLATE "C"`,
+  conceptType: `c.concept_type COLLATE "C"`,
   collection: `c.collection COLLATE "C"`,
   owner: `owner.name COLLATE "C"`,
   checked: `COALESCE((SELECT max(verified_at) FROM concept_verification
@@ -69,7 +69,7 @@ export type AllKnowledge = {
   readonly pageSize: typeof PAGE_SIZE;
 };
 
-export type KindCounted = {
+export type ConceptTypeCounted = {
   readonly conceptType: string;
   readonly count: number;
   readonly collections: readonly { readonly collection: string | null; readonly count: number }[];
@@ -81,7 +81,7 @@ const readAllKnowledgeAction = declareAction({
   refuses: ["role-forbids", "owner-forbids"],
 });
 
-const readKindsAction = declareAction({
+const readConceptTypesAction = declareAction({
   admits: ANY_ROLE,
   input: z.object({}),
   refuses: ["role-forbids", "owner-forbids"],
@@ -216,18 +216,18 @@ export const readAllKnowledge = async (
   return attempt(() => pageRead(reader.value, tx, input, now));
 };
 
-const KINDS = `SELECT c.concept_type, c.collection, count(*)::int AS count
+const CONCEPT_TYPES = `SELECT c.concept_type, c.collection, count(*)::int AS count
     FROM concept_index c
    WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}
    GROUP BY c.concept_type, c.collection`;
 
-type KindRow = {
+type ConceptTypeRow = {
   readonly concept_type: string;
   readonly collection: string | null;
   readonly count: number;
 };
 
-const kindsOf = (rows: readonly KindRow[]): readonly KindCounted[] =>
+const conceptTypesOf = (rows: readonly ConceptTypeRow[]): readonly ConceptTypeCounted[] =>
   [...Map.groupBy(rows, (row) => row.concept_type)]
     .map(([conceptType, held]) => ({
       conceptType,
@@ -238,19 +238,19 @@ const kindsOf = (rows: readonly KindRow[]): readonly KindCounted[] =>
     }))
     .toSorted((one, other) => byCodeUnit(one.conceptType, other.conceptType));
 
-export const readKinds = async (
+export const readConceptTypes = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<Result<{ readonly kinds: readonly KindCounted[] }, CurationRefusal>> => {
-  const admitted = admit(readKindsAction, principal, {});
+): Promise<Result<{ readonly conceptTypes: readonly ConceptTypeCounted[] }, CurationRefusal>> => {
+  const admitted = admit(readConceptTypesAction, principal, {});
   if (!admitted.ok) return err(admitted.error);
   const reader = await ownerAdmitted(admitted.value, tx);
   if (!reader.ok) return err(reader.error);
   return attempt(async () => {
-    const { rows } = await tx.query<KindRow>(KINDS, [
+    const { rows } = await tx.query<ConceptTypeRow>(CONCEPT_TYPES, [
       reader.value.workspaceId,
       ...readableParameters(reader.value),
     ]);
-    return { kinds: kindsOf(rows) };
+    return { conceptTypes: conceptTypesOf(rows) };
   });
 };

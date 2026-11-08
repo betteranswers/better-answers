@@ -5,7 +5,7 @@ import type { APIRequestContext, Download, Locator, Page, TestInfo } from "@play
 
 import {
   EXPORTS_KEYSTROKES as KEY,
-  KINDS_PAGE,
+  CONCEPT_TYPES_PAGE,
 } from "@/features/knowledge/curation/curation-state.ts";
 import { EXPORTS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -134,7 +134,7 @@ test.describe("Exports", () => {
             - listitem:
               - link "All Knowledge"
             - listitem:
-              - link "${KINDS_PAGE.name}"
+              - link "${CONCEPT_TYPES_PAGE.name}"
             - listitem:
               - link "Collections and Owners"
       `);

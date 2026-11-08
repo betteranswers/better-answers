@@ -617,8 +617,8 @@ describe("what a concept read cannot open", () => {
   });
 });
 
-describe("a concept's kind", () => {
-  it("is the folded kind its row holds", async () => {
+describe("a concept's type", () => {
+  it("is the folded type its row holds", async () => {
     const scenario = await arrange();
     const written = await conceptCiting(scenario, scenario.editor, [], {
       conceptType: "sector",

@@ -4,7 +4,7 @@ import {
   allKnowledgeInput,
   exportBundleSnapshot,
   readAllKnowledge,
-  readKinds,
+  readConceptTypes,
 } from "../../src/concepts/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { seedWideKnowledge } from "../fixtures/concept-shelf.ts";
@@ -21,7 +21,7 @@ const ROUNDS = 7;
 
 const PAGE_BUDGET_MS = 200;
 
-const KINDS_BUDGET_MS = 200;
+const CONCEPT_TYPES_BUDGET_MS = 200;
 
 const SNAPSHOT_BUDGET_MS = 5_000;
 
@@ -60,7 +60,7 @@ const figuresOf = (waited: readonly number[]) =>
   ] as const;
 
 describe("the Curation budgets at 3,000 concepts", () => {
-  it("reads All knowledge and Kinds within their budgets", async () => {
+  it("reads All knowledge and Concept Types within their budgets", async () => {
     const scenario = await arrange();
     const admin = scenario.admin;
     await seedWideKnowledge(db().pool, scenario.workspaceId, {
@@ -76,19 +76,22 @@ describe("the Curation budgets at 3,000 concepts", () => {
         ),
       ),
     );
-    const kinds = await measured(async () =>
-      answered(await readingAs(readers(), admin, (principal, tx) => readKinds(principal, tx))),
+    const conceptTypes = await measured(async () =>
+      answered(
+        await readingAs(readers(), admin, (principal, tx) => readConceptTypes(principal, tx)),
+      ),
     );
 
     await recordFigures("All knowledge's first page", figuresOf(page));
-    await recordFigures("Kinds", figuresOf(kinds));
+    await recordFigures("Concept Types", figuresOf(conceptTypes));
     expect(
       percentile(page, 0.5),
       "All knowledge's first page at the median, in milliseconds",
     ).toBeLessThan(PAGE_BUDGET_MS);
-    expect(percentile(kinds, 0.5), "the Kinds read at the median, in milliseconds").toBeLessThan(
-      KINDS_BUDGET_MS,
-    );
+    expect(
+      percentile(conceptTypes, 0.5),
+      "the Kinds read at the median, in milliseconds",
+    ).toBeLessThan(CONCEPT_TYPES_BUDGET_MS);
   });
 
   it("snapshots the knowledge base within its budget", async () => {

@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useId, useRef } from "react";
 
 import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
-import { KindLine } from "@/shared/knowledge/kind-line.tsx";
+import { TypeLine } from "@/shared/knowledge/kind-line.tsx";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
@@ -26,7 +26,7 @@ function GuideRow(properties: { readonly guide: GuideSummary }) {
         >
           {guideTitleOf(guide)}
         </Link>
-        <KindLine conceptType={guide.guideType} />
+        <TypeLine type={guide.guideType} />
         <span className="text-muted-foreground">{WORDS.sections(guide.sections)}</span>
         {guide.needsReview === 0 ? null : (
           <Pill variant="outline">{WORDS.needReview(guide.needsReview)}</Pill>

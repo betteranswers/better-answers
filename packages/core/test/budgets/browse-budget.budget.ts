@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { conceptIndexRows, testData } from "@better-answers/schema/testing";
 
-import { readKindConcepts, readKnowledgeTree } from "../../src/concepts/index.ts";
+import { readConceptsOfType, readKnowledgeTree } from "../../src/concepts/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { withMember, type PostgresDoor } from "../../src/store/postgres/index.ts";
 import { principalFor } from "../fixtures/workspace-with-bundle.ts";
@@ -16,7 +16,7 @@ const CONCEPTS = 3_000;
 
 const COLLECTIONS = 10;
 
-const KINDS = ["Contract", "Policy", "Procedure"] as const;
+const CONCEPT_TYPES = ["Contract", "Policy", "Procedure"] as const;
 
 const ROUNDS = 5;
 
@@ -26,7 +26,8 @@ type Shelf = { readonly postgres: PostgresDoor; readonly viewer: UserPrincipal }
 
 const collectionAt = (at: number): string => `collection-${at % COLLECTIONS}`;
 
-const kindAt = (at: number): string => KINDS[Math.floor(at / COLLECTIONS) % KINDS.length] ?? "";
+const conceptTypeAt = (at: number): string =>
+  CONCEPT_TYPES[Math.floor(at / COLLECTIONS) % CONCEPT_TYPES.length] ?? "";
 
 const seedWideShelf = async (): Promise<Shelf> => {
   const { door, workspaceId } = await provisionedWorkspace(db(), "Acme");
@@ -39,13 +40,13 @@ const seedWideShelf = async (): Promise<Shelf> => {
   try {
     const commitSha = (await testData(client).bundleCommit({ workspaceId })).sha;
     const places = Array.from({ length: CONCEPTS }, (_unused, at) => at);
-    const batches = Map.groupBy(places, (at) => `${collectionAt(at)}/${kindAt(at)}`);
+    const batches = Map.groupBy(places, (at) => `${collectionAt(at)}/${conceptTypeAt(at)}`);
     for (const held of batches.values()) {
       const first = held[0] ?? 0;
       await conceptIndexRows(client, {
         workspaceId,
         commitSha,
-        conceptType: kindAt(first),
+        conceptType: conceptTypeAt(first),
         sensitivity: "Internal",
         audienceGroups: null,
         concepts: held.map((at) => ({
@@ -74,9 +75,9 @@ describe("the knowledge base at 3,000 concepts", () => {
     shelf = await seedWideShelf();
   }, 60_000);
 
-  it("reads the tree and a kind's first page within budget", async () => {
+  it("reads the tree and a type's first page within budget", async () => {
     const treeMs: number[] = [];
-    const kindMs: number[] = [];
+    const conceptTypeMs: number[] = [];
     let counted = 0;
     let listed = 0;
     for (let round = 0; round < ROUNDS; round += 1) {
@@ -92,15 +93,15 @@ describe("the knowledge base at 3,000 concepts", () => {
           counted = tree.collections.reduce((sum, { count }) => sum + count, 0);
         }),
       );
-      kindMs.push(
+      conceptTypeMs.push(
         await timed(async () => {
           const branch = answered(
             answered(
               await withMember(shelf.viewer, shelf.postgres, (fresh, tx) =>
-                readKindConcepts(
+                readConceptsOfType(
                   fresh,
                   tx,
-                  { collection: collectionAt(0), conceptType: kindAt(0) },
+                  { collection: collectionAt(0), conceptType: conceptTypeAt(0) },
                   new Date(),
                 ),
               ),
@@ -117,19 +118,19 @@ describe("the knowledge base at 3,000 concepts", () => {
         "the slowest tree",
         `${inMs(percentile(treeMs, 1))}, against a budget of ${READ_BUDGET_MS} ms`,
       ],
-      ["a kind's first page at the median", inMs(percentile(kindMs, 0.5))],
+      ["a type's first page at the median", inMs(percentile(conceptTypeMs, 0.5))],
       [
         "the slowest first page",
-        `${inMs(percentile(kindMs, 1))}, against a budget of ${READ_BUDGET_MS} ms`,
+        `${inMs(percentile(conceptTypeMs, 1))}, against a budget of ${READ_BUDGET_MS} ms`,
       ],
     ]);
 
     expect(counted, "the concepts counted across the tree").toBe(CONCEPTS);
-    expect(listed, "the concepts on a kind's first page").toBe(50);
+    expect(listed, "the concepts on a type's first page").toBe(50);
     expect(percentile(treeMs, 1), "the slowest tree read, in milliseconds").toBeLessThan(
       READ_BUDGET_MS,
     );
-    expect(percentile(kindMs, 1), "the slowest first page, in milliseconds").toBeLessThan(
+    expect(percentile(conceptTypeMs, 1), "the slowest first page, in milliseconds").toBeLessThan(
       READ_BUDGET_MS,
     );
   });

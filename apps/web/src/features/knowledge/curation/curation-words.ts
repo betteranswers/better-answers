@@ -17,7 +17,7 @@ export const ALL_KNOWLEDGE_WORDS = {
     `${String(count)} matching ${count === 1 ? "concept" : "concepts"}`,
   columns: {
     title: "Title",
-    kind: "Type",
+    type: "Type",
     collection: "Collection",
     trust: "Trust",
     owner: "Owner",
@@ -32,7 +32,7 @@ export const ALL_KNOWLEDGE_WORDS = {
   automatically: "automatically",
   filters: {
     collection: { label: "Collection", any: "Any collection", yours: "Collections you own" },
-    kind: { label: "Type", any: "Any type" },
+    type: { label: "Type", any: "Any type" },
   },
   selected: "Selected concepts",
   everyOnThePage: "Select every concept on this page",
@@ -69,17 +69,17 @@ export const ALL_KNOWLEDGE_WORDS = {
 
 const typesCounted = (count: number): string => counted(count, "type", "types");
 
-export const KINDS_WORDS = {
+export const CONCEPT_TYPES_WORDS = {
   loading: "The concept types are still loading.",
   none: "No concept types yet.",
   noneSmall: "No types have 2 or fewer concepts.",
   caption: "Concept types",
   count: (shown: number, total: number): string =>
     shown === total ? typesCounted(total) : `${shown} of ${typesCounted(total)}`,
-  columns: { kind: "Type", concepts: "Concepts" },
+  columns: { type: "Type", concepts: "Concepts" },
   tail: "Types with 2 or fewer concepts",
   byCollection: "by collection",
-  collectionsOf: (kind: string): string => `${kind} concepts by collection`,
+  collectionsOf: (conceptType: string): string => `${conceptType} concepts by collection`,
   noCollection: CONCEPT_WORDS.noCollection,
   selectFirst: "Select a type first.",
   refusals: {

@@ -97,7 +97,7 @@ export const aNewConceptApi = (standing: Standing = "commits"): Api => {
   api.set("knowledge.tree", () =>
     read({
       collections: [
-        { collection: "policies", count: 1, kinds: [{ conceptType: "Policy", count: 1 }] },
+        { collection: "policies", count: 1, conceptTypes: [{ conceptType: "Policy", count: 1 }] },
       ],
     }),
   );

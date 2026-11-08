@@ -21,7 +21,7 @@ import {
   type StreamModel,
 } from "../llm/index.ts";
 import type { CallReserved, DraftReserving, JudgeRefusal } from "./judge.ts";
-import { ANSWER_KIND, type PlannedAnswer, type ReadStep, type RelatedConcept } from "./plan.ts";
+import { ANSWER_TYPE, type PlannedAnswer, type ReadStep, type RelatedConcept } from "./plan.ts";
 import type { DraftedSentence, DraftKeeping } from "./record.ts";
 import { checkedSentence, finishedSentences, type Citable } from "./sentences.ts";
 
@@ -48,7 +48,7 @@ export type DraftSteps<Refused = never> = {
 
 type Part = { readonly collection: string | null; readonly citable: readonly Citable[] };
 
-const isNotAnAnswer = (concept: RelatedConcept): boolean => concept.conceptType !== ANSWER_KIND;
+const isNotAnAnswer = (concept: RelatedConcept): boolean => concept.conceptType !== ANSWER_TYPE;
 
 const partsOf = (answer: PlannedAnswer): readonly Part[] => {
   const parts = new Map<string | null, Citable[]>();

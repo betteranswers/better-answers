@@ -87,7 +87,6 @@ export type IconName =
   | "history"
   | "invite"
   | "keystrokes"
-  | "kinds"
   | "knowledge-base"
   | "log"
   | "map"
@@ -114,6 +113,7 @@ export type IconName =
   | "tests"
   | "token"
   | "tray"
+  | "types"
   | "unsorted"
   | "unverified"
   | "verification"
@@ -147,7 +147,6 @@ const GLYPHS = {
   history: ClockCounterClockwiseIcon,
   invite: UserPlusIcon,
   keystrokes: KeyboardIcon,
-  kinds: ShapesIcon,
   "knowledge-base": TreeStructureIcon,
   log: ScrollIcon,
   map: GraphIcon,
@@ -174,6 +173,7 @@ const GLYPHS = {
   tests: TestTubeIcon,
   token: KeyIcon,
   tray: TrayIcon,
+  types: ShapesIcon,
   unsorted: CaretUpDownIcon,
   unverified: CircleDashedIcon,
   verification: CalendarCheckIcon,

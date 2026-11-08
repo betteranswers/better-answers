@@ -45,7 +45,7 @@ const atTheKnowledgeBase = async (page: Page): Promise<void> => {
 };
 
 const openedAt = (collection: string, conceptType: string): string =>
-  `${KNOWLEDGE_BASE}?base.collection=${encodeURIComponent(collection)}&base.kind=${encodeURIComponent(conceptType)}`;
+  `${KNOWLEDGE_BASE}?base.collection=${encodeURIComponent(collection)}&base.type=${encodeURIComponent(conceptType)}`;
 
 const bottomOf = async (drawn: Locator): Promise<number> => {
   const box = await drawn.boundingBox();
@@ -87,7 +87,7 @@ const COLLECTIONS = [
 
 const CONCEPTS = 3000;
 
-const A_KIND = 400;
+const A_CONCEPT_TYPE = 400;
 
 test.describe("Knowledge Base", () => {
   test("a Viewer browses 3,000 concepts by keyboard at two widths", async ({
@@ -108,7 +108,7 @@ test.describe("Knowledge Base", () => {
     const { seeded } = await seedConceptIndex(request, {
       workspaceId: workspace.workspaceId,
       batches: [
-        { collection: "company", conceptType: "Insurance Policy", count: A_KIND },
+        { collection: "company", conceptType: "Insurance Policy", count: A_CONCEPT_TYPE },
         ...COLLECTIONS.slice(1).map((collection) => ({
           collection,
           conceptType: "Procedure",
@@ -139,7 +139,7 @@ test.describe("Knowledge Base", () => {
       await expect(concepts.getByRole("link").first()).toHaveText("Insurance Policy 001");
 
       const more = concepts.getByRole("button", { name: "Load More" });
-      for (let shown = A_PAGE; shown < A_KIND; shown += A_PAGE) {
+      for (let shown = A_PAGE; shown < A_CONCEPT_TYPE; shown += A_PAGE) {
         const pagedAtMs = Date.now();
         await more.click();
         await expect(rowsOf(concepts)).toHaveCount(shown + A_PAGE);
@@ -211,7 +211,7 @@ test.describe("Knowledge Base", () => {
     await expect(rowsOf(concepts)).toHaveCount(A_PAGE);
     await expect(
       concepts.getByRole("columnheader"),
-      "the narrow list keeps the Kind column that its heading already names",
+      "the narrow list keeps the Type column that its heading already names",
     ).toHaveText(["Title", "Trust"]);
 
     expect(await topOf(concepts), "the list is not under the tree").toBeGreaterThanOrEqual(

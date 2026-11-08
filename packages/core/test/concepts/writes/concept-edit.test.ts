@@ -842,13 +842,13 @@ describe("a retitle or a rekind", () => {
       parts: { ...seed.parts, title: "Mileage Rates" },
     }));
     const keyAfterRetitle = await mergeKeyOf(iri);
-    const rekinded = await editedBy(scenario, scenario.admin, iri, (seed) => ({
+    const retyped = await editedBy(scenario, scenario.admin, iri, (seed) => ({
       parts: { ...seed.parts, conceptType: "Guideline" },
     }));
 
     expect(retitled.answer).toMatchObject({ ok: true, value: { outcome: "committed" } });
     expect(keyAfterRetitle).toBe("Policy:mileage rates");
-    expect(rekinded.answer).toMatchObject({ ok: true, value: { outcome: "committed" } });
+    expect(retyped.answer).toMatchObject({ ok: true, value: { outcome: "committed" } });
     expect(await mergeKeyOf(iri)).toBe("Guideline:mileage rates");
   });
 
@@ -881,7 +881,7 @@ describe("a retitle or a rekind", () => {
     expect(await pathOf(committedIri(again))).not.toBe(await pathOf(iri));
   });
 
-  it("keeps a non-derived key while title and kind are unchanged", async () => {
+  it("keeps a non-derived key while title and type are unchanged", async () => {
     const scenario = await arrange();
     const concept = await written(scenario);
 
