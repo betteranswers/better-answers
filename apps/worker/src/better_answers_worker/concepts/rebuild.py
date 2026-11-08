@@ -21,7 +21,7 @@ from .links import (
 class ConceptRecord:
     iri: str
     path: str
-    kind: str
+    concept_type: str
     status: str
     published_at: object
     sensitivity: str
@@ -49,7 +49,7 @@ class RebuildOutcome(ParseFindings):
 
 def _records(cursor: psycopg.Cursor, workspace_id: str) -> list[ConceptRecord]:
     cursor.execute(
-        "SELECT iri, path, kind, status, published_at, sensitivity, audience,"
+        "SELECT iri, path, concept_type, status, published_at, sensitivity, audience,"
         " audience_groups, content_hash FROM concept_index"
         " WHERE workspace_id = %s ORDER BY iri",
         (workspace_id,),
@@ -58,7 +58,7 @@ def _records(cursor: psycopg.Cursor, workspace_id: str) -> list[ConceptRecord]:
         ConceptRecord(
             iri=str(row[0]),
             path=str(row[1]),
-            kind=str(row[2]),
+            concept_type=str(row[2]),
             status=str(row[3]),
             published_at=row[4],
             sensitivity=str(row[5]),
@@ -101,11 +101,11 @@ def run_rebuild(
     records = _records(cursor, workspace_id)
 
     by_path = {
-        record.path: ResolvedTarget(record.iri, record.kind, record.status)
+        record.path: ResolvedTarget(record.iri, record.concept_type, record.status)
         for record in records
     }
     by_iri = {
-        record.iri: ResolvedTarget(record.iri, record.kind, record.status)
+        record.iri: ResolvedTarget(record.iri, record.concept_type, record.status)
         for record in records
     }
 
@@ -114,15 +114,15 @@ def run_rebuild(
 
     for record in records:
         cursor.execute(
-            "INSERT INTO map_node (workspace_id, gen, uid, label, kind, published_at,"
-            " sensitivity, audience, audience_groups)"
+            "INSERT INTO map_node (workspace_id, gen, uid, label, concept_type,"
+            " published_at, sensitivity, audience, audience_groups)"
             " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 workspace_id,
                 outcome.generation,
                 record.iri,
                 CONCEPT_NODE_LABEL,
-                record.kind,
+                record.concept_type,
                 record.published_at,
                 record.sensitivity,
                 record.audience,
@@ -148,15 +148,15 @@ def run_rebuild(
         references = references_of(body, frontmatter, record.path)
         for edge in outgoing_edges(
             iri=record.iri,
-            kind=record.kind,
+            concept_type=record.concept_type,
             references=references,
             by_path=by_path,
             by_iri=by_iri,
         ):
             cursor.execute(
                 "INSERT INTO map_edge (workspace_id, gen, uid, label, from_uid,"
-                " to_uid, from_kind, to_kind, section, sentence, published_at,"
-                " sensitivity, audience, audience_groups)"
+                " to_uid, from_concept_type, to_concept_type, section, sentence,"
+                " published_at, sensitivity, audience, audience_groups)"
                 " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     workspace_id,
@@ -165,8 +165,8 @@ def run_rebuild(
                     edge.label,
                     record.iri,
                     edge.to_uid,
-                    record.kind if edge.label == LINKS_TO_LABEL else None,
-                    edge.to_kind,
+                    record.concept_type if edge.label == LINKS_TO_LABEL else None,
+                    edge.to_concept_type,
                     edge.section,
                     edge.sentence,
                     record.published_at,

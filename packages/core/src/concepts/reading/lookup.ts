@@ -68,7 +68,7 @@ type ConceptRow = {
   readonly iri: string;
   readonly path: string;
   readonly collection: string | null;
-  readonly kind: string;
+  readonly concept_type: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
@@ -81,7 +81,7 @@ const LATEST_VERIFICATION = latestVerificationOf("c");
 
 const conceptSelect = (
   ranked: { readonly columns: string; readonly joins: string } | undefined,
-): string => `SELECT c.iri, c.path, c.collection, c.kind, c.title, c.frontmatter, c.body, c.status,
+): string => `SELECT c.iri, c.path, c.collection, c.concept_type, c.title, c.frontmatter, c.body, c.status,
               c.content_hash, c.commit_sha,
               ${LATEST_VERIFICATION.columns}${ranked === undefined ? "" : `, ${ranked.columns}`}
          FROM concept_index c
@@ -95,7 +95,7 @@ const openedOf = (row: ConceptRow): OpenedConcept => ({
   iri: ids.conceptIri.parse(row.iri),
   path: row.path,
   collection: row.collection,
-  conceptType: row.kind,
+  conceptType: row.concept_type,
   title: row.title,
   frontmatter: row.frontmatter,
   body: row.body,

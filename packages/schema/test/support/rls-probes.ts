@@ -43,13 +43,13 @@ export const A_CONCEPT_VERIFICATION_OF_ORIGIN = `INSERT INTO concept_verificatio
        VALUES ($1, $2, $3, 'process:better-answers-test', $4, $5)`;
 
 export const A_CONCEPT_INDEX_ROW_WITH_A_BODY = `INSERT INTO concept_index
-         (workspace_id, iri, path, kind, title, frontmatter, body, content_hash, commit_sha,
+         (workspace_id, iri, path, concept_type, title, frontmatter, body, content_hash, commit_sha,
           audience, status, sensitivity, published_at)
        VALUES ($1, $2, $3, 'Policy', 'Expenses', '{}'::jsonb, $4, $5, $6,
                'everyone', 'stable', 'Internal', now())`;
 
 export const A_CONCEPT_INDEX_ROW = `INSERT INTO concept_index
-         (workspace_id, iri, path, kind, title, frontmatter, body, content_hash, commit_sha,
+         (workspace_id, iri, path, concept_type, title, frontmatter, body, content_hash, commit_sha,
           audience, status, sensitivity, published_at)
        VALUES ($1, $2, $3, 'Policy', 'Expenses', '{}'::jsonb, 'body', $4, $5,
                'everyone', $6, $7, $8)`;
@@ -64,7 +64,7 @@ export const A_MAP_NODE =
   "INSERT INTO map_node (workspace_id, gen, uid, label) VALUES ($1, $2, $3, $4)";
 
 export const A_MAP_NODE_OF_KIND =
-  "INSERT INTO map_node (workspace_id, gen, uid, label, kind) VALUES ($1, $2, $3, $4, $5)";
+  "INSERT INTO map_node (workspace_id, gen, uid, label, concept_type) VALUES ($1, $2, $3, $4, $5)";
 
 export const A_MAP_NODE_CLASSED =
   "INSERT INTO map_node (workspace_id, gen, uid, label, sensitivity) VALUES ($1, $2, $3, $4, $5)";
@@ -94,7 +94,7 @@ export const A_DECIDED_SUGGESTION = `INSERT INTO suggestion
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`;
 
 export const A_CONCEPT_WRITE_REQUEST = `INSERT INTO concept_write_request
-         (workspace_id, suggestion_id, merge_key, path, concept_kind, title, frontmatter, body)
+         (workspace_id, suggestion_id, merge_key, path, concept_type, title, frontmatter, body)
        VALUES ($1, $2, 'policy:big', 'knowledge/big.md', 'Policy', 'Big', '{}'::jsonb, $3)`;
 
 export const ONE_CALL_AGAINST_A_TOKEN = `INSERT INTO mcp_call_counter (workspace_id, token_id, window_start, count)

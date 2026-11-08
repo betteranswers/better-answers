@@ -360,7 +360,7 @@ describe("seeding a guide from a template", () => {
         "{",
         `  "guide": "${guideId}",`,
         '  "template": "bid-library",',
-        '  "kind": "Bid library",',
+        '  "type": "Bid library",',
         '  "subject": null,',
         '  "roles": [',
         "    {",

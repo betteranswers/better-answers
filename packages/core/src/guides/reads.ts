@@ -264,14 +264,14 @@ const readGuideAction = declareAction({
 });
 
 type DefinitionRow = {
-  readonly kind: string;
+  readonly guide_type: string;
   readonly collection: string;
   readonly subject_iri: string | null;
   readonly subject_title: string | null;
 };
 
 const DEFINITION = `
-  SELECT g.kind, g.collection, g.subject_iri, c.title AS subject_title
+  SELECT g.guide_type, g.collection, g.subject_iri, c.title AS subject_title
     FROM guide_definition g
     LEFT JOIN concept_index c ON c.workspace_id = g.workspace_id AND c.iri = g.subject_iri
                              AND ${readableClause("c", 3)}
@@ -310,12 +310,12 @@ const SECTIONS = `
 
 type CitedRow = Footnote & {
   readonly write_up_id: string;
-  readonly kind: string;
+  readonly concept_type: string;
   readonly body: string;
 };
 
 const CITED = `
-  SELECT i.write_up_id, i.id AS label, i.iri, c.title, c.kind, c.body
+  SELECT i.write_up_id, i.id AS label, i.iri, c.title, c.concept_type, c.body
     FROM write_up_include i
     JOIN write_up w ON w.workspace_id = i.workspace_id AND w.id = i.write_up_id
     JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
@@ -325,11 +325,11 @@ const CITED = `
 
 type FactShapeRow = {
   readonly id: string;
-  readonly kind: string;
+  readonly concept_type: string;
   readonly tags: readonly string[];
 };
 
-const FACT_SHAPES = `SELECT id, kind, tags FROM guide_expected_fact
+const FACT_SHAPES = `SELECT id, concept_type, tags FROM guide_expected_fact
    WHERE workspace_id = $1 AND guide_id = $2`;
 
 const hiddenFrom = (reader: UserPrincipal, rows: readonly SectionRow[]): ReadonlySet<string> => {
@@ -368,7 +368,7 @@ const briefOf = (
   const read = {
     version: row.version,
     rendered: renderBrief(row.markdown, footnotes, "page"),
-    detail: cited.map(({ iri, title, kind: conceptType, body }) => ({
+    detail: cited.map(({ iri, title, concept_type: conceptType, body }) => ({
       iri,
       title,
       conceptType,
@@ -409,7 +409,7 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
   const everyFact = coverage.sections.flatMap((section) => section.facts);
   return {
     guideId,
-    guideType: definition.kind,
+    guideType: definition.guide_type,
     collection: definition.collection,
     subject:
       definition.subject_iri === null || definition.subject_title === null
@@ -434,8 +434,8 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
           facts: section.facts.map((fact) => {
             const shape = shapeOf.get(fact.factId);
             if (shape === undefined)
-              throw new Error(`guides: no kind and tags were read for fact ${fact.factId}`);
-            return { ...fact, conceptType: shape.kind, tags: shape.tags };
+              throw new Error(`guides: no concept type and tags were read for fact ${fact.factId}`);
+            return { ...fact, conceptType: shape.concept_type, tags: shape.tags };
           }),
         },
         brief: briefOf(reader, row, cited),
@@ -491,7 +491,7 @@ const readGuidesAction = declareAction({
 
 type SummaryRow = {
   readonly id: string;
-  readonly kind: string;
+  readonly guide_type: string;
   readonly collection: string;
   readonly subject_iri: string | null;
   readonly subject_title: string | null;
@@ -500,7 +500,7 @@ type SummaryRow = {
 };
 
 const GUIDES = `${WITHHELD_SECTIONS}
-  SELECT g.id, g.kind, g.collection, g.subject_iri, c.title AS subject_title,
+  SELECT g.id, g.guide_type, g.collection, g.subject_iri, c.title AS subject_title,
          count(s.id)::int AS sections,
          count(*) FILTER (WHERE ${readableClause("w", 2)} AND w.needs_review IS NOT NULL)::int
            AS needs_review
@@ -531,7 +531,7 @@ export const readGuides = async (
   return ok(
     read.value.rows.map((row) => ({
       guideId: row.id,
-      guideType: row.kind,
+      guideType: row.guide_type,
       collection: row.collection,
       subject:
         row.subject_iri === null || row.subject_title === null

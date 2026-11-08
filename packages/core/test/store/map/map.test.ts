@@ -271,7 +271,7 @@ describe("a map walk", () => {
 
     expect(steps).toHaveLength(2);
     for (const step of steps) {
-      expect(Object.keys(step).toSorted()).toEqual(["depth", "kind", "label", "uid"]);
+      expect(Object.keys(step).toSorted()).toEqual(["conceptType", "depth", "label", "uid"]);
     }
   });
 
@@ -634,7 +634,7 @@ const amend = async (
 ): Promise<void> => {
   await db().pool.query(
     `UPDATE concept_index
-        SET kind = COALESCE($2, kind), body = COALESCE($3, body), status = COALESCE($4, status)
+        SET concept_type = COALESCE($2, concept_type), body = COALESCE($3, body), status = COALESCE($4, status)
       WHERE iri = $1`,
     [iri, changes.conceptType ?? null, changes.body ?? null, changes.status ?? null],
   );
@@ -643,7 +643,7 @@ const amend = async (
 type EdgeFacts = {
   readonly label: string;
   readonly to_uid: string;
-  readonly to_kind: string | null;
+  readonly to_concept_type: string | null;
 };
 
 const edgeRowsFrom = async <Row extends QueryResultRow>(
@@ -659,7 +659,7 @@ const edgeRowsFrom = async <Row extends QueryResultRow>(
 };
 
 const edgesFrom = (scenario: MapScenario, fromUid: string): Promise<readonly EdgeFacts[]> =>
-  edgeRowsFrom<EdgeFacts>(scenario, fromUid, "label, to_uid, to_kind");
+  edgeRowsFrom<EdgeFacts>(scenario, fromUid, "label, to_uid, to_concept_type");
 
 const linkedPair = async (): Promise<{
   readonly scenario: MapScenario;
@@ -684,7 +684,7 @@ describe("the map delta for a later commit", () => {
     const { scenario, product, policy } = await linkedPair();
     await land(scenario, deltaOf(policy));
     expect(await edgesFrom(scenario, policy.iri)).toEqual([
-      { label: "LINKS_TO", to_uid: product.iri, to_kind: "Product" },
+      { label: "LINKS_TO", to_uid: product.iri, to_concept_type: "Product" },
     ]);
 
     const withoutTheLink = "Tiers are listed in the price book.";
@@ -704,7 +704,7 @@ describe("the map delta for a later commit", () => {
     await land(scenario, deltaOf(product, { conceptType: "Procedure" }));
 
     expect(await edgesFrom(scenario, policy.iri)).toEqual([
-      { label: "LINKS_TO", to_uid: product.iri, to_kind: "Procedure" },
+      { label: "LINKS_TO", to_uid: product.iri, to_concept_type: "Procedure" },
     ]);
   });
 
@@ -722,18 +722,18 @@ describe("the map delta for a later commit", () => {
     await land(scenario, deltaOf(cited));
     await land(scenario, deltaOf(successor));
     expect(await edgesFrom(scenario, successor.iri)).toEqual([
-      { label: "DERIVED_FROM", to_uid: cited.iri, to_kind: null },
+      { label: "DERIVED_FROM", to_uid: cited.iri, to_concept_type: null },
     ]);
 
     await land(scenario, deltaOf(cited));
     expect(await edgesFrom(scenario, successor.iri)).toEqual([
-      { label: "DERIVED_FROM", to_uid: cited.iri, to_kind: null },
+      { label: "DERIVED_FROM", to_uid: cited.iri, to_concept_type: null },
     ]);
 
     await amend(cited.iri, { status: "deprecated" });
     await land(scenario, deltaOf(cited, { status: "deprecated" }));
     expect(await edgesFrom(scenario, successor.iri)).toEqual([
-      { label: "SUPERSEDES", to_uid: cited.iri, to_kind: null },
+      { label: "SUPERSEDES", to_uid: cited.iri, to_concept_type: null },
     ]);
   });
 
@@ -755,7 +755,7 @@ describe("the map delta for a later commit", () => {
     await land(scenario, deltaOf(policy));
 
     expect(await edgesFrom(scenario, policy.iri)).toEqual([
-      { label: "DERIVED_FROM", to_uid: retired.iri, to_kind: null },
+      { label: "DERIVED_FROM", to_uid: retired.iri, to_concept_type: null },
     ]);
   });
 });
@@ -1172,7 +1172,7 @@ describe("a path reference with no concept at that path yet", () => {
     });
 
     expect(await edgesFrom(scenario, successor.iri)).toEqual([
-      { label: "SUPERSEDES", to_uid: retired.iri, to_kind: null },
+      { label: "SUPERSEDES", to_uid: retired.iri, to_concept_type: null },
     ]);
     expect(await unresolvedFrom(scenario, successor.iri)).toEqual([]);
   });

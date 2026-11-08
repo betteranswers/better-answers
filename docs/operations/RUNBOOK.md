@@ -238,8 +238,9 @@ On a migrated database, the api of every release before each migration below fai
 | `0072_the-knowledge-words` | 07/10/2026 | Renames tables to `write_up`, `write_up_include` and `concept_sensitivity_override`, a column to `unreadable_reason`, and a function to `narrower_sensitivity`. Moves stored values to `suggested-concept`, `citation-fix`, `unreadable` and `WriteUp`. | `relation … does not exist`, or a CHECK naming the old value, on the Sources list, sensitivities, overrides, narrowings, and suggestion sets. |
 | `0073_the-action` | 07/10/2026 | Renames the `act` column of `audit_event` and `identity_audit_event` to `action`. | `column "act" does not exist` on nearly every write, signing in among them, and every read of the audit logs. |
 | `0090_the-backoff` | 21/10/2026 | Narrows `job_queued_subject_key` to queued jobs not yet tried. | `there is no unique or exclusion constraint matching the ON CONFLICT specification` (42P10) on every job it enqueues. |
+| `0101_the-concept-type` | 08/11/2026 | Renames the concept's kind to `concept_type` on `concept_index`, `concept_write_request`, `guide_expected_fact` and `map_node`, `map_edge`'s `from_kind` and `to_kind` to `from_concept_type` and `to_concept_type`, and `guide_definition.kind` to `guide_type`. | `column "kind" does not exist` on every concept read and write, every guide read and every map write. |
 
-If 0069, 0072 or 0073 fails on `lock_timeout`, it rolls back whole and can run again. For 0069 and 0072, stop the old worker first.
+If 0069, 0072, 0073 or 0101 fails on `lock_timeout`, it rolls back whole and can run again. For 0069, 0072 and 0101, stop the old worker first.
 
 **After 0069, wipe every connected source.** The worker's engine tracks its rows under the passage table's old name, so after the rename it silently deletes nothing that leaves a source.
 

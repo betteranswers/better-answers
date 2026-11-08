@@ -68,7 +68,7 @@ const SECTION_WRITE_UP = `
    WHERE w.workspace_id = $1 AND w.id = $2 AND w.home = '${SECTION_HOME}'
      AND ${readableClause("w", 3)}`;
 
-const SECTION_FACTS = `(SELECT id, section_id, ordinal, kind, tags, collection
+const SECTION_FACTS = `(SELECT id, section_id, ordinal, concept_type, tags, collection
                           FROM guide_expected_fact
                          WHERE workspace_id = $1 AND guide_id = $5 AND section_id = $6) f`;
 

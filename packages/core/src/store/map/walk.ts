@@ -9,7 +9,7 @@ import type { Tx } from "./write.ts";
 export type WalkStep = {
   readonly uid: string;
   readonly label: string;
-  readonly kind: string | null;
+  readonly conceptType: string | null;
   readonly depth: number;
 };
 
@@ -39,9 +39,9 @@ const INSIDE: Narrowing = {
 };
 
 const NEAREST = `nearest AS MATERIALIZED (
-    SELECT uid, label, kind, min(depth) AS depth
+    SELECT uid, label, concept_type, min(depth) AS depth
       FROM walk
-     GROUP BY uid, label, kind
+     GROUP BY uid, label, concept_type
   )`;
 
 const walkStatement = (outward: boolean, narrowing: Narrowing = WHOLE): string => {
@@ -50,14 +50,14 @@ const walkStatement = (outward: boolean, narrowing: Narrowing = WHOLE): string =
     SELECT live_gen FROM map_generation WHERE workspace_id = $1
   ),
   walk AS (
-    SELECT n.uid, n.label, n.kind, 0 AS depth
+    SELECT n.uid, n.label, n.concept_type, 0 AS depth
       FROM map_node n
       JOIN live ON n.gen IS NULL OR n.gen = live.live_gen
      WHERE n.workspace_id = $1 AND n.uid = ANY($2::text[])
        AND ${readableClause("n", 3)}
        ${narrowing.seed}
     UNION
-    SELECT m.uid, m.label, m.kind, w.depth + 1
+    SELECT m.uid, m.label, m.concept_type, w.depth + 1
       FROM walk w
       JOIN map_edge e ON e.workspace_id = $1 AND e.${source} = w.uid
       JOIN live edge_live ON e.gen IS NULL OR e.gen = edge_live.live_gen
@@ -69,7 +69,7 @@ const walkStatement = (outward: boolean, narrowing: Narrowing = WHOLE): string =
        ${narrowing.hop}
   ),
   ${NEAREST}
-  SELECT uid, label, kind, depth
+  SELECT uid, label, concept_type AS "conceptType", depth
     FROM nearest
    ${narrowing.answered}
    ORDER BY depth, uid

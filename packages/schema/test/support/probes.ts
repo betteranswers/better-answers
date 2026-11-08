@@ -379,7 +379,7 @@ export const policiesIndexedInBulk = async (
     [workspaceId, column("iri"), column("path")],
   );
   await client.query(
-    `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body, content_hash,
+    `INSERT INTO concept_index (workspace_id, iri, path, concept_type, title, frontmatter, body, content_hash,
                                 commit_sha, status, published_at, sensitivity, audience)
        SELECT $1, iri, path, 'Policy', title, jsonb_build_object('title', title, 'type', 'Policy'),
               body, content_hash, $2, 'stable', now(), 'Internal', 'everyone'

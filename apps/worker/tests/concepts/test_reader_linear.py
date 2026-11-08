@@ -53,7 +53,7 @@ def test_reads_a_heading_of_eighty_thousand_spaces_inside_a_second() -> None:
         seconds_taken(
             lambda: outgoing_edges(
                 iri="https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
-                kind="Policy",
+                concept_type="Policy",
                 references=references_of(spaced, FRONTMATTER, "knowledge/expenses.md"),
                 by_path={},
                 by_iri={},

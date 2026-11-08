@@ -43,7 +43,7 @@ const fixture = contractFixture(
   "links",
   z.object({
     description: z.string(),
-    citing: z.object({ iri: z.string(), path: z.string(), kind: z.string() }),
+    citing: z.object({ iri: z.string(), path: z.string(), concept_type: z.string() }),
     cases: z.array(linksCase).min(1),
   }),
 );
@@ -67,7 +67,7 @@ const mapMadeBy = async (each: z.output<typeof linksCase>) => {
       writeConceptDelta(principal, tx, {
         workspaceId: reader.workspaceId,
         iri: fixture.citing.iri,
-        conceptType: fixture.citing.kind,
+        conceptType: fixture.citing.concept_type,
         path: fixture.citing.path,
         body: each.body,
         sources: citedSourcesOf(each.sources),

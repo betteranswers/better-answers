@@ -44,14 +44,14 @@ const readKnowledgeTreeAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-const KNOWLEDGE_TREE = `SELECT c.collection, c.kind, count(*)::int AS count
+const KNOWLEDGE_TREE = `SELECT c.collection, c.concept_type, count(*)::int AS count
     FROM concept_index c
    WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}
-   GROUP BY c.collection, c.kind`;
+   GROUP BY c.collection, c.concept_type`;
 
 type KindRow = {
   readonly collection: string | null;
-  readonly kind: string;
+  readonly concept_type: string;
   readonly count: number;
 };
 
@@ -72,7 +72,7 @@ const treeOf = (rows: readonly KindRow[]): KnowledgeTree => {
         collection,
         count: held.reduce((sum, row) => sum + row.count, 0),
         kinds: held
-          .map(({ kind: conceptType, count }) => ({ conceptType, count }))
+          .map(({ concept_type: conceptType, count }) => ({ conceptType, count }))
           .toSorted((one, other) => byCodeUnit(one.conceptType, other.conceptType)),
       }))
       .toSorted(collectionOrder),
@@ -131,12 +131,12 @@ const readKindConceptsAction = declareAction({
 
 const LATEST_VERIFICATION = latestVerificationOf("c");
 
-const KIND_CONCEPTS = `SELECT c.iri, c.title, c.kind, c.status, c.frontmatter, c.content_hash,
+const KIND_CONCEPTS = `SELECT c.iri, c.title, c.concept_type, c.status, c.frontmatter, c.content_hash,
               ${LATEST_VERIFICATION.columns}
          FROM concept_index c
          ${LATEST_VERIFICATION.joins}
         WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}
-          AND c.collection IS NOT DISTINCT FROM $4 AND c.kind = $5
+          AND c.collection IS NOT DISTINCT FROM $4 AND c.concept_type = $5
           AND ($6::text IS NULL OR (c.title COLLATE "C", c.iri) > ($6 COLLATE "C", $7))
         ORDER BY c.title COLLATE "C", c.iri
         LIMIT $8`;
@@ -148,7 +148,7 @@ export type TrustRow = {
   readonly content_hash: string;
 } & VerificationRow;
 
-type KindConceptRow = TrustRow & { readonly title: string; readonly kind: string };
+type KindConceptRow = TrustRow & { readonly title: string; readonly concept_type: string };
 
 export const trustOfRow = (row: TrustRow, judgedAt: Date): Trust =>
   trustOf(
@@ -166,7 +166,7 @@ const kindConceptOf = (row: KindConceptRow, judgedAt: Date): KindConcept => {
   return {
     iri: ids.conceptIri.parse(row.iri),
     title: row.title,
-    conceptType: row.kind,
+    conceptType: row.concept_type,
     trust: { tier: trust.tier, status: trust.status },
     trustWords: trustWords(trust),
   };

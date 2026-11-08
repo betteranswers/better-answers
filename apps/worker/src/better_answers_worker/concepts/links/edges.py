@@ -160,11 +160,11 @@ def references_of(
 
 
 class ResolvedTarget:
-    __slots__ = ("iri", "kind", "status")
+    __slots__ = ("concept_type", "iri", "status")
 
-    def __init__(self, iri: str, kind: str | None, status: str | None) -> None:
+    def __init__(self, iri: str, concept_type: str | None, status: str | None) -> None:
         self.iri = iri
-        self.kind = kind
+        self.concept_type = concept_type
         self.status = status
 
 
@@ -186,21 +186,21 @@ def unresolved_references(
 
 
 class OutgoingEdge:
-    __slots__ = ("label", "section", "sentence", "to_kind", "to_uid", "uid")
+    __slots__ = ("label", "section", "sentence", "to_concept_type", "to_uid", "uid")
 
     def __init__(
         self,
         uid: str,
         label: str,
         to_uid: str,
-        to_kind: str | None,
+        to_concept_type: str | None,
         section: str | None,
         sentence: str | None,
     ) -> None:
         self.uid = uid
         self.label = label
         self.to_uid = to_uid
-        self.to_kind = to_kind
+        self.to_concept_type = to_concept_type
         self.section = section
         self.sentence = sentence
 
@@ -208,7 +208,7 @@ class OutgoingEdge:
 def outgoing_edges(
     *,
     iri: str,
-    kind: str,
+    concept_type: str,
     references: Sequence[OutgoingReference],
     by_path: dict[str, ResolvedTarget],
     by_iri: dict[str, ResolvedTarget],
@@ -229,7 +229,8 @@ def outgoing_edges(
                 continue
             cited.add(resolved.iri)
             supersedes = (
-                resolved.status == CONCEPT_DEPRECATED_STATUS and resolved.kind == kind
+                resolved.status == CONCEPT_DEPRECATED_STATUS
+                and resolved.concept_type == concept_type
             )
             edges.append(
                 OutgoingEdge(
@@ -247,7 +248,7 @@ def outgoing_edges(
                 f"links_to:{iri}:{reference.ordinal}",
                 LINKS_TO_LABEL,
                 resolved.iri,
-                resolved.kind,
+                resolved.concept_type,
                 reference.section,
                 reference.sentence,
             )

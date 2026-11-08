@@ -28,7 +28,18 @@ const RENAMED_WORDS_ANYWHERE_IN_A_NAME = [
   "route",
   "slug",
   "narrower_class",
+  "concept_kind",
+  "from_kind",
+  "to_kind",
 ];
+
+/** `kind` stays a word for jobs, suggestions and backups, so the concept's renamed names are listed whole. */
+const RENAMED_NAMES: ReadonlySet<string> = new Set([
+  "concept_index_kind_not_null",
+  "guide_definition_kind_not_null",
+  "guide_expected_fact_kind_not_null",
+  "map_node_kind_idx",
+]);
 
 const NAMES = `
   SELECT 'constraint' AS kind, conname AS name FROM pg_constraint
@@ -80,6 +91,14 @@ describe("the names a renamed table leaves behind", () => {
       );
 
       expect(left).toEqual([]);
+    });
+  });
+
+  it("leaves no renamed name of a concept's type", async () => {
+    await withRollback(db().pool, async (client) => {
+      const rows = await namesWithAPartition(client);
+
+      expect(rows.filter(({ name }) => RENAMED_NAMES.has(name))).toEqual([]);
     });
   });
 });

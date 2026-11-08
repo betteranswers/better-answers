@@ -333,14 +333,14 @@ describe("a governed write", () => {
       edges: "0",
     });
     const row = await db().pool.query<Record<string, unknown>>(
-      "SELECT iri, path, kind, title, content_hash, commit_sha, status, sensitivity, audience FROM concept_index WHERE workspace_id = $1",
+      "SELECT iri, path, concept_type, title, content_hash, commit_sha, status, sensitivity, audience FROM concept_index WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(row.rows).toEqual([
       {
         iri: written.iri,
         path: input.path,
-        kind: "Policy",
+        concept_type: "Policy",
         title: "Expenses",
         content_hash: written.contentHash,
         commit_sha: written.sha,
@@ -364,11 +364,11 @@ describe("a governed write", () => {
       firstFile ??= { sha: written.sha, path: input.path };
     }
 
-    const kinds = await db().pool.query<{ kind: string }>(
-      "SELECT DISTINCT kind FROM concept_index WHERE workspace_id = $1",
+    const kinds = await db().pool.query<{ concept_type: string }>(
+      "SELECT DISTINCT concept_type FROM concept_index WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
-    expect(kinds.rows).toEqual([{ kind: "Policy" }]);
+    expect(kinds.rows).toEqual([{ concept_type: "Policy" }]);
 
     assert(firstFile !== undefined, "the first spelling did not land");
     const file = await fileAtCommit(
@@ -613,14 +613,14 @@ describe("the map rows a governed write creates", () => {
     }));
 
     const nodes = await db().pool.query(
-      "SELECT uid, label, kind, gen, sensitivity, audience FROM map_node WHERE workspace_id = $1 ORDER BY kind",
+      "SELECT uid, label, concept_type, gen, sensitivity, audience FROM map_node WHERE workspace_id = $1 ORDER BY concept_type",
       [scenario.workspaceId],
     );
     expect(nodes.rows).toEqual([
       {
         uid: policy.iri,
         label: "Concept",
-        kind: "Policy",
+        concept_type: "Policy",
         gen: 1,
         sensitivity: "Internal",
         audience: "everyone",
@@ -628,7 +628,7 @@ describe("the map rows a governed write creates", () => {
       {
         uid: product.iri,
         label: "Concept",
-        kind: "Product",
+        concept_type: "Product",
         gen: 1,
         sensitivity: "Internal",
         audience: "everyone",
@@ -636,7 +636,7 @@ describe("the map rows a governed write creates", () => {
     ]);
 
     const edges = await db().pool.query(
-      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM map_edge WHERE workspace_id = $1",
+      "SELECT uid, label, from_uid, to_uid, from_concept_type, to_concept_type, section, sentence FROM map_edge WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(edges.rows).toEqual([
@@ -645,8 +645,8 @@ describe("the map rows a governed write creates", () => {
         label: "LINKS_TO",
         from_uid: policy.iri,
         to_uid: product.iri,
-        from_kind: "Policy",
-        to_kind: "Product",
+        from_concept_type: "Policy",
+        to_concept_type: "Product",
         section: "Details",
         sentence: "See the product for tiers.",
       },
@@ -680,11 +680,11 @@ describe("the map rows a governed write creates", () => {
     const written = await landed(scenario, travel);
 
     const edges = await db().pool.query(
-      "SELECT from_uid, to_uid, to_kind FROM map_edge WHERE workspace_id = $1",
+      "SELECT from_uid, to_uid, to_concept_type FROM map_edge WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(edges.rows).toEqual([
-      { from_uid: first.iri, to_uid: written.iri, to_kind: "Guideline" },
+      { from_uid: first.iri, to_uid: written.iri, to_concept_type: "Guideline" },
     ]);
   });
 
@@ -702,7 +702,7 @@ describe("the map rows a governed write creates", () => {
     }));
 
     const edges = await db().pool.query(
-      "SELECT uid, to_uid, to_kind, section, sentence FROM map_edge WHERE workspace_id = $1 ORDER BY uid",
+      "SELECT uid, to_uid, to_concept_type, section, sentence FROM map_edge WHERE workspace_id = $1 ORDER BY uid",
       [scenario.workspaceId],
     );
     const sentence = `See the product, target and ${product.iri}.`;
@@ -710,21 +710,21 @@ describe("the map rows a governed write creates", () => {
       {
         uid: `links_to:${policy.iri}:0`,
         to_uid: product.iri,
-        to_kind: "Product",
+        to_concept_type: "Product",
         section: "Sources",
         sentence,
       },
       {
         uid: `links_to:${policy.iri}:1`,
         to_uid: product.iri,
-        to_kind: "Product",
+        to_concept_type: "Product",
         section: "Sources",
         sentence,
       },
       {
         uid: `links_to:${policy.iri}:2`,
         to_uid: product.iri,
-        to_kind: "Product",
+        to_concept_type: "Product",
         section: "Sources",
         sentence,
       },
@@ -837,7 +837,7 @@ describe("the map rows a governed write creates", () => {
     const third = await landed(scenario, successor);
 
     const edges = await db().pool.query(
-      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM map_edge WHERE workspace_id = $1 ORDER BY uid",
+      "SELECT uid, label, from_uid, to_uid, from_concept_type, to_concept_type, section, sentence FROM map_edge WHERE workspace_id = $1 ORDER BY uid",
       [scenario.workspaceId],
     );
 
@@ -847,8 +847,8 @@ describe("the map rows a governed write creates", () => {
         label: "SUPERSEDES",
         from_uid: third.iri,
         to_uid: first.iri,
-        from_kind: null,
-        to_kind: null,
+        from_concept_type: null,
+        to_concept_type: null,
         section: null,
         sentence: null,
       },
@@ -857,8 +857,8 @@ describe("the map rows a governed write creates", () => {
         label: "DERIVED_FROM",
         from_uid: third.iri,
         to_uid: second.iri,
-        from_kind: null,
-        to_kind: null,
+        from_concept_type: null,
+        to_concept_type: null,
         section: null,
         sentence: null,
       },

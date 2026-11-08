@@ -78,15 +78,15 @@ CREATE TEMPORARY TABLE concept ON COMMIT DROP AS
        'Note', 'Bid library', 'Public',
        E'A synthetic fixture note: the bid library holds the invoices and order terms this workspace answers from.\n\nSee also [Order delivery times](order-delivery-times.md).\n',
        '[]'::jsonb)
-    ) AS c(ulid, merge_key, path, kind, title, sensitivity, body, sources);
+    ) AS c(ulid, merge_key, path, concept_type, title, sensitivity, body, sources);
 INSERT INTO concept_identity (workspace_id, iri, merge_key)
   SELECT :'workspace', iri, merge_key FROM concept
   ON CONFLICT DO NOTHING;
 INSERT INTO concept_index
-    (workspace_id, iri, path, kind, title, frontmatter, body, content_hash, commit_sha, status, published_at,
+    (workspace_id, iri, path, concept_type, title, frontmatter, body, content_hash, commit_sha, status, published_at,
      sensitivity, audience)
-  SELECT :'workspace', iri, path, kind, title,
-         jsonb_build_object('iri', iri, 'title', title, 'type', kind, 'status', 'stable', 'sources', sources),
+  SELECT :'workspace', iri, path, concept_type, title,
+         jsonb_build_object('iri', iri, 'title', title, 'type', concept_type, 'status', 'stable', 'sources', sources),
          body, encode(sha256(convert_to(body, 'UTF8')), 'hex'), :'commit',
          'stable', now(), sensitivity, 'everyone'
     FROM concept

@@ -35,7 +35,7 @@ def test_derives_the_links_each_contract_case_expects() -> None:
                 }
                 for edge in outgoing_edges(
                     iri=citing["iri"],
-                    kind=citing["kind"],
+                    concept_type=citing["concept_type"],
                     references=references_of(
                         case["body"], {"sources": case["sources"]}, citing["path"]
                     ),

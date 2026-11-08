@@ -99,7 +99,7 @@ const accepted = async (
 
 const nodesAt = async (workspaceId: string, gen: number) => {
   const rows = await db().pool.query(
-    `SELECT uid, label, kind, published_at, sensitivity, audience, audience_groups
+    `SELECT uid, label, concept_type, published_at, sensitivity, audience, audience_groups
        FROM map_node WHERE workspace_id = $1 AND gen = $2 ORDER BY uid`,
     [workspaceId, gen],
   );
@@ -108,7 +108,7 @@ const nodesAt = async (workspaceId: string, gen: number) => {
 
 const edgesAt = async (workspaceId: string, gen: number) => {
   const rows = await db().pool.query(
-    `SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence,
+    `SELECT uid, label, from_uid, to_uid, from_concept_type, to_concept_type, section, sentence,
             published_at, sensitivity, audience, audience_groups
        FROM map_edge WHERE workspace_id = $1 AND gen = $2 ORDER BY uid`,
     [workspaceId, gen],

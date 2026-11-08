@@ -15,6 +15,7 @@ export const FACTORY_MODULES = [
   "packages/core/test/support/identity-rows.ts",
   "packages/schema/test/knowledge/concept-index-rows.ts",
   "packages/schema/test/migrations/before-the-action.ts",
+  "packages/schema/test/migrations/before-the-concept-type.ts",
   "packages/schema/test/migrations/before-the-knowledge-words.ts",
   "packages/schema/test/migrations/catalogue-statements.ts",
   "packages/schema/test/support/probes.ts",

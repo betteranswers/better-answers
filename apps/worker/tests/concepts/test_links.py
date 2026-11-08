@@ -24,13 +24,13 @@ def edges(
     body: str,
     frontmatter: Frontmatter | None = None,
     *,
-    kind: str = "Policy",
+    concept_type: str = "Policy",
     by_path: dict[str, ResolvedTarget] | None = None,
     by_iri: dict[str, ResolvedTarget] | None = None,
 ) -> list[OutgoingEdge]:
     return outgoing_edges(
         iri=IRI,
-        kind=kind,
+        concept_type=concept_type,
         references=references_of(body, frontmatter or {}, PATH),
         by_path=by_path or {},
         by_iri=by_iri or {},
@@ -49,7 +49,7 @@ def test_every_link_form_makes_an_edge_except_an_undefined_label() -> None:
     )
 
     assert [edge.label for edge in derived] == [LINKS_TO_LABEL] * 5
-    assert [edge.to_kind for edge in derived] == ["Product"] * 5
+    assert [edge.to_concept_type for edge in derived] == ["Product"] * 5
 
 
 def test_an_image_takes_an_ordinal_but_makes_no_edge() -> None:
@@ -98,7 +98,9 @@ def test_an_iri_target_makes_an_edge_even_if_unresolved() -> None:
 
     derived = edges(f"Pointing at [nothing yet]({UNLANDED_IRI}).")
 
-    assert [(edge.to_uid, edge.to_kind) for edge in derived] == [(UNLANDED_IRI, None)]
+    assert [(edge.to_uid, edge.to_concept_type) for edge in derived] == [
+        (UNLANDED_IRI, None)
+    ]
 
 
 def test_a_path_target_makes_an_edge_only_once_resolved() -> None:
@@ -111,7 +113,7 @@ def test_a_path_target_makes_an_edge_only_once_resolved() -> None:
             "knowledge/receipts.md": ResolvedTarget(OTHER_IRI, "Evidence", "stable")
         },
     )
-    assert [(edge.to_uid, edge.to_kind) for edge in resolved] == [
+    assert [(edge.to_uid, edge.to_concept_type) for edge in resolved] == [
         (OTHER_IRI, "Evidence")
     ]
 
@@ -153,7 +155,7 @@ def test_non_ascii_letters_cannot_make_a_url_scheme() -> None:
     assert [edge.to_uid for edge in derived] == [OTHER_IRI, UNLANDED_IRI]
 
 
-def test_lineage_supersedes_deprecated_same_kind_concepts_and_derives_from_others() -> (
+def test_lineage_supersedes_deprecated_same_type_concepts_and_derives_from_others() -> (
     None
 ):
     frontmatter: Frontmatter = {
@@ -178,7 +180,7 @@ def test_lineage_supersedes_deprecated_same_kind_concepts_and_derives_from_other
     ]
 
 
-def test_a_deprecated_concept_of_another_kind_is_not_superseded() -> None:
+def test_a_deprecated_concept_of_another_type_is_not_superseded() -> None:
     frontmatter = {"sources": [{"resource": OTHER_IRI}]}
 
     derived = edges(

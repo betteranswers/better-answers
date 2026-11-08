@@ -606,7 +606,7 @@ def test_a_rebuild_locks_the_generation_row_before_reading_concepts(
                 path="knowledge/receipts.md",
                 frontmatter={"title": "Receipts", "type": "Evidence", "iri": OTHER_IRI},
                 body="Receipts are kept for six years.",
-                kind="Evidence",
+                concept_type="Evidence",
             )
             hold_map_generation(cursor, workspace_id=workspace)
         write_bundle(
@@ -735,7 +735,7 @@ def test_a_rebuild_writes_the_next_generation_then_makes_it_live(
             path="knowledge/receipts.md",
             frontmatter={"title": "Receipts", "type": "Evidence", "iri": OTHER_IRI},
             body="Receipts are kept for six years.",
-            kind="Evidence",
+            concept_type="Evidence",
         )
 
         seed_map_generation(cursor, workspace_id=workspace)
@@ -757,8 +757,8 @@ def test_a_rebuild_writes_the_next_generation_then_makes_it_live(
         )
         assert cursor.fetchone() == (2,)
         cursor.execute(
-            "SELECT gen, label, from_uid, to_uid, from_kind, to_kind, section, sentence"
-            " FROM map_edge WHERE workspace_id = %s",
+            "SELECT gen, label, from_uid, to_uid, from_concept_type, to_concept_type,"
+            " section, sentence FROM map_edge WHERE workspace_id = %s",
             (workspace,),
         )
         assert cursor.fetchall() == [

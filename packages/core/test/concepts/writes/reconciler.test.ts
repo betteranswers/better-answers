@@ -175,7 +175,7 @@ const rowsOf = async (workspaceId: string) => {
      SELECT 'event', id, concat_ws(' ', action, actor, subject_id, detail::text)
        FROM audit_event WHERE workspace_id = $1
      UNION ALL
-     SELECT 'node', uid, concat_ws(' ', kind, gen::text) FROM map_node WHERE workspace_id = $1
+     SELECT 'node', uid, concat_ws(' ', concept_type, gen::text) FROM map_node WHERE workspace_id = $1
      UNION ALL
      SELECT 'edge', uid, concat_ws(' ', from_uid, to_uid) FROM map_edge WHERE workspace_id = $1
      UNION ALL
@@ -209,7 +209,7 @@ const iriOfFile = async (scenario: Scenario, sha: string, path: string): Promise
 
 const conceptRow = async (workspaceId: string, iri: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
-    `SELECT c.path, c.kind, c.title, c.content_hash, c.commit_sha, c.status, c.sensitivity,
+    `SELECT c.path, c.concept_type, c.title, c.content_hash, c.commit_sha, c.status, c.sensitivity,
             c.audience, i.merge_key
        FROM concept_index c
        JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
@@ -267,7 +267,7 @@ describe("a commit whose rows were lost", () => {
     const iri = await iriOfFile(scenario, sha, input.path);
     expect(await conceptRow(scenario.workspaceId, iri)).toEqual({
       path: input.path,
-      kind: "Guideline",
+      concept_type: "Guideline",
       title: "Travel",
       content_hash: contentHashOf(input.frontmatter, input.body, input.path),
       commit_sha: sha,
@@ -422,7 +422,7 @@ describe("a commit with lost rows, replayed from its file", () => {
     const iri = await iriOfFile(scenario, sha, input.path);
     expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({
       title: "Parking",
-      kind: "Guideline",
+      concept_type: "Guideline",
       merge_key: "Guideline:parking",
     });
   });
@@ -659,7 +659,7 @@ describe("a re-write whose rows were lost", () => {
 
     expect(await conceptRow(scenario.workspaceId, first.iri)).toEqual({
       path: input.path,
-      kind: "Guideline",
+      concept_type: "Guideline",
       title: "Parking",
       content_hash: contentHashOf(input.frontmatter, body, input.path),
       commit_sha: history[1],
@@ -987,7 +987,7 @@ describe("an acceptance whose rows were lost", () => {
     });
     expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({
       path: request.path,
-      kind: "Guideline",
+      concept_type: "Guideline",
       title: "Remote working",
       merge_key: request.mergeKey,
       content_hash: contentHashOf(request.frontmatter, request.body, request.path),

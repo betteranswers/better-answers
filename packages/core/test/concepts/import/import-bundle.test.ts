@@ -251,7 +251,7 @@ const nothingWritten = async (scenario: Scenario) => {
 
 const indexRows = async (workspaceId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
-    `SELECT path, kind, title, status, sensitivity
+    `SELECT path, concept_type, title, status, sensitivity
        FROM concept_index WHERE workspace_id = $1 ORDER BY path`,
     [workspaceId],
   );
@@ -519,42 +519,42 @@ describe("importing the bundle", () => {
     expect(await indexRows(scenario.workspaceId)).toEqual([
       {
         path: "knowledge/company/answers/data-retention-period.md",
-        kind: "Answer",
+        concept_type: "Answer",
         title: "Data retention period",
         status: "stable",
         sensitivity: "Internal",
       },
       {
         path: "knowledge/company/answers/support-hours.md",
-        kind: "Answer",
+        concept_type: "Answer",
         title: "Support hours",
         status: "stable",
         sensitivity: "Internal",
       },
       {
         path: "knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md",
-        kind: "Answer",
+        concept_type: "Answer",
         title: "Can two teams share one account? (Advanced plan)",
         status: "stable",
         sensitivity: "Internal",
       },
       {
         path: "knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md",
-        kind: "Answer",
+        concept_type: "Answer",
         title: "Can two teams share one account? (Standard plan)",
         status: "stable",
         sensitivity: "Internal",
       },
       {
         path: "knowledge/product/tiers/advanced-plan.md",
-        kind: "Tier",
+        concept_type: "Tier",
         title: "Advanced plan",
         status: "stable",
         sensitivity: "Internal",
       },
       {
         path: "knowledge/product/tiers/standard-plan.md",
-        kind: "Tier",
+        concept_type: "Tier",
         title: "Standard plan",
         status: "stable",
         sensitivity: "Internal",

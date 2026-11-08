@@ -118,7 +118,7 @@ type ResolvedTarget = {
 
 type ResolvedRow = {
   readonly iri: string;
-  readonly kind: string;
+  readonly concept_type: string;
   readonly status: string;
   readonly path: string;
 };
@@ -151,22 +151,22 @@ const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<Outgoing> =
 
   if (paths.length > 0) {
     const found = await tx.query<ResolvedRow>(
-      "SELECT iri, kind, status, path FROM concept_index WHERE workspace_id = $1 AND path = ANY($2::text[])",
+      "SELECT iri, concept_type, status, path FROM concept_index WHERE workspace_id = $1 AND path = ANY($2::text[])",
       [workspaceId, paths],
     );
     for (const row of found.rows) {
-      byPath.set(row.path, { iri: row.iri, conceptType: row.kind, status: row.status });
+      byPath.set(row.path, { iri: row.iri, conceptType: row.concept_type, status: row.status });
     }
   }
   const byIri = new Map<string, ResolvedTarget>();
 
   if (iris.length > 0) {
     const found = await tx.query<ResolvedRow>(
-      "SELECT iri, kind, status, path FROM concept_index WHERE workspace_id = $1 AND iri = ANY($2::text[])",
+      "SELECT iri, concept_type, status, path FROM concept_index WHERE workspace_id = $1 AND iri = ANY($2::text[])",
       [workspaceId, iris],
     );
     for (const row of found.rows) {
-      byIri.set(row.iri, { iri: row.iri, conceptType: row.kind, status: row.status });
+      byIri.set(row.iri, { iri: row.iri, conceptType: row.concept_type, status: row.status });
     }
   }
 
@@ -243,9 +243,9 @@ const replaceOutgoingEdges = async (gen: number, tx: Tx, concept: EdgeSource): P
   for (const edge of edges) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- every edge insert runs on the caller's transaction
     await tx.query(
-      `INSERT INTO map_edge (workspace_id, gen, uid, label, from_uid, to_uid, from_kind,
-                               to_kind, section, sentence, published_at, sensitivity, audience,
-                               audience_groups)
+      `INSERT INTO map_edge (workspace_id, gen, uid, label, from_uid, to_uid, from_concept_type,
+                             to_concept_type, section, sentence, published_at, sensitivity,
+                             audience, audience_groups)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         workspaceId,
@@ -297,11 +297,11 @@ export const writeConceptDelta = async (
   const gen = await liveGeneration(workspaceId, tx);
 
   await tx.query(
-    `INSERT INTO map_node (workspace_id, gen, uid, label, kind, published_at, sensitivity,
+    `INSERT INTO map_node (workspace_id, gen, uid, label, concept_type, published_at, sensitivity,
                              audience, audience_groups)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (workspace_id, gen, uid) WHERE gen IS NOT NULL
-     DO UPDATE SET kind = EXCLUDED.kind, published_at = EXCLUDED.published_at,
+     DO UPDATE SET concept_type = EXCLUDED.concept_type, published_at = EXCLUDED.published_at,
                    sensitivity = EXCLUDED.sensitivity, audience = EXCLUDED.audience,
                    audience_groups = EXCLUDED.audience_groups`,
     [
@@ -317,9 +317,9 @@ export const writeConceptDelta = async (
     ],
   );
   await tx.query(
-    `UPDATE map_edge SET to_kind = $4
+    `UPDATE map_edge SET to_concept_type = $4
       WHERE workspace_id = $1 AND gen = $2 AND label = '${LINKS_TO_LABEL}' AND to_uid = $3
-        AND to_kind IS DISTINCT FROM $4`,
+        AND to_concept_type IS DISTINCT FROM $4`,
     [workspaceId, gen, delta.iri, delta.conceptType],
   );
 
@@ -327,7 +327,7 @@ export const writeConceptDelta = async (
     `UPDATE map_edge SET label = CASE
         WHEN $4 AND EXISTS (SELECT 1 FROM map_node n
                              WHERE n.workspace_id = $1 AND n.gen = $2
-                               AND n.uid = map_edge.from_uid AND n.kind = $5)
+                               AND n.uid = map_edge.from_uid AND n.concept_type = $5)
         THEN '${SUPERSEDES_LABEL}' ELSE '${DERIVED_FROM_LABEL}' END
       WHERE workspace_id = $1 AND gen = $2 AND to_uid = $3
         AND label IN ('${SUPERSEDES_LABEL}', '${DERIVED_FROM_LABEL}')`,
@@ -336,7 +336,7 @@ export const writeConceptDelta = async (
   await replaceOutgoingEdges(gen, tx, delta);
 
   const citing = await tx.query<ConceptIndexRow>(
-    `SELECT workspace_id AS "workspaceId", iri, kind AS "conceptType", path, body, frontmatter,
+    `SELECT workspace_id AS "workspaceId", iri, concept_type AS "conceptType", path, body, frontmatter,
             published_at AS "publishedAt", sensitivity, audience,
             audience_groups AS "audienceGroups"
        FROM concept_index
