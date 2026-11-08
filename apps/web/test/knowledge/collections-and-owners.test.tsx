@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure } from "@test/stubbed-api.ts";
@@ -22,9 +23,9 @@ const PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Collections and Owne
 
 const RHIAN = { ...GRACE, personId: "01JRHIAN0000000000000000AA", displayName: "Rhian Pryce" };
 
-const PICKER = /^New Owner\s?of policy$/;
+const PICKER = new RegExp(`^${WORDS.newOwner}\\s?${WORDS.ofCollection("policy").trim()}$`, "u");
 
-const SAVE = /^Save\s?the new owner of policy$/;
+const SAVE = new RegExp(`^${WORDS.save}\\s?${WORDS.saveOf("policy").trim()}$`, "u");
 
 const POLICY = { collection: "policy", owner: null, overrides: 0 };
 

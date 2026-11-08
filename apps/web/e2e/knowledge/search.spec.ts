@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
 import { SEARCH_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
-import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
+import { SEARCH_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
+import { KNOWLEDGE_BASE_PAGE, SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 import { HOMES, NEW_QUESTION } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -327,10 +329,10 @@ test.describe("the Knowledge Search page", () => {
     await anAdminAtSearch(page, request, "Calder Records", []);
     await foundNothing(page, "zebra");
 
-    await expect(statusOf(page)).toHaveText("Nothing matches “zebra”.");
-    const next = searchRegion(page).getByRole("list", { name: "Where to look next" });
-    await expect(next.getByRole("link", { name: "Guides" })).toBeVisible();
-    await expect(next.getByRole("link", { name: "Knowledge Base" })).toBeVisible();
+    await expect(statusOf(page)).toHaveText(WORDS.noMatches("zebra"));
+    const next = searchRegion(page).getByRole("list", { name: WORDS.whereNext });
+    await expect(next.getByRole("link", { name: GUIDES_PAGE.name })).toBeVisible();
+    await expect(next.getByRole("link", { name: KNOWLEDGE_BASE_PAGE.name })).toBeVisible();
 
     await next.getByRole("link", { name: "Ask this question" }).click();
 
@@ -347,10 +349,10 @@ test.describe("the Knowledge Search page", () => {
     await skipLinkReachesThePage(page);
 
     await listsItsKeystrokes(page, "Search", KEY, [
-      "Search This Workspace’s Knowledge",
-      "Show More Matches",
-      "Open the Match in Focus",
-      "Close the Open Passage",
+      KEY.search.action,
+      KEY.more.action,
+      KEY.open.action,
+      KEY.close.action,
     ]);
 
     await page.keyboard.press(KEY.search.key);

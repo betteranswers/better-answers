@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { assert, describe, expect, it, vi } from "vitest";
 
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
+import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import {
   aConceptRow,
   ALL_KNOWLEDGE,
@@ -40,7 +41,7 @@ const THE_LEASE = aConceptRow(4, "Yard lease", { kind: "lease", collection: null
 
 const CONCEPTS: readonly ConceptRow[] = [THE_LEAVE, THE_EXPENSES, THE_DRILLS, THE_LEASE];
 
-const SET_OWNER = "Set Owner";
+const SET_OWNER = WORDS.setOwner.action;
 
 const region = () => within(screen.getByRole("region", { name: "All Knowledge" }));
 
@@ -79,9 +80,7 @@ const setOwnerAction = () => {
   return within(bar).getByRole("button", { name: SET_OWNER });
 };
 
-const SET_OWNER_DIALOG = (count: number) => ({
-  name: `Set the Owner of ${String(count)} ${count === 1 ? "Concept" : "Concepts"}`,
-});
+const SET_OWNER_DIALOG = (count: number) => ({ name: WORDS.setOwner.title(count) });
 
 const asked = (procedure: string): unknown[] =>
   server.asks.filter((ask) => ask.procedure === procedure).map((ask) => ask.input);
@@ -89,7 +88,7 @@ const asked = (procedure: string): unknown[] =>
 const lastAsk = () => knowledgeAsks().at(-1);
 
 const choosingRhian = (dialog: HTMLElement) => {
-  fireEvent.change(within(dialog).getByRole("combobox", { name: "New Owner" }), {
+  fireEvent.change(within(dialog).getByRole("combobox", { name: WORDS.setOwner.newOwner }), {
     target: { value: RHIAN.personId },
   });
   fireEvent.click(within(dialog).getByRole("button", { name: SET_OWNER }));
@@ -124,14 +123,15 @@ describe("the All Knowledge page", () => {
     await screen.findByRole("link", { name: "Annual leave" });
     expect(theCount()).toMatch(/^4\b/u);
     expect(cellOf("Annual leave", "Owner")).toBe("Ada");
-    expect(cellOf("Annual leave", "Last Verified")).toContain("4 March 2026");
-    expect(cellOf("Annual leave", "Last Verified")).toContain("Rhian Pryce");
+    expect(cellOf("Annual leave", WORDS.columns.checked)).toContain("4 March 2026");
+    expect(cellOf("Annual leave", WORDS.columns.checked)).toContain("Rhian Pryce");
     const ownOwner = cellOf("Expense claims", "Owner");
     expect(ownOwner).toContain("Rhian Pryce");
     expect(ownOwner, "a concept's own owner looks like its collection's").not.toBe("Rhian Pryce");
-    expect(cellOf("Expense claims", "Last Verified"), "an unverified concept shows a date").toMatch(
-      /^\D*\S\D*$/u,
-    );
+    expect(
+      cellOf("Expense claims", WORDS.columns.checked),
+      "an unverified concept shows a date",
+    ).toMatch(/^\D*\S\D*$/u);
     const unowned = cellOf("Fire drills", "Owner");
     expect(unowned, "a concept with no owner shows an empty cell").toMatch(/\S/u);
     expect(unowned, "a concept with no owner names a person").not.toMatch(/Ada|Rhian/u);
@@ -215,7 +215,7 @@ describe("the All Knowledge page", () => {
 
     expect(await region().findByRole("link", { name: "Concept 51" })).toBeDefined();
     expect(router.state.location.search).toMatchObject({ "all.page": 2 });
-    const pages = region().getByRole("navigation", { name: "Pages of Concepts" });
+    const pages = region().getByRole("navigation", { name: WORDS.pages });
     expect(within(pages).getAllByRole("status")[0]?.textContent).toMatch(/51\D+51\D+51/u);
   });
 });
@@ -268,7 +268,7 @@ describe("the All Knowledge page for an Admin", () => {
     const dialog = await screen.findByRole("dialog", SET_OWNER_DIALOG(2));
 
     const returned = within(dialog).getByRole("option", { name: "Its collection’s owner" });
-    fireEvent.change(within(dialog).getByRole("combobox", { name: "New Owner" }), {
+    fireEvent.change(within(dialog).getByRole("combobox", { name: WORDS.setOwner.newOwner }), {
       target: { value: returned.getAttribute("value") },
     });
     fireEvent.click(within(dialog).getByRole("button", { name: SET_OWNER }));
@@ -360,7 +360,7 @@ describe("the All Knowledge page for an owner", () => {
     expect(lastAsk()?.collections).toEqual(["policy", "safety"]);
     expect(region().queryByRole("link", { name: "Yard lease" })).toBeNull();
     expect(region().getByRole("combobox", { name: "Filter by Collection" }).textContent).toBe(
-      "Collections You Own",
+      WORDS.filters.collection.yours,
     );
     expect(region().queryAllByRole("checkbox")).toHaveLength(0);
     expect(region().queryByRole("toolbar")).toBeNull();
@@ -385,7 +385,10 @@ describe("the All Knowledge page for an owner", () => {
     const router = await openAt(ALL_KNOWLEDGE, api);
     await screen.findByRole("link", { name: "Annual leave" });
 
-    choosing(region().getByRole("combobox", { name: "Filter by Collection" }), "Any Collection");
+    choosing(
+      region().getByRole("combobox", { name: "Filter by Collection" }),
+      WORDS.filters.collection.any,
+    );
 
     expect(await region().findByRole("link", { name: "Yard lease" })).toBeDefined();
     expect(lastAsk()?.collections).toEqual([]);

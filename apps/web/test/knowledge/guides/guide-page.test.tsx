@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { describe, expect, it, vi } from "vitest";
 
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
+import { GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
 import {
   A_GUIDE_PAGE,
@@ -123,7 +124,7 @@ describe("the guide page", () => {
     await openGuide("Viewer", aGuide({ sections: [aSection({ brief: aViewersBrief() })] }));
 
     expect(screen.queryByRole("button", { name: "Edit Brief" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Show Detail" })).toBeDefined();
+    expect(screen.getByRole("button", { name: GUIDE_WORDS.showDetail })).toBeDefined();
   });
 
   it("offers Edit Brief to an Editor and to an Admin", async () => {
@@ -148,7 +149,7 @@ describe("the guide page", () => {
     await openAt(A_GUIDE_PAGE, api);
 
     const main = within(screen.getByRole("main"));
-    const back = await main.findByRole("link", { name: "Back to Guides" });
+    const back = await main.findByRole("link", { name: GUIDE_WORDS.toGuides });
     expect(back.getAttribute("href")).toBe(GUIDES_PAGE.path);
     expect(screen.queryByRole("article"), "the page drew a guide that was not found").toBeNull();
   });
@@ -219,15 +220,15 @@ describe("the Detail of a section", () => {
     await openGuide("Viewer");
 
     expect(screen.queryByText("Each bay is racked by row.")).toBeNull();
-    expect(screen.getByRole("button", { name: "Show Detail" }).getAttribute("aria-expanded")).toBe(
-      "false",
-    );
+    expect(
+      screen.getByRole("button", { name: GUIDE_WORDS.showDetail }).getAttribute("aria-expanded"),
+    ).toBe("false");
   });
 
   it("opens under the Brief and moves focus into it", async () => {
     await openGuide("Viewer");
 
-    fireEvent.click(screen.getByRole("button", { name: "Show Detail" }));
+    fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
 
     const detail = await screen.findByRole("region", { name: "Detail of section 1" });
     expect(within(detail).getByText("Each bay is racked by row.")).toBeDefined();
@@ -235,14 +236,14 @@ describe("the Detail of a section", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(detail);
     });
-    expect(screen.getByRole("button", { name: "Show Detail" }).getAttribute("aria-expanded")).toBe(
-      "true",
-    );
+    expect(
+      screen.getByRole("button", { name: GUIDE_WORDS.showDetail }).getAttribute("aria-expanded"),
+    ).toBe("true");
   });
 
   it("closes when shown again", async () => {
     await openGuide("Viewer");
-    const button = screen.getByRole("button", { name: "Show Detail" });
+    const button = screen.getByRole("button", { name: GUIDE_WORDS.showDetail });
 
     fireEvent.click(button);
     await screen.findByRole("region", { name: "Detail of section 1" });
@@ -253,7 +254,7 @@ describe("the Detail of a section", () => {
 
   it("returns focus to Show Detail when d closes it", async () => {
     await openGuide("Viewer");
-    const button = screen.getByRole("button", { name: "Show Detail" });
+    const button = screen.getByRole("button", { name: GUIDE_WORDS.showDetail });
 
     fireEvent.click(button);
     const detail = await screen.findByRole("region", { name: "Detail of section 1" });
@@ -278,7 +279,7 @@ describe("the Detail of a section", () => {
   it("opens on d for the section in focus", async () => {
     await openGuide("Viewer");
 
-    const button = screen.getByRole("button", { name: "Show Detail" });
+    const button = screen.getByRole("button", { name: GUIDE_WORDS.showDetail });
     button.focus();
     fireEvent.keyDown(button, { key: "d" });
 
@@ -295,7 +296,7 @@ describe("the Detail of a section", () => {
     );
 
     const second = within(sectionNamed("2. Insurance")).getByRole("button", {
-      name: "Show Detail",
+      name: GUIDE_WORDS.showDetail,
     });
     second.focus();
     fireEvent.keyDown(second, { key: "d" });
@@ -322,7 +323,7 @@ describe("the coverage of a section", () => {
 
     const section = within(sectionNamed(SECTION_ONE));
     expect(section.getByText(/\b3 of 4\b/u)).toBeDefined();
-    const add = section.getByRole("link", { name: "Add This Fact" });
+    const add = section.getByRole("link", { name: GUIDE_WORDS.addFact });
     expect(describedBy(add)).toContain(LIABILITY_TITLE);
     expect(describedBy(add)).toContain("Dana Example");
   });
@@ -330,7 +331,7 @@ describe("the coverage of a section", () => {
   it("names no owner for a fact in an unowned collection", async () => {
     await openGuide("Viewer", aGuide({ owner: null }));
 
-    const add = screen.getByRole("link", { name: "Add This Fact" });
+    const add = screen.getByRole("link", { name: GUIDE_WORDS.addFact });
     expect(describedBy(add)).toContain(LIABILITY_TITLE);
     expect(describedBy(add), "the line named an owner the collection lacks").not.toContain(
       "Dana Example",
@@ -340,7 +341,7 @@ describe("the coverage of a section", () => {
   it("offers Add This Fact to a Viewer too", async () => {
     await openGuide("Viewer");
 
-    expect(screen.getByRole("link", { name: "Add This Fact" })).toBeDefined();
+    expect(screen.getByRole("link", { name: GUIDE_WORDS.addFact })).toBeDefined();
   });
 
   it("lists no fact when every expected fact is recorded", async () => {
@@ -353,7 +354,7 @@ describe("the coverage of a section", () => {
     expect(section.getByText(/\b1 of 1\b/u)).toBeDefined();
     expect(sectionNamed(SECTION_ONE).textContent).not.toContain(LIABILITY_TITLE);
     expect(section.queryByRole("button", { name: "Include" })).toBeNull();
-    expect(section.queryByRole("link", { name: "Add This Fact" })).toBeNull();
+    expect(section.queryByRole("link", { name: GUIDE_WORDS.addFact })).toBeNull();
   });
 
   it("names an available fact and offers Include to an Editor", async () => {
@@ -366,7 +367,7 @@ describe("the coverage of a section", () => {
     expect(describedBy(section.getByRole("button", { name: "Include" }))).toContain(
       LIABILITY_TITLE,
     );
-    expect(section.queryByRole("link", { name: "Add This Fact" })).toBeNull();
+    expect(section.queryByRole("link", { name: GUIDE_WORDS.addFact })).toBeNull();
   });
 
   it("offers no Include to a Viewer", async () => {
@@ -430,7 +431,7 @@ describe("including an available fact", () => {
     });
     expect(screen.queryByRole("button", { name: "Include" })).toBeNull();
     expect(asksOf(INCLUDE)).toEqual([{ writeUpId: A_WRITE_UP_ID }]);
-    fireEvent.click(screen.getByRole("button", { name: "Show Detail" }));
+    fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
     expect(await screen.findByText("Cover is £5m.")).toBeDefined();
   });
 

@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { EDITOR_WORDS } from "@/features/knowledge/editing/editor-words.ts";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import {
   A_CONCEPT_IRI,
@@ -35,10 +36,17 @@ const TO_EDIT = "knowledge.conceptToEdit";
 
 const SAVE = "knowledge.saveConcept";
 
+const LAUNCHERS: ReadonlySet<string> = new Set([EDITOR_WORDS.edit, EDITOR_WORDS.suggest]);
+
+const HEADINGS: ReadonlySet<string> = new Set([
+  EDITOR_WORDS.headingEdit,
+  EDITOR_WORDS.headingSuggest,
+]);
+
 const editorOpened = async (api: Api) => {
   const router = await openAt(A_CONCEPT_PAGE, api);
-  fireEvent.click(await screen.findByRole("button", { name: /^(Edit|Suggest an Edit)$/u }));
-  await screen.findByRole("heading", { level: 3, name: /^(Edit This Concept|Suggest an Edit)$/u });
+  fireEvent.click(await screen.findByRole("button", { name: (name) => LAUNCHERS.has(name) }));
+  await screen.findByRole("heading", { level: 3, name: (name) => HEADINGS.has(name) });
   return router;
 };
 
@@ -78,7 +86,7 @@ const editorClosed = async (heading: string) => {
 
 const buttonFor = async (standing: Standing) => {
   await openAt(A_CONCEPT_PAGE, aConceptApi(standing));
-  const button = await screen.findByRole("button", { name: /^(Edit|Suggest an Edit)$/u });
+  const button = await screen.findByRole("button", { name: (name) => LAUNCHERS.has(name) });
   const name = button.textContent;
   cleanup();
   return name;
@@ -87,7 +95,7 @@ const buttonFor = async (standing: Standing) => {
 describe("editing a concept on its own page", () => {
   it("shows Edit to a committer, Suggest an Edit otherwise", async () => {
     expect(await buttonFor("commits")).toBe("Edit");
-    expect(await buttonFor("suggests")).toBe("Suggest an Edit");
+    expect(await buttonFor("suggests")).toBe(EDITOR_WORDS.suggest);
   });
 
   it("reads the concept to edit after the press", async () => {
@@ -97,7 +105,7 @@ describe("editing a concept on its own page", () => {
     expect(asksOf(TO_EDIT)).toHaveLength(0);
 
     fireEvent.click(button);
-    await screen.findByRole("heading", { level: 3, name: "Edit This Concept" });
+    await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingEdit });
     expect(asksOf(TO_EDIT)).toHaveLength(1);
     expect(asksOf("knowledge.tree")).toHaveLength(0);
   });
@@ -107,7 +115,10 @@ describe("editing a concept on its own page", () => {
     await screen.findByRole("button", { name: "Edit" });
 
     fireEvent.keyDown(document.body, { key: "e" });
-    const heading = await screen.findByRole("heading", { level: 3, name: "Edit This Concept" });
+    const heading = await screen.findByRole("heading", {
+      level: 3,
+      name: EDITOR_WORDS.headingEdit,
+    });
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
     });
@@ -136,12 +147,12 @@ describe("editing a concept on its own page", () => {
 
     retitled("Audit Log Retention");
     pressed("Save");
-    expect(await screen.findByRole("button", { name: "Keep Editing" })).toBeDefined();
+    expect(await screen.findByRole("button", { name: EDITOR_WORDS.keepEditing })).toBeDefined();
     expect(warnings().some((warning) => /\b2\b/u.test(warning))).toBe(true);
     expect(savesAsked()).toHaveLength(0);
 
     pressed("Save");
-    await editorClosed("Edit This Concept");
+    await editorClosed(EDITOR_WORDS.headingEdit);
     expect(wordsIn("status")).toMatch(/\S/);
     expect(savesAsked().map((asked) => asked.reuse)).toEqual(["confirmed"]);
   });
@@ -166,7 +177,7 @@ describe("editing a concept on its own page", () => {
       ).toBe(true);
     });
     pressed("Save");
-    await editorClosed("Edit This Concept");
+    await editorClosed(EDITOR_WORDS.headingEdit);
     expect(savesAsked().map((asked) => asked.reuse)).toEqual(["confirmed", "confirmed"]);
   });
 
@@ -231,7 +242,7 @@ describe("editing a concept on its own page", () => {
 
     expect(screen.getByRole("textbox", { name: "Source 1" })).toBeDefined();
     expect(screen.getByRole("textbox", { name: "Source 3" })).toBeDefined();
-    pressed("Add a Source");
+    pressed(EDITOR_WORDS.addSource);
     expect(screen.getByRole("textbox", { name: "Source 4" })).toBeDefined();
   });
 
@@ -248,7 +259,7 @@ describe("editing a concept on its own page", () => {
 
     await held.asked;
     held.resolve();
-    await editorClosed("Edit This Concept");
+    await editorClosed(EDITOR_WORDS.headingEdit);
     expect(wordsIn("status")).toMatch(/\S/);
   });
 
@@ -262,7 +273,7 @@ describe("editing a concept on its own page", () => {
     await waitFor(() => {
       expect(wordsIn("status"), "the status said nothing of the unchanged save").toMatch(/\S/);
     });
-    expect(screen.getByRole("heading", { level: 3, name: "Edit This Concept" })).toBeDefined();
+    expect(screen.getByRole("heading", { level: 3, name: EDITOR_WORDS.headingEdit })).toBeDefined();
   });
 
   it("reports a sent suggestion and closes the editor", async () => {
@@ -273,7 +284,7 @@ describe("editing a concept on its own page", () => {
     retitled("Audit Log Retention");
     pressed("Save");
 
-    await editorClosed("Suggest an Edit");
+    await editorClosed(EDITOR_WORDS.headingSuggest);
     expect(wordsIn("status"), "the status said nothing of the suggestion").toMatch(/\S/);
   });
 
@@ -285,16 +296,16 @@ describe("editing a concept on its own page", () => {
     retitled("Audit Log Retention");
     pressed("Save");
 
-    expect(await screen.findByRole("button", { name: "Reload the Concept" })).toBeDefined();
+    expect(await screen.findByRole("button", { name: EDITOR_WORDS.reload })).toBeDefined();
     expect(wordsIn("status")).toMatch(/\S/);
     api.set(TO_EDIT, () => aConceptToEdit({ base: "second-base" }));
-    pressed("Reload the Concept");
+    pressed(EDITOR_WORDS.reload);
 
     await waitFor(() => {
       expect(titleField().value).toBe("Audit Logs Retention");
     });
     expect(asksOf(TO_EDIT)).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: "Reload the Concept" })).toBeNull();
+    expect(screen.queryByRole("button", { name: EDITOR_WORDS.reload })).toBeNull();
     expect(wordsIn("status"), "the stale notice outlived the reload").toBe("");
   });
 
@@ -343,7 +354,7 @@ describe("editing a concept on its own page", () => {
 
     fireEvent.keyDown(titleField(), { key: "Enter", ctrlKey: true });
 
-    await editorClosed("Edit This Concept");
+    await editorClosed(EDITOR_WORDS.headingEdit);
     expect(savesAsked()).toHaveLength(1);
   });
 
@@ -352,18 +363,18 @@ describe("editing a concept on its own page", () => {
     await editorOpened(api);
 
     retitled("Audit Log Retention");
-    pressed("Close Editor");
-    expect(screen.queryByRole("heading", { level: 3, name: "Edit This Concept" })).toBeNull();
+    pressed(EDITOR_WORDS.close);
+    expect(screen.queryByRole("heading", { level: 3, name: EDITOR_WORDS.headingEdit })).toBeNull();
 
     pressed("Edit");
-    await screen.findByRole("heading", { level: 3, name: "Edit This Concept" });
+    await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingEdit });
     expect(titleField().value).toBe("Audit Log Retention");
   });
 
   it("gives a person's draft to no one else", async () => {
     await editorOpened(aConceptApi("commits"));
     retitled("Audit Log Retention");
-    pressed("Close Editor");
+    pressed(EDITOR_WORDS.close);
     cleanup();
 
     const api = aConceptApi("commits");
@@ -390,7 +401,7 @@ describe("editing a concept on its own page", () => {
     expect(await screen.findByRole("button", { name: "Leave" })).toBeDefined();
     expect(router.state.location.pathname).toBe(A_CONCEPT_PAGE);
 
-    pressed("Keep Editing");
+    pressed(EDITOR_WORDS.keepEditing);
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: "Leave" })).toBeNull();
     });
@@ -414,13 +425,13 @@ describe("editing a concept on its own page", () => {
 
     expect(screen.queryByText(/Restricted board minutes/u)).toBeNull();
     pressed("Remove source 1");
-    pressed("Add a Source");
+    pressed(EDITOR_WORDS.addSource);
     fireEvent.change(screen.getByRole("textbox", { name: "Source 3" }), {
       target: { value: "Calder handbook" },
     });
     pressed("Save");
 
-    await editorClosed("Edit This Concept");
+    await editorClosed(EDITOR_WORDS.headingEdit);
     const [asked] = savesAsked();
     expect(asked?.sources).toEqual(["Audit handbook", "Calder handbook"]);
     expect(asked?.withheld).toEqual([1]);
@@ -437,7 +448,7 @@ describe("editing a concept on its own page", () => {
     });
     await openAt(address, api);
 
-    await screen.findByRole("heading", { level: 3, name: "New Concept" });
+    await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
     expect(titleField().value).toBe("Cyber Essentials Plus certificate");
     expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Kind" }).value).toBe(
       "certification",
@@ -463,7 +474,7 @@ describe("editing a concept on its own page", () => {
     });
     const router = await openAt(address, api);
 
-    await screen.findByRole("heading", { level: 3, name: "New Concept" });
+    await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
     const save = screen.getByRole("button", { name: "Save" });
     expect(save.getAttribute("aria-disabled")).toBe("true");
     expect(describedBy(save), "the disabled Save gives no reason").toMatch(/\S/);
@@ -496,7 +507,7 @@ describe("editing a concept on its own page", () => {
     });
     const router = await openAt(address, api);
 
-    await screen.findByRole("heading", { level: 3, name: "New Concept" });
+    await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
     await waitFor(() => {
       expect(warnings().some((warning) => warning.includes("policies"))).toBe(true);
     });
@@ -506,7 +517,7 @@ describe("editing a concept on its own page", () => {
     pressed("Save");
 
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { level: 3, name: "New Concept" })).toBeNull();
+      expect(screen.queryByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew })).toBeNull();
     });
     expect(
       quiet.some((status) => /\S/u.test(status.textContent)),

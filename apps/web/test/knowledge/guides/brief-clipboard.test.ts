@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { copyBrief, copyingWords } from "@/features/knowledge/guides/brief-clipboard.ts";
+import { GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import type { BriefCopied } from "@/features/knowledge/knowledge-api.ts";
 import { clipboardTaking, partOf } from "@test/clipboard-stand-in.ts";
 import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
@@ -173,7 +174,7 @@ describe("copying a section on the guide page", () => {
 
     const section = within(screen.getByRole("region", { name: "1. Warehouse racking" }));
     expect(section.queryByRole("button", { name: "Copy" })).toBeNull();
-    expect(section.getByRole("button", { name: "Show Detail" })).toBeDefined();
+    expect(section.getByRole("button", { name: GUIDE_WORDS.showDetail })).toBeDefined();
   });
 
   it("alerts when the server refuses the copy", async () => {

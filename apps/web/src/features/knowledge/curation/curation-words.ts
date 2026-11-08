@@ -8,9 +8,9 @@ import type { GuideSummary, RecordsExported } from "../knowledge-api.ts";
 const conceptsCounted = (count: number): string => counted(count, "concept", "concepts");
 
 export const ALL_KNOWLEDGE_WORDS = {
-  caption: "Every concept you can read, with its kind, collection, owner and last verification.",
+  caption: "Every concept you can read.",
   loading: "The knowledge base is still loading.",
-  none: "No concepts in the knowledge base yet. A concept appears here once it is saved.",
+  none: "No concepts yet.",
   noneMatch: "No concepts match these filters.",
   count: conceptsCounted,
   matching: (count: number): string =>
@@ -21,28 +21,28 @@ export const ALL_KNOWLEDGE_WORDS = {
     collection: "Collection",
     trust: "Trust",
     owner: "Owner",
-    checked: "Last Verified",
+    checked: "Last verified",
   },
   noCollection: CONCEPT_WORDS.noCollection,
-  unowned: "No owner yet",
+  unowned: "No owner",
   unnamed: "Unnamed member",
   ownOwner: "Set for this concept only",
   notChecked: "Not verified yet",
   checkedBy: (by: string): string => `by ${by}`,
   filters: {
-    collection: { label: "Collection", any: "Any Collection", yours: "Collections You Own" },
-    kind: { label: "Kind", any: "Any Kind" },
+    collection: { label: "Collection", any: "Any collection", yours: "Collections you own" },
+    kind: { label: "Kind", any: "Any kind" },
   },
   selected: "Selected concepts",
   everyOnThePage: "Select every concept on this page",
-  selectFirst: "Please select a concept first.",
-  pages: "Pages of Concepts",
+  selectFirst: "Select a concept first.",
+  pages: "Pages of concepts",
   setOwner: {
-    action: "Set Owner",
-    title: (count: number): string => `Set the Owner of ${counted(count, "Concept", "Concepts")}`,
+    action: "Set owner",
+    title: (count: number): string => `Set the owner of ${counted(count, "concept", "concepts")}`,
     consequence:
-      "The person you choose becomes the owner of each selected concept, instead of its collection’s owner. Choose “Its collection’s owner” to undo this. Each change is recorded in the audit log.",
-    newOwner: "New Owner",
+      "The person you choose will own each selected concept. To undo, choose “Its collection’s owner”.",
+    newOwner: "New owner",
     choose: "Choose a person",
     collectionsOwner: "Its collection’s owner",
     pending: (name: string, count: number): string =>
@@ -52,21 +52,19 @@ export const ALL_KNOWLEDGE_WORDS = {
       `Removing the ${count === 1 ? "owner" : "owners"} set for ${conceptsCounted(count)}.`,
     returned: (count: number): string =>
       `${conceptsCounted(count)} no longer ${count === 1 ? "has its" : "have their"} own owner.`,
-    stillGoing: "The owner is still being set. Please wait.",
-    tooMany: (most: number): string => `Please select ${most} concepts or fewer.`,
+    stillGoing: "Still setting the owner.",
+    tooMany: (most: number): string => `Select ${most} concepts or fewer.`,
   },
   refusedOnRead: {
-    "owner-forbids": "You no longer own any collections, so you can’t view this page.",
+    "owner-forbids": "You can’t view this page. You no longer own a collection.",
     "role-forbids": "You don’t have permission to view this page.",
   } satisfies OwnSentences,
   refusedOnSetOwner: {
-    "owner-forbids": "You no longer own any collections, so you can’t view this page.",
+    "owner-forbids": "You can’t view this page. You no longer own a collection.",
     "role-forbids": "You don’t have permission to set the owner of concepts.",
-    "no-such-member":
-      "That person is no longer a member of this workspace. Please choose someone else.",
-    "no-such-concept":
-      "One of the selected concepts is no longer available. No owners were changed. Please reload the page and try again.",
-    malformed: "Please select between 1 and 200 concepts and choose a person.",
+    "no-such-member": "That person is no longer a member. Choose someone else.",
+    "no-such-concept": "A selected concept is no longer available. No owners were changed.",
+    malformed: "Select between 1 and 200 concepts and choose a person.",
   } satisfies OwnSentences,
 } as const;
 
@@ -74,19 +72,19 @@ const kindsCounted = (count: number): string => counted(count, "kind", "kinds");
 
 export const KINDS_WORDS = {
   loading: "The kinds are still loading.",
-  none: "No kinds to show yet. A kind appears here once it holds a concept you can read.",
+  none: "No kinds yet.",
   noneSmall: "No kinds have two or fewer concepts.",
-  caption: "Kinds in the knowledge base and how many concepts each has.",
+  caption: "Each kind and its number of concepts.",
   count: (shown: number, total: number): string =>
     shown === total ? kindsCounted(total) : `${shown} of ${kindsCounted(total)}`,
   columns: { kind: "Kind", concepts: "Concepts" },
-  tail: "Kinds With Two or Fewer Concepts",
+  tail: "Kinds with two or fewer concepts",
   byCollection: "by collection",
   collectionsOf: (kind: string): string => `Concepts of ${kind} by collection`,
   noCollection: CONCEPT_WORDS.noCollection,
-  selectFirst: "Please select a kind first.",
+  selectFirst: "Select a kind first.",
   refusals: {
-    "owner-forbids": "You no longer own any collections, so you can’t view this page.",
+    "owner-forbids": "You can’t view this page. You no longer own a collection.",
     "role-forbids": "You don’t have permission to view this page.",
   } satisfies OwnSentences,
 } as const;
@@ -109,28 +107,27 @@ export const EXPORTS_WORDS = {
   count: (count: number): string => counted(count, "export", "exports"),
   download: "Download",
   preparing: "Preparing",
-  ofThe: (name: string): string => ` the ${name}`,
-  preparingSaid: (name: string): string => `Preparing the ${name}. This can take a moment.`,
+  ofThe: (name: string): string => ` the ${name.toLowerCase()}`,
+  preparingSaid: (name: string): string => `Preparing the ${name.toLowerCase()}.`,
   knowledgeBase: {
-    name: "Knowledge Base Snapshot",
-    holds: "A zip file of every concept you can read right now. Guides are not included.",
+    name: "Knowledge base snapshot",
+    holds: "A zip file of every concept you can read. It leaves out guides.",
     saved: (file: string, files: number): string =>
       `Downloaded ${file}, with ${counted(files, "file", "files")} from your knowledge base.`,
   },
   records: {
     name: "Records",
-    holds: "A zip file with three spreadsheets: owners, verifications and usage of your knowledge.",
+    holds: "A zip file with three spreadsheets: owners, verifications and usage.",
     saved: (file: string, families: readonly Family[]): string =>
       `Downloaded ${file}, with ${counted(families.length, "spreadsheet", "spreadsheets")}: ${listed(families.map((family) => FAMILY_WORDS[family]))}.`,
   },
   guide: {
-    name: "Guide Snapshot",
-    holds:
-      "A document with a guide’s Briefs, dated and marked as not maintained. It won’t update when the guide changes. Each Brief in it is recorded as used.",
+    name: "Guide snapshot",
+    holds: "A dated copy of a guide’s Briefs. Downloading records each Brief as used.",
     picker: "Guide",
     option: (guide: GuideSummary): string => `${guideTitleOf(guide)} (${guide.kind})`,
     loading: "The guides are still loading.",
-    none: "No guides to show yet. A guide appears here once one is set up for a collection you can read.",
+    none: "No guides yet.",
     retry: "Retry",
     saved: (file: string, briefs: number): string =>
       `Downloaded ${file}, with ${counted(briefs, "Brief", "Briefs")}. Each Brief is recorded as used.`,
@@ -139,20 +136,17 @@ export const EXPORTS_WORDS = {
 
 export const SAID_OF_EXPORTED_KNOWLEDGE_BASE = {
   "role-forbids": "You don’t have permission to download the knowledge base.",
-  "not-found":
-    "There is nothing in your knowledge base you can download yet. Nothing was downloaded.",
-  "unrecorded-head":
-    "A change to your knowledge base is still being saved. Nothing was downloaded. Please try again in a minute.",
-  "export-too-large":
-    "Your knowledge base is too large to download as one file. Nothing was downloaded.",
+  "not-found": "Nothing was downloaded. Your knowledge base has no concepts you can read.",
+  "unrecorded-head": "Nothing was downloaded. A change is still saving.",
+  "export-too-large": "Nothing was downloaded. The knowledge base is too large for one file.",
 } satisfies OwnSentences;
 
 export const SAID_OF_EXPORTED_RECORDS = {
   "role-forbids": "You don’t have permission to download the records.",
-  "export-too-large": "Your records are too large to download as one file. Nothing was downloaded.",
+  "export-too-large": "Nothing was downloaded. The records are too large for one file.",
 } satisfies OwnSentences;
 
 export const SAID_OF_EXPORTED_GUIDE = {
   "role-forbids": "You don’t have permission to download a guide.",
-  "not-found": "This guide is no longer available. Please choose another guide.",
+  "not-found": "This guide is no longer available. Choose another guide.",
 } satisfies OwnSentences;

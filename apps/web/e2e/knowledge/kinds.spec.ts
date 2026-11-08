@@ -4,6 +4,7 @@ import {
   KINDS_KEYSTROKES as KEY,
   KINDS_LIST,
 } from "@/features/knowledge/curation/curation-state.ts";
+import { KINDS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -91,8 +92,7 @@ const rowTexts = async (page: Page): Promise<string[]> =>
     row.replace("by collection", "").replace(/\s+/gu, " ").trim(),
   );
 
-const filter = (page: Page): Locator =>
-  kinds(page).getByRole("button", { name: "Kinds With Two or Fewer Concepts" });
+const filter = (page: Page): Locator => kinds(page).getByRole("button", { name: WORDS.tail });
 
 test.describe("Kinds", () => {
   test("an Admin filters, sorts, and opens kinds by keyboard", async ({
@@ -118,8 +118,8 @@ test.describe("Kinds", () => {
         - heading "Kinds" [level=2]
         - status: 3 kinds
         - status
-        - button "Kinds With Two or Fewer Concepts"
-        - table "Kinds in the knowledge base and how many concepts each has.":
+        - button "${WORDS.tail}"
+        - table "${WORDS.caption}":
           - /children: equal
           - caption
           - rowgroup:
@@ -207,10 +207,7 @@ test.describe("Kinds", () => {
       );
     });
 
-    await listsItsKeystrokes(page, "Kinds", KEY, [
-      "Switch Between Every Kind and Kinds With Two or Fewer Concepts",
-      "Open or Close the Collections of the Kind in Focus",
-    ]);
+    await listsItsKeystrokes(page, "Kinds", KEY, [KEY.tail.action, KEY.open.action]);
   });
 
   test("a collection-owning Editor's counts include only concepts they can read", async ({

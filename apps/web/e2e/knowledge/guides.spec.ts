@@ -1,6 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { GUIDE_KEYSTROKES as KEY, guidePageOf } from "@/features/knowledge/guides/guide-state.ts";
+import { BRIEF_WORDS, GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -187,7 +188,7 @@ test.describe("the guide page", () => {
       const gap = insurance.getByText(EMPLOYERS_LIABILITY);
       await expect(gap).toBeVisible();
       await expect(insurance).toContainText(guided.admin.name);
-      await expect(insurance.getByRole("link", { name: "Add This Fact" })).toBeVisible();
+      await expect(insurance.getByRole("link", { name: GUIDE_WORDS.addFact })).toBeVisible();
       await expect(
         insurance.getByRole("heading", { name: PROFESSIONAL_INDEMNITY }),
         "the Editor in finance cannot read the restricted concept in the section's Detail",
@@ -196,7 +197,7 @@ test.describe("the guide page", () => {
 
     await test.step("opens a section's Detail by keyboard and moves focus into it", async () => {
       const first = sectionOf(page, FIRST_SECTION);
-      const show = first.getByRole("button", { name: "Show Detail" });
+      const show = first.getByRole("button", { name: GUIDE_WORDS.showDetail });
       await expect(show).toHaveAttribute("aria-expanded", "false");
       await show.focus();
       await page.keyboard.press("Enter");
@@ -208,11 +209,11 @@ test.describe("the guide page", () => {
     });
 
     await listsItsKeystrokes(page, "Guides", KEY, [
-      "Show or Hide the Detail of the Section in Focus",
-      "Add the Missing Fact of the Section in Focus",
-      "Edit the Brief of the Section in Focus",
-      "Save the Brief You Are Editing",
-      "Copy the Brief of the Section in Focus",
+      KEY.showDetail.action,
+      KEY.addFact.action,
+      KEY.editBrief.action,
+      KEY.saveBrief.action,
+      KEY.copyBrief.action,
     ]);
     await passesTheAccessibilityGate();
   });
@@ -240,7 +241,7 @@ test.describe("the guide page", () => {
     await expect(chipsOf(page)).toHaveCount(4);
     await passesTheAccessibilityGate();
     await opening.press("Escape");
-    await page.getByRole("button", { name: "Close Editor" }).click();
+    await page.getByRole("button", { name: BRIEF_WORDS.close }).click();
     await expect(opening).toHaveCount(0);
 
     const acknowledged: number[] = [];
@@ -277,7 +278,7 @@ test.describe("the guide page", () => {
       await expect(status, "the unchanged save did not name the current version").toContainText(
         namesVersion(ACTION_SAMPLES + 2),
       );
-      await page.getByRole("button", { name: "Close Editor" }).click();
+      await page.getByRole("button", { name: BRIEF_WORDS.close }).click();
     });
 
     await test.step("an Editor cuts and pastes a footnote chip, and the new order stays after a reload", async () => {
@@ -318,7 +319,7 @@ test.describe("the guide page", () => {
       await page.getByRole("link", { name: "Knowledge Base" }).click();
       const ask = page.getByRole("alertdialog");
       await expect(ask).toBeVisible();
-      await ask.getByRole("button", { name: "Keep Editing" }).click();
+      await ask.getByRole("button", { name: BRIEF_WORDS.keepEditing }).click();
       await expect(ask).toHaveCount(0);
       await expect(page).toHaveURL(new RegExp(`${guided.path}$`));
     });
@@ -418,7 +419,7 @@ test.describe("the guide page", () => {
     await test.step("a Viewer reads the first Brief and opens its Detail but sees no Edit Brief button", async () => {
       await expect(footnotesOf(first)).toHaveCount(4);
       await expect(page.getByRole("button", { name: "Edit Brief" })).toHaveCount(0);
-      await first.getByRole("button", { name: "Show Detail" }).click();
+      await first.getByRole("button", { name: GUIDE_WORDS.showDetail }).click();
       await expect(first.getByRole("region", { name: "Detail of section 1" })).toBeFocused();
     });
 
@@ -426,7 +427,7 @@ test.describe("the guide page", () => {
       const insurance = sectionOf(page, INSURANCE);
       await expect(insurance).toContainText("2 of 4");
       await expect(insurance.getByRole("list", { name: "Footnotes" })).toHaveCount(0);
-      await expect(insurance.getByRole("button", { name: "Show Detail" })).toHaveCount(0);
+      await expect(insurance.getByRole("button", { name: GUIDE_WORDS.showDetail })).toHaveCount(0);
       await expect(page.getByText(PROFESSIONAL_INDEMNITY)).toHaveCount(0);
     });
 

@@ -4,9 +4,9 @@ import { LAUNCH_WORDS } from "../knowledge-words.ts";
 
 export const EDITOR_WORDS = {
   ...LAUNCH_WORDS,
-  headingEdit: "Edit This Concept",
-  headingSuggest: "Suggest an Edit",
-  headingNew: "New Concept",
+  headingEdit: "Edit concept",
+  headingSuggest: "Suggest an edit",
+  headingNew: "New concept",
   title: "Title",
   kind: "Kind",
   description: "Description",
@@ -16,32 +16,32 @@ export const EDITOR_WORDS = {
   chooseCollection: "Choose a collection",
   body: "Body",
   sources: "Sources",
-  sourcesNumbered: "Sources are numbered in this order, and the body cites them by number.",
+  sourcesNumbered: "The body cites each source by its number.",
   source: (number: number): string => `Source ${String(number)}`,
   remove: "Remove",
   removeSource: (number: number): string => `Remove source ${String(number)}`,
-  addSource: "Add a Source",
+  addSource: "Add a source",
   withheld: (count: number): string =>
     count === 1
-      ? "1 source you can’t open won’t be changed"
-      : `${String(count)} sources you can’t open won’t be changed`,
+      ? "1 source you can’t open stays as it is"
+      : `${String(count)} sources you can’t open stay as they are`,
   editAs: "Edit as",
   visual: "Visual",
   markdown: "Markdown",
-  lossy: "This text uses markdown the visual editor would change, so it opens as markdown.",
+  lossy: "Opened as markdown. Visual editing is off for this text.",
   warning: "Warning",
-  commits: "When you save, everyone who can read this concept sees the change.",
+  commits: "Everyone who can read this concept will see your change.",
   commitsNew: (collection: string): string =>
-    `When you save, everyone who can read ${collection} can see this concept.`,
+    `Everyone who can read ${collection} will see this concept.`,
   suggests:
-    "When you save, your edit is sent to the concept’s owner for review. Nothing changes until they accept it.",
+    "Saving sends your edit to the concept’s owner for review. Nothing changes until they accept it.",
   suggestsNew:
-    "When you save, your new concept is sent to the collection’s owner or an Admin for review. Nothing is added until they accept it.",
+    "Saving sends your concept to the collection’s owner or an Admin for review. Nothing is added until they accept it.",
   reuse: (places: number): string =>
     `This concept is used in ${String(places)} places. Each one will show the change.`,
   save: "Save",
-  keepEditing: "Keep Editing",
-  close: "Close Editor",
+  keepEditing: "Keep editing",
+  close: "Close editor",
   leave: "Leave",
   leaving: "You have unsaved changes.",
   cannotSave: {
@@ -52,31 +52,25 @@ export const EDITOR_WORDS = {
   },
   saving: "Saving.",
   saved: "Saved.",
-  unchanged: "There are no changes to save.",
+  unchanged: "No changes to save.",
   stale: "This concept changed after you opened it.",
-  reload: "Reload the Concept",
+  reload: "Reload the concept",
 } as const;
 
 export const SAID_OF_EDITING = {
-  "reuse-unconfirmed":
-    "This concept is now used in more places than when you pressed Save. Please check how many, then save again.",
-  "stale-precondition":
-    "This concept changed after you opened it. Please reload it to see the change.",
-  "unrecorded-head":
-    "This workspace is still saving an earlier change. Nothing was saved. Please save again in a minute.",
-  "source-label-refused":
-    "A source can’t be the address of a passage. Please enter the name of its document instead.",
+  "reuse-unconfirmed": "This concept is now used in more places. Check the count, then save again.",
+  "stale-precondition": "This concept changed after you opened it. Reload it to see the change.",
+  "unrecorded-head": "Nothing was saved. An earlier change is still saving.",
+  "source-label-refused": "Enter the document’s name as the source, not a passage address.",
   "body-locator-refused":
-    "The body refers to a passage that is not in the sources. Please remove that reference, or add its source.",
-  "path-taken":
-    "A concept with that title already exists in this collection. Please change the title.",
+    "The body cites a passage that isn’t in the sources. Remove the citation or add its source.",
+  "path-taken": "This collection already has a concept with this title. Change the title.",
   "merge-key-taken":
-    "A concept with the same kind and title already exists. Please change the title or the kind.",
-  "rename-refused": "An edit can’t rename a concept. Please change the title back.",
+    "A concept with this kind and title already exists. Change the title or the kind.",
+  "rename-refused": "An edit can’t rename a concept. Change the title back.",
   "reclassification-refused": "An edit can’t change who can read this concept.",
-  "no-such-concept": "This concept is no longer available. Please go back to Search.",
-  "owner-forbids":
-    "Only this concept's owner or an Admin can change it directly. Please suggest an edit instead.",
+  "no-such-concept": "This concept is no longer available. Go back to Search.",
+  "owner-forbids": "Only the concept’s owner or an Admin can edit it. Suggest an edit instead.",
   malformed:
-    "Something in this concept is not valid. Please check the title, kind, tags, sources and body, then try again.",
+    "Something in this concept isn’t valid. Check the title, kind, tags, sources and body.",
 } satisfies OwnSentences;

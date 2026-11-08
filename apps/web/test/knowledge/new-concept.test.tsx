@@ -1,6 +1,8 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { EDITOR_WORDS } from "@/features/knowledge/editing/editor-words.ts";
+import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
 import {
   A_CONCEPT_IRI,
   A_CONCEPT_PAGE,
@@ -31,7 +33,7 @@ const TO_EDIT = "knowledge.conceptToEdit";
 
 const SAVE = "knowledge.saveConcept";
 
-const NEW_CONCEPT_OFFER = "New Concept";
+const NEW_CONCEPT_OFFER = SEARCH_WORDS.newConcept;
 
 const leaveAsked = () => screen.queryByRole("button", { name: "Leave" });
 
@@ -83,11 +85,12 @@ const pressed = (name: string): void => {
   fireEvent.click(screen.getByRole("button", { name }));
 };
 
-const newConceptHeading = () => screen.findByRole("heading", { level: 3, name: "New Concept" });
+const newConceptHeading = () =>
+  screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
 
 const newConceptClosed = () =>
   waitFor(() => {
-    expect(screen.queryByRole("heading", { level: 3, name: "New Concept" })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew })).toBeNull();
   });
 
 const openedForANewConcept = async (fields: Readonly<Record<string, string>> = {}, api?: Api) => {
@@ -134,7 +137,7 @@ describe("typing a new concept from Search", () => {
     const router = await openedForANewConcept({ collection: "policies" });
 
     typedInto(kindField(), "Policy");
-    pressed("Close Editor");
+    pressed(EDITOR_WORDS.close);
 
     await newConceptClosed();
     expect(leaveAsked()).toBeNull();
@@ -150,7 +153,7 @@ describe("typing a new concept from Search", () => {
     typedInto(kindField(), "Certification");
     typedInto(titleField(), "Cyber Essentials Plus");
 
-    pressed("Close Editor");
+    pressed(EDITOR_WORDS.close);
     await newConceptClosed();
     fireEvent.click(await screen.findByRole("button", { name: NEW_CONCEPT_OFFER }));
 

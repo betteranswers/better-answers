@@ -1,6 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { COLLECTIONS_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
+import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -94,7 +95,7 @@ const ownerAt = (collection: string): string =>
 const ownerOf = (page: Page, collection: string): Locator => page.locator(ownerAt(collection));
 
 const pickerOf = (page: Page, collection: string): Locator =>
-  page.getByRole("combobox", { name: `New Owner of ${collection}` });
+  page.getByRole("combobox", { name: `${WORDS.newOwner}${WORDS.ofCollection(collection)}` });
 
 const saveOf = (page: Page, collection: string): Locator =>
   page.getByRole("button", { name: `Save the new owner of ${collection}` });
@@ -156,13 +157,13 @@ test.describe("Collections and Owners", () => {
             - heading "policy" [level=3]
             - term: Owner
             - definition: ${JSON.stringify(EDITOR)}
-            - term: Concepts With Their Own Owner
+            - term: ${WORDS.ownOwners}
             - definition: /\\b1\\b/
           - listitem "safety":
             - heading "safety" [level=3]
             - term: Owner
             - definition
-            - term: Concepts With Their Own Owner
+            - term: ${WORDS.ownOwners}
             - definition
     `);
     await passesTheAccessibilityGate();
@@ -172,9 +173,7 @@ test.describe("Collections and Owners", () => {
       await signedInAtThePage(page, request, at.admin.email);
 
       await skipLinkReachesThePage(page);
-      await listsItsKeystrokes(page, "Collections and Owners", KEY, [
-        "Change the Owner of the Collection in Focus",
-      ]);
+      await listsItsKeystrokes(page, "Collections and Owners", KEY, [KEY.changeOwner.action]);
       await page.keyboard.press(KEY.changeOwner.key);
       await expect(
         pickerOf(page, "held"),

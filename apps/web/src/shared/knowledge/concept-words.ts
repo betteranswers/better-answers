@@ -9,15 +9,15 @@ export const EVIDENCE_WORDS = {
 
 export const CONCEPT_WORDS = {
   loading: "The concept is still loading.",
-  untitled: "Untitled Concept",
+  untitled: "Untitled concept",
   backTo: (page: string): string => `Back to ${page}`,
   sources: "Sources",
   links: "Links",
   footnotes: "Footnotes",
-  backToTheClaim: "Back to the Claim",
+  backToTheClaim: "Back to the claim",
   tags: "Tags",
   sourceNamed: (place: number, label: string): string => `Source ${place}: ${label}`,
-  ownPage: "Open This Concept’s Page",
+  ownPage: "Open the concept’s page",
   kind: "Kind",
   collection: "Collection",
   noCollection: "No collection",
@@ -33,19 +33,18 @@ export const CONCEPT_WORDS = {
     history: "History",
     status: "Status",
     statuses: {
-      current: "Stable",
       "changed-since-checked": "Changed since verified",
       "out-of-date": "Out of date",
       draft: "Draft",
       deprecated: "Deprecated",
-    } as const satisfies Record<Concept["trust"]["status"], string>,
+    } as const satisfies Record<Exclude<Concept["trust"]["status"], "current">, string>,
     reviewBy: "Review by",
     owner: "Owner",
     usedIn: "Used in",
     otherFields: "Other fields",
     aPerson: "A person",
     aFormerMember: "A former member",
-    automatically: "Automatically",
+    automatically: "An automatic check",
     notRecorded: "Not recorded",
     notCheckedYet: "Not checked yet",
     noEarlierChecks: "No earlier checks",
@@ -54,7 +53,12 @@ export const CONCEPT_WORDS = {
     ownerOf: (collection: string): string => `Owner of ${collection}`,
     goToSources: (count: number): string => `Go to ${counted(count, "source", "sources")}`,
     used: (guides: number, answers: number): string =>
-      `${counted(guides, "guide", "guides")} · ${counted(answers, "answer", "answers")}`,
+      [
+        guides === 0 ? null : counted(guides, "guide", "guides"),
+        answers === 0 ? null : counted(answers, "answer", "answers"),
+      ]
+        .filter((part) => part !== null)
+        .join(" · ") || "Not used yet",
     fields: (count: number): string => counted(count, "field", "fields"),
   },
 } as const;
