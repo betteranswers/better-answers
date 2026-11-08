@@ -12,7 +12,7 @@ Each block's strand, status, next marker, waits and plan live only in this table
 | S2b | knowledge | Ask answers from concepts with citations or refuses, and the Questions pages | S2a, S1 (unmapped passages) | done | | [S2b's plan](../archive/plans/2026-10-11-2309-feat-s2b-ask-plan.md), [rarity-weighted matching](../plans/004-rarity-weighted-matching.md) |
 | [S4](route/s4.md) | knowledge | The website and a SharePoint library as connected sources, priced before they sync | S1 | unplanned | | |
 | [S6](route/s6.md) | knowledge | A bid's question set answered and exported as a response-set document | S2b, S3 | unplanned | | |
-| [S7](route/s7.md) | knowledge | Suggested concepts extracted from synced sources within the spending limit | S4, S3 (the Kinds rename) | unplanned | | |
+| [S7](route/s7.md) | knowledge | Suggested concepts extracted from synced sources within the spending limit | S4, S3 (renaming a concept type) | unplanned | | |
 | [S8](route/s8.md) | knowledge | Concept vectors, taken up only when its trigger fires | trigger | reserve | | |
 | S3 | records | Concepts typed and edited, guides built from them, owners per collection | none | done | | [plan](../plans/007-s3-concepts-and-guides.md) |
 | [S5](route/s5.md) | records | Every suggestion decided on To decide, and answers promoted to `Answer`s | S2b, S3, S7 (the by-sync filter), V1 (flag routing) | unplanned | | |
@@ -79,6 +79,6 @@ A block is done when its Done when checks hold, not when every issue on its labe
 - Agent capabilities beyond the four read entries: `action:*` scopes, Agent Auth, the approval layer and the packaged client-side plugin. An MCP App showing a concept file inside Claude gets its own plan.
 - Imported and vendor bundles, the sensitivity-filtered bundle export, a read-only clone endpoint and scheduled exports.
 - A `.docx` response set with real footnotes, JavaScript-rendered pages in the website connector, and local embedding on the first estate.
-- A metrics store, SLOs, tracing, a status page, and ontology curation beyond the Kinds list.
+- A metrics store, SLOs, tracing, a status page, and ontology curation beyond the Concept Types list.
 - Multi-process repository locking, a second api process, and an estate resize.
 - Desktop Safari and Firefox. v0.1 supports desktop Chromium and iPhone WebKit, and C1 adds the iPhone run to the browser suite.

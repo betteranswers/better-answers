@@ -180,7 +180,7 @@ A heavy assistant user who asks the map from inside the assistant.
 - Puts completeness and accuracy ahead of speed.
 - Follows governance workflows to keep standards.
 - Watches coverage to find gaps.
-- Maintains the company's kinds and how things are classified.
+- Maintains the company's concept types and how things are classified.
 
 ### Jobs in the product
 
@@ -365,7 +365,7 @@ The strongest candidate for "just ask", and for agents that bring signals to the
 
 **Who:** the finance manager or commercial lead. In an SMB this is often the founder or an operations person with the commercial hat.
 
-**Role in the product:** Editor, since keeping concepts checked needs that level. Owner of the Rate, Certification and Insurance concepts, the kinds that carry a review cadence.
+**Role in the product:** Editor, since keeping concepts checked needs that level. Owner of the Rate, Certification and Insurance concepts, the concept types that carry a review cadence.
 
 **Technical comfort:** at home in spreadsheets and audit trails. Wants to see lineage and versions, not chat.
 

@@ -42,7 +42,7 @@ Trust never controls who can view a concept. Sensitivity does. The reader's role
 
 ## Who uses it
 
-- **People.** Employees with different backgrounds use the platform to run business activities and to curate knowledge. They include Admins, bid and sales writers, and product and technical staff. Admins manage sources, kinds, suggestions, and the Control Centre.
+- **People.** Employees with different backgrounds use the platform to run business activities and to curate knowledge. They include Admins, bid and sales writers, and product and technical staff. Admins manage sources, concept types, suggestions, and the Control Centre.
 - **Platform agents.** These agents work through the platform's MCP server, plugins, and skills, and run locally or hosted. Producer agents map and enrich the knowledge. Consumer agents answer questions and draft documents.
 - **External agents.** The remote MCP server gives read access to agents and assistants on other platforms, for example a user in Claude Desktop, Claude.ai, or Cowork. Those agents take the company's knowledge to wherever the work happens. An Asana task can reference a concept file that needs action. A Notion workspace or a Teams channel can hold a discussion about a concept, the map, or anything else the knowledge covers.
 

@@ -96,7 +96,7 @@ Here, a write-up's markdown carries a footnote marker whose label is an include 
 
 The spec makes a type taxonomy a non-goal, and `type` is a free string.
 
-Here, the platform keeps that rule. Kinds appear as concepts are written. At write time the platform folds each kind for case and plural. The kinds in use form a derived Kinds list with a count for each, and the list offers no rename or merge. No file lists the kinds, and no check rejects an unknown kind. See ADR 0026.
+Here, the platform keeps that rule, and calls the value a concept type. Concept types appear as concepts are written. At write time the platform folds each type for case and plural. The types in use form a derived Concept Types list with a count for each, and the list offers no rename or merge. No file lists the types, and no check rejects an unknown type. See ADR 0026.
 
 ### Access control
 

@@ -83,7 +83,7 @@
       const rows = [
         {
           title: "ISO 27001 certification",
-          kind: "Certification",
+          type: "Certification",
           state: "checked",
           by: "Priya Shah",
           at: "3 March 2026",
@@ -91,13 +91,13 @@
         },
         {
           title: "Standard tier response times",
-          kind: "Tier",
+          type: "Tier",
           state: "out-of-date",
           owner: "Liam Doyle",
         },
         {
           title: "Data processing locations",
-          kind: "Policy",
+          type: "Policy",
           state: "unchecked",
           owner: "Unassigned",
         },
@@ -166,7 +166,7 @@
                 onSelect={setSel}
                 columns={[
                   { key: "title", header: "Concept" },
-                  { key: "kind", header: "Kind", render: (r) => <Tag size="sm">{r.kind}</Tag> },
+                  { key: "type", header: "Type", render: (r) => <Tag size="sm">{r.type}</Tag> },
                   { key: "owner", header: "Owner" },
                   {
                     key: "trust",

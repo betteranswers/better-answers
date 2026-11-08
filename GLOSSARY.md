@@ -27,18 +27,19 @@ a reader is told a concept belongs to, and where an accepted suggestion is writt
 A top-level division of a company's knowledge by ownership: the company itself, one product or
 service, or one sector. Each collection has its owners.
 
-**Kind**:
-The type of a concept, in the word its producer chose rather than one drawn from a closed set.
+**Concept type**:
+What sort of thing a concept is, in the word its producer chose rather than one drawn from a
+closed set. A concept file holds it in OKF's `type` key.
 
 **Company language**:
-The kinds, names and links a company's concepts reveal. It is read off the knowledge base, never
-kept as a file or a registry.
+The concept types, names and links a company's concepts reveal. It is read off the knowledge base,
+never kept as a file or a registry.
 
 **Term**:
 A concept that defines what a word means in this company, kept in a glossary collection.
 
 **Q&A pair**:
-A concept of kind Answer: a question as its title and the company's answer as its body. It is
+A concept of type Answer: a question as its title and the company's answer as its body. It is
 knowledge the company reuses, such as an entry in a bid library.
 
 **IRI**:
@@ -74,7 +75,7 @@ Admin accepting suggestions.
 
 **Consumer**:
 A person or an agent that reads knowledge and must tolerate what it did not expect, such as an
-unknown kind or a concept it may not see.
+unknown concept type or a concept it may not see.
 
 **Record**:
 Something the platform keeps because it runs a use case, such as a guide, a write-up, usage or an
@@ -163,8 +164,8 @@ What the platform keeps of a connected source's documents and for how long: mirr
 transient. In every class, evidence a concept cites outlives its source.
 
 **Extraction template**:
-The instruction for extracting concepts from one kind of document: which kinds such a document
-evidences, and how a claim and its evidence are written.
+The instruction for extracting concepts from one kind of document: which concept types such a
+document evidences, and how a claim and its evidence are written.
 
 ### Visibility
 
