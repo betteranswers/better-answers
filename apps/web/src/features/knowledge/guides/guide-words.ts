@@ -1,7 +1,9 @@
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { counted } from "@/shared/words.ts";
 
 import type { GuideSection } from "../knowledge-api.ts";
+import { GUIDES_PAGE } from "./guide-state.ts";
 
 type NeedsReview = NonNullable<GuideSection["needsReview"]>;
 
@@ -10,8 +12,8 @@ const factsCounted = (met: number, of: number): string =>
 
 export const GUIDES_WORDS = {
   loading: "The guides are still loading.",
-  none: "No guides to show yet. A guide appears here once one is set up for a collection you can read.",
-  count: (count: number): string => counted(count, "Guide", "Guides"),
+  none: "No guides yet.",
+  count: (count: number): string => counted(count, "guide", "guides"),
   sections: (count: number): string => counted(count, "section", "sections"),
   needReview: (count: number): string =>
     `${counted(count, "section", "sections")} ${count === 1 ? "needs" : "need"} review`,
@@ -19,78 +21,79 @@ export const GUIDES_WORDS = {
 
 export const GUIDE_WORDS = {
   loading: "The guide is still loading.",
-  toGuides: "Back to Guides",
+  toGuides: CONCEPT_WORDS.backTo(GUIDES_PAGE.name),
   subject: "Subject",
   total: factsCounted,
-  noFacts: "No facts are expected in this section.",
+  noFacts: "No expected facts.",
   heading: (number: string, prompt: string): string => `${number}. ${prompt}`,
   needsReview: "Needs review",
   reasons: {
     "concept-changed": "Cites a concept that changed",
     "concept-removed": "Cites a concept that was removed",
-    "expectation-unmet": "Expects a fact that is not yet recorded",
-    "review-finding": "A review found something to check",
+    "expectation-unmet": "Missing an expected fact",
+    "review-finding": "A review flagged this section",
   } satisfies Record<NeedsReview, string>,
   withheld: "You can’t read the text of this section.",
-  noBrief: "This section has no text yet.",
+  noBrief: "No Brief yet.",
   footnotes: "Footnotes",
-  showDetail: "Show Detail",
+  showDetail: "Show detail",
   detailOf: (number: string): string => `Detail of section ${number}`,
-  noDetail: "No concepts are included in this section yet.",
+  noDetail: "No included concepts yet.",
   missing: (name: string, owner: string | undefined): string =>
-    `${name} isn’t recorded yet. ${owner === undefined ? "It has no owner, so an Admin is responsible for it." : `Owner: ${owner}.`}`,
+    owner === undefined
+      ? `${name} isn’t recorded yet.`
+      : `${name} isn’t recorded yet. Owner: ${owner}.`,
   available: (name: string): string => `${name} is recorded but not included in this section.`,
-  addFact: "Add This Fact",
+  addFact: "Add this fact",
   include: "Include",
   included: (number: string): string => `Included in section ${number}.`,
-  selectFirst: "Please select a section first.",
-  nothingToAdd: "No fact is missing from this section, so there is nothing to add.",
+  selectFirst: "Select a section first.",
+  nothingToAdd: "This section is complete.",
   copy: "Copy",
   copying: (number: string): string => `Copying section ${number}.`,
   copied: (number: string, footnotes: number): string =>
     footnotes === 0
-      ? `Copied section ${number}. It has no footnotes.`
-      : `Copied section ${number} with ${counted(footnotes, "footnote", "footnotes")}. Footnote numbers start at 1 in each copy.`,
-  notRecorded: "This copy couldn’t be recorded.",
-  notAllowed: "Your browser did not allow copying. Nothing was copied.",
-  belowYourRole:
-    "You can’t copy this section yet. Some of its concepts aren’t verified enough for your role.",
-  nothingToCopy: "Copy isn’t available for this section.",
-  closeToCopy: "Close the editor before you copy this section. Copy uses the saved Brief.",
+      ? `Copied section ${number}.`
+      : `Copied section ${number} with ${counted(footnotes, "footnote", "footnotes")}, numbered from 1.`,
+  notRecorded: "The copy wasn’t recorded.",
+  notAllowed: "Your browser blocked copying.",
+  belowYourRole: "You can’t copy this section yet. Some of its concepts need verifying first.",
+  nothingToCopy: "You can’t copy this section.",
+  closeToCopy: "Close the editor to copy the saved Brief.",
 } as const;
 
 export const BRIEF_WORDS = {
   edit: "Edit Brief",
   save: "Save Brief",
-  close: "Close Editor",
+  close: "Close editor",
   loading: "The editor is still loading.",
   label: (number: string): string => `Brief of section ${number}`,
   editing: (number: string): string => `Editing the Brief of section ${number}`,
   formatting: "Formatting",
-  placing: "Place a Footnote",
+  placing: "Place a footnote",
   footnote: "Footnote: ",
   notPlaced: "not placed",
-  noIncludes: "No concepts are included in this section to place as footnotes.",
+  noIncludes: "No included concepts to place.",
   saving: "Saving the Brief.",
   saved: (version: number): string => `Saved version ${String(version)}.`,
   unchanged: (version: number): string =>
-    `There are no changes to save. Version ${String(version)} is still the latest.`,
+    `No changes to save. Version ${String(version)} is the latest.`,
   stale: "Someone saved this Brief after you opened it.",
   reload: "Reload the Brief",
   reloaded: "Loaded the latest Brief. Your unsaved text is kept below it.",
-  earlier: "Your unsaved text from before the reload",
-  earlierDetail: "This text isn’t saved. Copy what you need from it into the Brief above.",
-  discardEarlier: "Discard This Text",
+  earlier: "Your unsaved text",
+  earlierDetail: "Copy what you need into the Brief above.",
+  discardEarlier: "Discard this text",
   leaving: "You have unsaved changes to this Brief.",
-  leavingDetail: "Your changes are kept in this tab. Select Edit Brief to go back to them.",
+  leavingDetail: "This tab keeps your changes. Select Edit Brief to return to them.",
   leave: "Leave",
-  keepEditing: "Keep Editing",
+  keepEditing: "Keep editing",
 } as const;
 
 export const SAID_OF_GUIDES = {
-  "not-found": "This guide isn’t available. Please go back to Guides.",
+  "not-found": "This guide isn’t available. Go back to Guides.",
   "marker-without-include":
-    "A footnote in the Brief refers to a concept that is no longer in this section. Please remove the footnote, then save again.",
+    "A footnote cites a concept this section no longer includes. Remove the footnote, then save again.",
   "stale-precondition": BRIEF_WORDS.stale,
   "role-forbids": "You don’t have permission to change this guide.",
   "below-action-threshold": GUIDE_WORDS.belowYourRole,

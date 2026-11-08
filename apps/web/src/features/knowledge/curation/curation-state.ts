@@ -6,12 +6,12 @@ import type { Keystroke } from "@/shared/keystrokes.tsx";
 import type { AllKnowledgeAsked } from "../knowledge-api.ts";
 
 export const ALL_KNOWLEDGE_KEYSTROKES = {
-  open: { key: "o", action: "Open the Concept in Focus" },
-  tick: { key: "x", action: "Select or Clear the Concept in Focus" },
-  setOwner: { key: "O", action: "Set the Owner of the Selected Concepts" },
-  clearSelection: { key: "Escape", action: "Clear the Selection" },
-  previousPage: { key: "[", action: "Show the Previous Page of Concepts" },
-  nextPage: { key: "]", action: "Show the Next Page of Concepts" },
+  open: { key: "o", action: "Open the concept in focus" },
+  tick: { key: "x", action: "Select or clear the concept in focus" },
+  setOwner: { key: "O", action: "Set the owner of the selected concepts" },
+  clearSelection: { key: "Escape", action: "Clear the selection" },
+  previousPage: { key: "[", action: "Show the previous page of concepts" },
+  nextPage: { key: "]", action: "Show the next page of concepts" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const ALL_KNOWLEDGE_LIST = "all";
@@ -131,8 +131,8 @@ export const isNarrowed = (held: Held, scope: CollectionScope): boolean =>
   scope.kind !== "every" || held.kind !== "";
 
 export const KINDS_KEYSTROKES = {
-  tail: { key: "t", action: "Switch Between Every Kind and Kinds With Two or Fewer Concepts" },
-  open: { key: "o", action: "Open or Close the Collections of the Kind in Focus" },
+  tail: { key: "t", action: "Switch between every kind and kinds with two or fewer concepts" },
+  open: { key: "o", action: "Open or close the collections of the kind in focus" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const KINDS_LIST = "kinds";
@@ -161,7 +161,7 @@ export const kindsSortOf = (sorted: KindsSorted): KindsSort | undefined =>
   KINDS_SORTS.find((sort) => sort === `${sorted.desc ? "-" : ""}${sorted.id}`);
 
 export const EXPORTS_KEYSTROKES = {
-  knowledgeBase: { key: "k", action: "Download the Knowledge Base Snapshot" },
-  records: { key: "r", action: "Download the Records" },
-  guide: { key: "g", action: "Download the Guide Snapshot" },
+  knowledgeBase: { key: "k", action: "Download the knowledge base snapshot" },
+  records: { key: "r", action: "Download the records" },
+  guide: { key: "g", action: "Download the guide snapshot" },
 } as const satisfies Readonly<Record<string, Keystroke>>;

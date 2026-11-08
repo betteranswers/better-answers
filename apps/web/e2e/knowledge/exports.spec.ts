@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import type { APIRequestContext, Download, Locator, Page, TestInfo } from "@playwright/test";
 
 import { EXPORTS_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
+import { EXPORTS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -31,11 +32,11 @@ const EXPORTS = pageNamed(CURATION, "Exports").path;
 
 const EDITOR = "Ifan Morgan";
 
-const KNOWLEDGE_BASE = "Knowledge Base Snapshot";
+const KNOWLEDGE_BASE = WORDS.knowledgeBase.name;
 
-const RECORDS = "Records";
+const RECORDS = WORDS.records.name;
 
-const GUIDE = "Guide Snapshot";
+const GUIDE = WORDS.guide.name;
 
 const CONCEPTS = [
   { title: "Annual leave", collection: "policy", body: "Everyone takes 25 days of leave." },
@@ -79,8 +80,10 @@ const aWorkspaceToExport = async (api: APIRequestContext, name: string): Promise
 
 const exportsRegion = (page: Page): Locator => page.getByRole("region", { name: "Exports" });
 
+const downloadNamed = (name: string): string => `${WORDS.download}${WORDS.ofThe(name)}`;
+
 const downloadOf = (page: Page, name: string): Locator =>
-  page.getByRole("button", { name: `Download the ${name}` });
+  page.getByRole("button", { name: downloadNamed(name) });
 
 const statusOf = (page: Page): Locator => exportsRegion(page).getByRole("status").nth(1);
 
@@ -158,28 +161,28 @@ test.describe("Exports", () => {
         - status: /\\b3\\b/
         - status
         - list:
-          - listitem "Knowledge Base Snapshot":
-            - heading "Knowledge Base Snapshot" [level=3]
+          - listitem "${KNOWLEDGE_BASE}":
+            - heading "${KNOWLEDGE_BASE}" [level=3]
             - paragraph
-            - button "Download the Knowledge Base Snapshot"
-          - listitem "Records":
-            - heading "Records" [level=3]
+            - button "${downloadNamed(KNOWLEDGE_BASE)}"
+          - listitem "${RECORDS}":
+            - heading "${RECORDS}" [level=3]
             - paragraph
-            - button "Download the Records"
-          - listitem "Guide Snapshot":
-            - heading "Guide Snapshot" [level=3]
+            - button "${downloadNamed(RECORDS)}"
+          - listitem "${GUIDE}":
+            - heading "${GUIDE}" [level=3]
             - paragraph
-            - combobox "Guide":
+            - combobox "${WORDS.guide.picker}":
               - option /Bid library/ [selected]
-            - button "Download the Guide Snapshot"
+            - button "${downloadNamed(GUIDE)}"
     `);
 
     await test.step("lists the key for each download under ?", async () => {
       await skipLinkReachesThePage(page);
       await listsItsKeystrokes(page, "Exports", KEY, [
-        "Download the Knowledge Base Snapshot",
-        "Download the Records",
-        "Download the Guide Snapshot",
+        KEY.knowledgeBase.action,
+        KEY.records.action,
+        KEY.guide.action,
       ]);
     });
 

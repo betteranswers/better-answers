@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BriefBody } from "@/features/knowledge/guides/brief-body.tsx";
+import { BRIEF_WORDS, GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
 import {
@@ -184,7 +185,7 @@ describe("moving among a Brief's footnote chips", () => {
       />,
     );
 
-    expect(screen.queryByRole("group", { name: "Place a Footnote" })).toBeNull();
+    expect(screen.queryByRole("group", { name: BRIEF_WORDS.placing })).toBeNull();
     expect(textField()).toBeDefined();
   });
 });
@@ -335,7 +336,7 @@ describe("a Brief saved after you opened it", () => {
   });
 
   describe("and reloaded over", () => {
-    const EARLIER = "Your unsaved text from before the reload";
+    const EARLIER = BRIEF_WORDS.earlier;
 
     const reloaded = async () => {
       const api = await refused();
@@ -376,7 +377,7 @@ describe("a Brief saved after you opened it", () => {
     it("goes when discarded, and focus stays in the editor", async () => {
       await reloaded();
 
-      fireEvent.click(screen.getByRole("button", { name: "Discard This Text" }));
+      fireEvent.click(screen.getByRole("button", { name: BRIEF_WORDS.discardEarlier }));
 
       expect(screen.queryByRole("textbox", { name: EARLIER })).toBeNull();
       expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save Brief" }));
@@ -436,7 +437,7 @@ describe("a draft of a Brief", () => {
     await opened();
     await typedAtTheEnd(" more");
 
-    fireEvent.click(screen.getByRole("button", { name: "Close Editor" }));
+    fireEvent.click(screen.getByRole("button", { name: BRIEF_WORDS.close }));
     fireEvent.click(screen.getByRole("button", { name: "Edit Brief" }));
 
     await waitFor(() => {
@@ -485,7 +486,7 @@ describe("a draft of a Brief", () => {
 
 describe("leaving with an unsaved draft", () => {
   const addAFact = () => {
-    fireEvent.click(screen.getByRole("link", { name: "Add This Fact" }));
+    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact }));
   };
 
   const askedToLeave = () => screen.findByRole("alertdialog");
@@ -501,9 +502,11 @@ describe("leaving with an unsaved draft", () => {
 
     const ask = await askedToLeave();
     expect(router.state.location.pathname).toBe(A_GUIDE_PAGE);
-    expect(document.activeElement).toBe(within(ask).getByRole("button", { name: "Keep Editing" }));
+    expect(document.activeElement).toBe(
+      within(ask).getByRole("button", { name: BRIEF_WORDS.keepEditing }),
+    );
 
-    fireEvent.click(within(ask).getByRole("button", { name: "Keep Editing" }));
+    fireEvent.click(within(ask).getByRole("button", { name: BRIEF_WORDS.keepEditing }));
 
     await waitFor(() => {
       expect(screen.queryByRole("alertdialog")).toBeNull();
@@ -516,7 +519,9 @@ describe("leaving with an unsaved draft", () => {
     const { router } = await opened();
     await typedAtTheEnd(" more");
     addAFact();
-    fireEvent.click(within(await askedToLeave()).getByRole("button", { name: "Keep Editing" }));
+    fireEvent.click(
+      within(await askedToLeave()).getByRole("button", { name: BRIEF_WORDS.keepEditing }),
+    );
     await waitFor(() => {
       expect(screen.queryByRole("alertdialog")).toBeNull();
     });
@@ -573,7 +578,7 @@ describe("opening the editor", () => {
 
   it("returns to the open text on e", async () => {
     await opened();
-    const show = screen.getByRole("button", { name: "Show Detail" });
+    const show = screen.getByRole("button", { name: GUIDE_WORDS.showDetail });
 
     show.focus();
     fireEvent.keyDown(show, { key: "e" });
@@ -585,7 +590,7 @@ describe("opening the editor", () => {
 
   it("opens on e for the section in focus", async () => {
     await openAt(A_GUIDE_PAGE, aGuideApi("Editor"));
-    const show = await screen.findByRole("button", { name: "Show Detail" });
+    const show = await screen.findByRole("button", { name: GUIDE_WORDS.showDetail });
 
     show.focus();
     fireEvent.keyDown(show, { key: "e" });

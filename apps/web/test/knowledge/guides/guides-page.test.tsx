@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
+import { GUIDES_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import {
   A_GUIDE_ID,
   A_GUIDE_PAGE,
@@ -27,7 +28,7 @@ describe("the Guides list", () => {
   it("counts the guides and names each by its subject", async () => {
     await openAt(GUIDES_PAGE.path, aGuideApi("Editor"));
 
-    expect((await main().findByText("1 Guide")).tagName).toBe("OUTPUT");
+    expect((await main().findByText(GUIDES_WORDS.count(1))).tagName).toBe("OUTPUT");
     const row = within(main().getByRole("list", { name: "Guides" })).getByRole("listitem");
     expect(within(row).getByRole("link", { name: "Northgate Ltd" })).toBeDefined();
     expect(within(row).getByText("Bid library")).toBeDefined();
@@ -78,7 +79,7 @@ describe("the Guides list", () => {
     api.set("knowledge.guides", () => read([]));
     await openAt(GUIDES_PAGE.path, api);
 
-    expect((await main().findByText("0 Guides")).tagName).toBe("OUTPUT");
+    expect((await main().findByText(GUIDES_WORDS.count(0))).tagName).toBe("OUTPUT");
     expect(main().queryByRole("list", { name: "Guides" })).toBeNull();
   });
 });

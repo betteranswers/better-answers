@@ -1,5 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { EDITOR_WORDS } from "@/features/knowledge/editing/editor-words.ts";
 import {
   CONCEPT_KEYSTROKES as KEY,
   EDITOR_KEYSTROKES,
@@ -219,15 +220,15 @@ test.describe("the concept page", () => {
     await atTheConcept(page, seeded, COMMITTEE);
 
     await page.keyboard.press(EDITOR_KEYSTROKES.edit.key);
-    const opened = page.getByRole("region", { name: "Edit This Concept" });
-    await expect(opened.getByRole("heading", { name: "Edit This Concept" })).toBeFocused();
+    const opened = page.getByRole("region", { name: EDITOR_WORDS.headingEdit });
+    await expect(opened.getByRole("heading", { name: EDITOR_WORDS.headingEdit })).toBeFocused();
     await passesTheAccessibilityGate();
     await opened.getByRole("button", { name: "Markdown" }).click();
     await expect(opened.getByRole("textbox", { name: "Body" })).toContainText(
       "The committee meets each quarter.",
     );
     await passesTheAccessibilityGate();
-    await opened.getByRole("button", { name: "Close Editor" }).click();
+    await opened.getByRole("button", { name: EDITOR_WORDS.close }).click();
     await expect(opened).toHaveCount(0);
 
     const samples: number[] = [];
@@ -235,7 +236,7 @@ test.describe("the concept page", () => {
     for (let sample = 1; sample <= ACTION_SAMPLES; sample += 1) {
       title = `${COMMITTEE} ${String(sample)}`;
       await page.keyboard.press(EDITOR_KEYSTROKES.edit.key);
-      const editor = page.getByRole("region", { name: "Edit This Concept" });
+      const editor = page.getByRole("region", { name: EDITOR_WORDS.headingEdit });
       await editor.getByRole("textbox", { name: "Title" }).fill(title);
 
       await page.keyboard.down("Control");
@@ -325,9 +326,9 @@ test.describe("the concept page", () => {
 
     await skipLinkReachesThePage(page);
     await listsItsKeystrokes(page, "Search", KEY, [
-      "Go Back to Search",
-      "Go to the Concept’s Sources",
-      "Go to the Concept’s Links",
+      KEY.back.action,
+      KEY.sources.action,
+      KEY.links.action,
     ]);
 
     await page.keyboard.press(KEY.sources.key);

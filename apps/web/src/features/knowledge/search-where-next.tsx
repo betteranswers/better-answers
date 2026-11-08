@@ -16,8 +16,8 @@ export function WhereNext(properties: { readonly query: string }) {
       name: WORDS.askThisQuestion,
       href: askingHere(here, NEW_QUESTION.path, "question", properties.query.trim()),
     },
-    { name: WORDS.browseGuides, href: GUIDES_PAGE.path },
-    { name: WORDS.browseKnowledgeBase, href: KNOWLEDGE_BASE_PAGE.path },
+    { name: GUIDES_PAGE.name, href: GUIDES_PAGE.path },
+    { name: KNOWLEDGE_BASE_PAGE.name, href: KNOWLEDGE_BASE_PAGE.path },
   ];
   return (
     <ul aria-label={WORDS.whereNext} className="flex flex-wrap gap-x-6 gap-y-2 px-4 pb-3">

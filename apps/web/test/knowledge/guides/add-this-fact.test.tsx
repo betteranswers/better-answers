@@ -1,6 +1,8 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { EDITOR_WORDS } from "@/features/knowledge/editing/editor-words.ts";
+import { GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import { aNewConceptApi } from "@test/knowledge/concept-editing-answers.ts";
 import {
@@ -31,7 +33,7 @@ const openedFromTheGuide = async (guide = aGuide()) => {
 const field = (name: string) => screen.getByRole<HTMLInputElement>("textbox", { name });
 
 const prefilled = async () => {
-  await screen.findByRole("heading", { level: 3, name: "New Concept" });
+  await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
   expect(field("Title").value).toBe(LIABILITY_TITLE);
   expect(field("Kind").value).toBe("Insurance policy");
   expect(field("Tags").value).toBe("employers-liability");
@@ -44,7 +46,7 @@ describe("adding a missing fact from a guide", () => {
   it("opens Search with the editor prefilled from the fact", async () => {
     const router = await openedFromTheGuide();
 
-    fireEvent.click(screen.getByRole("link", { name: "Add This Fact" }));
+    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact }));
 
     await prefilled();
     expect(router.state.location.pathname).toBe(SEARCH_PAGE.path);
@@ -53,7 +55,7 @@ describe("adding a missing fact from a guide", () => {
   it("links the new concept to the guide's subject", async () => {
     await openedFromTheGuide();
 
-    fireEvent.click(screen.getByRole("link", { name: "Add This Fact" }));
+    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact }));
 
     await prefilled();
     const body = screen.getByRole("textbox", { name: "Body" });
@@ -65,7 +67,7 @@ describe("adding a missing fact from a guide", () => {
   it("adds the fact in focus on a", async () => {
     const router = await openedFromTheGuide();
 
-    const add = screen.getByRole("link", { name: "Add This Fact" });
+    const add = screen.getByRole("link", { name: GUIDE_WORDS.addFact });
     add.focus();
     fireEvent.keyDown(add, { key: "a" });
 
@@ -76,7 +78,7 @@ describe("adding a missing fact from a guide", () => {
   it("leaves out a subject the guide does not have", async () => {
     const router = await openedFromTheGuide(aGuide({ subject: null }));
 
-    fireEvent.click(screen.getByRole("link", { name: "Add This Fact" }));
+    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact }));
 
     await prefilled();
     expect(router.state.location.search).not.toHaveProperty("knowledge.subject");
@@ -88,7 +90,7 @@ describe("adding a missing fact from a guide", () => {
     });
     const router = await openedFromTheGuide(recorded);
 
-    const button = screen.getByRole("button", { name: "Show Detail" });
+    const button = screen.getByRole("button", { name: GUIDE_WORDS.showDetail });
     button.focus();
     fireEvent.keyDown(button, { key: "a" });
 

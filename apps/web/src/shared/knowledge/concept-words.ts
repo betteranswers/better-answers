@@ -9,15 +9,15 @@ export const EVIDENCE_WORDS = {
 
 export const CONCEPT_WORDS = {
   loading: "The concept is still loading.",
-  untitled: "Untitled Concept",
+  untitled: "Untitled concept",
   backTo: (page: string): string => `Back to ${page}`,
   sources: "Sources",
   links: "Links",
   footnotes: "Footnotes",
-  backToTheClaim: "Back to the Claim",
+  backToTheClaim: "Back to the claim",
   tags: "Tags",
   sourceNamed: (place: number, label: string): string => `Source ${place}: ${label}`,
-  ownPage: "Open This Concept’s Page",
+  ownPage: "Open the concept’s page",
   kind: "Kind",
   collection: "Collection",
   noCollection: "No collection",

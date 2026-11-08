@@ -554,7 +554,7 @@
       }
     },
     {
-      "files": [],
+      "files": ["apps/web/src/features/knowledge/**", "apps/web/src/shared/knowledge/**"],
       "rules": {
         "better-answers/ui-copy-plain": "error"
       }

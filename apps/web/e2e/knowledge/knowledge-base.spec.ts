@@ -1,6 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { KNOWLEDGE_BASE_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
+import { KNOWLEDGE_BASE_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -27,8 +28,7 @@ const signedIn = async (page: Page, api: APIRequestContext, email: string): Prom
   await signIn(page, api, email);
 };
 
-const treeOf = (page: Page): Locator =>
-  page.getByRole("tree", { name: "Collections and Kinds", exact: true });
+const treeOf = (page: Page): Locator => page.getByRole("tree", { name: WORDS.tree, exact: true });
 
 const itemOf = (page: Page, name: string): Locator =>
   treeOf(page).getByRole("treeitem", { name: new RegExp(`^${name},`) });
@@ -159,9 +159,9 @@ test.describe("Knowledge Base", () => {
 
       await skipLinkReachesThePage(page);
       await listsItsKeystrokes(page, "Knowledge Base", KEY, [
-        "Go to the Collections and Kinds",
-        "Go to the Open Kind’s Concepts",
-        "Show More Concepts",
+        KEY.tree.action,
+        KEY.concepts.action,
+        KEY.more.action,
       ]);
       await page.keyboard.press(KEY.tree.key);
       await expect(itemOf(page, "company")).toBeFocused();

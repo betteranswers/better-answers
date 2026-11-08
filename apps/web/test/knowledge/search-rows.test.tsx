@@ -1,6 +1,9 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
+import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
+import { KNOWLEDGE_BASE_PAGE } from "@/shared/knowledge/concept-address.ts";
 import {
   aConceptMatch,
   aSearchApi,
@@ -129,8 +132,8 @@ describe("a Knowledge Search that finds nothing", () => {
     expect(linkIn("Ask this question").getAttribute("href")).toBe(
       "/ask/new-question?question=zebra",
     );
-    expect(linkIn("Guides").getAttribute("href")).toBe("/knowledge/guides");
-    expect(linkIn("Knowledge Base").getAttribute("href")).toBe("/knowledge/knowledge-base");
+    expect(linkIn(GUIDES_PAGE.name).getAttribute("href")).toBe("/knowledge/guides");
+    expect(linkIn(KNOWLEDGE_BASE_PAGE.name).getAttribute("href")).toBe("/knowledge/knowledge-base");
   });
 
   it("carries a typed question to Ask unchanged", async () => {
@@ -147,9 +150,7 @@ describe("a Knowledge Search that finds nothing", () => {
   it("names the next action while nothing is typed", async () => {
     await openedSearch(aSearchApi());
 
-    expect(searchStatusText()).toBe(
-      "Type a word or a question to search your company’s knowledge.",
-    );
+    expect(searchStatusText()).toBe(SEARCH_WORDS.nothingAsked);
     expect(screen.queryByRole("list", { name: "Where to look next" })).toBeNull();
   });
 });

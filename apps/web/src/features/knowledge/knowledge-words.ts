@@ -6,17 +6,17 @@ const quoted = (query: string): string => `“${query}”`;
 
 export const COLLECTIONS_WORDS = {
   loading: "The collections are still loading.",
-  none: "No collections to show yet. A collection appears here once it holds a concept you can read.",
+  none: "No collections yet.",
   count: (count: number): string => counted(count, "collection", "collections"),
   owner: "Owner",
-  unowned: "No owner yet. Only Admins can edit its concepts until an owner is set.",
+  unowned: "No owner. Only Admins can edit its concepts.",
   unnamed: "Unnamed member",
-  ownOwners: "Concepts With Their Own Owner",
+  ownOwners: "Concepts with their own owner",
   noOwnOwners: "None",
   ownOwnersCount: (count: number): string => counted(count, "concept", "concepts"),
-  newOwner: "New Owner",
+  newOwner: "New owner",
   ofCollection: (collection: string): string => ` of ${collection}`,
-  noOwner: "No Owner",
+  noOwner: "No owner",
   save: "Save",
   saveOf: (collection: string): string => ` the new owner of ${collection}`,
   named: (name: string, collection: string): string => `${name} now owns ${quoted(collection)}.`,
@@ -28,19 +28,16 @@ export const COLLECTIONS_WORDS = {
 } as const;
 
 export const SAID_OF_COLLECTIONS = {
-  "owner-forbids": "You no longer own any collections, so you can’t view this page.",
-  "no-such-member":
-    "That person is no longer a member of this workspace. Please choose someone else.",
+  "owner-forbids": "You can’t view this page. You no longer own a collection.",
+  "no-such-member": "That person is no longer a member. Choose someone else.",
 } satisfies OwnSentences;
 
 export const SEARCH_WORDS = {
   search: "Search by a word or a question",
-  nothingAsked: "Type a word or a question to search your company’s knowledge.",
+  nothingAsked: "Type a word or a question.",
   searching: (query: string): string => `Searching for ${quoted(query)}.`,
   noMatches: (query: string): string => `Nothing matches ${quoted(query)}.`,
   askThisQuestion: "Ask this question",
-  browseGuides: "Guides",
-  browseKnowledgeBase: "Knowledge Base",
   whereNext: "Where to look next",
   matched: (query: string, more: boolean): string =>
     more
@@ -48,18 +45,18 @@ export const SEARCH_WORDS = {
       : `Showing matches for ${quoted(query)}.`,
   matches: "Matches",
   passageLeft: "The passage you had open is no longer listed.",
-  selectFirst: "Please select a match first.",
-  more: "More Matches",
+  selectFirst: "Select a match first.",
+  more: "More matches",
   document: "Document",
-  newConcept: "New Concept",
+  newConcept: "New concept",
 } as const;
 
 export const LAUNCH_WORDS = {
   edit: "Edit",
-  suggest: "Suggest an Edit",
+  suggest: "Suggest an edit",
   loading: "The editor is still loading.",
-  suggested: "Your suggestion was sent to the concept’s owner for review.",
-  suggestedNew: "Your suggestion was sent to the collection’s owner or an Admin for review.",
+  suggested: "Suggestion sent to the concept’s owner.",
+  suggestedNew: "Suggestion sent to the collection’s owner or an Admin.",
 } as const;
 
 const conceptsCounted = (count: number): string => counted(count, "concept", "concepts");
@@ -68,12 +65,12 @@ const collectionNamed = (collection: string | null): string =>
   collection ?? CONCEPT_WORDS.noCollection;
 
 export const KNOWLEDGE_BASE_WORDS = {
-  tree: "Collections and Kinds",
+  tree: "Collections and kinds",
   collection: collectionNamed,
   labelled: (name: string, count: number): string => `${name}, ${conceptsCounted(count)}`,
   count: conceptsCounted,
   loading: "The knowledge base is still loading.",
-  none: "No concepts in the knowledge base yet. A concept appears here once it is saved.",
+  none: "No concepts yet.",
   concepts: "Concepts",
   openAKind: "Select a kind to see its concepts.",
   kindIn: (kind: string, collection: string | null): string =>
@@ -81,7 +78,7 @@ export const KNOWLEDGE_BASE_WORDS = {
   conceptsLoading: "The concepts are still loading.",
   noneOfTheKind: "No concepts of this kind yet.",
   columns: { title: "Title", kind: "Kind", trust: "Trust" },
-  more: "More Concepts",
+  more: "More concepts",
 } as const;
 
 export const RELATION_WORDS: ReadonlyMap<string, string> = new Map([

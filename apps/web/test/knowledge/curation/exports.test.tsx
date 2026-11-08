@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { STALE_CONFIRMATION } from "@/features/auth/refusal-words.ts";
+import { EXPORTS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { downloadsWatched, type SavedFile } from "@test/knowledge/downloads.ts";
 import { theOneEmptyStatus } from "@test/knowledge/empty-status.ts";
@@ -24,11 +25,11 @@ afterEach(() => {
 
 const PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Exports").path;
 
-const KNOWLEDGE_BASE = "Knowledge Base Snapshot";
+const KNOWLEDGE_BASE = WORDS.knowledgeBase.name;
 
-const RECORDS = "Records";
+const RECORDS = WORDS.records.name;
 
-const GUIDE = "Guide Snapshot";
+const GUIDE = WORDS.guide.name;
 
 const EXPORT_BUNDLE = "knowledge.exportBundle";
 
@@ -84,9 +85,11 @@ const anAdminOffering = (guides: readonly unknown[] = [aGuideSummary()]): Api =>
 const region = () => within(screen.getByRole("region", { name: "Exports", hidden: true }));
 
 const buttonNamed = (verb: string, name: string) =>
-  region().getByRole("button", { name: new RegExp(`^${verb}\\s?the ${name}$`, "u") });
+  region().getByRole("button", {
+    name: new RegExp(`^${verb}\\s?${WORDS.ofThe(name).trim()}$`, "u"),
+  });
 
-const downloadOf = (name: string) => buttonNamed("Download", name);
+const downloadOf = (name: string) => buttonNamed(WORDS.download, name);
 
 const readyToDownload = async (name: string) => {
   const button = await waitFor(() => downloadOf(name));
@@ -219,7 +222,7 @@ describe("the Exports page", () => {
 
     fireEvent.click(button);
     await running.asked;
-    const preparing = await waitFor(() => buttonNamed("Preparing", KNOWLEDGE_BASE));
+    const preparing = await waitFor(() => buttonNamed(WORDS.preparing, KNOWLEDGE_BASE));
     expect(preparing.getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(preparing);
     fireEvent.keyDown(document.body, { key: "k" });
@@ -263,7 +266,7 @@ describe("the Exports page", () => {
       region()
         .getAllByRole("button")
         .map((button) => button.textContent),
-    ).toEqual([`Download the ${KNOWLEDGE_BASE}`, `Download the ${RECORDS}`]);
+    ).toEqual([KNOWLEDGE_BASE, RECORDS].map((name) => `${WORDS.download}${WORDS.ofThe(name)}`));
     expect(region().queryByRole("combobox")).toBeNull();
     fireEvent.keyDown(document.body, { key: "g" });
     expect(asked(EXPORT_GUIDE)).toHaveLength(0);

@@ -1,6 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
+import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -152,17 +153,15 @@ test.describe("All Knowledge", () => {
               - columnheader "Collection"
               - columnheader "Trust"
               - columnheader "Owner"
-              - columnheader "Last Verified"
-        - navigation "Pages of Concepts"
+              - columnheader "${WORDS.columns.checked}"
+        - navigation "${WORDS.pages}"
     `);
     await expect(rowOf(page, "Annual leave")).toContainText(/\d{1,2} \w+ \d{4}/);
     await passesTheAccessibilityGate();
 
     await test.step("an Admin selects three rows and sets their owner by keyboard alone", async () => {
       await skipLinkReachesThePage(page);
-      await listsItsKeystrokes(page, "All Knowledge", KEY, [
-        "Set the Owner of the Selected Concepts",
-      ]);
+      await listsItsKeystrokes(page, "All Knowledge", KEY, [KEY.setOwner.action]);
 
       for (const title of SELECTED) {
         await tabUntilFocused(page, titleOf(page, title));
@@ -173,13 +172,13 @@ test.describe("All Knowledge", () => {
       await passesTheAccessibilityGate();
 
       await page.keyboard.press(`Shift+${KEY.setOwner.key}`);
-      const dialog = page.getByRole("dialog", { name: "Set the Owner of 3 Concepts" });
+      const dialog = page.getByRole("dialog", { name: WORDS.setOwner.title(SELECTED.length) });
       await expect(dialog).toBeVisible();
-      const picker = dialog.getByRole("combobox", { name: "New Owner" });
+      const picker = dialog.getByRole("combobox", { name: WORDS.setOwner.newOwner });
       await tabUntilFocused(page, picker);
       await page.keyboard.press(NEW_OWNER.slice(0, 1));
       await expect(picker.locator("option:checked")).toHaveText(NEW_OWNER);
-      await tabUntilFocused(page, dialog.getByRole("button", { name: "Set Owner" }));
+      await tabUntilFocused(page, dialog.getByRole("button", { name: WORDS.setOwner.action }));
       await page.keyboard.press("Enter");
 
       await expect(dialog).toHaveCount(0);
@@ -213,7 +212,7 @@ test.describe("All Knowledge", () => {
       await passesTheAccessibilityGate();
 
       await filterOf(page, "Collection").click();
-      await page.getByRole("option", { name: "Any Collection" }).click();
+      await page.getByRole("option", { name: WORDS.filters.collection.any }).click();
       await expect(titleOf(page, "Fire drills")).toBeVisible();
       await allKnowledge(page).getByRole("button", { name: "Owner", exact: true }).click();
       await expect(page).toHaveURL(/all\.sort/);
@@ -225,7 +224,7 @@ test.describe("All Knowledge", () => {
 
       await expect(page).toHaveURL(held);
       await expect(titleOf(page, "Fire drills")).toBeVisible();
-      await expect(filterOf(page, "Collection")).toContainText("Any Collection");
+      await expect(filterOf(page, "Collection")).toContainText(WORDS.filters.collection.any);
       await expect(titleOf(page, "Annual leave")).toBeFocused();
     });
 
