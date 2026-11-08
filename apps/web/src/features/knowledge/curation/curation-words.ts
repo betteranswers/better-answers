@@ -53,11 +53,11 @@ export const ALL_KNOWLEDGE_WORDS = {
     tooMany: (most: number): string => `Select ${most} concepts or fewer.`,
   },
   refusedOnRead: {
-    "owner-forbids": "You can’t view this page. You no longer own a collection.",
+    "owner-forbids": "This page is for collection owners. You no longer own one.",
     "role-forbids": "You don’t have permission to view this page.",
   } satisfies OwnSentences,
   refusedOnSetOwner: {
-    "owner-forbids": "You can’t view this page. You no longer own a collection.",
+    "owner-forbids": "This page is for collection owners. You no longer own one.",
     "role-forbids": "You don’t have permission to set the owner of concepts.",
     "no-such-member": "That person is no longer a member. Choose someone else.",
     "no-such-concept": "A selected concept is no longer available. No owners were changed.",
@@ -81,7 +81,7 @@ export const KINDS_WORDS = {
   noCollection: CONCEPT_WORDS.noCollection,
   selectFirst: "Select a type first.",
   refusals: {
-    "owner-forbids": "You can’t view this page. You no longer own a collection.",
+    "owner-forbids": "This page is for collection owners. You no longer own one.",
     "role-forbids": "You don’t have permission to view this page.",
   } satisfies OwnSentences,
 } as const;
