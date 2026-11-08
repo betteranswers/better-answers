@@ -1,8 +1,8 @@
 ---
 version: 1
 slug: "apps-web-src-features-knowledge"
-primary_target: "apps/web/src/features/knowledge"
-related_targets: []
+primary_target: "src/features/knowledge"
+related_targets: ["src/shared/knowledge"]
 ---
 
 # Knowledge area (S3): concept page first
