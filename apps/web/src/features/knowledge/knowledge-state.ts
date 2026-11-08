@@ -24,7 +24,7 @@ export const EDITOR_KEYSTROKES = {
   edit: { key: "e", action: "Edit the concept or suggest an edit" },
   mode: { key: "m", action: "Switch between visual and markdown editing" },
   save: { key: "Control+Enter", action: "Save the concept you are editing" },
-  leave: { key: "Escape", action: "Leave the text field for the editor’s buttons" },
+  leave: { key: "Escape", action: "Move from the text field to the editor’s buttons" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const COLLECTIONS_KEYSTROKES = {

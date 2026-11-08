@@ -71,6 +71,7 @@ export const KNOWLEDGE_BASE_WORDS = {
   count: conceptsCounted,
   loading: "The knowledge base is still loading.",
   none: "No concepts yet.",
+  addFromSearch: (search: string): string => `Add a concept from ${search}`,
   concepts: "Concepts",
   openAKind: "Select a kind to see its concepts.",
   kindIn: (kind: string, collection: string | null): string =>

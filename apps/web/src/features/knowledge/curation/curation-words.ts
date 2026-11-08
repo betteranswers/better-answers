@@ -63,7 +63,7 @@ export const ALL_KNOWLEDGE_WORDS = {
     "owner-forbids": "You can’t view this page. You no longer own a collection.",
     "role-forbids": "You don’t have permission to set the owner of concepts.",
     "no-such-member": "That person is no longer a member. Choose someone else.",
-    "no-such-concept": "No owners were changed. Reload the page and try again.",
+    "no-such-concept": "A selected concept is no longer available. No owners were changed.",
     malformed: "Select between 1 and 200 concepts and choose a person.",
   } satisfies OwnSentences,
 } as const;
@@ -123,7 +123,7 @@ export const EXPORTS_WORDS = {
   },
   guide: {
     name: "Guide snapshot",
-    holds: "A dated document of a guide’s Briefs. It stays as it is when the guide changes.",
+    holds: "A dated copy of a guide’s Briefs. Downloading records each Brief as used.",
     picker: "Guide",
     option: (guide: GuideSummary): string => `${guideTitleOf(guide)} (${guide.kind})`,
     loading: "The guides are still loading.",
@@ -137,7 +137,7 @@ export const EXPORTS_WORDS = {
 export const SAID_OF_EXPORTED_KNOWLEDGE_BASE = {
   "role-forbids": "You don’t have permission to download the knowledge base.",
   "not-found": "Nothing was downloaded. Your knowledge base has no concepts you can read.",
-  "unrecorded-head": "Nothing was downloaded. Try again in a minute.",
+  "unrecorded-head": "Nothing was downloaded. A change is still saving.",
   "export-too-large": "Nothing was downloaded. The knowledge base is too large for one file.",
 } satisfies OwnSentences;
 

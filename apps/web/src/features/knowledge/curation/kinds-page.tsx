@@ -20,6 +20,7 @@ import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { CLEAR_WORDS } from "@/shared/words.ts";
 
+import { AddFromSearch } from "../add-from-search.tsx";
 import { useKinds, type KindCounted } from "../knowledge-api.ts";
 import {
   KINDS_FIELDS,
@@ -263,7 +264,7 @@ function KindsRegion() {
           focusAfterRetry={heading}
         >
           {listed.length === 0 ? (
-            <ListState state={{ kind: "empty", words: WORDS.none, action: null }} />
+            <ListState state={{ kind: "empty", words: WORDS.none, action: <AddFromSearch /> }} />
           ) : (
             <KindsTable
               shown={shown}

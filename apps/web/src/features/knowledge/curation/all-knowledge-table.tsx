@@ -21,6 +21,7 @@ import { SelectionBar } from "@/shared/list/selection-bar.tsx";
 import { selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { CLEAR_WORDS } from "@/shared/words.ts";
 
+import { AddFromSearch } from "../add-from-search.tsx";
 import type { AllKnowledge, AllKnowledgeRow, useAllKnowledge } from "../knowledge-api.ts";
 import type { AllKnowledgeAddress, Standing } from "./all-knowledge-address.ts";
 import {
@@ -90,7 +91,7 @@ function NoConcepts(properties: {
   readonly heading: RefObject<HTMLElement | null>;
 }) {
   if (!properties.narrowed) {
-    return <ListState state={{ kind: "empty", words: WORDS.none, action: null }} />;
+    return <ListState state={{ kind: "empty", words: WORDS.none, action: <AddFromSearch /> }} />;
   }
   return (
     <ListState

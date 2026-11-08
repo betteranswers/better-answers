@@ -28,13 +28,15 @@ export const EDITOR_WORDS = {
   editAs: "Edit as",
   visual: "Visual",
   markdown: "Markdown",
-  lossy: "Opened as markdown. The visual editor would change some of this text.",
+  lossy: "Opened as markdown. Visual editing is off for this text.",
   warning: "Warning",
-  commits: "Saving changes this concept for everyone who can read it.",
+  commits: "Everyone who can read this concept will see your change.",
   commitsNew: (collection: string): string =>
     `Everyone who can read ${collection} will see this concept.`,
-  suggests: "Saving sends your edit to the concept’s owner for review.",
-  suggestsNew: "Saving sends your concept to the collection’s owner or an Admin for review.",
+  suggests:
+    "Saving sends your edit to the concept’s owner for review. Nothing changes until they accept it.",
+  suggestsNew:
+    "Saving sends your concept to the collection’s owner or an Admin for review. Nothing is added until they accept it.",
   reuse: (places: number): string =>
     `This concept is used in ${String(places)} places. Each one will show the change.`,
   save: "Save",
@@ -58,7 +60,7 @@ export const EDITOR_WORDS = {
 export const SAID_OF_EDITING = {
   "reuse-unconfirmed": "This concept is now used in more places. Check the count, then save again.",
   "stale-precondition": "This concept changed after you opened it. Reload it to see the change.",
-  "unrecorded-head": "Nothing was saved. Try again in a minute.",
+  "unrecorded-head": "Nothing was saved. An earlier change is still saving.",
   "source-label-refused": "Enter the document’s name as the source, not a passage address.",
   "body-locator-refused":
     "The body cites a passage that isn’t in the sources. Remove the citation or add its source.",

@@ -15,6 +15,7 @@ import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
 import { Card } from "@/shared/ui/card.tsx";
 
+import { AddFromSearch } from "./add-from-search.tsx";
 import {
   useKindConcepts,
   useKnowledgeTree,
@@ -218,7 +219,7 @@ function Browsed(properties: {
   const { collections, open } = properties;
   const tabStopRef = useTabStop();
   if (collections.length === 0) {
-    return <ListState state={{ kind: "empty", words: WORDS.none, action: null }} />;
+    return <ListState state={{ kind: "empty", words: WORDS.none, action: <AddFromSearch /> }} />;
   }
 
   return (

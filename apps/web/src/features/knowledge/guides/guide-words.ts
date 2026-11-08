@@ -59,7 +59,7 @@ export const GUIDE_WORDS = {
   notAllowed: "Your browser blocked copying.",
   belowYourRole: "You can’t copy this section yet. Some of its concepts need verifying first.",
   nothingToCopy: "You can’t copy this section.",
-  closeToCopy: "Close the editor to copy the saved Brief.",
+  closeToCopy: "Close the editor, then copy the saved Brief.",
 } as const;
 
 export const BRIEF_WORDS = {
