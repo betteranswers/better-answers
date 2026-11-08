@@ -36,7 +36,7 @@ function Missing(properties: { readonly fact: SectionFact; readonly gaps: Gaps }
           gaps.onAdd(href);
         }}
       >
-        {WORDS.addFact}
+        {WORDS.addFact(fact.name)}
       </RowLink>
     </>
   );

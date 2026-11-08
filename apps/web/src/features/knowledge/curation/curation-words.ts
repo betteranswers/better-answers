@@ -29,6 +29,7 @@ export const ALL_KNOWLEDGE_WORDS = {
   ownOwner: "Set on this concept",
   notChecked: "Not yet",
   checkedBy: (by: string): string => `by ${by}`,
+  automatically: "automatically",
   filters: {
     collection: { label: "Collection", any: "Any collection", yours: "Collections you own" },
     kind: { label: "Type", any: "Any type" },
@@ -108,7 +109,7 @@ export const EXPORTS_WORDS = {
   },
   guide: {
     name: "Guide snapshot",
-    holds: "A dated copy of a guide’s Briefs. Downloading it counts as using each Brief.",
+    holds: "A dated copy of a guide’s Briefs. Downloading it records each Brief as used.",
     picker: "Guide",
     option: (guide: GuideSummary): string => `${guideTitleOf(guide)} (${guide.kind})`,
     loading: "The guides are still loading.",

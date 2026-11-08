@@ -31,9 +31,7 @@ function FootnotePlacer(properties: {
 }) {
   const { editor, includes, placed } = properties;
   const labelId = useId();
-  if (includes.length === 0) {
-    return <p className="text-muted-foreground">{WORDS.noIncludes}</p>;
-  }
+  if (includes.length === 0) return null;
   return (
     <fieldset
       aria-labelledby={labelId}

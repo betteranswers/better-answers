@@ -46,7 +46,7 @@ describe("adding a missing fact from a guide", () => {
   it("opens Search with the editor prefilled from the fact", async () => {
     const router = await openedFromTheGuide();
 
-    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact }));
+    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact(LIABILITY_TITLE) }));
 
     await prefilled();
     expect(router.state.location.pathname).toBe(SEARCH_PAGE.path);
@@ -55,7 +55,7 @@ describe("adding a missing fact from a guide", () => {
   it("links the new concept to the guide's subject", async () => {
     await openedFromTheGuide();
 
-    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact }));
+    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact(LIABILITY_TITLE) }));
 
     await prefilled();
     const body = screen.getByRole("textbox", { name: "Body" });
@@ -67,7 +67,7 @@ describe("adding a missing fact from a guide", () => {
   it("adds the fact in focus on a", async () => {
     const router = await openedFromTheGuide();
 
-    const add = screen.getByRole("link", { name: GUIDE_WORDS.addFact });
+    const add = screen.getByRole("link", { name: GUIDE_WORDS.addFact(LIABILITY_TITLE) });
     add.focus();
     fireEvent.keyDown(add, { key: "a" });
 
@@ -78,7 +78,7 @@ describe("adding a missing fact from a guide", () => {
   it("leaves out a subject the guide does not have", async () => {
     const router = await openedFromTheGuide(aGuide({ subject: null }));
 
-    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact }));
+    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact(LIABILITY_TITLE) }));
 
     await prefilled();
     expect(router.state.location.search).not.toHaveProperty("knowledge.subject");

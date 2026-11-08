@@ -323,7 +323,7 @@ describe("the coverage of a section", () => {
 
     const section = within(sectionNamed(SECTION_ONE));
     expect(section.getByText(/\b3 of 4\b/u)).toBeDefined();
-    const add = section.getByRole("link", { name: GUIDE_WORDS.addFact });
+    const add = section.getByRole("link", { name: GUIDE_WORDS.addFact(LIABILITY_TITLE) });
     expect(describedBy(add)).toContain(LIABILITY_TITLE);
     expect(describedBy(add)).toContain("Dana Example");
   });
@@ -331,7 +331,7 @@ describe("the coverage of a section", () => {
   it("names no owner for a fact in an unowned collection", async () => {
     await openGuide("Viewer", aGuide({ owner: null }));
 
-    const add = screen.getByRole("link", { name: GUIDE_WORDS.addFact });
+    const add = screen.getByRole("link", { name: GUIDE_WORDS.addFact(LIABILITY_TITLE) });
     expect(describedBy(add)).toContain(LIABILITY_TITLE);
     expect(describedBy(add), "the line named an owner the collection lacks").not.toContain(
       "Dana Example",
@@ -341,7 +341,7 @@ describe("the coverage of a section", () => {
   it("offers Add This Fact to a Viewer too", async () => {
     await openGuide("Viewer");
 
-    expect(screen.getByRole("link", { name: GUIDE_WORDS.addFact })).toBeDefined();
+    expect(screen.getByRole("link", { name: GUIDE_WORDS.addFact(LIABILITY_TITLE) })).toBeDefined();
   });
 
   it("lists no fact when every expected fact is recorded", async () => {
@@ -354,7 +354,7 @@ describe("the coverage of a section", () => {
     expect(section.getByText(/\b1 of 1\b/u)).toBeDefined();
     expect(sectionNamed(SECTION_ONE).textContent).not.toContain(LIABILITY_TITLE);
     expect(section.queryByRole("button", { name: "Include" })).toBeNull();
-    expect(section.queryByRole("link", { name: GUIDE_WORDS.addFact })).toBeNull();
+    expect(section.queryByRole("link", { name: GUIDE_WORDS.addFact(LIABILITY_TITLE) })).toBeNull();
   });
 
   it("names an available fact and offers Include to an Editor", async () => {
@@ -367,7 +367,7 @@ describe("the coverage of a section", () => {
     expect(describedBy(section.getByRole("button", { name: "Include" }))).toContain(
       LIABILITY_TITLE,
     );
-    expect(section.queryByRole("link", { name: GUIDE_WORDS.addFact })).toBeNull();
+    expect(section.queryByRole("link", { name: GUIDE_WORDS.addFact(LIABILITY_TITLE) })).toBeNull();
   });
 
   it("offers no Include to a Viewer", async () => {

@@ -185,10 +185,12 @@ test.describe("the guide page", () => {
     await test.step("shows the missing fact, its owner, and an Add This Fact link", async () => {
       const insurance = sectionOf(page, INSURANCE);
       await expect(insurance).toContainText("3 of 4");
-      const gap = insurance.getByText(EMPLOYERS_LIABILITY);
+      const gap = insurance.getByText(EMPLOYERS_LIABILITY).first();
       await expect(gap).toBeVisible();
       await expect(insurance).toContainText(guided.admin.name);
-      await expect(insurance.getByRole("link", { name: GUIDE_WORDS.addFact })).toBeVisible();
+      await expect(
+        insurance.getByRole("link", { name: GUIDE_WORDS.addFact(EMPLOYERS_LIABILITY) }),
+      ).toBeVisible();
       await expect(
         insurance.getByRole("heading", { name: PROFESSIONAL_INDEMNITY }),
         "the Editor in finance cannot read the restricted concept in the section's Detail",

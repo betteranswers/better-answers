@@ -44,7 +44,7 @@ export const GUIDE_WORDS = {
       ? `${name} isn’t recorded yet.`
       : `${name} isn’t recorded yet. Owner: ${owner}.`,
   available: (name: string): string => `${name} is recorded but not included in this section.`,
-  addFact: "Add this fact",
+  addFact: (name: string): string => `Add ${name}`,
   include: "Include",
   included: (number: string): string => `Included in section ${number}.`,
   selectFirst: "Select a section first.",
@@ -73,7 +73,6 @@ export const BRIEF_WORDS = {
   placing: "Add a footnote",
   footnote: "Footnote: ",
   notPlaced: "not cited yet",
-  noIncludes: "No concepts to cite.",
   saving: "Saving the Brief.",
   saved: (version: number): string => `Brief saved as version ${String(version)}.`,
   unchanged: (version: number): string =>
@@ -85,7 +84,7 @@ export const BRIEF_WORDS = {
   earlierDetail: "Copy what you need into the Brief above.",
   discardEarlier: "Discard this text",
   leaving: "Leave with unsaved changes?",
-  leavingDetail: "This tab keeps your changes. Edit the Brief again to get them back.",
+  leavingDetail: "Your unsaved text stays in this tab until you close it.",
   leave: "Leave",
   keepEditing: "Keep editing",
 } as const;

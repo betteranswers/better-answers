@@ -11,8 +11,8 @@ export const ALL_KNOWLEDGE_KEYSTROKES = {
   tick: { key: "x", action: "Select or clear the concept" },
   setOwner: { key: "O", action: "Set the owner of the selected concepts" },
   clearSelection: { key: "Escape", action: "Clear the selection" },
-  previousPage: { key: "[", action: "Previous page" },
-  nextPage: { key: "]", action: "Next page" },
+  previousPage: { key: "[", action: "Show the previous page" },
+  nextPage: { key: "]", action: "Show the next page" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const ALL_KNOWLEDGE_LIST = "all";
@@ -132,8 +132,8 @@ export const isNarrowed = (held: Held, scope: CollectionScope): boolean =>
   scope.kind !== "every" || held.kind !== "";
 
 export const KINDS_KEYSTROKES = {
-  tail: { key: "t", action: "Show only types with 2 or fewer concepts, or all types" },
-  open: { key: "o", action: "Show or hide collections" },
+  tail: { key: "t", action: "Show types with 2 or fewer concepts, or all types" },
+  open: { key: "o", action: "Show or hide the type’s collections" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const KINDS_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Concept Types");

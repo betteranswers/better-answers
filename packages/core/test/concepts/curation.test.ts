@@ -247,7 +247,7 @@ describe("the All knowledge row for each concept", () => {
         trust: { tier: "machine-confirmed", status: "current" },
         trustWords: "Verified automatically",
         owner: null,
-        checkedBy: "an automatic check",
+        checkedBy: null,
         checkedOn: "5 October 2026",
       },
       {

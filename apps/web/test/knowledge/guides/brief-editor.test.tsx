@@ -16,6 +16,7 @@ import {
   AN_INCLUDE_ID,
   BRIEF_BEFORE,
   BRIEF_MARKED,
+  LIABILITY_TITLE,
   RACKING_IRI,
   RACKING_TITLE,
   SAVE_BRIEF,
@@ -488,7 +489,7 @@ describe("a draft of a Brief", () => {
 
 describe("leaving with an unsaved draft", () => {
   const addAFact = () => {
-    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact }));
+    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact(LIABILITY_TITLE) }));
   };
 
   const askedToLeave = () => screen.findByRole("alertdialog");

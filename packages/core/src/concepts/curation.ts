@@ -141,14 +141,11 @@ type PageRow = TrustRow & {
   readonly total: number;
 };
 
-const AUTOMATIC_CHECK = "an automatic check";
-
 const checkerOf = (trust: Trust): string | null => {
   switch (trust.tier) {
     case "human-reviewed":
       return verifierWords(trust.verifiedBy);
     case "machine-confirmed":
-      return AUTOMATIC_CHECK;
     case "unverified":
       return null;
   }
