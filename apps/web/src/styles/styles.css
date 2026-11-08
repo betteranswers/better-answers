@@ -28,6 +28,19 @@
     :where(p, h1, h2, h3, h4, h5, h6) {
     max-width: none;
   }
+
+  ::selection {
+    background-color: var(--surface-selected);
+    color: var(--text-primary);
+  }
+
+  :where(html) {
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  :where(a) {
+    text-underline-offset: 0.18em;
+  }
 }
 
 /* A "+" centred on each corner's hairline: one pseudo-element of eight bars, so a mark adds no
@@ -89,8 +102,8 @@
    * layer, and a single tile would leave the grid showing above it.
    */
   [data-grid-pattern]:has([data-grid-mask="reading"]) {
-    --mask-solid: 704px;
-    --mask-clear: 768px;
+    --mask-solid: 576px;
+    --mask-clear: 640px;
     background-image:
       linear-gradient(90deg, var(--surface-page) var(--mask-solid), transparent var(--mask-clear)),
       linear-gradient(var(--grid-line) var(--border-width), transparent var(--border-width)),

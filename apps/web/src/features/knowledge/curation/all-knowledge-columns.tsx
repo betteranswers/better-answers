@@ -92,7 +92,13 @@ export const allKnowledgeColumns = column.columns([
   column.accessor("trustWords", {
     id: "trust",
     header: WORDS.columns.trust,
-    cell: ({ row }) => <TrustMark trust={row.original.trust} words={row.original.trustWords} />,
+    cell: ({ row }) => (
+      <TrustMark
+        trust={row.original.trust}
+        words={row.original.trustWords}
+        className="whitespace-nowrap"
+      />
+    ),
   }),
   column.accessor("owner", {
     id: "owner",

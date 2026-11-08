@@ -283,7 +283,7 @@ const INTERFACE = "[font-size:var(--text-base)]";
 
 /** Each class is spelt out because Tailwind finds a class by reading the source. */
 const LAYOUT =
-  "grid grid-cols-[minmax(0,640px)] @min-[880px]:grid-cols-[minmax(0,640px)_352px] @min-[880px]:grid-rows-[auto_auto_1fr] @min-[880px]:gap-x-12 @min-[1056px]:gap-x-16";
+  "grid grid-cols-[minmax(0,544px)] @min-[880px]:grid-cols-[minmax(0,544px)_352px] @min-[880px]:grid-rows-[auto_auto_1fr] @min-[880px]:gap-x-12 @min-[1056px]:gap-x-16";
 
 const WAY_BACK = "order-1 mb-2 @min-[880px]:col-start-1 @min-[880px]:row-start-1";
 

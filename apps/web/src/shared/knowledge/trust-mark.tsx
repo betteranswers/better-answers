@@ -86,7 +86,7 @@ export function TrustMark(properties: TrustMarkProperties) {
         {date === null ? null : (
           <>
             {" · "}
-            <span className="font-mono">{dayWords(date)}</span>
+            {dayWords(date)}
           </>
         )}
       </span>

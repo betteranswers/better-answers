@@ -199,5 +199,6 @@
      value named `prose`. */
   --container-measure: var(--measure-prose);
   --container-measure-narrow: var(--measure-narrow);
+  --container-measure-reading: var(--measure-reading);
   --container-page: var(--page-max);
 }

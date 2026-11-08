@@ -24,5 +24,7 @@
   --band-h: 48px;
   --measure-prose: 65ch;
   --measure-narrow: 52ch;
+  /* About 75 characters of Geist. */
+  --measure-reading: 34em;
   --page-max: 1200px;
 }
