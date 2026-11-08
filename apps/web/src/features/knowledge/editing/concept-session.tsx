@@ -491,12 +491,18 @@ export function ConceptSession(properties: SessionProps) {
   const outcome =
     opening.problem === undefined ? outcomeFrom(state, target) : failed(opening.problem, "action");
 
+  const besideTheButtons = "open" in state;
+
   return (
     <>
       {properties.slot === null
         ? null
-        : createPortal(<OutcomeLine outcome={outcome} />, properties.slot)}
+        : createPortal(
+            <OutcomeLine outcome={besideTheButtons ? undefined : outcome} />,
+            properties.slot,
+          )}
       <EditorRegion
+        outcome={besideTheButtons ? outcome : undefined}
         state={state}
         target={target}
         collections={collections}

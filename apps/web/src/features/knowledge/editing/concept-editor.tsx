@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -61,6 +62,7 @@ export type EditorProps = {
   readonly headingRef: RefObject<HTMLHeadingElement | null>;
   readonly leaving: Leaving | undefined;
   readonly events: EditorEvents;
+  readonly outcome: Outcome | undefined;
 };
 
 const headingOf = (open: Open, target: EditTarget): string => {
@@ -432,6 +434,7 @@ export function ConceptEditor(properties: EditorProps) {
       />
       {review === undefined ? null : <p className="mt-4 text-muted-foreground">{review}</p>}
       <Actions shown={shown} target={target} events={events} />
+      <OutcomeLine outcome={properties.outcome} className="mt-3" />
       {properties.leaving === undefined ? null : (
         <LeavingAsk
           leaving={properties.leaving}
