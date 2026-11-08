@@ -64,7 +64,7 @@ describe("the Knowledge Search page", () => {
     const api = aSearchApi();
     const router = await openedSearch(api);
 
-    await waitFor(() => expect(searchStatusText()).toMatch(/\S/));
+    expect(searchStatusText()).toBe("");
     expect(matchRows()).toHaveLength(0);
     const nothingAsked = searchStatusText();
 
@@ -120,7 +120,7 @@ describe("the Knowledge Search page", () => {
           .getAllByRole("link")
           .map((link) => link.textContent),
       ).toEqual(["Search", "Guides", "Knowledge Base"]);
-      expect(searchStatusText()).toMatch(/\S/);
+      expect(searchStatusText()).toBe("");
       expect(matchRows()).toHaveLength(0);
     });
   }

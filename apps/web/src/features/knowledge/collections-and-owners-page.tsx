@@ -118,7 +118,7 @@ function OwnerPicker(properties: { readonly owned: CollectionOwned; readonly nam
       }}
     >
       <Label htmlFor={pickerId}>
-        {WORDS.newOwner}
+        {WORDS.owner}
         <span className="sr-only">{WORDS.ofCollection(owned.collection)}</span>
       </Label>
       <NativeSelect
@@ -160,11 +160,11 @@ function CollectionRow(properties: {
       <h3 id={headingId} tabIndex={-1} className="font-medium text-foreground">
         {owned.collection}
       </h3>
+      {naming === undefined ? null : <OwnerPicker owned={owned} naming={naming} />}
       <dl className="mt-2 grid items-baseline gap-x-4 gap-y-1 sm:grid-cols-[max-content_1fr]">
-        <Row term={WORDS.owner}>{ownerWords(owned.owner)}</Row>
+        {naming === undefined ? <Row term={WORDS.owner}>{ownerWords(owned.owner)}</Row> : null}
         <Row term={WORDS.ownOwners}>{ownOwnersWords(owned.overrides)}</Row>
       </dl>
-      {naming === undefined ? null : <OwnerPicker owned={owned} naming={naming} />}
     </li>
   );
 }

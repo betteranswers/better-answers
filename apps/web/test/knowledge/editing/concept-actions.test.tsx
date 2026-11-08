@@ -146,12 +146,12 @@ describe("editing a concept on its own page", () => {
     await editorOpened(api);
 
     retitled("Audit Log Retention");
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
     expect(await screen.findByRole("button", { name: EDITOR_WORDS.keepEditing })).toBeDefined();
     expect(warnings().some((warning) => /\b2\b/u.test(warning))).toBe(true);
     expect(savesAsked()).toHaveLength(0);
 
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
     await editorClosed(EDITOR_WORDS.headingEdit);
     expect(wordsIn("status")).toMatch(/\S/);
     expect(savesAsked().map((asked) => asked.reuse)).toEqual(["confirmed"]);
@@ -167,8 +167,8 @@ describe("editing a concept on its own page", () => {
     await editorOpened(api);
 
     retitled("Audit Log Retention");
-    pressed("Save");
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
+    pressed(EDITOR_WORDS.save);
 
     await waitFor(() => {
       expect(
@@ -176,20 +176,20 @@ describe("editing a concept on its own page", () => {
         "the ask kept the old count of places",
       ).toBe(true);
     });
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
     await editorClosed(EDITOR_WORDS.headingEdit);
     expect(savesAsked().map((asked) => asked.reuse)).toEqual(["confirmed", "confirmed"]);
   });
 
   it("warns what a save does, differently for a suggestion", async () => {
     await editorOpened(aConceptApi("commits"));
-    const [commits] = warnings();
+    expect(screen.queryByText(EDITOR_WORDS.suggests)).toBeNull();
+    expect(screen.getByRole("button", { name: EDITOR_WORDS.save })).toBeDefined();
     cleanup();
 
     await editorOpened(aConceptApi("suggests"));
-    const [suggests] = warnings();
-    expect(commits, "the editor showed no warning before saving").toMatch(/\S/);
-    expect(suggests, "a suggestion is warned of as if it commits").not.toBe(commits);
+    expect(screen.getByText(EDITOR_WORDS.suggests)).toBeDefined();
+    expect(screen.getByRole("button", { name: EDITOR_WORDS.sendSuggestion })).toBeDefined();
   });
 
   it("opens a table body as markdown and disables Visual", async () => {
@@ -253,9 +253,11 @@ describe("editing a concept on its own page", () => {
     await editorOpened(api);
 
     retitled("Audit Log Retention");
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
     expect(wordsIn("status"), "the status said nothing while saving").toMatch(/\S/);
-    expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe("true");
+    expect(
+      screen.getByRole("button", { name: EDITOR_WORDS.save }).getAttribute("aria-disabled"),
+    ).toBe("true");
 
     await held.asked;
     held.resolve();
@@ -268,7 +270,7 @@ describe("editing a concept on its own page", () => {
     api.set(SAVE, unchanged);
     await editorOpened(api);
 
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
 
     await waitFor(() => {
       expect(wordsIn("status"), "the status said nothing of the unchanged save").toMatch(/\S/);
@@ -282,7 +284,7 @@ describe("editing a concept on its own page", () => {
     await editorOpened(api);
 
     retitled("Audit Log Retention");
-    pressed("Save");
+    pressed(EDITOR_WORDS.sendSuggestion);
 
     await editorClosed(EDITOR_WORDS.headingSuggest);
     expect(wordsIn("status"), "the status said nothing of the suggestion").toMatch(/\S/);
@@ -294,7 +296,7 @@ describe("editing a concept on its own page", () => {
     await editorOpened(api);
 
     retitled("Audit Log Retention");
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
 
     expect(await screen.findByRole("button", { name: EDITOR_WORDS.reload })).toBeDefined();
     expect(wordsIn("status")).toMatch(/\S/);
@@ -315,7 +317,7 @@ describe("editing a concept on its own page", () => {
     await editorOpened(api);
 
     retitled("Audit Log Retention");
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
 
     await waitFor(() => {
       expect(wordsIn("alert"), "the refused save raised no alert").toMatch(/\S/);
@@ -328,7 +330,7 @@ describe("editing a concept on its own page", () => {
     api.set(SAVE, committed);
     await editorOpened(api);
 
-    const save = screen.getByRole("button", { name: "Save" });
+    const save = screen.getByRole("button", { name: EDITOR_WORDS.save });
     expect(save.getAttribute("aria-disabled")).toBe("true");
     expect(describedBy(save), "the disabled Save gives no reason").toMatch(/\S/);
 
@@ -398,18 +400,18 @@ describe("editing a concept on its own page", () => {
     act(() => {
       void router.navigate({ href: SEARCH_PAGE.path });
     });
-    expect(await screen.findByRole("button", { name: "Leave" })).toBeDefined();
+    expect(await screen.findByRole("button", { name: EDITOR_WORDS.leave })).toBeDefined();
     expect(router.state.location.pathname).toBe(A_CONCEPT_PAGE);
 
     pressed(EDITOR_WORDS.keepEditing);
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Leave" })).toBeNull();
+      expect(screen.queryByRole("button", { name: EDITOR_WORDS.leave })).toBeNull();
     });
 
     act(() => {
       void router.navigate({ href: SEARCH_PAGE.path });
     });
-    fireEvent.click(await screen.findByRole("button", { name: "Leave" }));
+    fireEvent.click(await screen.findByRole("button", { name: EDITOR_WORDS.leave }));
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(SEARCH_PAGE.path);
     });
@@ -429,7 +431,7 @@ describe("editing a concept on its own page", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Source 3" }), {
       target: { value: "Calder handbook" },
     });
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
 
     await editorClosed(EDITOR_WORDS.headingEdit);
     const [asked] = savesAsked();
@@ -450,7 +452,7 @@ describe("editing a concept on its own page", () => {
 
     await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
     expect(titleField().value).toBe("Cyber Essentials Plus certificate");
-    expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Kind" }).value).toBe(
+    expect(screen.getByRole<HTMLInputElement>("textbox", { name: EDITOR_WORDS.kind }).value).toBe(
       "certification",
     );
     expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Tags" }).value).toBe(
@@ -462,7 +464,7 @@ describe("editing a concept on its own page", () => {
     expect(screen.getByRole("textbox", { name: "Body" }).textContent).toContain(
       "Audit Logs Retention",
     );
-    expect(warnings().some((warning) => warning.includes("policies"))).toBe(true);
+    expect(await screen.findByRole("button", { name: EDITOR_WORDS.save })).toBeDefined();
   });
 
   it("commits a new concept and opens its page", async () => {
@@ -475,20 +477,18 @@ describe("editing a concept on its own page", () => {
     const router = await openAt(address, api);
 
     await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
-    const save = screen.getByRole("button", { name: "Save" });
+    const save = screen.getByRole("button", { name: EDITOR_WORDS.save });
     expect(save.getAttribute("aria-disabled")).toBe("true");
     expect(describedBy(save), "the disabled Save gives no reason").toMatch(/\S/);
 
     fireEvent.change(screen.getByRole("combobox", { name: "Collection" }), {
       target: { value: "policies" },
     });
-    await waitFor(() => {
-      expect(warnings().some((warning) => warning.includes("policies"))).toBe(true);
-    });
-    fireEvent.change(screen.getByRole("textbox", { name: "Kind" }), {
+    await screen.findByRole("button", { name: EDITOR_WORDS.save });
+    fireEvent.change(screen.getByRole("textbox", { name: EDITOR_WORDS.kind }), {
       target: { value: "Policy" },
     });
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(A_CONCEPT_PAGE);
@@ -508,13 +508,11 @@ describe("editing a concept on its own page", () => {
     const router = await openAt(address, api);
 
     await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
-    await waitFor(() => {
-      expect(warnings().some((warning) => warning.includes("policies"))).toBe(true);
-    });
+    await screen.findByRole("button", { name: EDITOR_WORDS.save });
     const quiet = screen
       .getAllByRole("status")
       .filter((status) => status.textContent.trim() === "");
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
 
     await waitFor(() => {
       expect(screen.queryByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew })).toBeNull();

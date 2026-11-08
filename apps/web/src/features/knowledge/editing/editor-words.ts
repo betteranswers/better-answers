@@ -8,7 +8,7 @@ export const EDITOR_WORDS = {
   headingSuggest: "Suggest an edit",
   headingNew: "New concept",
   title: "Title",
-  kind: "Kind",
+  kind: "Type",
   description: "Description",
   tags: "Tags",
   tagsHint: "Separate tags with commas.",
@@ -16,41 +16,36 @@ export const EDITOR_WORDS = {
   chooseCollection: "Choose a collection",
   body: "Body",
   sources: "Sources",
-  sourcesNumbered: "The body cites each source by its number.",
   source: (number: number): string => `Source ${String(number)}`,
   remove: "Remove",
   removeSource: (number: number): string => `Remove source ${String(number)}`,
   addSource: "Add a source",
   withheld: (count: number): string =>
     count === 1
-      ? "1 source you can’t open stays as it is"
-      : `${String(count)} sources you can’t open stay as they are`,
+      ? "1 hidden source stays as it is"
+      : `${String(count)} hidden sources stay as they are`,
   editAs: "Edit as",
   visual: "Visual",
   markdown: "Markdown",
-  lossy: "Opened as markdown. Visual editing is off for this text.",
+  lossy: "Visual editing isn’t available for this text.",
   warning: "Warning",
-  commits: "Everyone who can read this concept will see your change.",
-  commitsNew: (collection: string): string =>
-    `Everyone who can read ${collection} will see this concept.`,
-  suggests:
-    "Saving sends your edit to the concept’s owner for review. Nothing changes until they accept it.",
-  suggestsNew:
-    "Saving sends your concept to the collection’s owner or an Admin for review. Nothing is added until they accept it.",
+  suggests: "Your edit goes to the concept’s owner for review.",
+  suggestsNew: "Your concept goes to the collection’s owner or an Admin for review.",
   reuse: (places: number): string =>
-    `This concept is used in ${String(places)} places. Each one will show the change.`,
+    `This concept is used in ${String(places)} places. Save your change to all of them?`,
   save: "Save",
+  sendSuggestion: "Send suggestion",
   keepEditing: "Keep editing",
-  close: "Close editor",
-  leave: "Leave",
-  leaving: "You have unsaved changes.",
+  close: "Cancel",
+  leave: "Discard changes",
+  leaving: "Discard your unsaved changes?",
   cannotSave: {
     collection: "Choose a collection before you save.",
     title: "Add a title before you save.",
-    kind: "Add a kind before you save.",
+    kind: "Add a type before you save.",
     body: "Add some text to the body before you save.",
   },
-  saving: "Saving.",
+  saving: "Saving…",
   saved: "Saved.",
   unchanged: "No changes to save.",
   stale: "This concept changed after you opened it.",
@@ -66,11 +61,11 @@ export const SAID_OF_EDITING = {
     "The body cites a passage that isn’t in the sources. Remove the citation or add its source.",
   "path-taken": "This collection already has a concept with this title. Change the title.",
   "merge-key-taken":
-    "A concept with this kind and title already exists. Change the title or the kind.",
+    "A concept with this type and title already exists. Change the title or the type.",
   "rename-refused": "An edit can’t rename a concept. Change the title back.",
   "reclassification-refused": "An edit can’t change who can read this concept.",
   "no-such-concept": "This concept is no longer available. Go back to Search.",
   "owner-forbids": "Only the concept’s owner or an Admin can edit it. Suggest an edit instead.",
   malformed:
-    "Something in this concept isn’t valid. Check the title, kind, tags, sources and body.",
+    "Something in this concept isn’t valid. Check the title, type, tags, sources and body.",
 } satisfies OwnSentences;

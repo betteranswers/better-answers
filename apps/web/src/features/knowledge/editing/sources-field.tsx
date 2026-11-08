@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
@@ -27,7 +27,6 @@ export function SourcesField(properties: {
   readonly onChange: (sources: readonly SourceEntry[]) => void;
 }) {
   const { locked } = properties;
-  const hintId = useId();
   const [held, setHeld] = useState<SourceRows>(() => ({
     rows: properties.sources.map((entry, at) => ({ id: at, entry })),
     next: properties.sources.length,
@@ -41,16 +40,16 @@ export function SourcesField(properties: {
     held.rows.map((row) => (row.id === id ? { id, entry } : row));
 
   return (
-    <fieldset className="mt-4 min-w-0" aria-describedby={hintId}>
+    <fieldset className="mt-4 min-w-0">
       <legend className="text-sm font-medium">{WORDS.sources}</legend>
-      <p id={hintId} className="mt-1.5 text-muted-foreground">
-        {WORDS.sourcesNumbered}
-      </p>
-      <ol className="mt-2 grid list-decimal gap-2 pl-6">
+      <ol className="mt-2 grid gap-2">
         {held.rows.map((row, at) => {
           const number = sourceNumberOf(properties.withheld, at);
           return (
             <li key={row.id} value={number} className="flex flex-wrap items-center gap-2">
+              <span className="font-mono [font-size:var(--text-sm)] text-muted-foreground">
+                [{number}]
+              </span>
               {typeof row.entry === "string" ? (
                 <Input
                   aria-label={WORDS.source(number)}

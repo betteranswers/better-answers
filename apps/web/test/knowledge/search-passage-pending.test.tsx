@@ -23,7 +23,6 @@ import {
   refusing,
   retryButton,
   rowNamed,
-  searchStatus,
   searchStatusText,
   searchBox,
   searchHeading,
@@ -179,7 +178,6 @@ describe("the Knowledge Search page", () => {
     api.set("knowledge.find", finding(TABLE));
     api.set("knowledge.open", theForkliftGuide);
     const router = await openedSearch(api);
-    await waitFor(() => expect(searchStatus().textContent).toMatch(/\S/));
     const nothingAsked = searchStatusText();
     await searched(router, "forklift");
 

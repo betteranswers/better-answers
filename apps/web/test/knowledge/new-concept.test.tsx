@@ -35,17 +35,20 @@ const SAVE = "knowledge.saveConcept";
 
 const NEW_CONCEPT_OFFER = SEARCH_WORDS.newConcept;
 
-const leaveAsked = () => screen.queryByRole("button", { name: "Leave" });
+const leaveAsked = () => screen.queryByRole("button", { name: EDITOR_WORDS.leave });
 
 const quietStatuses = () =>
   screen.getAllByRole("status").filter((each) => each.textContent.trim() === "");
 
-const warnings = () =>
-  screen.queryAllByText("Warning").map((label) => label.parentElement?.textContent ?? "");
+const saveNamed = () =>
+  screen
+    .getAllByRole("button")
+    .map((button) => button.textContent)
+    .find((name) => name === EDITOR_WORDS.save || name === EDITOR_WORDS.sendSuggestion);
 
-const warnsOf = async (collection: string) => {
+const savesAs = async (name: string) => {
   await waitFor(() => {
-    expect(warnings().some((warning) => warning.includes(collection))).toBe(true);
+    expect(saveNamed()).toBe(name);
   });
 };
 
@@ -66,7 +69,7 @@ const firstLate = (late: Promise<unknown>, afterwards: unknown) => {
   };
 };
 
-const kindField = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Kind" });
+const kindField = () => screen.getByRole<HTMLInputElement>("textbox", { name: EDITOR_WORDS.kind });
 
 const titleField = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Title" });
 
@@ -118,15 +121,15 @@ describe("typing a new concept from Search", () => {
     typedInto(kindField(), "Policy");
     chose("policies");
 
-    await warnsOf("policies");
+    await savesAs(EDITOR_WORDS.save);
     expect(leaveAsked()).toBeNull();
     expect(kindField().value).toBe("Policy");
     expect(router.state.location.searchStr).toContain("knowledge.collection=policies");
-    expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
-      "false",
-    );
+    expect(
+      screen.getByRole("button", { name: EDITOR_WORDS.save }).getAttribute("aria-disabled"),
+    ).toBe("false");
 
-    pressed("Save");
+    pressed(EDITOR_WORDS.save);
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(A_CONCEPT_PAGE);
     });
@@ -179,7 +182,7 @@ describe("typing a new concept from Search", () => {
     );
     await newConceptHeading();
     typedInto(titleField(), "Cyber Essentials Plus");
-    pressed("Save");
+    pressed(EDITOR_WORDS.sendSuggestion);
     await newConceptClosed();
 
     fireEvent.click(await screen.findByRole("button", { name: NEW_CONCEPT_OFFER }));
@@ -210,14 +213,13 @@ describe("typing a new concept from Search", () => {
       expect(asksOf(TO_EDIT)).toHaveLength(1);
     });
     chose("finance");
-    await warnsOf("finance");
-    const [beforeTheLateRead] = warnings();
+    await savesAs(EDITOR_WORDS.save);
     await settlingAfter(() => {
       lateRead.resolve(aConceptToEdit({ ...BLANK_TO_EDIT, standing: "suggests" }));
     });
 
     expect(asksOf(TO_EDIT)).toHaveLength(2);
-    expect(warnings(), "the late read changed the save's standing").toEqual([beforeTheLateRead]);
+    expect(saveNamed(), "the late read changed the save's standing").toBe(EDITOR_WORDS.save);
   });
 
   it("reports a new concept's suggestion after its form closes", async () => {
@@ -225,11 +227,9 @@ describe("typing a new concept from Search", () => {
     api.set(SAVE, suggested);
     await openedForANewConcept({ collection: "policies", kind: "Policy" }, api);
 
-    await waitFor(() => {
-      expect(warnings()[0], "the editor showed no warning before saving").toMatch(/\S/);
-    });
+    await savesAs(EDITOR_WORDS.sendSuggestion);
     const quiet = quietStatuses();
-    pressed("Save");
+    pressed(EDITOR_WORDS.sendSuggestion);
 
     await newConceptClosed();
     expect(savesAsked()).toHaveLength(1);

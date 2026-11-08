@@ -2,6 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { MATCHES_A_PAGE as A_PAGE } from "@/features/knowledge/knowledge-state.ts";
+import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
 import {
   aSearchApi,
   answeringFinds,
@@ -75,7 +76,6 @@ describe("the Knowledge Search page", () => {
         searchStatusText(),
         "the status did not change when the open passage was dropped",
       ).not.toBe(whileListed);
-      const saidItLeft = searchStatusText();
       await focusLandsOn(searchHeading, "focus fell to the page body when the passage closed");
 
       pressed(firstOpener());
@@ -84,7 +84,7 @@ describe("the Knowledge Search page", () => {
         "the reopened passage's heading did not take focus",
       );
       expect(searchStatusText(), "the dropped-passage notice stayed after a passage reopened").toBe(
-        whileListed,
+        SEARCH_WORDS.matched("pallet", A_PAGE - 1, true),
       );
 
       searchBox().focus();
@@ -92,7 +92,7 @@ describe("the Knowledge Search page", () => {
       fireVisibilityChange();
 
       await waitFor(() => expect(matchRows()).toHaveLength(A_PAGE - 2));
-      expect(searchStatusText()).toBe(saidItLeft);
+      expect(searchStatusText()).toContain(SEARCH_WORDS.passageLeft);
       focusIsOn(searchBox(), "focus was taken from where the reader put it");
 
       typed("forklift");
@@ -101,7 +101,7 @@ describe("the Knowledge Search page", () => {
       typed("pallet");
       await waitFor(() =>
         expect(searchStatusText(), "the dropped-passage notice came back with the search").toBe(
-          whileListed,
+          SEARCH_WORDS.matched("pallet", A_PAGE - 2, true),
         ),
       );
     });

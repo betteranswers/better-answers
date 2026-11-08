@@ -95,10 +95,10 @@ const ownerAt = (collection: string): string =>
 const ownerOf = (page: Page, collection: string): Locator => page.locator(ownerAt(collection));
 
 const pickerOf = (page: Page, collection: string): Locator =>
-  page.getByRole("combobox", { name: `${WORDS.newOwner}${WORDS.ofCollection(collection)}` });
+  page.getByRole("combobox", { name: `${WORDS.owner}${WORDS.ofCollection(collection)}` });
 
 const saveOf = (page: Page, collection: string): Locator =>
-  page.getByRole("button", { name: `Save the new owner of ${collection}` });
+  page.getByRole("button", { name: `${WORDS.save}${WORDS.saveOf(collection)}` });
 
 const statusOf = (page: Page): Locator => collections(page).getByRole("status").nth(1);
 
@@ -188,7 +188,6 @@ test.describe("Collections and Owners", () => {
       await page.keyboard.press("Tab");
       await expect(saveOf(page, "policy")).toBeFocused();
       await page.keyboard.press("Enter");
-      await expect(ownerOf(page, "policy")).not.toContainText(EDITOR);
       await expect(statusOf(page)).toHaveText(/\S/);
 
       await page.keyboard.press("Tab");
@@ -197,13 +196,17 @@ test.describe("Collections and Owners", () => {
       await expect(pickerOf(page, "safety")).toHaveValue(at.viewer.id);
       await page.keyboard.press("Tab");
       await page.keyboard.press("Enter");
-      await expect(ownerOf(page, "safety")).toHaveText(VIEWER);
+      await expect(statusOf(page)).toHaveText(new RegExp(VIEWER, "u"));
 
       await page.keyboard.press(KEY.changeOwner.key);
       await expect(
         pickerOf(page, "safety"),
         "the change-owner key did not focus the picker of the collection in focus",
       ).toBeFocused();
+
+      await page.reload();
+      await expect(pickerOf(page, "policy")).toHaveValue("");
+      await expect(pickerOf(page, "safety")).toHaveValue(at.viewer.id);
     });
   });
 });

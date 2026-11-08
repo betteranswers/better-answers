@@ -12,7 +12,6 @@ import { useLanding, useLandingLine } from "@/shared/landing.ts";
 import { GridTable } from "@/shared/list/grid-table.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
-import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
 import { Card } from "@/shared/ui/card.tsx";
 
 import {
@@ -103,17 +102,11 @@ const columnsOf = (landAt: number | undefined, onLanded: () => void) =>
         <ConceptLink concept={row.original} landsHere={row.index === landAt} onLanded={onLanded} />
       ),
     }),
-    column.accessor("kind", {
-      header: WORDS.columns.kind,
-      cell: ({ getValue }) => getValue(),
-    }),
     column.accessor("trustWords", {
       header: WORDS.columns.trust,
       cell: ({ row }) => <TrustMark trust={row.original.trust} words={row.original.trustWords} />,
     }),
   ]);
-
-const NARROW_HIDES: ReadonlySet<string> = new Set(["kind"]);
 
 function ConceptRows(properties: {
   readonly caption: string;
@@ -128,7 +121,6 @@ function ConceptRows(properties: {
   );
   const columns = useMemo(() => columnsOf(landAt, landed), [landAt, landed]);
   const table = useTable({ features, columns, data: listed, getRowId: (concept) => concept.iri });
-  const [hidden] = useHiddenColumns(NARROW_HIDES);
 
   if (read.isPending) {
     return <ListState state={{ kind: "loading", words: WORDS.conceptsLoading }} />;
@@ -152,7 +144,6 @@ function ConceptRows(properties: {
       <GridTable
         table={table}
         caption={properties.caption}
-        hidden={hidden}
         empty={<ListState state={{ kind: "empty", words: WORDS.noneOfTheKind, action: null }} />}
       />
       <ListPages

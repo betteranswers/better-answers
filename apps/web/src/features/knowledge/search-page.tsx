@@ -77,10 +77,9 @@ const searchedOf = (query: string, matches: Matches): Searched => {
 };
 
 const saidOf = (searched: Searched, query: string, more: boolean, shown: number): string => {
-  if (searched === "nothing-asked") return WORDS.nothingAsked;
   if (searched === "searching") return WORDS.searching(query);
-  if (searched === "failed") return "";
-  return shown === 0 ? WORDS.noMatches(query) : WORDS.matched(query, more);
+  if (searched !== "listed") return "";
+  return shown === 0 ? WORDS.noMatches(query) : WORDS.matched(query, shown, more);
 };
 
 type OpenedFor = Opened & { readonly query: string; readonly waited: boolean };

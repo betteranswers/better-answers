@@ -23,7 +23,7 @@ const PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Collections and Owne
 
 const RHIAN = { ...GRACE, personId: "01JRHIAN0000000000000000AA", displayName: "Rhian Pryce" };
 
-const PICKER = new RegExp(`^${WORDS.newOwner}\\s?${WORDS.ofCollection("policy").trim()}$`, "u");
+const PICKER = new RegExp(`^${WORDS.owner}\\s?${WORDS.ofCollection("policy").trim()}$`, "u");
 
 const SAVE = new RegExp(`^${WORDS.save}\\s?${WORDS.saveOf("policy").trim()}$`, "u");
 
