@@ -11,7 +11,6 @@ import { GridTable } from "@/shared/list/grid-table.tsx";
 import { ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { onTheRowInFocus, rowInFocus, type Saying } from "@/shared/list/row-focus.ts";
 import { ownsNoLonger, useArrivalDecidedAgainOnceUnowned } from "@/shared/member/ownership.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
@@ -25,16 +24,13 @@ import {
   KINDS_FIELDS,
   KINDS_KEYSTROKES as KEY,
   KINDS_LIST,
+  KINDS_PAGE as KINDS,
   KINDS_TAIL_MAX,
   kindsSortedOf,
   kindsSortOf,
   type KindsSort,
 } from "./curation-state.ts";
 import { KINDS_WORDS as WORDS } from "./curation-words.ts";
-
-const CURATION = menuGroupIn(KNOWLEDGE, "curation");
-
-const KINDS = pageNamed(CURATION, "Kinds");
 
 const { outcomeOfFailure } = refusalsOf(WORDS.refusals);
 

@@ -161,8 +161,8 @@ export function SetOwnerDialog(properties: { readonly setOwner: SetOwner }) {
       open={setOwner.open}
       onOpenChange={setOwner.setOpen}
       content={{ className: "wrap-anywhere", onCloseAutoFocus: setOwner.returnFocus }}
-      title={WORDS.setOwner.title(setOwner.count)}
-      consequence={WORDS.setOwner.consequence}
+      title={WORDS.setOwner.action}
+      consequence={WORDS.setOwner.consequence(setOwner.count)}
       commit={
         <Button disabled={setOwner.picked === NO_ONE} onClick={setOwner.commit}>
           {WORDS.setOwner.action}

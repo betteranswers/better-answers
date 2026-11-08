@@ -103,8 +103,6 @@ const whatTheAlertSays = (): string =>
     .map((alert) => alert.textContent)
     .join("");
 
-const theCount = () => region().getAllByRole("status", { hidden: true })[0]?.textContent ?? "";
-
 const theStatusEmptyOnArrival = () =>
   theOneEmptyStatus(region().getAllByRole("status", { hidden: true }));
 
@@ -137,7 +135,6 @@ describe("the Exports page", () => {
         .map((heading) => heading.textContent),
     ).toEqual([KNOWLEDGE_BASE, RECORDS, GUIDE]);
     expect(region().getAllByRole("listitem")).toHaveLength(3);
-    expect(theCount()).toMatch(/^3\b/u);
     expect(downloadOf(KNOWLEDGE_BASE).getAttribute("aria-keyshortcuts")).toBe("k");
     expect(downloadOf(RECORDS).getAttribute("aria-keyshortcuts")).toBe("r");
     expect(downloadOf(GUIDE).getAttribute("aria-keyshortcuts")).toBe("g");

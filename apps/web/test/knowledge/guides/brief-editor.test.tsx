@@ -16,6 +16,7 @@ import {
   AN_INCLUDE_ID,
   BRIEF_BEFORE,
   BRIEF_MARKED,
+  LIABILITY_TITLE,
   RACKING_IRI,
   RACKING_TITLE,
   SAVE_BRIEF,
@@ -154,7 +155,9 @@ describe("moving among a Brief's footnote chips", () => {
         onChange={onChange}
       />,
     );
-    const place = screen.getByRole("button", { name: `${RACKING_TITLE} (not placed)` });
+    const place = screen.getByRole("button", {
+      name: `${RACKING_TITLE} (${BRIEF_WORDS.notPlaced})`,
+    });
 
     caretAtEnd(textField());
     fireEvent.click(place);
@@ -486,7 +489,7 @@ describe("a draft of a Brief", () => {
 
 describe("leaving with an unsaved draft", () => {
   const addAFact = () => {
-    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact }));
+    fireEvent.click(screen.getByRole("link", { name: GUIDE_WORDS.addFact(LIABILITY_TITLE) }));
   };
 
   const askedToLeave = () => screen.findByRole("alertdialog");

@@ -59,16 +59,20 @@ function OwnerCell(properties: { readonly owner: AllKnowledgeRow["owner"] }) {
 }
 
 function CheckedCell(properties: { readonly concept: AllKnowledgeRow }) {
-  const { checkedBy, checkedOn } = properties.concept;
+  const { checkedBy, checkedOn, trust } = properties.concept;
   if (checkedBy === null && checkedOn === null) {
     return <span className="text-muted-foreground">{WORDS.notChecked}</span>;
   }
+  const by =
+    trust.tier === "machine-confirmed"
+      ? WORDS.automatically
+      : checkedBy === null
+        ? null
+        : WORDS.checkedBy(checkedBy);
   return (
     <span className="flex flex-col leading-tight">
       {checkedOn === null ? null : <span>{checkedOn}</span>}
-      {checkedBy === null ? null : (
-        <span className="text-xs text-muted-foreground">{WORDS.checkedBy(checkedBy)}</span>
-      )}
+      {by === null ? null : <span className="text-xs text-muted-foreground">{by}</span>}
     </span>
   );
 }

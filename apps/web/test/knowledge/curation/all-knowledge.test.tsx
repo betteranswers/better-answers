@@ -80,7 +80,7 @@ const setOwnerAction = () => {
   return within(bar).getByRole("button", { name: SET_OWNER });
 };
 
-const SET_OWNER_DIALOG = (count: number) => ({ name: WORDS.setOwner.title(count) });
+const SET_OWNER_DIALOG = { name: WORDS.setOwner.action };
 
 const asked = (procedure: string): unknown[] =>
   server.asks.filter((ask) => ask.procedure === procedure).map((ask) => ask.input);
@@ -102,7 +102,7 @@ const settingTheOwnerOfTwo = async () => {
   assert(bar !== null, "ticking two concepts did not show the selection bar");
   expect(within(bar).getByRole("status").textContent).toMatch(/^2\b/u);
   fireEvent.click(setOwnerAction());
-  choosingRhian(await screen.findByRole("dialog", SET_OWNER_DIALOG(2)));
+  choosingRhian(await screen.findByRole("dialog", SET_OWNER_DIALOG));
 };
 
 const refusalOf = (word: string) =>
@@ -265,9 +265,9 @@ describe("the All Knowledge page for an Admin", () => {
     fireEvent.click(tickOf("Annual leave"));
     fireEvent.click(tickOf("Expense claims"));
     fireEvent.click(setOwnerAction());
-    const dialog = await screen.findByRole("dialog", SET_OWNER_DIALOG(2));
+    const dialog = await screen.findByRole("dialog", SET_OWNER_DIALOG);
 
-    const returned = within(dialog).getByRole("option", { name: "Its collection’s owner" });
+    const returned = within(dialog).getByRole("option", { name: WORDS.setOwner.collectionsOwner });
     fireEvent.change(within(dialog).getByRole("combobox", { name: WORDS.setOwner.newOwner }), {
       target: { value: returned.getAttribute("value") },
     });
@@ -278,9 +278,7 @@ describe("the All Knowledge page for an Admin", () => {
         { iris: [THE_LEAVE.iri, THE_EXPENSES.iri], personId: null },
       ]),
     );
-    await waitFor(() =>
-      expect(outcome.textContent).toBe("2 concepts no longer have their own owner."),
-    );
+    await waitFor(() => expect(outcome.textContent).toBe(WORDS.setOwner.returned(2)));
   });
 
   it("selects and sets an owner by keystroke alone", async () => {
@@ -297,7 +295,7 @@ describe("the All Knowledge page for an Admin", () => {
     expect(tickOf("Annual leave").getAttribute("aria-checked")).toBe("true");
     fireEvent.keyDown(leave, { key: KEY.setOwner.key, shiftKey: true });
 
-    const dialog = await screen.findByRole("dialog", SET_OWNER_DIALOG(1));
+    const dialog = await screen.findByRole("dialog", SET_OWNER_DIALOG);
     expect(
       within(dialog).getByRole("button", { name: SET_OWNER }).hasAttribute("disabled"),
       "Set Owner is enabled before a person is chosen",

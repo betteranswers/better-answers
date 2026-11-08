@@ -6,7 +6,7 @@ import { useKeystroke, usePageKeystrokes, type Keystroke } from "@/shared/keystr
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
+import { PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf, refusedWith } from "@/shared/refusal-outcome.tsx";
 import { stockWait, type OwnSentences } from "@/shared/refusal-words.ts";
 import { saveFile, type FileToSave } from "@/shared/save-file.ts";
@@ -314,11 +314,9 @@ function ExportsRegion() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      <ListHead
-        heading={EXPORTS_PAGE.name}
-        headingId={headingId}
-        count={WORDS.count(EXPORTS.length)}
-      />
+      <h2 id={headingId} className="sr-only">
+        {EXPORTS_PAGE.name}
+      </h2>
       <OutcomeLine outcome={outcome} className="mt-2" />
       <Card marks className="mt-4">
         <ul>

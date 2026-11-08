@@ -4,9 +4,9 @@ import { assert, describe, expect, it, vi } from "vitest";
 import {
   KINDS_KEYSTROKES as KEY,
   KINDS_LIST,
+  KINDS_PAGE,
 } from "@/features/knowledge/curation/curation-state.ts";
 import { KINDS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { theOneEmptyStatus } from "@test/knowledge/empty-status.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure } from "@test/stubbed-api.ts";
@@ -24,7 +24,7 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
-const PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Kinds").path;
+const PAGE = KINDS_PAGE.path;
 
 const KINDS = [
   {
@@ -50,7 +50,7 @@ const aKindsApi = (kinds: readonly unknown[] = KINDS) => {
   return api;
 };
 
-const region = () => within(screen.getByRole("region", { name: "Kinds" }));
+const region = () => within(screen.getByRole("region", { name: KINDS_PAGE.name }));
 
 const disclosures = () =>
   region()
@@ -108,10 +108,10 @@ describe("the Kinds page", () => {
       ["Ledger", "Policy", "Procedure", "Role"].map(countOf),
       "a count differs from the kind's",
     ).toEqual(["2", "3", "1", "2"]);
-    expect(region().getByText("4 kinds")).toBeDefined();
-    expect(region().getByRole("columnheader", { name: "Kind" }).getAttribute("aria-sort")).toBe(
-      "ascending",
-    );
+    expect(region().getByText(WORDS.count(4, 4))).toBeDefined();
+    expect(
+      region().getByRole("columnheader", { name: WORDS.columns.kind }).getAttribute("aria-sort"),
+    ).toBe("ascending");
   });
 
   it("holds a sort by concepts in the address", async () => {
@@ -138,7 +138,7 @@ describe("the Kinds page", () => {
     await waitFor(() => expect(kindsListed()).toEqual(["Policy", "Ledger", "Role", "Procedure"]));
     expect(searchOf(router)).toContain(`${KINDS_LIST}.sort=-count`);
 
-    fireEvent.click(sortHead("Kind"));
+    fireEvent.click(sortHead(WORDS.columns.kind));
 
     await waitFor(() => expect(kindsListed()).toEqual(["Ledger", "Policy", "Procedure", "Role"]));
     expect(searchOf(router)).not.toContain(`${KINDS_LIST}.sort`);
@@ -150,7 +150,7 @@ describe("the Kinds page", () => {
     await table();
     expect(kindsListed()).toEqual(["Ledger", "Role", "Procedure"]);
     expect(filterButton().getAttribute("aria-pressed")).toBe("true");
-    expect(region().getByText("3 of 4 kinds")).toBeDefined();
+    expect(region().getByText(WORDS.count(3, 4))).toBeDefined();
   });
 
   it("shows only kinds with two or fewer concepts when pressed", async () => {
@@ -163,7 +163,7 @@ describe("the Kinds page", () => {
     await waitFor(() => expect(kindsListed()).toEqual(["Ledger", "Procedure", "Role"]));
     expect(filterButton().getAttribute("aria-pressed")).toBe("true");
     expect(searchOf(router)).toContain(`${KINDS_LIST}.tail=small`);
-    expect(region().getByText("3 of 4 kinds")).toBeDefined();
+    expect(region().getByText(WORDS.count(3, 4))).toBeDefined();
 
     fireEvent.click(filterButton());
 
@@ -198,7 +198,7 @@ describe("the Kinds page", () => {
 
     const clear = await region().findByRole("button", { name: "Clear Filters" });
     expect(kindsListed()).toEqual([]);
-    expect(region().getByText("0 of 1 kind")).toBeDefined();
+    expect(region().getByText(WORDS.count(0, 1))).toBeDefined();
 
     clear.focus();
     fireEvent.click(clear);
@@ -287,7 +287,7 @@ describe("the Kinds page", () => {
       region()
         .getAllByRole("columnheader")
         .map((each) => each.textContent),
-    ).toEqual(["Kind", "Concepts"]);
+    ).toEqual([WORDS.columns.kind, WORDS.columns.concepts]);
     for (const editable of ["textbox", "combobox", "checkbox", "menuitem", "spinbutton"]) {
       expect(region().queryAllByRole(editable), `a ${editable} stands on a read-only page`).toEqual(
         [],
@@ -300,8 +300,8 @@ describe("the Kinds page", () => {
         .map((each) => each.textContent),
     ).toEqual([
       WORDS.tail,
-      "Kind",
-      "Concepts",
+      WORDS.columns.kind,
+      WORDS.columns.concepts,
       ...["Ledger", "Policy", "Procedure", "Role"].map((kind) => `${kind}${WORDS.byCollection}`),
     ]);
   });
@@ -309,7 +309,7 @@ describe("the Kinds page", () => {
   it("shows no table for an empty knowledge base", async () => {
     await openAt(PAGE, aKindsApi([]));
 
-    expect(await region().findByText("0 kinds")).toBeDefined();
+    expect(await region().findByText(WORDS.count(0, 0))).toBeDefined();
     expect(region().queryByRole("table")).toBeNull();
     expect(region().queryByRole("button", { name: WORDS.tail })).toBeNull();
     expect(
@@ -368,6 +368,6 @@ describe("the Kinds page", () => {
     api.set("session.member", () => asAnOwner([]));
     refused.resolve();
 
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Kinds" })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("region", { name: KINDS_PAGE.name })).toBeNull());
   });
 });

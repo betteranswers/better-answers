@@ -36,7 +36,7 @@ function Missing(properties: { readonly fact: SectionFact; readonly gaps: Gaps }
           gaps.onAdd(href);
         }}
       >
-        {WORDS.addFact}
+        {WORDS.addFact(fact.name)}
       </RowLink>
     </>
   );
@@ -66,11 +66,10 @@ function Available(properties: { readonly fact: SectionFact; readonly gaps: Gaps
 
 export function Coverage(properties: { readonly gaps: Gaps }) {
   const { gaps } = properties;
+  if (gaps.of === 0) return null;
   return (
     <div className="mt-6">
-      <p className="font-medium">
-        {gaps.of === 0 ? WORDS.noFacts : WORDS.total(gaps.met, gaps.of)}
-      </p>
+      <p className="font-medium">{WORDS.total(gaps.met, gaps.of)}</p>
       {gaps.unmet.length === 0 ? null : (
         <ul className="mt-2 grid gap-3">
           {gaps.unmet.map((fact) => (

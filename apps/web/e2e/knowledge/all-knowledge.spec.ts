@@ -111,7 +111,7 @@ const tickOf = (page: Page, title: string): Locator =>
 const selectedBar = (page: Page): Locator =>
   allKnowledge(page).getByRole("toolbar", { name: "Selected concepts" });
 
-const filterOf = (page: Page, name: "Collection" | "Kind"): Locator =>
+const filterOf = (page: Page, name: string): Locator =>
   allKnowledge(page).getByRole("combobox", { name: `Filter by ${name}` });
 
 test.describe("All Knowledge", () => {
@@ -141,7 +141,7 @@ test.describe("All Knowledge", () => {
         - status: /\\b64\\b/
         - status
         - combobox "Filter by Collection"
-        - combobox "Filter by Kind"
+        - combobox "Filter by ${WORDS.filters.kind.label}"
         - button "Columns"
         - table:
           - rowgroup:
@@ -149,7 +149,7 @@ test.describe("All Knowledge", () => {
               - columnheader "Select every concept on this page":
                 - checkbox "Select every concept on this page"
               - columnheader "Title"
-              - columnheader "Kind"
+              - columnheader "${WORDS.columns.kind}"
               - columnheader "Collection"
               - columnheader "Trust"
               - columnheader "Owner"
@@ -172,7 +172,7 @@ test.describe("All Knowledge", () => {
       await passesTheAccessibilityGate();
 
       await page.keyboard.press(`Shift+${KEY.setOwner.key}`);
-      const dialog = page.getByRole("dialog", { name: WORDS.setOwner.title(SELECTED.length) });
+      const dialog = page.getByRole("dialog", { name: WORDS.setOwner.action });
       await expect(dialog).toBeVisible();
       const picker = dialog.getByRole("combobox", { name: WORDS.setOwner.newOwner });
       await tabUntilFocused(page, picker);

@@ -338,7 +338,7 @@ export function GuideSectionView(properties: SectionProps) {
                 aria-keyshortcuts={KEY.showDetail.key}
                 onClick={detail.toggle}
               >
-                {WORDS.showDetail}
+                {detail.open ? WORDS.hideDetail : WORDS.showDetail}
               </Button>
             </div>
             {editing.editor}

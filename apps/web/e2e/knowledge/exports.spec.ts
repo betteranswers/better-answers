@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 
 import type { APIRequestContext, Download, Locator, Page, TestInfo } from "@playwright/test";
 
-import { EXPORTS_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
+import {
+  EXPORTS_KEYSTROKES as KEY,
+  KINDS_PAGE,
+} from "@/features/knowledge/curation/curation-state.ts";
 import { EXPORTS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
@@ -85,7 +88,7 @@ const downloadNamed = (name: string): string => `${WORDS.download}${WORDS.ofThe(
 const downloadOf = (page: Page, name: string): Locator =>
   page.getByRole("button", { name: downloadNamed(name) });
 
-const statusOf = (page: Page): Locator => exportsRegion(page).getByRole("status").nth(1);
+const statusOf = (page: Page): Locator => exportsRegion(page).getByRole("status");
 
 const downloadedBy = async (page: Page, act: () => Promise<void>): Promise<Download> => {
   const [download] = await Promise.all([page.waitForEvent("download"), act()]);
@@ -131,7 +134,7 @@ test.describe("Exports", () => {
             - listitem:
               - link "All Knowledge"
             - listitem:
-              - link "Kinds"
+              - link "${KINDS_PAGE.name}"
             - listitem:
               - link "Collections and Owners"
       `);
@@ -158,7 +161,6 @@ test.describe("Exports", () => {
     await expect(exportsRegion(page)).toMatchAriaSnapshot(`
       - region "Exports":
         - heading "Exports" [level=2]
-        - status: /\\b3\\b/
         - status
         - list:
           - listitem "${KNOWLEDGE_BASE}":
