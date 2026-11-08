@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EDITOR_WORDS } from "@/features/knowledge/editing/editor-words.ts";
+import { EDITOR_WORDS, SAID_OF_EDITING } from "@/features/knowledge/editing/editor-words.ts";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import {
   A_CONCEPT_IRI,
@@ -182,6 +182,7 @@ describe("editing a concept on its own page", () => {
         "the ask kept the old count of places",
       ).toBe(true);
     });
+    expect(wordsIn("status")).toContain(SAID_OF_EDITING["reuse-unconfirmed"]);
     pressed(EDITOR_WORDS.save);
     await editorClosed(EDITOR_WORDS.headingEdit);
     expect(savesAsked().map((asked) => asked.reuse)).toEqual(["confirmed", "confirmed"]);

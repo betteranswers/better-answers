@@ -25,7 +25,7 @@ export const COLLECTIONS_WORDS = {
 } as const;
 
 export const SAID_OF_COLLECTIONS = {
-  "owner-forbids": "This page is for collection owners. You no longer own one.",
+  "owner-forbids": "You need to own a collection to view this page.",
   "no-such-member": "That person is no longer a member. Choose someone else.",
 } satisfies OwnSentences;
 

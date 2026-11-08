@@ -376,7 +376,7 @@ const OUTCOMES: Outcomes = {
   loading: () => undefined,
   unreadable: (state) => failed(state.failure, "read"),
   editing: editingOutcome,
-  confirming: () => undefined,
+  confirming: (state) => (state.recounted ? said(SAID_OF_EDITING["reuse-unconfirmed"]) : undefined),
   saving: () => said(WORDS.saving),
   stale: () => said(WORDS.stale),
   done: (state, target) =>
