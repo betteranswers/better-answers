@@ -40,7 +40,7 @@ export const EDITOR_WORDS = {
     const concepts = counted(linkingConcepts, "other concept", "other concepts");
     if (linkingConcepts === 0) return `This concept is in ${sections}. Save your change?`;
     if (writeUps === 0) return `This concept is linked from ${concepts}. Save your change?`;
-    return `This concept is in ${sections} and ${concepts}. Save your change?`;
+    return `This concept is in ${sections} and linked from ${concepts}. Save your change?`;
   },
   save: "Save",
   sendSuggestion: "Send suggestion",
@@ -63,17 +63,18 @@ export const EDITOR_WORDS = {
 } as const;
 
 export const SAID_OF_EDITING = {
-  "reuse-unconfirmed": "This concept is now used in more places.",
+  "reuse-unconfirmed": "Nothing was saved. The places below changed since you opened the editor.",
   "stale-precondition": "This concept changed after you opened it. Reload it to see the change.",
   "unrecorded-head": "Nothing was saved. An earlier change is still saving.",
-  "source-label-refused": "Enter the document’s name as the source, not a passage address.",
+  "source-label-refused":
+    "Nothing was saved. Name each source by its document, such as Handbook.pdf, not by a passage address.",
   "body-locator-refused":
-    "The body cites a passage that isn’t in the sources. Remove the citation or add its source.",
+    "The body names a passage address that no source lists. Remove it, or add the source it comes from.",
   "path-taken": "This collection already has a concept with this title. Change the title.",
   "merge-key-taken":
     "A concept with this type and title already exists. Change the title or the type.",
   "rename-refused": "An edit can’t rename a concept. Change the title back.",
-  "reclassification-refused": "An edit can’t change who can read this concept.",
+  "reclassification-refused": "Nothing was saved. An edit can’t change who can read this concept.",
   "no-such-concept": "This concept is no longer available. Go back to Search.",
   "owner-forbids": "Only the concept’s owner or an Admin can edit it. Suggest an edit instead.",
   malformed:
