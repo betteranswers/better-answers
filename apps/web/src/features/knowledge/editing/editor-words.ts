@@ -38,9 +38,12 @@ export const EDITOR_WORDS = {
   reuse: ({ writeUps, linkingConcepts }: PlacesUsing): string => {
     const sections = counted(writeUps, "guide section", "guide sections");
     const concepts = counted(linkingConcepts, "other concept", "other concepts");
-    if (linkingConcepts === 0) return `This concept is in ${sections}. Save your change?`;
-    if (writeUps === 0) return `This concept is linked from ${concepts}. Save your change?`;
-    return `This concept is in ${sections} and ${concepts}. Save your change?`;
+    if (linkingConcepts === 0)
+      return `This concept is in ${sections}. Saving changes it there too.`;
+    if (writeUps === 0) {
+      return `This concept is linked from ${concepts}. Saving changes it there too.`;
+    }
+    return `This concept is in ${sections} and linked from ${concepts}. Saving changes it there too.`;
   },
   save: "Save",
   sendSuggestion: "Send suggestion",
@@ -63,17 +66,17 @@ export const EDITOR_WORDS = {
 } as const;
 
 export const SAID_OF_EDITING = {
-  "reuse-unconfirmed": "This concept is now used in more places.",
+  "reuse-unconfirmed": "Nothing was saved. More places now use this concept.",
   "stale-precondition": "This concept changed after you opened it. Reload it to see the change.",
   "unrecorded-head": "Nothing was saved. An earlier change is still saving.",
-  "source-label-refused": "Enter the document’s name as the source, not a passage address.",
+  "source-label-refused":
+    "Nothing was saved. Use the document’s name as the source, such as Handbook.pdf.",
   "body-locator-refused":
-    "The body cites a passage that isn’t in the sources. Remove the citation or add its source.",
+    "Nothing was saved. Delete the reference code in the body, such as 01HX…/chars:0-40.",
   "path-taken": "This collection already has a concept with this title. Change the title.",
   "merge-key-taken":
     "A concept with this type and title already exists. Change the title or the type.",
   "rename-refused": "An edit can’t rename a concept. Change the title back.",
-  "reclassification-refused": "An edit can’t change who can read this concept.",
   "no-such-concept": "This concept is no longer available. Go back to Search.",
   "owner-forbids": "Only the concept’s owner or an Admin can edit it. Suggest an edit instead.",
   malformed:

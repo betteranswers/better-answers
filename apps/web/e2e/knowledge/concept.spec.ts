@@ -182,7 +182,7 @@ const atTheConcept = async (page: Page, seeded: Workspace, title: string): Promi
   return concept;
 };
 
-const STATUS_OF_THE_CONCEPT = "//article//output";
+const STATUS_OF_THE_EDITOR = "//article//section[.//h3]//output";
 
 const edges = (drawn: Locator) =>
   drawn.evaluate((node) => {
@@ -241,7 +241,7 @@ test.describe("the concept page", () => {
       await editor.getByRole("textbox", { name: "Title" }).fill(title);
 
       await page.keyboard.down("Control");
-      await clockTheNextKey(page, { at: STATUS_OF_THE_CONCEPT, reads: EDITOR_WORDS.saving });
+      await clockTheNextKey(page, { at: STATUS_OF_THE_EDITOR, reads: EDITOR_WORDS.saving });
       await page.keyboard.press("Enter");
       await page.keyboard.up("Control");
 

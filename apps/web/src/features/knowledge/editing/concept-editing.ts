@@ -36,7 +36,7 @@ export type EditorState =
       readonly unchanged: boolean;
       readonly failure: Failure | undefined;
     }
-  | { readonly stage: "confirming"; readonly open: Open }
+  | { readonly stage: "confirming"; readonly open: Open; readonly recounted: boolean }
   | { readonly stage: "saving"; readonly open: Open; readonly confirmed: boolean }
   | { readonly stage: "stale"; readonly open: Open }
   | { readonly stage: "done"; readonly outcome: "committed" | "suggested" };
@@ -103,7 +103,7 @@ const HANDLERS: Handlers = {
   save: (state) =>
     whileEditing(state, (open) =>
       asksBeforeSaving(open)
-        ? { stage: "confirming", open }
+        ? { stage: "confirming", open, recounted: false }
         : { stage: "saving", open, confirmed: false },
     ),
   confirm: (state) =>
@@ -115,7 +115,7 @@ const HANDLERS: Handlers = {
   stale: (state) => (state.stage === "saving" ? { stage: "stale", open: state.open } : state),
   reread: (state, event) =>
     state.stage === "saving"
-      ? { stage: "confirming", open: { ...state.open, read: event.read } }
+      ? { stage: "confirming", open: { ...state.open, read: event.read }, recounted: true }
       : state,
   relocated: (state, event) =>
     whileEditing(state, (open) => editingFrom({ ...open, read: event.read })),

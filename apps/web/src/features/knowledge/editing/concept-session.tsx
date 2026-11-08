@@ -376,7 +376,7 @@ const OUTCOMES: Outcomes = {
   loading: () => undefined,
   unreadable: (state) => failed(state.failure, "read"),
   editing: editingOutcome,
-  confirming: () => undefined,
+  confirming: (state) => (state.recounted ? said(SAID_OF_EDITING["reuse-unconfirmed"]) : undefined),
   saving: () => said(WORDS.saving),
   stale: () => said(WORDS.stale),
   done: (state, target) =>
@@ -491,12 +491,18 @@ export function ConceptSession(properties: SessionProps) {
   const outcome =
     opening.problem === undefined ? outcomeFrom(state, target) : failed(opening.problem, "action");
 
+  const besideTheButtons = "open" in state;
+
   return (
     <>
       {properties.slot === null
         ? null
-        : createPortal(<OutcomeLine outcome={outcome} />, properties.slot)}
+        : createPortal(
+            <OutcomeLine outcome={besideTheButtons ? undefined : outcome} />,
+            properties.slot,
+          )}
       <EditorRegion
+        outcome={besideTheButtons ? outcome : undefined}
         state={state}
         target={target}
         collections={collections}

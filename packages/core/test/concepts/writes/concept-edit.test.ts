@@ -633,10 +633,11 @@ describe("what a save refuses", () => {
   it("counts write-up includes and inbound links where it is used", async () => {
     const scenario = await arrange();
     const concept = await usedTwice(scenario);
+    await writeUpIncluding(db(), scenario.workspaceId, [concept.iri]);
 
     const seed = await toEdit(scenario, scenario.admin, concept.iri);
 
-    expect(seed.usedIn).toEqual({ writeUps: 1, linkingConcepts: 1 });
+    expect(seed.usedIn).toEqual({ writeUps: 2, linkingConcepts: 1 });
   });
 
   it("refuses saving a reused concept until the editor confirms", async () => {

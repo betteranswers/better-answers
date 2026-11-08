@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EDITOR_WORDS } from "@/features/knowledge/editing/editor-words.ts";
+import { EDITOR_WORDS, SAID_OF_EDITING } from "@/features/knowledge/editing/editor-words.ts";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import {
   A_CONCEPT_IRI,
@@ -174,6 +174,7 @@ describe("editing a concept on its own page", () => {
 
     retitled("Audit Log Retention");
     pressed(EDITOR_WORDS.save);
+    screen.getByRole("button", { name: EDITOR_WORDS.save }).focus();
     pressed(EDITOR_WORDS.save);
 
     await waitFor(() => {
@@ -181,6 +182,17 @@ describe("editing a concept on its own page", () => {
         warnings().some((warning) => warning.includes(EDITOR_WORDS.reuse(USED_THRICE))),
         "the ask kept the old count of places",
       ).toBe(true);
+    });
+    const line = screen.getByText(SAID_OF_EDITING["reuse-unconfirmed"]);
+    const question = screen.getByText(EDITOR_WORDS.warning);
+    expect(
+      line.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the places-changed line is not above the question",
+    ).toBeTruthy();
+    await waitFor(() => {
+      expect(document.activeElement, "focus fell to the page after the refusal").toBe(
+        screen.getByRole("button", { name: EDITOR_WORDS.save }),
+      );
     });
     pressed(EDITOR_WORDS.save);
     await editorClosed(EDITOR_WORDS.headingEdit);
