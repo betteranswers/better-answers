@@ -8,7 +8,7 @@ import { GUIDES_PAGE } from "./guide-state.ts";
 type NeedsReview = NonNullable<GuideSection["needsReview"]>;
 
 const factsCounted = (met: number, of: number): string =>
-  `${String(met)} of ${String(of)} ${of === 1 ? "fact" : "facts"} recorded`;
+  `${String(met)} of ${String(of)} ${of === 1 ? "fact" : "facts"} included`;
 
 export const GUIDES_WORDS = {
   loading: "The guides are still loading.",
@@ -29,7 +29,7 @@ export const GUIDE_WORDS = {
   reasons: {
     "concept-changed": "Cites a concept that changed",
     "concept-removed": "Cites a concept that was removed",
-    "expectation-unmet": "A fact is missing",
+    "expectation-unmet": "A fact isn’t included",
     "review-finding": "A review flagged this section",
   } satisfies Record<NeedsReview, string>,
   withheld: "You can’t read the text of this section.",
@@ -59,7 +59,7 @@ export const GUIDE_WORDS = {
   notAllowed: "Your browser blocked copying.",
   belowYourRole: "You can’t copy this section yet. Some of its concepts need verifying first.",
   nothingToCopy: "You can’t copy this section.",
-  closeToCopy: "Close the editor before you copy.",
+  closeToCopy: "Save or close the editor before you copy.",
 } as const;
 
 export const BRIEF_WORDS = {

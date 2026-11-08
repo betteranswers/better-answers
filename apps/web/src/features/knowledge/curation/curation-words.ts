@@ -47,10 +47,8 @@ export const ALL_KNOWLEDGE_WORDS = {
     pending: (name: string, count: number): string =>
       `Setting ${name} as the owner of ${conceptsCounted(count)}.`,
     done: (name: string, count: number): string => `${name} now owns ${conceptsCounted(count)}.`,
-    returning: (count: number): string =>
-      `Returning ${conceptsCounted(count)} to ${count === 1 ? "its" : "their"} collection’s owner.`,
-    returned: (count: number): string =>
-      `${conceptsCounted(count)} now ${count === 1 ? "has its" : "have their"} collection’s owner.`,
+    returning: (count: number): string => `Removing the owner set on ${conceptsCounted(count)}.`,
+    returned: (count: number): string => `Removed the owner set on ${conceptsCounted(count)}.`,
     stillGoing: "Still setting the owner.",
     tooMany: (most: number): string => `Select ${most} concepts or fewer.`,
   },
