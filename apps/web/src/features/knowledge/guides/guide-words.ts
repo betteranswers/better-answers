@@ -55,7 +55,7 @@ export const GUIDE_WORDS = {
     footnotes === 0
       ? `Section ${number} copied.`
       : `Section ${number} copied with ${counted(footnotes, "footnote", "footnotes")}.`,
-  notRecorded: "Its use wasn’t recorded.",
+  notRecorded: "Recording the copy failed.",
   notAllowed: "Your browser blocked copying.",
   belowYourRole: "You can’t copy this section yet. Some of its concepts need verifying first.",
   nothingToCopy: "You can’t copy this section.",

@@ -48,8 +48,7 @@ export const ALL_KNOWLEDGE_WORDS = {
       `Setting ${name} as the owner of ${conceptsCounted(count)}.`,
     done: (name: string, count: number): string => `${name} now owns ${conceptsCounted(count)}.`,
     returning: (count: number): string => `Updating the owner of ${conceptsCounted(count)}.`,
-    returned: (count: number): string =>
-      `${conceptsCounted(count)} now ${count === 1 ? "uses" : "use"} the collection’s owner.`,
+    returned: (count: number): string => `Removed the owner set on ${conceptsCounted(count)}.`,
     stillGoing: "Still setting the owner.",
     tooMany: (most: number): string => `Select ${most} concepts or fewer.`,
   },
@@ -111,7 +110,7 @@ export const EXPORTS_WORDS = {
   },
   guide: {
     name: "Guide snapshot",
-    holds: "A dated copy of a guide’s Briefs. Downloading it records each Brief as used.",
+    holds: "A file of a guide’s Briefs.",
     picker: "Guide",
     option: (guide: GuideSummary): string => `${guideTitleOf(guide)} (${guide.kind})`,
     loading: "The guides are still loading.",

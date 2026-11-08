@@ -22,8 +22,8 @@ export const GUIDE_KEYSTROKES = {
   addFact: { key: "a", action: "Add the missing fact of the focused section" },
   editBrief: { key: "e", action: "Edit the Brief of the focused section" },
   copyBrief: { key: "c", action: "Copy the Brief of the focused section" },
-  saveBrief: { key: "Control+Enter", action: "Save the Brief" },
-  leave: { key: "Escape", action: "Leave the text field" },
+  saveBrief: { key: "Control+Enter", action: "Save the Brief you’re editing" },
+  leave: { key: "Escape", action: "Move from the Brief text to the editor buttons" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const SECTION_ACTIONS = {
