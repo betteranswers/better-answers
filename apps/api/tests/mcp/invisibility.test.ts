@@ -177,7 +177,7 @@ describe("a concept from a Restricted document, read by a Viewer", () => {
           {
             iri,
             url: page,
-            kind: "Note",
+            type: "Note",
             title: TITLE,
             collection: null,
             trust: { tier: "unverified", status: "current", checkedBy: null, checkedAt: null },
@@ -267,7 +267,7 @@ describe("documents through the MCP find and open entries", () => {
       {
         layer: "bundles",
         iri,
-        kind: "Note",
+        type: "Note",
         title: COVERING_TITLE,
         trust: {
           tier: "unverified",
@@ -282,7 +282,6 @@ describe("documents through the MCP find and open entries", () => {
       },
       {
         layer: "sources",
-        kind: "document",
         title: INVOICE_TITLE,
         locator: standalone.locator,
         sensitivity: "Internal",
@@ -327,7 +326,6 @@ describe("documents through the MCP find and open entries", () => {
       hits: [
         {
           layer: "sources",
-          kind: "document",
           title: INVOICE_TITLE,
           locator: standalone.locator,
           sensitivity: "Internal",

@@ -480,7 +480,6 @@ describe("renderFind", () => {
         matches: [
           {
             layer: "sources",
-            kind: "document",
             title: "The bid library's invoice",
             locator: "01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44",
             sensitivity: "Internal",
@@ -505,7 +504,6 @@ describe("renderFind", () => {
         matches: [
           {
             layer: "sources",
-            kind: "document",
             title: "The bid library's invoice",
             locator: "01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44",
             sensitivity: "Internal",
@@ -1936,7 +1934,6 @@ describe("find and open across concepts and source passages", () => {
           },
           {
             layer: "sources",
-            kind: "document",
             title: INVOICE_TITLE,
             locator: invoice.locator,
             sensitivity: "Internal",
@@ -2111,7 +2108,6 @@ describe("find and open across concepts and source passages", () => {
     expect(found.value.matches).toEqual([
       {
         layer: "sources",
-        kind: "document",
         title: INVOICE_TITLE,
         locator: visible.locator,
         sensitivity: "Internal",
@@ -2212,7 +2208,6 @@ describe("find and open across concepts and source passages", () => {
           },
           {
             layer: "sources",
-            kind: "document",
             title: "The bid library's invoice",
             locator: invoice.locator,
             sensitivity: "Internal",

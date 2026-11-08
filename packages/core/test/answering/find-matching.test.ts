@@ -484,7 +484,6 @@ describe("paging find's results", () => {
     expect(toTheAdmin.matches).toEqual([
       matching.objectContaining({
         layer: "sources",
-        kind: "document",
         sensitivity: "Restricted",
         locator: `${payroll.documentId}/chars:0-${content.length}`,
       }),

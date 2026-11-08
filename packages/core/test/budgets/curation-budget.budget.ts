@@ -90,7 +90,7 @@ describe("the Curation budgets at 3,000 concepts", () => {
     ).toBeLessThan(PAGE_BUDGET_MS);
     expect(
       percentile(conceptTypes, 0.5),
-      "the Kinds read at the median, in milliseconds",
+      "the Concept Types read at the median, in milliseconds",
     ).toBeLessThan(CONCEPT_TYPES_BUDGET_MS);
   });
 

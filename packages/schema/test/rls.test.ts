@@ -48,7 +48,7 @@ import {
   A_MAP_GENERATION,
   A_MAP_NODE,
   A_MAP_NODE_CLASSED,
-  A_MAP_NODE_OF_KIND,
+  A_MAP_NODE_OF_TYPE,
   A_GROUP,
   A_GROUP_MEMBER,
   AN_AUDIT_EVENT_ROW,
@@ -1274,7 +1274,7 @@ describe("the map tables under app_rt", () => {
       const [current] = generation.rows;
       assert(current !== undefined, "workspace A has no map generation");
       const next = current.live_gen + 1;
-      await client.query(A_MAP_NODE_OF_KIND, [WS_A, next, live.uid, "Concept", "Policy"]);
+      await client.query(A_MAP_NODE_OF_TYPE, [WS_A, next, live.uid, "Concept", "Policy"]);
       await client.query(AN_EDGE, [
         WS_A,
         next,
