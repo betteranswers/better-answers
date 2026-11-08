@@ -174,6 +174,23 @@ describe("the All Knowledge page", () => {
     });
   });
 
+  it("sorts by type from the Type column's header", async () => {
+    const router = await openAt(
+      ALL_KNOWLEDGE,
+      anAllKnowledgeApi(() => CONCEPTS),
+    );
+    await screen.findByRole("link", { name: "Expense claims" });
+
+    fireEvent.click(region().getByRole("button", { name: "Type" }));
+
+    await waitFor(() => {
+      expect(router.state.location.search).toMatchObject({ "all.sort": "type" });
+    });
+    await waitFor(() => {
+      expect(lastAsk()?.sort).toEqual({ column: "type", desc: false });
+    });
+  });
+
   it("offers Clear Filters when no concept matches", async () => {
     await openAt(
       `${ALL_KNOWLEDGE}?all.type=nothing`,

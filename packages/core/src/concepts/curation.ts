@@ -24,7 +24,7 @@ import { trustWords, ukLongDate, verifierWords, type Trust } from "./trust.ts";
 
 const PAGE_SIZE = 50;
 
-const SORT_COLUMNS = ["title", "conceptType", "collection", "owner", "checked"] as const;
+const SORT_COLUMNS = ["title", "type", "collection", "owner", "checked"] as const;
 
 type SortColumn = (typeof SORT_COLUMNS)[number];
 
@@ -34,7 +34,7 @@ type SortColumn = (typeof SORT_COLUMNS)[number];
  */
 const SORT_KEYS = {
   title: `c.title COLLATE "C"`,
-  conceptType: `c.concept_type COLLATE "C"`,
+  type: `c.concept_type COLLATE "C"`,
   collection: `c.collection COLLATE "C"`,
   owner: `owner.name COLLATE "C"`,
   checked: `COALESCE((SELECT max(verified_at) FROM concept_verification

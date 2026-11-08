@@ -345,8 +345,8 @@ describe("sorting, filtering and paging All knowledge", () => {
   it.each([
     ["title", false, "ABEDC"],
     ["title", true, "CDEAB"],
-    ["conceptType", false, "BDACE"],
-    ["conceptType", true, "EACBD"],
+    ["type", false, "BDACE"],
+    ["type", true, "EACBD"],
     ["collection", false, "ABCED"],
     ["collection", true, "DCEAB"],
     ["owner", false, "ABCED"],
@@ -365,7 +365,7 @@ describe("sorting, filtering and paging All knowledge", () => {
   it.each<[Column, (group: number, at: string) => Omit<Shelved, "iri">]>([
     ["title", (group, at) => ({ path: `knowledge/company/${at}.md`, title: `Group ${group}` })],
     [
-      "conceptType",
+      "type",
       (group, at) => ({
         path: `knowledge/company/${at}.md`,
         title: "Same",

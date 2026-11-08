@@ -37,8 +37,8 @@ type Sorted = AllKnowledgeAsked["sort"];
 const SORTED = {
   title: { column: "title", desc: false },
   "-title": { column: "title", desc: true },
-  type: { column: "conceptType", desc: false },
-  "-type": { column: "conceptType", desc: true },
+  type: { column: "type", desc: false },
+  "-type": { column: "type", desc: true },
   collection: { column: "collection", desc: false },
   "-collection": { column: "collection", desc: true },
   owner: { column: "owner", desc: false },
