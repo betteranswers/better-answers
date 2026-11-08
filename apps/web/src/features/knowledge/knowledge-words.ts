@@ -11,7 +11,7 @@ export const COLLECTIONS_WORDS = {
   owner: "Owner",
   unowned: "No owner",
   unnamed: "Unnamed member",
-  ownOwners: "Concepts with a different owner",
+  ownOwners: "Concepts owned by someone else",
   noOwnOwners: "None",
   ownOwnersCount: (count: number): string => counted(count, "concept", "concepts"),
   ofCollection: (collection: string): string => ` of ${collection}`,
@@ -37,7 +37,7 @@ export const SEARCH_WORDS = {
   askThisQuestion: "Ask this question",
   whereNext: "Where to look next",
   matched: (query: string, count: number, more: boolean): string =>
-    `${more ? `More than ${String(count)} matches` : counted(count, "match", "matches")} for ${quoted(query)}`,
+    `${more ? `More than ${String(count)} matches` : counted(count, "match", "matches")} for ${quoted(query)}.`,
   matches: "Matches",
   passageLeft: "The passage you opened is no longer in the results.",
   selectFirst: "Select a match first.",
@@ -50,7 +50,7 @@ export const LAUNCH_WORDS = {
   edit: "Edit",
   suggest: "Suggest an edit",
   loading: "Loading the editor…",
-  suggested: "Suggestion sent to the concept’s owner.",
+  suggested: "Suggestion sent to the concept’s owner or an Admin.",
   suggestedNew: "Suggestion sent to the collection’s owner or an Admin.",
 } as const;
 
@@ -67,7 +67,7 @@ export const KNOWLEDGE_BASE_WORDS = {
   loading: "Loading the knowledge base…",
   none: "No concepts yet.",
   concepts: "Concepts",
-  openAKind: "Select a type to see its concepts.",
+  openAKind: "Open a collection, then choose a type.",
   kindIn: (kind: string, collection: string | null): string =>
     collection === null ? `${kind}, ${CONCEPT_WORDS.noCollection}` : `${kind} in ${collection}`,
   conceptsLoading: "Loading concepts…",

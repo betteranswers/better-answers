@@ -22,21 +22,21 @@ export const EDITOR_WORDS = {
   addSource: "Add a source",
   withheld: (count: number): string =>
     count === 1
-      ? "1 hidden source stays as it is"
-      : `${String(count)} hidden sources stay as they are`,
+      ? "1 source you can’t open is kept."
+      : `${String(count)} sources you can’t open are kept.`,
   editAs: "Edit as",
   visual: "Visual",
   markdown: "Markdown",
-  lossy: "Visual editing isn’t available for this text.",
+  lossy: "Edit this text in Markdown. The visual editor can’t show all of it.",
   warning: "Warning",
-  suggests: "Your edit goes to the concept’s owner for review.",
+  suggests: "Your edit goes to the concept’s owner or an Admin for review.",
   suggestsNew: "Your concept goes to the collection’s owner or an Admin for review.",
   reuse: (places: number): string =>
     `This concept is used in ${String(places)} places. Save your change to all of them?`,
   save: "Save",
   sendSuggestion: "Send suggestion",
   keepEditing: "Keep editing",
-  close: "Cancel",
+  close: "Close",
   leave: "Discard changes",
   leaving: "Discard your unsaved changes?",
   cannotSave: {
@@ -53,7 +53,7 @@ export const EDITOR_WORDS = {
 } as const;
 
 export const SAID_OF_EDITING = {
-  "reuse-unconfirmed": "This concept is now used in more places. Check the count, then save again.",
+  "reuse-unconfirmed": "This concept is now used in more places.",
   "stale-precondition": "This concept changed after you opened it. Reload it to see the change.",
   "unrecorded-head": "Nothing was saved. An earlier change is still saving.",
   "source-label-refused": "Enter the document’s name as the source, not a passage address.",

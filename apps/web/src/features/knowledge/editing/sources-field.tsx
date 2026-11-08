@@ -20,6 +20,13 @@ const labelOf = (entry: Exclude<SourceEntry, string>, number: number): string =>
   return typeof named === "string" ? named : WORDS.source(number);
 };
 
+/** The body cites a source by its `id`, the same word its chip shows. */
+const citedAs = (entry: SourceEntry): string | undefined => {
+  if (typeof entry === "string") return undefined;
+  const id = entry["id"];
+  return typeof id === "string" && id !== "" ? id : undefined;
+};
+
 export function SourcesField(properties: {
   readonly sources: readonly SourceEntry[];
   readonly withheld: readonly { readonly at: number }[];
@@ -47,9 +54,11 @@ export function SourcesField(properties: {
           const number = sourceNumberOf(properties.withheld, at);
           return (
             <li key={row.id} value={number} className="flex flex-wrap items-center gap-2">
-              <span className="font-mono [font-size:var(--text-sm)] text-muted-foreground">
-                [{number}]
-              </span>
+              {citedAs(row.entry) === undefined ? null : (
+                <span className="border border-border px-1 font-mono text-[length:var(--text-xs)] leading-none">
+                  {citedAs(row.entry)}
+                </span>
+              )}
               {typeof row.entry === "string" ? (
                 <Input
                   aria-label={WORDS.source(number)}
