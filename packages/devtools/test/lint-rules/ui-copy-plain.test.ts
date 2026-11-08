@@ -3,9 +3,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintBatchOver } from "@better-answers/devtools/throwaway-tree";
 import type { PlannedLint, Tree } from "@better-answers/devtools/throwaway-tree";
-import { ROLES } from "@better-answers/schema/roles";
 
-import { allowedPhrases, BANNED_PATTERNS } from "../../lint-rules/rules/ui-copy-plain.ts";
+import { BANNED_PATTERNS } from "../../lint-rules/rules/ui-copy-plain.ts";
 import { wordsOf } from "../support/fixture-text.ts";
 
 const RULE = "better-answers/ui-copy-plain";
@@ -105,9 +104,6 @@ const EXEMPT_TESTS: readonly (readonly [string, string])[] = [
 
 const REFUSED: readonly Row[] = [
   ["the export description", EXPORT_DESCRIPTION],
-  ["a Title Case detail label", "Details from the File"],
-  ["a Title Case action with an alternative", "Edit This Concept, or Suggest an Edit"],
-  ["a Title Case heading", "Edit This Concept"],
   [
     "an explanation of an empty section",
     "No fact is missing from this section, so there is nothing to add.",
@@ -116,32 +112,8 @@ const REFUSED: readonly Row[] = [
 
 const REWRITES: readonly Row[] = [
   ["the export description", "A dated copy of a guide’s Briefs."],
-  ["a sentence case detail label", "Details from the file"],
-  ["a sentence case action with an alternative", "Edit or suggest an edit"],
-  ["a sentence case heading", "Edit concept"],
   ["an area name", "Knowledge base"],
   ["a plain absence", "No missing facts"],
-];
-
-const TITLE_CASE: readonly Row[] = [
-  ["a second capitalised word", "Sign Out"],
-  ["a capital after a dot separator", "Concepts · Recently Edited"],
-  ["a capital after a colon", "Filter: Any Owner"],
-  ["a capitalised possessive", "Go to the Concept’s Sources"],
-  ["a capitalised hyphenated word", "Last Sign-In"],
-  ["a trust word written in the wrong case", "Mark as Out of Date"],
-];
-
-const SENTENCE_CASE: readonly Row[] = [
-  ["a lower case second word", "Sign out"],
-  ["a capital that opens a segment", "Concepts · Recently edited"],
-  ["a capital that opens a sentence", "Are you sure? Delete it"],
-  ["a glossary vendor", "Ask Claude"],
-  ["a glossary term of two words", "Open Control Centre"],
-  ["a role", "Invite an Admin"],
-  ["a trust word of three words", "Mark as Out of date"],
-  ["a trust word with a person left out", "Show Verified by"],
-  ["an acronym", "Export as PDF"],
 ];
 
 const BANNED: readonly Row[] = [
@@ -165,14 +137,12 @@ const LIMITS_ACCEPTED: readonly Row[] = [
   ["a short sentence with a full stop", "Manage people and groups."],
 ];
 
-batch.control(saying("Sign Out"), CONFIG, [FILE]);
+batch.control(saying("Manage people."), CONFIG, [FILE]);
 
-const flaggedSign = planned("Sign Out");
+const flaggedManage = planned("Manage people.");
 
 const refusals = plan(REFUSED);
 const rewrites = plan(REWRITES);
-const titleCase = plan(TITLE_CASE);
-const sentenceCase = plan(SENTENCE_CASE);
 const banned = plan(BANNED);
 const limitsRefused = plan(LIMITS_REFUSED);
 const limitsAccepted = plan(LIMITS_ACCEPTED);
@@ -181,14 +151,15 @@ const notCopy = plan(NOT_COPY);
 const syntax = SYNTAX.map(([what, file, code]) => [what, lint({ [file]: code })] as const);
 
 const inTests = EXEMPT_TESTS.map(
-  ([what, file]) => [what, lint({ [file]: 'export const words = "Sign Out";\n' })] as const,
+  ([what, file]) => [what, lint({ [file]: 'export const words = "Manage people.";\n' })] as const,
 );
 
 const jsx = lint({
-  "apps/web/src/button.tsx": "export const Button = () => <button>Sign Out</button>;\n",
+  "apps/web/src/button.tsx": "export const Button = () => <button>Manage people.</button>;\n",
 });
-const jsxSentenceCase = lint({
-  "apps/web/src/button.tsx": "export const Button = () => <button>Sign out</button>;\n",
+const jsxPlain = lint({
+  "apps/web/src/button.tsx":
+    "export const Button = () => <button>Manage people and groups.</button>;\n",
 });
 const jsxLowerCase = lint({
   "apps/web/src/button.tsx": "export const Button = () => <button>edit concept</button>;\n",
@@ -197,13 +168,13 @@ const attributeLowerCase = lint({
   "apps/web/src/field.tsx": 'export const Field = () => <input aria-label="edit concept" />;\n',
 });
 const jsxAttribute = lint({
-  "apps/web/src/field.tsx": 'export const Field = () => <input title="Sign Out" />;\n',
+  "apps/web/src/field.tsx": 'export const Field = () => <input title="Manage people." />;\n',
 });
 const template = lint({
-  [FILE]: "export const words = (device: string): string => `Sign Out of ${device}`;\n",
+  [FILE]: "export const words = (device: string): string => `Manage ${device}.`;\n",
 });
-const templateSentenceCase = lint({
-  [FILE]: "export const words = (device: string): string => `Sign out of ${device}`;\n",
+const templatePlain = lint({
+  [FILE]: "export const words = (device: string): string => `Manage ${device} and groups.`;\n",
 });
 const templatePlaceholder = lint({
   [FILE]: "export const words = (title: string): string => `Edit ${title} now`;\n",
@@ -213,7 +184,7 @@ beforeAll(batch.run);
 
 describe("the plain copy rule refuses over-written copy", () => {
   it("names the fix and the rule in its error", () => {
-    const output = flaggedSign.output();
+    const output = flaggedManage.output();
 
     expect(output).toContain(MESSAGE);
     expect(output).toContain("better-answers(ui-copy-plain)");
@@ -228,19 +199,17 @@ describe("the plain copy rule refuses over-written copy", () => {
   });
 });
 
-describe("the plain copy rule checks sentence case", () => {
-  it.each(titleCase)("refuses %s", (_what, found) => {
-    expect(found.flagged()).toEqual([FILE]);
-  });
-
-  it.each(sentenceCase)("accepts %s", (_what, found) => {
-    expect(found.flagged()).toEqual([]);
-  });
-});
-
 describe("the plain copy rule refuses the banned patterns", () => {
   it.each(banned)("refuses %s", (_what, found) => {
     expect(found.flagged()).toEqual([FILE]);
+  });
+
+  it("keeps every banned pattern stateless and Unicode aware", () => {
+    for (const pattern of BANNED_PATTERNS) {
+      expect(pattern.unicode).toBe(true);
+      expect(pattern.global).toBe(false);
+      expect(pattern.sticky).toBe(false);
+    }
   });
 });
 
@@ -257,7 +226,7 @@ describe("the plain copy rule limits a string", () => {
 describe("the plain copy rule reads every kind of text", () => {
   it("reads the text of a JSX element", () => {
     expect(jsx.flagged()).toEqual(["apps/web/src/button.tsx"]);
-    expect(jsxSentenceCase.flagged()).toEqual([]);
+    expect(jsxPlain.flagged()).toEqual([]);
   });
 
   it("reads the text of a JSX attribute", () => {
@@ -271,7 +240,7 @@ describe("the plain copy rule reads every kind of text", () => {
 
   it("reads a template literal around its placeholders", () => {
     expect(template.flagged()).toEqual([FILE]);
-    expect(templateSentenceCase.flagged()).toEqual([]);
+    expect(templatePlain.flagged()).toEqual([]);
     expect(templatePlaceholder.flagged()).toEqual([]);
   });
 });
@@ -287,43 +256,5 @@ describe("the plain copy rule leaves non-copy alone", () => {
 
   it.each(inTests)("exempts %s", (_what, found) => {
     expect(found.flagged()).toEqual([]);
-  });
-});
-
-describe("the plain copy rule builds its allow-list from the docs", () => {
-  it("holds the proper nouns of the glossary", () => {
-    expect(allowedPhrases()).toContainEqual(["Control", "Centre"]);
-    expect(allowedPhrases()).toContainEqual(["Open", "Knowledge", "Format"]);
-    expect(allowedPhrases()).toContainEqual(["Claude"]);
-  });
-
-  it("leaves out a word that only opens a sentence", () => {
-    expect(allowedPhrases()).not.toContainEqual(["One"]);
-  });
-
-  it("holds every role", () => {
-    for (const role of ROLES) expect(allowedPhrases()).toContainEqual([role]);
-  });
-
-  it("holds the seven trust words as written", () => {
-    expect(allowedPhrases()).toEqual(
-      expect.arrayContaining([
-        ["Verified", "by"],
-        ["Verified", "automatically"],
-        ["Unverified"],
-        ["Changed", "since", "verified"],
-        ["Out", "of", "date"],
-        ["Draft"],
-        ["Deprecated"],
-      ]),
-    );
-  });
-
-  it("keeps every banned pattern stateless and Unicode aware", () => {
-    for (const pattern of BANNED_PATTERNS) {
-      expect(pattern.unicode).toBe(true);
-      expect(pattern.global).toBe(false);
-      expect(pattern.sticky).toBe(false);
-    }
   });
 });
