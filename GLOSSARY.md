@@ -29,7 +29,8 @@ service, or one sector. Each collection has its owners.
 
 **Concept type**:
 What sort of thing a concept is, in the word its producer chose rather than one drawn from a
-closed set. A concept file holds it in OKF's `type` key.
+closed set. A concept file holds it in OKF's `type` key, the code calls it `conceptType`, and
+Postgres calls it `concept_type`.
 
 **Company language**:
 The concept types, names and links a company's concepts reveal. It is read off the knowledge base,
