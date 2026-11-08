@@ -3,5 +3,5 @@
 - Meet WCAG 2.2 AA, and test it with a keyboard and a screen reader. Follow GOV.UK Design System semantics (tag, details, notification banner, warning text, summary list) without the GOV.UK brand.
 - Give every common action a keystroke, and list them under `?`. Bulk work is select-then-command.
 - Write UI text in the glossary's reader words: see `GLOSSARY.md`.
-- Before you change the UI, read the surface brief in `.impeccable/surfaces/` for the area and use the tokens in `src/styles/`.
+- Before you change the UI, read `DESIGN.md` at the repository root and the surface brief in `.impeccable/surfaces/` for the area, and use the tokens in `src/styles/`.
 - `test/` mirrors `src/` without the `features/` level. The test of `src/features/<feature>/x.tsx` is `test/<feature>/x.test.tsx`, and the tests of `src/app/` and `src/shared/` are under `test/app/` and `test/shared/`. Every helper of `test/` is in `test/support/`, even one a single folder uses, and is imported as `@test/<file>`. The web's repository checks sit in `test/gates/`. A spec is in `e2e/<feature>/`, the shell's in `e2e/app/`, and the suite's own modules stay at the `e2e/` root.

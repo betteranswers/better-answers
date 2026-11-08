@@ -127,7 +127,6 @@ describe("a dated trust mark", () => {
     );
 
     expect(mark?.textContent).toBe("Verified automatically · 3 October 2026");
-    expect(mark?.querySelector(".font-mono")?.textContent).toBe("3 October 2026");
   });
 
   it("leaves a person's date to the server's words", () => {

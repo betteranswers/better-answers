@@ -355,7 +355,7 @@ const COMPONENTS: Components = {
 const PLUGINS = [remarkGfm];
 
 const PROSE = cn(
-  "max-w-measure text-pretty wrap-anywhere",
+  "max-w-measure-reading text-pretty wrap-anywhere",
   "[font-size:var(--prose-size,var(--text-lg))] [line-height:var(--prose-leading,var(--leading-prose))]",
   "[&>*+*]:mt-4 [&_li>*+*]:mt-2 [&_li+li]:mt-1",
   "[&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6",

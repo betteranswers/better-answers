@@ -6,6 +6,7 @@ A living company knowledge map for UK SMBs, built on the Open Knowledge Format (
 
 - `VISION.md` describes what this repository builds towards.
 - `GLOSSARY.md` is the glossary.
+- `DESIGN.md` records the web app's design system: its colours, type, layout and components.
 - `docs/specs/` holds the specs. `v01-route.md` and the `route/` folder are the route spec. `v01-stories.md` holds the v0.1 user stories.
 - `docs/okf-v02.md` says what OKF defines, what it leaves open, and where each part lands in this repository. Read it before you add a key, a convention, or a feature that changes the knowledge layer (bundles, concepts, and search).
 - `docs/plans/` holds the unified plans.

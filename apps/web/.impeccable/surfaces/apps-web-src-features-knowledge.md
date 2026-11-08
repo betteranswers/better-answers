@@ -15,7 +15,9 @@ Constraints: trust words are a closed set, always text; UK dates; sentence case;
 
 Chosen direction: Issued Drawing (the incumbent blueprint, sharpened). Memorable moment: the title block beside every concept.
 
-Unresolved: whether search matches body and kind (api work, scoped in the plan); the Geist decision is recorded in DESIGN.md at finish.
+Unresolved: whether search matches body and kind (api work, scoped in the plan). DESIGN.md records the Geist decision.
+
+Adaptation: the title block shows History in place of Revision. OKF v0.2 records no revision number. BA-341 serves the concept's earlier checks.
 
 ## Direction contract
 

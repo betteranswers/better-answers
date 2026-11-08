@@ -54,7 +54,7 @@ export function ConceptLine(properties: {
         </RowLink>
       )}
       {match.description === null ? null : (
-        <p className="max-w-full truncate text-muted-foreground">{match.description}</p>
+        <p className="line-clamp-2 max-w-full text-muted-foreground">{match.description}</p>
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <TrustMark trust={match.trust} words={match.trustWords} dated />

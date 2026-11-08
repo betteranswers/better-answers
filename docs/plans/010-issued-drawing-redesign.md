@@ -1194,6 +1194,8 @@ Five challengers were declined, each with the lines worth keeping recorded in th
 
 **The closing score.** BA-345 records its critique score here, and Close the program records the score at `main`.
 
+- BA-345, 08/11/2026: 26/40, up from 21/40. A sub-agent ran the design review. The detector found 0 findings on the concept page, Search with results and with no match, the seeded guide and All Knowledge. The snapshot is `.impeccable/critique/2026-11-08T00-30-14Z__apps-web-src-features-knowledge.md`. The finish review ended at `fix`. Four items stay open for the operator: the Back to Search link and the tags above the body, the search field's width, one date in two faces in the title block, and a closing row on the title block.
+
 **Unproven.** Two questions stay open. The first is whether the title block's density holds at 390px, which BA-342's lane 8 checks. The second is whether matching the kind in search raises false matches, which BA-343's lanes 3, 4 and 7 check.
 
 ## Appendix B. Alternatives rejected

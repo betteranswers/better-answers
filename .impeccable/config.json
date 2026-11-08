@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "createdAt": "2026-11-08T00:22:13.494Z",
+        "reason": "Operator chose Issued Drawing on 06/11/2026; its contract names Geist 400/500/600 and Geist Mono, and DESIGN.md records Geist as the system face"
+      }
+    ]
+  }
+}

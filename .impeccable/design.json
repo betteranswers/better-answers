@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-08T00:30:00Z",
+  "title": "Design System: better-answers",
+  "extensions": {
+    "colorMeta": {
+      "ink-blue": {
+        "role": "primary",
+        "displayName": "Ink blue",
+        "canonical": "#2e4bd4",
+        "tonalRamp": [
+          "#1d2a68",
+          "#233285",
+          "#2639aa",
+          "#2e4bd4",
+          "#3f62ea",
+          "#6685f7",
+          "#bccbfe",
+          "#eef2ff"
+        ]
+      },
+      "page": {
+        "role": "neutral",
+        "displayName": "Page",
+        "canonical": "#fcfcfd",
+        "tonalRamp": [
+          "#17191c",
+          "#3d4148",
+          "#565b64",
+          "#727781",
+          "#9aa0a9",
+          "#c6cad1",
+          "#e8eaed",
+          "#fcfcfd"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#17191c"
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#dfe1e6"
+      },
+      "verified-word": {
+        "role": "tertiary",
+        "displayName": "Verified green",
+        "canonical": "#0f6141",
+        "tonalRamp": ["#0f6141", "#137a52", "#a9dcc4", "#e8f6ef"]
+      },
+      "stale-word": {
+        "role": "tertiary",
+        "displayName": "Stale amber",
+        "canonical": "#864a06",
+        "tonalRamp": ["#864a06", "#a55d09", "#f2d59b", "#fdf3e3"]
+      },
+      "draft-word": {
+        "role": "tertiary",
+        "displayName": "Draft violet",
+        "canonical": "#54329f",
+        "tonalRamp": ["#54329f", "#6741c4", "#d6c8f5", "#f2eefc"]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Title",
+        "purpose": "The one page title, h1."
+      },
+      "prose": {
+        "displayName": "Prose",
+        "purpose": "A concept's body, capped at --measure-reading."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "The interface: tables, lists, title block values."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Title block cell labels and menu group names only."
+      },
+      "reference": {
+        "displayName": "Reference",
+        "purpose": "References, source numbers and title block dates, in Geist Mono."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-xs",
+        "value": "0 1px 2px rgba(11, 12, 14, 0.05)",
+        "purpose": "The kit's outline button and field."
+      },
+      {
+        "name": "shadow-md",
+        "value": "0 2px 4px rgba(11, 12, 14, 0.06), 0 4px 12px rgba(11, 12, 14, 0.06)",
+        "purpose": "Menus and popovers."
+      },
+      {
+        "name": "shadow-dialog",
+        "value": "0 16px 48px rgba(11, 12, 14, 0.18), 0 4px 12px rgba(11, 12, 14, 0.08)",
+        "purpose": "Dialogs. The largest shadow."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.2, 0, 0.13, 1)",
+        "purpose": "State changes of controls."
+      },
+      {
+        "name": "duration-fast",
+        "value": "120ms",
+        "purpose": "Colour and border changes of controls."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      },
+      {
+        "name": "concept-two-column",
+        "value": "880px of page width"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action on a page.",
+      "html": "<button class=\"ds-btn-primary\">Save</button>",
+      "css": ".ds-btn-primary{height:32px;padding:0 16px;border:0;border-radius:0;background:var(--accent-600,#2e4bd4);color:#fff;font:500 13px/1 'Geist Variable',Geist,sans-serif;transition:background-color 120ms cubic-bezier(.2,0,.13,1)}.ds-btn-primary:hover{background:var(--accent-700,#2639aa)}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 2px #bccbfe,0 0 0 3px #2e4bd4}"
+    },
+    {
+      "name": "Outline button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary actions such as Edit and Copy.",
+      "html": "<button class=\"ds-btn-outline\">Copy</button>",
+      "css": ".ds-btn-outline{height:32px;padding:0 16px;border:1px solid #dfe1e6;border-radius:0;background:#fcfcfd;color:#26292e;font:500 13px/1 'Geist Variable',Geist,sans-serif;box-shadow:0 1px 2px rgba(11,12,14,.05)}.ds-btn-outline:hover{background:#f7f8f9}.ds-btn-outline:focus-visible{outline:none;box-shadow:0 0 0 2px #bccbfe,0 0 0 3px #2e4bd4}"
+    },
+    {
+      "name": "Search field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A square field with the control edge.",
+      "html": "<input class=\"ds-input\" placeholder=\"Search\">",
+      "css": ".ds-input{height:36px;width:280px;padding:0 12px;border:1px solid #727781;border-radius:0;background:#fcfcfd;color:#17191c;font:400 13px 'Geist Variable',Geist,sans-serif}.ds-input:focus-visible{outline:none;box-shadow:0 0 0 2px #bccbfe,0 0 0 3px #2e4bd4}"
+    },
+    {
+      "name": "Trust tag",
+      "kind": "chip",
+      "refersTo": "trust-tag-verified",
+      "description": "The trust word on its tint, in lists and search.",
+      "html": "<span class=\"ds-trust\">Verified automatically</span>",
+      "css": ".ds-trust{display:inline-flex;padding:2px 8px;border:1px solid #a9dcc4;background:#e8f6ef;color:#0f6141;font:500 14px 'Geist Variable',Geist,sans-serif}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A hairline box on the sheet.",
+      "html": "<div class=\"ds-card\">Card</div>",
+      "css": ".ds-card{padding:16px;border:1px solid #e8eaed;border-radius:0;background:#fff;color:#17191c;font:400 14px 'Geist Variable',Geist,sans-serif}"
+    },
+    {
+      "name": "Title block",
+      "kind": "custom",
+      "refersTo": "title-block",
+      "description": "The signature: who generated, who checked, and the trust of a concept.",
+      "html": "<aside class=\"ds-tb\"><dl><div class=\"ds-tb-cell ds-tb-trust\"><dt>Trust</dt><dd>Verified by Priya Shah · 3 March 2026</dd></div><div class=\"ds-tb-cell\"><dt>Reference</dt><dd class=\"ds-mono\">knowledge/sectors/example</dd></div></dl></aside>",
+      "css": ".ds-tb{width:352px;border:1px solid #17191c;background:#fff;font:400 14px 'Geist Variable',Geist,sans-serif}.ds-tb dl{margin:0}.ds-tb-cell{padding:8px 12px 10px;border-top:1px solid #e8eaed}.ds-tb-cell:first-child{border-top:0}.ds-tb dt{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#565b64}.ds-tb dd{margin:2px 0 0;font-weight:500;color:#17191c}.ds-tb-trust{background:#e8f6ef}.ds-tb-trust dt,.ds-tb-trust dd{color:#0f6141}.ds-tb-trust dd{font-size:16px;font-weight:600}.ds-mono{font-family:'Geist Mono Variable','Geist Mono',monospace;font-size:12px;font-weight:400}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Issued Drawing",
+    "overview": "The operator chose the Issued Drawing world on 6 November 2026. Each concept is drawn like an engineering drawing. A title block beside the concept states who generated it, who checked it, the current check and the review date. The page is a pale grey field with a faint grid.\n\nThe app is a tool. People read, check and copy knowledge in it every day. Density is high and decoration is low. Hairlines divide content. Corners are square. One blue marks what a person can act on. Colour also marks trust, and the trust word always says the same thing as text.\n\nThe tokens live in `apps/web/src/styles/`. This file records them. When the two differ, the stylesheets win and this file is out of date.",
+    "keyCharacteristics": [
+      "A faint 32px grid on the page, kept off the reading column.",
+      "Square corners on every object except the spinner, the radio and the avatar.",
+      "Hairlines, not shadows, divide content.",
+      "One interactive blue, ink blue.",
+      "Trust as a pale tint and a dark word, never colour alone.",
+      "Geist for words, Geist Mono for references, sources and dates in the title block.",
+      "Text selection, scrollbars and link underlines take their colours from the tokens."
+    ],
+    "rules": [
+      {
+        "name": "The one blue rule",
+        "body": "Ink blue marks only links, focus and the primary action. A fill that is not an action uses ink or grey.",
+        "section": "colors"
+      },
+      {
+        "name": "The word first rule",
+        "body": "A trust colour only tints a tag or a cell whose word already states the trust. Colour never carries trust alone.",
+        "section": "colors"
+      },
+      {
+        "name": "The measure rule",
+        "body": "Running text stops at about 75 characters. Use `--measure-reading` (34em). In Geist one `ch` is 0.67em wide, and `65ch` holds about 95 characters.",
+        "section": "typography"
+      },
+      {
+        "name": "The label rule",
+        "body": "Uppercase is only for the label of a title block cell or a menu group. A heading is never uppercase, and nothing sits above a heading as a label.",
+        "section": "typography"
+      },
+      {
+        "name": "The flat sheet rule",
+        "body": "Nothing on the page itself casts a shadow. A card, a title block or a table is a hairline box on the sheet.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** write each trust state as its word, from the closed set in `PRODUCT.md`.",
+      "**Do** keep ink blue for links, focus and the primary action.",
+      "**Do** set references, source numbers and dates in Geist Mono.",
+      "**Do** divide content with 1px hairlines.",
+      "**Do** stop prose at `--measure-reading`.",
+      "**Do** take every value from the tokens in `apps/web/src/styles/`."
+    ],
+    "donts": [
+      "**Don't** round a corner other than the spinner, the radio or the avatar.",
+      "**Don't** cast a shadow from an object that sits on the page.",
+      "**Don't** add a second accent colour.",
+      "**Don't** let colour carry trust without its word.",
+      "**Don't** put a small uppercase label above a heading.",
+      "**Don't** add an animation beyond the four in `keyframes.css`."
+    ]
+  }
+}
