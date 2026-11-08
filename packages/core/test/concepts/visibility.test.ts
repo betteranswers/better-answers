@@ -1899,6 +1899,7 @@ describe("finding concepts", () => {
             iri: visible.iri,
             kind: "Policy",
             title: "Expenses policy",
+            description: null,
             trust: {
               tier: "unverified",
               status: "current",

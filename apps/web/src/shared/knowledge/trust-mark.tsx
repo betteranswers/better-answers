@@ -1,31 +1,39 @@
-import { Icon } from "@/shared/icon.tsx";
+import { Icon, type IconName } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
+import { dayWords } from "@/shared/words.ts";
 
-const TRUST_WORDS = [
-  "verified-by",
-  "verified-automatically",
-  "unverified",
-  "changed-since-verified",
-  "out-of-date",
-  "draft",
-  "deprecated",
-] as const;
+import type { Concept } from "./knowledge-reads.ts";
 
-type TrustWord = (typeof TRUST_WORDS)[number];
+type Trust = Concept["trust"];
+
+type Standing = Pick<Trust, "tier" | "status">;
+
+type Tier = Trust["tier"];
+
+type Status = Trust["status"];
 
 type Tone = "verified" | "unverified" | "stale" | "draft";
 
-const MARKS = {
-  "verified-by": { lead: "Verified by ", tone: "verified" },
-  "verified-automatically": { lead: "Verified automatically", tone: "verified" },
-  unverified: { lead: "Unverified", tone: "unverified" },
-  "changed-since-verified": { lead: "Changed since verified", tone: "stale" },
-  "out-of-date": { lead: "Out of date", tone: "stale" },
-  draft: { lead: "Draft", tone: "draft" },
-  deprecated: { lead: "Deprecated", tone: "unverified" },
-} as const satisfies Record<TrustWord, { readonly lead: string; readonly tone: Tone }>;
+type Mark = { readonly tone: Tone; readonly icon: IconName };
 
-const TINTS = {
+const TIER_MARKS = {
+  unverified: { tone: "unverified", icon: "unverified" },
+  "machine-confirmed": { tone: "verified", icon: "verified-automatically" },
+  "human-reviewed": { tone: "verified", icon: "verified-by" },
+} as const satisfies Record<Tier, Mark>;
+
+const STATUS_MARKS = {
+  "changed-since-checked": { tone: "stale", icon: "changed-since-verified" },
+  "out-of-date": { tone: "stale", icon: "out-of-date" },
+  draft: { tone: "draft", icon: "draft" },
+  deprecated: { tone: "unverified", icon: "deprecated" },
+} as const satisfies Record<Exclude<Status, "current">, Mark>;
+
+/** A status other than `current` is the word the reader sees, so it decides the mark before the tier does. */
+export const markOf = (trust: Standing): Mark =>
+  trust.status === "current" ? TIER_MARKS[trust.tier] : STATUS_MARKS[trust.status];
+
+export const TONE_CLASSES = {
   verified:
     "border-[var(--trust-verified-border)] bg-[var(--trust-verified-bg)] text-[var(--trust-verified-fg)]",
   unverified:
@@ -36,21 +44,52 @@ const TINTS = {
     "border-[var(--trust-draft-border)] bg-[var(--trust-draft-bg)] text-[var(--trust-draft-fg)]",
 } as const satisfies Record<Tone, string>;
 
-const trustWordOf = (words: string): TrustWord | undefined =>
-  TRUST_WORDS.find((word) => words.startsWith(MARKS[word].lead));
+const CHIP = "gap-1.5 border px-2 py-0.5 font-medium";
 
-export function TrustMark(properties: { readonly words: string; readonly className?: string }) {
-  const word = trustWordOf(properties.words);
+const FLAT = "gap-2 font-semibold text-balance [font-size:var(--text-lg)]";
+
+type TrustMarkProperties = {
+  readonly words: string;
+  readonly className?: string;
+  /** Draws no chip, for a cell that carries the tone and the text colour itself. */
+  readonly flat?: true;
+} & (
+  | { readonly trust: Standing; readonly dated?: undefined }
+  | { readonly trust: Standing & Pick<Trust, "verifiedAt">; readonly dated: true }
+);
+
+/** The server's words already carry the date of a person's verification, so only a machine's check needs it. */
+const checkedOn = (properties: TrustMarkProperties): string | null => {
+  if (properties.dated !== true) return null;
+  const { status, tier, verifiedAt } = properties.trust;
+  return status === "current" && tier === "machine-confirmed" && verifiedAt !== null
+    ? verifiedAt
+    : null;
+};
+
+export function TrustMark(properties: TrustMarkProperties) {
+  const { tone, icon } = markOf(properties.trust);
+  const date = checkedOn(properties);
+  const flat = properties.flat === true;
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center gap-1.5 border px-2 py-0.5 font-medium",
-        TINTS[word === undefined ? "unverified" : MARKS[word].tone],
+        "inline-flex max-w-full items-center",
+        flat ? FLAT : CHIP,
+        flat ? undefined : TONE_CLASSES[tone],
         properties.className,
       )}
     >
-      {word === undefined ? null : <Icon name={word} weight="bold" />}
-      <span className="min-w-0 wrap-anywhere">{properties.words}</span>
+      <Icon name={icon} weight="bold" className={flat ? "size-4.5" : ""} />
+      <span className="min-w-0 wrap-anywhere">
+        {properties.words}
+        {date === null ? null : (
+          <>
+            {" · "}
+            <span className="font-mono">{dayWords(date)}</span>
+          </>
+        )}
+      </span>
     </span>
   );
 }

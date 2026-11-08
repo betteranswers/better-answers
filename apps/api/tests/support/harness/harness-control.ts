@@ -30,6 +30,7 @@ import {
   nameOwners,
   ownersNaming,
   seedConceptIndex,
+  seedCollectionGuide,
   seedConcepts,
   seedEditSuggestion,
   seedGuide,
@@ -60,6 +61,7 @@ const HARNESS_PREFIX = "/__harness";
 const provisioning = z.object({
   name: z.string().min(1).optional(),
   adminEmail: z.string().min(1).optional(),
+  adminName: z.string().min(1).optional(),
 });
 const person = z.object({
   email: z.string().min(1).optional(),
@@ -250,7 +252,11 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
 
   control.post(`${HARNESS_PREFIX}/guides`, async (context) => {
     const asked = await readBody(context.req.raw, guideSeeding);
-    return context.json(await seedGuide(app, asked));
+    return context.json(
+      asked.collection === undefined
+        ? await seedGuide(app, asked)
+        : await seedCollectionGuide(app, asked, asked.collection),
+    );
   });
 
   control.post(`${HARNESS_PREFIX}/usage`, async (context) => {

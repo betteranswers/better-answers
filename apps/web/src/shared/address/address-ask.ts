@@ -1,11 +1,12 @@
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-export type Ask = "action" | "search";
+export type Ask = "action" | "search" | "question";
 
 const ASKED_BEFORE = {
   action: "act",
   search: undefined,
+  question: undefined,
 } as const satisfies Readonly<Record<Ask, string | undefined>>;
 
 type Read = { readonly asJson: boolean; readonly string: string | undefined };

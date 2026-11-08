@@ -168,6 +168,8 @@ const CONCEPT_READ = `${conceptSelect({
 
 export type ConceptRead = {
   readonly iri: ConceptIri;
+  readonly path: string;
+  readonly collection: string | null;
   readonly frontmatter: Frontmatter;
   readonly body: string;
   readonly trust: Trust;
@@ -220,6 +222,8 @@ export const readConcept = async (
   const trust = trustOf({ ...concept, verification: verifications[0] }, reads.now);
   return ok({
     iri: concept.iri,
+    path: concept.path,
+    collection: concept.collection,
     frontmatter: projectedFrontmatter(concept.frontmatter, sources.value),
     body: concept.body,
     trust,

@@ -2,6 +2,7 @@ import { useId, useState, type Ref } from "react";
 
 import { ceilingLiftsIn, refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { copiedToTheClipboard } from "@/shared/lib/clipboard.ts";
 import { STOCK, stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
@@ -14,7 +15,6 @@ import {
   recoveryCodesText,
 } from "../account-words.ts";
 import { focusOn, Outcome } from "../auth-page.tsx";
-import { copiedToTheClipboard } from "../clipboard.ts";
 import { CODES_NOT_TICKED, saidOfASecondFactorRefusal } from "../refusal-words.ts";
 
 const COPY_CODES: Keystroke = { key: "c", action: ACCOUNT_ACTIONS.copyCodes };

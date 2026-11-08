@@ -42,10 +42,12 @@ const openedBy = async (seeded: Seeded, reader: UserPrincipal, iri: ConceptIri) 
   return opened.concept;
 };
 
-const aConcept = async (seeded: Seeded, checks: readonly { actor: string; at: Date }[] = []) => {
-  const [iri] = await shelve(db().pool, seeded.workspaceId, [
-    { path: "knowledge/company/expenses.md", checks },
-  ]);
+const aConcept = async (
+  seeded: Seeded,
+  checks: readonly { actor: string; at: Date }[] = [],
+  path = "knowledge/company/expenses.md",
+) => {
+  const [iri] = await shelve(db().pool, seeded.workspaceId, [{ path, checks }]);
   if (iri === undefined) throw new Error("no concept was shelved");
   return iri;
 };
@@ -84,6 +86,28 @@ const inAHiddenSection = (seeded: Seeded, iri: string) =>
     });
     await seed.writeUpInclude({ workspaceId: seeded.workspaceId, writeUpId: writeUp.id, iri });
   });
+
+describe("an opened concept's place", () => {
+  it("carries its path and its collection", async () => {
+    const seeded = await seededWorkspace();
+    const iri = await aConcept(seeded);
+
+    const concept = await openedBy(seeded, seeded.priya, iri);
+
+    expect(concept.path).toBe("knowledge/company/expenses.md");
+    expect(concept.collection).toBe("company");
+  });
+
+  it("has no collection for a concept outside every collection", async () => {
+    const seeded = await seededWorkspace();
+    const iri = await aConcept(seeded, [], "knowledge/loose.md");
+
+    const concept = await openedBy(seeded, seeded.priya, iri);
+
+    expect(concept.path).toBe("knowledge/loose.md");
+    expect(concept.collection).toBeNull();
+  });
+});
 
 describe("an opened concept's verifications", () => {
   it("lists every verification newest first, and trusts the newest", async () => {

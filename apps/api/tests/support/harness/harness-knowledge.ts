@@ -32,6 +32,7 @@ import {
 } from "@better-answers/core/testing/northgate";
 import {
   AUDIENCES,
+  boundarySchemas,
   COLLECTION,
   CONCEPT_STABLE_STATUS,
   CONCEPT_STATUSES,
@@ -104,6 +105,11 @@ const aSource = z
     }
   });
 
+const aVerification = z.strictObject({
+  by: boundarySchemas.user.select.shape.id.optional(),
+  at: z.coerce.date(),
+});
+
 const aConcept = z
   .object({
     title: z.string().min(1),
@@ -115,11 +121,19 @@ const aConcept = z
     audience: z.enum(AUDIENCES).default("everyone"),
     groupMemberIds: z.array(z.string().min(1)).default([]),
     trust: z.enum(TRUST_TIERS).default("unverified"),
+    verifications: z.array(aVerification).min(1).optional(),
     linksTo: z.array(z.string().min(1)).default([]),
     sources: z.array(aSource).default([]),
     frontmatter: conceptFrontmatter.default({}),
   })
   .superRefine((concept, context) => {
+    if (concept.verifications !== undefined && concept.trust !== "unverified") {
+      context.addIssue({
+        code: "custom",
+        path: ["trust"],
+        message: "a concept's verifications set its trust, so it takes one or the other",
+      });
+    }
     if (concept.audience !== "groups") return;
     for (const [nth, memberId] of concept.groupMemberIds.entries()) {
       if (!concept.groupMemberIds.slice(0, nth).includes(memberId)) continue;
@@ -461,22 +475,46 @@ const heldCloser = (concept: AskedConcept, source: AskedSource): boolean =>
 const citesCloserHeldEvidence = (concept: AskedConcept): boolean =>
   concept.sources.some((source) => heldCloser(concept, source));
 
+type Verification = { readonly actor: string; readonly at?: Date };
+
+const verificationsOf = (concept: AskedConcept, writer: Writer): readonly Verification[] => {
+  if (concept.verifications !== undefined) {
+    return concept.verifications.map(({ by, at }) => ({
+      actor: by === undefined ? SUITE_VERIFIER : actorIdOfPerson(by),
+      at,
+    }));
+  }
+  if (concept.trust === "unverified") return [];
+  return [
+    {
+      actor:
+        concept.trust === "human-reviewed"
+          ? actorIdOfPerson(writer.principal.userId)
+          : SUITE_VERIFIER,
+    },
+  ];
+};
+
 const verified = async (
   app: TestApp,
   writer: Writer,
   concept: AskedConcept,
   written: { readonly iri: string; readonly contentHash: string },
 ) => {
-  const actor =
-    concept.trust === "human-reviewed" ? actorIdOfPerson(writer.principal.userId) : SUITE_VERIFIER;
-  await inOneTransaction(app, (client) =>
-    testData(client).conceptVerification({
-      workspaceId: writer.principal.workspaceId,
-      iri: written.iri,
-      actor,
-      contentHash: written.contentHash,
-    }),
-  );
+  const verifications = verificationsOf(concept, writer);
+  if (verifications.length === 0) return;
+  await inOneTransaction(app, async (client) => {
+    const seed = testData(client);
+    for (const { actor, at } of verifications) {
+      await seed.conceptVerification({
+        workspaceId: writer.principal.workspaceId,
+        iri: written.iri,
+        actor,
+        contentHash: written.contentHash,
+        ...(at === undefined ? {} : { verifiedAt: at }),
+      });
+    }
+  });
 };
 
 const seedConcept = async (
@@ -490,7 +528,7 @@ const seedConcept = async (
   else if (citesCloserHeldEvidence(concept)) {
     await sharedPastItsEvidence(app, writer, concept, written.iri);
   }
-  if (concept.trust !== "unverified") await verified(app, writer, concept, written);
+  await verified(app, writer, concept, written);
   const documents = new Map(
     written.citations.flatMap(({ document }) =>
       document === undefined ? [] : [[document.documentId, document.title] as const],
@@ -564,13 +602,23 @@ const strangersToTheWorkspace = (
   asked: Asked,
   members: ReadonlyMap<string, Role>,
 ): readonly Refusal[] =>
-  asked.concepts.flatMap((concept, at) =>
-    strangersAmong(concept.audience === "groups" ? concept.groupMemberIds : [], members, [
+  asked.concepts.flatMap((concept, at) => [
+    ...strangersAmong(concept.audience === "groups" ? concept.groupMemberIds : [], members, [
       "concepts",
       at,
       "groupMemberIds",
     ]),
-  );
+    ...(concept.verifications ?? []).flatMap(({ by }, nth) =>
+      by === undefined || members.has(by)
+        ? []
+        : [
+            {
+              path: ["concepts", at, "verifications", nth, "by"],
+              message: "a verification is by a member of the workspace",
+            },
+          ],
+    ),
+  ]);
 
 const writerRefused = (role: Role | undefined): readonly Refusal[] => {
   if (role === undefined) {
@@ -673,11 +721,20 @@ export const seedManifest = async (
   return { written: landed.value.written };
 };
 
-export const guideSeeding = z.strictObject({
-  workspaceId: z.string().min(1),
-  userId: z.string().min(1),
-  financeUserIds: z.array(z.string().min(1)),
-});
+export const guideSeeding = z
+  .strictObject({
+    workspaceId: z.string().min(1),
+    userId: z.string().min(1),
+    financeUserIds: z.array(z.string().min(1)).default([]),
+    collection: z.string().regex(COLLECTION).optional(),
+  })
+  .refine(
+    ({ collection, financeUserIds }) => collection === undefined || financeUserIds.length === 0,
+    {
+      path: ["financeUserIds"],
+      message: "a guide over a collection seeds no finance group",
+    },
+  );
 
 type GuideAsked = z.output<typeof guideSeeding>;
 
@@ -740,6 +797,24 @@ const guideAlreadyHeld = (guides: number, groups: number): readonly Refusal[] =>
   return groups === 0
     ? []
     : [{ path: ["workspaceId"], message: `the workspace already holds a group named ${FINANCE}` }];
+};
+
+const collectionGuideRefusals = async (
+  app: TestApp,
+  asked: GuideAsked,
+  collection: string,
+): Promise<readonly Refusal[]> => {
+  const { workspaceId, userId } = asked;
+  const held = await app.database.superuser.query<{ held: number }>(
+    "SELECT count(*)::int AS held FROM concept_index WHERE workspace_id = $1 AND collection = $2",
+    [workspaceId, collection],
+  );
+  return [
+    ...writerRefused((await membersOf(app, workspaceId)).get(userId)),
+    ...(held.rows[0]?.held === 0
+      ? [{ path: ["collection"], message: `the workspace holds no concept in ${collection}` }]
+      : []),
+  ];
 };
 
 const guideRefusals = async (app: TestApp, asked: GuideAsked): Promise<readonly Refusal[]> => {
@@ -828,6 +903,22 @@ const briefsWritten = async (
       throw new Error(`the Brief of "${section.prompt}" was not saved as version 2`);
     }
   }
+};
+
+type CollectionGuideSeeded = Pick<GuideSeeded, "guideId" | "sections">;
+
+export const seedCollectionGuide = async (
+  app: TestApp,
+  asked: GuideAsked,
+  collection: string,
+): Promise<CollectionGuideSeeded> => {
+  const { workspaceId, userId } = asked;
+  refuse(await collectionGuideRefusals(app, asked, collection));
+  const principal = await actingIn(app, { workspaceId, userId }, async (resolved) => resolved);
+  const seeded = await seedGuideRows(principal, guideDoors(app), { ...BID_LIBRARY, collection });
+  if (!seeded.ok) throw new Error(`the guide was refused: ${String(seeded.error)}`);
+  const { guideId } = seeded.value;
+  return { guideId, sections: await sectionsOf(app, { workspaceId, userId }, guideId) };
 };
 
 export const seedGuide = async (app: TestApp, asked: GuideAsked): Promise<GuideSeeded> => {

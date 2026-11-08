@@ -769,10 +769,12 @@ describe("a concept's relations", () => {
       [
         "body",
         "bodyLinks",
+        "collection",
         "frontmatter",
         "iri",
         "owner",
         "pane",
+        "path",
         "relations",
         "trust",
         "trustWords",
@@ -874,10 +876,12 @@ describe("a body's links", () => {
     const seen: string[] = [];
     for (const { iri } of [toWithheld, toUnwritten, outOfTheBundle]) {
       seen.push(
-        JSON.stringify({ ...(await readFor(scenario.viewer, iri)), owner: undefined }).replaceAll(
-          iri,
-          "this concept",
-        ),
+        JSON.stringify({
+          ...(await readFor(scenario.viewer, iri)),
+          owner: undefined,
+          path: undefined,
+          collection: undefined,
+        }).replaceAll(iri, "this concept"),
       );
     }
 

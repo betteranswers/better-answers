@@ -55,7 +55,7 @@ export const pageNamed = <Held extends MenuGroup>(
   return page;
 };
 
-const NEW_QUESTION = pageNamed(menuGroupIn(ASK, "ask"), "New Question");
+export const NEW_QUESTION = pageNamed(menuGroupIn(ASK, "ask"), "New Question");
 
 export const HOMES = {
   Admin: pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members"),

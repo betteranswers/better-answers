@@ -17,6 +17,7 @@ export const CONCEPT_KEYSTROKES = {
   back: wayBackKeystroke("Search"),
   sources: { key: "s", action: "Go to the Concept’s Sources" },
   links: { key: "l", action: "Go to the Concept’s Links" },
+  copy: { key: "c", action: "Copy the concept’s text" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const EDITOR_KEYSTROKES = {

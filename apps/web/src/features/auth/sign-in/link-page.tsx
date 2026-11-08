@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { copiedToTheClipboard } from "@/shared/lib/clipboard.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
@@ -19,7 +20,6 @@ import {
 } from "../auth-hooks.ts";
 import { AuthPage, Outcome, ReadAgain } from "../auth-page.tsx";
 import { carriedOnTo, leavingFor } from "../carried-flow.ts";
-import { copiedToTheClipboard } from "../clipboard.ts";
 import { saidOfAFailure } from "../refusal-words.ts";
 import { useStepAfterSignIn } from "../second-factor-steps.ts";
 import {

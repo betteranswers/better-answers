@@ -30,7 +30,14 @@ import { answersUsing } from "./records.ts";
 import type { OpenResult, AnswerResult } from "./results.ts";
 
 export { NOT_COMPANY_KNOWLEDGE } from "./results.ts";
-export type { FindMatch, FindResult, OpenView, OpenResult, AnswerResult } from "./results.ts";
+export type {
+  FindMatch,
+  FindResult,
+  FoundForText,
+  OpenedForText,
+  OpenResult,
+  AnswerResult,
+} from "./results.ts";
 export { find } from "./find.ts";
 export { renderFind, renderOpen, mapWords, renderAnswer } from "./render.ts";
 
@@ -144,6 +151,8 @@ const conceptOpened = async (
 
   const {
     iri,
+    path,
+    collection,
     frontmatter,
     body,
     relations,
@@ -158,6 +167,8 @@ const conceptOpened = async (
     found: true,
     concept: {
       iri,
+      path,
+      collection,
       frontmatter,
       body,
       relations,

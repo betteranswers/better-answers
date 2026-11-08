@@ -23,8 +23,9 @@ import {
   type AnswerResult,
   type FindMatch,
   type FindResult,
+  type FoundForText,
+  type OpenedForText,
   type OpenResult,
-  type OpenView,
   type RelatedConcept,
   type ReturnedConcept,
   type Trust,
@@ -61,7 +62,7 @@ const coreTrust = ({ tier, status, checkedBy, checkedAt, rider }: WireTrust): Tr
     : { tier, status, verifiedBy: checkedBy, verifiedAt: checkedAt, rider };
 
 type WireMatch<Match> = Match extends { readonly trust: Trust }
-  ? Omit<Match, "trust"> & { readonly trust: WireTrust }
+  ? Omit<Match, "trust" | "description"> & { readonly trust: WireTrust }
   : Match;
 
 type WireFound = {
@@ -72,12 +73,14 @@ type WireFound = {
 
 const foundOnTheWire = ({ matches, ...found }: FindResult): WireFound => ({
   ...found,
-  hits: matches.map((match) =>
-    match.layer === "bundles" ? { ...match, trust: wireTrust(match.trust) } : match,
-  ),
+  hits: matches.map((match) => {
+    if (match.layer !== "bundles") return match;
+    const { description: _description, ...concept } = match;
+    return { ...concept, trust: wireTrust(match.trust) };
+  }),
 });
 
-const foundInCore = ({ hits, ...found }: WireFound): FindResult<string> => ({
+const foundInCore = ({ hits, ...found }: WireFound): FoundForText => ({
   ...found,
   matches: hits.map((match) =>
     match.layer === "bundles" ? { ...match, trust: coreTrust(match.trust) } : match,
@@ -110,7 +113,7 @@ const openedOnTheWire = (opened: OpenResult<string>) => {
 
 type WireOpened = ReturnType<typeof openedOnTheWire>;
 
-const openedInCore = (opened: WireOpened): OpenView<string> => {
+const openedInCore = (opened: WireOpened): OpenedForText => {
   if (!opened.found || !("concept" in opened)) return opened;
   return { ...opened, concept: { ...opened.concept, trust: coreTrust(opened.concept.trust) } };
 };

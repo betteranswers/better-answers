@@ -2,6 +2,7 @@ import { useRef, type RefObject } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { cn } from "@/shared/lib/utils.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import {
   DropdownMenu,
@@ -24,6 +25,7 @@ type Choice = { readonly value: string; readonly label: string };
 
 type Search = {
   readonly label: string;
+  readonly wide?: boolean;
   readonly maxLength?: number;
   readonly value: string;
   readonly onChange: (value: string) => void;
@@ -69,11 +71,11 @@ function FocusOn(properties: {
 }
 
 function SearchField(properties: { readonly search: Search }) {
-  const { label, value, onChange, keystroke, maxLength } = properties.search;
+  const { label, value, onChange, keystroke, maxLength, wide } = properties.search;
   const own = useRef<HTMLInputElement>(null);
   const ref = properties.search.inputRef ?? own;
   return (
-    <div className="relative w-full max-w-64">
+    <div className={cn("relative w-full", wide === true ? "max-w-xl" : "max-w-64")}>
       <Icon
         name="search"
         className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground"

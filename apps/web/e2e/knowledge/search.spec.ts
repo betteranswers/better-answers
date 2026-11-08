@@ -4,7 +4,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { SEARCH_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
-import { HOMES } from "@/shared/navigation.ts";
+import { HOMES, NEW_QUESTION } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -322,6 +322,21 @@ test.describe("the Knowledge Search page", () => {
       await expect(opener).toBeFocused();
     });
   }
+
+  test("a search with no match leads to Ask", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Calder Records", []);
+    await foundNothing(page, "zebra");
+
+    await expect(statusOf(page)).toHaveText("Nothing matches “zebra”.");
+    const next = searchRegion(page).getByRole("list", { name: "Where to look next" });
+    await expect(next.getByRole("link", { name: "Guides" })).toBeVisible();
+    await expect(next.getByRole("link", { name: "Knowledge Base" })).toBeVisible();
+
+    await next.getByRole("link", { name: "Ask this question" }).click();
+
+    await expect(page, "the question stayed in the address").toHaveURL(NEW_QUESTION.path);
+    await expect(page.getByRole("textbox", { name: "Question" })).toHaveValue("zebra");
+  });
 
   test("an Admin searches, opens, and loads more matches by keyboard", async ({
     page,

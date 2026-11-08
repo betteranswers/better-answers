@@ -130,7 +130,7 @@ function CitedConcept(properties: {
       {read === undefined ? null : (
         <>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <TrustMark words={read.trustWords} />
+            <TrustMark trust={read.trust} words={read.trustWords} />
             <KindLine kind={kindOf(read.frontmatter)} />
           </div>
           {titleOf(read.frontmatter) === opened.title ? null : (

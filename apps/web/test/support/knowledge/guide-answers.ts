@@ -69,6 +69,7 @@ export const aSection = (changes: Changes = {}) => ({
   layers: ["assembled", "quoted"],
   hidden: false,
   needsReview: null,
+  trust: { tier: "machine-confirmed", status: "current" },
   trustWords: "Verified automatically",
   copy: "offered",
   coverage: { met: 3, of: 4, facts: [aFact()] },

@@ -258,7 +258,7 @@ function SectionHead(properties: {
         {WORDS.heading(section.number, section.prompt)}
       </Heading>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <TrustMark words={section.trustWords} />
+        <TrustMark trust={section.trust} words={section.trustWords} />
         {section.needsReview === null ? null : (
           <>
             <Pill variant="outline">{WORDS.needsReview}</Pill>

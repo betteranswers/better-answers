@@ -142,6 +142,7 @@ export type TestApp = {
   provision(input?: {
     name?: string | undefined;
     adminEmail?: string | undefined;
+    adminName?: string | undefined;
   }): Promise<Provisioned>;
 
   person(email?: string, name?: string): Promise<Person>;
@@ -386,7 +387,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
   };
 
   const provision: TestApp["provision"] = async (input = {}) => {
-    const admin = await person(input.adminEmail);
+    const admin = await person(input.adminEmail, input.adminName);
     const id = ulid();
     const name = input.name ?? `Workspace ${id.slice(-4)}`;
     const shortName = `ws-${id.toLowerCase()}`;

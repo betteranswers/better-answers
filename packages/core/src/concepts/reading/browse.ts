@@ -114,6 +114,7 @@ type KindConcept = {
   readonly iri: ConceptIri;
   readonly title: string;
   readonly kind: string;
+  readonly trust: Pick<Trust, "tier" | "status">;
   readonly trustWords: string;
 };
 
@@ -160,12 +161,16 @@ export const trustOfRow = (row: TrustRow, judgedAt: Date): Trust =>
     judgedAt,
   );
 
-const kindConceptOf = (row: KindConceptRow, judgedAt: Date): KindConcept => ({
-  iri: ids.conceptIri.parse(row.iri),
-  title: row.title,
-  kind: row.kind,
-  trustWords: trustWords(trustOfRow(row, judgedAt)),
-});
+const kindConceptOf = (row: KindConceptRow, judgedAt: Date): KindConcept => {
+  const trust = trustOfRow(row, judgedAt);
+  return {
+    iri: ids.conceptIri.parse(row.iri),
+    title: row.title,
+    kind: row.kind,
+    trust: { tier: trust.tier, status: trust.status },
+    trustWords: trustWords(trust),
+  };
+};
 
 const kindConceptsOf = (rows: readonly KindConceptRow[], judgedAt: Date): KindConcepts => {
   const page = rows.slice(0, KIND_PAGE_SIZE).map((row) => kindConceptOf(row, judgedAt));
