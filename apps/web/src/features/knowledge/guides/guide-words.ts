@@ -58,7 +58,7 @@ export const GUIDE_WORDS = {
   notRecorded: "It wasn’t recorded as used.",
   notAllowed: "Your browser blocked copying.",
   belowYourRole: "You can’t copy this section yet. Some of its concepts need verifying first.",
-  nothingToCopy: "This section has no Brief to copy.",
+  nothingToCopy: "You can’t copy this section.",
   closeToCopy: "Close the editor before you copy.",
 } as const;
 
