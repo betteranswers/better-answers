@@ -6,8 +6,8 @@ import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { LINK } from "@/shared/knowledge/concept-body.tsx";
 import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
-import { KindLine } from "@/shared/knowledge/kind-line.tsx";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
+import { TypeLine } from "@/shared/knowledge/type-line.tsx";
 import { ListState, RecordLoading } from "@/shared/list/list-pages.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
@@ -95,7 +95,7 @@ function GuideHeader(properties: { readonly guide: Guide }) {
   const subjectPage = subject === null ? undefined : conceptPageOf(subject.iri);
   return (
     <header className="mt-4">
-      <KindLine conceptType={guide.guideType} collection={guide.collection} />
+      <TypeLine type={guide.guideType} collection={guide.collection} />
       {subject === null || subjectPage === undefined ? null : (
         <p className="mt-2">
           <span className="text-muted-foreground">{WORDS.subject} </span>

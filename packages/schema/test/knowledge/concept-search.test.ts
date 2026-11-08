@@ -81,7 +81,7 @@ describe("the concept's search column", () => {
     });
   });
 
-  it("weights tags in either form and the kind at B", async () => {
+  it("weights tags in either form and the type at B", async () => {
     await withACommit(async (client, seed) => {
       const weighedB = async (
         frontmatter: Record<string, string | string[]>,

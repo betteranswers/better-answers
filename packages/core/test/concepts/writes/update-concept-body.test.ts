@@ -8,7 +8,7 @@ import { doorsOf, suiteWithBundles } from "../../fixtures/workspace-with-bundle.
 
 const { db, arrange } = suiteWithBundles();
 
-const kindOf = async (iri: ConceptIri): Promise<string | undefined> => {
+const conceptTypeOf = async (iri: ConceptIri): Promise<string | undefined> => {
   const found = await db().pool.query<{ concept_type: string }>(
     "SELECT concept_type FROM concept_index WHERE iri = $1",
     [iri],
@@ -16,7 +16,7 @@ const kindOf = async (iri: ConceptIri): Promise<string | undefined> => {
   return found.rows[0]?.concept_type;
 };
 
-it("keeps an Analyses concept's stored kind through a body update", async () => {
+it("keeps an Analyses concept's stored type through a body update", async () => {
   const scenario = await arrange();
   const title = "Quarterly Margins";
   const landed = await writeConcept(scenario.admin, doorsOf(scenario), {
@@ -34,7 +34,7 @@ it("keeps an Analyses concept's stored kind through a body update", async () => 
   });
   assert(landed.ok, "the write landed");
   const { iri, contentHash } = landed.value;
-  const stored = await kindOf(iri);
+  const stored = await conceptTypeOf(iri);
 
   const updated = await updateConceptBody(scenario.admin, doorsOf(scenario), {
     iri,
@@ -44,5 +44,5 @@ it("keeps an Analyses concept's stored kind through a body update", async () => 
   });
 
   expect(updated).toMatchObject({ ok: true, value: { written: { iri } } });
-  expect(await kindOf(iri)).toBe(stored);
+  expect(await conceptTypeOf(iri)).toBe(stored);
 });

@@ -34,8 +34,8 @@ import { conceptVisibilityFrom, replaceCitations } from "../visibility.ts";
 import { restsAlsoOnUnlessEvidenceAgrees } from "../writes/reconciler-hit.ts";
 import { markDeciding } from "../writes/suggestions.ts";
 
-export const mergeKeyOf = (foldedKind: string, title: string): string =>
-  `${foldedKind}:${title.trim().replaceAll(/\s+/gu, " ").toLowerCase()}`;
+export const mergeKeyOf = (foldedConceptType: string, title: string): string =>
+  `${foldedConceptType}:${title.trim().replaceAll(/\s+/gu, " ").toLowerCase()}`;
 
 const conceptRow = boundarySchemas.conceptIndex.insert.omit({ commitSha: true });
 

@@ -6,8 +6,8 @@ import {
   type Heading,
   type Opened,
 } from "@/shared/knowledge/evidence-panel.tsx";
-import { KindLine } from "@/shared/knowledge/kind-line.tsx";
 import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
+import { TypeLine } from "@/shared/knowledge/type-line.tsx";
 import { useLandingLine } from "@/shared/landing.ts";
 import { RowLink } from "@/shared/list/grid-table.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -58,8 +58,8 @@ export function ConceptLine(properties: {
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <TrustMark trust={match.trust} words={match.trustWords} dated />
-        <KindLine
-          conceptType={match.conceptType}
+        <TypeLine
+          type={match.conceptType}
           collection={match.collection ?? CONCEPT_WORDS.noCollection}
         />
       </div>
@@ -97,7 +97,7 @@ export function PassageLine(properties: {
           {match.title}
         </Button>
         <SensitivityTag sensitivity={match.sensitivity} />
-        <KindLine conceptType={WORDS.document} className="basis-full" />
+        <TypeLine type={WORDS.document} className="basis-full" />
       </div>
       <p className="mt-1 break-words text-muted-foreground">{match.openingLine}</p>
       {opened === undefined || opening.beside ? null : (

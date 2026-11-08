@@ -463,7 +463,7 @@ describe("editing a concept on its own page", () => {
     const address = newConceptAt({
       new: "Cyber Essentials Plus certificate",
       collection: "policies",
-      kind: "certification",
+      type: "certification",
       tags: "cyber-essentials",
       subject: A_CONCEPT_IRI,
     });
@@ -521,7 +521,7 @@ describe("editing a concept on its own page", () => {
     const address = newConceptAt({
       new: "Cyber Essentials Plus certificate",
       collection: "policies",
-      kind: "Policy",
+      type: "Policy",
       subject: A_CONCEPT_IRI,
     });
     const router = await openAt(address, api);

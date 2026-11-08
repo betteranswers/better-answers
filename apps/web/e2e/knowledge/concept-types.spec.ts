@@ -1,11 +1,11 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import {
-  KINDS_KEYSTROKES as KEY,
-  KINDS_LIST,
-  KINDS_PAGE,
+  CONCEPT_TYPES_KEYSTROKES as KEY,
+  CONCEPT_TYPES_LIST,
+  CONCEPT_TYPES_PAGE,
 } from "@/features/knowledge/curation/curation-state.ts";
-import { KINDS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
+import { CONCEPT_TYPES_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -21,7 +21,7 @@ import { listsItsKeystrokes, signedIn } from "../knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-const KINDS = KINDS_PAGE.path;
+const CONCEPT_TYPES = CONCEPT_TYPES_PAGE.path;
 
 const EDITOR = "Ifan Morgan";
 
@@ -29,7 +29,7 @@ type Member = { readonly id: string; readonly email: string };
 
 type Curated = { readonly admin: Member; readonly editor: Member };
 
-const aWorkspaceOfKinds = async (api: APIRequestContext, name: string): Promise<Curated> => {
+const aWorkspaceOfConceptTypes = async (api: APIRequestContext, name: string): Promise<Curated> => {
   const adminEmail = anAddress("admin");
   const workspace = await provision(api, { name, adminEmail });
   const { workspaceId } = workspace;
@@ -88,49 +88,51 @@ const aWorkspaceOfKinds = async (api: APIRequestContext, name: string): Promise<
   };
 };
 
-const kinds = (page: Page): Locator => page.getByRole("region", { name: KINDS_PAGE.name });
+const conceptTypes = (page: Page): Locator =>
+  page.getByRole("region", { name: CONCEPT_TYPES_PAGE.name });
 
-const kindsDrawn = async (page: Page): Promise<Locator> => {
-  await page.goto(KINDS);
-  await expect(kinds(page).getByRole("table")).toBeVisible();
-  return kinds(page);
+const conceptTypesDrawn = async (page: Page): Promise<Locator> => {
+  await page.goto(CONCEPT_TYPES);
+  await expect(conceptTypes(page).getByRole("table")).toBeVisible();
+  return conceptTypes(page);
 };
 
 const disclosureOf = (page: Page, conceptType: string): Locator =>
-  kinds(page).getByRole("button", { name: new RegExp(`^${conceptType}`) });
+  conceptTypes(page).getByRole("button", { name: new RegExp(`^${conceptType}`) });
 
 const collectionsOf = (page: Page, conceptType: string): Locator =>
-  kinds(page).getByRole("list", { name: WORDS.collectionsOf(conceptType) });
+  conceptTypes(page).getByRole("list", { name: WORDS.collectionsOf(conceptType) });
 
 const rowTexts = async (page: Page): Promise<string[]> =>
-  (await kinds(page).locator("tbody tr").allInnerTexts()).map((row) =>
+  (await conceptTypes(page).locator("tbody tr").allInnerTexts()).map((row) =>
     row.replace("by collection", "").replace(/\s+/gu, " ").trim(),
   );
 
-const filter = (page: Page): Locator => kinds(page).getByRole("button", { name: WORDS.tail });
+const filter = (page: Page): Locator =>
+  conceptTypes(page).getByRole("button", { name: WORDS.tail });
 
-test.describe("Kinds", () => {
-  test("an Admin filters, sorts, and opens kinds by keyboard", async ({
+test.describe("Concept Types", () => {
+  test("an Admin filters, sorts, and opens types by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
-    const at = await aWorkspaceOfKinds(request, "Teme Valley Surveys");
+    const at = await aWorkspaceOfConceptTypes(request, "Teme Valley Surveys");
     await signedIn(page, request, at.admin.email);
 
     const started = Date.now();
-    await page.goto(KINDS);
-    await expect(kinds(page).getByRole("table")).toBeVisible();
+    await page.goto(CONCEPT_TYPES);
+    await expect(conceptTypes(page).getByRole("table")).toBeVisible();
     const elapsed = Date.now() - started;
-    test.info().annotations.push({ type: "kinds", description: `${elapsed} ms` });
-    expect(elapsed, "the kinds took longer than the list time budget to render").toBeLessThan(
+    test.info().annotations.push({ type: "concept types", description: `${elapsed} ms` });
+    expect(elapsed, "the types took longer than the list time budget to render").toBeLessThan(
       LIST_BUDGET_MS,
     );
 
-    await expect(kinds(page)).toMatchAriaSnapshot(`
-      - region "${KINDS_PAGE.name}":
+    await expect(conceptTypes(page)).toMatchAriaSnapshot(`
+      - region "${CONCEPT_TYPES_PAGE.name}":
         - /children: equal
-        - heading "${KINDS_PAGE.name}" [level=2]
+        - heading "${CONCEPT_TYPES_PAGE.name}" [level=2]
         - status: ${WORDS.count(3, 3)}
         - status
         - button "${WORDS.tail}"
@@ -139,10 +141,10 @@ test.describe("Kinds", () => {
           - caption
           - rowgroup:
             - /children: equal
-            - row "${WORDS.columns.kind} ${WORDS.columns.concepts}":
+            - row "${WORDS.columns.type} ${WORDS.columns.concepts}":
               - /children: equal
-              - columnheader "${WORDS.columns.kind}":
-                - button "${WORDS.columns.kind}"
+              - columnheader "${WORDS.columns.type}":
+                - button "${WORDS.columns.type}"
               - columnheader "${WORDS.columns.concepts}":
                 - button "${WORDS.columns.concepts}"
           - rowgroup:
@@ -164,18 +166,18 @@ test.describe("Kinds", () => {
               - cell "1"
     `);
     await expect(
-      kinds(page).getByRole("columnheader", { name: WORDS.columns.kind }),
+      conceptTypes(page).getByRole("columnheader", { name: WORDS.columns.type }),
     ).toHaveAttribute("aria-sort", "ascending");
     await passesTheAccessibilityGate();
 
     await skipLinkReachesThePage(page);
 
-    await test.step("turns the Kinds With Two or Fewer Concepts filter on and off by keyboard alone", async () => {
+    await test.step("turns the Types With Two or Fewer Concepts filter on and off by keyboard alone", async () => {
       await page.keyboard.press("Tab");
       await expect(filter(page)).toBeFocused();
       await page.keyboard.press("Enter");
       await expect(filter(page)).toHaveAttribute("aria-pressed", "true");
-      await expect(page).toHaveURL(new RegExp(`${KINDS_LIST}\\.tail=small`));
+      await expect(page).toHaveURL(new RegExp(`${CONCEPT_TYPES_LIST}\\.tail=small`));
       expect(await rowTexts(page)).toEqual(["Procedure 2", "Term 1"]);
       await page.keyboard.press("Enter");
       await expect(filter(page)).toHaveAttribute("aria-pressed", "false");
@@ -185,21 +187,21 @@ test.describe("Kinds", () => {
     await test.step("sorts by the Concepts column by keyboard alone", async () => {
       await page.keyboard.press("Tab");
       await expect(
-        kinds(page).getByRole("button", { name: WORDS.columns.kind, exact: true }),
+        conceptTypes(page).getByRole("button", { name: WORDS.columns.type, exact: true }),
       ).toBeFocused();
       await page.keyboard.press("Tab");
-      const concepts = kinds(page).getByRole("button", { name: "Concepts", exact: true });
+      const concepts = conceptTypes(page).getByRole("button", { name: "Concepts", exact: true });
       await expect(concepts).toBeFocused();
       await page.keyboard.press("Enter");
-      await expect(page).toHaveURL(new RegExp(`${KINDS_LIST}\\.sort=count`));
+      await expect(page).toHaveURL(new RegExp(`${CONCEPT_TYPES_LIST}\\.sort=count`));
       expect(await rowTexts(page)).toEqual(["Term 1", "Procedure 2", "Policy 3"]);
       await page.keyboard.press("Enter");
-      await expect(page).toHaveURL(new RegExp(`${KINDS_LIST}\\.sort=-count`));
+      await expect(page).toHaveURL(new RegExp(`${CONCEPT_TYPES_LIST}\\.sort=-count`));
       await expect(concepts).toBeFocused();
       expect(await rowTexts(page)).toEqual(["Policy 3", "Procedure 2", "Term 1"]);
     });
 
-    await test.step("opens and closes a kind by keyboard alone", async () => {
+    await test.step("opens and closes a type by keyboard alone", async () => {
       await page.keyboard.press("Tab");
       await expect(disclosureOf(page, "Policy")).toBeFocused();
       await page.keyboard.press(KEY.open.key);
@@ -217,13 +219,15 @@ test.describe("Kinds", () => {
       await page.reload();
       await expect(filter(page)).toHaveAttribute("aria-pressed", "true");
       expect(await rowTexts(page)).toEqual(["Procedure 2", "Term 1"]);
-      await expect(kinds(page).getByRole("columnheader", { name: "Concepts" })).toHaveAttribute(
-        "aria-sort",
-        "descending",
-      );
+      await expect(
+        conceptTypes(page).getByRole("columnheader", { name: "Concepts" }),
+      ).toHaveAttribute("aria-sort", "descending");
     });
 
-    await listsItsKeystrokes(page, KINDS_PAGE.name, KEY, [KEY.tail.action, KEY.open.action]);
+    await listsItsKeystrokes(page, CONCEPT_TYPES_PAGE.name, KEY, [
+      KEY.tail.action,
+      KEY.open.action,
+    ]);
   });
 
   test("a collection-owning Editor's counts include only concepts they can read", async ({
@@ -231,28 +235,28 @@ test.describe("Kinds", () => {
     request,
     passesTheAccessibilityGate,
   }) => {
-    const at = await aWorkspaceOfKinds(request, "Wye Valley Tools");
+    const at = await aWorkspaceOfConceptTypes(request, "Wye Valley Tools");
     await signedIn(page, request, at.editor.email);
-    await kindsDrawn(page);
+    await conceptTypesDrawn(page);
 
     expect(await rowTexts(page), "the counts include withheld concepts").toEqual([
       "Policy 2",
       "Procedure 2",
       "Term 1",
     ]);
-    await expect(kinds(page).getByText(WORDS.count(3, 3))).toBeVisible();
-    await expect(kinds(page).getByText("Minutes")).toHaveCount(0);
-    await expect(kinds(page).getByText("board")).toHaveCount(0);
+    await expect(conceptTypes(page).getByText(WORDS.count(3, 3))).toBeVisible();
+    await expect(conceptTypes(page).getByText("Minutes")).toHaveCount(0);
+    await expect(conceptTypes(page).getByText("board")).toHaveCount(0);
     await expect(page.getByText(/bundle/iu)).toHaveCount(0);
 
-    await test.step("shows all three kinds when the Kinds With Two or Fewer Concepts filter is on", async () => {
+    await test.step("shows all three types when the Types With Two or Fewer Concepts filter is on", async () => {
       await filter(page).click();
       await expect(filter(page)).toHaveAttribute("aria-pressed", "true");
       expect(await rowTexts(page)).toEqual(["Policy 2", "Procedure 2", "Term 1"]);
-      await expect(kinds(page).getByText(WORDS.count(3, 3))).toBeVisible();
+      await expect(conceptTypes(page).getByText(WORDS.count(3, 3))).toBeVisible();
     });
 
-    await test.step("counts each kind in each collection the Editor can read", async () => {
+    await test.step("counts each type in each collection the Editor can read", async () => {
       await disclosureOf(page, "Policy").click();
       await expect(collectionsOf(page, "Policy").getByRole("listitem")).toHaveText(["hr2"]);
       await disclosureOf(page, "Procedure").click();

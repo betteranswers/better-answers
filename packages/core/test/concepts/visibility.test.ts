@@ -340,12 +340,12 @@ describe("what a governed write takes from its cited connected sources", () => {
     });
   });
 
-  it("gives a kind named __proto__ the fallback sensitivity", async () => {
+  it("gives a type named __proto__ the fallback sensitivity", async () => {
     const scenario = await arrange();
 
     const written = await conceptCiting(scenario, scenario.editor, [], {
       conceptType: "__proto__",
-      frontmatter: { title: "A kind named for the prototype", type: "__proto__" },
+      frontmatter: { title: "A type named for the prototype", type: "__proto__" },
       sensitivity: "Internal",
     });
 

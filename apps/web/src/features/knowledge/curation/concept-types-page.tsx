@@ -19,18 +19,18 @@ import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { CLEAR_WORDS } from "@/shared/words.ts";
 
-import { useKinds, type KindCounted } from "../knowledge-api.ts";
+import { useConceptTypes, type ConceptTypeCounted } from "../knowledge-api.ts";
 import {
-  KINDS_FIELDS,
-  KINDS_KEYSTROKES as KEY,
-  KINDS_LIST,
-  KINDS_PAGE as KINDS,
-  KINDS_TAIL_MAX,
-  kindsSortedOf,
-  kindsSortOf,
-  type KindsSort,
+  CONCEPT_TYPES_FIELDS,
+  CONCEPT_TYPES_KEYSTROKES as KEY,
+  CONCEPT_TYPES_LIST,
+  CONCEPT_TYPES_PAGE,
+  CONCEPT_TYPES_TAIL_MAX,
+  conceptTypesSortedOf,
+  conceptTypesSortOf,
+  type ConceptTypesSort,
 } from "./curation-state.ts";
-import { KINDS_WORDS as WORDS } from "./curation-words.ts";
+import { CONCEPT_TYPES_WORDS as WORDS } from "./curation-words.ts";
 
 const { outcomeOfFailure } = refusalsOf(WORDS.refusals);
 
@@ -38,25 +38,25 @@ const wordsOfFailure = (failure: Error | ApiError) => outcomeOfFailure(failure, 
 
 const LISTED: readonly Keystroke[] = Object.values(KEY);
 
-const SORTABLE: ReadonlySet<string> = new Set(["kind", "count"]);
+const SORTABLE: ReadonlySet<string> = new Set(["type", "count"]);
 
-const NONE: readonly KindCounted[] = [];
+const NONE: readonly ConceptTypeCounted[] = [];
 
 const NONE_OPEN: ReadonlySet<string> = new Set();
 
 const features = tableFeatures({});
 
-const column = createColumnHelper<typeof features, KindCounted>();
+const column = createColumnHelper<typeof features, ConceptTypeCounted>();
 
 const arranged = (
-  kinds: readonly KindCounted[],
-  sort: KindsSort,
+  conceptTypes: readonly ConceptTypeCounted[],
+  sort: ConceptTypesSort,
   tail: boolean,
-): readonly KindCounted[] => {
-  const { id, desc } = kindsSortedOf(sort);
+): readonly ConceptTypeCounted[] => {
+  const { id, desc } = conceptTypesSortedOf(sort);
   const direction = desc ? -1 : 1;
-  return kinds
-    .filter((each) => !tail || each.count <= KINDS_TAIL_MAX)
+  return conceptTypes
+    .filter((each) => !tail || each.count <= CONCEPT_TYPES_TAIL_MAX)
     .toSorted(
       (one, other) =>
         direction *
@@ -83,7 +83,7 @@ const DisclosuresContext = createContext<Disclosures>({
   toggle: () => undefined,
 });
 
-function KindCell(properties: { readonly counted: KindCounted }) {
+function ConceptTypeCell(properties: { readonly counted: ConceptTypeCounted }) {
   const { counted } = properties;
   const disclosures = useContext(DisclosuresContext);
   const open = disclosures.opened.has(counted.conceptType);
@@ -115,9 +115,9 @@ function KindCell(properties: { readonly counted: KindCounted }) {
 
 const COLUMNS = column.columns([
   column.accessor("conceptType", {
-    id: "kind",
-    header: WORDS.columns.kind,
-    cell: ({ row }) => <KindCell counted={row.original} />,
+    id: "type",
+    header: WORDS.columns.type,
+    cell: ({ row }) => <ConceptTypeCell counted={row.original} />,
   }),
   column.accessor("count", {
     header: WORDS.columns.concepts,
@@ -149,14 +149,14 @@ function TailSwitch(properties: {
 }
 
 type Narrowing = {
-  readonly sort: KindsSort;
+  readonly sort: ConceptTypesSort;
   readonly tail: boolean;
-  readonly onSort: (sort: KindsSort) => void;
+  readonly onSort: (sort: ConceptTypesSort) => void;
   readonly onTail: (tail: boolean) => void;
 };
 
-function KindsTable(properties: {
-  readonly shown: readonly KindCounted[];
+function ConceptTypesTable(properties: {
+  readonly shown: readonly ConceptTypeCounted[];
   readonly narrowing: Narrowing;
   readonly say: Saying;
 }) {
@@ -210,9 +210,9 @@ function KindsTable(properties: {
         caption={WORDS.caption}
         sorting={{
           sortable: SORTABLE,
-          sorted: kindsSortedOf(sort),
+          sorted: conceptTypesSortedOf(sort),
           onSortedChange: (next) => {
-            const picked = kindsSortOf(next);
+            const picked = conceptTypesSortOf(next);
             if (picked !== undefined) onSort(picked);
           },
         }}
@@ -234,14 +234,14 @@ function KindsTable(properties: {
   );
 }
 
-function KindsRegion() {
+function ConceptTypesRegion() {
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
-  const read = useKinds();
+  const read = useConceptTypes();
   useArrivalDecidedAgainOnceUnowned(ownsNoLonger(read.error));
-  const { state, write } = useListAddress(KINDS_LIST, KINDS_FIELDS);
+  const { state, write } = useListAddress(CONCEPT_TYPES_LIST, CONCEPT_TYPES_FIELDS);
   const [outcome, say] = useState<Outcome>();
-  const listed = read.data?.kinds ?? NONE;
+  const listed = read.data?.conceptTypes ?? NONE;
   const { sort } = state;
   const tail = state.tail === "small";
   const shown = useMemo(() => arranged(listed, sort, tail), [listed, sort, tail]);
@@ -249,7 +249,7 @@ function KindsRegion() {
   return (
     <section aria-labelledby={headingId} className="mt-6">
       <ListHead
-        heading={KINDS.name}
+        heading={CONCEPT_TYPES_PAGE.name}
         headingId={headingId}
         headingRef={heading}
         count={read.data === undefined ? "" : WORDS.count(shown.length, listed.length)}
@@ -265,7 +265,7 @@ function KindsRegion() {
           {listed.length === 0 ? (
             <ListState state={{ kind: "empty", words: WORDS.none, action: null }} />
           ) : (
-            <KindsTable
+            <ConceptTypesTable
               shown={shown}
               say={say}
               narrowing={{
@@ -286,11 +286,11 @@ function KindsRegion() {
   );
 }
 
-export function KindsPage() {
+export function ConceptTypesPage() {
   return (
     <>
-      <PageHead title={KINDS.name} />
-      <KindsRegion />
+      <PageHead title={CONCEPT_TYPES_PAGE.name} />
+      <ConceptTypesRegion />
     </>
   );
 }

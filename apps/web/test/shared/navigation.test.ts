@@ -1,7 +1,7 @@
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
-import { KINDS_PAGE } from "@/features/knowledge/curation/curation-state.ts";
+import { CONCEPT_TYPES_PAGE } from "@/features/knowledge/curation/curation-state.ts";
 import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
 import {
@@ -79,7 +79,7 @@ describe("the navigation declaration", () => {
               "All Knowledge",
               "Due for Verification",
               "Conflicts",
-              KINDS_PAGE.name,
+              CONCEPT_TYPES_PAGE.name,
               "Collections and Owners",
               "Exports",
             ],
@@ -144,7 +144,7 @@ describe("the navigation declaration", () => {
       "/knowledge/guides",
       "/knowledge/knowledge-base",
       "/knowledge/all-knowledge",
-      "/knowledge/kinds",
+      "/knowledge/types",
       "/knowledge/collections-and-owners",
       "/knowledge/exports",
       "/inbox/waiting-on-you",
@@ -190,7 +190,7 @@ describe("the navigation declaration", () => {
 
 const ASK_OUTLINE = ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]];
 
-const OWNER_CURATION = ["All Knowledge", KINDS_PAGE.name, "Collections and Owners"];
+const OWNER_CURATION = ["All Knowledge", CONCEPT_TYPES_PAGE.name, "Collections and Owners"];
 
 const KNOWLEDGE_WITH_OWNER_CURATION = [
   "Knowledge",

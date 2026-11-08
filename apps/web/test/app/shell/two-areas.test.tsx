@@ -25,7 +25,7 @@ const QUESTIONS = aPage("Your Questions", "/first/your-questions", "question");
 
 const GUIDES = aPage("Guides", "/second/guides", "guides");
 
-const KINDS = aPage("Kinds", "/second/kinds", "kinds");
+const TYPES = aPage("Types", "/second/types", "types");
 
 const TWO_AREAS: VisibleTree = {
   home: QUESTIONS,
@@ -41,7 +41,7 @@ const TWO_AREAS: VisibleTree = {
       id: "second",
       name: "Second",
       icon: "map",
-      menuGroups: [{ id: "reading", name: "Reading", pages: [GUIDES, KINDS] }],
+      menuGroups: [{ id: "reading", name: "Reading", pages: [GUIDES, TYPES] }],
       opensAt: GUIDES,
     },
   ],
@@ -58,7 +58,7 @@ const openAt = async (path: string) => {
       />
     ),
   });
-  const pages = [QUESTIONS, GUIDES, KINDS].map((each) =>
+  const pages = [QUESTIONS, GUIDES, TYPES].map((each) =>
     createRoute({
       getParentRoute: () => root,
       path: each.path,
@@ -127,7 +127,7 @@ describe("a rail of two areas", () => {
       within(swapped)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Guides", "Kinds"]);
+    ).toEqual(["Guides", "Types"]);
     expect(within(swapped).getByRole("link", { current: "page" }).textContent).toBe("Guides");
     expect(screen.queryByRole("navigation", { name: "First" })).toBeNull();
     expect(second.getAttribute("aria-current")).toBe("page");

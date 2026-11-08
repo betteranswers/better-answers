@@ -13,7 +13,7 @@ import { WHILE_A_CEILING_HOLDS } from "@/shared/api/query-client.ts";
 import { useTRPC } from "@/shared/api/trpc.ts";
 import { memberOptions } from "@/shared/member/member.ts";
 
-import { MATCHES_A_PAGE, type OpenKind } from "./knowledge-state.ts";
+import { MATCHES_A_PAGE, type OpenConceptType } from "./knowledge-state.ts";
 
 type Api = ReturnType<typeof useTRPC>;
 
@@ -39,17 +39,17 @@ export type Matches = ReturnType<typeof useMatches>;
 
 export type CollectionCounted = inferOutput<Api["knowledge"]["tree"]>["collections"][number];
 
-export type KindConcept = inferOutput<Api["knowledge"]["kindConcepts"]>["concepts"][number];
+export type ConceptOfType = inferOutput<Api["knowledge"]["conceptsOfType"]>["concepts"][number];
 
 export const useKnowledgeTree = () => {
   const api = useTRPC();
   return useQuery(api.knowledge.tree.queryOptions(undefined, WHILE_A_CEILING_HOLDS));
 };
 
-export const useKindConcepts = (open: OpenKind) => {
+export const useConceptsOfType = (open: OpenConceptType) => {
   const api = useTRPC();
   return useInfiniteQuery(
-    api.knowledge.kindConcepts.infiniteQueryOptions(
+    api.knowledge.conceptsOfType.infiniteQueryOptions(
       open === undefined
         ? skipToken
         : { collection: open.collection, conceptType: open.conceptType },
@@ -58,7 +58,7 @@ export const useKindConcepts = (open: OpenKind) => {
   );
 };
 
-export type KindConceptsRead = ReturnType<typeof useKindConcepts>;
+export type ConceptsOfTypeRead = ReturnType<typeof useConceptsOfType>;
 
 export type EditRead = inferOutput<Api["knowledge"]["conceptToEdit"]>;
 
@@ -256,11 +256,13 @@ export const useAllKnowledge = (asked: AllKnowledgeAsked) => {
   );
 };
 
-export type KindCounted = inferOutput<Api["knowledge"]["kinds"]>["kinds"][number];
+export type ConceptTypeCounted = inferOutput<
+  Api["knowledge"]["conceptTypes"]
+>["conceptTypes"][number];
 
-export const useKinds = () => {
+export const useConceptTypes = () => {
   const api = useTRPC();
-  return useQuery(api.knowledge.kinds.queryOptions());
+  return useQuery(api.knowledge.conceptTypes.queryOptions());
 };
 
 export const useSetOwners = () => {

@@ -13,8 +13,8 @@ import { WaitingOnYouPage } from "@/features/inbox/waiting-on-you-page.tsx";
 import { CollectionsAndOwnersPage } from "@/features/knowledge/collections-and-owners-page.tsx";
 import { ConceptPage } from "@/features/knowledge/concept-page.tsx";
 import { AllKnowledgePage } from "@/features/knowledge/curation/all-knowledge-page.tsx";
+import { ConceptTypesPage } from "@/features/knowledge/curation/concept-types-page.tsx";
 import { ExportsPage } from "@/features/knowledge/curation/exports-page.tsx";
-import { KindsPage } from "@/features/knowledge/curation/kinds-page.tsx";
 import { GuidePage } from "@/features/knowledge/guides/guide-page.tsx";
 import { GUIDE_ID } from "@/features/knowledge/guides/guide-state.ts";
 import { GuidesPage } from "@/features/knowledge/guides/guides-page.tsx";
@@ -47,7 +47,7 @@ const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>
   ["/knowledge/guides", { draw: GuidesPage }],
   ["/knowledge/knowledge-base", { draw: KnowledgeBasePage }],
   ["/knowledge/all-knowledge", { draw: AllKnowledgePage }],
-  ["/knowledge/kinds", { draw: KindsPage }],
+  ["/knowledge/types", { draw: ConceptTypesPage }],
   ["/knowledge/collections-and-owners", { draw: CollectionsAndOwnersPage }],
   ["/knowledge/exports", { draw: ExportsPage }],
   ["/inbox/waiting-on-you", { draw: WaitingOnYouPage }],

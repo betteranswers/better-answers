@@ -146,14 +146,14 @@ describe("find matches any of the query's words", () => {
     );
   });
 
-  it("finds a concept by a word only in its kind", async () => {
+  it("finds a concept by a word only in its type", async () => {
     const { workspaceId, viewer } = await arrange();
     await conceptsLanded(workspaceId, [PUBLIC_LIABILITY, { title: "Fire drills" }]);
 
     expect(titlesOf(await searching(viewer, "insurance"))).toEqual([PUBLIC_LIABILITY.title]);
   });
 
-  it("ranks title words above the same words in a kind", async () => {
+  it("ranks title words above the same words in a type", async () => {
     const { workspaceId, viewer } = await arrange();
     await conceptsLanded(workspaceId, [PUBLIC_LIABILITY, { title: "Insurance renewals" }]);
 

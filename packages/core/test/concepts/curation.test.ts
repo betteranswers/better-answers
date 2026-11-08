@@ -3,7 +3,7 @@ import type { z } from "zod";
 
 import { conceptIriOf, ulid, WELL_FORMED_ULID, type ConceptIri } from "@better-answers/schema";
 
-import { allKnowledgeInput, readAllKnowledge, readKinds } from "../../src/concepts/index.ts";
+import { allKnowledgeInput, readAllKnowledge, readConceptTypes } from "../../src/concepts/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { withMember, type PostgresDoor } from "../../src/store/postgres/index.ts";
 import {
@@ -65,18 +65,18 @@ const asked = (overrides: Asked = {}) =>
 const allKnowledgeAs = (seeded: Seeded, reader: UserPrincipal, input = asked()) =>
   withMember(reader, seeded.postgres, (fresh, tx) => readAllKnowledge(fresh, tx, input, NOW));
 
-const kindsAs = (seeded: Seeded, reader: UserPrincipal) =>
-  withMember(reader, seeded.postgres, (fresh, tx) => readKinds(fresh, tx));
+const conceptTypesAs = (seeded: Seeded, reader: UserPrincipal) =>
+  withMember(reader, seeded.postgres, (fresh, tx) => readConceptTypes(fresh, tx));
 
 const knowledgeRead = async (seeded: Seeded, reader: UserPrincipal, input = asked()) =>
   answered(answered(await allKnowledgeAs(seeded, reader, input)));
 
-const kindsRead = async (seeded: Seeded, reader: UserPrincipal) =>
-  answered(answered(await kindsAs(seeded, reader))).kinds;
+const conceptTypesRead = async (seeded: Seeded, reader: UserPrincipal) =>
+  answered(answered(await conceptTypesAs(seeded, reader))).conceptTypes;
 
 const READS = [
   ["All knowledge", (seeded: Seeded, reader: UserPrincipal) => allKnowledgeAs(seeded, reader)],
-  ["Kinds", (seeded: Seeded, reader: UserPrincipal) => kindsAs(seeded, reader)],
+  ["Concept Types", (seeded: Seeded, reader: UserPrincipal) => conceptTypesAs(seeded, reader)],
 ] as const;
 
 const REFUSED = { ok: true, value: { ok: false, error: "owner-forbids" } };
@@ -345,8 +345,8 @@ describe("sorting, filtering and paging All knowledge", () => {
   it.each([
     ["title", false, "ABEDC"],
     ["title", true, "CDEAB"],
-    ["kind", false, "BDACE"],
-    ["kind", true, "EACBD"],
+    ["type", false, "BDACE"],
+    ["type", true, "EACBD"],
     ["collection", false, "ABCED"],
     ["collection", true, "DCEAB"],
     ["owner", false, "ABCED"],
@@ -365,11 +365,11 @@ describe("sorting, filtering and paging All knowledge", () => {
   it.each<[Column, (group: number, at: string) => Omit<Shelved, "iri">]>([
     ["title", (group, at) => ({ path: `knowledge/company/${at}.md`, title: `Group ${group}` })],
     [
-      "kind",
+      "type",
       (group, at) => ({
         path: `knowledge/company/${at}.md`,
         title: "Same",
-        conceptType: `Kind ${group}`,
+        conceptType: `Type ${group}`,
       }),
     ],
     ["collection", (group, at) => ({ path: `knowledge/group-${group}/${at}.md`, title: "Same" })],
@@ -415,9 +415,9 @@ describe("sorting, filtering and paging All knowledge", () => {
   it.each<[string, Asked, string]>([
     ["a collection", { collections: ["people"] }, "EC"],
     ["two collections", { collections: ["company", "people"] }, "ABEC"],
-    ["a kind", { conceptType: "Contract" }, "BD"],
-    ["a collection and a kind", { collections: ["company"], conceptType: "Policy" }, "A"],
-    ["a collection holding no such kind", { collections: ["people"], conceptType: "Contract" }, ""],
+    ["a type", { conceptType: "Contract" }, "BD"],
+    ["a collection and a type", { collections: ["company"], conceptType: "Policy" }, "A"],
+    ["a collection holding no such type", { collections: ["people"], conceptType: "Contract" }, ""],
     ["a collection holding nothing", { collections: ["archive"] }, ""],
   ])("filters by %s", async (_name, filter, letters) => {
     const seeded = await seededForSorting();
@@ -501,7 +501,7 @@ describe("sorting, filtering and paging All knowledge", () => {
     ["an empty collection", { collections: [""] }],
     ["page zero", { page: 0 }],
     ["a fractional page", { page: 1.5 }],
-    ["an empty kind", { conceptType: " " }],
+    ["an empty type", { conceptType: " " }],
     ["a sort by something else", { sort: { column: "body", desc: false } }],
     ["a stray key", { colour: "red" }],
   ])("refuses %s in the input", (_name, overrides) => {
@@ -556,12 +556,12 @@ describe("only what the reader may read", () => {
     return { seeded, hrOwner };
   };
 
-  it("leaves concepts the reader cannot read out of kind counts", async () => {
+  it("leaves concepts the reader cannot read out of type counts", async () => {
     const { seeded, hrOwner } = await seededWithHr();
 
-    const outside = await kindsRead(seeded, seeded.owner);
-    const inside = await kindsRead(seeded, hrOwner);
-    const admins = await kindsRead(seeded, seeded.admin);
+    const outside = await conceptTypesRead(seeded, seeded.owner);
+    const inside = await conceptTypesRead(seeded, hrOwner);
+    const admins = await conceptTypesRead(seeded, seeded.admin);
 
     expect(outside).toEqual([
       {
@@ -640,16 +640,20 @@ describe("only what the reader may read", () => {
     expect([outside.total, inside.total, admins.total]).toEqual([5, 7, 6]);
   });
 
-  it("counts no withheld concept in any filter, kind or total", async () => {
+  it("counts no withheld concept in any filter, type or total", async () => {
     const { seeded } = await seededWithHr();
 
     const filtered = await knowledgeRead(seeded, seeded.owner, asked({ collections: ["people"] }));
-    const ofKind = await knowledgeRead(seeded, seeded.owner, asked({ conceptType: "Appraisal" }));
+    const ofConceptType = await knowledgeRead(
+      seeded,
+      seeded.owner,
+      asked({ conceptType: "Appraisal" }),
+    );
     const secondPage = await knowledgeRead(seeded, seeded.owner, asked({ page: 2 }));
 
     expect(filtered.rows.map(({ title }) => title)).toEqual(["Rota"]);
     expect(filtered.total).toBe(1);
-    expect(ofKind).toEqual({ rows: [], total: 0, page: 1, pageSize: 50 });
+    expect(ofConceptType).toEqual({ rows: [], total: 0, page: 1, pageSize: 50 });
     expect(secondPage.total).toBe(5);
   });
 
@@ -661,10 +665,10 @@ describe("only what the reader may read", () => {
     ]);
 
     const read = await knowledgeRead(seeded, seeded.admin);
-    const kinds = await kindsRead(seeded, seeded.admin);
+    const conceptTypes = await conceptTypesRead(seeded, seeded.admin);
 
     expect(read.rows.map(({ title }) => title)).toEqual(["Expenses"]);
-    expect(kinds.map(({ count }) => count)).toEqual([1]);
+    expect(conceptTypes.map(({ count }) => count)).toEqual([1]);
   });
 });
 
@@ -679,13 +683,13 @@ describe("the wide workspace the budget reads", () => {
     });
 
     const page = await knowledgeRead(seeded, seeded.owner);
-    const kinds = await kindsRead(seeded, seeded.owner);
+    const conceptTypes = await conceptTypesRead(seeded, seeded.owner);
 
     expect(page).toMatchObject({ total: 120, pageSize: 50 });
     expect(page.rows).toHaveLength(50);
-    expect(kinds.map(({ conceptType, count }) => [conceptType, count])).toEqual(
-      Array.from({ length: 8 }, (_unused, at) => [`Kind ${at}`, 15]),
+    expect(conceptTypes.map(({ conceptType, count }) => [conceptType, count])).toEqual(
+      Array.from({ length: 8 }, (_unused, at) => [`Type ${at}`, 15]),
     );
-    expect(kinds.every(({ collections }) => collections.length === 3)).toBe(true);
+    expect(conceptTypes.every(({ collections }) => collections.length === 3)).toBe(true);
   });
 });

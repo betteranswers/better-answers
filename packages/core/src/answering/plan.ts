@@ -35,7 +35,7 @@ import type { RecordedConcept } from "./record.ts";
 
 export type MapState = Readonly<RecordMapState>;
 
-export const ANSWER_KIND = "Answer";
+export const ANSWER_TYPE = "Answer";
 
 export type PreviewedConcept<Iri extends string = ConceptIri> = {
   readonly iri: Iri;
@@ -229,7 +229,7 @@ const returnedOf = async (
   const trust = trustOf(concept, now);
   const kept = { iri: concept.iri, contentHash: concept.contentHash, trust };
   const preview = previewOf(concept, trust);
-  if (concept.conceptType !== ANSWER_KIND) return ok({ shown: preview, kept });
+  if (concept.conceptType !== ANSWER_TYPE) return ok({ shown: preview, kept });
   const evidence = await evidenceOf(reader, tx, concept.frontmatter, reads);
   if (!evidence.ok) return evidence;
   return ok({ shown: { ...preview, body: concept.body, evidence: evidence.value }, kept });

@@ -47,11 +47,11 @@ export const useAllKnowledgeAddress = ({ admin, owned }: Standing) => {
     chooseCollection: (choice: string | undefined) => {
       write({ collection: heldFor(choice, !admin), page: 1 });
     },
-    chooseKind: (conceptType: string | undefined) => {
-      write({ kind: conceptType ?? "", page: 1 });
+    chooseConceptType: (conceptType: string | undefined) => {
+      write({ type: conceptType ?? "", page: 1 });
     },
     clearFilters: () => {
-      write({ collection: heldFor(undefined, !admin), kind: "", page: 1 });
+      write({ collection: heldFor(undefined, !admin), type: "", page: 1 });
     },
   };
 };

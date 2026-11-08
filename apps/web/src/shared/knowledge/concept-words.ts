@@ -18,7 +18,7 @@ export const CONCEPT_WORDS = {
   tags: "Tags",
   sourceNamed: (place: number, label: string): string => `Source ${place}: ${label}`,
   ownPage: "Open concept",
-  kind: "Type",
+  type: "Type",
   collection: "Collection",
   noCollection: "No collection",
   notCompanyKnowledge: "Not company knowledge",

@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { ConceptIri } from "@better-answers/schema";
 
 import {
-  readKindConcepts,
+  readConceptsOfType,
   readKnowledgeTree,
-  type KindConceptsInput,
+  type ConceptsOfTypeInput,
 } from "../../../src/concepts/index.ts";
 import type { Role, UserPrincipal } from "../../../src/kernel/index.ts";
 import { withMember, type PostgresDoor } from "../../../src/store/postgres/index.ts";
@@ -48,11 +48,15 @@ const treeReadBy = async (seeded: Seeded, reader: UserPrincipal) =>
     ),
   );
 
-const kindReadBy = async (seeded: Seeded, reader: UserPrincipal, input: KindConceptsInput) =>
+const conceptTypeReadBy = async (
+  seeded: Seeded,
+  reader: UserPrincipal,
+  input: ConceptsOfTypeInput,
+) =>
   answered(
     answered(
       await withMember(reader, seeded.postgres, (fresh, tx) =>
-        readKindConcepts(fresh, tx, input, now),
+        readConceptsOfType(fresh, tx, input, now),
       ),
     ),
   );
@@ -76,7 +80,7 @@ describe("the knowledge tree", () => {
         {
           collection: "company",
           count: 3,
-          kinds: [
+          conceptTypes: [
             { conceptType: "Contract", count: 1 },
             { conceptType: "Policy", count: 2 },
           ],
@@ -88,12 +92,12 @@ describe("the knowledge tree", () => {
         {
           collection: "company",
           count: 4,
-          kinds: [
+          conceptTypes: [
             { conceptType: "Contract", count: 1 },
             { conceptType: "Policy", count: 3 },
           ],
         },
-        { collection: "held", count: 1, kinds: [{ conceptType: "Policy", count: 1 }] },
+        { collection: "held", count: 1, conceptTypes: [{ conceptType: "Policy", count: 1 }] },
       ],
     });
   });
@@ -122,8 +126,8 @@ describe("the knowledge tree", () => {
 
     const insideTree = await treeReadBy(seeded, inside);
     const outsideTree = await treeReadBy(seeded, outside);
-    const insideBranch = await kindReadBy(seeded, inside, people);
-    const outsideBranch = await kindReadBy(seeded, outside, people);
+    const insideBranch = await conceptTypeReadBy(seeded, inside, people);
+    const outsideBranch = await conceptTypeReadBy(seeded, outside, people);
 
     expect(insideTree.collections.map(({ collection, count }) => [collection, count])).toEqual([
       ["company", 1],
@@ -143,15 +147,15 @@ describe("the knowledge tree", () => {
     ]);
 
     const tree = await treeReadBy(seeded, seeded.viewer);
-    const outside = await kindReadBy(seeded, seeded.viewer, {
+    const outside = await conceptTypeReadBy(seeded, seeded.viewer, {
       collection: null,
       conceptType: "Policy",
     });
 
     expect(tree.collections).toEqual([
-      { collection: "archive", count: 1, kinds: [{ conceptType: "Policy", count: 1 }] },
-      { collection: "company", count: 1, kinds: [{ conceptType: "Policy", count: 1 }] },
-      { collection: null, count: 1, kinds: [{ conceptType: "Policy", count: 1 }] },
+      { collection: "archive", count: 1, conceptTypes: [{ conceptType: "Policy", count: 1 }] },
+      { collection: "company", count: 1, conceptTypes: [{ conceptType: "Policy", count: 1 }] },
+      { collection: null, count: 1, conceptTypes: [{ conceptType: "Policy", count: 1 }] },
     ]);
     expect(outside).toEqual({
       concepts: [
@@ -179,8 +183,8 @@ const policyAt = (at: number): Shelved => ({
   title: `Policy ${numbered(at === TIED_ACROSS_THE_PAGE_EDGE ? at - 1 : at)}`,
 });
 
-describe("a kind's concepts", () => {
-  it("lists a kind's concepts fifty at a time", async () => {
+describe("a type's concepts", () => {
+  it("lists a type's concepts fifty at a time", async () => {
     const seeded = await seededWorkspace();
     const iris = await shelve(seeded, [
       ...Array.from({ length: POLICIES }, (_unused, at) => policyAt(POLICIES - 1 - at)),
@@ -188,12 +192,12 @@ describe("a kind's concepts", () => {
     ]);
     const company = { collection: "company", conceptType: "Policy" };
 
-    const first = await kindReadBy(seeded, seeded.viewer, company);
-    const second = await kindReadBy(seeded, seeded.viewer, {
+    const first = await conceptTypeReadBy(seeded, seeded.viewer, company);
+    const second = await conceptTypeReadBy(seeded, seeded.viewer, {
       ...company,
       cursor: first.nextCursor,
     });
-    const third = await kindReadBy(seeded, seeded.viewer, {
+    const third = await conceptTypeReadBy(seeded, seeded.viewer, {
       ...company,
       cursor: second.nextCursor,
     });

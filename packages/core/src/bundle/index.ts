@@ -37,7 +37,7 @@ export const foldConceptType = (conceptType: string): string =>
     const head = word.charAt(0).toUpperCase();
     const cased = head.charAt(0) + (head.slice(1) + word.slice(1)).toLowerCase();
     if (cased.endsWith("ies")) return `${cased.slice(0, -3)}y`;
-    // A stored kind is folded again, so an `es` comes off only where the next line keeps the `s`.
+    // A stored type is folded again, so an `es` comes off only where the next line keeps the `s`.
     if (/(x|z|ch|sh|ss|us|is)es$/u.test(cased)) return cased.slice(0, -2);
     if (/(ss|us|is)$/u.test(cased) || !cased.endsWith("s")) return cased;
     return cased.slice(0, -1);

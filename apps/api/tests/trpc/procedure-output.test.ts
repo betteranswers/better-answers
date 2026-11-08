@@ -62,6 +62,8 @@ describe("the outputs of router procedures", () => {
       "knowledge.briefCopy",
       "knowledge.collections",
       "knowledge.conceptToEdit",
+      "knowledge.conceptTypes",
+      "knowledge.conceptsOfType",
       "knowledge.exportBundle",
       "knowledge.exportGuide",
       "knowledge.exportRecords",
@@ -69,8 +71,6 @@ describe("the outputs of router procedures", () => {
       "knowledge.guide",
       "knowledge.guides",
       "knowledge.includeAvailable",
-      "knowledge.kindConcepts",
-      "knowledge.kinds",
       "knowledge.nameOwner",
       "knowledge.open",
       "knowledge.recordCopy",
@@ -195,13 +195,13 @@ describe("the outputs of router procedures", () => {
       | "knowledge.collections"
       | "knowledge.nameOwner"
       | "knowledge.allKnowledge"
-      | "knowledge.kinds"
+      | "knowledge.conceptTypes"
       | "knowledge.setOwners"
       | "knowledge.exportBundle"
       | "knowledge.exportRecords"
       | "knowledge.exportGuide"
       | "knowledge.tree"
-      | "knowledge.kindConcepts"
+      | "knowledge.conceptsOfType"
       | "knowledge.conceptToEdit"
       | "knowledge.saveConcept"
       | "knowledge.guides"

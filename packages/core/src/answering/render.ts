@@ -3,7 +3,7 @@ import type { JudgeState, QuestionVerdict } from "@better-answers/schema";
 import { ukLongDate, verifierWords, type VerificationEvent } from "../concepts/index.ts";
 import type { Evidence, PassageView } from "./boundary.ts";
 import {
-  ANSWER_KIND,
+  ANSWER_TYPE,
   type MapState,
   type PlannedAnswer,
   type PreviewedConcept,
@@ -153,7 +153,7 @@ const namedOrNone = (collections: readonly string[]): string =>
 const returnedText = (heading: string, concept: ReturnedConcept<string>): readonly string[] => [
   "",
   `## ${heading}${concept.conceptType} · ${concept.collection ?? NO_COLLECTION}`,
-  concept.conceptType === ANSWER_KIND ? `Question: ${concept.title}` : concept.title,
+  concept.conceptType === ANSWER_TYPE ? `Question: ${concept.title}` : concept.title,
   `_${concept.trustWords}_`,
   "",
   concept.body.trimEnd(),

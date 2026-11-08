@@ -58,7 +58,7 @@ const audienceIntersection = (audiences: readonly Audience[]): Audience | "nobod
   return distinct.length === 0 ? "nobody" : { audience: AUDIENCE_GROUPS, audienceGroups: distinct };
 };
 
-const KIND_FLOOR: ReadonlyMap<string, Sensitivity> = new Map([["Person", RESTRICTED]]);
+const CONCEPT_TYPE_FLOOR: ReadonlyMap<string, Sensitivity> = new Map([["Person", RESTRICTED]]);
 
 export type Derivation = {
   readonly conceptType?: string | undefined;
@@ -80,7 +80,9 @@ export const derivedVisibility = (derivation: Derivation): Visibility => {
   if (derivation.override !== undefined) return derivation.override;
   const inherited = combined(derivation.from) ?? derivation.fallback;
   const floor =
-    derivation.conceptType === undefined ? undefined : KIND_FLOOR.get(derivation.conceptType);
+    derivation.conceptType === undefined
+      ? undefined
+      : CONCEPT_TYPE_FLOOR.get(derivation.conceptType);
   return floor === undefined
     ? inherited
     : { ...inherited, sensitivity: narrower(inherited.sensitivity, floor) };

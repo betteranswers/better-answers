@@ -13,7 +13,6 @@ import {
   type Heading,
   type Opened,
 } from "@/shared/knowledge/evidence-panel.tsx";
-import { KindLine } from "@/shared/knowledge/kind-line.tsx";
 import {
   openingOf,
   useConcept,
@@ -24,6 +23,7 @@ import { useOpenedFrom } from "@/shared/knowledge/open-match.ts";
 import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { TitleBlock } from "@/shared/knowledge/title-block.tsx";
+import { TypeLine } from "@/shared/knowledge/type-line.tsx";
 import { copiedToTheClipboard } from "@/shared/lib/clipboard.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { RowLink } from "@/shared/list/grid-table.tsx";
@@ -132,8 +132,8 @@ function Header(properties: {
         <p className="mt-1.5 text-muted-foreground [font-size:var(--text-lg)]">{description}</p>
       )}
       <div className="mt-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-border pb-5">
-        <KindLine
-          conceptType={concept.conceptType}
+        <TypeLine
+          type={concept.conceptType}
           collection={collection ?? WORDS.noCollection}
           className="min-h-8 items-center [font-size:var(--text-sm)] [&_dd]:text-foreground"
         />

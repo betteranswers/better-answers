@@ -69,12 +69,12 @@ export const KNOWLEDGE_BASE_WORDS = {
   concepts: "Concepts",
   openACollection: "Open a collection to see its types.",
   chooseAType: "Choose a type to see its concepts.",
-  kindIn: (conceptType: string, collection: string | null): string =>
+  conceptTypeIn: (conceptType: string, collection: string | null): string =>
     collection === null
       ? `${conceptType}, ${CONCEPT_WORDS.noCollection}`
       : `${conceptType} in ${collection}`,
   conceptsLoading: "Loading concepts…",
-  noneOfTheKind: "No concepts of this type yet.",
+  noneOfTheType: "No concepts of this type yet.",
   columns: { title: "Title", trust: "Trust" },
   more: "Show more concepts",
 } as const;

@@ -361,7 +361,7 @@ const aWorkspaceOfBirds = () =>
   ]);
 
 describe("the knowledge tree over tRPC", () => {
-  it("returns the knowledge tree and pages a kind's concepts", async () => {
+  it("returns the knowledge tree and pages a type's concepts", async () => {
     const { workspace, viewer } = await aWorkspaceOfBirds();
     await seedConceptIndex(
       app(),
@@ -373,11 +373,11 @@ describe("the knowledge tree over tRPC", () => {
     const { api } = await webSignedIn(app(), viewer.email);
 
     const tree = await api.knowledge.tree.query();
-    const first = await api.knowledge.kindConcepts.query({
+    const first = await api.knowledge.conceptsOfType.query({
       collection: "birds",
       conceptType: "Answer",
     });
-    const rest = await api.knowledge.kindConcepts.query({
+    const rest = await api.knowledge.conceptsOfType.query({
       collection: "birds",
       conceptType: "Answer",
       cursor: first.nextCursor,
@@ -385,8 +385,8 @@ describe("the knowledge tree over tRPC", () => {
 
     expect(tree).toEqual({
       collections: [
-        { collection: "birds", count: 61, kinds: [{ conceptType: "Answer", count: 61 }] },
-        { collection: null, count: 1, kinds: [{ conceptType: "Procedure", count: 1 }] },
+        { collection: "birds", count: 61, conceptTypes: [{ conceptType: "Answer", count: 61 }] },
+        { collection: null, count: 1, conceptTypes: [{ conceptType: "Procedure", count: 1 }] },
       ],
     });
     expect([first.concepts.length, rest.concepts.length, rest.nextCursor]).toEqual([50, 11, null]);
@@ -399,9 +399,9 @@ describe("the knowledge tree over tRPC", () => {
     const { api } = await webSignedIn(app(), viewer.email);
 
     const refused = await refusalOfCall(
-      api.knowledge.kindConcepts.query({ collection: "birds/herons", conceptType: "Answer" }),
+      api.knowledge.conceptsOfType.query({ collection: "birds/herons", conceptType: "Answer" }),
     );
-    const answered = await api.knowledge.kindConcepts.query({
+    const answered = await api.knowledge.conceptsOfType.query({
       collection: "birds",
       conceptType: "Answer",
     });
@@ -412,7 +412,7 @@ describe("the knowledge tree over tRPC", () => {
 });
 
 describe("the Curation reads over tRPC", () => {
-  it("shows Kinds to owners and Admins, refusing a Viewer", async () => {
+  it("shows Concept Types to owners and Admins, refusing a Viewer", async () => {
     const { workspace, viewer } = await aWorkspaceOfBirds();
     const owner = await app().person();
     await app().addMember(workspace.workspaceId, owner.id, "Editor");
@@ -428,20 +428,20 @@ describe("the Curation reads over tRPC", () => {
     const asTheOwner = await webSignedIn(app(), owner.email);
     const asTheAdmin = await webSignedIn(app(), workspace.admin.email);
 
-    const refused = await refusalOfCall(asTheViewer.api.knowledge.kinds.query());
-    const ownerSees = await asTheOwner.api.knowledge.kinds.query();
-    const adminSees = await asTheAdmin.api.knowledge.kinds.query();
+    const refused = await refusalOfCall(asTheViewer.api.knowledge.conceptTypes.query());
+    const ownerSees = await asTheOwner.api.knowledge.conceptTypes.query();
+    const adminSees = await asTheAdmin.api.knowledge.conceptTypes.query();
 
     expect(refused).toMatchObject({
       data: { httpStatus: 403, refusal: { word: "owner-forbids", class: "forbidden" } },
     });
     expect(ownerSees).toEqual({
-      kinds: [
+      conceptTypes: [
         { conceptType: "Answer", count: 1, collections: [{ collection: "birds", count: 1 }] },
         { conceptType: "Procedure", count: 1, collections: [{ collection: null, count: 1 }] },
       ],
     });
-    expect(adminSees.kinds.map(({ conceptType, count }) => [conceptType, count])).toEqual([
+    expect(adminSees.conceptTypes.map(({ conceptType, count }) => [conceptType, count])).toEqual([
       ["Answer", 2],
       ["Procedure", 1],
     ]);

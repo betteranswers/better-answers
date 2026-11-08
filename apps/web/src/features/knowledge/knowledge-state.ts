@@ -49,7 +49,7 @@ export const SEARCH_FIELDS = {
   search: searchText(QUERY_MAX),
   new: searchText(NEW_CONCEPT_MAX),
   collection: searchText(NEW_CONCEPT_MAX),
-  kind: searchText(NEW_CONCEPT_MAX),
+  type: searchText(NEW_CONCEPT_MAX),
   tags: searchText(NEW_CONCEPT_MAX),
   subject: searchText(NEW_CONCEPT_MAX),
 };
@@ -58,12 +58,12 @@ export const KNOWLEDGE_BASE_LIST = "base";
 
 export const KNOWLEDGE_BASE_FIELDS = {
   collection: searchText(),
-  kind: searchText(),
+  type: searchText(),
 };
 
-type HeldOpen = { readonly collection: string; readonly kind: string };
+type HeldOpen = { readonly collection: string; readonly type: string };
 
-export type OpenKind =
+export type OpenConceptType =
   | { readonly collection: string | null; readonly conceptType: string }
   | undefined;
 
@@ -71,15 +71,15 @@ const NOTHING_OPEN = "";
 
 const NO_COLLECTION_HELD = "";
 
-export const openKindAt = (held: HeldOpen): OpenKind =>
-  held.kind.trim() === NOTHING_OPEN
+export const openConceptTypeAt = (held: HeldOpen): OpenConceptType =>
+  held.type.trim() === NOTHING_OPEN
     ? undefined
     : {
         collection: held.collection === NO_COLLECTION_HELD ? null : held.collection,
-        conceptType: held.kind,
+        conceptType: held.type,
       };
 
 export const heldOf = (collection: string | null, conceptType: string): HeldOpen => ({
   collection: collection ?? NO_COLLECTION_HELD,
-  kind: conceptType,
+  type: conceptType,
 });

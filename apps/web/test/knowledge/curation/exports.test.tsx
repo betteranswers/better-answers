@@ -241,8 +241,8 @@ describe("the Exports page", () => {
 
     fireEvent.click(await readyToDownload(KNOWLEDGE_BASE));
     await running.asked;
-    await router.navigate({ to: "/knowledge/kinds" });
-    await waitFor(() => expect(router.state.location.pathname).toBe("/knowledge/kinds"));
+    await router.navigate({ to: "/knowledge/types" });
+    await waitFor(() => expect(router.state.location.pathname).toBe("/knowledge/types"));
     running.resolve();
 
     const file = await theOneSaved();

@@ -44,7 +44,7 @@ type Titled = Pick<Guide, "collection" | "subject">;
 const heldFor = (guide: Titled, fact: SectionFact): NewConceptHeld => ({
   new: fact.name,
   collection: guide.collection,
-  kind: fact.conceptType,
+  type: fact.conceptType,
   tags: fact.tags.join(", "),
   subject: guide.subject?.iri ?? "",
 });

@@ -78,7 +78,7 @@ describe("a concept's row on the Knowledge Search page", () => {
 
     expect(text).toContain(CHECKED_BY_PRIYA);
     expect(text.match(/3 March 2026/g)).toHaveLength(1);
-    expect(text).toContain(`${CONCEPT_WORDS.kind}Sector`);
+    expect(text).toContain(`${CONCEPT_WORDS.type}Sector`);
     expect(text).toContain("CollectionSectors");
   });
 

@@ -15,19 +15,19 @@ import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 
 import {
-  useKindConcepts,
+  useConceptsOfType,
   useKnowledgeTree,
   type CollectionCounted,
-  type KindConcept,
-  type KindConceptsRead,
+  type ConceptOfType,
+  type ConceptsOfTypeRead,
 } from "./knowledge-api.ts";
 import {
   heldOf,
   KNOWLEDGE_BASE_FIELDS,
   KNOWLEDGE_BASE_KEYSTROKES as KEY,
   KNOWLEDGE_BASE_LIST,
-  openKindAt,
-  type OpenKind,
+  openConceptTypeAt,
+  type OpenConceptType,
 } from "./knowledge-state.ts";
 import { initiallyExpanded, KnowledgeTree, toggled } from "./knowledge-tree.tsx";
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "./knowledge-words.ts";
@@ -36,7 +36,7 @@ const LISTED = Object.values(KEY);
 
 const NONE: readonly CollectionCounted[] = [];
 
-type ShownKind = {
+type ShownConceptType = {
   readonly collection: string | null;
   readonly conceptType: string;
   readonly count: number;
@@ -45,22 +45,22 @@ type ShownKind = {
 const totalOf = (collections: readonly CollectionCounted[]): number =>
   collections.reduce((sum, held) => sum + held.count, 0);
 
-const shownKindOf = (
+const shownConceptTypeOf = (
   collections: readonly CollectionCounted[],
-  open: OpenKind,
-): ShownKind | undefined => {
+  open: OpenConceptType,
+): ShownConceptType | undefined => {
   if (open === undefined) return undefined;
   const count = collections
     .find((held) => held.collection === open.collection)
-    ?.kinds.find((counted) => counted.conceptType === open.conceptType)?.count;
+    ?.conceptTypes.find((counted) => counted.conceptType === open.conceptType)?.count;
   return count === undefined ? undefined : { ...open, count };
 };
 
-const useOpenKind = () => {
+const useOpenConceptType = () => {
   const { state, write } = useListAddress(KNOWLEDGE_BASE_LIST, KNOWLEDGE_BASE_FIELDS);
   return {
-    open: openKindAt(state),
-    openKind: (collection: string | null, conceptType: string) => {
+    open: openConceptTypeAt(state),
+    openConceptType: (collection: string | null, conceptType: string) => {
       write(heldOf(collection, conceptType));
     },
   };
@@ -92,7 +92,7 @@ const useTabStop = () => {
 
 const features = tableFeatures({});
 
-const column = createColumnHelper<typeof features, KindConcept>();
+const column = createColumnHelper<typeof features, ConceptOfType>();
 
 const columnsOf = (landAt: number | undefined, onLanded: () => void) =>
   column.columns([
@@ -110,7 +110,7 @@ const columnsOf = (landAt: number | undefined, onLanded: () => void) =>
 
 function ConceptRows(properties: {
   readonly caption: string;
-  readonly read: KindConceptsRead;
+  readonly read: ConceptsOfTypeRead;
   readonly focusAfterRetry: RefObject<HTMLHeadingElement | null>;
 }) {
   const { read } = properties;
@@ -144,7 +144,7 @@ function ConceptRows(properties: {
       <GridTable
         table={table}
         caption={properties.caption}
-        empty={<ListState state={{ kind: "empty", words: WORDS.noneOfTheKind, action: null }} />}
+        empty={<ListState state={{ kind: "empty", words: WORDS.noneOfTheType, action: null }} />}
       />
       <ListPages
         pages={{
@@ -165,9 +165,9 @@ function ConceptRows(properties: {
 }
 
 function Concepts(properties: {
-  readonly shown: ShownKind | undefined;
+  readonly shown: ShownConceptType | undefined;
   readonly browsing: boolean;
-  readonly read: KindConceptsRead;
+  readonly read: ConceptsOfTypeRead;
 }) {
   const { shown } = properties;
   const headingId = useId();
@@ -176,7 +176,7 @@ function Concepts(properties: {
     heading.current?.focus();
   });
   const named =
-    shown === undefined ? WORDS.concepts : WORDS.kindIn(shown.conceptType, shown.collection);
+    shown === undefined ? WORDS.concepts : WORDS.conceptTypeIn(shown.conceptType, shown.collection);
 
   return (
     <section aria-labelledby={headingId} className="min-w-0">
@@ -210,9 +210,9 @@ function Concepts(properties: {
 
 function Browsed(properties: {
   readonly collections: readonly CollectionCounted[];
-  readonly open: OpenKind;
+  readonly open: OpenConceptType;
   readonly onOpen: (collection: string | null, conceptType: string) => void;
-  readonly read: KindConceptsRead;
+  readonly read: ConceptsOfTypeRead;
 }) {
   const { collections, open } = properties;
   const tabStopRef = useTabStop();
@@ -237,7 +237,7 @@ function Browsed(properties: {
           />
         </div>
         <Concepts
-          shown={shownKindOf(collections, open)}
+          shown={shownConceptTypeOf(collections, open)}
           browsing={expanded.size > 0}
           read={properties.read}
         />
@@ -250,8 +250,8 @@ function KnowledgeBaseRegion() {
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   const tree = useKnowledgeTree();
-  const { open, openKind } = useOpenKind();
-  const read = useKindConcepts(open);
+  const { open, openConceptType } = useOpenConceptType();
+  const read = useConceptsOfType(open);
   const collections = tree.data?.collections;
 
   return (
@@ -269,7 +269,12 @@ function KnowledgeBaseRegion() {
           failed={failedReadWords}
           focusAfterRetry={heading}
         >
-          <Browsed collections={collections ?? NONE} open={open} onOpen={openKind} read={read} />
+          <Browsed
+            collections={collections ?? NONE}
+            open={open}
+            onOpen={openConceptType}
+            read={read}
+          />
         </ListRead>
       </Card>
     </section>

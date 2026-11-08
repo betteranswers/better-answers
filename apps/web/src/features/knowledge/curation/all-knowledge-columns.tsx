@@ -13,14 +13,14 @@ export const allKnowledgeFeatures = tableFeatures({});
 const column = createColumnHelper<typeof allKnowledgeFeatures, AllKnowledgeRow>();
 
 export const HIDEABLE = [
-  { id: "kind", label: WORDS.columns.kind },
+  { id: "type", label: WORDS.columns.type },
   { id: "collection", label: WORDS.columns.collection },
   { id: "trust", label: WORDS.columns.trust },
   { id: "owner", label: WORDS.columns.owner },
   { id: "checked", label: WORDS.columns.checked },
 ] as const;
 
-export const NARROW_HIDES: ReadonlySet<string> = new Set(["kind", "trust"]);
+export const NARROW_HIDES: ReadonlySet<string> = new Set(["type", "trust"]);
 
 export type Opening = {
   readonly returnedTo: string | undefined;
@@ -84,8 +84,8 @@ export const allKnowledgeColumns = column.columns([
     cell: ({ row }) => <TitleCell concept={row.original} />,
   }),
   column.accessor("conceptType", {
-    id: "kind",
-    header: WORDS.columns.kind,
+    id: "type",
+    header: WORDS.columns.type,
     cell: ({ getValue }) => getValue(),
   }),
   column.accessor("collection", {

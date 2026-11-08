@@ -89,7 +89,7 @@ export const shelveOne = async (
 };
 
 const WIDE_COLLECTIONS = 12;
-const WIDE_KINDS = 8;
+const WIDE_CONCEPT_TYPES = 8;
 
 export type WideKnowledge = {
   readonly count: number;
@@ -100,7 +100,7 @@ export type WideKnowledge = {
 const wideConceptAt = (at: number, checker: string): Shelved => ({
   path: `knowledge/collection-${at % WIDE_COLLECTIONS}/concept-${at}.md`,
   title: `Concept ${String(at).padStart(5, "0")}`,
-  conceptType: `Kind ${at % WIDE_KINDS}`,
+  conceptType: `Type ${at % WIDE_CONCEPT_TYPES}`,
   checks:
     at % 3 === 0
       ? [

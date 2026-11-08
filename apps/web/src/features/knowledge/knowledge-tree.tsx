@@ -4,7 +4,7 @@ import { Icon } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 
 import type { CollectionCounted } from "./knowledge-api.ts";
-import type { OpenKind } from "./knowledge-state.ts";
+import type { OpenConceptType } from "./knowledge-state.ts";
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "./knowledge-words.ts";
 
 type Placed = {
@@ -18,23 +18,23 @@ type Placed = {
 
 type CollectionRow = Placed & { readonly level: 1; readonly expanded: boolean };
 
-type KindRow = Placed & { readonly level: 2; readonly conceptType: string };
+type ConceptTypeRow = Placed & { readonly level: 2; readonly conceptType: string };
 
-type TreeRow = CollectionRow | KindRow;
+type TreeRow = CollectionRow | ConceptTypeRow;
 
-type Collected = { readonly row: CollectionRow; readonly kinds: readonly KindRow[] };
+type Collected = { readonly row: CollectionRow; readonly conceptTypes: readonly ConceptTypeRow[] };
 
 const idOf = (collection: string | null, conceptType?: string): string =>
   JSON.stringify(conceptType === undefined ? [collection] : [collection, conceptType]);
 
-const kindRowsOf = (held: CollectionCounted): readonly KindRow[] =>
-  held.kinds.map((counted, place) => ({
+const conceptTypeRowsOf = (held: CollectionCounted): readonly ConceptTypeRow[] =>
+  held.conceptTypes.map((counted, place) => ({
     id: idOf(held.collection, counted.conceptType),
     level: 2,
     name: counted.conceptType,
     count: counted.count,
     collection: held.collection,
-    setsize: held.kinds.length,
+    setsize: held.conceptTypes.length,
     posinset: place + 1,
     conceptType: counted.conceptType,
   }));
@@ -54,13 +54,13 @@ const outlineOf = (
       posinset: at + 1,
       expanded: expanded.has(held.collection),
     };
-    return { row, kinds: row.expanded ? kindRowsOf(held) : [] };
+    return { row, conceptTypes: row.expanded ? conceptTypeRowsOf(held) : [] };
   });
 
 type Step =
   | { readonly does: "focus"; readonly at: number }
   | { readonly does: "toggle"; readonly at: number; readonly row: CollectionRow }
-  | { readonly does: "open"; readonly at: number; readonly row: KindRow };
+  | { readonly does: "open"; readonly at: number; readonly row: ConceptTypeRow };
 
 type Keyed = (rows: readonly TreeRow[], at: number) => Step | undefined;
 
@@ -193,15 +193,15 @@ function TreeItem(properties: {
   );
 }
 
-const openIdOf = (open: OpenKind): string | undefined =>
+const openIdOf = (open: OpenConceptType): string | undefined =>
   open === undefined ? undefined : idOf(open.collection, open.conceptType);
 
-export const initiallyExpanded = (open: OpenKind): ReadonlySet<string | null> =>
+export const initiallyExpanded = (open: OpenConceptType): ReadonlySet<string | null> =>
   new Set(open === undefined ? [] : [open.collection]);
 
 export function KnowledgeTree(properties: {
   readonly collections: readonly CollectionCounted[];
-  readonly open: OpenKind;
+  readonly open: OpenConceptType;
   readonly onOpen: (collection: string | null, conceptType: string) => void;
   readonly expanded: ReadonlySet<string | null>;
   readonly onToggle: (collection: string | null) => void;
@@ -211,7 +211,7 @@ export function KnowledgeTree(properties: {
   const treeId = useId();
   const [focused, setFocused] = useState(() => openIdOf(open));
   const outline = outlineOf(properties.collections, expanded);
-  const rows = outline.flatMap(({ row, kinds }) => [row, ...kinds]);
+  const rows = outline.flatMap(({ row, conceptTypes }) => [row, ...conceptTypes]);
   const indexOf = new Map(rows.map((row, index) => [row.id, index]));
   const at = indexOf.get(focused ?? "") ?? 0;
   const openId = openIdOf(open);
@@ -255,13 +255,13 @@ export function KnowledgeTree(properties: {
 
   return (
     <ul role="tree" aria-label={WORDS.tree} className="py-1">
-      {outline.map(({ row, kinds }) =>
+      {outline.map(({ row, conceptTypes }) =>
         drawn(
           row,
           row.expanded ? (
-            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a tree's group lists a collection's kinds, and no tag this rule offers is a list
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a tree's group lists a collection's types, and no tag this rule offers is a list
             <ul role="group" id={`${domIdOf(row)}-group`}>
-              {kinds.map((conceptType) => drawn(conceptType))}
+              {conceptTypes.map((conceptType) => drawn(conceptType))}
             </ul>
           ) : undefined,
         ),

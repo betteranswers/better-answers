@@ -61,10 +61,10 @@ describe("the concept page", () => {
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
-  it("names the kind and collection, or no collection", async () => {
+  it("names the type and collection, or no collection", async () => {
     const article = await opened({ collection: null });
 
-    expect(article.getByText(CONCEPT_WORDS.kind).nextElementSibling?.textContent).toBe("Sector");
+    expect(article.getByText(CONCEPT_WORDS.type).nextElementSibling?.textContent).toBe("Sector");
     expect(article.getByText("Collection").nextElementSibling?.textContent).toBe("No collection");
   });
 });

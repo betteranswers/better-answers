@@ -163,8 +163,8 @@ export const KNOWLEDGE = {
         },
         {
           name: "Concept Types",
-          path: "/knowledge/kinds",
-          icon: "kinds",
+          path: "/knowledge/types",
+          icon: "types",
           built: true,
           seenBy: ADMINS,
           owners: "of-a-collection",

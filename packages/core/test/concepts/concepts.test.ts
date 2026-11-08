@@ -351,7 +351,7 @@ describe("a governed write", () => {
     ]);
   });
 
-  it("normalises the row's kind but keeps the file's spelling", async () => {
+  it("normalises the row's type but keeps the file's spelling", async () => {
     const scenario = await arrange();
 
     let headSeen: string | null = null;
@@ -364,11 +364,11 @@ describe("a governed write", () => {
       firstFile ??= { sha: written.sha, path: input.path };
     }
 
-    const kinds = await db().pool.query<{ concept_type: string }>(
+    const conceptTypes = await db().pool.query<{ concept_type: string }>(
       "SELECT DISTINCT concept_type FROM concept_index WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
-    expect(kinds.rows).toEqual([{ concept_type: "Policy" }]);
+    expect(conceptTypes.rows).toEqual([{ concept_type: "Policy" }]);
 
     assert(firstFile !== undefined, "the first spelling did not land");
     const file = await fileAtCommit(
@@ -817,7 +817,7 @@ describe("the map rows a governed write creates", () => {
     ]);
   });
 
-  it("labels a cited deprecated same-kind concept succession, else derivation", async () => {
+  it("labels a cited deprecated same-type concept succession, else derivation", async () => {
     const scenario = await arrange();
 
     const superseded = writeFor({ status: "deprecated" });

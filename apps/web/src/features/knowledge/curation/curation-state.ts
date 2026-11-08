@@ -20,8 +20,8 @@ export const ALL_KNOWLEDGE_LIST = "all";
 const SORTS = [
   "title",
   "-title",
-  "kind",
-  "-kind",
+  "type",
+  "-type",
   "collection",
   "-collection",
   "owner",
@@ -37,8 +37,8 @@ type Sorted = AllKnowledgeAsked["sort"];
 const SORTED = {
   title: { column: "title", desc: false },
   "-title": { column: "title", desc: true },
-  kind: { column: "kind", desc: false },
-  "-kind": { column: "kind", desc: true },
+  type: { column: "type", desc: false },
+  "-type": { column: "type", desc: true },
   collection: { column: "collection", desc: false },
   "-collection": { column: "collection", desc: true },
   owner: { column: "owner", desc: false },
@@ -53,7 +53,7 @@ export const SORTABLE: ReadonlySet<string> = new Set(
 
 export const ALL_KNOWLEDGE_FIELDS = {
   collection: searchText(),
-  kind: searchText(),
+  type: searchText(),
   sort: z.enum(SORTS).optional().catch(undefined),
   page: PAGE_NUMBER,
 };
@@ -124,44 +124,44 @@ export const allKnowledgeAsked = (
     sort: sortedOf(held.sort),
     page: held.page,
   };
-  if (held.kind !== "") asked.conceptType = held.kind;
+  if (held.type !== "") asked.conceptType = held.type;
   return asked;
 };
 
 export const isNarrowed = (held: Held, scope: CollectionScope): boolean =>
-  scope.kind !== "every" || held.kind !== "";
+  scope.kind !== "every" || held.type !== "";
 
-export const KINDS_KEYSTROKES = {
+export const CONCEPT_TYPES_KEYSTROKES = {
   tail: { key: "t", action: "Show types with 2 or fewer concepts, or all types" },
   open: { key: "o", action: "Show or hide the focused type’s collections" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
-export const KINDS_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Concept Types");
+export const CONCEPT_TYPES_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Concept Types");
 
-export const KINDS_LIST = "kinds";
+export const CONCEPT_TYPES_LIST = "types";
 
-export const KINDS_TAIL_MAX = 2;
+export const CONCEPT_TYPES_TAIL_MAX = 2;
 
-const KINDS_SORTS = ["kind", "-kind", "count", "-count"] as const;
+const CONCEPT_TYPES_SORTS = ["type", "-type", "count", "-count"] as const;
 
-export type KindsSort = (typeof KINDS_SORTS)[number];
+export type ConceptTypesSort = (typeof CONCEPT_TYPES_SORTS)[number];
 
-const KINDS_TAILS = ["small"] as const;
+const CONCEPT_TYPES_TAILS = ["small"] as const;
 
-export const KINDS_FIELDS = {
-  sort: z.enum(KINDS_SORTS).catch("kind"),
-  tail: z.enum(KINDS_TAILS).optional().catch(undefined),
+export const CONCEPT_TYPES_FIELDS = {
+  sort: z.enum(CONCEPT_TYPES_SORTS).catch("type"),
+  tail: z.enum(CONCEPT_TYPES_TAILS).optional().catch(undefined),
 };
 
-type KindsSorted = { readonly id: string; readonly desc: boolean };
+type ConceptTypesSorted = { readonly id: string; readonly desc: boolean };
 
-export const kindsSortedOf = (sort: KindsSort): KindsSorted => ({
+export const conceptTypesSortedOf = (sort: ConceptTypesSort): ConceptTypesSorted => ({
   id: sort.replace(/^-/u, ""),
   desc: sort.startsWith("-"),
 });
 
-export const kindsSortOf = (sorted: KindsSorted): KindsSort | undefined =>
-  KINDS_SORTS.find((sort) => sort === `${sorted.desc ? "-" : ""}${sorted.id}`);
+export const conceptTypesSortOf = (sorted: ConceptTypesSorted): ConceptTypesSort | undefined =>
+  CONCEPT_TYPES_SORTS.find((sort) => sort === `${sorted.desc ? "-" : ""}${sorted.id}`);
 
 export const EXPORTS_KEYSTROKES = {
   knowledgeBase: { key: "k", action: "Download the knowledge base snapshot" },

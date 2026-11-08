@@ -14,14 +14,14 @@ import {
   exportGuideSnapshot,
   exportRecords,
   exportRecordsInput,
-  kindConceptsInput,
+  conceptsOfTypeInput,
   nameOwner,
   nameOwnerInput,
   nameOwnerOfEach,
   nameOwnerOfEachInput,
   readAllKnowledge,
-  readKindConcepts,
-  readKinds,
+  readConceptsOfType,
+  readConceptTypes,
   readKnowledgeTree,
   readSectionTrusts,
   recordCopy,
@@ -195,13 +195,15 @@ export const knowledgeRouter = router({
   tree: knowledgeReadProcedure.query(({ ctx }) =>
     crossing(ctx, readKnowledgeTree.name, readKnowledgeTree(ctx.principal, ctx.tx)),
   ),
-  kindConcepts: knowledgeReadProcedure.input(parsedBy(kindConceptsInput)).query(({ ctx, input }) =>
-    crossing(
-      ctx,
-      readKindConcepts.name,
-      given(input, (asked) => readKindConcepts(ctx.principal, ctx.tx, asked, ctx.clock.now())),
+  conceptsOfType: knowledgeReadProcedure
+    .input(parsedBy(conceptsOfTypeInput))
+    .query(({ ctx, input }) =>
+      crossing(
+        ctx,
+        readConceptsOfType.name,
+        given(input, (asked) => readConceptsOfType(ctx.principal, ctx.tx, asked, ctx.clock.now())),
+      ),
     ),
-  ),
   guides: knowledgeReadProcedure.query(({ ctx }) =>
     crossing(ctx, readGuides.name, readGuides(ctx.principal, ctx.tx)),
   ),
@@ -257,8 +259,8 @@ export const knowledgeRouter = router({
       given(input, (asked) => readAllKnowledge(ctx.principal, ctx.tx, asked, ctx.clock.now())),
     ),
   ),
-  kinds: queryProcedure.query(({ ctx }) =>
-    crossing(ctx, readKinds.name, readKinds(ctx.principal, ctx.tx)),
+  conceptTypes: queryProcedure.query(({ ctx }) =>
+    crossing(ctx, readConceptTypes.name, readConceptTypes(ctx.principal, ctx.tx)),
   ),
   setOwners: mutationProcedure
     .input(parsedBy(nameOwnerOfEachInput))
