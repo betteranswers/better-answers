@@ -235,7 +235,7 @@ export const submitSuggestionSet = async (
               suggestion_id: payload.suggestionId,
               merge_key: payload.mergeKey,
               path: payload.path,
-              concept_kind: payload.conceptType,
+              concept_type: payload.conceptType,
               title: payload.title,
 
               frontmatter: JSON.stringify(payload.frontmatter),
@@ -408,7 +408,7 @@ type PayloadRow = {
   readonly proposer: string;
   readonly merge_key: string;
   readonly path: string;
-  readonly concept_kind: string;
+  readonly concept_type: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
@@ -421,7 +421,7 @@ export const payloadFor = async (
   suggestionId: string,
 ): Promise<SuggestionPayload | undefined> => {
   const found = await tx.query<PayloadRow>(
-    `SELECT set_id, kind, proposer, merge_key, path, concept_kind, title, frontmatter, body,
+    `SELECT set_id, kind, proposer, merge_key, path, concept_type, title, frontmatter, body,
             base_content_hash
        FROM concept_write_request_for($1)`,
     [suggestionId],
@@ -434,7 +434,7 @@ export const payloadFor = async (
     proposer: actorOf(row.proposer),
     mergeKey: row.merge_key,
     path: row.path,
-    conceptType: row.concept_kind,
+    conceptType: row.concept_type,
     title: row.title,
     frontmatter: row.frontmatter,
     body: row.body,

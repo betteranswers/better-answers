@@ -153,7 +153,10 @@ export const conceptVisibilityFrom = async (
   });
 };
 
-type IndexVisibilityRow = VisibilityRow & { readonly workspace_id: string; readonly kind: string };
+type IndexVisibilityRow = VisibilityRow & {
+  readonly workspace_id: string;
+  readonly concept_type: string;
+};
 
 const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> => {
   await tx.query(
@@ -168,7 +171,7 @@ const recomputeConceptVisibility = async (
   iri: string,
 ): Promise<void> => {
   const held = await tx.query<IndexVisibilityRow>(
-    `SELECT workspace_id, kind, sensitivity, audience, audience_groups FROM concept_index
+    `SELECT workspace_id, concept_type, sensitivity, audience, audience_groups FROM concept_index
       WHERE workspace_id = ${scopeClause(1)} AND iri = $2 FOR UPDATE`,
     [scopeParameter(principal), iri],
   );
@@ -177,7 +180,7 @@ const recomputeConceptVisibility = async (
     throw new Error(`visibility: ${iri} is cited but has no concept_index row`);
   const visibility = await conceptVisibilityFrom(principal, tx, {
     iri,
-    conceptType: row.kind,
+    conceptType: row.concept_type,
     fallback: visibilityOf(row),
     alsoOn: await restsAlsoOnItsCommit(principal, tx, iri),
   });

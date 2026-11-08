@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0100_the-concept-kind"
+MIGRATION_ID = "0101_the-concept-type"
 
-MIGRATION_WHEN = 1794000676696
+MIGRATION_WHEN = 1794172849431
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -103,7 +103,7 @@ TABLES: dict[str, dict[str, str]] = {
         "workspace_id": "text NOT NULL",
         "iri": "text NOT NULL",
         "path": "text NOT NULL",
-        "kind": "text NOT NULL",
+        "concept_type": "text NOT NULL",
         "title": "text NOT NULL",
         "frontmatter": "jsonb NOT NULL",
         "body": "text NOT NULL",
@@ -150,7 +150,7 @@ TABLES: dict[str, dict[str, str]] = {
         "suggestion_id": "text NOT NULL",
         "merge_key": "text NOT NULL",
         "path": "text NOT NULL",
-        "concept_kind": "text NOT NULL",
+        "concept_type": "text NOT NULL",
         "title": "text NOT NULL",
         "frontmatter": "jsonb NOT NULL",
         "body": "text NOT NULL",
@@ -241,7 +241,7 @@ TABLES: dict[str, dict[str, str]] = {
         "workspace_id": "text NOT NULL",
         "id": "text NOT NULL",
         "template": "text NOT NULL",
-        "kind": "text NOT NULL",
+        "guide_type": "text NOT NULL",
         "collection": "text NOT NULL",
         "subject_iri": "text",
         "created_at": "timestamp with time zone NOT NULL",
@@ -262,7 +262,7 @@ TABLES: dict[str, dict[str, str]] = {
         "section_id": "text NOT NULL",
         "ordinal": "integer NOT NULL",
         "name": "text NOT NULL",
-        "kind": "text NOT NULL",
+        "concept_type": "text NOT NULL",
         "tags": "text[] NOT NULL",
         "collection": "text",
         "at_least": "integer NOT NULL",
@@ -368,8 +368,8 @@ TABLES: dict[str, dict[str, str]] = {
         "label": "text NOT NULL",
         "from_uid": "text NOT NULL",
         "to_uid": "text NOT NULL",
-        "from_kind": "text",
-        "to_kind": "text",
+        "from_concept_type": "text",
+        "to_concept_type": "text",
         "section": "text",
         "sentence": "text",
         "published_at": "timestamp with time zone",
@@ -386,7 +386,7 @@ TABLES: dict[str, dict[str, str]] = {
         "gen": "integer",
         "uid": "text NOT NULL",
         "label": "text NOT NULL",
-        "kind": "text",
+        "concept_type": "text",
         "published_at": "timestamp with time zone",
         "sensitivity": "text NOT NULL",
         "audience": "text NOT NULL",

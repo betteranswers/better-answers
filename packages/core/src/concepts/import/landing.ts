@@ -62,7 +62,7 @@ export type Held = {
 
 type HeldRow = {
   readonly path: string;
-  readonly kind: string;
+  readonly concept_type: string;
   readonly title: string;
   readonly merge_key: string;
   readonly sensitivity: string;
@@ -80,7 +80,7 @@ export const heldByIri = async (
 ): Promise<Held | undefined> => {
   const predicate = principal.kind === "user" ? `AND ${sensitivityAndAudienceClause("c", 3)}` : "";
   const found = await tx.query<HeldRow>(
-    `SELECT c.path, c.kind, c.title, i.merge_key, c.sensitivity, c.audience, c.audience_groups,
+    `SELECT c.path, c.concept_type, c.title, i.merge_key, c.sensitivity, c.audience, c.audience_groups,
             c.status, c.content_hash, c.published_at
        FROM concept_index c
        JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
@@ -97,7 +97,7 @@ export const heldByIri = async (
     ? undefined
     : {
         path: row.path,
-        conceptType: row.kind,
+        conceptType: row.concept_type,
         title: row.title,
         mergeKey: row.merge_key,
         sensitivity: row.sensitivity,
@@ -377,12 +377,12 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
     onTheRow: true,
   });
   await tx.query(
-    `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body,
+    `INSERT INTO concept_index (workspace_id, iri, path, concept_type, title, frontmatter, body,
                                 content_hash, commit_sha, status, published_at, sensitivity,
                                 audience, audience_groups)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      ON CONFLICT (workspace_id, iri) DO UPDATE
-        SET path = EXCLUDED.path, kind = EXCLUDED.kind, title = EXCLUDED.title,
+        SET path = EXCLUDED.path, concept_type = EXCLUDED.concept_type, title = EXCLUDED.title,
             frontmatter = EXCLUDED.frontmatter, body = EXCLUDED.body,
             content_hash = EXCLUDED.content_hash, commit_sha = EXCLUDED.commit_sha,
             status = EXCLUDED.status, published_at = EXCLUDED.published_at,

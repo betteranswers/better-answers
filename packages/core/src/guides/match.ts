@@ -9,7 +9,7 @@ type MatchAt = {
 export const matchesTheFact = (at: MatchAt): string =>
   `c.workspace_id = $${at.scope}
      AND ${readableClause("c", at.reader)}
-     AND c.kind = f.kind
+     AND c.concept_type = f.concept_type
      AND COALESCE(c.frontmatter -> 'tags', '[]'::jsonb) @> to_jsonb(f.tags)
      AND c.collection = COALESCE(f.collection, ${at.guideCollection})`;
 

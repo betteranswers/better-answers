@@ -25,8 +25,9 @@ const MINT_IDENTITIES = `INSERT INTO concept_identity (workspace_id, iri, merge_
   SELECT $1, iri, 'indexed:' || lower(substr(iri, ${CONCEPT_IRI_PREFIX.length + 1}))
     FROM unnest($2::text[]) AS held(iri)`;
 
-const INDEX_ROWS = `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body,
-         content_hash, commit_sha, status, published_at, sensitivity, audience, audience_groups)
+const INDEX_ROWS = `INSERT INTO concept_index (workspace_id, iri, path, concept_type, title, frontmatter,
+         body, content_hash, commit_sha, status, published_at, sensitivity, audience,
+         audience_groups)
   SELECT $1, held.iri, held.path, $4, held.title,
          jsonb_build_object('title', held.title, 'type', $4::text), $5,
          encode(sha256(convert_to(held.path, 'UTF8')), 'hex'), $6, $7, now(), $8, $9, $10

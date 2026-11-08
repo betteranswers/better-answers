@@ -1295,7 +1295,7 @@ describe("the map tables under app_rt", () => {
 
       await refusesEach(client, [
         [
-          "UPDATE map_node SET kind = 'Product'",
+          "UPDATE map_node SET concept_type = 'Product'",
           "the worker updating a node, which could change the live generation",
         ],
         [
@@ -1472,7 +1472,7 @@ const submitRequest = (overrides: Record<string, unknown> = {}): Record<string, 
   suggestion_id: ulid(),
   merge_key: `policy:${ulid().toLowerCase()}`,
   path: `knowledge/${ulid().toLowerCase()}.md`,
-  concept_kind: "Policy",
+  concept_type: "Policy",
   title: "Expenses",
   frontmatter: '{"title":"Expenses"}',
   body: "Expenses are claimed within thirty days.",

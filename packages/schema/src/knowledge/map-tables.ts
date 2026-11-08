@@ -77,13 +77,13 @@ export const mapNode = withRLS(
   {
     ...mapRowColumns(),
 
-    conceptType: text("kind"),
+    conceptType: text("concept_type"),
     ...readableUnitColumns(),
   },
   "workspaceId",
   (table) => [
     ...partitionKeys("map_node", table),
-    index("map_node_kind_idx").on(table.workspaceId, table.conceptType),
+    index("map_node_concept_type_idx").on(table.workspaceId, table.conceptType),
     check("map_node_label_check", sql.raw(nodeLabelCheck)),
     check("map_node_gen_check", sql.raw(genCheck)),
     check("map_node_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
@@ -97,9 +97,9 @@ export const mapEdge = withRLS(
     ...mapRowColumns(),
     fromUid: text("from_uid").notNull(),
     toUid: text("to_uid").notNull(),
-    fromConceptType: text("from_kind"),
+    fromConceptType: text("from_concept_type"),
 
-    toConceptType: text("to_kind"),
+    toConceptType: text("to_concept_type"),
     section: text("section"),
     sentence: text("sentence"),
     ...readableUnitColumns(),
@@ -117,7 +117,7 @@ export const mapEdge = withRLS(
     check(
       "map_edge_links_to_check",
       sql.raw(
-        `label = 'LINKS_TO' OR (from_kind IS NULL AND to_kind IS NULL AND section IS NULL AND sentence IS NULL)`,
+        `label = 'LINKS_TO' OR (from_concept_type IS NULL AND to_concept_type IS NULL AND section IS NULL AND sentence IS NULL)`,
       ),
     ),
   ],

@@ -184,7 +184,7 @@ describe("the local database", () => {
 
     it("has three concepts and the Restricted one cites the document", async () => {
       const concepts = await browse.query(
-        `SELECT iri, title, kind, sensitivity, audience, status FROM concept_index
+        `SELECT iri, title, concept_type, sensitivity, audience, status FROM concept_index
           WHERE workspace_id = $1 ORDER BY path`,
         [SYNTHETIC_WORKSPACE],
       );
@@ -193,10 +193,10 @@ describe("the local database", () => {
         [SYNTHETIC_WORKSPACE],
       );
 
-      const concept = (title: string, kind: string, sensitivity: string, ulid: string) => ({
+      const concept = (title: string, conceptType: string, sensitivity: string, ulid: string) => ({
         iri: `https://better-answers.com/c/${ulid}`,
         title,
-        kind,
+        concept_type: conceptType,
         sensitivity,
         audience: "everyone",
         status: "stable",

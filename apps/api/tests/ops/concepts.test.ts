@@ -312,7 +312,7 @@ describe("pnpm ops", () => {
     type IndexRow = {
       readonly iri: string;
       readonly path: string;
-      readonly kind: string;
+      readonly concept_type: string;
       readonly title: string;
       readonly status: string;
       readonly sensitivity: string;
@@ -320,7 +320,7 @@ describe("pnpm ops", () => {
 
     const indexRowsOf = async (app: TestApp, workspaceId: string) => {
       const found = await app.database.superuser.query<IndexRow>(
-        `SELECT iri, path, kind, title, status, sensitivity
+        `SELECT iri, path, concept_type, title, status, sensitivity
            FROM concept_index WHERE workspace_id = $1 ORDER BY path`,
         [workspaceId],
       );
@@ -428,7 +428,7 @@ describe("pnpm ops", () => {
       );
       const rows = await indexRowsOf(served(), workspaceId);
       expect(rows.map((row) => row.path)).toEqual(IMPORTED_PATHS);
-      expect(rows.map((row) => `${row.kind}: ${row.title}`)).toEqual([
+      expect(rows.map((row) => `${row.concept_type}: ${row.title}`)).toEqual([
         "Answer: Data retention period",
         "Answer: Support hours",
         "Answer: Can two teams share one account? (Advanced plan)",

@@ -501,12 +501,12 @@ describe("a save of a concept citing a deleted document", () => {
   const acceptedEdit = async (scenario: Scenario, iri: ConceptIri, path: string, body: string) => {
     const found = await db().pool.query<{
       merge_key: string;
-      kind: string;
+      concept_type: string;
       title: string;
       frontmatter: Frontmatter;
       content_hash: string;
     }>(
-      `SELECT i.merge_key, c.kind, c.title, c.frontmatter, c.content_hash
+      `SELECT i.merge_key, c.concept_type, c.title, c.frontmatter, c.content_hash
          FROM concept_index c
          JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
         WHERE c.iri = $1`,
@@ -524,7 +524,7 @@ describe("a save of a concept citing a deleted document", () => {
           {
             mergeKey: held.merge_key,
             path,
-            conceptType: held.kind,
+            conceptType: held.concept_type,
             title: held.title,
             frontmatter,
             body,
@@ -763,14 +763,14 @@ describe("the author a save commits as", () => {
 
     expect(answer).toMatchObject({ ok: true, value: { outcome: "committed" } });
     const landed = await db().pool.query(
-      "SELECT path, collection, kind, title FROM concept_index WHERE workspace_id = $1",
+      "SELECT path, collection, concept_type, title FROM concept_index WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(landed.rows).toEqual([
       {
         path: "knowledge/policy/mileage-allowance-uk.md",
         collection: "policy",
-        kind: "Policy",
+        concept_type: "Policy",
         title: "Mileage Allowance (UK)",
       },
     ]);

@@ -1,16 +1,12 @@
-import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import pg from "pg";
+import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { migrationsFolder } from "../../src/index.ts";
-import { POSTGRES_IMAGE } from "../../src/postgres-image.ts";
-import { testData, type TestData } from "../support/factory.ts";
-import { endPool, POSTGRES_COMMAND } from "../support/harness.ts";
-import { migrationsFolderEndingAt } from "./journal-statements.ts";
-
-type ConceptRow = NonNullable<Parameters<TestData["conceptIndex"]>[0]>;
+import { testData } from "../support/factory.ts";
+import { conceptStoredBefore0101, type ConceptBefore0101 } from "./before-the-concept-type.ts";
+import { inADatabaseMigratedTo } from "./database-at.ts";
 
 const ROWS = 300;
 
@@ -22,12 +18,13 @@ const title = (at: number) => `Answer ${String(at)}`;
 const MIGRATIONS: readonly {
   readonly migration: string;
   readonly lastBefore: string;
-  readonly rowAt: (at: number) => ConceptRow;
+  readonly rowAt: (at: number) => ConceptBefore0101;
 }[] = [
   {
     migration: "0080 adds descriptions",
     lastBefore: "0079_the-model-key",
     rowAt: (at) => ({
+      conceptType: "Answer",
       title: title(at),
       frontmatter: {
         title: title(at),
@@ -75,19 +72,14 @@ describe("a search vector migration over concepts stored before it", () => {
   it.each(MIGRATIONS)(
     "$migration at B and keeps a valid index",
     async ({ lastBefore, rowAt }) => {
-      const container = await new PostgreSqlContainer(POSTGRES_IMAGE)
-        .withCommand([...POSTGRES_COMMAND])
-        .start();
-      const pool = new pg.Pool({ connectionString: container.getConnectionUri(), max: 2 });
-      try {
-        await migrate(drizzle(pool), { migrationsFolder: migrationsFolderEndingAt(lastBefore) });
+      await inADatabaseMigratedTo(lastBefore, async (pool) => {
         const client = await pool.connect();
         try {
           const seed = testData(client);
           const { id: workspaceId } = await seed.workspace();
           const { sha } = await seed.bundleCommit({ workspaceId });
           for (let at = 0; at < ROWS; at += 1) {
-            await seed.conceptIndex({ ...rowAt(at), workspaceId, commitSha: sha });
+            await conceptStoredBefore0101(seed, client, workspaceId, sha, rowAt(at));
           }
         } finally {
           client.release();
@@ -100,10 +92,7 @@ describe("a search vector migration over concepts stored before it", () => {
           before: { rows: ROWS, held: 0, weights: null, valid: true, ready: true },
           after: { rows: ROWS, held: 1, weights: "B", valid: true, ready: true },
         });
-      } finally {
-        await endPool(pool);
-        await container.stop();
-      }
+      });
     },
     300_000,
   );

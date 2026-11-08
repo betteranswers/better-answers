@@ -39,7 +39,7 @@ const skeletonSection = z.strictObject({
 export const guideSkeleton = z.strictObject({
   guide: z.string(),
   template: z.string(),
-  kind: z.string(),
+  type: z.string(),
   subject: z.string().nullable(),
   roles: z.array(
     z.strictObject({
@@ -90,7 +90,7 @@ export const skeletonOf = (
 ): GuideSkeleton => ({
   guide: definition.id,
   template: definition.template,
-  kind: definition.guideType,
+  type: definition.guideType,
   subject: definition.subjectIri,
   roles: definition.roles
     .toSorted((one, other) => ROLES.indexOf(one.role) - ROLES.indexOf(other.role))

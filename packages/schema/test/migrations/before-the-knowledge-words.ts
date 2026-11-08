@@ -1,6 +1,6 @@
 import type pg from "pg";
 
-import { ulid } from "../../src/index.ts";
+import { conceptIriOf, ulid } from "../../src/index.ts";
 import { testData } from "../support/factory.ts";
 import { suggestionWrittenOfAnyKind } from "../support/probes.ts";
 import { migrationsFolderEndingAt } from "./journal-statements.ts";
@@ -10,6 +10,12 @@ const THE_LAST_BEFORE = "0071_the-short-name";
 export const migrationsFolderBefore0072 = (): string => migrationsFolderEndingAt(THE_LAST_BEFORE);
 
 const A_PERSON = "human:01J6CCCCCCCCCCCCCCCCCCCCCC";
+
+/** The factory writes today's column names, and `map_node.kind` is `concept_type` only from 0101. */
+const MAP_NODES_BEFORE_0101 = `INSERT INTO map_node
+    (workspace_id, gen, uid, label, kind, published_at, sensitivity, audience)
+  VALUES ($1, $2, $3, 'Concept', 'Policy', now(), 'Internal', 'everyone'),
+         ($1, $2, $4, 'Concept', 'Policy', now(), 'Internal', 'everyone')`;
 
 const A_RUN = "better-answers-extraction/1.2";
 
@@ -67,9 +73,15 @@ export const oldWordsAndControlRowsStoredIn = async (
     ],
   );
 
-  const relabelled = await seed.mapNode({ workspaceId });
-  await seed.mapNode({ workspaceId });
-  await client.query("UPDATE map_node SET label = 'Composition' WHERE uid = $1", [relabelled.uid]);
+  const { liveGen } = await seed.mapGeneration({ workspaceId });
+  const relabelled = conceptIriOf(ulid());
+  await client.query(MAP_NODES_BEFORE_0101, [
+    workspaceId,
+    liveGen,
+    relabelled,
+    conceptIriOf(ulid()),
+  ]);
+  await client.query("UPDATE map_node SET label = 'Composition' WHERE uid = $1", [relabelled]);
 
   const writeUp = ulid();
   await client.query(

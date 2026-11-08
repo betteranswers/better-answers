@@ -1020,7 +1020,7 @@ export const editSuggesting = z.strictObject({
 
 type StandingFile = {
   readonly path: string;
-  readonly kind: string;
+  readonly concept_type: string;
   readonly title: string;
   readonly frontmatter: Readonly<Record<string, unknown>>;
   readonly body: string;
@@ -1033,7 +1033,7 @@ const standingFileOf = async (
   asked: { readonly workspaceId: string; readonly iri: string },
 ): Promise<StandingFile> => {
   const found = await app.database.superuser.query<StandingFile>(
-    `SELECT c.path, c.kind, c.title, c.frontmatter, c.body, c.content_hash, i.merge_key
+    `SELECT c.path, c.concept_type, c.title, c.frontmatter, c.body, c.content_hash, i.merge_key
        FROM concept_index c
        JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
       WHERE c.workspace_id = $1 AND c.iri = $2`,
@@ -1063,7 +1063,7 @@ export const seedEditSuggestion = async (
         {
           mergeKey: standing.merge_key,
           path: standing.path,
-          conceptType: standing.kind,
+          conceptType: standing.concept_type,
           title,
           frontmatter: conceptFrontmatter.parse({ ...standing.frontmatter, title }),
           body: asked.body ?? standing.body,

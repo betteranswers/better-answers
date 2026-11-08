@@ -68,7 +68,7 @@ const templateFor = (input: SeedGuideInput): Template | undefined =>
     : undefined;
 
 const FACTS_AS_GIVEN = `jsonb_to_recordset($5::jsonb)
-  AS f(id text, section_id text, ordinal int, kind text, tags text[], collection text)`;
+  AS f(id text, section_id text, ordinal int, concept_type text, tags text[], collection text)`;
 
 const firstMatchesFor = async (
   reader: UserPrincipal,
@@ -79,7 +79,7 @@ const firstMatchesFor = async (
     id: fact.id,
     section_id: fact.sectionId,
     ordinal: fact.ordinal,
-    kind: fact.conceptType,
+    concept_type: fact.conceptType,
     tags: fact.tags,
     collection: fact.collection,
   }));

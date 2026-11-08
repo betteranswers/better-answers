@@ -363,8 +363,9 @@ def seed_concept_index(
         (workspace_id, sha, ulid()),
     )
     cursor.execute(
-        "INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter,"
-        " body, content_hash, commit_sha, status, published_at, sensitivity, audience)"
+        "INSERT INTO concept_index (workspace_id, iri, path, concept_type, title,"
+        " frontmatter, body, content_hash, commit_sha, status, published_at,"
+        " sensitivity, audience)"
         " VALUES (%s, %s, %s, 'Policy', 'Expenses', '{}'::jsonb, 'body', %s, %s,"
         " 'stable', now(), 'Internal', 'everyone') RETURNING *",
         (workspace_id, iri, path, content_hash, sha),
@@ -380,11 +381,14 @@ def seed_concept(
     path: str,
     frontmatter: dict[str, Any],
     body: str,
-    kind: str = "Policy",
+    concept_type: str = "Policy",
     status: str = "stable",
 ) -> str:
     seed_concept_identity(
-        cursor, workspace_id=workspace_id, iri=iri, merge_key=f"{kind}:{path}".lower()
+        cursor,
+        workspace_id=workspace_id,
+        iri=iri,
+        merge_key=f"{concept_type}:{path}".lower(),
     )
     sha = f"{abs(hash(path)):040x}"[:40]
     cursor.execute(
@@ -396,15 +400,16 @@ def seed_concept(
     content = render_concept_file(frontmatter, body)
     parsed_frontmatter, parsed_body = parse_concept_file(content)
     cursor.execute(
-        "INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter,"
-        " body, content_hash, commit_sha, status, published_at, sensitivity, audience)"
+        "INSERT INTO concept_index (workspace_id, iri, path, concept_type, title,"
+        " frontmatter, body, content_hash, commit_sha, status, published_at,"
+        " sensitivity, audience)"
         " VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, now(), 'Internal',"
         " 'everyone')",
         (
             workspace_id,
             iri,
             path,
-            kind,
+            concept_type,
             str(frontmatter.get("title", "Untitled")),
             json.dumps(parsed_frontmatter),
             parsed_body,
@@ -436,12 +441,12 @@ def seed_map_node(
     workspace_id: str,
     gen: int,
     uid: str,
-    kind: str = "Policy",
+    concept_type: str = "Policy",
 ) -> dict[str, Any]:
     cursor.execute(
-        "INSERT INTO map_node (workspace_id, gen, uid, label, kind)"
+        "INSERT INTO map_node (workspace_id, gen, uid, label, concept_type)"
         " VALUES (%s, %s, %s, 'Concept', %s) RETURNING *",
-        (workspace_id, gen, uid, kind),
+        (workspace_id, gen, uid, concept_type),
     )
     return _returning_row(cursor)
 

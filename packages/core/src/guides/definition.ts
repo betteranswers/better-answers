@@ -130,7 +130,7 @@ export const definitionOf = (rows: GuideRows): GuideDefinition => ({
 
 type DefinitionRow = Omit<GuideDefinition, "roles" | "sections">;
 
-const DEFINITION = `SELECT id, template, kind AS "guideType", collection, subject_iri AS "subjectIri"
+const DEFINITION = `SELECT id, template, guide_type AS "guideType", collection, subject_iri AS "subjectIri"
   FROM guide_definition WHERE workspace_id = $1 AND id = $2`;
 
 const ROLES_OF = `SELECT role, default_layer AS "defaultLayer", action_threshold AS "actionThreshold"
@@ -164,7 +164,7 @@ export const insertGuideRows = async (
   const { id, template, guideType, collection, subjectIri } = rows.definition;
   const scoped = [principal.workspaceId, id];
   await tx.query(
-    `INSERT INTO guide_definition (workspace_id, id, template, kind, collection, subject_iri)
+    `INSERT INTO guide_definition (workspace_id, id, template, guide_type, collection, subject_iri)
      VALUES ($1, $2, $3, $4, $5, $6)`,
     [...scoped, template, guideType, collection, subjectIri],
   );
@@ -186,8 +186,8 @@ export const insertGuideRows = async (
     [...scoped, JSON.stringify(rows.sections)],
   );
   await tx.query(
-    `INSERT INTO guide_expected_fact (workspace_id, guide_id, id, section_id, ordinal, name, kind,
-                                      tags, collection, at_least)
+    `INSERT INTO guide_expected_fact (workspace_id, guide_id, id, section_id, ordinal, name,
+                                      concept_type, tags, collection, at_least)
      SELECT $1, $2, f.id, f."sectionId", f.ordinal, f.name, f."conceptType", f.tags, f.collection,
             f."atLeast"
        FROM jsonb_to_recordset($3::jsonb)

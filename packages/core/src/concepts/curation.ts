@@ -34,7 +34,7 @@ type SortColumn = (typeof SORT_COLUMNS)[number];
  */
 const SORT_KEYS = {
   title: `c.title COLLATE "C"`,
-  kind: `c.kind COLLATE "C"`,
+  kind: `c.concept_type COLLATE "C"`,
   collection: `c.collection COLLATE "C"`,
   owner: `owner.name COLLATE "C"`,
   checked: `COALESCE((SELECT max(verified_at) FROM concept_verification
@@ -100,7 +100,7 @@ const ownerAdmitted = async (
 
 const READABLE_AND_FILTERED = `c.workspace_id = $1 AND ${readableClause("c", 2)}
           AND (cardinality($4::text[]) = 0 OR c.collection = ANY($4::text[]))
-          AND ($5::text IS NULL OR c.kind = $5)`;
+          AND ($5::text IS NULL OR c.concept_type = $5)`;
 
 const LATEST_VERIFICATION = latestVerificationOf("page");
 
@@ -108,7 +108,7 @@ const pageQuery = ({ column, desc }: AllKnowledgeInput["sort"]): string => {
   const direction = desc ? "DESC" : "ASC";
   return `SELECT page.*, ${LATEST_VERIFICATION.columns}
     FROM (
-      SELECT c.workspace_id, c.iri, c.title, c.kind, c.collection, c.status, c.frontmatter,
+      SELECT c.workspace_id, c.iri, c.title, c.concept_type, c.collection, c.status, c.frontmatter,
              c.content_hash,
              COALESCE(own.person_id, standing.person_id) AS owner_id,
              own.person_id IS NOT NULL AS owner_is_own,
@@ -133,7 +133,7 @@ const MATCHED = `SELECT count(*)::int AS total FROM concept_index c WHERE ${READ
 
 type PageRow = TrustRow & {
   readonly title: string;
-  readonly kind: string;
+  readonly concept_type: string;
   readonly collection: string | null;
   readonly owner_id: UserId | null;
   readonly owner_is_own: boolean;
@@ -156,7 +156,7 @@ const rowOf = (row: PageRow, now: Date): AllKnowledgeRow => {
   return {
     iri: ids.conceptIri.parse(row.iri),
     title: row.title,
-    conceptType: row.kind,
+    conceptType: row.concept_type,
     collection: row.collection,
     trust: { tier: trust.tier, status: trust.status },
     trustWords: trustWords(trust),
@@ -216,19 +216,19 @@ export const readAllKnowledge = async (
   return attempt(() => pageRead(reader.value, tx, input, now));
 };
 
-const KINDS = `SELECT c.kind, c.collection, count(*)::int AS count
+const KINDS = `SELECT c.concept_type, c.collection, count(*)::int AS count
     FROM concept_index c
    WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}
-   GROUP BY c.kind, c.collection`;
+   GROUP BY c.concept_type, c.collection`;
 
 type KindRow = {
-  readonly kind: string;
+  readonly concept_type: string;
   readonly collection: string | null;
   readonly count: number;
 };
 
 const kindsOf = (rows: readonly KindRow[]): readonly KindCounted[] =>
-  [...Map.groupBy(rows, (row) => row.kind)]
+  [...Map.groupBy(rows, (row) => row.concept_type)]
     .map(([conceptType, held]) => ({
       conceptType,
       count: held.reduce((sum, row) => sum + row.count, 0),

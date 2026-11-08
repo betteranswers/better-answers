@@ -708,6 +708,13 @@
       "when": 1794000676696,
       "tag": "0100_the-concept-kind",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1794172849431,
+      "tag": "0101_the-concept-type",
+      "breakpoints": true
     }
   ]
 }

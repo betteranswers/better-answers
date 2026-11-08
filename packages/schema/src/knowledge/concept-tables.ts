@@ -226,7 +226,7 @@ const CONCEPT_SEARCH = [
   `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, jsonb_path_query_array(frontmatter, '$.description')), 'B')`,
   `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, coalesce(substring(body from '(?n)^Also known as: (.*)$'), '')), 'B')`,
   `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, body), 'C')`,
-  `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, kind), 'B')`,
+  `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, concept_type), 'B')`,
 ].join(" || ");
 
 export const collectionOf = (path: string): string =>
@@ -242,7 +242,7 @@ export const conceptIndex = withRLS(
 
     path: text("path").notNull(),
 
-    conceptType: text("kind").notNull(),
+    conceptType: text("concept_type").notNull(),
     title: text("title").notNull(),
     frontmatter: jsonb("frontmatter").notNull(),
     body: text("body").notNull(),
