@@ -303,8 +303,13 @@ function Actions(properties: {
   readonly shown: EditorShown;
   readonly target: EditTarget;
   readonly events: EditorEvents;
+  readonly outcome: Outcome | undefined;
+  readonly saveRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { shown, target, events } = properties;
+  const { shown, target, events, saveRef } = properties;
+  const said = (
+    <OutcomeLine outcome={properties.outcome} className="mt-3 [&_[role=alert]]:text-destructive" />
+  );
   const reasonId = useId();
   const cannot = cannotSaveBecause(target, shown.open.draft);
   const saving = shown.stage === "saving";
@@ -316,20 +321,24 @@ function Actions(properties: {
 
   if (shown.stage === "stale") {
     return (
-      <div className="mt-4 flex flex-wrap gap-3">
-        <Button type="button" variant="accent" onClick={events.reload}>
-          {WORDS.reload}
-        </Button>
-        {closing}
-      </div>
+      <>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button type="button" variant="accent" onClick={events.reload}>
+            {WORDS.reload}
+          </Button>
+          {closing}
+        </div>
+        {said}
+      </>
     );
   }
   if (shown.stage === "confirming") {
     return (
       <>
+        {said}
         <Warning words={WORDS.reuse(shown.open.read.usedIn)} />
         <div className="mt-3 flex flex-wrap gap-3">
-          <Button type="button" onClick={events.confirm}>
+          <Button ref={saveRef} type="button" onClick={events.confirm}>
             {WORDS.save}
           </Button>
           <Button type="button" variant="outline" onClick={events.keepEditing}>
@@ -340,24 +349,41 @@ function Actions(properties: {
     );
   }
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-3">
-      <Button
-        type="button"
-        aria-disabled={cannot !== undefined || saving}
-        aria-describedby={cannot === undefined ? undefined : reasonId}
-        onClick={events.save}
-      >
-        {suggesting(shown.open, target) ? WORDS.sendSuggestion : WORDS.save}
-      </Button>
-      {closing}
-      {cannot === undefined ? null : (
-        <p id={reasonId} className="text-muted-foreground">
-          {WORDS.cannotSave[cannot]}
-        </p>
-      )}
-    </div>
+    <>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Button
+          ref={saveRef}
+          type="button"
+          aria-disabled={cannot !== undefined || saving}
+          aria-describedby={cannot === undefined ? undefined : reasonId}
+          onClick={events.save}
+        >
+          {suggesting(shown.open, target) ? WORDS.sendSuggestion : WORDS.save}
+        </Button>
+        {closing}
+        {cannot === undefined ? null : (
+          <p id={reasonId} className="text-muted-foreground">
+            {WORDS.cannotSave[cannot]}
+          </p>
+        )}
+      </div>
+      {said}
+    </>
   );
 }
+
+/** A refused save swaps the buttons, so focus would fall to the page. It goes back to Save. */
+const useSaveRefocused = (
+  stage: EditorShown["stage"],
+  saveRef: RefObject<HTMLButtonElement | null>,
+) => {
+  const was = useRef(stage);
+  useEffect(() => {
+    const leftSaving = was.current === "saving" && stage !== "saving";
+    was.current = stage;
+    if (leftSaving && document.activeElement === document.body) saveRef.current?.focus();
+  }, [stage, saveRef]);
+};
 
 export function ConceptEditor(properties: EditorProps) {
   const { shown, target, events, headingRef } = properties;
@@ -365,6 +391,8 @@ export function ConceptEditor(properties: EditorProps) {
   const headingId = useId();
   const locked = shown.stage !== "editing";
   const review = shown.stage === "stale" ? undefined : reviewOf(open, target);
+  const saveRef = useRef<HTMLButtonElement>(null);
+  useSaveRefocused(shown.stage, saveRef);
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -433,8 +461,13 @@ export function ConceptEditor(properties: EditorProps) {
         }}
       />
       {review === undefined ? null : <p className="mt-4 text-muted-foreground">{review}</p>}
-      <Actions shown={shown} target={target} events={events} />
-      <OutcomeLine outcome={properties.outcome} className="mt-3" />
+      <Actions
+        shown={shown}
+        target={target}
+        events={events}
+        outcome={properties.outcome}
+        saveRef={saveRef}
+      />
       {properties.leaving === undefined ? null : (
         <LeavingAsk
           leaving={properties.leaving}

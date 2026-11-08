@@ -174,6 +174,7 @@ describe("editing a concept on its own page", () => {
 
     retitled("Audit Log Retention");
     pressed(EDITOR_WORDS.save);
+    screen.getByRole("button", { name: EDITOR_WORDS.save }).focus();
     pressed(EDITOR_WORDS.save);
 
     await waitFor(() => {
@@ -182,7 +183,17 @@ describe("editing a concept on its own page", () => {
         "the ask kept the old count of places",
       ).toBe(true);
     });
-    expect(wordsIn("status")).toContain(SAID_OF_EDITING["reuse-unconfirmed"]);
+    const line = screen.getByText(SAID_OF_EDITING["reuse-unconfirmed"]);
+    const question = screen.getByText(EDITOR_WORDS.warning);
+    expect(
+      line.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the places-changed line is not above the question",
+    ).toBeTruthy();
+    await waitFor(() => {
+      expect(document.activeElement, "focus fell to the page after the refusal").toBe(
+        screen.getByRole("button", { name: EDITOR_WORDS.save }),
+      );
+    });
     pressed(EDITOR_WORDS.save);
     await editorClosed(EDITOR_WORDS.headingEdit);
     expect(savesAsked().map((asked) => asked.reuse)).toEqual(["confirmed", "confirmed"]);
