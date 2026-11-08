@@ -12,7 +12,7 @@ type Concept = YourRecord["concepts"][number];
 const aConcept = (collection: string | null, judged?: "yes" | "no"): Concept => {
   const concept = {
     iri: conceptIriOf(ulid()),
-    kind: "Policy",
+    conceptType: "Policy",
     title: "Retention",
     collection,
     trustWords: "Unverified",

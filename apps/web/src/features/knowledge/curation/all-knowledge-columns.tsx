@@ -83,7 +83,7 @@ export const allKnowledgeColumns = column.columns([
     header: WORDS.columns.title,
     cell: ({ row }) => <TitleCell concept={row.original} />,
   }),
-  column.accessor("kind", {
+  column.accessor("conceptType", {
     id: "kind",
     header: WORDS.columns.kind,
     cell: ({ getValue }) => getValue(),

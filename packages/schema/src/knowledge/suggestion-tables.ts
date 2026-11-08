@@ -116,7 +116,7 @@ export const conceptWriteRequest = withRLS(
 
     path: text("path").notNull(),
 
-    conceptKind: text("concept_kind").notNull(),
+    conceptType: text("concept_kind").notNull(),
     title: text("title").notNull(),
     frontmatter: jsonb("frontmatter").notNull(),
     body: text("body").notNull(),

@@ -40,7 +40,7 @@ export const ANSWER_KIND = "Answer";
 export type PreviewedConcept<Iri extends string = ConceptIri> = {
   readonly iri: Iri;
   readonly url: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly title: string;
   readonly collection: string | null;
   readonly trust: Trust;
@@ -59,7 +59,7 @@ export type RelatedConcept<Iri extends string = ConceptIri> =
 export const previewed = <Iri extends string>({
   iri,
   url,
-  kind,
+  conceptType,
   title,
   collection,
   trust,
@@ -67,7 +67,7 @@ export const previewed = <Iri extends string>({
 }: RelatedConcept<Iri>): PreviewedConcept<Iri> => ({
   iri,
   url,
-  kind,
+  conceptType,
   title,
   collection,
   trust,
@@ -205,11 +205,11 @@ const reachedBeyond = (
 type Returned = { readonly shown: RelatedConcept; readonly kept: RecordedConcept };
 
 const previewOf = (concept: OpenedConcept, trust: Trust): PreviewedConcept => {
-  const { iri, kind, title, collection } = concept;
+  const { iri, conceptType, title, collection } = concept;
   return {
     iri,
     url: conceptPageOf(iri),
-    kind,
+    conceptType,
     title,
     collection,
     trust,
@@ -229,7 +229,7 @@ const returnedOf = async (
   const trust = trustOf(concept, now);
   const kept = { iri: concept.iri, contentHash: concept.contentHash, trust };
   const preview = previewOf(concept, trust);
-  if (concept.kind !== ANSWER_KIND) return ok({ shown: preview, kept });
+  if (concept.conceptType !== ANSWER_KIND) return ok({ shown: preview, kept });
   const evidence = await evidenceOf(reader, tx, concept.frontmatter, reads);
   if (!evidence.ok) return evidence;
   return ok({ shown: { ...preview, body: concept.body, evidence: evidence.value }, kept });

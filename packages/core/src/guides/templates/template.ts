@@ -10,7 +10,7 @@ type TrustTier = (typeof TRUST_TIERS)[number];
 
 type ExpectedFactTemplate = {
   readonly name: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly tags: readonly string[];
   readonly collection?: string;
   readonly atLeast?: number;
@@ -35,7 +35,7 @@ export type TemplateRole = {
 
 export type Template = {
   readonly id: string;
-  readonly kind: string;
+  readonly guideType: string;
   readonly roles: readonly TemplateRole[];
   readonly sections: readonly SectionTemplate[];
 };

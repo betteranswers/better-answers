@@ -33,14 +33,14 @@ const CHECKED_BY_PRIYA = "Verified by Priya Shah · 3 March 2026";
 
 const SAFEGUARDING = [
   aConceptMatch("Safeguarding Children Partnerships", 1, {
-    kind: "Sector",
+    conceptType: "Sector",
     collection: "Sectors",
     description: "How local partnerships keep children safe, and who buys training and audits.",
     trust: standing("human-reviewed", "current", "Priya Shah", "2026-03-03T09:41:00.000Z"),
     trustWords: CHECKED_BY_PRIYA,
   }),
   aConceptMatch("Safeguarding Training Policy", 2, {
-    kind: "Policy",
+    conceptType: "Policy",
     collection: "Policies",
     description: "Who is trained, how often, and where the record is kept.",
     trust: standing("machine-confirmed", "current", null, "2026-02-12T10:00:00.000Z"),
@@ -50,7 +50,7 @@ const SAFEGUARDING = [
     description: "The names to call when a concern is raised.",
   }),
   aConceptMatch("Safeguarding Review Rota", 4, {
-    kind: "Process",
+    conceptType: "Process",
     collection: "Operations",
     description: null,
     trust: standing("human-reviewed", "out-of-date", "Priya Shah", "2025-01-10T09:00:00.000Z"),

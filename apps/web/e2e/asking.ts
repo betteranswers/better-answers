@@ -7,7 +7,7 @@ export const QUESTION = "How do buyers access audit information?";
 export const USERS = {
   title: "How do buyers access audit information about their users' actions?",
   collection: "audits",
-  kind: "Answer",
+  conceptType: "Answer",
   body: "Buyers download their users' audit log from the console.",
   trust: "machine-confirmed",
 } as const;
@@ -15,20 +15,20 @@ export const USERS = {
 export const SUPPLIER = {
   title: "How do buyers access audit information about the supplier's actions?",
   collection: "audits",
-  kind: "Answer",
+  conceptType: "Answer",
   body: "The supplier sends its own audit report on request.",
 } as const;
 
 export const POLICY = {
   title: "Audit information access for buyers",
   collection: "audits",
-  kind: "Policy",
+  conceptType: "Policy",
   body: "Buyers access audit information through the console's audit page.",
 } as const;
 
 const UNFILED = {
   title: "How do buyers access audit information they exported?",
-  kind: "Answer",
+  conceptType: "Answer",
   body: "Exported audit information stays in the buyer's own storage.",
 } as const;
 

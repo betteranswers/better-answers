@@ -33,7 +33,7 @@ type Frontmatter = z.infer<typeof conceptFrontmatter>;
 type EdgeSource = {
   readonly workspaceId: string;
   readonly iri: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly path: string;
   readonly body: string;
 
@@ -56,7 +56,7 @@ type OutgoingEdge = {
   readonly uid: string;
   readonly label: string;
   readonly toUid: string;
-  readonly toKind: string | null;
+  readonly toConceptType: string | null;
   readonly section: string | null;
   readonly sentence: string | null;
 };
@@ -112,7 +112,7 @@ const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
 
 type ResolvedTarget = {
   readonly iri: string;
-  readonly kind: string | null;
+  readonly conceptType: string | null;
   readonly status: string | null;
 };
 
@@ -123,8 +123,8 @@ type ResolvedRow = {
   readonly path: string;
 };
 
-const supersedes = (target: ResolvedTarget, fromKind: string): boolean =>
-  target.status === CONCEPT_DEPRECATED_STATUS && target.kind === fromKind;
+const supersedes = (target: ResolvedTarget, fromConceptType: string): boolean =>
+  target.status === CONCEPT_DEPRECATED_STATUS && target.conceptType === fromConceptType;
 
 type UnresolvedReference = {
   readonly relation: Relation;
@@ -155,7 +155,7 @@ const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<Outgoing> =
       [workspaceId, paths],
     );
     for (const row of found.rows) {
-      byPath.set(row.path, { iri: row.iri, kind: row.kind, status: row.status });
+      byPath.set(row.path, { iri: row.iri, conceptType: row.kind, status: row.status });
     }
   }
   const byIri = new Map<string, ResolvedTarget>();
@@ -166,7 +166,7 @@ const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<Outgoing> =
       [workspaceId, iris],
     );
     for (const row of found.rows) {
-      byIri.set(row.iri, { iri: row.iri, kind: row.kind, status: row.status });
+      byIri.set(row.iri, { iri: row.iri, conceptType: row.kind, status: row.status });
     }
   }
 
@@ -179,7 +179,7 @@ const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<Outgoing> =
   const edges = references.flatMap((ref): readonly OutgoingEdge[] => {
     const resolved =
       "iri" in ref.target
-        ? (byIri.get(ref.target.iri) ?? { iri: ref.target.iri, kind: null, status: null })
+        ? (byIri.get(ref.target.iri) ?? { iri: ref.target.iri, conceptType: null, status: null })
         : byPath.get(ref.target.path);
     if (resolved === undefined) return [];
     if (ref.relation === "lineage") {
@@ -188,9 +188,9 @@ const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<Outgoing> =
       return [
         {
           uid: `lineage:${concept.iri}:${ref.ordinal}`,
-          label: supersedes(resolved, concept.kind) ? SUPERSEDES_LABEL : DERIVED_FROM_LABEL,
+          label: supersedes(resolved, concept.conceptType) ? SUPERSEDES_LABEL : DERIVED_FROM_LABEL,
           toUid: resolved.iri,
-          toKind: null,
+          toConceptType: null,
           section: null,
           sentence: null,
         },
@@ -201,7 +201,7 @@ const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<Outgoing> =
         uid: `links_to:${concept.iri}:${ref.ordinal}`,
         label: LINKS_TO_LABEL,
         toUid: resolved.iri,
-        toKind: resolved.kind,
+        toConceptType: resolved.conceptType,
         section: ref.section,
         sentence: ref.sentence,
       },
@@ -254,8 +254,8 @@ const replaceOutgoingEdges = async (gen: number, tx: Tx, concept: EdgeSource): P
         edge.label,
         concept.iri,
         edge.toUid,
-        edge.label === LINKS_TO_LABEL ? concept.kind : null,
-        edge.toKind,
+        edge.label === LINKS_TO_LABEL ? concept.conceptType : null,
+        edge.toConceptType,
         edge.section,
         edge.sentence,
         concept.publishedAt,
@@ -309,7 +309,7 @@ export const writeConceptDelta = async (
       gen,
       delta.iri,
       CONCEPT_NODE_LABEL,
-      delta.kind,
+      delta.conceptType,
       delta.publishedAt,
       delta.sensitivity,
       delta.audience,
@@ -320,7 +320,7 @@ export const writeConceptDelta = async (
     `UPDATE map_edge SET to_kind = $4
       WHERE workspace_id = $1 AND gen = $2 AND label = '${LINKS_TO_LABEL}' AND to_uid = $3
         AND to_kind IS DISTINCT FROM $4`,
-    [workspaceId, gen, delta.iri, delta.kind],
+    [workspaceId, gen, delta.iri, delta.conceptType],
   );
 
   await tx.query(
@@ -331,12 +331,12 @@ export const writeConceptDelta = async (
         THEN '${SUPERSEDES_LABEL}' ELSE '${DERIVED_FROM_LABEL}' END
       WHERE workspace_id = $1 AND gen = $2 AND to_uid = $3
         AND label IN ('${SUPERSEDES_LABEL}', '${DERIVED_FROM_LABEL}')`,
-    [workspaceId, gen, delta.iri, delta.status === CONCEPT_DEPRECATED_STATUS, delta.kind],
+    [workspaceId, gen, delta.iri, delta.status === CONCEPT_DEPRECATED_STATUS, delta.conceptType],
   );
   await replaceOutgoingEdges(gen, tx, delta);
 
   const citing = await tx.query<ConceptIndexRow>(
-    `SELECT workspace_id AS "workspaceId", iri, kind, path, body, frontmatter,
+    `SELECT workspace_id AS "workspaceId", iri, kind AS "conceptType", path, body, frontmatter,
             published_at AS "publishedAt", sensitivity, audience,
             audience_groups AS "audienceGroups"
        FROM concept_index

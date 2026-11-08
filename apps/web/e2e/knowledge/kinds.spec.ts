@@ -40,21 +40,36 @@ const aWorkspaceOfKinds = async (api: APIRequestContext, name: string): Promise<
     workspaceId,
     userId: workspace.admin.id,
     concepts: [
-      { title: "Annual leave", kind: "Policy", collection: "hr", body: "Everyone takes 25 days." },
-      { title: "Expense claims", kind: "Policy", collection: "hr", body: "Claims go in monthly." },
+      {
+        title: "Annual leave",
+        conceptType: "Policy",
+        collection: "hr",
+        body: "Everyone takes 25 days.",
+      },
+      {
+        title: "Expense claims",
+        conceptType: "Policy",
+        collection: "hr",
+        body: "Claims go in monthly.",
+      },
       {
         title: "Salary bands",
-        kind: "Policy",
+        conceptType: "Policy",
         collection: "hr",
         body: "Bands are set each April.",
         sensitivity: "Restricted",
       },
-      { title: "Notice period", kind: "Term", collection: "hr", body: "Four weeks." },
-      { title: "Fire drills", kind: "Procedure", collection: "safety", body: "Each quarter." },
-      { title: "Visitor passes", kind: "Procedure", body: "Passes are signed for." },
+      { title: "Notice period", conceptType: "Term", collection: "hr", body: "Four weeks." },
+      {
+        title: "Fire drills",
+        conceptType: "Procedure",
+        collection: "safety",
+        body: "Each quarter.",
+      },
+      { title: "Visitor passes", conceptType: "Procedure", body: "Passes are signed for." },
       {
         title: "Board minutes",
-        kind: "Minutes",
+        conceptType: "Minutes",
         collection: "board",
         body: "The secretary keeps them.",
         audience: "groups",
@@ -81,11 +96,11 @@ const kindsDrawn = async (page: Page): Promise<Locator> => {
   return kinds(page);
 };
 
-const disclosureOf = (page: Page, kind: string): Locator =>
-  kinds(page).getByRole("button", { name: new RegExp(`^${kind}`) });
+const disclosureOf = (page: Page, conceptType: string): Locator =>
+  kinds(page).getByRole("button", { name: new RegExp(`^${conceptType}`) });
 
-const collectionsOf = (page: Page, kind: string): Locator =>
-  kinds(page).getByRole("list", { name: WORDS.collectionsOf(kind) });
+const collectionsOf = (page: Page, conceptType: string): Locator =>
+  kinds(page).getByRole("list", { name: WORDS.collectionsOf(conceptType) });
 
 const rowTexts = async (page: Page): Promise<string[]> =>
   (await kinds(page).locator("tbody tr").allInnerTexts()).map((row) =>

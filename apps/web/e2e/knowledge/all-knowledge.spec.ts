@@ -75,7 +75,7 @@ const aWorkspaceToReview = async (api: APIRequestContext, name: string): Promise
   });
   await seedConceptIndex(api, {
     workspaceId,
-    batches: [{ collection: "archive", kind: "note", count: 60, title: "Zone note" }],
+    batches: [{ collection: "archive", conceptType: "note", count: 60, title: "Zone note" }],
   });
   await nameOwners(api, {
     workspaceId,

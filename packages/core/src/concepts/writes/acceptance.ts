@@ -156,7 +156,7 @@ const acceptanceOf = async (
     iri: found.target,
     mergeKey: found.payload.mergeKey,
     path: found.payload.path,
-    kind: found.payload.conceptKind,
+    conceptType: found.payload.conceptType,
     title: found.payload.title,
     frontmatter: found.payload.frontmatter,
     body: found.payload.body,

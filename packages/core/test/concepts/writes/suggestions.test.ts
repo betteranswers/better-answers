@@ -13,7 +13,7 @@ import {
   conceptByIri,
   contentHashOf,
   declineSuggestion,
-  foldKind,
+  foldConceptType,
   mergeKeyOf,
   parseConceptFile,
   submitSuggestionSet,
@@ -51,7 +51,7 @@ const requestFor = (overrides: Partial<SuggestionRequest> = {}): SuggestionReque
   return {
     mergeKey: `policy:expenses-${proposed}`,
     path: `knowledge/policy/expenses-${proposed}.md`,
-    conceptKind: "Policy",
+    conceptType: "Policy",
     title: "Expenses",
     frontmatter: { title: "Expenses", type: "Policy" },
     body: SUGGESTED_BODY,
@@ -177,7 +177,7 @@ const editorWrote = async (scenario: Scenario, overrides: Partial<WriteConceptIn
   const input: WriteConceptInput = {
     mergeKey: `policy:expenses-${proposed}`,
     path: `knowledge/policy/expenses-${proposed}.md`,
-    kind: "Policy",
+    conceptType: "Policy",
     title: "Expenses",
     frontmatter: { title: "Expenses", type: "Policy" },
     body: "Expenses are claimed within thirty days.",
@@ -238,7 +238,7 @@ const seededSuggestion = async (
       suggestionId: raised.id,
       mergeKey: request.mergeKey,
       path: request.path,
-      conceptKind: request.conceptKind,
+      conceptType: request.conceptType,
       title: request.title,
       frontmatter: request.frontmatter,
       body: request.body,
@@ -667,7 +667,7 @@ describe("an acceptance of a suggestion that changes nothing", () => {
       {
         mergeKey: input.mergeKey,
         path: input.path,
-        conceptKind: input.kind,
+        conceptType: input.conceptType,
         title: input.title,
         frontmatter: stored.value.frontmatter,
         body: stored.value.body,
@@ -1355,7 +1355,7 @@ describe("what a write cannot do with an IRI", () => {
       iri: conceptIriOf(ulid()),
       mergeKey: "policy:invented",
       path: "knowledge/policy/invented.md",
-      kind: "Policy",
+      conceptType: "Policy",
       title: "Invented",
       frontmatter: { title: "Invented" },
       body: "A concept whose key its author chose.",
@@ -1420,7 +1420,7 @@ describe("an acceptance sent directly through the write path", () => {
   it.each([
     ["body", () => ({ body: "Expenses are claimed whenever." })],
     ["merge key", () => ({ mergeKey: "policy:another" })],
-    ["kind", () => ({ kind: "Guideline" })],
+    ["concept type", () => ({ conceptType: "Guideline" })],
     ["title", () => ({ title: "Expenses and receipts" })],
     ["frontmatter", () => ({ frontmatter: { title: "Expenses", type: "Policy", owner: "Ada" } })],
     ["status", () => ({ status: "draft" })],
@@ -1461,7 +1461,7 @@ describe("an acceptance sent directly through the write path", () => {
     const refused = await writeConcept(scenario.editor, doorsOf(scenario), {
       mergeKey: proposal.mergeKey,
       path: elsewhere,
-      kind: proposal.conceptKind,
+      conceptType: proposal.conceptType,
       title: proposal.title,
       frontmatter: proposal.frontmatter,
       body: proposal.body,
@@ -1700,7 +1700,7 @@ describe("an accepted edit's identity and state", () => {
 
     await acceptedOne(scenario, set.setId);
 
-    expect(await mergeKeyHeldBy(written.iri)).toBe(mergeKeyOf(foldKind("Policy"), RETITLED));
+    expect(await mergeKeyHeldBy(written.iri)).toBe(mergeKeyOf(foldConceptType("Policy"), RETITLED));
   });
 
   it("keeps the key when an accepted edit keeps its title", async () => {
@@ -1717,7 +1717,7 @@ describe("an accepted edit's identity and state", () => {
     const { input, written, set } = await proposedAgainst(scenario, "edit", {}, retitled);
     await editorWrote(scenario, {
       ...retitled,
-      mergeKey: mergeKeyOf(foldKind("Policy"), RETITLED),
+      mergeKey: mergeKeyOf(foldConceptType("Policy"), RETITLED),
       expects: { head: written.sha },
     });
     const before = await bundleHistory(scenario.git, scenario.workspaceId);

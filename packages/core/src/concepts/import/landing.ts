@@ -22,7 +22,7 @@ import {
   visibilityOf,
   type Visibility,
 } from "../../access/index.ts";
-import { foldKind, landBundleCommit } from "../../bundle/index.ts";
+import { foldConceptType, landBundleCommit } from "../../bundle/index.ts";
 import { flagWriteUpsCiting, recomputeWriteUpsIncluding } from "../../guides/index.ts";
 import type { ActorId, PlatformPrincipal, Principal } from "../../kernel/index.ts";
 import { fileAt, type Committed, type GitDoor } from "../../store/git/index.ts";
@@ -46,7 +46,7 @@ export const WRITE_CONSTRAINTS = {
 
 export type Held = {
   readonly path: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly title: string;
   readonly mergeKey: string;
 
@@ -97,7 +97,7 @@ export const heldByIri = async (
     ? undefined
     : {
         path: row.path,
-        kind: row.kind,
+        conceptType: row.kind,
         title: row.title,
         mergeKey: row.merge_key,
         sensitivity: row.sensitivity,
@@ -264,7 +264,7 @@ type RowFacts = {
   readonly workspaceId: string;
   readonly iri: string;
   readonly path: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
@@ -305,7 +305,7 @@ export const indexRowOf = (facts: RowFacts, held: Held | undefined, now: Date) =
     workspaceId: facts.workspaceId,
     iri: facts.iri,
     path: facts.path,
-    kind: foldKind(facts.kind),
+    conceptType: foldConceptType(facts.conceptType),
     title: facts.title,
     frontmatter: facts.frontmatter,
     body: facts.body,
@@ -371,7 +371,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
 
   const visibility = await conceptVisibilityFrom(principal, tx, {
     iri: index.iri,
-    kind: index.kind,
+    conceptType: index.conceptType,
     fallback: held,
     alsoOn: index.restsAlsoOn,
     onTheRow: true,
@@ -392,7 +392,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
       index.workspaceId,
       index.iri,
       index.path,
-      index.kind,
+      index.conceptType,
       index.title,
       index.frontmatter,
       index.body,
@@ -411,7 +411,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
   await writeConceptDelta(principal, tx, {
     workspaceId: index.workspaceId,
     iri: index.iri,
-    kind: index.kind,
+    conceptType: index.conceptType,
     path: index.path,
     body: index.body,
     sources: citedSourcesOf(index.frontmatter?.["sources"]),

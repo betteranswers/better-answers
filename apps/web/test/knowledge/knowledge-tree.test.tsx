@@ -12,13 +12,13 @@ const COLLECTIONS = [
     collection: "company",
     count: 4,
     kinds: [
-      { kind: "insurance policy", count: 2 },
-      { kind: "lease", count: 1 },
-      { kind: "licence", count: 1 },
+      { conceptType: "insurance policy", count: 2 },
+      { conceptType: "lease", count: 1 },
+      { conceptType: "licence", count: 1 },
     ],
   },
-  { collection: "product", count: 1, kinds: [{ kind: "datasheet", count: 1 }] },
-  { collection: null, count: 1, kinds: [{ kind: "policy", count: 1 }] },
+  { collection: "product", count: 1, kinds: [{ conceptType: "datasheet", count: 1 }] },
+  { collection: null, count: 1, kinds: [{ conceptType: "policy", count: 1 }] },
 ];
 
 type Opened = (collection: string | null, kind: string) => void;
@@ -86,7 +86,7 @@ describe("the knowledge tree", () => {
   });
 
   it("moves to the next item starting with a typed letter", () => {
-    drawn({ collection: "company", kind: "lease" });
+    drawn({ collection: "company", conceptType: "lease" });
     fromCompany();
 
     expect(pressed("l"), "the tree let the typed letter reach the page").toBe(false);
@@ -112,7 +112,7 @@ describe("the knowledge tree", () => {
   });
 
   it("reaches the first item by Home, the last by End", () => {
-    drawn({ collection: null, kind: "policy" });
+    drawn({ collection: null, conceptType: "policy" });
     item("policy").focus();
 
     pressed("Home");
@@ -122,7 +122,7 @@ describe("the knowledge tree", () => {
   });
 
   it("moves up to a collection with Left, then closes it", () => {
-    drawn({ collection: "company", kind: "lease" });
+    drawn({ collection: "company", conceptType: "lease" });
     item("lease").focus();
 
     pressed("ArrowLeft");
@@ -133,7 +133,7 @@ describe("the knowledge tree", () => {
   });
 
   it("opens a kind with Enter or a click", () => {
-    const onOpen = drawn({ collection: "company", kind: "lease" });
+    const onOpen = drawn({ collection: "company", conceptType: "lease" });
     expect(item("lease").getAttribute("aria-selected")).toBe("true");
     item("insurance policy").focus();
 

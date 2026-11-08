@@ -3150,7 +3150,7 @@ const recordActorsIn = async (workspaceId: string) => {
 const A_LATE_CONCEPT = {
   mergeKey: "guideline:late-claims",
   path: "knowledge/late-claims/late-claims.md",
-  kind: "Guideline",
+  conceptType: "Guideline",
   title: "Late claims",
   frontmatter: { title: "Late claims", type: "Guideline" },
   body: "# Late claims\n\nA claim after thirty days needs a manager's note.",

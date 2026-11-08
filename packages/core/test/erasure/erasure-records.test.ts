@@ -302,7 +302,7 @@ describe("an edit the person proposed", () => {
           {
             mergeKey: "policy:expenses",
             path: "knowledge/expenses.md",
-            conceptKind: "Policy",
+            conceptType: "Policy",
             title: "Expenses",
             frontmatter: named.frontmatter ?? { title: "Expenses", type: "Policy" },
             body: named.body ?? "Expenses are claimed within sixty days.",

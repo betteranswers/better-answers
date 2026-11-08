@@ -21,9 +21,12 @@ import {
 } from "./results.ts";
 
 const conceptLine = (
-  concept: Pick<PreviewedConcept<string>, "kind" | "title" | "collection" | "trustWords" | "iri">,
+  concept: Pick<
+    PreviewedConcept<string>,
+    "conceptType" | "title" | "collection" | "trustWords" | "iri"
+  >,
 ): string =>
-  `${concept.kind} · ${concept.title} · ${concept.collection ?? NO_COLLECTION} · ${concept.trustWords} · ${concept.iri}`;
+  `${concept.conceptType} · ${concept.title} · ${concept.collection ?? NO_COLLECTION} · ${concept.trustWords} · ${concept.iri}`;
 
 const findLine = (match: FoundForText["matches"][number]): string =>
   match.layer === "bundles"
@@ -149,8 +152,8 @@ const namedOrNone = (collections: readonly string[]): string =>
 
 const returnedText = (heading: string, concept: ReturnedConcept<string>): readonly string[] => [
   "",
-  `## ${heading}${concept.kind} · ${concept.collection ?? NO_COLLECTION}`,
-  concept.kind === ANSWER_KIND ? `Question: ${concept.title}` : concept.title,
+  `## ${heading}${concept.conceptType} · ${concept.collection ?? NO_COLLECTION}`,
+  concept.conceptType === ANSWER_KIND ? `Question: ${concept.title}` : concept.title,
   `_${concept.trustWords}_`,
   "",
   concept.body.trimEnd(),

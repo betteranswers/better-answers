@@ -227,7 +227,7 @@ describe("Waiting on you", () => {
     const requestOn = (standing: typeof one): SuggestionRequest => ({
       mergeKey: standing.input.mergeKey,
       path: standing.input.path,
-      conceptKind: "Policy",
+      conceptType: "Policy",
       title: "Expenses",
       frontmatter: { title: "Expenses", type: "Policy" },
       body: "Expenses are claimed within sixty days.",
@@ -259,7 +259,7 @@ describe("Waiting on you", () => {
           {
             mergeKey: `policy:mileage-${n}`,
             path: `knowledge/policy/mileage-${n}.md`,
-            conceptKind: "Policy",
+            conceptType: "Policy",
             title: "Mileage",
             frontmatter: { title: "Mileage", type: "Policy" },
             body: "Mileage is paid at 45p a mile.",

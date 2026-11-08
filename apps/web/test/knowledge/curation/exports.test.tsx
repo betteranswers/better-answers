@@ -68,7 +68,7 @@ const PAST_ITS_CEILING = {
 
 const OTHER_GUIDE = aGuideSummary({
   guideId: idOf(8),
-  kind: "Tender pack",
+  guideType: "Tender pack",
   collection: "southgate",
   subject: null,
 });

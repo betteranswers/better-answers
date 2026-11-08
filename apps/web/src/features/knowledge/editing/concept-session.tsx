@@ -52,7 +52,7 @@ import { draftKeyOf, forgetDraft, keptDraftOf, sameDraft, useKeptDraft } from ".
 
 export type Prefill = {
   readonly title: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly tags: string;
   readonly subject: string;
 };
@@ -77,7 +77,7 @@ type SessionProps = SessionOptions & {
 };
 
 const BLANK: EditRead = {
-  parts: { title: "", kind: "", description: null, tags: [], body: "" },
+  parts: { title: "", conceptType: "", description: null, tags: [], body: "" },
   sources: [],
   withheld: [],
   base: null,
@@ -126,7 +126,7 @@ const useSubjectLink = (subject: string | undefined) => {
 
 const draftOf = (read: EditRead): Draft => ({
   title: read.parts.title,
-  kind: read.parts.kind,
+  conceptType: read.parts.conceptType,
   description: read.parts.description ?? "",
   tags: read.parts.tags.join(", "),
   body: read.parts.body,
@@ -181,7 +181,7 @@ const useOpened = (
       : {
           ...own,
           title: prefill.title,
-          kind: prefill.kind,
+          conceptType: prefill.conceptType,
           tags: prefill.tags,
           body: subject.link ?? own.body,
         };

@@ -329,7 +329,7 @@ const landOne = async (
   const wrote = await writeConcept(principal, doors, {
     mergeKey: concept.mergeKey,
     path: concept.path,
-    kind: concept.kind,
+    conceptType: concept.conceptType,
     title: concept.title,
     frontmatter: concept.frontmatter,
     body: concept.body,
@@ -415,7 +415,7 @@ const rewriteEach = async (
       iri: held.iri,
       mergeKey: held.mergeKey,
       path: concept.path,
-      kind: concept.kind,
+      conceptType: concept.conceptType,
       title: concept.title,
       frontmatter: concept.frontmatter,
       body: linked.body,

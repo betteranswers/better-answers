@@ -74,7 +74,7 @@ const CONCEPTS: readonly SeedConcept[] = [
   {
     title: "Supplier Audits",
     collection: "audits",
-    kind: "Policy",
+    conceptType: "Policy",
     body: "Each supplier is audited once a year.",
     trust: "machine-confirmed",
   },

@@ -42,7 +42,7 @@ const CONCEPT_PREFIX = "https://better-answers.com/c/";
 
 type ConceptWrite = Omit<
   Parameters<typeof writeConcept>[2],
-  "kind" | "author" | "expects" | "status"
+  "conceptType" | "author" | "expects" | "status"
 >;
 
 const conceptWrittenIn = async (
@@ -56,7 +56,7 @@ const conceptWrittenIn = async (
     writer,
     { git, postgres: app.doors.postgres, clock: app.doors.clock },
     {
-      kind: "Note",
+      conceptType: "Note",
       author: { name: workspace.admin.name, email: workspace.admin.email },
       expects: { head: await head(writer, git) },
       status: "stable",

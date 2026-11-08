@@ -95,7 +95,7 @@ function GuideHeader(properties: { readonly guide: Guide }) {
   const subjectPage = subject === null ? undefined : conceptPageOf(subject.iri);
   return (
     <header className="mt-4">
-      <KindLine kind={guide.kind} collection={guide.collection} />
+      <KindLine conceptType={guide.guideType} collection={guide.collection} />
       {subject === null || subjectPage === undefined ? null : (
         <p className="mt-2">
           <span className="text-muted-foreground">{WORDS.subject} </span>

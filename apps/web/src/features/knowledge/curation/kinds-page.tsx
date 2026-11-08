@@ -59,20 +59,23 @@ const arranged = (
     .filter((each) => !tail || each.count <= KINDS_TAIL_MAX)
     .toSorted(
       (one, other) =>
-        direction * (id === "count" ? one.count - other.count : byCodeUnit(one.kind, other.kind)) ||
-        byCodeUnit(one.kind, other.kind),
+        direction *
+          (id === "count"
+            ? one.count - other.count
+            : byCodeUnit(one.conceptType, other.conceptType)) ||
+        byCodeUnit(one.conceptType, other.conceptType),
     );
 };
 
-const toggled = (held: ReadonlySet<string>, kind: string): ReadonlySet<string> => {
+const toggled = (held: ReadonlySet<string>, conceptType: string): ReadonlySet<string> => {
   const next = new Set(held);
-  if (!next.delete(kind)) next.add(kind);
+  if (!next.delete(conceptType)) next.add(conceptType);
   return next;
 };
 
 type Disclosures = {
   readonly opened: ReadonlySet<string>;
-  readonly toggle: (kind: string) => void;
+  readonly toggle: (conceptType: string) => void;
 };
 
 const DisclosuresContext = createContext<Disclosures>({
@@ -80,25 +83,25 @@ const DisclosuresContext = createContext<Disclosures>({
   toggle: () => undefined,
 });
 
-function KindCell(properties: { readonly kind: KindCounted }) {
-  const { kind } = properties;
+function KindCell(properties: { readonly counted: KindCounted }) {
+  const { counted } = properties;
   const disclosures = useContext(DisclosuresContext);
-  const open = disclosures.opened.has(kind.kind);
+  const open = disclosures.opened.has(counted.conceptType);
   return (
     <Collapsible
       open={open}
       onOpenChange={() => {
-        disclosures.toggle(kind.kind);
+        disclosures.toggle(counted.conceptType);
       }}
     >
       <CollapsibleTrigger className="-mx-1 inline-flex min-h-6 items-center gap-1 px-1 text-left font-medium wrap-anywhere hover:underline">
         <Icon name={open ? "caret-down" : "caret-right"} className="text-muted-foreground" />
-        {kind.kind}
+        {counted.conceptType}
         <span className="sr-only">{WORDS.byCollection}</span>
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2 pl-5">
-        <ul aria-label={WORDS.collectionsOf(kind.kind)} className="grid max-w-sm gap-1">
-          {kind.collections.map((held) => (
+        <ul aria-label={WORDS.collectionsOf(counted.conceptType)} className="grid max-w-sm gap-1">
+          {counted.collections.map((held) => (
             <li key={JSON.stringify(held.collection)} className="flex justify-between gap-4">
               <span className="wrap-anywhere">{held.collection ?? WORDS.noCollection}</span>
               <span className="tabular-nums">{held.count}</span>
@@ -111,9 +114,10 @@ function KindCell(properties: { readonly kind: KindCounted }) {
 }
 
 const COLUMNS = column.columns([
-  column.accessor("kind", {
+  column.accessor("conceptType", {
+    id: "kind",
     header: WORDS.columns.kind,
-    cell: ({ row }) => <KindCell kind={row.original} />,
+    cell: ({ row }) => <KindCell counted={row.original} />,
   }),
   column.accessor("count", {
     header: WORDS.columns.concepts,
@@ -163,8 +167,8 @@ function KindsTable(properties: {
   const disclosures = useMemo<Disclosures>(
     () => ({
       opened,
-      toggle: (kind) => {
-        setOpened((held) => toggled(held, kind));
+      toggle: (conceptType) => {
+        setOpened((held) => toggled(held, conceptType));
       },
     }),
     [opened],
@@ -173,11 +177,11 @@ function KindsTable(properties: {
     features,
     columns: COLUMNS,
     data: shown,
-    getRowId: (each) => each.kind,
+    getRowId: (each) => each.conceptType,
   });
 
   const acting = onTheRowInFocus(
-    () => rowInFocus(shown, (each) => each.kind),
+    () => rowInFocus(shown, (each) => each.conceptType),
     say,
     selectFirst(WORDS.selectFirst),
   );
@@ -188,7 +192,7 @@ function KindsTable(properties: {
   useKeystroke(
     KEY.open,
     acting((each) => {
-      disclosures.toggle(each.kind);
+      disclosures.toggle(each.conceptType);
     }),
   );
 

@@ -79,7 +79,7 @@ const mapWithLeftovers = async (workspace: ProvisionedWorkspace): Promise<void> 
       workspaceId,
       gen: null,
       label: "source-entity:Person",
-      kind: null,
+      conceptType: null,
     });
     await seed.mapEdge({
       workspaceId,

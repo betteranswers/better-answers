@@ -325,7 +325,7 @@ describe("what a governed write takes from its cited connected sources", () => {
     });
 
     const person = await conceptCiting(scenario, scenario.editor, [website.documentId], {
-      kind: "Person",
+      conceptType: "Person",
       frontmatter: { title: "Ada Lovelace", type: "Person" },
     });
     const page = await conceptCiting(scenario, scenario.editor, [website.documentId]);
@@ -344,7 +344,7 @@ describe("what a governed write takes from its cited connected sources", () => {
     const scenario = await arrange();
 
     const written = await conceptCiting(scenario, scenario.editor, [], {
-      kind: "__proto__",
+      conceptType: "__proto__",
       frontmatter: { title: "A kind named for the prototype", type: "__proto__" },
       sensitivity: "Internal",
     });
@@ -364,7 +364,7 @@ describe("what a governed write takes from its cited connected sources", () => {
     const refused = await writeConcept(scenario.editor, doorsOf(scenario), {
       mergeKey: "note:cites-an-uncatalogued-document",
       path,
-      kind: "Note",
+      conceptType: "Note",
       title: "A note on a document nobody catalogued",
       frontmatter: {
         title: "A note on a document nobody catalogued",
@@ -546,7 +546,7 @@ describe("what a re-write cannot do to a concept's sensitivity", () => {
     const scenario = await arrange();
     const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
-      kind: "Person",
+      conceptType: "Person",
       frontmatter: { title: "Jane Doe", type: "Person" },
       mergeKey: "person:jane doe",
     });
@@ -563,7 +563,7 @@ describe("what a re-write cannot do to a concept's sensitivity", () => {
     const ontoKey = await writeConcept(scenario.editor, doorsOf(scenario), {
       mergeKey: withheld.mergeKey,
       path: "knowledge/policy/jane-doe-again.md",
-      kind: "Person",
+      conceptType: "Person",
       title: "Jane Doe",
       frontmatter: { title: "Jane Doe", type: "Person" },
       body: "A second card.",
@@ -1722,7 +1722,7 @@ describe("an Admin's recorded override", () => {
     const scenario = await arrange();
     const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const person = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
-      kind: "Person",
+      conceptType: "Person",
       frontmatter: { title: "Ada Lovelace", type: "Person" },
     });
     const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [person.iri]);
@@ -1865,7 +1865,7 @@ const expensesNotes = async (scenario: Scenario) => {
   const visible = await conceptCiting(scenario, scenario.editor, [internal.documentId], {
     title: "Expenses policy",
     frontmatter: { title: "Expenses policy", type: "Policy", tags: ["finance"] },
-    kind: "Policy",
+    conceptType: "Policy",
   });
   const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
     title: "Expenses of the board",
@@ -1897,7 +1897,7 @@ describe("finding concepts", () => {
           {
             layer: "bundles",
             iri: visible.iri,
-            kind: "Policy",
+            conceptType: "Policy",
             title: "Expenses policy",
             description: null,
             trust: {

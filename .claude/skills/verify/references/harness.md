@@ -8,7 +8,7 @@
 | `POST /people` | optional `email` and `displayName`; a person in no workspace | `id`, `email`, `name` |
 | `POST /members` | `workspaceId`, `userId`, `role` of `Admin`, `Editor` or `Viewer` | `{"added":true}` |
 | `POST /invitations` | `workspaceId`, `email`, `inviterId`, `role` | `id` |
-| `POST /concepts` | `workspaceId`, `userId`, `concepts` of `title`, `body`, optional `collection`, `kind`, `trust`, `verifications`, `status` (`stable` unless named) | `concepts` with `iri`, `title`, `path`, `documents` |
+| `POST /concepts` | `workspaceId`, `userId`, `concepts` of `title`, `body`, optional `collection`, `conceptType`, `trust`, `verifications`, `status` (`stable` unless named) | `concepts` with `iri`, `title`, `path`, `documents` |
 | `POST /owners` | `workspaceId`, `userId` of an Admin, `owners` of `collection` or `iri`, and `personId` or `null` | `{"named":<number of owners>}` |
 | `POST /manifest` | `workspaceId`, `userId` of an Admin | `{"written":true}`, a bundle manifest committed at the knowledge base's head (an imported knowledge base has one, a typed one does not) |
 | `POST /guides` | `workspaceId`, `userId` of an Admin, `financeUserIds` of members to place in the group `finance`; or `collection` alone | `guideId`, `groupId`, `sections` with `sectionId`, `writeUpId`, `prompt`, `includes` of `id`, `iri`, `title`, and `concepts` mapping each title to its `iri`. With `collection`, only `guideId` and `sections` |
@@ -28,7 +28,7 @@
 
 `verifications` on a concept is a list of `{by, at}`. `by` is the id of a member of the workspace, and a verification with no `by` is the suite's machine verifier's. `at` is an ISO date and time. The newest one sets the concept's trust and the older ones are its history. Give `verifications` or `trust`, not both, since `trust: "human-reviewed"` writes one verification by the seeding user at the time of the seed.
 
-`collection` on `POST /guides` seeds one bid-library guide over that collection's concepts. It adds no Northgate concepts and no `finance` group, writes no Brief, and refuses a collection with no concept. It takes no `financeUserIds`. A concept joins the guide when its `kind` is exactly a bid-library kind, such as `company fact` or `insurance policy`, and its `tags` hold that fact's tags.
+`collection` on `POST /guides` seeds one bid-library guide over that collection's concepts. It adds no Northgate concepts and no `finance` group, writes no Brief, and refuses a collection with no concept. It takes no `financeUserIds`. A concept joins the guide when its `conceptType` is exactly a bid-library concept type, such as `company fact` or `insurance policy`, and its `tags` hold that fact's tags.
 
 A concept's `frontmatter` takes `generated` as a list, `[{"by":"okf-extract/0.4","at":"2026-02-10"}]`, because frontmatter holds no nested object. `stale_after` in the past reads *Out of date*.
 

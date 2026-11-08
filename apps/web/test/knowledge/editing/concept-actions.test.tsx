@@ -471,9 +471,9 @@ describe("editing a concept on its own page", () => {
 
     await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
     expect(titleField().value).toBe("Cyber Essentials Plus certificate");
-    expect(screen.getByRole<HTMLInputElement>("textbox", { name: EDITOR_WORDS.kind }).value).toBe(
-      "certification",
-    );
+    expect(
+      screen.getByRole<HTMLInputElement>("textbox", { name: EDITOR_WORDS.conceptType }).value,
+    ).toBe("certification");
     expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Tags" }).value).toBe(
       "cyber-essentials",
     );
@@ -504,7 +504,7 @@ describe("editing a concept on its own page", () => {
       target: { value: "policies" },
     });
     await screen.findByRole("button", { name: EDITOR_WORDS.save });
-    fireEvent.change(screen.getByRole("textbox", { name: EDITOR_WORDS.kind }), {
+    fireEvent.change(screen.getByRole("textbox", { name: EDITOR_WORDS.conceptType }), {
       target: { value: "Policy" },
     });
     pressed(EDITOR_WORDS.save);

@@ -182,7 +182,9 @@ const replayedMergeKey = async (
 ): Promise<string> => {
   if (suggested === undefined && held !== undefined) return held.mergeKey;
   const wanted =
-    suggested === undefined ? mergeKeyOf(row.kind, row.title) : acceptedKeyOf(suggested, held, row);
+    suggested === undefined
+      ? mergeKeyOf(row.conceptType, row.title)
+      : acceptedKeyOf(suggested, held, row);
   const holder = await targetOfMergeKey(platform, tx, wanted);
   return holder === undefined || holder === row.iri ? wanted : (held?.mergeKey ?? row.iri);
 };
@@ -222,9 +224,9 @@ const replayableOf = (
   held: Held | undefined,
   clock: Clock,
 ): IndexRow | undefined => {
-  const kind = stringIn(facts.frontmatter, "type") ?? held?.kind;
+  const conceptType = stringIn(facts.frontmatter, "type") ?? held?.conceptType;
   const title = stringIn(facts.frontmatter, "title") ?? held?.title;
-  if (kind === undefined || title === undefined) return undefined;
+  if (conceptType === undefined || title === undefined) return undefined;
   const contentHash = contentHashOf(facts.frontmatter, facts.body, facts.path);
 
   const parsed = indexRowOf(
@@ -232,7 +234,7 @@ const replayableOf = (
       workspaceId,
       iri: facts.iri,
       path: facts.path,
-      kind,
+      conceptType,
       title,
       frontmatter: facts.frontmatter,
       body: facts.body,

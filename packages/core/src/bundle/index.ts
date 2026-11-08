@@ -32,8 +32,8 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 
-export const foldKind = (kind: string): string =>
-  kind.replaceAll(/\S+/gu, (word) => {
+export const foldConceptType = (conceptType: string): string =>
+  conceptType.replaceAll(/\S+/gu, (word) => {
     const head = word.charAt(0).toUpperCase();
     const cased = head.charAt(0) + (head.slice(1) + word.slice(1)).toLowerCase();
     if (cased.endsWith("ies")) return `${cased.slice(0, -3)}y`;

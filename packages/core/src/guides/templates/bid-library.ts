@@ -12,7 +12,7 @@ const section = (
 
 export const BID_LIBRARY: Template = {
   id: "bid-library",
-  kind: "Bid library",
+  guideType: "Bid library",
   roles: [
     { role: "Admin", defaultLayer: "assembled", actionThreshold: "unverified" },
     { role: "Editor", defaultLayer: "assembled", actionThreshold: "unverified" },
@@ -26,10 +26,10 @@ export const BID_LIBRARY: Template = {
       usageNote: "Open with the facts a buyer checks before reading on.",
       layers: BOTH_LAYERS,
       expects: [
-        { name: "Company registration", kind: "company fact", tags: ["registration"] },
-        { name: "Headcount", kind: "company fact", tags: ["headcount"] },
-        { name: "Year founded", kind: "company fact", tags: ["founded"] },
-        { name: "Registered office", kind: "company fact", tags: ["office"] },
+        { name: "Company registration", conceptType: "company fact", tags: ["registration"] },
+        { name: "Headcount", conceptType: "company fact", tags: ["headcount"] },
+        { name: "Year founded", conceptType: "company fact", tags: ["founded"] },
+        { name: "Registered office", conceptType: "company fact", tags: ["office"] },
       ],
     }),
     section({
@@ -39,8 +39,8 @@ export const BID_LIBRARY: Template = {
       usageNote: "Name what the company sells in the words a buyer uses.",
       layers: BOTH_LAYERS,
       expects: [
-        { name: "Services", kind: "service", tags: [], atLeast: 2 },
-        { name: "Sectors served", kind: "sector", tags: ["served"] },
+        { name: "Services", conceptType: "service", tags: [], atLeast: 2 },
+        { name: "Sectors served", conceptType: "sector", tags: ["served"] },
       ],
     }),
     section({
@@ -52,20 +52,20 @@ export const BID_LIBRARY: Template = {
       expects: [
         {
           name: "Public liability insurance",
-          kind: "insurance policy",
+          conceptType: "insurance policy",
           tags: ["public-liability"],
         },
         {
           name: "Professional indemnity insurance",
-          kind: "insurance policy",
+          conceptType: "insurance policy",
           tags: ["professional-indemnity"],
         },
         {
           name: "Employers' liability insurance",
-          kind: "insurance policy",
+          conceptType: "insurance policy",
           tags: ["employers-liability"],
         },
-        { name: "Filed accounts", kind: "company fact", tags: ["accounts"] },
+        { name: "Filed accounts", conceptType: "company fact", tags: ["accounts"] },
       ],
     }),
     section({
@@ -75,10 +75,10 @@ export const BID_LIBRARY: Template = {
       usageNote: null,
       layers: QUOTED_ALONE,
       expects: [
-        { name: "ISO 27001 certificate", kind: "certification", tags: ["iso-27001"] },
+        { name: "ISO 27001 certificate", conceptType: "certification", tags: ["iso-27001"] },
         {
           name: "Cyber Essentials Plus certificate",
-          kind: "certification",
+          conceptType: "certification",
           tags: ["cyber-essentials-plus"],
         },
       ],
@@ -90,9 +90,13 @@ export const BID_LIBRARY: Template = {
       usageNote: null,
       layers: BOTH_LAYERS,
       expects: [
-        { name: "Data protection registration", kind: "registration", tags: ["data-protection"] },
-        { name: "Privacy policy", kind: "policy", tags: ["privacy"] },
-        { name: "Data location", kind: "company fact", tags: ["data-location"] },
+        {
+          name: "Data protection registration",
+          conceptType: "registration",
+          tags: ["data-protection"],
+        },
+        { name: "Privacy policy", conceptType: "policy", tags: ["privacy"] },
+        { name: "Data location", conceptType: "company fact", tags: ["data-location"] },
       ],
     }),
     section({
@@ -102,10 +106,10 @@ export const BID_LIBRARY: Template = {
       usageNote: "Say how the company keeps information safe, then show the evidence.",
       layers: BOTH_LAYERS,
       expects: [
-        { name: "Security practices", kind: "practice", tags: ["security"], atLeast: 2 },
+        { name: "Security practices", conceptType: "practice", tags: ["security"], atLeast: 2 },
         {
           name: "Cyber Essentials Plus certificate",
-          kind: "certification",
+          conceptType: "certification",
           tags: ["cyber-essentials-plus"],
         },
       ],
@@ -119,7 +123,7 @@ export const BID_LIBRARY: Template = {
           expects: [
             {
               name: "Security testing practices",
-              kind: "practice",
+              conceptType: "practice",
               tags: ["testing"],
               atLeast: 2,
             },
@@ -134,9 +138,9 @@ export const BID_LIBRARY: Template = {
       usageNote: "Say what a customer does when something goes wrong.",
       layers: BOTH_LAYERS,
       expects: [
-        { name: "Incident severity levels", kind: "service level", tags: ["severity"] },
-        { name: "Support hours", kind: "company fact", tags: ["support-hours"] },
-        { name: "Escalation path", kind: "practice", tags: ["escalation"] },
+        { name: "Incident severity levels", conceptType: "service level", tags: ["severity"] },
+        { name: "Support hours", conceptType: "company fact", tags: ["support-hours"] },
+        { name: "Escalation path", conceptType: "practice", tags: ["escalation"] },
       ],
     }),
   ],

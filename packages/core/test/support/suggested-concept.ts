@@ -24,7 +24,7 @@ export const conceptWritten = async (
   const input: WriteConceptInput = {
     mergeKey: `policy:expenses-${n}`,
     path: `knowledge/policy/expenses-${n}.md`,
-    kind: "Policy",
+    conceptType: "Policy",
     title: "Expenses",
     frontmatter: { title: "Expenses", type: "Policy" },
     body: "Expenses are claimed within thirty days.",
@@ -55,7 +55,7 @@ export const proposedBy = async (
         {
           mergeKey: standing.input.mergeKey,
           path: standing.input.path,
-          conceptKind: "Policy",
+          conceptType: "Policy",
           title: "Expenses",
           frontmatter: { title: "Expenses", type: "Policy" },
           body: "Expenses are claimed within sixty days.",

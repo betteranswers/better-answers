@@ -124,7 +124,7 @@ export const allKnowledgeAsked = (
     sort: sortedOf(held.sort),
     page: held.page,
   };
-  if (held.kind !== "") asked.kind = held.kind;
+  if (held.kind !== "") asked.conceptType = held.kind;
   return asked;
 };
 

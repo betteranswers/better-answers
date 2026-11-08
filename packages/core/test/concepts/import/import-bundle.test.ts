@@ -350,7 +350,7 @@ const standingConcept = (
   writeConcept(scenario.admin, doorsOf(scenario), {
     mergeKey,
     path: "knowledge/elsewhere.md",
-    kind: "Answer",
+    conceptType: "Answer",
     title: "Elsewhere",
     frontmatter: { title: "Elsewhere", type: "Answer" },
     body: "A concept that already stands.",
@@ -770,7 +770,7 @@ describe("importing the bundle", () => {
       iri: standing.value.iri,
       mergeKey: "Answer:elsewhere",
       path: "knowledge/elsewhere.md",
-      kind: "Answer",
+      conceptType: "Answer",
       title: "Elsewhere",
       frontmatter: { title: "Elsewhere", type: "Answer" },
       body: "A concept that already stands.",

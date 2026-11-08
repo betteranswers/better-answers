@@ -193,7 +193,7 @@ export const coverageOf = async (
 };
 
 type FactRead = Coverage["sections"][number]["facts"][number] & {
-  readonly kind: string;
+  readonly conceptType: string;
   readonly tags: readonly string[];
 };
 
@@ -206,7 +206,7 @@ type SectionFacts = {
 type Detail = {
   readonly iri: string;
   readonly title: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly body: string;
 };
 
@@ -242,7 +242,7 @@ export type SectionRead = {
 
 export type GuideRead = {
   readonly guideId: string;
-  readonly kind: string;
+  readonly guideType: string;
   readonly collection: string;
   readonly subject: { readonly iri: string; readonly title: string } | null;
   readonly coverage: { readonly met: number; readonly of: number };
@@ -368,7 +368,12 @@ const briefOf = (
   const read = {
     version: row.version,
     rendered: renderBrief(row.markdown, footnotes, "page"),
-    detail: cited.map(({ iri, title, kind, body }) => ({ iri, title, kind, body })),
+    detail: cited.map(({ iri, title, kind: conceptType, body }) => ({
+      iri,
+      title,
+      conceptType,
+      body,
+    })),
   };
   return reader.role === "Viewer"
     ? read
@@ -404,7 +409,7 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
   const everyFact = coverage.sections.flatMap((section) => section.facts);
   return {
     guideId,
-    kind: definition.kind,
+    guideType: definition.kind,
     collection: definition.collection,
     subject:
       definition.subject_iri === null || definition.subject_title === null
@@ -430,7 +435,7 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
             const shape = shapeOf.get(fact.factId);
             if (shape === undefined)
               throw new Error(`guides: no kind and tags were read for fact ${fact.factId}`);
-            return { ...fact, kind: shape.kind, tags: shape.tags };
+            return { ...fact, conceptType: shape.kind, tags: shape.tags };
           }),
         },
         brief: briefOf(reader, row, cited),
@@ -471,7 +476,7 @@ export const readGuide = async (
 
 type GuideSummary = {
   readonly guideId: string;
-  readonly kind: string;
+  readonly guideType: string;
   readonly collection: string;
   readonly subject: { readonly iri: string; readonly title: string } | null;
   readonly sections: number;
@@ -526,7 +531,7 @@ export const readGuides = async (
   return ok(
     read.value.rows.map((row) => ({
       guideId: row.id,
-      kind: row.kind,
+      guideType: row.kind,
       collection: row.collection,
       subject:
         row.subject_iri === null || row.subject_title === null

@@ -13,7 +13,7 @@ import {
 type IndexRows = {
   readonly workspaceId: string;
   readonly commitSha: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly sensitivity: (typeof SENSITIVITIES)[number];
   readonly audienceGroups: readonly string[] | null;
   readonly concepts: readonly { readonly path: string; readonly title: string }[];
@@ -42,7 +42,7 @@ export const conceptIndexRows = async (
     rows.workspaceId,
     iris,
     rows.concepts.map(({ path }) => path),
-    rows.kind,
+    rows.conceptType,
     BODY,
     rows.commitSha,
     CONCEPT_STABLE_STATUS,

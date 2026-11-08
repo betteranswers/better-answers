@@ -208,7 +208,7 @@ export const landRecallSet = async (
     const written = await writeConcept(scenario.admin, doorsOf(scenario), {
       mergeKey: `answer:${key}`,
       path: `knowledge/${group}/${key}.md`,
-      kind: "Answer",
+      conceptType: "Answer",
       title,
       frontmatter: { title, type: "Answer", tags: [group] },
       body: `${body}\n`,

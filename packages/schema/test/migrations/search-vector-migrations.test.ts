@@ -40,8 +40,12 @@ const MIGRATIONS: readonly {
     migration: "0100 adds kinds",
     lastBefore: "0099_the-lineage-rebuilds",
     rowAt: (at) => {
-      const kind = at === 0 ? `${ONE_ROWS_WORD} Policy` : "Policy";
-      return { kind, title: title(at), frontmatter: { title: title(at), type: kind } };
+      const conceptType = at === 0 ? `${ONE_ROWS_WORD} Policy` : "Policy";
+      return {
+        conceptType,
+        title: title(at),
+        frontmatter: { title: title(at), type: conceptType },
+      };
     },
   },
 ];

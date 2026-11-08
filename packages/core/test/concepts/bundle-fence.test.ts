@@ -28,7 +28,7 @@ const { db, arrange } = suiteWithBundles();
 const A_GUIDELINE: WriteConceptInput = {
   mergeKey: "guideline:kettles",
   path: "knowledge/guidelines/kettles.md",
-  kind: "Guideline",
+  conceptType: "Guideline",
   title: "Kettles",
   frontmatter: { title: "Kettles", type: "Guideline", tags: ["kitchen"] },
   body: "# Kettles\n\nDescale the kettle every month.",

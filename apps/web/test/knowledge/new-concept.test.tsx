@@ -57,7 +57,7 @@ const collectionsIn = (...names: readonly string[]) =>
     collections: names.map((collection) => ({
       collection,
       count: 1,
-      kinds: [{ kind: "Policy", count: 1 }],
+      kinds: [{ conceptType: "Policy", count: 1 }],
     })),
   });
 
@@ -69,7 +69,8 @@ const firstLate = (late: Promise<unknown>, afterwards: unknown) => {
   };
 };
 
-const kindField = () => screen.getByRole<HTMLInputElement>("textbox", { name: EDITOR_WORDS.kind });
+const kindField = () =>
+  screen.getByRole<HTMLInputElement>("textbox", { name: EDITOR_WORDS.conceptType });
 
 const titleField = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Title" });
 

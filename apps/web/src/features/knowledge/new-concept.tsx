@@ -30,7 +30,12 @@ function NewConceptEditor(properties: {
   const editing = useConceptEditing({
     target: { kind: "new", collection: held.collection === "" ? undefined : held.collection },
     standing: undefined,
-    prefill: { title: held.new, kind: held.kind, tags: held.tags, subject: held.subject },
+    prefill: {
+      title: held.new,
+      conceptType: held.kind,
+      tags: held.tags,
+      subject: held.subject,
+    },
     startsOpen: true,
     onCollection: (collection) => {
       write({ collection: collection ?? "" }, OWN_WRITE);

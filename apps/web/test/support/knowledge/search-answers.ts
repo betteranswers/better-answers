@@ -97,7 +97,7 @@ export const aConceptMatch = (
 ): Match => ({
   layer: "bundles",
   iri: iriOf(number),
-  kind: "Answer",
+  conceptType: "Answer",
   title,
   description: null,
   trust: { tier: "unverified", status: "current", verifiedBy: null, verifiedAt: null, rider: null },
@@ -129,7 +129,7 @@ export const anOpenedConcept = (
   iri: aConceptIri(iri),
   path: "knowledge/concept.md",
   collection: null,
-  kind: "Answer",
+  conceptType: "Answer",
   frontmatter,
   body,
   relations: [],
@@ -183,7 +183,7 @@ export const anIssuedConcept = (over: Partial<Concept> = {}): Concept =>
     {
       path: "knowledge/sectors/safeguarding-children-partnerships.md",
       collection: "Sectors",
-      kind: "Sector",
+      conceptType: "Sector",
       trust: VERIFIED_BY_PRIYA,
       trustWords: "Verified by Priya Shah · 3 March 2026",
       verifications: [PRIYA, THE_EXTRACTOR],

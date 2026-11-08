@@ -2,12 +2,12 @@ import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { cn } from "@/shared/lib/utils.ts";
 
 export function KindLine(properties: {
-  readonly kind: string | undefined;
+  readonly conceptType: string | undefined;
   readonly collection?: string;
   readonly className?: string;
 }) {
   const parts = [
-    { label: CONCEPT_WORDS.kind, value: properties.kind },
+    { label: CONCEPT_WORDS.kind, value: properties.conceptType },
     { label: CONCEPT_WORDS.collection, value: properties.collection },
   ].filter((part) => part.value !== undefined);
   if (parts.length === 0) return null;

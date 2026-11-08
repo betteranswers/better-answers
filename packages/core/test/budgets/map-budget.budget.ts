@@ -52,7 +52,7 @@ const bodyOf = (at: number): string => {
 const writeOf = (at: number, head: string | null): WriteConceptInput => ({
   mergeKey: `policy:expenses-${at}`,
   path: `knowledge/expenses-${at}.md`,
-  kind: "Policy",
+  conceptType: "Policy",
   title: `Expenses ${at}`,
   frontmatter: { title: `Expenses ${at}`, type: "Policy" },
   body: bodyOf(at),

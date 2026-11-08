@@ -90,7 +90,7 @@ export const skeletonOf = (
 ): GuideSkeleton => ({
   guide: definition.id,
   template: definition.template,
-  kind: definition.kind,
+  kind: definition.guideType,
   subject: definition.subjectIri,
   roles: definition.roles
     .toSorted((one, other) => ROLES.indexOf(one.role) - ROLES.indexOf(other.role))

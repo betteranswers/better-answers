@@ -54,7 +54,7 @@ export type OpenedConcept = {
   readonly iri: ConceptIri;
   readonly path: string;
   readonly collection: string | null;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
@@ -95,7 +95,7 @@ const openedOf = (row: ConceptRow): OpenedConcept => ({
   iri: ids.conceptIri.parse(row.iri),
   path: row.path,
   collection: row.collection,
-  kind: row.kind,
+  conceptType: row.kind,
   title: row.title,
   frontmatter: row.frontmatter,
   body: row.body,
@@ -170,7 +170,7 @@ export type ConceptRead = {
   readonly iri: ConceptIri;
   readonly path: string;
   readonly collection: string | null;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
   readonly trust: Trust;
@@ -225,7 +225,7 @@ export const readConcept = async (
     iri: concept.iri,
     path: concept.path,
     collection: concept.collection,
-    kind: concept.kind,
+    conceptType: concept.conceptType,
     frontmatter: projectedFrontmatter(concept.frontmatter, sources.value),
     body: concept.body,
     trust,

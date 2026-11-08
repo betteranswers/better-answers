@@ -249,6 +249,8 @@ If 0069, 0072 or 0073 fails on `lock_timeout`, it rolls back whole and can run a
 
 **After 0072,** a browser tab opened before the release shows the error page on Sources until reloaded. Tell the Admins to reload. **After 0073,** the next release renamed the api's wire key `act` to `action`, so a tab opened before that release must be reloaded.
 
+**After the release that renames the concept's kind on the api's wire to `conceptType`** (08/11/2026), a Knowledge tab opened before the release cannot read concept types, list a type's concepts or save a concept until reloaded. A draft kept in that tab is dropped. Tell members to reload. The MCP entries keep `kind`.
+
 **The migration that adds `map_unresolved_reference`** (22/10/2026) starts the table empty, so a link written before the release has no row until its map is rebuilt. The migration queues one `full-rebuild` job with the reason `upgrade` for each workspace that has a map, unless a full rebuild already waits there. It runs once per database. Nothing is run by hand. Until a workspace's rebuild is done, a concept that lands at a path an older link names does not answer that link.
 
 1. To watch, count `SELECT workspace_id, status FROM job WHERE kind = 'full-rebuild' AND reason = 'upgrade'` as `postgres`. Every row reaches `done` once the new worker is up.

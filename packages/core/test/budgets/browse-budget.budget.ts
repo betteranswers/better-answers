@@ -45,7 +45,7 @@ const seedWideShelf = async (): Promise<Shelf> => {
       await conceptIndexRows(client, {
         workspaceId,
         commitSha,
-        kind: kindAt(first),
+        conceptType: kindAt(first),
         sensitivity: "Internal",
         audienceGroups: null,
         concepts: held.map((at) => ({
@@ -100,7 +100,7 @@ describe("the knowledge base at 3,000 concepts", () => {
                 readKindConcepts(
                   fresh,
                   tx,
-                  { collection: collectionAt(0), kind: kindAt(0) },
+                  { collection: collectionAt(0), conceptType: kindAt(0) },
                   new Date(),
                 ),
               ),

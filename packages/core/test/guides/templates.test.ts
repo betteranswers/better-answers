@@ -37,10 +37,10 @@ const fact = (
   sectionId: string,
   ordinal: number,
   name: string,
-  kind: string,
+  conceptType: string,
   tags: readonly string[],
   atLeast = 1,
-) => ({ id, sectionId, ordinal, name, kind, tags, collection: null, atLeast });
+) => ({ id, sectionId, ordinal, name, conceptType, tags, collection: null, atLeast });
 
 describe("the shipped templates", () => {
   it("parses every shipped template into expected fact rows", () => {
@@ -52,7 +52,7 @@ describe("the shipped templates", () => {
       definition: {
         id: "01J9GUIDE00000000000000000",
         template: "bid-library",
-        kind: "Bid library",
+        guideType: "Bid library",
         collection: "company",
         subjectIri: null,
       },

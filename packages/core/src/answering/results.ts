@@ -17,7 +17,7 @@ export const NO_COLLECTION = "No collection";
 export type ConceptMatch<Iri extends string> = {
   readonly layer: "bundles";
   readonly iri: Iri;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly title: string;
   readonly description: string | null;
   readonly trust: Trust;
@@ -51,7 +51,7 @@ export type ConceptView<Iri extends string> = {
   readonly iri: Iri;
   readonly path: string;
   readonly collection: string | null;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
   readonly relations: readonly {
@@ -91,7 +91,7 @@ export type FoundForText<Iri extends string = string> = Omit<FindResult<Iri>, "m
 
 export type OpenedForText = Opened<
   string,
-  Omit<ConceptView<string>, "path" | "collection" | "kind">
+  Omit<ConceptView<string>, "path" | "collection" | "conceptType">
 >;
 
 type PaneWords = Pick<ConceptRead["pane"], "access" | "lead" | "next">;

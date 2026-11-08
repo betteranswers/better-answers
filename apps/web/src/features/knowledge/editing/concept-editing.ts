@@ -6,7 +6,7 @@ export type Mode = "visual" | "source";
 
 export type Draft = {
   readonly title: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly description: string;
   readonly tags: string;
   readonly body: string;
@@ -145,7 +145,7 @@ export const savedAs = (target: EditTarget, open: Open, confirmed: boolean): Sav
   const common = {
     parts: {
       title: draft.title,
-      kind: draft.kind,
+      conceptType: draft.conceptType,
       description: draft.description.trim() === "" ? null : draft.description,
       tags: [...tagsOf(draft.tags)],
       body: draft.body,
@@ -171,12 +171,12 @@ export const sourceNumberOf = (
   return number + 1;
 };
 
-export type CannotSave = "collection" | "title" | "kind" | "body";
+export type CannotSave = "collection" | "title" | "conceptType" | "body";
 
 export const cannotSaveBecause = (target: EditTarget, draft: Draft): CannotSave | undefined => {
   if (target.kind === "new" && target.collection === undefined) return "collection";
   if (draft.title.trim() === "") return "title";
-  if (draft.kind.trim() === "") return "kind";
+  if (draft.conceptType.trim() === "") return "conceptType";
   if (draft.body.trim() === "") return "body";
   return undefined;
 };

@@ -40,7 +40,7 @@ const versioned = {
 const guideDefinitionRefinements = {
   workspaceId,
   id: guideId,
-  kind: (schema: z.ZodString) => schema.trim().min(1),
+  guideType: (schema: z.ZodString) => schema.trim().min(1),
   collection: (schema: z.ZodString) => schema.regex(COLLECTION),
   template: (schema: z.ZodString) => schema.trim().min(1),
   subjectIri: conceptIri,
@@ -86,7 +86,7 @@ const guideExpectedFactRefinements = {
   sectionId,
   ordinal,
   name: (schema: z.ZodString) => schema.trim().min(1),
-  kind: (schema: z.ZodString) => schema.trim().min(1),
+  conceptType: (schema: z.ZodString) => schema.trim().min(1),
   tags: (schema: z.ZodArray<z.ZodString>) => z.array(schema.element.trim().min(1)),
   collection: (schema: z.ZodString) => schema.regex(COLLECTION),
   atLeast: (schema: z.ZodNumber) => schema.int().positive(),

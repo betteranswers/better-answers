@@ -130,7 +130,10 @@ const documentMatch = z.object({
     ),
 });
 
-export const findOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
+export const findOutputWith = <Trust extends z.ZodType, Typed extends z.ZodRawShape>(
+  trust: Trust,
+  typeField: Typed,
+) =>
   z.object({
     query: z.string(),
     matches: z.array(
@@ -138,7 +141,7 @@ export const findOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
         z.object({
           layer: z.literal("bundles"),
           iri: z.string(),
-          kind: z.string(),
+          ...typeField,
           title: z.string(),
           trust,
           trustWords: z.string(),
@@ -184,11 +187,14 @@ export type Evidence<Iri extends string> = {
   readonly iri?: Iri;
 };
 
-const previewedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
+const previewedConceptWith = <Trust extends z.ZodType, Typed extends z.ZodRawShape>(
+  trust: Trust,
+  typeField: Typed,
+) =>
   z.object({
     iri: z.string().describe("Pass this to `open` as `iri` to read the whole concept."),
     url: z.string().describe("A link to the concept's page, for the person to open."),
-    kind: z.string(),
+    ...typeField,
     title: z
       .string()
       .describe("The concept's title. For an `Answer`, this is the question it answers."),
@@ -200,14 +206,20 @@ const previewedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
     trustWords: z.string(),
   });
 
-const returnedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
-  previewedConceptWith(trust).extend({
+const returnedConceptWith = <Trust extends z.ZodType, Typed extends z.ZodRawShape>(
+  trust: Trust,
+  typeField: Typed,
+) =>
+  previewedConceptWith(trust, typeField).extend({
     body: z.string().describe("The full text of the `Answer`. Quote it unchanged."),
     evidence: z.array(evidenceItem),
   });
 
-const relatedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
-  previewedConceptWith(trust).extend({
+const relatedConceptWith = <Trust extends z.ZodType, Typed extends z.ZodRawShape>(
+  trust: Trust,
+  typeField: Typed,
+) =>
+  previewedConceptWith(trust, typeField).extend({
     body: z
       .string()
       .exactOptional()
@@ -220,14 +232,17 @@ const relatedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
       .describe("The sources of an `Answer`. Present only when `body` is present."),
   });
 
-export const answerOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
+export const answerOutputWith = <Trust extends z.ZodType, Typed extends z.ZodRawShape>(
+  trust: Trust,
+  typeField: Typed,
+) =>
   z.object({
     verdict: z.enum(QUESTION_VERDICTS),
     recordId: z
       .string()
       .describe("The id of the saved record of this question. `give_feedback` takes it."),
     answers: z
-      .array(returnedConceptWith(trust))
+      .array(returnedConceptWith(trust, typeField))
       .describe("Each `Answer` that the judge found answers the question as asked, in full."),
     judgeState: z
       .enum(JUDGE_STATES)
@@ -235,7 +250,7 @@ export const answerOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
         "Whether the judge ran. `judged`: it ran. `judging-failed`: it could not judge, so its candidates are under `related`. `not-judged`: the workspace has no judge, or no `Answer` was a candidate. Only a judged `Answer` appears under `answers`.",
       ),
     related: z
-      .array(relatedConceptWith(trust))
+      .array(relatedConceptWith(trust, typeField))
       .describe(
         "Other concepts related to the question, best match first. An `Answer` comes in full when `judgeState` is `not-judged` or `judging-failed`. Every other concept comes as one line.",
       ),

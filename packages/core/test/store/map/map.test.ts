@@ -218,7 +218,7 @@ describe("a map walk", () => {
         workspaceId: scenario.workspaceId,
         gen: null,
         label: "source-entity:Person",
-        kind: null,
+        conceptType: null,
       });
       await seed.mapEdge({
         workspaceId: scenario.workspaceId,
@@ -543,7 +543,7 @@ describe("a map walk narrowed to collections", () => {
     const { entry, section, beyond } = await seeded(async (seed) => {
       const made = {
         entry: await conceptNode(seed, workspaceId, "audits"),
-        section: (await seed.mapNode({ workspaceId, label: "Section", kind: null })).uid,
+        section: (await seed.mapNode({ workspaceId, label: "Section", conceptType: null })).uid,
         beyond: await conceptNode(seed, workspaceId, "audits"),
       };
       await seed.mapEdge({ workspaceId, fromUid: made.entry, toUid: made.section });
@@ -565,7 +565,7 @@ describe("a map walk narrowed to collections", () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
     const { hub, last: concepts } = await hubOf(workspaceId, {
-      first: (seed, uid) => seed.mapNode({ workspaceId, uid, label: "Section", kind: null }),
+      first: (seed, uid) => seed.mapNode({ workspaceId, uid, label: "Section", conceptType: null }),
       last: (seed, uid) => conceptNode(seed, workspaceId, "audits", uid),
     });
 
@@ -608,7 +608,7 @@ const deltaOf = (row: IndexRow, overrides: Partial<ConceptDelta> = {}): ConceptD
   return {
     workspaceId: row.workspaceId,
     iri: row.iri,
-    kind: row.kind,
+    conceptType: row.conceptType,
     path: row.path,
     body: row.body,
     sources: citedSourcesOf(row.frontmatter["sources"]),
@@ -630,13 +630,13 @@ const land = async (scenario: MapScenario, delta: ConceptDelta): Promise<void> =
 
 const amend = async (
   iri: string,
-  changes: { readonly kind?: string; readonly body?: string; readonly status?: string },
+  changes: { readonly conceptType?: string; readonly body?: string; readonly status?: string },
 ): Promise<void> => {
   await db().pool.query(
     `UPDATE concept_index
         SET kind = COALESCE($2, kind), body = COALESCE($3, body), status = COALESCE($4, status)
       WHERE iri = $1`,
-    [iri, changes.kind ?? null, changes.body ?? null, changes.status ?? null],
+    [iri, changes.conceptType ?? null, changes.body ?? null, changes.status ?? null],
   );
 };
 
@@ -667,10 +667,13 @@ const linkedPair = async (): Promise<{
   readonly policy: IndexRow;
 }> => {
   const scenario = await arrange();
-  const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
+  const product = await conceptIn(scenario, {
+    path: "knowledge/product.md",
+    conceptType: "Product",
+  });
   const policy = await conceptIn(scenario, {
     path: "knowledge/policy.md",
-    kind: "Policy",
+    conceptType: "Policy",
     body: "See [the product](./product.md) for tiers.",
   });
   return { scenario, product, policy };
@@ -697,8 +700,8 @@ describe("the map delta for a later commit", () => {
     await land(scenario, deltaOf(product));
     await land(scenario, deltaOf(policy));
 
-    await amend(product.iri, { kind: "Procedure" });
-    await land(scenario, deltaOf(product, { kind: "Procedure" }));
+    await amend(product.iri, { conceptType: "Procedure" });
+    await land(scenario, deltaOf(product, { conceptType: "Procedure" }));
 
     expect(await edgesFrom(scenario, policy.iri)).toEqual([
       { label: "LINKS_TO", to_uid: product.iri, to_kind: "Procedure" },
@@ -707,10 +710,13 @@ describe("the map delta for a later commit", () => {
 
   it("changes derived-from to supersedes once the cited concept is deprecated", async () => {
     const scenario = await arrange();
-    const cited = await conceptIn(scenario, { path: "knowledge/expenses.md", kind: "Policy" });
+    const cited = await conceptIn(scenario, {
+      path: "knowledge/expenses.md",
+      conceptType: "Policy",
+    });
     const successor = await conceptIn(scenario, {
       path: "knowledge/expenses-v2.md",
-      kind: "Policy",
+      conceptType: "Policy",
       frontmatter: { title: "Expenses v2", type: "Policy", sources: [{ resource: cited.iri }] },
     });
     await land(scenario, deltaOf(cited));
@@ -736,12 +742,12 @@ describe("the map delta for a later commit", () => {
 
     const retired = await conceptIn(scenario, {
       path: "knowledge/old-product.md",
-      kind: "Product",
+      conceptType: "Product",
       status: "deprecated",
     });
     const policy = await conceptIn(scenario, {
       path: "knowledge/policy.md",
-      kind: "Policy",
+      conceptType: "Policy",
       frontmatter: { title: "Expenses", type: "Policy", sources: [{ resource: retired.iri }] },
     });
     await land(scenario, deltaOf(retired));
@@ -764,7 +770,7 @@ const linksFrom = (scenario: MapScenario, fromUid: string): Promise<readonly Lin
   edgeRowsFrom<LinkFacts>(scenario, fromUid, "to_uid, section, sentence");
 
 const authorOf = (scenario: MapScenario, body: string, path = "knowledge/policy.md") =>
-  conceptIn(scenario, { path, kind: "Policy", body });
+  conceptIn(scenario, { path, conceptType: "Policy", body });
 
 const derived = async (
   body: string,
@@ -772,8 +778,8 @@ const derived = async (
 ): Promise<{ readonly target: IndexRow; readonly links: readonly LinkFacts[] }> => {
   const scenario = await arrange();
   const [wanted, ...decoys] = paths;
-  const target = await conceptIn(scenario, { path: wanted, kind: "Product" });
-  for (const path of decoys) await conceptIn(scenario, { path, kind: "Product" });
+  const target = await conceptIn(scenario, { path: wanted, conceptType: "Product" });
+  for (const path of decoys) await conceptIn(scenario, { path, conceptType: "Product" });
   const policy = await authorOf(scenario, body);
   await land(scenario, deltaOf(policy));
   return { target, links: await linksFrom(scenario, policy.iri) };
@@ -959,12 +965,15 @@ describe("which markdown in a body makes an edge", () => {
 
   it("makes one lineage edge per cited concept, ignoring URLs", async () => {
     const scenario = await arrange();
-    const cited = await conceptIn(scenario, { path: "knowledge/expenses.md", kind: "Policy" });
+    const cited = await conceptIn(scenario, {
+      path: "knowledge/expenses.md",
+      conceptType: "Policy",
+    });
 
     const unwritten = conceptIriOf(ulid());
     const successor = await conceptIn(scenario, {
       path: "knowledge/expenses-v2.md",
-      kind: "Policy",
+      conceptType: "Policy",
       frontmatter: {
         title: "Expenses v2",
         type: "Policy",
@@ -988,7 +997,10 @@ describe("which markdown in a body makes an edge", () => {
 
   it("counts a lineage ordinal over the sources naming a resource", async () => {
     const scenario = await arrange();
-    const cited = await conceptIn(scenario, { path: "knowledge/expenses.md", kind: "Policy" });
+    const cited = await conceptIn(scenario, {
+      path: "knowledge/expenses.md",
+      conceptType: "Policy",
+    });
     const successor = await conceptIn(scenario, { path: "knowledge/expenses-v2.md" });
     await land(scenario, deltaOf(cited));
 
@@ -1016,7 +1028,7 @@ describe("which markdown in a body makes an edge", () => {
 
     const product = await conceptIn(scenario, {
       path: "knowledge/policy/deep/product.md",
-      kind: "Product",
+      conceptType: "Product",
     });
     await land(scenario, deltaOf(product));
 
@@ -1065,7 +1077,7 @@ const landedAt = async (
   path: string,
   overrides: Partial<IndexRow> = {},
 ): Promise<IndexRow> => {
-  const landed = await conceptIn(scenario, { path, kind: "Product", ...overrides });
+  const landed = await conceptIn(scenario, { path, conceptType: "Product", ...overrides });
   await land(scenario, deltaOf(landed));
   return landed;
 };
@@ -1142,7 +1154,7 @@ describe("a path reference with no concept at that path yet", () => {
     const scenario = await arrange();
     const successor = await conceptIn(scenario, {
       path: "knowledge/expenses.md",
-      kind: "Policy",
+      conceptType: "Policy",
       frontmatter: {
         title: "Expenses",
         type: "Policy",
@@ -1155,7 +1167,7 @@ describe("a path reference with no concept at that path yet", () => {
     ]);
 
     const retired = await landedAt(scenario, "knowledge/policy.md", {
-      kind: "Policy",
+      conceptType: "Policy",
       status: "deprecated",
     });
 
@@ -1167,11 +1179,11 @@ describe("a path reference with no concept at that path yet", () => {
 
   it("treats a connected source's passage as evidence, not lineage", async () => {
     const scenario = await arrange();
-    await landedAt(scenario, "knowledge/pricing.md", { kind: "Policy" });
+    await landedAt(scenario, "knowledge/pricing.md", { conceptType: "Policy" });
     const document = ulid();
     const citer = await conceptIn(scenario, {
       path: "knowledge/expenses.md",
-      kind: "Policy",
+      conceptType: "Policy",
       frontmatter: {
         title: "Expenses",
         type: "Policy",

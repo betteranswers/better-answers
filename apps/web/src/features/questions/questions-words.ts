@@ -58,7 +58,7 @@ export const QUESTIONS_WORDS = {
     collectionsNamed: "Collections Chosen",
     verdict: "Verdict",
     judge: "Judge",
-    kind: "Kind",
+    conceptType: "Type",
     collection: "Collection",
     trust: "Trust",
     judged: "Judge’s Verdict",

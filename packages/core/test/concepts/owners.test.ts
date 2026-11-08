@@ -54,7 +54,7 @@ const conceptAt = (path: string, overrides: Partial<WriteConceptInput> = {}): Wr
   return {
     mergeKey: `policy:owned-${written}`,
     path,
-    kind: "Policy",
+    conceptType: "Policy",
     title: `Owned ${written}`,
     frontmatter: { title: `Owned ${written}`, type: "Policy" },
     body: "Expenses are claimed within thirty days.",

@@ -131,7 +131,7 @@ function CitedConcept(properties: {
         <>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <TrustMark trust={read.trust} words={read.trustWords} />
-            <KindLine kind={read.kind} />
+            <KindLine conceptType={read.conceptType} />
           </div>
           {titleOf(read.frontmatter) === opened.title ? null : (
             <p className="font-medium wrap-anywhere">{titleOf(read.frontmatter)}</p>

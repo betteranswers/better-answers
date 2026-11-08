@@ -50,7 +50,9 @@ export const useKindConcepts = (open: OpenKind) => {
   const api = useTRPC();
   return useInfiniteQuery(
     api.knowledge.kindConcepts.infiniteQueryOptions(
-      open === undefined ? skipToken : { collection: open.collection, kind: open.kind },
+      open === undefined
+        ? skipToken
+        : { collection: open.collection, conceptType: open.conceptType },
       { getNextPageParam: (page) => page.nextCursor, ...WHILE_A_CEILING_HOLDS },
     ),
   );

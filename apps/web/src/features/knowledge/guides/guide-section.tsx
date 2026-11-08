@@ -125,7 +125,7 @@ function Detail(properties: {
                   </Link>
                 )}
               </Title>
-              <KindLine kind={concept.kind} />
+              <KindLine conceptType={concept.conceptType} />
             </div>
             <div className="mt-2">
               <ConceptBody

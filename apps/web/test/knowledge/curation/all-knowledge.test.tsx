@@ -37,7 +37,7 @@ const THE_EXPENSES = aConceptRow(2, "Expense claims", {
 
 const THE_DRILLS = aConceptRow(3, "Fire drills", { collection: "safety" });
 
-const THE_LEASE = aConceptRow(4, "Yard lease", { kind: "lease", collection: null });
+const THE_LEASE = aConceptRow(4, "Yard lease", { conceptType: "lease", collection: null });
 
 const CONCEPTS: readonly ConceptRow[] = [THE_LEAVE, THE_EXPENSES, THE_DRILLS, THE_LEASE];
 
@@ -149,7 +149,7 @@ describe("the All Knowledge page", () => {
     await screen.findByRole("link", { name: "Expense claims" });
     expect(lastAsk()).toEqual({
       collections: ["policy"],
-      kind: "policy",
+      conceptType: "policy",
       sort: { column: "title", desc: true },
       page: 1,
     });
@@ -187,7 +187,7 @@ describe("the All Knowledge page", () => {
 
     expect(await region().findByRole("link", { name: "Annual leave" })).toBeDefined();
     expect(lastAsk()).toMatchObject({ collections: [] });
-    expect(lastAsk()?.kind).toBeUndefined();
+    expect(lastAsk()?.conceptType).toBeUndefined();
   });
 
   it("shows an empty table for an empty knowledge base", async () => {

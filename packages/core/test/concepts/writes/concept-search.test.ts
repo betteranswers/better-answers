@@ -22,7 +22,7 @@ const RETENTION = {
   path: "knowledge/retention-schedule.md",
   mergeKey: "policy:retention-schedule",
   title: "Retention Schedule",
-  kind: "Policy",
+  conceptType: "Policy",
   frontmatter: { title: "Retention Schedule", type: "Policy", tags: ["compliance"] },
 } as const;
 

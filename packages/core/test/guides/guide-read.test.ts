@@ -74,7 +74,7 @@ describe("reading a guide", () => {
       ["6.1", "Security testing"],
       ["7", "Support and service levels"],
     ]);
-    expect(guide).toMatchObject({ kind: "Bid library", collection: "company", subject: null });
+    expect(guide).toMatchObject({ guideType: "Bid library", collection: "company", subject: null });
   });
 
   it("lists each expected fact not yet included in coverage", async () => {
@@ -89,7 +89,7 @@ describe("reading a guide", () => {
         {
           name: "Employers' liability insurance",
           state: "missing",
-          kind: "Insurance Policy",
+          conceptType: "Insurance Policy",
           tags: ["employers-liability"],
           available: [],
         },
@@ -249,7 +249,7 @@ describe("reading a guide", () => {
     expect(answered(await listed(seeded.ng.editor))).toEqual([
       {
         guideId: seeded.guideId,
-        kind: "Bid library",
+        guideType: "Bid library",
         collection: "company",
         subject: null,
         sections: 8,

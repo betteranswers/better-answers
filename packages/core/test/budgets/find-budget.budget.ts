@@ -60,7 +60,7 @@ const sourcedAnswer = async (scenario: Scenario, cited: ConceptIri): Promise<Con
   const written = await conceptCiting(scenario, scenario.editor, [internal.documentId], {
     path: "knowledge/security/log-and-backup-retention.md",
     mergeKey: "answer:log-and-backup-retention",
-    kind: "Answer",
+    conceptType: "Answer",
     title: "Log and Backup Retention",
     frontmatter: {
       title: "Log and Backup Retention",

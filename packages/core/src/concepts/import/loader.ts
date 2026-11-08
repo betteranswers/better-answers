@@ -17,7 +17,7 @@ import { uriDecoded } from "@better-answers/schema/concept-file";
 import { SCHEMED } from "@better-answers/schema/scan";
 
 import { action, declareActions, record } from "../../audit/index.ts";
-import { foldKind } from "../../bundle/index.ts";
+import { foldConceptType } from "../../bundle/index.ts";
 import {
   err,
   isPortablePath,
@@ -81,7 +81,7 @@ type VerifiedEvent = {
 export type LoadedConcept = {
   readonly file: string;
   readonly path: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly title: string;
   readonly mergeKey: string;
   readonly frontmatter: Frontmatter;
@@ -275,8 +275,8 @@ const readConcept = (
   const parsed = parsedConcept(file, text);
   if (!parsed.ok) return parsed;
   const { frontmatter, body } = parsed.value;
-  const kind = stringOf(frontmatter, "type");
-  if (kind === undefined) return err(unsound(file, "type-or-title-missing", "type"));
+  const conceptType = stringOf(frontmatter, "type");
+  if (conceptType === undefined) return err(unsound(file, "type-or-title-missing", "type"));
   const title = stringOf(frontmatter, "title");
   if (title === undefined) return err(unsound(file, "type-or-title-missing", "title"));
   const verified = verifiedEventsOf(file, frontmatter);
@@ -286,9 +286,9 @@ const readConcept = (
   return ok({
     file,
     path: path.value,
-    kind,
+    conceptType,
     title,
-    mergeKey: mergeKeyOf(foldKind(kind), title),
+    mergeKey: mergeKeyOf(foldConceptType(conceptType), title),
     frontmatter,
     body,
     verified: verified.value,

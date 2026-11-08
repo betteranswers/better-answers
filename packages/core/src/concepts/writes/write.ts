@@ -11,7 +11,7 @@ import {
 
 import { widens, type Visibility } from "../../access/index.ts";
 import { action, declareActions, record } from "../../audit/index.ts";
-import { commitAndLandAsMember, foldKind, withBundleWrite } from "../../bundle/index.ts";
+import { commitAndLandAsMember, foldConceptType, withBundleWrite } from "../../bundle/index.ts";
 import {
   actorIdOf,
   admit,
@@ -58,7 +58,7 @@ import { IMPORT_SENSITIVITY_DEFAULT } from "../import/loader.ts";
 import { deciderAdmits, ownerAdmits, standingConcept } from "../owners.ts";
 import { conceptVisibilityFrom } from "../visibility.ts";
 import type { PassedOnCommitRefusal } from "../vocabulary.ts";
-import { acceptedKeyOf } from "./merge-key.ts";
+import { acceptedKeyOf, heldAsWritten } from "./merge-key.ts";
 import { EVIDENCE_AGREES } from "./reconciler-hit.ts";
 import {
   conceptOfSuggestion,
@@ -103,7 +103,7 @@ export type WriteConceptInput = {
   readonly mergeKey: string;
 
   readonly path: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
@@ -160,7 +160,7 @@ export type WriteConceptRefusal =
 
 const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
   const named = { ...input.frontmatter };
-  if (typeof named["type"] !== "string") named["type"] = input.kind;
+  if (typeof named["type"] !== "string") named["type"] = input.conceptType;
   if (typeof named["title"] !== "string") named["title"] = input.title;
   if (input.status !== undefined) named["status"] = input.status;
   named["iri"] = iri;
@@ -271,7 +271,7 @@ const writeUnderLock = async (
       workspaceId: principal.workspaceId,
       iri: write.iri,
       path: write.input.path,
-      kind: write.input.kind,
+      conceptType: write.input.conceptType,
       title: write.input.title,
       frontmatter: write.frontmatter,
       body: write.input.body,
@@ -317,7 +317,7 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
             ? undefined
             : await conceptVisibilityFrom(fresh, tx, {
                 iri,
-                kind: foldKind(input.kind),
+                conceptType: foldConceptType(input.conceptType),
                 fallback: heldVisibilityOf(held),
                 citing: write.evidence.map((piece) => piece.sourceDocumentId),
                 alsoOn: citing.restsAlsoOn,
@@ -377,7 +377,8 @@ const WRITE_REFUSALS: readonly (readonly [
   ],
   [
     "unchanged",
-    (write, { stored, held }) => stored === renderedOf(write) && rowsAsHeld(write, held),
+    (write, { stored, held }) =>
+      stored === renderedOf(write) && heldAsWritten(held, write.mergeKey, write.input),
   ],
   [
     "widening-refused",
@@ -389,9 +390,6 @@ const WRITE_REFUSALS: readonly (readonly [
 
 const renderedOf = (write: ParsedWrite): string =>
   renderConceptFile(write.frontmatter, write.input.body);
-
-const rowsAsHeld = ({ input, mergeKey }: ParsedWrite, held: Held | undefined): boolean =>
-  held?.mergeKey === mergeKey && held.title === input.title && held.kind === foldKind(input.kind);
 
 const isDirectEdit = ({ input }: ParsedWrite, held: Held | undefined): held is Held =>
   held !== undefined && input.acceptance === undefined;
@@ -459,7 +457,7 @@ const namesItsSuggestion = ({ input, mergeKey }: ParsedWrite, payload: Suggestio
   payload.kind === input.acceptance?.kind &&
   payload.mergeKey === mergeKey &&
   payload.path === input.path &&
-  payload.conceptKind === input.kind;
+  payload.conceptType === input.conceptType;
 
 const carriesItsProposal = ({ input }: ParsedWrite, payload: SuggestionPayload) =>
   payload.title === input.title &&

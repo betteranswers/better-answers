@@ -14,7 +14,7 @@ import {
   type ConceptIri,
 } from "@better-answers/schema";
 
-import { authorOf, foldKind } from "../../bundle/index.ts";
+import { authorOf, foldConceptType } from "../../bundle/index.ts";
 import {
   admit,
   ANY_ROLE,
@@ -104,7 +104,7 @@ const sourcesValueOf = (
   return texts.length > 0 ? texts : records;
 };
 
-type EditedFile = ConceptFile & { readonly title: string; readonly kind: string };
+type EditedFile = ConceptFile & { readonly title: string; readonly conceptType: string };
 
 export const rendersAlike = (one: ConceptFile, other: ConceptFile): boolean =>
   renderConceptFile(one.frontmatter, one.body) === renderConceptFile(other.frontmatter, other.body);
@@ -118,7 +118,7 @@ const editedFileOf = (
   if (listed === undefined) return undefined;
   const edited: readonly (readonly [string, FrontmatterValue | null])[] = [
     ["title", parts.title],
-    ["type", parts.kind],
+    ["type", parts.conceptType],
     ["description", parts.description],
     ["tags", parts.tags],
     ["sources", listed],
@@ -127,7 +127,7 @@ const editedFileOf = (
     (file, [key, value]) => withPart(file, key, value),
     stored.frontmatter,
   );
-  return { frontmatter, body: parts.body, title: parts.title, kind: parts.kind };
+  return { frontmatter, body: parts.body, title: parts.title, conceptType: parts.conceptType };
 };
 
 const sourceLabelRefusalOf = (
@@ -193,7 +193,7 @@ const SOURCE_ENTRY = z.union([
 const SAVED_FIELDS = {
   parts: z.strictObject({
     title: boundarySchemas.conceptIndex.insert.shape.title,
-    kind: boundarySchemas.conceptIndex.insert.shape.kind,
+    conceptType: boundarySchemas.conceptIndex.insert.shape.conceptType,
     description: z.string().nullable(),
     tags: z.array(z.string().trim().min(1)).readonly(),
     body: boundarySchemas.conceptIndex.insert.shape.body,
@@ -387,7 +387,7 @@ const savingNew = async (
   if (!read.value.ok) return err(read.value.error);
   if (read.value.value === undefined) return err("path-taken");
   const { path } = read.value.value;
-  const mergeKey = mergeKeyOf(foldKind(input.parts.kind), input.parts.title);
+  const mergeKey = mergeKeyOf(foldConceptType(input.parts.conceptType), input.parts.title);
   return ok({
     iri: undefined,
     mergeKey,
@@ -431,7 +431,7 @@ export const committed = (
     iri: edit.iri,
     mergeKey: edit.mergeKey,
     path: edit.path,
-    kind: edit.file.kind,
+    conceptType: edit.file.conceptType,
     title: edit.file.title,
     frontmatter: edit.file.frontmatter,
     body: edit.file.body,
@@ -458,7 +458,7 @@ const suggested = async (
       {
         mergeKey: saving.heldKey,
         path: saving.path,
-        conceptKind: saving.file.kind,
+        conceptType: saving.file.conceptType,
         title: saving.file.title,
         frontmatter: saving.file.frontmatter,
         body: saving.file.body,

@@ -133,7 +133,7 @@ function Header(properties: {
       )}
       <div className="mt-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-border pb-5">
         <KindLine
-          kind={concept.kind}
+          conceptType={concept.conceptType}
           collection={collection ?? WORDS.noCollection}
           className="min-h-8 items-center [font-size:var(--text-sm)] [&_dd]:text-foreground"
         />

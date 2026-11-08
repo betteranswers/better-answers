@@ -193,7 +193,7 @@ const landed = async (db: MigratedPostgres, workspaceId: string, set: ReuseSet) 
     for (const { key, title, body } of answers) {
       const iri = await conceptSeeded(db, workspaceId, {
         collection: group,
-        kind: "Answer",
+        conceptType: "Answer",
         title,
         body: `${body}\n`,
       });

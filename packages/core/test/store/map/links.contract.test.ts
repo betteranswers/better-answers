@@ -67,7 +67,7 @@ const mapMadeBy = async (each: z.output<typeof linksCase>) => {
       writeConceptDelta(principal, tx, {
         workspaceId: reader.workspaceId,
         iri: fixture.citing.iri,
-        kind: fixture.citing.kind,
+        conceptType: fixture.citing.kind,
         path: fixture.citing.path,
         body: each.body,
         sources: citedSourcesOf(each.sources),

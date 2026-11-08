@@ -8,7 +8,7 @@ import { openModelClient, type ModelAttemptLine, type ModelClient } from "../../
 export const A_CANDIDATE: ReturnedConcept = {
   iri: conceptIriOf(WELL_FORMED_ULID.parse("01J6AAAAAAAAAAAAAAAAAAAAAA")),
   url: "/knowledge/search/01J6AAAAAAAAAAAAAAAAAAAAAA",
-  kind: "Answer",
+  conceptType: "Answer",
   title: "How long are audit logs kept?",
   collection: "audits",
   body: "Audit logs are kept for thirteen months.\n",

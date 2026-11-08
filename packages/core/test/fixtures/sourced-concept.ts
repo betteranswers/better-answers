@@ -280,7 +280,7 @@ export const conceptCiting = async (
   const written = await writeConcept(writer, doorsOf(scenario), {
     mergeKey,
     path,
-    kind: "Note",
+    conceptType: "Note",
     title,
     body: `Note ${sequence} rests on what it cites.`,
     message: `Record sourced note ${sequence}`,
@@ -305,7 +305,7 @@ export const rewriteCiting = async (
     iri: written.iri,
     mergeKey: written.mergeKey,
     path: written.path,
-    kind: "Note",
+    conceptType: "Note",
     title: written.title,
     body: "The note says something else now.",
     message: "Re-write the note",

@@ -242,7 +242,7 @@ export const conceptIndex = withRLS(
 
     path: text("path").notNull(),
 
-    kind: text("kind").notNull(),
+    conceptType: text("kind").notNull(),
     title: text("title").notNull(),
     frontmatter: jsonb("frontmatter").notNull(),
     body: text("body").notNull(),

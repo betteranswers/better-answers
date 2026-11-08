@@ -22,7 +22,7 @@ it("keeps an Analyses concept's stored kind through a body update", async () => 
   const landed = await writeConcept(scenario.admin, doorsOf(scenario), {
     mergeKey: "analysis:quarterly-margins",
     path: "knowledge/analysis/quarterly-margins.md",
-    kind: "Analyses",
+    conceptType: "Analyses",
     title,
     frontmatter: { title, type: "Analyses" },
     body: "Margins held steady this quarter.",

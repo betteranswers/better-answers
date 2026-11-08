@@ -28,7 +28,7 @@ import { latestVerificationOf } from "./latest-verification.ts";
 
 const KIND_PAGE_SIZE = 50;
 
-type KindCount = { readonly kind: string; readonly count: number };
+type KindCount = { readonly conceptType: string; readonly count: number };
 
 type CollectionCount = {
   readonly collection: string | null;
@@ -72,8 +72,8 @@ const treeOf = (rows: readonly KindRow[]): KnowledgeTree => {
         collection,
         count: held.reduce((sum, row) => sum + row.count, 0),
         kinds: held
-          .map(({ kind, count }) => ({ kind, count }))
-          .toSorted((one, other) => byCodeUnit(one.kind, other.kind)),
+          .map(({ kind: conceptType, count }) => ({ conceptType, count }))
+          .toSorted((one, other) => byCodeUnit(one.conceptType, other.conceptType)),
       }))
       .toSorted(collectionOrder),
   };
@@ -104,7 +104,7 @@ type KindCursor = z.output<typeof kindCursor>;
 /** Not strict: tRPC's infinite query sends its `direction` beside the cursor. */
 export const kindConceptsInput = z.object({
   collection: z.string().regex(COLLECTION).nullable(),
-  kind: conceptColumns.kind,
+  conceptType: conceptColumns.conceptType,
   cursor: kindCursor.nullish(),
 });
 
@@ -113,7 +113,7 @@ export type KindConceptsInput = z.output<typeof kindConceptsInput>;
 type KindConcept = {
   readonly iri: ConceptIri;
   readonly title: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly trust: Pick<Trust, "tier" | "status">;
   readonly trustWords: string;
 };
@@ -166,7 +166,7 @@ const kindConceptOf = (row: KindConceptRow, judgedAt: Date): KindConcept => {
   return {
     iri: ids.conceptIri.parse(row.iri),
     title: row.title,
-    kind: row.kind,
+    conceptType: row.kind,
     trust: { tier: trust.tier, status: trust.status },
     trustWords: trustWords(trust),
   };
@@ -193,13 +193,13 @@ export const readKindConcepts = async (
   const admitted = admit(readKindConceptsAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const reader = admitted.value;
-  const { collection, kind, cursor } = input;
+  const { collection, conceptType, cursor } = input;
   return attempt(async () => {
     const { rows } = await tx.query<KindConceptRow>(KIND_CONCEPTS, [
       reader.workspaceId,
       ...readableParameters(reader),
       collection,
-      kind,
+      conceptType,
       cursor?.title ?? null,
       cursor?.iri ?? null,
       KIND_PAGE_SIZE + 1,

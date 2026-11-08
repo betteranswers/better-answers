@@ -148,7 +148,7 @@ describe("the manifest, which is the bundle's first commit", () => {
     const first = await writeConcept(scenario.admin, doorsOf(scenario), {
       mergeKey: "policy:expenses",
       path: "knowledge/expenses.md",
-      kind: "Policy",
+      conceptType: "Policy",
       title: "Expenses",
       frontmatter: { title: "Expenses", type: "Policy" },
       body: "Expenses are claimed within thirty days.",

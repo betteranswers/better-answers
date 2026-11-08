@@ -34,7 +34,7 @@ const arrangedWithInvoices = async (): Promise<{
       await seed.conceptIndex({
         workspaceId,
         title: `Invoice ${String(invoice)}`,
-        kind: "Invoice",
+        conceptType: "Invoice",
         body: `Invoice ${String(invoice)} was paid in full.`,
       });
     }

@@ -18,25 +18,25 @@ type Placed = {
 
 type CollectionRow = Placed & { readonly level: 1; readonly expanded: boolean };
 
-type KindRow = Placed & { readonly level: 2; readonly kind: string };
+type KindRow = Placed & { readonly level: 2; readonly conceptType: string };
 
 type TreeRow = CollectionRow | KindRow;
 
 type Collected = { readonly row: CollectionRow; readonly kinds: readonly KindRow[] };
 
-const idOf = (collection: string | null, kind?: string): string =>
-  JSON.stringify(kind === undefined ? [collection] : [collection, kind]);
+const idOf = (collection: string | null, conceptType?: string): string =>
+  JSON.stringify(conceptType === undefined ? [collection] : [collection, conceptType]);
 
 const kindRowsOf = (held: CollectionCounted): readonly KindRow[] =>
   held.kinds.map((counted, place) => ({
-    id: idOf(held.collection, counted.kind),
+    id: idOf(held.collection, counted.conceptType),
     level: 2,
-    name: counted.kind,
+    name: counted.conceptType,
     count: counted.count,
     collection: held.collection,
     setsize: held.kinds.length,
     posinset: place + 1,
-    kind: counted.kind,
+    conceptType: counted.conceptType,
   }));
 
 const outlineOf = (
@@ -194,7 +194,7 @@ function TreeItem(properties: {
 }
 
 const openIdOf = (open: OpenKind): string | undefined =>
-  open === undefined ? undefined : idOf(open.collection, open.kind);
+  open === undefined ? undefined : idOf(open.collection, open.conceptType);
 
 export const initiallyExpanded = (open: OpenKind): ReadonlySet<string | null> =>
   new Set(open === undefined ? [] : [open.collection]);
@@ -202,7 +202,7 @@ export const initiallyExpanded = (open: OpenKind): ReadonlySet<string | null> =>
 export function KnowledgeTree(properties: {
   readonly collections: readonly CollectionCounted[];
   readonly open: OpenKind;
-  readonly onOpen: (collection: string | null, kind: string) => void;
+  readonly onOpen: (collection: string | null, conceptType: string) => void;
   readonly expanded: ReadonlySet<string | null>;
   readonly onToggle: (collection: string | null) => void;
   readonly tabStopRef?: Ref<HTMLDivElement>;
@@ -223,7 +223,7 @@ export function KnowledgeTree(properties: {
     setFocused(row.id);
     document.getElementById(domIdOf(row))?.focus();
     if (step.does === "toggle") properties.onToggle(step.row.collection);
-    if (step.does === "open") onOpen(step.row.collection, step.row.kind);
+    if (step.does === "open") onOpen(step.row.collection, step.row.conceptType);
   };
 
   const drawn = (row: TreeRow, group?: ReactNode) => {
@@ -261,7 +261,7 @@ export function KnowledgeTree(properties: {
           row.expanded ? (
             // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a tree's group lists a collection's kinds, and no tag this rule offers is a list
             <ul role="group" id={`${domIdOf(row)}-group`}>
-              {kinds.map((kind) => drawn(kind))}
+              {kinds.map((conceptType) => drawn(conceptType))}
             </ul>
           ) : undefined,
         ),
