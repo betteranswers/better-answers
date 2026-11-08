@@ -209,7 +209,7 @@ function SourceLine(properties: {
 
 function Counted(properties: { readonly children: number }) {
   return (
-    <span className="ml-2 [font-size:var(--text-base)] font-normal text-muted-foreground">
+    <span className="ml-1 [font-size:var(--text-base)] font-normal text-muted-foreground">
       {properties.children}
     </span>
   );
@@ -225,12 +225,14 @@ function Sources(properties: {
   return (
     <section aria-labelledby={headingId} className="mt-8">
       <h2 ref={heading} id={headingId} tabIndex={-1} className={SECTION_HEADING}>
-        {WORDS.sources}
-        <Counted>{concept.evidence.length}</Counted>
+        {WORDS.sources} <Counted>{concept.evidence.length}</Counted>
       </h2>
       {concept.access === "included" ? null : (
         <p className="mt-1 text-muted-foreground">{concept.lead}</p>
       )}
+      {concept.access === "partly-included" || concept.access === "not-included" ? (
+        <p className="mt-1 text-muted-foreground">{concept.next}</p>
+      ) : null}
       <ol className="mt-3 border-t border-border">
         {keyed(concept.evidence, ({ source }) => source).map(({ key, item }, source) => (
           <SourceLine key={key} item={item} source={source} opening={opening} />
@@ -247,8 +249,7 @@ function Links(properties: { readonly concept: Concept; readonly heading: Headin
   return (
     <section aria-labelledby={headingId} className="mt-8">
       <h2 ref={heading} id={headingId} tabIndex={-1} className={SECTION_HEADING}>
-        {WORDS.links}
-        <Counted>{relations.length}</Counted>
+        {WORDS.links} <Counted>{relations.length}</Counted>
       </h2>
       <ul className="mt-3 border-t border-border">
         {relations.map((relation) => {

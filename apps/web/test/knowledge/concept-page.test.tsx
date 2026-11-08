@@ -79,7 +79,7 @@ describe("the sources of the concept page", () => {
     const article = await opened({ evidence: SOURCES });
 
     const sources = article.getByRole("region", { name: /Sources/u });
-    expect(within(sources).getByRole("heading").textContent).toBe("Sources2");
+    expect(within(sources).getByRole("heading", { name: "Sources 2" })).toBeDefined();
     expect(
       within(sources)
         .getAllByRole("listitem")
@@ -97,9 +97,11 @@ describe("the sources of the concept page", () => {
       evidence: SOURCES,
       access: "partly-included",
       lead: "Some sources are not included.",
+      next: "Ask an Admin for access to the sources.",
     });
 
     expect(article.getByText("Some sources are not included.")).toBeDefined();
+    expect(article.getByText("Ask an Admin for access to the sources.")).toBeDefined();
   });
 });
 
@@ -123,7 +125,7 @@ describe("the links of the concept page", () => {
 
     const links = article.getByRole("region", { name: /Links/u });
     expect(within(links).getByRole("link", { name: "Section 11 audit" })).toBeDefined();
-    expect(within(links).getByRole("heading").textContent).toBe("Links1");
+    expect(within(links).getByRole("heading", { name: "Links 1" })).toBeDefined();
   });
 });
 
