@@ -3,9 +3,9 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import {
   KINDS_KEYSTROKES as KEY,
   KINDS_LIST,
+  KINDS_PAGE,
 } from "@/features/knowledge/curation/curation-state.ts";
 import { KINDS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -21,7 +21,7 @@ import { listsItsKeystrokes, signedIn } from "../knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-const KINDS = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Kinds").path;
+const KINDS = KINDS_PAGE.path;
 
 const EDITOR = "Ifan Morgan";
 
@@ -73,7 +73,7 @@ const aWorkspaceOfKinds = async (api: APIRequestContext, name: string): Promise<
   };
 };
 
-const kinds = (page: Page): Locator => page.getByRole("region", { name: "Kinds" });
+const kinds = (page: Page): Locator => page.getByRole("region", { name: KINDS_PAGE.name });
 
 const kindsDrawn = async (page: Page): Promise<Locator> => {
   await page.goto(KINDS);
@@ -85,7 +85,7 @@ const disclosureOf = (page: Page, kind: string): Locator =>
   kinds(page).getByRole("button", { name: new RegExp(`^${kind}`) });
 
 const collectionsOf = (page: Page, kind: string): Locator =>
-  kinds(page).getByRole("list", { name: `Concepts of ${kind} by collection` });
+  kinds(page).getByRole("list", { name: WORDS.collectionsOf(kind) });
 
 const rowTexts = async (page: Page): Promise<string[]> =>
   (await kinds(page).locator("tbody tr").allInnerTexts()).map((row) =>
@@ -113,10 +113,10 @@ test.describe("Kinds", () => {
     );
 
     await expect(kinds(page)).toMatchAriaSnapshot(`
-      - region "Kinds":
+      - region "${KINDS_PAGE.name}":
         - /children: equal
-        - heading "Kinds" [level=2]
-        - status: 3 kinds
+        - heading "${KINDS_PAGE.name}" [level=2]
+        - status: ${WORDS.count(3, 3)}
         - status
         - button "${WORDS.tail}"
         - table "${WORDS.caption}":
@@ -124,12 +124,12 @@ test.describe("Kinds", () => {
           - caption
           - rowgroup:
             - /children: equal
-            - row "Kind Concepts":
+            - row "${WORDS.columns.kind} ${WORDS.columns.concepts}":
               - /children: equal
-              - columnheader "Kind":
-                - button "Kind"
-              - columnheader "Concepts":
-                - button "Concepts"
+              - columnheader "${WORDS.columns.kind}":
+                - button "${WORDS.columns.kind}"
+              - columnheader "${WORDS.columns.concepts}":
+                - button "${WORDS.columns.concepts}"
           - rowgroup:
             - /children: equal
             - row "Policy by collection 3":
@@ -148,10 +148,9 @@ test.describe("Kinds", () => {
                 - button "Term by collection"
               - cell "1"
     `);
-    await expect(kinds(page).getByRole("columnheader", { name: "Kind" })).toHaveAttribute(
-      "aria-sort",
-      "ascending",
-    );
+    await expect(
+      kinds(page).getByRole("columnheader", { name: WORDS.columns.kind }),
+    ).toHaveAttribute("aria-sort", "ascending");
     await passesTheAccessibilityGate();
 
     await skipLinkReachesThePage(page);
@@ -170,7 +169,9 @@ test.describe("Kinds", () => {
 
     await test.step("sorts by the Concepts column by keyboard alone", async () => {
       await page.keyboard.press("Tab");
-      await expect(kinds(page).getByRole("button", { name: "Kind", exact: true })).toBeFocused();
+      await expect(
+        kinds(page).getByRole("button", { name: WORDS.columns.kind, exact: true }),
+      ).toBeFocused();
       await page.keyboard.press("Tab");
       const concepts = kinds(page).getByRole("button", { name: "Concepts", exact: true });
       await expect(concepts).toBeFocused();
@@ -207,7 +208,7 @@ test.describe("Kinds", () => {
       );
     });
 
-    await listsItsKeystrokes(page, "Kinds", KEY, [KEY.tail.action, KEY.open.action]);
+    await listsItsKeystrokes(page, KINDS_PAGE.name, KEY, [KEY.tail.action, KEY.open.action]);
   });
 
   test("a collection-owning Editor's counts include only concepts they can read", async ({
@@ -224,7 +225,7 @@ test.describe("Kinds", () => {
       "Procedure 2",
       "Term 1",
     ]);
-    await expect(kinds(page).getByText("3 kinds")).toBeVisible();
+    await expect(kinds(page).getByText(WORDS.count(3, 3))).toBeVisible();
     await expect(kinds(page).getByText("Minutes")).toHaveCount(0);
     await expect(kinds(page).getByText("board")).toHaveCount(0);
     await expect(page.getByText(/bundle/iu)).toHaveCount(0);
@@ -233,7 +234,7 @@ test.describe("Kinds", () => {
       await filter(page).click();
       await expect(filter(page)).toHaveAttribute("aria-pressed", "true");
       expect(await rowTexts(page)).toEqual(["Policy 2", "Procedure 2", "Term 1"]);
-      await expect(kinds(page).getByText("3 kinds")).toBeVisible();
+      await expect(kinds(page).getByText(WORDS.count(3, 3))).toBeVisible();
     });
 
     await test.step("counts each kind in each collection the Editor can read", async () => {

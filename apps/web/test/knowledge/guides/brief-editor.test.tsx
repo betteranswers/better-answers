@@ -154,7 +154,9 @@ describe("moving among a Brief's footnote chips", () => {
         onChange={onChange}
       />,
     );
-    const place = screen.getByRole("button", { name: `${RACKING_TITLE} (not placed)` });
+    const place = screen.getByRole("button", {
+      name: `${RACKING_TITLE} (${BRIEF_WORDS.notPlaced})`,
+    });
 
     caretAtEnd(textField());
     fireEvent.click(place);

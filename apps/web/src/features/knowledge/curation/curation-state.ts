@@ -2,16 +2,17 @@ import { z } from "zod";
 
 import { PAGE_NUMBER, searchText } from "@/shared/address/list-address.ts";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
+import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import type { AllKnowledgeAsked } from "../knowledge-api.ts";
 
 export const ALL_KNOWLEDGE_KEYSTROKES = {
-  open: { key: "o", action: "Open the concept in focus" },
-  tick: { key: "x", action: "Select or clear the concept in focus" },
+  open: { key: "o", action: "Open the concept" },
+  tick: { key: "x", action: "Select or clear the concept" },
   setOwner: { key: "O", action: "Set the owner of the selected concepts" },
   clearSelection: { key: "Escape", action: "Clear the selection" },
-  previousPage: { key: "[", action: "Show the previous page of concepts" },
-  nextPage: { key: "]", action: "Show the next page of concepts" },
+  previousPage: { key: "[", action: "Previous page" },
+  nextPage: { key: "]", action: "Next page" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const ALL_KNOWLEDGE_LIST = "all";
@@ -131,9 +132,11 @@ export const isNarrowed = (held: Held, scope: CollectionScope): boolean =>
   scope.kind !== "every" || held.kind !== "";
 
 export const KINDS_KEYSTROKES = {
-  tail: { key: "t", action: "Switch between every kind and kinds with two or fewer concepts" },
-  open: { key: "o", action: "Open or close the collections of the kind in focus" },
+  tail: { key: "t", action: "Show only types with 2 or fewer concepts, or all types" },
+  open: { key: "o", action: "Show or hide collections" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
+
+export const KINDS_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Concept Types");
 
 export const KINDS_LIST = "kinds";
 

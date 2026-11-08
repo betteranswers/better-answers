@@ -1,5 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { KINDS_PAGE } from "@/features/knowledge/curation/curation-state.ts";
 import { COLLECTIONS_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -131,7 +132,7 @@ test.describe("Collections and Owners", () => {
           - listitem:
             - link "All Knowledge"
           - listitem:
-            - link "Kinds"
+            - link "${KINDS_PAGE.name}"
           - listitem:
             - link "Collections and Owners"
     `);

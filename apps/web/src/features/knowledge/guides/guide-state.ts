@@ -18,12 +18,12 @@ export const GUIDE_ID = z.string().regex(ULID);
 export const guidePageOf = (guideId: string): string => detailAt(GUIDES_PAGE, guideId);
 
 export const GUIDE_KEYSTROKES = {
-  showDetail: { key: "d", action: "Show or hide the detail of the section in focus" },
-  addFact: { key: "a", action: "Add the missing fact of the section in focus" },
-  editBrief: { key: "e", action: "Edit the Brief of the section in focus" },
-  copyBrief: { key: "c", action: "Copy the Brief of the section in focus" },
-  saveBrief: { key: "Control+Enter", action: "Save the Brief you are editing" },
-  leave: { key: "Escape", action: "Move from the Brief’s text to the editor’s buttons" },
+  showDetail: { key: "d", action: "Show or hide detail" },
+  addFact: { key: "a", action: "Add a missing fact" },
+  editBrief: { key: "e", action: "Edit the Brief" },
+  copyBrief: { key: "c", action: "Copy the Brief" },
+  saveBrief: { key: "Control+Enter", action: "Save the Brief" },
+  leave: { key: "Escape", action: "Leave the text box" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const SECTION_ACTIONS = {

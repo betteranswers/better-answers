@@ -1,5 +1,5 @@
 import type { Editor } from "@tiptap/core";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useId, useState, type MouseEvent } from "react";
 
 import { Button } from "@/shared/ui/button.tsx";
 
@@ -30,11 +30,18 @@ function FootnotePlacer(properties: {
   readonly placed: ReadonlySet<string>;
 }) {
   const { editor, includes, placed } = properties;
+  const labelId = useId();
   if (includes.length === 0) {
     return <p className="text-muted-foreground">{WORDS.noIncludes}</p>;
   }
   return (
-    <fieldset aria-label={WORDS.placing} className="m-0 flex min-w-0 flex-wrap gap-1 border-0 p-0">
+    <fieldset
+      aria-labelledby={labelId}
+      className="m-0 flex min-w-0 flex-wrap items-center gap-1 border-0 p-0"
+    >
+      <span id={labelId} className="mr-1 text-muted-foreground">
+        {WORDS.placing}
+      </span>
       {includes.map((include) => (
         <Button
           key={include.label}

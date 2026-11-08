@@ -8,7 +8,7 @@ import { GUIDES_PAGE } from "./guide-state.ts";
 type NeedsReview = NonNullable<GuideSection["needsReview"]>;
 
 const factsCounted = (met: number, of: number): string =>
-  `${String(met)} of ${String(of)} expected ${of === 1 ? "fact" : "facts"} recorded`;
+  `${String(met)} of ${String(of)} ${of === 1 ? "fact" : "facts"} recorded`;
 
 export const GUIDES_WORDS = {
   loading: "The guides are still loading.",
@@ -24,21 +24,21 @@ export const GUIDE_WORDS = {
   toGuides: CONCEPT_WORDS.backTo(GUIDES_PAGE.name),
   subject: "Subject",
   total: factsCounted,
-  noFacts: "No expected facts.",
   heading: (number: string, prompt: string): string => `${number}. ${prompt}`,
   needsReview: "Needs review",
   reasons: {
     "concept-changed": "Cites a concept that changed",
     "concept-removed": "Cites a concept that was removed",
-    "expectation-unmet": "Missing an expected fact",
+    "expectation-unmet": "A fact is missing",
     "review-finding": "A review flagged this section",
   } satisfies Record<NeedsReview, string>,
   withheld: "You can’t read the text of this section.",
   noBrief: "No Brief yet.",
   footnotes: "Footnotes",
   showDetail: "Show detail",
+  hideDetail: "Hide detail",
   detailOf: (number: string): string => `Detail of section ${number}`,
-  noDetail: "No included concepts yet.",
+  noDetail: "No concepts included yet.",
   missing: (name: string, owner: string | undefined): string =>
     owner === undefined
       ? `${name} isn’t recorded yet.`
@@ -48,18 +48,18 @@ export const GUIDE_WORDS = {
   include: "Include",
   included: (number: string): string => `Included in section ${number}.`,
   selectFirst: "Select a section first.",
-  nothingToAdd: "This section is complete.",
+  nothingToAdd: "This section has no missing facts.",
   copy: "Copy",
   copying: (number: string): string => `Copying section ${number}.`,
   copied: (number: string, footnotes: number): string =>
     footnotes === 0
-      ? `Copied section ${number}.`
-      : `Copied section ${number} with ${counted(footnotes, "footnote", "footnotes")}, numbered from 1.`,
-  notRecorded: "The copy wasn’t recorded.",
+      ? `Section ${number} copied.`
+      : `Section ${number} copied with ${counted(footnotes, "footnote", "footnotes")}.`,
+  notRecorded: "It wasn’t recorded as used.",
   notAllowed: "Your browser blocked copying.",
   belowYourRole: "You can’t copy this section yet. Some of its concepts need verifying first.",
-  nothingToCopy: "You can’t copy this section.",
-  closeToCopy: "Close the editor, then copy the saved Brief.",
+  nothingToCopy: "This section has no Brief to copy.",
+  closeToCopy: "Close the editor before you copy.",
 } as const;
 
 export const BRIEF_WORDS = {
@@ -70,28 +70,28 @@ export const BRIEF_WORDS = {
   label: (number: string): string => `Brief of section ${number}`,
   editing: (number: string): string => `Editing the Brief of section ${number}`,
   formatting: "Formatting",
-  placing: "Place a footnote",
+  placing: "Add a footnote",
   footnote: "Footnote: ",
-  notPlaced: "not placed",
-  noIncludes: "No included concepts to place.",
+  notPlaced: "not cited yet",
+  noIncludes: "No concepts to cite.",
   saving: "Saving the Brief.",
-  saved: (version: number): string => `Saved version ${String(version)}.`,
+  saved: (version: number): string => `Brief saved as version ${String(version)}.`,
   unchanged: (version: number): string =>
     `No changes to save. Version ${String(version)} is the latest.`,
-  stale: "Someone saved this Brief after you opened it.",
+  stale: "Someone else saved this Brief while you were editing.",
   reload: "Reload the Brief",
-  reloaded: "Loaded the latest Brief. Your unsaved text is kept below it.",
+  reloaded: "Loaded the latest Brief. Your unsaved text is below it.",
   earlier: "Your unsaved text",
   earlierDetail: "Copy what you need into the Brief above.",
   discardEarlier: "Discard this text",
-  leaving: "You have unsaved changes to this Brief.",
-  leavingDetail: "This tab keeps your changes. Select Edit Brief to return to them.",
+  leaving: "Leave with unsaved changes?",
+  leavingDetail: "This tab keeps your changes. Edit the Brief again to get them back.",
   leave: "Leave",
   keepEditing: "Keep editing",
 } as const;
 
 export const SAID_OF_GUIDES = {
-  "not-found": "This guide isn’t available. Go back to Guides.",
+  "not-found": "This guide isn’t available.",
   "marker-without-include":
     "A footnote cites a concept this section no longer includes. Remove the footnote, then save again.",
   "stale-precondition": BRIEF_WORDS.stale,

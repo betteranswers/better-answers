@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { jumpsIn, linesOf, matching, searchGroup, type JumpGroup } from "@/app/shell/jump-to.tsx";
 import { findWhat, JUMP_TO, searchFor } from "@/app/words.ts";
+import { KINDS_PAGE } from "@/features/knowledge/curation/curation-state.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import {
   CONSOLE,
@@ -137,7 +138,7 @@ describe("what jump-to lists", () => {
           "Guides",
           "Knowledge Base",
           "All Knowledge",
-          "Kinds",
+          KINDS_PAGE.name,
           "Collections and Owners",
           "Exports",
           "Waiting on You",

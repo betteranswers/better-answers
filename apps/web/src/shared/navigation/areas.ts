@@ -162,7 +162,7 @@ export const KNOWLEDGE = {
           owners: "of-a-collection",
         },
         {
-          name: "Kinds",
+          name: "Concept Types",
           path: "/knowledge/kinds",
           icon: "kinds",
           built: true,

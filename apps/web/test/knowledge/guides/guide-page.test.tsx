@@ -237,7 +237,7 @@ describe("the Detail of a section", () => {
       expect(document.activeElement).toBe(detail);
     });
     expect(
-      screen.getByRole("button", { name: GUIDE_WORDS.showDetail }).getAttribute("aria-expanded"),
+      screen.getByRole("button", { name: GUIDE_WORDS.hideDetail }).getAttribute("aria-expanded"),
     ).toBe("true");
   });
 
