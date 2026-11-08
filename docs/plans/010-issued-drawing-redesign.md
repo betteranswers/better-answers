@@ -27,14 +27,16 @@ Status 07/11/2026. The units ran as the table shows. Three things differ from th
 | A1 | BA-343 | Merged, #1025 (`939fd3a37`) |
 | A2 | BA-341 | Merged, #1026 (`fb3307178`) |
 | B | BA-339, BA-340 | Merged, #1027 (`26b450f84`). `packages/design-system` is gone |
-| C1 | BA-342, BA-344 | #1031 open. It stops at merge-ready for the operator's review |
-| C2 | BA-345 | Waits for C1 |
+| C1 | BA-342, BA-344 | Merged, #1031 (`c7051c88a`) |
+| C2 | BA-345 | Ready to start |
 | D1 | BA-346 | Merged, #1030 (`fd3050040`). The `ui-copy-plain` rule is on `main` and off for every folder |
-| D2 | BA-347 | Waits for C1 |
-| E | BA-348 to BA-351 | Branch `liam/ba-348-rewrite-the-ask-and-questions-copy-with-clarify` holds only the commit that turns the rule on for its feature folders. It restarts after C1 merges |
+| D2 | BA-347 | Ready to start |
+| E | BA-348 to BA-351 | Branch `liam/ba-348-rewrite-the-ask-and-questions-copy-with-clarify` holds only the commit that turns the rule on for its feature folders. It can restart now that C1 has merged |
 | F | BA-352 to BA-355 | Waits for D2 |
 
 The run paused at 01:13 on 07/11/2026, when the model's usage limit ran out. A new session took it up from the saved worktrees the same day.
+
+Changed 07/11/2026. The operator reviews the app directly, so the review-gated PRs need no screenshots or video, and each one lands on `main` once its verifier records `PASS` or `PASS+NOTES`. The verifier may be another model from the same vendor.
 
 ## How to read this
 
