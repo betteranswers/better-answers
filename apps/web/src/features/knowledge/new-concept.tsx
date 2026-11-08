@@ -43,6 +43,7 @@ function NewConceptEditor(properties: {
   return (
     <>
       {editing.actions}
+      {editing.status}
       {editing.editor}
     </>
   );

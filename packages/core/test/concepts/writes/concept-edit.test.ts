@@ -636,7 +636,7 @@ describe("what a save refuses", () => {
 
     const seed = await toEdit(scenario, scenario.admin, concept.iri);
 
-    expect(seed.usedIn).toBe(2);
+    expect(seed.usedIn).toEqual({ writeUps: 1, linkingConcepts: 1 });
   });
 
   it("refuses saving a reused concept until the editor confirms", async () => {

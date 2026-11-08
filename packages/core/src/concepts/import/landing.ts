@@ -123,21 +123,33 @@ export const holderOfPath = async (
 
 const PLACES_USING = `SELECT
     (SELECT count(DISTINCT i.write_up_id) FROM write_up_include i
-      WHERE i.workspace_id = ${scopeClause(1)} AND i.iri = $2)
-  + (SELECT count(DISTINCT e.from_uid)
+      WHERE i.workspace_id = ${scopeClause(1)} AND i.iri = $2) AS write_ups,
+    (SELECT count(DISTINCT e.from_uid)
        FROM map_generation g
        JOIN map_edge e ON e.workspace_id = g.workspace_id AND e.gen = g.live_gen
       WHERE g.workspace_id = ${scopeClause(1)} AND e.to_uid = $2 AND e.label = '${LINKS_TO_LABEL}'
-        AND e.from_uid <> $2) AS places`;
+        AND e.from_uid <> $2) AS linking_concepts`;
+
+export type PlacesUsing = { readonly writeUps: number; readonly linkingConcepts: number };
 
 export const placesUsingReadableOrNot = async (
   principal: Principal,
   tx: Tx,
   iri: string,
-): Promise<number> => {
-  const found = await tx.query<{ places: string }>(PLACES_USING, [scopeParameter(principal), iri]);
-  return Number(found.rows[0]?.places ?? 0);
+): Promise<PlacesUsing> => {
+  const found = await tx.query<{ write_ups: string; linking_concepts: string }>(PLACES_USING, [
+    scopeParameter(principal),
+    iri,
+  ]);
+  const [row] = found.rows;
+  return {
+    writeUps: Number(row?.write_ups ?? 0),
+    linkingConcepts: Number(row?.linking_concepts ?? 0),
+  };
 };
+
+export const placesCount = ({ writeUps, linkingConcepts }: PlacesUsing): number =>
+  writeUps + linkingConcepts;
 
 export const cataloguedOf = async (
   principal: Principal,

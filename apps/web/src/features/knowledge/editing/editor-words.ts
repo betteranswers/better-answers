@@ -1,6 +1,10 @@
 import type { OwnSentences } from "@/shared/refusal-words.ts";
+import { counted } from "@/shared/words.ts";
 
+import type { EditRead } from "../knowledge-api.ts";
 import { LAUNCH_WORDS } from "../knowledge-words.ts";
+
+type PlacesUsing = EditRead["usedIn"];
 
 export const EDITOR_WORDS = {
   ...LAUNCH_WORDS,
@@ -31,10 +35,14 @@ export const EDITOR_WORDS = {
   warning: "Warning",
   suggests: "Your edit goes to the concept’s owner or an Admin for review.",
   suggestsNew: "Your concept goes to the collection’s owner or an Admin for review.",
-  reuse: (places: number): string =>
-    `This concept is used in ${String(places)} guide sections and linked concepts. Save your change to all of them?`,
+  reuse: ({ writeUps, linkingConcepts }: PlacesUsing): string => {
+    const sections = counted(writeUps, "guide section", "guide sections");
+    const concepts = counted(linkingConcepts, "other concept", "other concepts");
+    if (linkingConcepts === 0) return `This concept is in ${sections}. Save your change?`;
+    if (writeUps === 0) return `This concept is linked from ${concepts}. Save your change?`;
+    return `This concept is in ${sections} and ${concepts}. Save your change?`;
+  },
   save: "Save",
-  saveToAll: "Save to all",
   sendSuggestion: "Send suggestion",
   keepEditing: "Keep editing",
   close: "Close",

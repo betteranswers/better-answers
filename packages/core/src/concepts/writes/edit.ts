@@ -16,7 +16,12 @@ import {
 } from "../../kernel/index.ts";
 import type { Tx } from "../../store/postgres/index.ts";
 import type { Frontmatter, FrontmatterSource, FrontmatterValue } from "../file.ts";
-import { heldByIri, placesUsingReadableOrNot, type Held } from "../import/landing.ts";
+import {
+  heldByIri,
+  placesUsingReadableOrNot,
+  type Held,
+  type PlacesUsing,
+} from "../import/landing.ts";
 import { ownerOf, standingConcept, type OwnedConcept } from "../owners.ts";
 import { namesADocument, resolvedSourcesOf, type PassageReader } from "../reading/read.ts";
 
@@ -40,8 +45,10 @@ export type ConceptToEdit = {
   readonly withheld: readonly WithheldSource[];
   readonly base: string | null;
   readonly standing: Standing;
-  readonly usedIn: number;
+  readonly usedIn: PlacesUsing;
 };
+
+const UNUSED: PlacesUsing = { writeUps: 0, linkingConcepts: 0 };
 
 export type EditedConcept = { readonly iri: string } | { readonly collection: string };
 
@@ -166,7 +173,7 @@ export const conceptToEdit = async (
       withheld: [],
       base: null,
       standing: standing.value,
-      usedIn: 0,
+      usedIn: UNUSED,
     });
   }
   return standingToEdit(reader, tx, data.iri, passageAt);
@@ -191,7 +198,7 @@ const standingToEdit = async (
   if (!read.ok) return err(read.error);
   if (read.value === undefined) return err("no-such-concept");
   const { held, row, standing } = read.value;
-  const usedIn = standing === "commits" ? await placesUsingReadableOrNot(reader, tx, iri) : 0;
+  const usedIn = standing === "commits" ? await placesUsingReadableOrNot(reader, tx, iri) : UNUSED;
   const opened = await openedSourcesOf(reader, tx, row.frontmatter, passageAt);
   if (!opened.ok) return err(opened.error);
   return ok({

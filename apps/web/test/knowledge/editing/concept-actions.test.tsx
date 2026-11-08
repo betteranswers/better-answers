@@ -36,6 +36,10 @@ const TO_EDIT = "knowledge.conceptToEdit";
 
 const SAVE = "knowledge.saveConcept";
 
+const USED_TWICE = { writeUps: 1, linkingConcepts: 1 };
+
+const USED_THRICE = { writeUps: 2, linkingConcepts: 1 };
+
 const LAUNCHERS: ReadonlySet<string> = new Set([EDITOR_WORDS.edit, EDITOR_WORDS.suggest]);
 
 const HEADINGS: ReadonlySet<string> = new Set([
@@ -141,26 +145,28 @@ describe("editing a concept on its own page", () => {
   });
 
   it("asks once when the concept is used twice", async () => {
-    const api = aConceptApi("commits", { usedIn: 2 });
+    const api = aConceptApi("commits", { usedIn: USED_TWICE });
     api.set(SAVE, committed);
     await editorOpened(api);
 
     retitled("Audit Log Retention");
     pressed(EDITOR_WORDS.save);
     expect(await screen.findByRole("button", { name: EDITOR_WORDS.keepEditing })).toBeDefined();
-    expect(warnings().some((warning) => /\b2\b/u.test(warning))).toBe(true);
+    expect(warnings().some((warning) => warning.includes(EDITOR_WORDS.reuse(USED_TWICE)))).toBe(
+      true,
+    );
     expect(savesAsked()).toHaveLength(0);
 
-    pressed(EDITOR_WORDS.saveToAll);
+    pressed(EDITOR_WORDS.save);
     await editorClosed(EDITOR_WORDS.headingEdit);
     expect(wordsIn("status")).toMatch(/\S/);
     expect(savesAsked().map((asked) => asked.reuse)).toEqual(["confirmed"]);
   });
 
   it("asks again when a place was added meanwhile", async () => {
-    const api = aConceptApi("commits", { usedIn: 2 });
+    const api = aConceptApi("commits", { usedIn: USED_TWICE });
     api.set(SAVE, () => {
-      api.set(TO_EDIT, () => aConceptToEdit({ usedIn: 3 }));
+      api.set(TO_EDIT, () => aConceptToEdit({ usedIn: USED_THRICE }));
       api.set(SAVE, committed);
       return aRefusalAnswer("reuse-unconfirmed", "inapplicable", 422);
     });
@@ -168,15 +174,15 @@ describe("editing a concept on its own page", () => {
 
     retitled("Audit Log Retention");
     pressed(EDITOR_WORDS.save);
-    pressed(EDITOR_WORDS.saveToAll);
+    pressed(EDITOR_WORDS.save);
 
     await waitFor(() => {
       expect(
-        warnings().some((warning) => /\b3\b/u.test(warning)),
+        warnings().some((warning) => warning.includes(EDITOR_WORDS.reuse(USED_THRICE))),
         "the ask kept the old count of places",
       ).toBe(true);
     });
-    pressed(EDITOR_WORDS.saveToAll);
+    pressed(EDITOR_WORDS.save);
     await editorClosed(EDITOR_WORDS.headingEdit);
     expect(savesAsked().map((asked) => asked.reuse)).toEqual(["confirmed", "confirmed"]);
   });

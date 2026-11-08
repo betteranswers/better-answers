@@ -82,7 +82,7 @@ const BLANK: EditRead = {
   withheld: [],
   base: null,
   standing: "suggests",
-  usedIn: 0,
+  usedIn: { writeUps: 0, linkingConcepts: 0 },
 };
 
 const NO_COLLECTIONS: readonly string[] = [];

@@ -69,7 +69,8 @@ const editingFrom = (
   failure: said.failure,
 });
 
-const asksBeforeSaving = (open: Open): boolean => open.read.usedIn > 1;
+const asksBeforeSaving = ({ read }: Open): boolean =>
+  read.usedIn.writeUps + read.usedIn.linkingConcepts > 1;
 
 const savedFrom = (answer: Saved, open: Open): EditorState => {
   if (answer.outcome === "unchanged") return editingFrom(open, { unchanged: true });

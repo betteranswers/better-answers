@@ -118,6 +118,7 @@ function Header(properties: {
   readonly concept: Concept;
   readonly heading: Heading;
   readonly actions: ReactNode;
+  readonly status: ReactNode;
   readonly copying: ReturnType<typeof useCopy>;
 }) {
   const { concept, heading, actions, copying } = properties;
@@ -152,6 +153,9 @@ function Header(properties: {
           >
             {WORDS.copy}
           </Button>
+        </div>
+        <div className="-mt-2 basis-full text-right [font-size:var(--text-sm)]">
+          {properties.status}
         </div>
       </div>
       {tags.length === 0 ? null : (
@@ -380,7 +384,13 @@ function ConceptShown(properties: {
           <WayBack iri={iri} quiet />
         </p>
         <header className={cn(HEAD, INTERFACE)}>
-          <Header concept={concept} heading={heading} actions={editing.actions} copying={copying} />
+          <Header
+            concept={concept}
+            heading={heading}
+            actions={editing.actions}
+            status={editing.status}
+            copying={copying}
+          />
           {editing.editor}
         </header>
         <div className={BODY}>
