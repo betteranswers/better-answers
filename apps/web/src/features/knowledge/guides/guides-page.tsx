@@ -2,8 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { useId, useRef } from "react";
 
 import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
-import { TypeLine } from "@/shared/knowledge/kind-line.tsx";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
+import { TypeLine } from "@/shared/knowledge/type-line.tsx";
 import { ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { Card } from "@/shared/ui/card.tsx";

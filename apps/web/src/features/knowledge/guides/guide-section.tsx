@@ -3,9 +3,9 @@ import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "rea
 
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { ConceptBody, LINK } from "@/shared/knowledge/concept-body.tsx";
-import { TypeLine } from "@/shared/knowledge/kind-line.tsx";
 import type { Evidence } from "@/shared/knowledge/knowledge-reads.ts";
 import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
+import { TypeLine } from "@/shared/knowledge/type-line.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { keyedRow } from "@/shared/list/row-focus.ts";
 import { Button } from "@/shared/ui/button.tsx";

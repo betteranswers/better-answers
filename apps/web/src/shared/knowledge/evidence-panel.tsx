@@ -18,10 +18,10 @@ import { conceptPageOf } from "./concept-address.ts";
 import { ConceptBody, LINK } from "./concept-body.tsx";
 import { titleOf } from "./concept-frontmatter.ts";
 import { CONCEPT_WORDS, EVIDENCE_WORDS } from "./concept-words.ts";
-import { TypeLine } from "./kind-line.tsx";
 import { useConcept, usePassage, type Opening } from "./knowledge-reads.ts";
 import { failedReadWords } from "./refusal.tsx";
 import { TrustMark } from "./trust-mark.tsx";
+import { TypeLine } from "./type-line.tsx";
 
 type OpenedSource =
   | (Extract<Opening, { readonly kind: "passage" }> & { readonly unmapped?: true })

@@ -6,8 +6,8 @@ import {
   type Heading,
   type Opened,
 } from "@/shared/knowledge/evidence-panel.tsx";
-import { TypeLine } from "@/shared/knowledge/kind-line.tsx";
 import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
+import { TypeLine } from "@/shared/knowledge/type-line.tsx";
 import { useLandingLine } from "@/shared/landing.ts";
 import { RowLink } from "@/shared/list/grid-table.tsx";
 import { Button } from "@/shared/ui/button.tsx";
