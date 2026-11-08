@@ -43,21 +43,22 @@ export const ALL_KNOWLEDGE_WORDS = {
     consequence: (count: number): string => `Choose a new owner for ${conceptsCounted(count)}.`,
     newOwner: "New owner",
     choose: "Choose a person",
-    collectionsOwner: "The collection’s owner",
+    collectionsOwner: "Use the collection’s owner",
     pending: (name: string, count: number): string =>
       `Setting ${name} as the owner of ${conceptsCounted(count)}.`,
     done: (name: string, count: number): string => `${name} now owns ${conceptsCounted(count)}.`,
-    returning: (count: number): string => `Removing the owner set on ${conceptsCounted(count)}.`,
-    returned: (count: number): string => `Removed the owner set on ${conceptsCounted(count)}.`,
+    returning: (count: number): string => `Updating the owner of ${conceptsCounted(count)}.`,
+    returned: (count: number): string =>
+      `${conceptsCounted(count)} now ${count === 1 ? "uses" : "use"} the collection’s owner.`,
     stillGoing: "Still setting the owner.",
     tooMany: (most: number): string => `Select ${most} concepts or fewer.`,
   },
   refusedOnRead: {
-    "owner-forbids": "This page is for collection owners. You no longer own one.",
+    "owner-forbids": "You need to own a collection to view this page.",
     "role-forbids": "You don’t have permission to view this page.",
   } satisfies OwnSentences,
   refusedOnSetOwner: {
-    "owner-forbids": "This page is for collection owners. You no longer own one.",
+    "owner-forbids": "You need to own a collection to view this page.",
     "role-forbids": "You don’t have permission to set the owner of concepts.",
     "no-such-member": "That person is no longer a member. Choose someone else.",
     "no-such-concept": "A selected concept is no longer available. No owners were changed.",
@@ -81,7 +82,7 @@ export const KINDS_WORDS = {
   noCollection: CONCEPT_WORDS.noCollection,
   selectFirst: "Select a type first.",
   refusals: {
-    "owner-forbids": "This page is for collection owners. You no longer own one.",
+    "owner-forbids": "You need to own a collection to view this page.",
     "role-forbids": "You don’t have permission to view this page.",
   } satisfies OwnSentences,
 } as const;

@@ -7,8 +7,8 @@ import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import type { AllKnowledgeAsked } from "../knowledge-api.ts";
 
 export const ALL_KNOWLEDGE_KEYSTROKES = {
-  open: { key: "o", action: "Open the concept" },
-  tick: { key: "x", action: "Select or clear the concept" },
+  open: { key: "o", action: "Open the focused concept" },
+  tick: { key: "x", action: "Select or clear the focused concept" },
   setOwner: { key: "O", action: "Set the owner of the selected concepts" },
   clearSelection: { key: "Escape", action: "Clear the selection" },
   previousPage: { key: "[", action: "Show the previous page" },
@@ -133,7 +133,7 @@ export const isNarrowed = (held: Held, scope: CollectionScope): boolean =>
 
 export const KINDS_KEYSTROKES = {
   tail: { key: "t", action: "Show types with 2 or fewer concepts, or all types" },
-  open: { key: "o", action: "Show or hide the type’s collections" },
+  open: { key: "o", action: "Show or hide the focused type’s collections" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const KINDS_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Concept Types");

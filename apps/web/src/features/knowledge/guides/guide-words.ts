@@ -55,7 +55,7 @@ export const GUIDE_WORDS = {
     footnotes === 0
       ? `Section ${number} copied.`
       : `Section ${number} copied with ${counted(footnotes, "footnote", "footnotes")}.`,
-  notRecorded: "It wasn’t recorded as used.",
+  notRecorded: "Its use wasn’t recorded.",
   notAllowed: "Your browser blocked copying.",
   belowYourRole: "You can’t copy this section yet. Some of its concepts need verifying first.",
   nothingToCopy: "You can’t copy this section.",
@@ -84,7 +84,7 @@ export const BRIEF_WORDS = {
   earlierDetail: "Copy what you need into the Brief above.",
   discardEarlier: "Discard this text",
   leaving: "Leave with unsaved changes?",
-  leavingDetail: "Your unsaved text stays in this tab until you close it.",
+  leavingDetail: "You can come back to your unsaved text until you close this tab.",
   leave: "Leave",
   keepEditing: "Keep editing",
 } as const;
