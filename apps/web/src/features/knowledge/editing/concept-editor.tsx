@@ -328,7 +328,7 @@ function Actions(properties: {
         <Warning words={WORDS.reuse(shown.open.read.usedIn)} />
         <div className="mt-3 flex flex-wrap gap-3">
           <Button type="button" onClick={events.confirm}>
-            {WORDS.save}
+            {WORDS.saveToAll}
           </Button>
           <Button type="button" variant="outline" onClick={events.keepEditing}>
             {WORDS.keepEditing}

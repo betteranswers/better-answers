@@ -151,7 +151,7 @@ describe("editing a concept on its own page", () => {
     expect(warnings().some((warning) => /\b2\b/u.test(warning))).toBe(true);
     expect(savesAsked()).toHaveLength(0);
 
-    pressed(EDITOR_WORDS.save);
+    pressed(EDITOR_WORDS.saveToAll);
     await editorClosed(EDITOR_WORDS.headingEdit);
     expect(wordsIn("status")).toMatch(/\S/);
     expect(savesAsked().map((asked) => asked.reuse)).toEqual(["confirmed"]);
@@ -168,7 +168,7 @@ describe("editing a concept on its own page", () => {
 
     retitled("Audit Log Retention");
     pressed(EDITOR_WORDS.save);
-    pressed(EDITOR_WORDS.save);
+    pressed(EDITOR_WORDS.saveToAll);
 
     await waitFor(() => {
       expect(
@@ -176,7 +176,7 @@ describe("editing a concept on its own page", () => {
         "the ask kept the old count of places",
       ).toBe(true);
     });
-    pressed(EDITOR_WORDS.save);
+    pressed(EDITOR_WORDS.saveToAll);
     await editorClosed(EDITOR_WORDS.headingEdit);
     expect(savesAsked().map((asked) => asked.reuse)).toEqual(["confirmed", "confirmed"]);
   });
@@ -367,6 +367,7 @@ describe("editing a concept on its own page", () => {
     retitled("Audit Log Retention");
     pressed(EDITOR_WORDS.close);
     expect(screen.queryByRole("heading", { level: 3, name: EDITOR_WORDS.headingEdit })).toBeNull();
+    expect(wordsIn("status")).toContain(EDITOR_WORDS.kept);
 
     pressed("Edit");
     await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingEdit });

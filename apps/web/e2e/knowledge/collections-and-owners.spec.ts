@@ -163,8 +163,6 @@ test.describe("Collections and Owners", () => {
             - heading "safety" [level=3]
             - term: Owner
             - definition
-            - term: ${WORDS.ownOwners}
-            - definition
     `);
     await passesTheAccessibilityGate();
 

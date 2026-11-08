@@ -29,7 +29,7 @@ import {
   openKindAt,
   type OpenKind,
 } from "./knowledge-state.ts";
-import { KnowledgeTree } from "./knowledge-tree.tsx";
+import { initiallyExpanded, KnowledgeTree, toggled } from "./knowledge-tree.tsx";
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "./knowledge-words.ts";
 
 const LISTED = Object.values(KEY);
@@ -166,6 +166,7 @@ function ConceptRows(properties: {
 
 function Concepts(properties: {
   readonly shown: ShownKind | undefined;
+  readonly browsing: boolean;
   readonly read: KindConceptsRead;
 }) {
   const { shown } = properties;
@@ -187,7 +188,13 @@ function Concepts(properties: {
         </output>
       </div>
       {shown === undefined ? (
-        <ListState state={{ kind: "empty", words: WORDS.openAKind, action: null }} />
+        <ListState
+          state={{
+            kind: "empty",
+            words: properties.browsing ? WORDS.chooseAType : WORDS.openACollection,
+            action: null,
+          }}
+        />
       ) : (
         <ConceptRows
           key={JSON.stringify([shown.collection, shown.kind])}
@@ -208,6 +215,7 @@ function Browsed(properties: {
 }) {
   const { collections, open } = properties;
   const tabStopRef = useTabStop();
+  const [expanded, setExpanded] = useState(() => initiallyExpanded(open));
   if (collections.length === 0) {
     return <ListState state={{ kind: "empty", words: WORDS.none, action: null }} />;
   }
@@ -220,10 +228,18 @@ function Browsed(properties: {
             collections={collections}
             open={open}
             onOpen={properties.onOpen}
+            expanded={expanded}
+            onToggle={(collection) => {
+              setExpanded((held) => toggled(held, collection));
+            }}
             tabStopRef={tabStopRef}
           />
         </div>
-        <Concepts shown={shownKindOf(collections, open)} read={properties.read} />
+        <Concepts
+          shown={shownKindOf(collections, open)}
+          browsing={expanded.size > 0}
+          read={properties.read}
+        />
       </div>
     </div>
   );

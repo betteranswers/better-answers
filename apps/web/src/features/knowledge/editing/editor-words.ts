@@ -22,21 +22,23 @@ export const EDITOR_WORDS = {
   addSource: "Add a source",
   withheld: (count: number): string =>
     count === 1
-      ? "1 source you can’t open is kept."
-      : `${String(count)} sources you can’t open are kept.`,
+      ? "1 source you can’t open stays on this concept."
+      : `${String(count)} sources you can’t open stay on this concept.`,
   editAs: "Edit as",
   visual: "Visual",
   markdown: "Markdown",
-  lossy: "Edit this text in Markdown. The visual editor can’t show all of it.",
+  lossy: "Edit this text in Markdown. It has parts the visual editor can’t show.",
   warning: "Warning",
   suggests: "Your edit goes to the concept’s owner or an Admin for review.",
   suggestsNew: "Your concept goes to the collection’s owner or an Admin for review.",
   reuse: (places: number): string =>
-    `This concept is used in ${String(places)} places. Save your change to all of them?`,
+    `This concept is used in ${String(places)} guide sections and linked concepts. Save your change to all of them?`,
   save: "Save",
+  saveToAll: "Save to all",
   sendSuggestion: "Send suggestion",
   keepEditing: "Keep editing",
   close: "Close",
+  kept: "Your changes are kept for when you reopen the editor.",
   leave: "Discard changes",
   leaving: "Discard your unsaved changes?",
   cannotSave: {
