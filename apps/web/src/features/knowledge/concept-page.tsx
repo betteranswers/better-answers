@@ -5,7 +5,7 @@ import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { conceptMatchKey, conceptPageOf, wayBackOf } from "@/shared/knowledge/concept-address.ts";
 import { ConceptBody, LINK, type MarkOpening } from "@/shared/knowledge/concept-body.tsx";
-import { descriptionOf, kindOf, tagsOf, titleOf } from "@/shared/knowledge/concept-frontmatter.ts";
+import { descriptionOf, tagsOf, titleOf } from "@/shared/knowledge/concept-frontmatter.ts";
 import { CONCEPT_WORDS as WORDS } from "@/shared/knowledge/concept-words.ts";
 import {
   EvidenceInline,
@@ -132,7 +132,7 @@ function Header(properties: {
       )}
       <div className="mt-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-border pb-5">
         <KindLine
-          kind={kindOf(frontmatter)}
+          kind={concept.kind}
           collection={collection ?? WORDS.noCollection}
           className="min-h-8 items-center [font-size:var(--text-sm)] [&_dd]:text-foreground"
         />

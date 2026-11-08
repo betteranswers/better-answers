@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   descriptionOf,
   generatedOf,
-  kindOf,
   otherFieldsOf,
   READ_KEYS,
   staleAfterOf,
@@ -20,7 +19,6 @@ describe("concept frontmatter parsing", () => {
   });
 
   it("returns the kind and tags unchanged", () => {
-    expect(kindOf({ type: "Answer" })).toBe("Answer");
     expect(tagsOf({ type: "Answer", tags: ["audit", "retention"] })).toEqual([
       "audit",
       "retention",

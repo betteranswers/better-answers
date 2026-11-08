@@ -51,6 +51,7 @@ export type ConceptView<Iri extends string> = {
   readonly iri: Iri;
   readonly path: string;
   readonly collection: string | null;
+  readonly kind: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
   readonly relations: readonly {
@@ -83,12 +84,15 @@ type Opened<Iri extends string, View> =
       readonly locator?: string | undefined;
     };
 
-/** What the MCP entries keep: the web pages alone read `description`, `path` and a concept's `collection`. */
+/** What the MCP entries keep: the web pages alone read `description`, `path`, and a concept's `collection` and `kind`. */
 export type FoundForText<Iri extends string = string> = Omit<FindResult<Iri>, "matches"> & {
   readonly matches: readonly (Omit<ConceptMatch<Iri>, "description"> | DocumentMatch)[];
 };
 
-export type OpenedForText = Opened<string, Omit<ConceptView<string>, "path" | "collection">>;
+export type OpenedForText = Opened<
+  string,
+  Omit<ConceptView<string>, "path" | "collection" | "kind">
+>;
 
 type PaneWords = Pick<ConceptRead["pane"], "access" | "lead" | "next">;
 

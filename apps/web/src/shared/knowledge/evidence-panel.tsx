@@ -16,7 +16,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet.tsx";
 
 import { conceptPageOf } from "./concept-address.ts";
 import { ConceptBody, LINK } from "./concept-body.tsx";
-import { kindOf, titleOf } from "./concept-frontmatter.ts";
+import { titleOf } from "./concept-frontmatter.ts";
 import { CONCEPT_WORDS, EVIDENCE_WORDS } from "./concept-words.ts";
 import { KindLine } from "./kind-line.tsx";
 import { useConcept, usePassage, type Opening } from "./knowledge-reads.ts";
@@ -131,7 +131,7 @@ function CitedConcept(properties: {
         <>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <TrustMark trust={read.trust} words={read.trustWords} />
-            <KindLine kind={kindOf(read.frontmatter)} />
+            <KindLine kind={read.kind} />
           </div>
           {titleOf(read.frontmatter) === opened.title ? null : (
             <p className="font-medium wrap-anywhere">{titleOf(read.frontmatter)}</p>
