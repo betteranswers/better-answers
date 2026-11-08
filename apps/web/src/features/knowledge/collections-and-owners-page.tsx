@@ -46,9 +46,6 @@ const nameOf = (owner: Owner): string => (owner.name === "" ? WORDS.unnamed : ow
 const ownerWords = (owner: Owner | null): string =>
   owner === null ? WORDS.unowned : nameOf(owner);
 
-const ownOwnersWords = (count: number): string =>
-  count === 0 ? WORDS.noOwnOwners : WORDS.ownOwnersCount(count);
-
 const withTheOwner = (choices: readonly Owner[], owner: Owner | null): readonly Owner[] =>
   owner === null || choices.some((choice) => choice.id === owner.id)
     ? choices
@@ -118,7 +115,7 @@ function OwnerPicker(properties: { readonly owned: CollectionOwned; readonly nam
       }}
     >
       <Label htmlFor={pickerId}>
-        {WORDS.newOwner}
+        {WORDS.owner}
         <span className="sr-only">{WORDS.ofCollection(owned.collection)}</span>
       </Label>
       <NativeSelect
@@ -160,11 +157,15 @@ function CollectionRow(properties: {
       <h3 id={headingId} tabIndex={-1} className="font-medium text-foreground">
         {owned.collection}
       </h3>
-      <dl className="mt-2 grid items-baseline gap-x-4 gap-y-1 sm:grid-cols-[max-content_1fr]">
-        <Row term={WORDS.owner}>{ownerWords(owned.owner)}</Row>
-        <Row term={WORDS.ownOwners}>{ownOwnersWords(owned.overrides)}</Row>
-      </dl>
       {naming === undefined ? null : <OwnerPicker owned={owned} naming={naming} />}
+      {naming !== undefined && owned.overrides === 0 ? null : (
+        <dl className="mt-2 grid items-baseline gap-x-4 gap-y-1 sm:grid-cols-[max-content_1fr]">
+          {naming === undefined ? <Row term={WORDS.owner}>{ownerWords(owned.owner)}</Row> : null}
+          {owned.overrides === 0 ? null : (
+            <Row term={WORDS.ownOwners}>{WORDS.ownOwnersCount(owned.overrides)}</Row>
+          )}
+        </dl>
+      )}
     </li>
   );
 }

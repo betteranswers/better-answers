@@ -12,7 +12,6 @@ import { useLanding, useLandingLine } from "@/shared/landing.ts";
 import { GridTable } from "@/shared/list/grid-table.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
-import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
 import { Card } from "@/shared/ui/card.tsx";
 
 import {
@@ -30,7 +29,7 @@ import {
   openKindAt,
   type OpenKind,
 } from "./knowledge-state.ts";
-import { KnowledgeTree } from "./knowledge-tree.tsx";
+import { initiallyExpanded, KnowledgeTree, toggled } from "./knowledge-tree.tsx";
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "./knowledge-words.ts";
 
 const LISTED = Object.values(KEY);
@@ -103,17 +102,11 @@ const columnsOf = (landAt: number | undefined, onLanded: () => void) =>
         <ConceptLink concept={row.original} landsHere={row.index === landAt} onLanded={onLanded} />
       ),
     }),
-    column.accessor("kind", {
-      header: WORDS.columns.kind,
-      cell: ({ getValue }) => getValue(),
-    }),
     column.accessor("trustWords", {
       header: WORDS.columns.trust,
       cell: ({ row }) => <TrustMark trust={row.original.trust} words={row.original.trustWords} />,
     }),
   ]);
-
-const NARROW_HIDES: ReadonlySet<string> = new Set(["kind"]);
 
 function ConceptRows(properties: {
   readonly caption: string;
@@ -128,7 +121,6 @@ function ConceptRows(properties: {
   );
   const columns = useMemo(() => columnsOf(landAt, landed), [landAt, landed]);
   const table = useTable({ features, columns, data: listed, getRowId: (concept) => concept.iri });
-  const [hidden] = useHiddenColumns(NARROW_HIDES);
 
   if (read.isPending) {
     return <ListState state={{ kind: "loading", words: WORDS.conceptsLoading }} />;
@@ -152,7 +144,6 @@ function ConceptRows(properties: {
       <GridTable
         table={table}
         caption={properties.caption}
-        hidden={hidden}
         empty={<ListState state={{ kind: "empty", words: WORDS.noneOfTheKind, action: null }} />}
       />
       <ListPages
@@ -175,6 +166,7 @@ function ConceptRows(properties: {
 
 function Concepts(properties: {
   readonly shown: ShownKind | undefined;
+  readonly browsing: boolean;
   readonly read: KindConceptsRead;
 }) {
   const { shown } = properties;
@@ -196,7 +188,13 @@ function Concepts(properties: {
         </output>
       </div>
       {shown === undefined ? (
-        <ListState state={{ kind: "empty", words: WORDS.openAKind, action: null }} />
+        <ListState
+          state={{
+            kind: "empty",
+            words: properties.browsing ? WORDS.chooseAType : WORDS.openACollection,
+            action: null,
+          }}
+        />
       ) : (
         <ConceptRows
           key={JSON.stringify([shown.collection, shown.kind])}
@@ -217,6 +215,7 @@ function Browsed(properties: {
 }) {
   const { collections, open } = properties;
   const tabStopRef = useTabStop();
+  const [expanded, setExpanded] = useState(() => initiallyExpanded(open));
   if (collections.length === 0) {
     return <ListState state={{ kind: "empty", words: WORDS.none, action: null }} />;
   }
@@ -229,10 +228,18 @@ function Browsed(properties: {
             collections={collections}
             open={open}
             onOpen={properties.onOpen}
+            expanded={expanded}
+            onToggle={(collection) => {
+              setExpanded((held) => toggled(held, collection));
+            }}
             tabStopRef={tabStopRef}
           />
         </div>
-        <Concepts shown={shownKindOf(collections, open)} read={properties.read} />
+        <Concepts
+          shown={shownKindOf(collections, open)}
+          browsing={expanded.size > 0}
+          read={properties.read}
+        />
       </div>
     </div>
   );

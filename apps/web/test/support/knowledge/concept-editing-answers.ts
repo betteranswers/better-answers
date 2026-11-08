@@ -31,7 +31,7 @@ const TO_EDIT = {
   withheld: [],
   base: "first-base",
   standing: "commits",
-  usedIn: 1,
+  usedIn: { writeUps: 1, linkingConcepts: 0 },
 };
 
 export const aConceptToEdit = (changes: Readonly<Record<string, unknown>> = {}) =>
@@ -85,7 +85,7 @@ export const BLANK_TO_EDIT = {
   parts: { ...PARTS, title: "", kind: "", tags: [], body: "" },
   sources: [],
   base: null,
-  usedIn: 0,
+  usedIn: { writeUps: 0, linkingConcepts: 0 },
 };
 
 export const aNewConceptApi = (standing: Standing = "commits"): Api => {

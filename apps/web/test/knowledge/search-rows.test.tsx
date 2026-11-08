@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
 import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { KNOWLEDGE_BASE_PAGE } from "@/shared/knowledge/concept-address.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import {
   aConceptMatch,
   aSearchApi,
@@ -77,7 +78,7 @@ describe("a concept's row on the Knowledge Search page", () => {
 
     expect(text).toContain(CHECKED_BY_PRIYA);
     expect(text.match(/3 March 2026/g)).toHaveLength(1);
-    expect(text).toContain("KindSector");
+    expect(text).toContain(`${CONCEPT_WORDS.kind}Sector`);
     expect(text).toContain("CollectionSectors");
   });
 
@@ -128,7 +129,7 @@ describe("a Knowledge Search that finds nothing", () => {
 
     await foundNothing(api, "zebra");
 
-    expect(searchStatusText()).toBe("Nothing matches “zebra”.");
+    expect(searchStatusText()).toBe(SEARCH_WORDS.noMatches("zebra"));
     expect(linkIn("Ask this question").getAttribute("href")).toBe(
       "/ask/new-question?question=zebra",
     );
@@ -150,7 +151,8 @@ describe("a Knowledge Search that finds nothing", () => {
   it("names the next action while nothing is typed", async () => {
     await openedSearch(aSearchApi());
 
-    expect(searchStatusText()).toBe(SEARCH_WORDS.nothingAsked);
+    expect(screen.getByRole("searchbox", { name: SEARCH_WORDS.search })).toBeTruthy();
+    expect(searchStatusText()).toBe("");
     expect(screen.queryByRole("list", { name: "Where to look next" })).toBeNull();
   });
 });

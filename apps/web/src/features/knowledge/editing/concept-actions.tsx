@@ -9,7 +9,11 @@ import type { SessionOptions } from "./concept-session.tsx";
 
 type Options = SessionOptions & { readonly startsOpen?: boolean };
 
-export type ConceptEditing = { readonly actions: ReactNode; readonly editor: ReactNode };
+export type ConceptEditing = {
+  readonly actions: ReactNode;
+  readonly status: ReactNode;
+  readonly editor: ReactNode;
+};
 
 const LazySession = lazy(() =>
   // oxlint-disable-next-line better-answers/import-statically -- Tiptap and CodeMirror stay out of the concept page's first chunk
@@ -34,23 +38,20 @@ export function useConceptEditing(options: Options): ConceptEditing {
   });
 
   return {
-    actions: (
-      <div className="flex min-w-0 flex-col items-start gap-1">
-        {session.standing === undefined ? null : (
-          <Button
-            ref={buttonRef}
-            type="button"
-            variant="outline"
-            aria-keyshortcuts={EDITOR_KEYSTROKES.edit.key}
-            aria-expanded={expanded}
-            onClick={press}
-          >
-            {session.standing === "commits" ? WORDS.edit : WORDS.suggest}
-          </Button>
-        )}
-        <div ref={setSlot} />
-      </div>
-    ),
+    actions:
+      session.standing === undefined ? null : (
+        <Button
+          ref={buttonRef}
+          type="button"
+          variant="outline"
+          aria-keyshortcuts={EDITOR_KEYSTROKES.edit.key}
+          aria-expanded={expanded}
+          onClick={press}
+        >
+          {session.standing === "commits" ? WORDS.edit : WORDS.suggest}
+        </Button>
+      ),
+    status: <div ref={setSlot} />,
     editor: launched ? (
       <Suspense fallback={<p className="mt-6 text-muted-foreground">{WORDS.loading}</p>}>
         <LazySession

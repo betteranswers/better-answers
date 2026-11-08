@@ -2,9 +2,9 @@ import { searchText } from "@/shared/address/list-address.ts";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 
 export const SEARCH_KEYSTROKES = {
-  search: { key: "/", action: "Search this workspace’s knowledge" },
-  open: { key: "o", action: "Open the match in focus" },
-  close: { key: "Escape", action: "Close the open passage" },
+  search: { key: "/", action: "Search" },
+  open: { key: "o", action: "Open the selected match" },
+  close: { key: "Escape", action: "Close the passage" },
   more: { key: "m", action: "Show more matches" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
@@ -15,25 +15,25 @@ export const wayBackKeystroke = (page: string): Keystroke => ({
 
 export const CONCEPT_KEYSTROKES = {
   back: wayBackKeystroke("Search"),
-  sources: { key: "s", action: "Go to the concept’s sources" },
-  links: { key: "l", action: "Go to the concept’s links" },
-  copy: { key: "c", action: "Copy the concept’s text" },
+  sources: { key: "s", action: "Go to sources" },
+  links: { key: "l", action: "Go to links" },
+  copy: { key: "c", action: "Copy the text" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const EDITOR_KEYSTROKES = {
-  edit: { key: "e", action: "Edit the concept or suggest an edit" },
-  mode: { key: "m", action: "Switch between visual and markdown editing" },
-  save: { key: "Control+Enter", action: "Save the concept you are editing" },
-  leave: { key: "Escape", action: "Move from the text field to the editor’s buttons" },
+  edit: { key: "e", action: "Edit or suggest an edit" },
+  mode: { key: "m", action: "Switch between visual and Markdown" },
+  save: { key: "Control+Enter", action: "Save" },
+  leave: { key: "Escape", action: "Leave the text field" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const COLLECTIONS_KEYSTROKES = {
-  changeOwner: { key: "c", action: "Change the owner of the collection in focus" },
+  changeOwner: { key: "c", action: "Change the selected collection’s owner" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const KNOWLEDGE_BASE_KEYSTROKES = {
-  tree: { key: "t", action: "Go to the collections and kinds" },
-  concepts: { key: "c", action: "Go to the open kind’s concepts" },
+  tree: { key: "t", action: "Go to collections and types" },
+  concepts: { key: "c", action: "Go to the concept list" },
   more: { key: "m", action: "Show more concepts" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 

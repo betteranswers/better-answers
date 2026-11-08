@@ -68,11 +68,13 @@ const headingOf = (open: Open, target: EditTarget): string => {
   return open.read.standing === "commits" ? WORDS.headingEdit : WORDS.headingSuggest;
 };
 
-const consequenceOf = (open: Open, target: EditTarget): string | undefined => {
-  const commits = open.read.standing === "commits";
-  if (target.kind === "concept") return commits ? WORDS.commits : WORDS.suggests;
-  if (target.collection === undefined) return undefined;
-  return commits ? WORDS.commitsNew(target.collection) : WORDS.suggestsNew;
+const suggesting = (open: Open, target: EditTarget): boolean =>
+  open.read.standing !== "commits" &&
+  (target.kind === "concept" || target.collection !== undefined);
+
+const reviewOf = (open: Open, target: EditTarget): string | undefined => {
+  if (!suggesting(open, target)) return undefined;
+  return target.kind === "concept" ? WORDS.suggests : WORDS.suggestsNew;
 };
 
 const IN_A_TEXT_FIELD = 'input, textarea, [contenteditable="true"], [role="textbox"]';
@@ -343,7 +345,7 @@ function Actions(properties: {
         aria-describedby={cannot === undefined ? undefined : reasonId}
         onClick={events.save}
       >
-        {WORDS.save}
+        {suggesting(shown.open, target) ? WORDS.sendSuggestion : WORDS.save}
       </Button>
       {closing}
       {cannot === undefined ? null : (
@@ -360,7 +362,7 @@ export function ConceptEditor(properties: EditorProps) {
   const { open } = shown;
   const headingId = useId();
   const locked = shown.stage !== "editing";
-  const consequence = shown.stage === "stale" ? undefined : consequenceOf(open, target);
+  const review = shown.stage === "stale" ? undefined : reviewOf(open, target);
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -428,7 +430,7 @@ export function ConceptEditor(properties: EditorProps) {
           events.edit({ sources });
         }}
       />
-      {consequence === undefined ? null : <Warning words={consequence} />}
+      {review === undefined ? null : <p className="mt-4 text-muted-foreground">{review}</p>}
       <Actions shown={shown} target={target} events={events} />
       {properties.leaving === undefined ? null : (
         <LeavingAsk

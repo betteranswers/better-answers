@@ -129,6 +129,7 @@ export const anOpenedConcept = (
   iri: aConceptIri(iri),
   path: "knowledge/concept.md",
   collection: null,
+  kind: "Answer",
   frontmatter,
   body,
   relations: [],
@@ -173,7 +174,7 @@ export const anIssuedConcept = (over: Partial<Concept> = {}): Concept =>
     "https://better-answers.com/c/01JRETENTN000000000000000A",
     {
       title: "Safeguarding Children Partnerships",
-      type: "Sector",
+      type: "sector",
       description: "How local partnerships keep children safe, and who buys training and audits.",
       generated: [{ by: "okf-extract/0.4", at: "2026-02-10" }],
       stale_after: "2026-09-03",
@@ -182,6 +183,7 @@ export const anIssuedConcept = (over: Partial<Concept> = {}): Concept =>
     {
       path: "knowledge/sectors/safeguarding-children-partnerships.md",
       collection: "Sectors",
+      kind: "Sector",
       trust: VERIFIED_BY_PRIYA,
       trustWords: "Verified by Priya Shah · 3 March 2026",
       verifications: [PRIYA, THE_EXTRACTOR],

@@ -119,7 +119,7 @@ const keyedBy = (event: KeyboardEvent): Keyed | undefined => {
   return KEYED.get(event.key) ?? (TYPED_AHEAD.test(event.key) ? typedAhead(event.key) : undefined);
 };
 
-const toggled = (
+export const toggled = (
   expanded: ReadonlySet<string | null>,
   collection: string | null,
 ): ReadonlySet<string | null> => {
@@ -196,18 +196,19 @@ function TreeItem(properties: {
 const openIdOf = (open: OpenKind): string | undefined =>
   open === undefined ? undefined : idOf(open.collection, open.kind);
 
-const initiallyExpanded = (open: OpenKind): ReadonlySet<string | null> =>
+export const initiallyExpanded = (open: OpenKind): ReadonlySet<string | null> =>
   new Set(open === undefined ? [] : [open.collection]);
 
 export function KnowledgeTree(properties: {
   readonly collections: readonly CollectionCounted[];
   readonly open: OpenKind;
   readonly onOpen: (collection: string | null, kind: string) => void;
+  readonly expanded: ReadonlySet<string | null>;
+  readonly onToggle: (collection: string | null) => void;
   readonly tabStopRef?: Ref<HTMLDivElement>;
 }) {
-  const { open, onOpen } = properties;
+  const { open, onOpen, expanded } = properties;
   const treeId = useId();
-  const [expanded, setExpanded] = useState(() => initiallyExpanded(open));
   const [focused, setFocused] = useState(() => openIdOf(open));
   const outline = outlineOf(properties.collections, expanded);
   const rows = outline.flatMap(({ row, kinds }) => [row, ...kinds]);
@@ -221,7 +222,7 @@ export function KnowledgeTree(properties: {
     if (step === undefined || row === undefined) return;
     setFocused(row.id);
     document.getElementById(domIdOf(row))?.focus();
-    if (step.does === "toggle") setExpanded((held) => toggled(held, step.row.collection));
+    if (step.does === "toggle") properties.onToggle(step.row.collection);
     if (step.does === "open") onOpen(step.row.collection, step.row.kind);
   };
 

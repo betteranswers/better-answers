@@ -82,7 +82,7 @@ const BLANK: EditRead = {
   withheld: [],
   base: null,
   standing: "suggests",
-  usedIn: 0,
+  usedIn: { writeUps: 0, linkingConcepts: 0 },
 };
 
 const NO_COLLECTIONS: readonly string[] = [];
@@ -372,7 +372,7 @@ const editingOutcome = (state: StateAt<"editing">): Outcome | undefined => {
 };
 
 const OUTCOMES: Outcomes = {
-  closed: () => undefined,
+  closed: (state) => (state.kept ? said(WORDS.kept) : undefined),
   loading: () => undefined,
   unreadable: (state) => failed(state.failure, "read"),
   editing: editingOutcome,
@@ -479,7 +479,7 @@ export function ConceptSession(properties: SessionProps) {
     close: () => {
       if (state.stage === "saving") return;
       opening.forgetProblem();
-      dispatch({ type: "close" });
+      dispatch({ type: "close", kept: hasUnsaved(state, opening.baseline) });
       finish(undefined);
     },
     collection: (collection) => {

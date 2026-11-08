@@ -29,9 +29,6 @@ const wordsAt = (frontmatter: Frontmatter, key: ReadKey): string | undefined =>
 export const titleOf = (frontmatter: Frontmatter): string =>
   wordsAt(frontmatter, "title") ?? WORDS.untitled;
 
-export const kindOf = (frontmatter: Frontmatter): string | undefined =>
-  wordsAt(frontmatter, "type");
-
 export const descriptionOf = (frontmatter: Frontmatter): string | undefined =>
   wordsAt(frontmatter, "description");
 

@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { detailAt } from "@/shared/navigation.ts";
 import { clipboardAnswering } from "@test/clipboard-stand-in.ts";
 import { aConceptIri, anIssuedConcept } from "@test/knowledge/search-answers.ts";
@@ -63,7 +64,7 @@ describe("the concept page", () => {
   it("names the kind and collection, or no collection", async () => {
     const article = await opened({ collection: null });
 
-    expect(article.getByText("Kind").nextElementSibling?.textContent).toBe("Sector");
+    expect(article.getByText(CONCEPT_WORDS.kind).nextElementSibling?.textContent).toBe("Sector");
     expect(article.getByText("Collection").nextElementSibling?.textContent).toBe("No collection");
   });
 });

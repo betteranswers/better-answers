@@ -27,7 +27,7 @@ export type Open = {
 export type Failure = Error | ApiError;
 
 export type EditorState =
-  | { readonly stage: "closed" }
+  | { readonly stage: "closed"; readonly kept: boolean }
   | { readonly stage: "loading" }
   | { readonly stage: "unreadable"; readonly failure: Failure }
   | {
@@ -55,9 +55,9 @@ export type EditorEvent =
   | { readonly type: "stale" }
   | { readonly type: "reread"; readonly read: EditRead }
   | { readonly type: "relocated"; readonly read: EditRead }
-  | { readonly type: "close" };
+  | { readonly type: "close"; readonly kept: boolean };
 
-export const CLOSED: EditorState = { stage: "closed" };
+export const CLOSED: EditorState = { stage: "closed", kept: false };
 
 const editingFrom = (
   open: Open,
@@ -69,7 +69,8 @@ const editingFrom = (
   failure: said.failure,
 });
 
-const asksBeforeSaving = (open: Open): boolean => open.read.usedIn > 1;
+const asksBeforeSaving = ({ read }: Open): boolean =>
+  read.usedIn.writeUps + read.usedIn.linkingConcepts > 1;
 
 const savedFrom = (answer: Saved, open: Open): EditorState => {
   if (answer.outcome === "unchanged") return editingFrom(open, { unchanged: true });
@@ -118,7 +119,7 @@ const HANDLERS: Handlers = {
       : state,
   relocated: (state, event) =>
     whileEditing(state, (open) => editingFrom({ ...open, read: event.read })),
-  close: () => CLOSED,
+  close: (_state, event) => ({ stage: "closed", kept: event.kept }),
 };
 
 const reduced = <Type extends EditorEvent["type"]>(

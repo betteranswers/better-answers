@@ -1478,7 +1478,7 @@ describe("opening a concept by IRI", () => {
       iri: written.iri,
       path: input.path,
       collection: "policy",
-
+      kind: "Policy",
       frontmatter: {
         title: "Expenses",
         type: "Policy",

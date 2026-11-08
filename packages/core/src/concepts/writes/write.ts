@@ -47,6 +47,7 @@ import {
   indexRowOf,
   type IndexRow,
   landRows,
+  placesCount,
   placesUsingReadableOrNot,
   WRITE_CONSTRAINTS,
   type Citing,
@@ -332,7 +333,9 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
         waiting:
           input.acceptance === undefined ||
           (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
-        places: asksReuse(write, held) ? await placesUsingReadableOrNot(fresh, tx, iri) : 0,
+        places: asksReuse(write, held)
+          ? placesCount(await placesUsingReadableOrNot(fresh, tx, iri))
+          : 0,
       };
     }),
   );

@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { OpenKind } from "@/features/knowledge/knowledge-state.ts";
-import { KnowledgeTree } from "@/features/knowledge/knowledge-tree.tsx";
+import { initiallyExpanded, KnowledgeTree, toggled } from "@/features/knowledge/knowledge-tree.tsx";
 
 afterEach(cleanup);
 
@@ -20,9 +21,26 @@ const COLLECTIONS = [
   { collection: null, count: 1, kinds: [{ kind: "policy", count: 1 }] },
 ];
 
+type Opened = (collection: string | null, kind: string) => void;
+
+function Tree(properties: { readonly open: OpenKind; readonly onOpen: Opened }) {
+  const [expanded, setExpanded] = useState(() => initiallyExpanded(properties.open));
+  return (
+    <KnowledgeTree
+      collections={COLLECTIONS}
+      open={properties.open}
+      onOpen={properties.onOpen}
+      expanded={expanded}
+      onToggle={(collection) => {
+        setExpanded((held) => toggled(held, collection));
+      }}
+    />
+  );
+}
+
 const drawn = (open?: OpenKind) => {
-  const onOpen = vi.fn<(collection: string | null, kind: string) => void>();
-  render(<KnowledgeTree collections={COLLECTIONS} open={open} onOpen={onOpen} />);
+  const onOpen = vi.fn<Opened>();
+  render(<Tree open={open} onOpen={onOpen} />);
   return onOpen;
 };
 

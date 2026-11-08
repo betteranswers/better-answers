@@ -617,6 +617,21 @@ describe("what a concept read cannot open", () => {
   });
 });
 
+describe("a concept's kind", () => {
+  it("is the folded kind its row holds", async () => {
+    const scenario = await arrange();
+    const written = await conceptCiting(scenario, scenario.editor, [], {
+      kind: "sector",
+      frontmatter: { type: "sector" },
+    });
+
+    const read = await readFor(scenario.admin, written.iri);
+
+    expect(read?.frontmatter["type"]).toBe("sector");
+    expect(read?.kind).toBe("Sector");
+  });
+});
+
 describe("a concept's projected frontmatter", () => {
   it("keeps a locator only where the reader may open it", async () => {
     const scenario = await arrange();
@@ -772,6 +787,7 @@ describe("a concept's relations", () => {
         "collection",
         "frontmatter",
         "iri",
+        "kind",
         "owner",
         "pane",
         "path",

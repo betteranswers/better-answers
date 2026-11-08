@@ -170,6 +170,7 @@ export type ConceptRead = {
   readonly iri: ConceptIri;
   readonly path: string;
   readonly collection: string | null;
+  readonly kind: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
   readonly trust: Trust;
@@ -224,6 +225,7 @@ export const readConcept = async (
     iri: concept.iri,
     path: concept.path,
     collection: concept.collection,
+    kind: concept.kind,
     frontmatter: projectedFrontmatter(concept.frontmatter, sources.value),
     body: concept.body,
     trust,

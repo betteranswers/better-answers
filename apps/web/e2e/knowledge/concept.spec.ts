@@ -6,6 +6,7 @@ import {
   EDITOR_KEYSTROKES,
 } from "@/features/knowledge/knowledge-state.ts";
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -240,7 +241,7 @@ test.describe("the concept page", () => {
       await editor.getByRole("textbox", { name: "Title" }).fill(title);
 
       await page.keyboard.down("Control");
-      await clockTheNextKey(page, { at: STATUS_OF_THE_CONCEPT, reads: "Saving." });
+      await clockTheNextKey(page, { at: STATUS_OF_THE_CONCEPT, reads: EDITOR_WORDS.saving });
       await page.keyboard.press("Enter");
       await page.keyboard.up("Control");
 
@@ -298,7 +299,7 @@ test.describe("the concept page", () => {
         .getByRole("complementary", { name: "About this concept" })
         .locator(`xpath=.//dt[normalize-space()="${label}"]/following-sibling::dd[1]`);
     await expect(rowOf("Trust")).toContainText(`Verified by ${workspace.admin.name}`);
-    await expect(rowOf("Checked by")).toContainText(workspace.admin.name);
+    await expect(rowOf(CONCEPT_WORDS.titleBlock.checkedBy)).toContainText(workspace.admin.name);
     await expect(rowOf("Owner")).toContainText("Ifan Morgan");
     await expect(rowOf("Owner")).toContainText(`Owner of ${CONTRACTS}`);
     await expect(rowOf("Review by")).toHaveText("1 March 2027");
