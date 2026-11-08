@@ -28,13 +28,15 @@ Status 07/11/2026. The units ran as the table shows. Three things differ from th
 | A2 | BA-341 | Merged, #1026 (`fb3307178`) |
 | B | BA-339, BA-340 | Merged, #1027 (`26b450f84`). `packages/design-system` is gone |
 | C1 | BA-342, BA-344 | Merged, #1031 (`c7051c88a`) |
-| C2 | BA-345 | Ready to start |
+| C2 | BA-345 | Merged, #1032 (`aea74a7dc`). `DESIGN.md` is the design authority. The critique scores 26/40 |
 | D1 | BA-346 | Merged, #1030 (`fd3050040`). The `ui-copy-plain` rule is on `main` and off for every folder |
-| D2 | BA-347 | Ready to start |
+| D2 | BA-347 | Merged, #1033 (`a213841bd`). The `ui-copy-plain` rule is on for both Knowledge folders |
 | E | BA-348 to BA-351 | Branch `liam/ba-348-rewrite-the-ask-and-questions-copy-with-clarify` holds only the commit that turns the rule on for its feature folders. It can restart now that C1 has merged |
-| F | BA-352 to BA-355 | Waits for D2 |
+| F | BA-352 to BA-355 | Ready to start |
 
 The run paused at 01:13 on 07/11/2026, when the model's usage limit ran out. A new session took it up from the saved worktrees the same day.
+
+Changed 08/11/2026. Every copy PR gets a verifier who reads each string the reader sees. The lint does not catch copy that reads like a riddle, such as a reason clause or a line that explains by what is missing. A string that fails this is a blocking finding.
 
 Changed 07/11/2026. The operator reviews the app directly, so the review-gated PRs need no screenshots or video, and each one lands on `main` once its verifier records `PASS` or `PASS+NOTES`. The verifier may be another model from the same vendor.
 
