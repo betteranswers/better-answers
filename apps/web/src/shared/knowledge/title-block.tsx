@@ -122,7 +122,7 @@ const ROWS: readonly Row[] = [
   {
     label: WORDS.status,
     span: "half",
-    value: ({ trust }) => WORDS.statuses[trust.status],
+    value: ({ trust }) => (trust.status === "current" ? null : WORDS.statuses[trust.status]),
   },
   {
     label: WORDS.reviewBy,

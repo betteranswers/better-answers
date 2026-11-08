@@ -82,7 +82,6 @@ export const KNOWLEDGE_BASE_WORDS = {
 } as const;
 
 export const RELATION_WORDS: ReadonlyMap<string, string> = new Map([
-  ["LINKS_TO", "Links to"],
   ["SUPERSEDES", "Supersedes"],
   ["CITES", "Cites"],
 ]);
