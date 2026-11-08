@@ -11,7 +11,7 @@ export const COLLECTIONS_WORDS = {
   owner: "Owner",
   unowned: "No owner",
   unnamed: "Unnamed member",
-  ownOwners: "Concepts owned by someone else",
+  ownOwners: "Concepts with an owner set on them",
   noOwnOwners: "None",
   ownOwnersCount: (count: number): string => counted(count, "concept", "concepts"),
   ofCollection: (collection: string): string => ` of ${collection}`,
