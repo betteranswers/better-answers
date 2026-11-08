@@ -78,7 +78,7 @@ const restoreDrillNote = (
   writeConcept(principal, doors, {
     mergeKey: "note:restore-drill",
     path: "knowledge/restore-drill.md",
-    kind: "Note",
+    conceptType: "Note",
     title: "Restore drill",
     frontmatter: { title: "Restore drill", type: "Note" },
     body: "The rows are behind the bundle until the reconciler runs.",
@@ -536,12 +536,12 @@ describe("pnpm ops", () => {
       expect(rest).toEqual([]);
       assert(match?.layer === "bundles", "the match is not a concept");
       expect({
-        kind: match.kind,
+        conceptType: match.conceptType,
         title: match.title,
         tags: match.tags,
         words: trustWords(match.trust),
       }).toEqual({
-        kind: "Answer",
+        conceptType: "Answer",
         title: "Data retention period",
         tags: ["company", "data-protection", "g-cloud-15"],
         words: "Verified by Theo Approver · 1 June 2026 · imported",

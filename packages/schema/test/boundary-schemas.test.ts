@@ -604,7 +604,7 @@ const acceptedRows = {
     {
       workspaceId: WS_ID,
       id: GUIDE_ID,
-      kind: "bid",
+      guideType: "bid",
       collection: "bids",
       template: "bid-response",
       subjectIri: CONCEPT_IRI,
@@ -652,7 +652,7 @@ const acceptedRows = {
       sectionId: SECTION_ID,
       ordinal: 0,
       name: "Insurance cover",
-      kind: "Policy",
+      conceptType: "Policy",
       tags: ["insurance"],
       collection: null,
       atLeast: 2,
@@ -819,7 +819,7 @@ const acceptedRows = {
       workspaceId: WS_ID,
       iri: CONCEPT_IRI,
       path: "knowledge/expenses.md",
-      kind: "Policy",
+      conceptType: "Policy",
       title: "Expenses",
       frontmatter: { title: "Expenses", type: "Policy", tags: ["finance"] },
       body: "Expenses are claimed within thirty days.",
@@ -885,7 +885,7 @@ const acceptedRows = {
       gen: 1,
       uid: CONCEPT_IRI,
       label: "Concept",
-      kind: "Policy",
+      conceptType: "Policy",
       publishedAt: NOW,
       sensitivity: "Internal",
       audience: "everyone",
@@ -908,8 +908,8 @@ const acceptedRows = {
       label: "LINKS_TO",
       fromUid: CONCEPT_IRI,
       toUid: "https://better-answers.com/c/01J6RRRRRRRRRRRRRRRRRRRRRR",
-      fromKind: "Policy",
-      toKind: "Product",
+      fromConceptType: "Policy",
+      toConceptType: "Product",
       section: "Details",
       sentence: "The expenses policy applies per product tier.",
       publishedAt: NOW,
@@ -1005,7 +1005,7 @@ const acceptedRows = {
       suggestionId: SUGGESTION_ID,
       mergeKey: "policy:expenses",
       path: "knowledge/expenses.md",
-      conceptKind: "Policy",
+      conceptType: "Policy",
       title: "Expenses",
       frontmatter: { title: "Expenses", type: "Policy", sources: [{ resource: "/s.md" }] },
       body: "Expenses are claimed within sixty days.",
@@ -2390,7 +2390,7 @@ describe("5. the inferred select types match the pinned shapes", () => {
       workspaceId: WorkspaceId;
       iri: ConceptIri;
       path: string;
-      kind: string;
+      conceptType: string;
       title: string;
       frontmatter: Frontmatter;
       body: string;
@@ -2436,7 +2436,7 @@ describe("5. the inferred select types match the pinned shapes", () => {
       gen: number | null;
       uid: string;
       label: string;
-      kind: string | null;
+      conceptType: string | null;
     };
     mapEdge: {
       publishedAt: Date | null;
@@ -2449,8 +2449,8 @@ describe("5. the inferred select types match the pinned shapes", () => {
       label: string;
       fromUid: string;
       toUid: string;
-      fromKind: string | null;
-      toKind: string | null;
+      fromConceptType: string | null;
+      toConceptType: string | null;
       section: string | null;
       sentence: string | null;
     };
@@ -2510,7 +2510,7 @@ describe("5. the inferred select types match the pinned shapes", () => {
       suggestionId: string;
       mergeKey: string;
       path: string;
-      conceptKind: string;
+      conceptType: string;
       title: string;
       frontmatter: Frontmatter;
       body: string;
@@ -2672,7 +2672,7 @@ describe("5. the inferred select types match the pinned shapes", () => {
     guideDefinition: {
       workspaceId: WorkspaceId;
       id: string;
-      kind: string;
+      guideType: string;
       collection: string;
       template: string;
       subjectIri: ConceptIri | null;
@@ -2704,7 +2704,7 @@ describe("5. the inferred select types match the pinned shapes", () => {
       sectionId: string;
       ordinal: number;
       name: string;
-      kind: string;
+      conceptType: string;
       tags: string[];
       collection: string | null;
       atLeast: number;

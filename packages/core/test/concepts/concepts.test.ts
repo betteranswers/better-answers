@@ -86,7 +86,7 @@ const writeFor = (overrides: Partial<WriteConceptInput> = {}): WriteConceptInput
 const unnamedWrite = (overrides: Partial<WriteConceptInput>): WriteConceptInput => ({
   mergeKey: `policy:expenses-${minted}`,
   path: `knowledge/policy/expenses-${minted}.md`,
-  kind: "Policy",
+  conceptType: "Policy",
   title: "Expenses",
 
   frontmatter: {
@@ -292,7 +292,7 @@ describe("a governed write", () => {
     const scenario = await arrange();
 
     const input = writeFor({
-      kind: "Policy",
+      conceptType: "Policy",
       title: "Expenses",
       frontmatter: { title: "Expense claims", type: "Procedure" },
     });
@@ -356,9 +356,9 @@ describe("a governed write", () => {
 
     let headSeen: string | null = null;
     let firstFile: { readonly sha: string; readonly path: string } | undefined;
-    for (const kind of ["policy", "Policies", "POLICY"]) {
-      const base = writeFor({ kind, expects: { head: headSeen } });
-      const input = { ...base, frontmatter: { ...base.frontmatter, type: kind } };
+    for (const conceptType of ["policy", "Policies", "POLICY"]) {
+      const base = writeFor({ conceptType, expects: { head: headSeen } });
+      const input = { ...base, frontmatter: { ...base.frontmatter, type: conceptType } };
       const written = await landed(scenario, input);
       headSeen = written.sha;
       firstFile ??= { sha: written.sha, path: input.path };
@@ -593,7 +593,7 @@ describe("the map rows a governed write creates", () => {
     scenario: Scenario,
     writeOf: (product: Written, filename: string) => Partial<WriteConceptInput>,
   ) => {
-    const input = writeFor({ kind: "Product", status: "stable" });
+    const input = writeFor({ conceptType: "Product", status: "stable" });
     const first = await landed(scenario, input);
     const product = { ...input, iri: first.iri };
     const policyInput = writeFor({
@@ -608,7 +608,7 @@ describe("the map rows a governed write creates", () => {
   it("maps the concept and its links in the commit's transaction", async () => {
     const scenario = await arrange();
     const { product, policy } = await linkedPair(scenario, (_product, filename) => ({
-      kind: "Policy",
+      conceptType: "Policy",
       body: `# Details\n\nSee [the product](./${filename}) for tiers.`,
     }));
 
@@ -672,7 +672,7 @@ describe("the map rows a governed write creates", () => {
     expect(await rowsFor(scenario.workspaceId)).toMatchObject({ edges: "0" });
 
     const travel = writeFor({
-      kind: "Guideline",
+      conceptType: "Guideline",
       status: "stable",
       path: "knowledge/policy/travel.md",
       expects: { head: first.sha },
@@ -1478,7 +1478,7 @@ describe("opening a concept by IRI", () => {
       iri: written.iri,
       path: input.path,
       collection: "policy",
-      kind: "Policy",
+      conceptType: "Policy",
       frontmatter: {
         title: "Expenses",
         type: "Policy",

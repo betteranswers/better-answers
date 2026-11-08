@@ -62,7 +62,7 @@ const written = async (
   const landed = await writeConcept(scenario.admin, doorsOf(scenario), {
     mergeKey: `policy:expenses-${minted}`,
     path: `knowledge/policy/expenses-${minted}.md`,
-    kind: "Policy",
+    conceptType: "Policy",
     title,
     frontmatter: { title, type: "Policy", ...frontmatter },
     body,
@@ -165,7 +165,13 @@ const mergeKeyOf = async (iri: ConceptIri): Promise<string | undefined> => {
 
 const newPolicy = (title: string, sources: SaveConceptInput["sources"] = []): SaveConceptInput => ({
   collection: "policy",
-  parts: { title, kind: "Policy", description: null, tags: [], body: `${title} is paid monthly.` },
+  parts: {
+    title,
+    conceptType: "Policy",
+    description: null,
+    tags: [],
+    body: `${title} is paid monthly.`,
+  },
   sources,
   base: null,
   withheld: [],
@@ -518,7 +524,7 @@ describe("a save of a concept citing a deleted document", () => {
           {
             mergeKey: held.merge_key,
             path,
-            conceptKind: held.kind,
+            conceptType: held.kind,
             title: held.title,
             frontmatter,
             body,
@@ -745,7 +751,7 @@ describe("the author a save commits as", () => {
       collection: "policy",
       parts: {
         title: "Mileage Allowance (UK)",
-        kind: "Policy",
+        conceptType: "Policy",
         description: null,
         tags: [],
         body: "Mileage is paid at the HMRC rate.",
@@ -837,7 +843,7 @@ describe("a retitle or a rekind", () => {
     }));
     const keyAfterRetitle = await mergeKeyOf(iri);
     const rekinded = await editedBy(scenario, scenario.admin, iri, (seed) => ({
-      parts: { ...seed.parts, kind: "Guideline" },
+      parts: { ...seed.parts, conceptType: "Guideline" },
     }));
 
     expect(retitled.answer).toMatchObject({ ok: true, value: { outcome: "committed" } });

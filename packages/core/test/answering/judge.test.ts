@@ -56,7 +56,7 @@ const aJudgingWorkspace = ({
 
 const anAnswer = (title: string, body: string, collection = "audits"): SeededConcept => ({
   collection,
-  kind: "Answer",
+  conceptType: "Answer",
   title,
   body,
 });
@@ -428,7 +428,7 @@ describe("ask with a judge", () => {
     const sentFor = [...candidatesIn(promptOf(request.body))];
     expect(sentFor).toHaveLength(1);
     expect(titlesOf(answer.answers)).toEqual(sentFor.map(([title]) => title));
-    expect(answer.related.map((concept) => [concept.kind, "body" in concept])).toEqual([
+    expect(answer.related.map((concept) => [concept.conceptType, "body" in concept])).toEqual([
       ["Answer", false],
     ]);
   });

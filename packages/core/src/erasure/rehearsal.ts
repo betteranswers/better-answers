@@ -177,7 +177,7 @@ const conceptSeeded = async (
     {
       mergeKey: CONCEPT_MERGE_KEY,
       path: ERASURE_REHEARSAL_PATH,
-      kind: "Note",
+      conceptType: "Note",
       title: CONCEPT_TITLE,
       frontmatter: {
         title: CONCEPT_TITLE,

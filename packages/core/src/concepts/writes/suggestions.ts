@@ -159,7 +159,7 @@ export type SuggestionRequest = {
   readonly mergeKey: string;
   readonly path: string;
 
-  readonly conceptKind: string;
+  readonly conceptType: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
@@ -213,7 +213,7 @@ export const submitSuggestionSet = async (
         suggestionId: ulid(),
         mergeKey: request.mergeKey,
         path: request.path,
-        conceptKind: request.conceptKind,
+        conceptType: request.conceptType,
         title: request.title,
         frontmatter: request.frontmatter,
         body: request.body,
@@ -235,7 +235,7 @@ export const submitSuggestionSet = async (
               suggestion_id: payload.suggestionId,
               merge_key: payload.mergeKey,
               path: payload.path,
-              concept_kind: payload.conceptKind,
+              concept_kind: payload.conceptType,
               title: payload.title,
 
               frontmatter: JSON.stringify(payload.frontmatter),
@@ -395,7 +395,7 @@ export type SuggestionPayload = {
   readonly proposer: ActorId;
   readonly mergeKey: string;
   readonly path: string;
-  readonly conceptKind: string;
+  readonly conceptType: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
@@ -434,7 +434,7 @@ export const payloadFor = async (
     proposer: actorOf(row.proposer),
     mergeKey: row.merge_key,
     path: row.path,
-    conceptKind: row.concept_kind,
+    conceptType: row.concept_kind,
     title: row.title,
     frontmatter: row.frontmatter,
     body: row.body,

@@ -238,7 +238,7 @@ describe("the evidence pane", () => {
       sensitivity: "Restricted",
     });
     const { written, locators } = await sourcedNote(scenario, scenario.editor, [restricted], {
-      kind: "Person",
+      conceptType: "Person",
       frontmatter: { title: "Ada Lovelace", type: "Person" },
     });
     await overriddenTo(scenario, written.iri, "Internal");
@@ -621,14 +621,14 @@ describe("a concept's kind", () => {
   it("is the folded kind its row holds", async () => {
     const scenario = await arrange();
     const written = await conceptCiting(scenario, scenario.editor, [], {
-      kind: "sector",
+      conceptType: "sector",
       frontmatter: { type: "sector" },
     });
 
     const read = await readFor(scenario.admin, written.iri);
 
     expect(read?.frontmatter["type"]).toBe("sector");
-    expect(read?.kind).toBe("Sector");
+    expect(read?.conceptType).toBe("Sector");
   });
 });
 
@@ -786,8 +786,8 @@ describe("a concept's relations", () => {
         "bodyLinks",
         "collection",
         "frontmatter",
+        "conceptType",
         "iri",
-        "kind",
         "owner",
         "pane",
         "path",

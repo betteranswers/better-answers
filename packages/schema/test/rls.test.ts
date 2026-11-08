@@ -1408,7 +1408,7 @@ describe("the map tables under app_rt", () => {
         workspaceId: WS_A,
         gen: null,
         label: "source-entity:Person",
-        kind: null,
+        conceptType: null,
       });
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);

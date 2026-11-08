@@ -48,7 +48,7 @@ export type DraftSteps<Refused = never> = {
 
 type Part = { readonly collection: string | null; readonly citable: readonly Citable[] };
 
-const isNotAnAnswer = (concept: RelatedConcept): boolean => concept.kind !== ANSWER_KIND;
+const isNotAnAnswer = (concept: RelatedConcept): boolean => concept.conceptType !== ANSWER_KIND;
 
 const partsOf = (answer: PlannedAnswer): readonly Part[] => {
   const parts = new Map<string | null, Citable[]>();
@@ -72,7 +72,7 @@ const NO_COLLECTION = "none";
 const conceptBlock = (label: string, concept: OpenedConcept): string =>
   [
     `<concept number="${label}">`,
-    `<kind>${concept.kind}</kind>`,
+    `<kind>${concept.conceptType}</kind>`,
     `<title>${concept.title}</title>`,
     "<text>",
     concept.body.trimEnd(),

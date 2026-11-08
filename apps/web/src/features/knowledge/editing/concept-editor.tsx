@@ -98,7 +98,7 @@ function Warning(properties: { readonly words: string }) {
   );
 }
 
-type TextKey = "title" | "kind" | "description" | "tags";
+type TextKey = "title" | "conceptType" | "description" | "tags";
 
 type TextFieldShown = {
   readonly key: TextKey;
@@ -109,7 +109,7 @@ type TextFieldShown = {
 
 const TEXT_FIELDS: readonly TextFieldShown[] = [
   { key: "title", label: WORDS.title },
-  { key: "kind", label: WORDS.kind },
+  { key: "conceptType", label: WORDS.conceptType },
   { key: "description", label: WORDS.description, multiline: true },
   { key: "tags", label: WORDS.tags, hint: WORDS.tagsHint },
 ];

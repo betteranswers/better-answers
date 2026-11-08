@@ -827,7 +827,7 @@ describe("ask, an entry on the own-transaction road", () => {
         concepts: [
           {
             title: "Console exports",
-            kind: "Note",
+            conceptType: "Note",
             body: "A spreadsheet can be exported from the console.",
           },
           {
@@ -967,12 +967,12 @@ describe("ask, an entry on the own-transaction road", () => {
     const beyondTheEntryPoints = Math.max(0, ASK_CAPS.related - ASK_CAPS.entryPoints);
     const reached = Array.from({ length: beyondTheEntryPoints }, (_, nth) => ({
       title: `Console exports ${String(nth)}`,
-      kind: "Note",
+      conceptType: "Note",
       body: aSizedBodyOf("A spreadsheet can be exported from the console. ", NEAR_THE_BODY_CAP),
     }));
     const entries = Array.from({ length: ASK_CAPS.entryPoints }, (_, nth) => ({
       title: `Audit log retention ${String(nth)}`,
-      kind: "Policy",
+      conceptType: "Policy",
       body: aSizedBodyOf("Audit logs are kept for thirteen months. ", NEAR_THE_BODY_CAP),
       linksTo: reached
         .filter((_entryPoint, place) => place % ASK_CAPS.entryPoints === nth)

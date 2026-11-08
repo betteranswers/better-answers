@@ -26,22 +26,26 @@ const UNRELATED = "Nothing here bears on it.";
 type ConceptShape = {
   readonly title: string;
   readonly body?: string;
-  readonly kind?: string;
+  readonly conceptType?: string;
   readonly description?: string;
   readonly sensitivity?: string;
 };
 
 const conceptLanded = (
   workspaceId: string,
-  { title, body, kind = "Policy", description, sensitivity }: ConceptShape,
+  { title, body, conceptType = "Policy", description, sensitivity }: ConceptShape,
 ): Promise<ConceptIri> =>
   seededBy(db(), async (seed) => {
     const row = await seed.conceptIndex({
       workspaceId,
       title,
-      kind,
+      conceptType,
       body: body ?? UNRELATED,
-      frontmatter: { title, type: kind, ...(description === undefined ? {} : { description }) },
+      frontmatter: {
+        title,
+        type: conceptType,
+        ...(description === undefined ? {} : { description }),
+      },
       ...(sensitivity === undefined ? {} : { sensitivity }),
     });
     return ids.conceptIri.parse(row.iri);

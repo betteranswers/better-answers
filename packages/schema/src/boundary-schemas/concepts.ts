@@ -119,7 +119,7 @@ const conceptFileRefinements = {
   frontmatter: () => frontmatter,
 };
 
-const conceptKind = (schema: z.ZodString) => schema.trim().min(1);
+const conceptType = (schema: z.ZodString) => schema.trim().min(1);
 
 const conceptIndexRefinements = {
   workspaceId,
@@ -136,7 +136,7 @@ const conceptIndexRefinements = {
         },
         { message: `a concept's body must be at most ${CONCEPT_BODY_MAX} characters` },
       ),
-  kind: conceptKind,
+  conceptType,
   contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
   commitSha: (schema: z.ZodString) => schema.regex(GIT_SHA),
   status: (schema: z.ZodString) => schema.pipe(z.enum(CONCEPT_STATUSES)),
@@ -261,7 +261,7 @@ const conceptWriteRequestRefinements = {
   suggestionId: (schema: z.ZodString) => schema.regex(ULID),
   mergeKey: (schema: z.ZodString) => schema.trim().min(1),
   ...conceptFileRefinements,
-  conceptKind,
+  conceptType,
 
   body: (schema: z.ZodString) => schema.max(SUGGESTION_BODY_MAX),
   baseContentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),

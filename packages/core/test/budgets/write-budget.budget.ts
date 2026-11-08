@@ -58,7 +58,7 @@ type IndexRow = Awaited<ReturnType<TestData["conceptIndex"]>>;
 const deltaOf = (row: IndexRow) => ({
   workspaceId: row.workspaceId,
   iri: row.iri,
-  kind: row.kind,
+  conceptType: row.conceptType,
   path: row.path,
   body: row.body,
   sources: citedSourcesOf(row.frontmatter?.["sources"]),
@@ -110,7 +110,7 @@ const inboundLinks = async (tx: Tx, workspaceId: string, iri: string): Promise<n
 const writeOf = (target: number, head: string | null): WriteConceptInput => ({
   mergeKey: `policy:pending-${target}`,
   path: pendingPath(target),
-  kind: "Policy",
+  conceptType: "Policy",
   title: `Pending ${target}`,
   frontmatter: { title: `Pending ${target}`, type: "Policy" },
   body: `The rule ${target} the seeded rules were waiting for.`,
@@ -181,7 +181,7 @@ const timedBackfills = async (
 const citedOf = (target: number, head: string | null): WriteConceptInput => ({
   mergeKey: `policy:cited-${target}`,
   path: `knowledge/policy/cited-${target}.md`,
-  kind: "Policy",
+  conceptType: "Policy",
   title: `Cited ${target}`,
   frontmatter: { title: `Cited ${target}`, type: "Policy" },
   body: `Rule ${target} is the rule eight sections of the bid library draw on.`,

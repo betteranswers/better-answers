@@ -61,7 +61,7 @@ function ConceptItem(properties: { readonly concept: ConceptRead }) {
     <li className="grid gap-1 border-t border-border pt-3 first:border-t-0 first:pt-0">
       <ConceptTitle iri={concept.iri} title={concept.title} />
       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-        <Row term={WORDS.terms.kind}>{concept.kind}</Row>
+        <Row term={WORDS.terms.conceptType}>{concept.conceptType}</Row>
         <Row term={WORDS.terms.collection}>{concept.collection ?? WORDS.noCollection}</Row>
         <Row term={WORDS.terms.trust}>
           <Pill>{concept.trustWords}</Pill>

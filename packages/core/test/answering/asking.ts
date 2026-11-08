@@ -186,7 +186,7 @@ export const withoutRecord = ({ recordId: _recordId, ...answer }: AnswerResult) 
 
 export type SeededConcept = {
   readonly collection: string | null;
-  readonly kind?: string;
+  readonly conceptType?: string;
   readonly title: string;
   readonly body: string;
   readonly contentHash?: string;
@@ -211,7 +211,14 @@ export const conceptSeeded = (
 ): Promise<ConceptIri> =>
   seedingWith(db.pool, async (seed) => {
     seededConcepts += 1;
-    const { kind = "Policy", title, body, sensitivity = "Internal", contentHash, status } = shape;
+    const {
+      conceptType = "Policy",
+      title,
+      body,
+      sensitivity = "Internal",
+      contentHash,
+      status,
+    } = shape;
     const folder = shape.collection === null ? "" : `${shape.collection}/`;
     const { iri } = await seed.conceptIdentity({
       workspaceId,
@@ -221,10 +228,10 @@ export const conceptSeeded = (
       workspaceId,
       iri,
       path: `knowledge/${folder}seeded-${seededConcepts}.md`,
-      kind,
+      conceptType,
       title,
       body,
-      frontmatter: { title, type: kind },
+      frontmatter: { title, type: conceptType },
       sensitivity,
       ...(contentHash === undefined ? {} : { contentHash }),
       ...statusAs(status),
@@ -232,7 +239,7 @@ export const conceptSeeded = (
     await seed.mapNode({
       workspaceId,
       uid: indexed.iri,
-      kind,
+      conceptType,
       sensitivity,
       ...publishedAs(status),
     });
@@ -316,7 +323,7 @@ export const answerWritten = (scenario: Scenario, shape: WrittenAnswer): Promise
   conceptCiting(scenario, scenario.editor, [], {
     mergeKey: `answer:${shape.slug}`,
     path: `knowledge/${shape.collection}/${shape.slug}.md`,
-    kind: "Answer",
+    conceptType: "Answer",
     title: shape.title,
     frontmatter: { title: shape.title, type: "Answer" },
     body: shape.body,

@@ -46,11 +46,11 @@ export const typedBy = async (
 ): Promise<ConceptWritten> =>
   answered(
     await writeConcept(editor, doorsOf(scenario), {
-      mergeKey: `${concept.kind}:${concept.slug}`,
+      mergeKey: `${concept.conceptType}:${concept.slug}`,
       path: pathOf(concept),
-      kind: concept.kind,
+      conceptType: concept.conceptType,
       title: concept.title,
-      frontmatter: { title: concept.title, type: concept.kind, tags: [...concept.tags] },
+      frontmatter: { title: concept.title, type: concept.conceptType, tags: [...concept.tags] },
       body: concept.body,
       message: `Record ${concept.title.toLowerCase()}`,
       author: AUTHOR,
@@ -70,7 +70,7 @@ const verifiedLines = (reviewer: string, times: number): string =>
 
 const importedFile = (concept: Concept, reviewer: string, verifications: number): string =>
   `---
-type: ${concept.kind}
+type: ${concept.conceptType}
 title: ${concept.title}
 tags: [${concept.tags.join(", ")}]
 ${verifiedLines(reviewer, verifications)}---

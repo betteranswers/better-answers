@@ -51,7 +51,7 @@ const mapRow = {
 const mapNodeRefinements = {
   ...mapRow,
   label: mapLabel(MAP_NODE_LABELS),
-  kind: mapKey,
+  conceptType: mapKey,
 };
 
 const mapNodeSelect = createSelectSchema(mapNode, mapNodeRefinements);
@@ -72,8 +72,8 @@ const mapEdgeRefinements = {
   label: mapLabel(MAP_EDGE_LABELS),
   fromUid: mapKey,
   toUid: mapKey,
-  fromKind: mapKey,
-  toKind: mapKey,
+  fromConceptType: mapKey,
+  toConceptType: mapKey,
 };
 
 const mapEdgeSelect = createSelectSchema(mapEdge, mapEdgeRefinements);

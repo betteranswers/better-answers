@@ -632,7 +632,7 @@ const indexedOf = async (workspaceId: string, iri: string) => {
 const rewordedBody = async (
   ng: Northgate,
   iri: string,
-  facts: { readonly kind: string; readonly tags: readonly string[]; readonly body: string },
+  facts: { readonly conceptType: string; readonly tags: readonly string[]; readonly body: string },
 ) => {
   const held = await indexedOf(ng.scenario.workspaceId, iri);
   answered(
@@ -640,9 +640,9 @@ const rewordedBody = async (
       iri,
       mergeKey: held.merge_key,
       path: held.path,
-      kind: facts.kind,
+      conceptType: facts.conceptType,
       title: held.title,
-      frontmatter: { title: held.title, type: facts.kind, tags: [...facts.tags] },
+      frontmatter: { title: held.title, type: facts.conceptType, tags: [...facts.tags] },
       body: facts.body,
       message: "Reword the concept",
       author: { name: "Nadia Editor", email: "nadia@northgate.invalid" },
@@ -665,12 +665,12 @@ describe("a change to a concept that a write-up includes", () => {
     );
 
     await rewordedBody(ng, ng.iri("publicLiability"), {
-      kind: "insurance policy",
+      conceptType: "insurance policy",
       tags: ["public-liability"],
       body: "Public liability cover of ten million pounds, renewed each April.",
     });
     await rewordedBody(ng, ng.iri("cyberEssentialsPlus"), {
-      kind: "certification",
+      conceptType: "certification",
       tags: ["cyber-essentials-plus"],
       body: "Northgate holds Cyber Essentials Plus, renewed each March by an accredited body.",
     });
@@ -693,7 +693,7 @@ describe("a change to a concept that a write-up includes", () => {
         iri: ng.iri("supportHours"),
         mergeKey: hours.merge_key,
         path: hours.path,
-        kind: "company fact",
+        conceptType: "company fact",
         title: hours.title,
         frontmatter: { title: hours.title, type: "company fact", tags: ["support-hours"] },
         body: "The service desk answers from 08:00 to 18:00 on working days.",
@@ -708,7 +708,7 @@ describe("a change to a concept that a write-up includes", () => {
     );
 
     await rewordedBody(ng, certificate, {
-      kind: "certification",
+      conceptType: "certification",
       tags: ["cyber-essentials-plus"],
       body: "Northgate holds Cyber Essentials Plus, renewed each March by an accredited body.",
     });

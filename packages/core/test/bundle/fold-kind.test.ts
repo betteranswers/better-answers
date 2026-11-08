@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { foldKind } from "../../src/bundle/index.ts";
+import { foldConceptType } from "../../src/bundle/index.ts";
 
 it.each([
   ["policy", "Policy"],
@@ -19,8 +19,8 @@ it.each([
   ["Bonus", "Bonus"],
   ["Analysis", "Analysis"],
   ["Rate  card", "Rate  Card"],
-])("folds the kind %s to %s", (kind, folded) => {
-  expect(foldKind(kind)).toBe(folded);
+])("folds the kind %s to %s", (conceptType, folded) => {
+  expect(foldConceptType(conceptType)).toBe(folded);
 });
 
 it.each([
@@ -50,7 +50,7 @@ it.each([
   "ies",
   "s",
   "ßes",
-])("folds %s to a kind that folds to itself", (kind) => {
-  const folded = foldKind(kind);
-  expect(foldKind(folded)).toBe(folded);
+])("folds %s to a kind that folds to itself", (conceptType) => {
+  const folded = foldConceptType(conceptType);
+  expect(foldConceptType(folded)).toBe(folded);
 });

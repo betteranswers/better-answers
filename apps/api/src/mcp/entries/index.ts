@@ -61,8 +61,15 @@ const coreTrust = ({ tier, status, checkedBy, checkedAt, rider }: WireTrust): Tr
     ? { tier, status, verifiedBy: checkedBy, verifiedAt: checkedAt, rider }
     : { tier, status, verifiedBy: checkedBy, verifiedAt: checkedAt, rider };
 
-type WireMatch<Match> = Match extends { readonly trust: Trust }
-  ? Omit<Match, "trust" | "description"> & { readonly trust: WireTrust }
+const TYPE_KEY = "kind";
+
+const typeField = { [TYPE_KEY]: z.string() };
+
+type WireMatch<Match> = Match extends { readonly trust: Trust; readonly conceptType: string }
+  ? Omit<Match, "trust" | "description" | "conceptType"> & {
+      readonly trust: WireTrust;
+      readonly [TYPE_KEY]: string;
+    }
   : Match;
 
 type WireFound = {
@@ -75,16 +82,19 @@ const foundOnTheWire = ({ matches, ...found }: FindResult): WireFound => ({
   ...found,
   hits: matches.map((match) => {
     if (match.layer !== "bundles") return match;
-    const { description: _description, ...concept } = match;
-    return { ...concept, trust: wireTrust(match.trust) };
+    const { description: _description, conceptType, ...concept } = match;
+    return { ...concept, [TYPE_KEY]: conceptType, trust: wireTrust(match.trust) };
   }),
 });
 
+const coreMatch = <Match extends { readonly trust: WireTrust; readonly [TYPE_KEY]: string }>({
+  [TYPE_KEY]: conceptType,
+  ...match
+}: Match) => ({ ...match, conceptType, trust: coreTrust(match.trust) });
+
 const foundInCore = ({ hits, ...found }: WireFound): FoundForText => ({
   ...found,
-  matches: hits.map((match) =>
-    match.layer === "bundles" ? { ...match, trust: coreTrust(match.trust) } : match,
-  ),
+  matches: hits.map((match) => (match.layer === "bundles" ? coreMatch(match) : match)),
 });
 
 const openedOnTheWire = (opened: OpenResult<string>) => {
@@ -123,7 +133,7 @@ const wired = <Value, Wired, Refused>(
   wire: (value: Value) => Wired,
 ): Result<Wired, Refused> => (result.ok ? ok(wire(result.value)) : result);
 
-const found = findOutputWith(trust);
+const found = findOutputWith(trust, typeField);
 
 const findEntry = defineEntry({
   road: "resolvers-transaction",
@@ -160,8 +170,9 @@ const answeredOnTheWire = (
   origin: string,
   { verdict, recordId, answers, judgeState, related, ...answer }: AnswerResult,
 ): WireAnswered => {
-  const wire = <Concept extends RelatedConcept>(concept: Concept) => ({
+  const wire = <Concept extends RelatedConcept>({ conceptType, ...concept }: Concept) => ({
     ...concept,
+    [TYPE_KEY]: conceptType,
     url: `${origin}${concept.url}`,
     trust: wireTrust(concept.trust),
   });
@@ -176,11 +187,7 @@ const answeredOnTheWire = (
 };
 
 const answeredInCore = ({ answers, related, ...answer }: WireAnswered): AnswerResult<string> => {
-  const core = <Concept extends WireMatch<RelatedConcept<string>>>(concept: Concept) => ({
-    ...concept,
-    trust: coreTrust(concept.trust),
-  });
-  return { ...answer, answers: answers.map(core), related: related.map(core) };
+  return { ...answer, answers: answers.map(coreMatch), related: related.map(coreMatch) };
 };
 
 const askEntryAt = (origin: string) =>
@@ -195,7 +202,7 @@ const askEntryAt = (origin: string) =>
       question: askInput.shape.question,
       collections: askInput.shape.collections,
     }),
-    output: answerOutputWith(trust),
+    output: answerOutputWith(trust, typeField),
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,

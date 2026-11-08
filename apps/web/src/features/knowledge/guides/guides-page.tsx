@@ -26,7 +26,7 @@ function GuideRow(properties: { readonly guide: GuideSummary }) {
         >
           {guideTitleOf(guide)}
         </Link>
-        <KindLine kind={guide.kind} />
+        <KindLine conceptType={guide.guideType} />
         <span className="text-muted-foreground">{WORDS.sections(guide.sections)}</span>
         {guide.needsReview === 0 ? null : (
           <Pill variant="outline">{WORDS.needReview(guide.needsReview)}</Pill>

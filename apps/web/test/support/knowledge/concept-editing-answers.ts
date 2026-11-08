@@ -19,7 +19,7 @@ export type Standing = "commits" | "suggests";
 
 export const PARTS = {
   title: "Audit Logs Retention",
-  kind: "Policy",
+  conceptType: "Policy",
   description: null,
   tags: ["audit"],
   body: "Audit logs are kept for seven years.",
@@ -40,7 +40,11 @@ export const aConceptToEdit = (changes: Readonly<Record<string, unknown>> = {}) 
 const aConceptOpened = (standing: Standing) =>
   read({
     found: true,
-    concept: anOpenedConcept(A_CONCEPT_IRI, { title: PARTS.title, type: PARTS.kind }, PARTS.body),
+    concept: anOpenedConcept(
+      A_CONCEPT_IRI,
+      { title: PARTS.title, type: PARTS.conceptType },
+      PARTS.body,
+    ),
     standing,
   });
 
@@ -82,7 +86,7 @@ export const newConceptAt = (fields: Readonly<Record<string, string>>): string =
 };
 
 export const BLANK_TO_EDIT = {
-  parts: { ...PARTS, title: "", kind: "", tags: [], body: "" },
+  parts: { ...PARTS, title: "", conceptType: "", tags: [], body: "" },
   sources: [],
   base: null,
   usedIn: { writeUps: 0, linkingConcepts: 0 },
@@ -92,7 +96,9 @@ export const aNewConceptApi = (standing: Standing = "commits"): Api => {
   const api = aConceptApi(standing, BLANK_TO_EDIT);
   api.set("knowledge.tree", () =>
     read({
-      collections: [{ collection: "policies", count: 1, kinds: [{ kind: "Policy", count: 1 }] }],
+      collections: [
+        { collection: "policies", count: 1, kinds: [{ conceptType: "Policy", count: 1 }] },
+      ],
     }),
   );
   return api;

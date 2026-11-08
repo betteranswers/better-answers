@@ -148,7 +148,7 @@ const aConceptCitingRestrictedMinutes = async () => {
   const written = await writeConcept(writer, doors, {
     mergeKey: "note:heron-nesting",
     path: "knowledge/heron-nesting.md",
-    kind: "Note",
+    conceptType: "Note",
     title: NESTING,
     frontmatter: {
       title: NESTING,
@@ -189,8 +189,13 @@ const aConceptCitingRestrictedMinutes = async () => {
 
 const inCoresKeys = (hit: Rpc): Rpc => {
   if (hit["trust"] === undefined) return hit;
+  const { kind, ...concept } = hit;
   const { checkedBy, checkedAt, ...trust } = rpcOf(hit["trust"]);
-  return { ...hit, trust: { ...trust, verifiedBy: checkedBy, verifiedAt: checkedAt } };
+  return {
+    ...concept,
+    conceptType: kind,
+    trust: { ...trust, verifiedBy: checkedBy, verifiedAt: checkedAt },
+  };
 };
 
 const withoutDescription = (match: Rpc): Rpc => {
@@ -317,7 +322,7 @@ const threeNotesAskingTheBoard = async () => {
     const landed = await writeConcept(writer, doors, {
       mergeKey: `note:${name}`,
       path: conceptPath,
-      kind: "Note",
+      conceptType: "Note",
       title: concept.title,
       frontmatter: { title: concept.title, type: "Note" },
       body: concept.body,
@@ -352,7 +357,7 @@ const aWorkspaceOfBirds = () =>
   aWorkspaceHolding([
     { ...FEEDING_WRITTEN, collection: "birds" },
     { ...RINGING_WRITTEN, collection: "birds" },
-    { title: SURVEY, body: "Heron counts are taken each June.", kind: "Procedure" },
+    { title: SURVEY, body: "Heron counts are taken each June.", conceptType: "Procedure" },
   ]);
 
 describe("the knowledge tree over tRPC", () => {
@@ -362,23 +367,26 @@ describe("the knowledge tree over tRPC", () => {
       app(),
       conceptIndexSeeding.parse({
         workspaceId: workspace.workspaceId,
-        batches: [{ collection: "birds", kind: "Answer", count: 60 }],
+        batches: [{ collection: "birds", conceptType: "Answer", count: 60 }],
       }),
     );
     const { api } = await webSignedIn(app(), viewer.email);
 
     const tree = await api.knowledge.tree.query();
-    const first = await api.knowledge.kindConcepts.query({ collection: "birds", kind: "Answer" });
+    const first = await api.knowledge.kindConcepts.query({
+      collection: "birds",
+      conceptType: "Answer",
+    });
     const rest = await api.knowledge.kindConcepts.query({
       collection: "birds",
-      kind: "Answer",
+      conceptType: "Answer",
       cursor: first.nextCursor,
     });
 
     expect(tree).toEqual({
       collections: [
-        { collection: "birds", count: 61, kinds: [{ kind: "Answer", count: 61 }] },
-        { collection: null, count: 1, kinds: [{ kind: "Procedure", count: 1 }] },
+        { collection: "birds", count: 61, kinds: [{ conceptType: "Answer", count: 61 }] },
+        { collection: null, count: 1, kinds: [{ conceptType: "Procedure", count: 1 }] },
       ],
     });
     expect([first.concepts.length, rest.concepts.length, rest.nextCursor]).toEqual([50, 11, null]);
@@ -391,11 +399,11 @@ describe("the knowledge tree over tRPC", () => {
     const { api } = await webSignedIn(app(), viewer.email);
 
     const refused = await refusalOfCall(
-      api.knowledge.kindConcepts.query({ collection: "birds/herons", kind: "Answer" }),
+      api.knowledge.kindConcepts.query({ collection: "birds/herons", conceptType: "Answer" }),
     );
     const answered = await api.knowledge.kindConcepts.query({
       collection: "birds",
-      kind: "Answer",
+      conceptType: "Answer",
     });
 
     expect(refused).toMatchObject(MALFORMED);
@@ -429,11 +437,11 @@ describe("the Curation reads over tRPC", () => {
     });
     expect(ownerSees).toEqual({
       kinds: [
-        { kind: "Answer", count: 1, collections: [{ collection: "birds", count: 1 }] },
-        { kind: "Procedure", count: 1, collections: [{ collection: null, count: 1 }] },
+        { conceptType: "Answer", count: 1, collections: [{ collection: "birds", count: 1 }] },
+        { conceptType: "Procedure", count: 1, collections: [{ collection: null, count: 1 }] },
       ],
     });
-    expect(adminSees.kinds.map(({ kind, count }) => [kind, count])).toEqual([
+    expect(adminSees.kinds.map(({ conceptType, count }) => [conceptType, count])).toEqual([
       ["Answer", 2],
       ["Procedure", 1],
     ]);
@@ -805,7 +813,7 @@ const aPolicyItsEditorOwns = async () => {
   const written = await writeConcept(writer, doors, {
     mergeKey: "policy:heron-disturbance",
     path: "knowledge/policy/heron-disturbance.md",
-    kind: "Policy",
+    conceptType: "Policy",
     title: "Heron disturbance",
     frontmatter: { title: "Heron disturbance", type: "Policy" },
     body: "Keep fifty metres from a nesting heron.\n",
@@ -894,7 +902,7 @@ const aGuideHeldByAnEditorInFinance = async () => {
 describe("a guide over tRPC", () => {
   it("lists the guide with needsReview counted for each reader", async () => {
     const { outsider, editor, seeded } = await aGuideHeldByAnEditorInFinance();
-    const listed = { guideId: seeded.guideId, kind: "Bid library", collection: "company" };
+    const listed = { guideId: seeded.guideId, guideType: "Bid library", collection: "company" };
 
     const forEditor = await (await webSignedIn(app(), editor.email)).api.knowledge.guides.query();
     const forOutsider = await (
@@ -1011,7 +1019,7 @@ describe("a guide over tRPC", () => {
           {
             title: EMPLOYERS_LIABILITY.title,
             collection: "company",
-            kind: EMPLOYERS_LIABILITY.kind,
+            conceptType: EMPLOYERS_LIABILITY.conceptType,
             body: EMPLOYERS_LIABILITY.body,
             frontmatter: { tags: [...EMPLOYERS_LIABILITY.tags] },
           },

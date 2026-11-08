@@ -60,7 +60,7 @@ const guideline = (
   return {
     mergeKey: `guideline:${title.toLowerCase()}-${written}`,
     path: `knowledge/guidelines/${title.toLowerCase()}-${written}.md`,
-    kind: "Guideline",
+    conceptType: "Guideline",
     title,
     frontmatter: { title, type: "Guideline", tags: ["finance", "travel"] },
     body: `# ${title}\n\nBook through the platform, and claim within a month.`,
@@ -784,7 +784,7 @@ describe("a re-write whose rows were lost", () => {
       iri: first.iri,
       mergeKey: input.mergeKey,
       path: input.path,
-      kind: input.kind,
+      conceptType: input.conceptType,
       title: input.title,
       frontmatter: input.frontmatter,
       body: "# Allowances\n\nWhat the board minuted, reworded.",
@@ -924,7 +924,7 @@ const requestFor = (
   return {
     mergeKey: `guideline:proposed-${proposed}`,
     path: `knowledge/guidelines/proposed-${proposed}.md`,
-    conceptKind: "Guideline",
+    conceptType: "Guideline",
     title,
     frontmatter: { title, type: "Guideline" },
     body: `# ${title}\n\nProposed by a colleague, decided by an Admin.`,

@@ -79,7 +79,7 @@ const firstMatchesFor = async (
     id: fact.id,
     section_id: fact.sectionId,
     ordinal: fact.ordinal,
-    kind: fact.kind,
+    kind: fact.conceptType,
     tags: fact.tags,
     collection: fact.collection,
   }));

@@ -77,7 +77,7 @@ describe("a judged result where every large `Answer` is rejected", () => {
     expect([answer.verdict, answer.judgeState, answer.answers]).toEqual(["related", "judged", []]);
     expect(answer.related).toHaveLength(ASK_CAPS.related);
     expect(new Set(answer.related.flatMap((concept) => Object.keys(concept)))).toEqual(
-      new Set(["iri", "url", "kind", "title", "collection", "trust", "trustWords"]),
+      new Set(["iri", "url", "conceptType", "title", "collection", "trust", "trustWords"]),
     );
     expect(JSON.stringify(answer).length).toBeLessThan(CLAUDE_CODE_INLINE_RESULT_CHARACTERS);
   });

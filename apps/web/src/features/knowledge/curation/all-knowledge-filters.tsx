@@ -52,7 +52,7 @@ export function AllKnowledgeFilters(properties: {
           value: heldKind,
           anyLabel: WORDS.filters.kind.any,
           choices: choicesOf(
-            kinds.map((each) => each.kind),
+            kinds.map((each) => each.conceptType),
             heldKind,
           ),
           onChange: address.chooseKind,

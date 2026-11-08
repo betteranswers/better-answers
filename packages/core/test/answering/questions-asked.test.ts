@@ -631,7 +631,7 @@ describe("reading the questions asked", () => {
         concepts: [
           {
             iri: cited.iri,
-            kind: "Policy",
+            conceptType: "Policy",
             title: "Expenses",
             collection: "audits",
             trustWords: "Unverified",

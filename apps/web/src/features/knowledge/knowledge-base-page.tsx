@@ -38,7 +38,7 @@ const NONE: readonly CollectionCounted[] = [];
 
 type ShownKind = {
   readonly collection: string | null;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly count: number;
 };
 
@@ -52,7 +52,7 @@ const shownKindOf = (
   if (open === undefined) return undefined;
   const count = collections
     .find((held) => held.collection === open.collection)
-    ?.kinds.find((counted) => counted.kind === open.kind)?.count;
+    ?.kinds.find((counted) => counted.conceptType === open.conceptType)?.count;
   return count === undefined ? undefined : { ...open, count };
 };
 
@@ -60,8 +60,8 @@ const useOpenKind = () => {
   const { state, write } = useListAddress(KNOWLEDGE_BASE_LIST, KNOWLEDGE_BASE_FIELDS);
   return {
     open: openKindAt(state),
-    openKind: (collection: string | null, kind: string) => {
-      write(heldOf(collection, kind));
+    openKind: (collection: string | null, conceptType: string) => {
+      write(heldOf(collection, conceptType));
     },
   };
 };
@@ -175,7 +175,8 @@ function Concepts(properties: {
   useKeystroke(KEY.concepts, () => {
     heading.current?.focus();
   });
-  const named = shown === undefined ? WORDS.concepts : WORDS.kindIn(shown.kind, shown.collection);
+  const named =
+    shown === undefined ? WORDS.concepts : WORDS.kindIn(shown.conceptType, shown.collection);
 
   return (
     <section aria-labelledby={headingId} className="min-w-0">
@@ -197,7 +198,7 @@ function Concepts(properties: {
         />
       ) : (
         <ConceptRows
-          key={JSON.stringify([shown.collection, shown.kind])}
+          key={JSON.stringify([shown.collection, shown.conceptType])}
           caption={named}
           read={properties.read}
           focusAfterRetry={heading}
@@ -210,7 +211,7 @@ function Concepts(properties: {
 function Browsed(properties: {
   readonly collections: readonly CollectionCounted[];
   readonly open: OpenKind;
-  readonly onOpen: (collection: string | null, kind: string) => void;
+  readonly onOpen: (collection: string | null, conceptType: string) => void;
   readonly read: KindConceptsRead;
 }) {
   const { collections, open } = properties;

@@ -407,7 +407,12 @@ describe("including an available fact", () => {
         coverage: { met: 4, of: 4, facts: [aFact({ state: "met" })] },
         brief: aBrief({
           detail: [
-            { iri: RACKING_IRI, title: LIABILITY_TITLE, kind: "Policy", body: "Cover is £5m." },
+            {
+              iri: RACKING_IRI,
+              title: LIABILITY_TITLE,
+              conceptType: "Policy",
+              body: "Cover is £5m.",
+            },
           ],
         }),
       }),

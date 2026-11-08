@@ -13,7 +13,7 @@ export const ALL_KNOWLEDGE = ALL_KNOWLEDGE_PAGE.path;
 export type ConceptRow = {
   readonly iri: string;
   readonly title: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly collection: string | null;
   readonly trust: { readonly tier: string; readonly status: string };
   readonly trustWords: string;
@@ -36,7 +36,7 @@ export const aConceptRow = (
 ): ConceptRow => ({
   iri: iriOf(number),
   title,
-  kind: "policy",
+  conceptType: "policy",
   collection: "policy",
   trust: { tier: "unverified", status: "current" },
   trustWords: "Unverified",
@@ -48,7 +48,7 @@ export const aConceptRow = (
 
 const ASKED = z.object({
   collections: z.array(z.string()),
-  kind: z.string().optional(),
+  conceptType: z.string().optional(),
   sort: z.object({ column: z.string(), desc: z.boolean() }),
   page: z.number().default(1),
 });
@@ -63,7 +63,7 @@ export const knowledgeAsks = (): readonly AllKnowledgeAsked[] =>
 const keyOf = (row: ConceptRow, column: string): string =>
   ({
     title: row.title,
-    kind: row.kind,
+    conceptType: row.conceptType,
     collection: row.collection ?? "",
     owner: row.owner?.name ?? "",
     checked: row.checkedOn ?? "",
@@ -73,7 +73,8 @@ const inTheCollections = (row: ConceptRow, collections: readonly string[]): bool
   collections.length === 0 || (row.collection !== null && collections.includes(row.collection));
 
 const matching = (asked: AllKnowledgeAsked) => (row: ConceptRow) =>
-  inTheCollections(row, asked.collections) && (asked.kind === undefined || row.kind === asked.kind);
+  inTheCollections(row, asked.collections) &&
+  (asked.conceptType === undefined || row.conceptType === asked.conceptType);
 
 const answeringFrom = (listed: () => readonly ConceptRow[]) => (): unknown => {
   const asked = ASKED.parse(
@@ -96,14 +97,14 @@ const answeringFrom = (listed: () => readonly ConceptRow[]) => (): unknown => {
 
 const KINDS = [
   {
-    kind: "policy",
+    conceptType: "policy",
     count: 3,
     collections: [
       { collection: "policy", count: 2 },
       { collection: "safety", count: 1 },
     ],
   },
-  { kind: "lease", count: 1, collections: [{ collection: null, count: 1 }] },
+  { conceptType: "lease", count: 1, collections: [{ collection: null, count: 1 }] },
 ];
 
 export const RHIAN = {

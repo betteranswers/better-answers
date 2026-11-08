@@ -144,7 +144,7 @@ export const updateConceptBody = async (
     path: held.path,
     mergeKey: held.mergeKey,
     base: input.base,
-    file: { ...to, title: held.title, kind: held.kind },
+    file: { ...to, title: held.title, conceptType: held.conceptType },
     author,
     reuse: "confirmed",
     message: `Update the body of ${held.path} in place`,

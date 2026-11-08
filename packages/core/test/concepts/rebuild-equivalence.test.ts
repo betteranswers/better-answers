@@ -44,7 +44,7 @@ const wrote = async (
   const title = overrides.title ?? `Note ${sequence}`;
   const mergeKey = overrides.mergeKey ?? `note:equivalence-${sequence}`;
   const written = await writeConcept(writer, doorsOf(scenario), {
-    kind: "Note",
+    conceptType: "Note",
     frontmatter: { title, type: "Note" },
     message: `Record ${title}`,
     author: { name: "Ada Editor", email: "ada@acme.invalid" },
@@ -76,7 +76,7 @@ const accepted = async (
           ...request,
           mergeKey: `note:accepted-${sequence}`,
           path: `knowledge/accepted-${sequence}.md`,
-          conceptKind: "Note",
+          conceptType: "Note",
           title: `Accepted note ${sequence}`,
         },
       ],

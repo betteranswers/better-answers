@@ -191,7 +191,7 @@ const conceptMatchOf = (concept: OpenedConcept, now: Date): ConceptMatch<Concept
   return {
     layer: "bundles",
     iri: concept.iri,
-    kind: concept.kind,
+    conceptType: concept.conceptType,
     title: concept.title,
     description: descriptionOf(concept.frontmatter),
     trust,

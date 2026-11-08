@@ -18,7 +18,7 @@ type Check = { readonly actor: string; readonly at: Date };
 export type Shelved = {
   readonly path: string;
   readonly iri?: ConceptIri;
-  readonly kind?: string;
+  readonly conceptType?: string;
   readonly title?: string;
   readonly sensitivity?: (typeof SENSITIVITIES)[number];
   readonly audienceGroups?: readonly string[];
@@ -48,7 +48,7 @@ const shelvedWith = async (
     ...(iri === undefined ? {} : { iri }),
     ...columns,
     title,
-    frontmatter: { title, type: columns.kind ?? "Policy" },
+    frontmatter: { title, type: columns.conceptType ?? "Policy" },
     ...audienceOf(audienceGroups),
     ...draftOf(draft),
   });
@@ -100,7 +100,7 @@ export type WideKnowledge = {
 const wideConceptAt = (at: number, checker: string): Shelved => ({
   path: `knowledge/collection-${at % WIDE_COLLECTIONS}/concept-${at}.md`,
   title: `Concept ${String(at).padStart(5, "0")}`,
-  kind: `Kind ${at % WIDE_KINDS}`,
+  conceptType: `Kind ${at % WIDE_KINDS}`,
   checks:
     at % 3 === 0
       ? [

@@ -33,7 +33,7 @@ export const aFact = (changes: Changes = {}) => ({
   name: LIABILITY_TITLE,
   state: "missing",
   available: [],
-  kind: "Insurance policy",
+  conceptType: "Insurance policy",
   tags: ["employers-liability"],
   ...changes,
 });
@@ -45,7 +45,12 @@ export const aBrief = (changes: Changes = {}) => ({
     footnotes: [{ number: 1, label: AN_INCLUDE_ID, iri: RACKING_IRI, title: RACKING_TITLE }],
   },
   detail: [
-    { iri: RACKING_IRI, title: RACKING_TITLE, kind: "Policy", body: "Each bay is racked by row." },
+    {
+      iri: RACKING_IRI,
+      title: RACKING_TITLE,
+      conceptType: "Policy",
+      body: "Each bay is racked by row.",
+    },
   ],
   editable: {
     markdown: BRIEF_MARKED,
@@ -79,7 +84,7 @@ export const aSection = (changes: Changes = {}) => ({
 
 export const aGuide = (changes: Changes = {}) => ({
   guideId: A_GUIDE_ID,
-  kind: "Bid library",
+  guideType: "Bid library",
   collection: "northgate",
   subject: { iri: RACKING_IRI, title: "Northgate Ltd" },
   coverage: { met: 3, of: 4 },
@@ -90,7 +95,7 @@ export const aGuide = (changes: Changes = {}) => ({
 
 export const aGuideSummary = (changes: Changes = {}) => ({
   guideId: A_GUIDE_ID,
-  kind: "Bid library",
+  guideType: "Bid library",
   collection: "northgate",
   subject: { iri: RACKING_IRI, title: "Northgate Ltd" },
   sections: 8,

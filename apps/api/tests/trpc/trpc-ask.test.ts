@@ -79,7 +79,7 @@ const webAndMcpFor = async (
 const ACCESS_POLICY = {
   title: "Audit information access for buyers",
   collection: "audits",
-  kind: "Policy",
+  conceptType: "Policy",
   body: "Buyers access audit information through the console's audit page.",
 };
 
@@ -592,6 +592,7 @@ describe("your questions over tRPC", () => {
 
 const wireConcept = z.looseObject({
   url: z.string(),
+  kind: z.string(),
   trust: z.looseObject({
     checkedBy: z.string().nullable(),
     checkedAt: z.string().nullable(),
@@ -606,10 +607,11 @@ const wireAnswer = z.looseObject({
 
 const inCoreTerms = (answered: Rpc, origin: string) => {
   const { answers, related, ...rest } = wireAnswer.parse(answered);
-  const core = ({ url, trust, ...concept }: z.infer<typeof wireConcept>) => {
+  const core = ({ url, kind, trust, ...concept }: z.infer<typeof wireConcept>) => {
     const { checkedBy, checkedAt, ...kept } = trust;
     return {
       ...concept,
+      conceptType: kind,
       url: url.slice(origin.length),
       trust: { ...kept, verifiedBy: checkedBy, verifiedAt: checkedAt },
     };

@@ -99,7 +99,7 @@ export const conceptVisibilityFrom = async (
   tx: Tx,
   concept: {
     readonly iri: string;
-    readonly kind: string;
+    readonly conceptType: string;
     readonly fallback: Visibility;
 
     readonly citing?: readonly string[] | undefined;
@@ -142,7 +142,7 @@ export const conceptVisibilityFrom = async (
         )
       : undefined;
   return derivedVisibility({
-    kind: concept.kind,
+    conceptType: concept.conceptType,
     from: [
       ...connectedSources.rows.flatMap(restingOn),
       ...(concept.alsoOn ?? []),
@@ -177,7 +177,7 @@ const recomputeConceptVisibility = async (
     throw new Error(`visibility: ${iri} is cited but has no concept_index row`);
   const visibility = await conceptVisibilityFrom(principal, tx, {
     iri,
-    kind: row.kind,
+    conceptType: row.kind,
     fallback: visibilityOf(row),
     alsoOn: await restsAlsoOnItsCommit(principal, tx, iri),
   });

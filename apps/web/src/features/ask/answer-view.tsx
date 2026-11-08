@@ -23,7 +23,7 @@ import { ASK_WORDS as WORDS } from "./ask-words.ts";
 
 type ShownConcept = {
   readonly iri: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly title: string;
   readonly collection: string | null;
   readonly trustWords: string;
@@ -154,7 +154,7 @@ function ConceptItem(properties: { readonly concept: ShownConcept }) {
   return (
     <li className="grid gap-2">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <Pill>{concept.kind}</Pill>
+        <Pill>{concept.conceptType}</Pill>
         <Button
           id={openerId}
           variant="link"

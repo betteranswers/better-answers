@@ -133,7 +133,7 @@ const RELATED_LINE =
 const returned = (overrides: Partial<ReturnedConcept<string>> = {}): ReturnedConcept<string> => ({
   iri: "https://better-answers.com/c/01A",
   url: "https://app.example/knowledge/search/01A",
-  kind: "Answer",
+  conceptType: "Answer",
   title: "How long are audit logs kept?",
   collection: "audits",
   body: "Audit logs are kept for thirteen months.\n",
@@ -288,7 +288,7 @@ describe("renderAnswer", () => {
     const policy: PreviewedConcept<string> = {
       iri: "https://better-answers.com/c/01B",
       url: "https://app.example/knowledge/search/01B",
-      kind: "Policy",
+      conceptType: "Policy",
       title: "Retention policy",
       collection: null,
       trust: unverified,
@@ -306,7 +306,7 @@ describe("renderAnswer", () => {
     const policy: PreviewedConcept<string> = {
       iri: "https://better-answers.com/c/01B",
       url: "https://app.example/knowledge/search/01B",
-      kind: "Policy",
+      conceptType: "Policy",
       title: "Retention policy",
       collection: null,
       trust: unverified,
@@ -405,7 +405,7 @@ describe("renderFind", () => {
           {
             layer: "bundles",
             iri: "https://better-answers.com/c/01A",
-            kind: "Policy",
+            conceptType: "Policy",
             title: "Expenses",
             trust: unverified,
             trustWords: "Unverified",
@@ -415,7 +415,7 @@ describe("renderFind", () => {
           {
             layer: "bundles",
             iri: "https://better-answers.com/c/01B",
-            kind: "Guide",
+            conceptType: "Guide",
             title: "Travel",
             trust: {
               tier: "human-reviewed",
@@ -441,7 +441,7 @@ describe("renderFind", () => {
   it("names each concept's collection, or No collection, in its line", () => {
     const match = {
       layer: "bundles",
-      kind: "Answer",
+      conceptType: "Answer",
       trust: unverified,
       trustWords: "Unverified",
       tags: [],
@@ -1279,14 +1279,14 @@ const RETENTION_QUESTION = "How long are audit logs kept?";
 
 const RETENTION_ANSWER: SeededConcept = {
   collection: "audits",
-  kind: "Answer",
+  conceptType: "Answer",
   title: "How long are audit logs kept?",
   body: "Audit logs are kept for thirteen months.\n",
 };
 
 const CONSOLE_EXPORTS: SeededConcept = {
   collection: "lms",
-  kind: "Note",
+  conceptType: "Note",
   title: "Console exports",
   body: "Exports are made in the console.\n",
 };
@@ -1353,13 +1353,13 @@ describe("what ask returns with no model", () => {
     const { workspaceId, asker } = await anAsker();
     const users = {
       collection: "audits",
-      kind: "Answer",
+      conceptType: "Answer",
       title: "How do buyers access audit information about their users' actions?",
       body: "Buyers download their users' audit log from the console.\n",
     };
     const supplier = {
       collection: "audits",
-      kind: "Answer",
+      conceptType: "Answer",
       title: "How do buyers access audit information about the supplier's actions?",
       body: "The supplier sends its own audit report on request.\n",
     };
@@ -1383,10 +1383,10 @@ describe("what ask returns with no model", () => {
       [
         { concept: users, iri: usersIri },
         { concept: supplier, iri: supplierIri },
-      ].map(({ concept: { collection, kind, title, body }, iri }) => ({
+      ].map(({ concept: { collection, conceptType, title, body }, iri }) => ({
         iri,
         url: pageOf(iri),
-        kind,
+        conceptType,
         title,
         collection,
         body,
@@ -1419,13 +1419,13 @@ describe("what ask returns with no model", () => {
       {
         iri: policy,
         url: pageOf(policy),
-        kind: "Policy",
+        conceptType: "Policy",
         title: "Audit log retention",
         collection: "audits",
         trust: unverified,
         trustWords: "Unverified",
       },
-      expect.objectContaining({ iri: note, kind: "Note" }),
+      expect.objectContaining({ iri: note, conceptType: "Note" }),
     ]);
     expect(
       answer.related.map((concept) => ["body", "evidence"].filter((key) => key in concept)),
@@ -1520,7 +1520,7 @@ describe("what ask returns with no model", () => {
     const entry = await seededIn(workspaceId, { ...RETENTION_ANSWER, linksTo: [reached] });
     await seedingWith(db().pool, async (seed) => {
       for (const uid of sections) {
-        await seed.mapNode({ workspaceId, uid, label: "Section", kind: null });
+        await seed.mapNode({ workspaceId, uid, label: "Section", conceptType: null });
         await seed.mapEdge({ workspaceId, fromUid: entry, toUid: uid });
       }
     });
@@ -1782,7 +1782,7 @@ describe("what ask returns with no model", () => {
 
     const answer = await asked(db(), asker, { question: RETENTION_QUESTION });
 
-    expect(answerOutputWith(trust).parse(answer)).toEqual(answer);
+    expect(answerOutputWith(trust, { conceptType: z.string() }).parse(answer)).toEqual(answer);
   });
 });
 
@@ -1817,7 +1817,7 @@ describe("find and open across concepts and source passages", () => {
       const seed = testData(client);
       const indexed = await seed.conceptIndex({
         workspaceId,
-        kind: "Policy",
+        conceptType: "Policy",
         title: CONCEPT_TITLE,
         body: CONCEPT_BODY,
         frontmatter: {
@@ -1855,14 +1855,14 @@ describe("find and open across concepts and source passages", () => {
       const seed = testData(client);
       const cited = await seed.conceptIndex({
         workspaceId,
-        kind: "Policy",
+        conceptType: "Policy",
         title: "Travel policy",
         publishedAt: PUBLISHED_AT,
         sensitivity: "Internal",
       });
       const indexed = await seed.conceptIndex({
         workspaceId,
-        kind: "Policy",
+        conceptType: "Policy",
         title: CONCEPT_TITLE,
         body: CONCEPT_BODY,
         frontmatter: {
@@ -1926,7 +1926,7 @@ describe("find and open across concepts and source passages", () => {
           {
             layer: "bundles",
             iri,
-            kind: "Policy",
+            conceptType: "Policy",
             title: CONCEPT_TITLE,
             description: null,
             trust: unverified,
@@ -2176,7 +2176,7 @@ describe("find and open across concepts and source passages", () => {
 
     const found = await searching(reader);
     assert(found.ok);
-    const parsed = findOutputWith(trust).safeParse(found.value);
+    const parsed = findOutputWith(trust, { conceptType: z.string() }).safeParse(found.value);
 
     expect(parsed.data?.matches).toEqual([
       expect.objectContaining({
@@ -2195,7 +2195,7 @@ describe("find and open across concepts and source passages", () => {
     const found = await searching(reader);
 
     assert(found.ok);
-    expect(findOutputWith(trust).safeParse(found.value)).toEqual({
+    expect(findOutputWith(trust, { conceptType: z.string() }).safeParse(found.value)).toEqual({
       success: true,
       data: {
         query: "kingfisher",
@@ -2203,7 +2203,7 @@ describe("find and open across concepts and source passages", () => {
           {
             layer: "bundles",
             iri,
-            kind: "Policy",
+            conceptType: "Policy",
             title: "Kingfisher policy",
             trust: unverified,
             trustWords: "Unverified",

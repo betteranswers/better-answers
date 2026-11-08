@@ -273,7 +273,7 @@ export type SeedConcept = {
   readonly title: string;
   readonly collection?: string;
   readonly body: string;
-  readonly kind?: string;
+  readonly conceptType?: string;
   readonly sensitivity?: Sensitivity;
   readonly audience?: (typeof AUDIENCES)[number];
   readonly groupMemberIds?: readonly string[];
@@ -365,7 +365,7 @@ export const usageOf = (
 
 type SeedIndexBatch = {
   readonly collection: string | null;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly count: number;
   readonly title?: string;
   readonly sensitivity?: Sensitivity;

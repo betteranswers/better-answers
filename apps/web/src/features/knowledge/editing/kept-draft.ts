@@ -7,7 +7,7 @@ import type { Draft, EditorState, EditTarget } from "./concept-editing.ts";
 
 export const sameDraft = (one: Draft, other: Draft): boolean =>
   one.title === other.title &&
-  one.kind === other.kind &&
+  one.conceptType === other.conceptType &&
   one.description === other.description &&
   one.tags === other.tags &&
   one.body === other.body &&
@@ -22,7 +22,7 @@ const KEPT_DRAFT = z.object({
   base: z.string().nullable(),
   draft: z.object({
     title: z.string(),
-    kind: z.string(),
+    conceptType: z.string(),
     description: z.string(),
     tags: z.string(),
     body: z.string(),

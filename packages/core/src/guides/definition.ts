@@ -1,4 +1,4 @@
-import { foldKind } from "../bundle/index.ts";
+import { foldConceptType } from "../bundle/index.ts";
 import type { UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import type {
@@ -31,7 +31,7 @@ type ExpectedFactRow = {
   readonly sectionId: string;
   readonly ordinal: number;
   readonly name: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly tags: readonly string[];
   readonly collection: string | null;
   readonly atLeast: number;
@@ -41,7 +41,7 @@ export type GuideRows = {
   readonly definition: {
     readonly id: string;
     readonly template: string;
-    readonly kind: string;
+    readonly guideType: string;
     readonly collection: string;
     readonly subjectIri: string | null;
   };
@@ -66,7 +66,7 @@ const sectionRowsOf = (
         sectionId: id,
         ordinal: factOrdinal,
         name: fact.name,
-        kind: foldKind(fact.kind),
+        conceptType: foldConceptType(fact.conceptType),
         tags: fact.tags,
         collection: fact.collection ?? null,
         atLeast: fact.atLeast ?? 1,
@@ -88,7 +88,7 @@ export const guideRowsOf = (
     definition: {
       id: placement.guideId,
       template: template.id,
-      kind: template.kind,
+      guideType: template.guideType,
       collection: placement.collection,
       subjectIri: placement.subjectIri,
     },
@@ -101,7 +101,7 @@ export const guideRowsOf = (
 export type GuideDefinition = {
   readonly id: string;
   readonly template: string;
-  readonly kind: string;
+  readonly guideType: string;
   readonly collection: string;
   readonly subjectIri: string | null;
   readonly roles: readonly TemplateRole[];
@@ -130,7 +130,7 @@ export const definitionOf = (rows: GuideRows): GuideDefinition => ({
 
 type DefinitionRow = Omit<GuideDefinition, "roles" | "sections">;
 
-const DEFINITION = `SELECT id, template, kind, collection, subject_iri AS "subjectIri"
+const DEFINITION = `SELECT id, template, kind AS "guideType", collection, subject_iri AS "subjectIri"
   FROM guide_definition WHERE workspace_id = $1 AND id = $2`;
 
 const ROLES_OF = `SELECT role, default_layer AS "defaultLayer", action_threshold AS "actionThreshold"
@@ -161,12 +161,12 @@ export const insertGuideRows = async (
   tx: Tx,
   rows: GuideRows,
 ): Promise<void> => {
-  const { id, template, kind, collection, subjectIri } = rows.definition;
+  const { id, template, guideType, collection, subjectIri } = rows.definition;
   const scoped = [principal.workspaceId, id];
   await tx.query(
     `INSERT INTO guide_definition (workspace_id, id, template, kind, collection, subject_iri)
      VALUES ($1, $2, $3, $4, $5, $6)`,
-    [...scoped, template, kind, collection, subjectIri],
+    [...scoped, template, guideType, collection, subjectIri],
   );
   await tx.query(
     `INSERT INTO guide_role (workspace_id, guide_id, role, default_layer, action_threshold)
@@ -188,10 +188,10 @@ export const insertGuideRows = async (
   await tx.query(
     `INSERT INTO guide_expected_fact (workspace_id, guide_id, id, section_id, ordinal, name, kind,
                                       tags, collection, at_least)
-     SELECT $1, $2, f.id, f."sectionId", f.ordinal, f.name, f.kind, f.tags, f.collection,
+     SELECT $1, $2, f.id, f."sectionId", f.ordinal, f.name, f."conceptType", f.tags, f.collection,
             f."atLeast"
        FROM jsonb_to_recordset($3::jsonb)
-         AS f(id text, "sectionId" text, ordinal int, name text, kind text, tags text[],
+         AS f(id text, "sectionId" text, ordinal int, name text, "conceptType" text, tags text[],
               collection text, "atLeast" int)`,
     [...scoped, JSON.stringify(rows.facts)],
   );

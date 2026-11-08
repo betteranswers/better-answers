@@ -97,7 +97,7 @@ type KeptConcept = NonNullable<z.output<typeof skeleton>["concepts"]>[number];
 
 type ConceptAsRead = {
   readonly iri: ConceptIri;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly title: string;
   readonly collection: string | null;
   readonly trustWords: string;
@@ -264,7 +264,7 @@ const conceptAsRead = (kept: KeptConcept, read: Read): readonly ConceptAsRead[] 
   if (opened === undefined) return [];
   const concept = {
     iri: kept.iri,
-    kind: opened.kind,
+    conceptType: opened.conceptType,
     title: opened.title,
     collection: opened.collection,
     trustWords: trustWords(trustOf(opened, read.now)),

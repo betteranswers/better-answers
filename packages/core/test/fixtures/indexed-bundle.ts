@@ -36,7 +36,7 @@ export const bundleIndexed = async (
         const iris = await conceptIndexRows(client, {
           workspaceId,
           commitSha: head,
-          kind: "Policy",
+          conceptType: "Policy",
           sensitivity: visibility.sensitivity,
           audienceGroups: visibility.audienceGroups,
           concepts: held.map(({ path, title }) => ({ path, title })),

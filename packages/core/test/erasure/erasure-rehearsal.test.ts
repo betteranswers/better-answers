@@ -189,7 +189,7 @@ describe("seeding the synthetic subject", () => {
     const other = await writeConcept(scenario.admin, doorsOf(scenario), {
       mergeKey: "Note:not the drill",
       path: CONCEPT_PATH,
-      kind: "Note",
+      conceptType: "Note",
       title: "Not the drill",
       frontmatter: { title: "Not the drill", type: "Note" },
       body: "A note somebody left at the drill's path.",

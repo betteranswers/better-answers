@@ -624,7 +624,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const commit = overrides.commitSha ?? (await bundleCommit({ workspaceId })).sha;
     return insertRow(client, boundarySchemas.conceptIndex, {
       path: `knowledge/${ulid().toLowerCase()}.md`,
-      kind: "Policy",
+      conceptType: "Policy",
       title: "Expenses",
       frontmatter: { title: "Expenses", type: "Policy" },
       body: "Expenses are claimed within thirty days.",
@@ -712,7 +712,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     return insertRow(client, boundarySchemas.mapNode, {
       uid: conceptIriOf(ulid()),
       label: "Concept",
-      kind: "Policy",
+      conceptType: "Policy",
       publishedAt: new Date(),
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,
@@ -733,12 +733,12 @@ export const testData = (client: pg.PoolClient): TestData => {
     const link =
       label === "LINKS_TO"
         ? {
-            fromKind: "Policy",
-            toKind: "Policy",
+            fromConceptType: "Policy",
+            toConceptType: "Policy",
             section: "Details",
             sentence: "One policy rests on another.",
           }
-        : { fromKind: null, toKind: null, section: null, sentence: null };
+        : { fromConceptType: null, toConceptType: null, section: null, sentence: null };
     return insertRow(client, boundarySchemas.mapEdge, {
       uid: `links_to:${ulid()}`,
       publishedAt: new Date(),
@@ -815,7 +815,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     return insertRow(client, boundarySchemas.conceptWriteRequest, {
       mergeKey: `policy:${ulid().toLowerCase()}`,
       path: `knowledge/${ulid().toLowerCase()}.md`,
-      conceptKind: "Policy",
+      conceptType: "Policy",
       title: "Expenses",
       frontmatter: { title: "Expenses", type: "Policy" },
       body: "Expenses are claimed within thirty days.",
@@ -1037,7 +1037,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     return insertRow(client, boundarySchemas.guideDefinition, {
       id: ulid(),
-      kind: "bid",
+      guideType: "bid",
       collection: "bids",
       template: "bid-response",
       subjectIri: null,
@@ -1098,7 +1098,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       id: ulid(),
       ordinal: 0,
       name: "Insurance cover",
-      kind: "Policy",
+      conceptType: "Policy",
       tags: [],
       collection: null,
       atLeast: 1,

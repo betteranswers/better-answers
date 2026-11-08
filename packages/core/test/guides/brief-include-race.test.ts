@@ -27,7 +27,7 @@ const ANOTHER_POLICY = {
   key: "anotherPolicy",
   slug: "business-continuity-plan",
   title: "Business continuity plan",
-  kind: "insurance policy",
+  conceptType: "insurance policy",
   tags: ["continuity"],
   body: "Northgate keeps a business continuity plan and tests it each year.",
 } as const satisfies Concept;

@@ -112,7 +112,7 @@ export const EXPORTS_WORDS = {
     name: "Guide snapshot",
     holds: "A file of a guide’s Briefs.",
     picker: "Guide",
-    option: (guide: GuideSummary): string => `${guideTitleOf(guide)} (${guide.kind})`,
+    option: (guide: GuideSummary): string => `${guideTitleOf(guide)} (${guide.guideType})`,
     loading: "The guides are still loading.",
     none: "No guides yet.",
     retry: "Retry",

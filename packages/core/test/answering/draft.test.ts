@@ -50,7 +50,7 @@ const LMS_LOGS: SeededConcept = {
 
 const anAnswer = (title: string, body: string): SeededConcept => ({
   collection: "audits",
-  kind: "Answer",
+  conceptType: "Answer",
   title,
   body,
 });

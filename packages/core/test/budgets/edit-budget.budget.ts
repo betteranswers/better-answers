@@ -26,7 +26,7 @@ const passages = (principal: UserPrincipal, tx: Tx) => (locator: string) =>
 const policyAt = (at: number, body: string): WriteConceptInput => ({
   mergeKey: `policy:rule-${at}`,
   path: `knowledge/policy/rule-${at}.md`,
-  kind: "Policy",
+  conceptType: "Policy",
   title: `Rule ${at}`,
   frontmatter: { title: `Rule ${at}`, type: "Policy" },
   body,

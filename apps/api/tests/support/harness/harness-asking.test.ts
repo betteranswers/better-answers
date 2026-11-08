@@ -21,7 +21,7 @@ const { users: USERS, supplier: SUPPLIER } = AUDIT_ANSWERS;
 const POLICY = {
   title: "Audit information access for buyers",
   collection: "audits",
-  kind: "Policy",
+  conceptType: "Policy",
   body: "Buyers access audit information through the console's audit page.",
 };
 

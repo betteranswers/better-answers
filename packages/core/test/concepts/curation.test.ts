@@ -176,7 +176,12 @@ describe("the All knowledge row for each concept", () => {
         title: "Holiday",
         checks: [{ actor: `human:${priya.userId}`, at: new Date("2026-07-31T23:30:00Z") }],
       },
-      { iri: FIXED("D"), path: "knowledge/company/lease.md", title: "Lease", kind: "Contract" },
+      {
+        iri: FIXED("D"),
+        path: "knowledge/company/lease.md",
+        title: "Lease",
+        conceptType: "Contract",
+      },
       {
         iri: FIXED("E"),
         path: "knowledge/loose.md",
@@ -198,7 +203,7 @@ describe("the All knowledge row for each concept", () => {
       {
         iri: FIXED("F"),
         title: "Archive",
-        kind: "Policy",
+        conceptType: "Policy",
         collection: "archive",
         trust: { tier: "unverified", status: "current" },
         trustWords: "Unverified",
@@ -209,7 +214,7 @@ describe("the All knowledge row for each concept", () => {
       {
         iri: FIXED("A"),
         title: "Expenses",
-        kind: "Policy",
+        conceptType: "Policy",
         collection: "company",
         trust: { tier: "human-reviewed", status: "current" },
         trustWords: "Verified by Priya Anand · 3 October 2026",
@@ -220,7 +225,7 @@ describe("the All knowledge row for each concept", () => {
       {
         iri: FIXED("C"),
         title: "Holiday",
-        kind: "Policy",
+        conceptType: "Policy",
         collection: "company",
         trust: { tier: "human-reviewed", status: "current" },
         trustWords: "Verified by Priya Anand · 1 August 2026",
@@ -231,7 +236,7 @@ describe("the All knowledge row for each concept", () => {
       {
         iri: FIXED("D"),
         title: "Lease",
-        kind: "Contract",
+        conceptType: "Contract",
         collection: "company",
         trust: { tier: "unverified", status: "current" },
         trustWords: "Unverified",
@@ -242,7 +247,7 @@ describe("the All knowledge row for each concept", () => {
       {
         iri: FIXED("E"),
         title: "Loose",
-        kind: "Policy",
+        conceptType: "Policy",
         collection: null,
         trust: { tier: "machine-confirmed", status: "current" },
         trustWords: "Verified automatically",
@@ -253,7 +258,7 @@ describe("the All knowledge row for each concept", () => {
       {
         iri: FIXED("B"),
         title: "Travel",
-        kind: "Policy",
+        conceptType: "Policy",
         collection: "company",
         trust: { tier: "human-reviewed", status: "current" },
         trustWords: "Verified by a former member · 4 October 2026",
@@ -309,16 +314,16 @@ const seededForSorting = async () => {
       iri: FIXED("B"),
       path: "knowledge/company/b.md",
       title: "Alpha",
-      kind: "Contract",
+      conceptType: "Contract",
       checks: checked(priya, "2026-03-01T09:00:00Z"),
     },
     { iri: FIXED("C"), path: "knowledge/people/c.md", title: "beta" },
-    { iri: FIXED("D"), path: "knowledge/d.md", title: "Gamma", kind: "Contract" },
+    { iri: FIXED("D"), path: "knowledge/d.md", title: "Gamma", conceptType: "Contract" },
     {
       iri: FIXED("E"),
       path: "knowledge/people/e.md",
       title: "Delta",
-      kind: "Standard",
+      conceptType: "Standard",
       checks: checked(priya, "2026-03-01T09:00:00Z"),
     },
   ]);
@@ -361,7 +366,11 @@ describe("sorting, filtering and paging All knowledge", () => {
     ["title", (group, at) => ({ path: `knowledge/company/${at}.md`, title: `Group ${group}` })],
     [
       "kind",
-      (group, at) => ({ path: `knowledge/company/${at}.md`, title: "Same", kind: `Kind ${group}` }),
+      (group, at) => ({
+        path: `knowledge/company/${at}.md`,
+        title: "Same",
+        conceptType: `Kind ${group}`,
+      }),
     ],
     ["collection", (group, at) => ({ path: `knowledge/group-${group}/${at}.md`, title: "Same" })],
   ])("breaks a tie in %s by the concept, either way", async (column, grouped) => {
@@ -406,9 +415,9 @@ describe("sorting, filtering and paging All knowledge", () => {
   it.each<[string, Asked, string]>([
     ["a collection", { collections: ["people"] }, "EC"],
     ["two collections", { collections: ["company", "people"] }, "ABEC"],
-    ["a kind", { kind: "Contract" }, "BD"],
-    ["a collection and a kind", { collections: ["company"], kind: "Policy" }, "A"],
-    ["a collection holding no such kind", { collections: ["people"], kind: "Contract" }, ""],
+    ["a kind", { conceptType: "Contract" }, "BD"],
+    ["a collection and a kind", { collections: ["company"], conceptType: "Policy" }, "A"],
+    ["a collection holding no such kind", { collections: ["people"], conceptType: "Contract" }, ""],
     ["a collection holding nothing", { collections: ["archive"] }, ""],
   ])("filters by %s", async (_name, filter, letters) => {
     const seeded = await seededForSorting();
@@ -492,7 +501,7 @@ describe("sorting, filtering and paging All knowledge", () => {
     ["an empty collection", { collections: [""] }],
     ["page zero", { page: 0 }],
     ["a fractional page", { page: 1.5 }],
-    ["an empty kind", { kind: " " }],
+    ["an empty kind", { conceptType: " " }],
     ["a sort by something else", { sort: { column: "body", desc: false } }],
     ["a stray key", { colour: "red" }],
   ])("refuses %s in the input", (_name, overrides) => {
@@ -520,17 +529,17 @@ describe("only what the reader may read", () => {
     shelved(seeded, [
       { path: "knowledge/company/expenses.md", title: "Expenses" },
       { path: "knowledge/company/travel.md", title: "Travel" },
-      { path: "knowledge/company/lease.md", title: "Lease", kind: "Contract" },
+      { path: "knowledge/company/lease.md", title: "Lease", conceptType: "Contract" },
       { path: "knowledge/company/salaries.md", title: "Salaries", sensitivity: "Restricted" },
       { path: "knowledge/company/grievances.md", title: "Grievances", audienceGroups: [hr] },
       { path: "knowledge/people/rota.md", title: "Rota" },
       {
         path: "knowledge/people/appraisals.md",
         title: "Appraisals",
-        kind: "Appraisal",
+        conceptType: "Appraisal",
         audienceGroups: [hr],
       },
-      { path: "knowledge/loose.md", title: "Loose", kind: "Contract" },
+      { path: "knowledge/loose.md", title: "Loose", conceptType: "Contract" },
     ]);
 
   const seededWithHr = async () => {
@@ -556,7 +565,7 @@ describe("only what the reader may read", () => {
 
     expect(outside).toEqual([
       {
-        kind: "Contract",
+        conceptType: "Contract",
         count: 2,
         collections: [
           { collection: "company", count: 1 },
@@ -564,7 +573,7 @@ describe("only what the reader may read", () => {
         ],
       },
       {
-        kind: "Policy",
+        conceptType: "Policy",
         count: 3,
         collections: [
           { collection: "company", count: 2 },
@@ -573,9 +582,9 @@ describe("only what the reader may read", () => {
       },
     ]);
     expect(inside).toEqual([
-      { kind: "Appraisal", count: 1, collections: [{ collection: "people", count: 1 }] },
+      { conceptType: "Appraisal", count: 1, collections: [{ collection: "people", count: 1 }] },
       {
-        kind: "Contract",
+        conceptType: "Contract",
         count: 2,
         collections: [
           { collection: "company", count: 1 },
@@ -583,7 +592,7 @@ describe("only what the reader may read", () => {
         ],
       },
       {
-        kind: "Policy",
+        conceptType: "Policy",
         count: 4,
         collections: [
           { collection: "company", count: 3 },
@@ -591,7 +600,7 @@ describe("only what the reader may read", () => {
         ],
       },
     ]);
-    expect(admins.map(({ kind, count }) => [kind, count])).toEqual([
+    expect(admins.map(({ conceptType, count }) => [conceptType, count])).toEqual([
       ["Contract", 2],
       ["Policy", 4],
     ]);
@@ -635,7 +644,7 @@ describe("only what the reader may read", () => {
     const { seeded } = await seededWithHr();
 
     const filtered = await knowledgeRead(seeded, seeded.owner, asked({ collections: ["people"] }));
-    const ofKind = await knowledgeRead(seeded, seeded.owner, asked({ kind: "Appraisal" }));
+    const ofKind = await knowledgeRead(seeded, seeded.owner, asked({ conceptType: "Appraisal" }));
     const secondPage = await knowledgeRead(seeded, seeded.owner, asked({ page: 2 }));
 
     expect(filtered.rows.map(({ title }) => title)).toEqual(["Rota"]);
@@ -674,7 +683,7 @@ describe("the wide workspace the budget reads", () => {
 
     expect(page).toMatchObject({ total: 120, pageSize: 50 });
     expect(page.rows).toHaveLength(50);
-    expect(kinds.map(({ kind, count }) => [kind, count])).toEqual(
+    expect(kinds.map(({ conceptType, count }) => [conceptType, count])).toEqual(
       Array.from({ length: 8 }, (_unused, at) => [`Kind ${at}`, 15]),
     );
     expect(kinds.every(({ collections }) => collections.length === 3)).toBe(true);

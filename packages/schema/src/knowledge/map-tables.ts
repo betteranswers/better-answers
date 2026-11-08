@@ -77,13 +77,13 @@ export const mapNode = withRLS(
   {
     ...mapRowColumns(),
 
-    kind: text("kind"),
+    conceptType: text("kind"),
     ...readableUnitColumns(),
   },
   "workspaceId",
   (table) => [
     ...partitionKeys("map_node", table),
-    index("map_node_kind_idx").on(table.workspaceId, table.kind),
+    index("map_node_kind_idx").on(table.workspaceId, table.conceptType),
     check("map_node_label_check", sql.raw(nodeLabelCheck)),
     check("map_node_gen_check", sql.raw(genCheck)),
     check("map_node_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
@@ -97,9 +97,9 @@ export const mapEdge = withRLS(
     ...mapRowColumns(),
     fromUid: text("from_uid").notNull(),
     toUid: text("to_uid").notNull(),
-    fromKind: text("from_kind"),
+    fromConceptType: text("from_kind"),
 
-    toKind: text("to_kind"),
+    toConceptType: text("to_kind"),
     section: text("section"),
     sentence: text("sentence"),
     ...readableUnitColumns(),

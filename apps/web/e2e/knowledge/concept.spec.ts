@@ -101,7 +101,7 @@ const aWorkspaceOfConcepts = async (api: APIRequestContext, name: string) => {
     concepts: [
       {
         title: COMMITTEE,
-        kind: "Team",
+        conceptType: "Team",
         body: "The committee meets each quarter.",
         sources: [{ title: CHARTER, passages: [CHARTER_PASSAGE] }],
       },
@@ -277,7 +277,7 @@ test.describe("the concept page", () => {
         {
           title: LEASE,
           collection: CONTRACTS,
-          kind: "Contract",
+          conceptType: "Contract",
           body: "The yard lease runs for ten years.",
           trust: "human-reviewed",
           sources: [{ title: LEASE_DOCUMENT, at: "p.3" }],

@@ -64,7 +64,7 @@ describe("the knowledge tree", () => {
       { path: "knowledge/company/expenses.md" },
       { path: "knowledge/company/travel.md" },
       { path: "knowledge/company/salaries.md", sensitivity: "Restricted" },
-      { path: "knowledge/company/lease.md", kind: "Contract" },
+      { path: "knowledge/company/lease.md", conceptType: "Contract" },
       { path: "knowledge/held/board-minutes.md", sensitivity: "Restricted" },
     ]);
 
@@ -77,8 +77,8 @@ describe("the knowledge tree", () => {
           collection: "company",
           count: 3,
           kinds: [
-            { kind: "Contract", count: 1 },
-            { kind: "Policy", count: 2 },
+            { conceptType: "Contract", count: 1 },
+            { conceptType: "Policy", count: 2 },
           ],
         },
       ],
@@ -89,11 +89,11 @@ describe("the knowledge tree", () => {
           collection: "company",
           count: 4,
           kinds: [
-            { kind: "Contract", count: 1 },
-            { kind: "Policy", count: 3 },
+            { conceptType: "Contract", count: 1 },
+            { conceptType: "Policy", count: 3 },
           ],
         },
-        { collection: "held", count: 1, kinds: [{ kind: "Policy", count: 1 }] },
+        { collection: "held", count: 1, kinds: [{ conceptType: "Policy", count: 1 }] },
       ],
     });
   });
@@ -118,7 +118,7 @@ describe("the knowledge tree", () => {
       { path: "knowledge/people/rota.md", draft: true },
       { path: "knowledge/drafts/plan.md", draft: true },
     ]);
-    const people = { collection: "people", kind: "Policy" };
+    const people = { collection: "people", conceptType: "Policy" };
 
     const insideTree = await treeReadBy(seeded, inside);
     const outsideTree = await treeReadBy(seeded, outside);
@@ -143,19 +143,22 @@ describe("the knowledge tree", () => {
     ]);
 
     const tree = await treeReadBy(seeded, seeded.viewer);
-    const outside = await kindReadBy(seeded, seeded.viewer, { collection: null, kind: "Policy" });
+    const outside = await kindReadBy(seeded, seeded.viewer, {
+      collection: null,
+      conceptType: "Policy",
+    });
 
     expect(tree.collections).toEqual([
-      { collection: "archive", count: 1, kinds: [{ kind: "Policy", count: 1 }] },
-      { collection: "company", count: 1, kinds: [{ kind: "Policy", count: 1 }] },
-      { collection: null, count: 1, kinds: [{ kind: "Policy", count: 1 }] },
+      { collection: "archive", count: 1, kinds: [{ conceptType: "Policy", count: 1 }] },
+      { collection: "company", count: 1, kinds: [{ conceptType: "Policy", count: 1 }] },
+      { collection: null, count: 1, kinds: [{ conceptType: "Policy", count: 1 }] },
     ]);
     expect(outside).toEqual({
       concepts: [
         {
           iri: loose,
           title: "Loose",
-          kind: "Policy",
+          conceptType: "Policy",
           trust: { tier: "unverified", status: "current" },
           trustWords: "Unverified",
         },
@@ -181,9 +184,9 @@ describe("a kind's concepts", () => {
     const seeded = await seededWorkspace();
     const iris = await shelve(seeded, [
       ...Array.from({ length: POLICIES }, (_unused, at) => policyAt(POLICIES - 1 - at)),
-      { path: "knowledge/company/lease.md", kind: "Contract" },
+      { path: "knowledge/company/lease.md", conceptType: "Contract" },
     ]);
-    const company = { collection: "company", kind: "Policy" };
+    const company = { collection: "company", conceptType: "Policy" };
 
     const first = await kindReadBy(seeded, seeded.viewer, company);
     const second = await kindReadBy(seeded, seeded.viewer, {
@@ -200,6 +203,6 @@ describe("a kind's concepts", () => {
     expect(third.nextCursor).toBeNull();
     expect(new Set(listed.map(({ iri }) => iri))).toEqual(new Set(iris.slice(0, POLICIES)));
     expect(listed.map(({ title }) => title)).toEqual(listed.map(({ title }) => title).toSorted());
-    expect(listed.every(({ kind }) => kind === "Policy")).toBe(true);
+    expect(listed.every(({ conceptType }) => conceptType === "Policy")).toBe(true);
   });
 });

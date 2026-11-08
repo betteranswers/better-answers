@@ -34,7 +34,9 @@ const aKnowledgeBaseApi = () => {
   const api = aSearchApi();
   api.set("knowledge.tree", () =>
     read({
-      collections: [{ collection: "company", count: 1, kinds: [{ kind: "lease", count: 1 }] }],
+      collections: [
+        { collection: "company", count: 1, kinds: [{ conceptType: "lease", count: 1 }] },
+      ],
     }),
   );
   api.set("knowledge.kindConcepts", () =>
@@ -43,7 +45,7 @@ const aKnowledgeBaseApi = () => {
         {
           iri: `${CONCEPT_IRI_PREFIX}${A_LEASE}`,
           title: "Yard Lease",
-          kind: "lease",
+          conceptType: "lease",
           trust: { tier: "unverified", status: "current" },
           trustWords: "Unverified",
         },
@@ -140,7 +142,7 @@ describe("the concept page's back link", () => {
       new Set([
         JSON.stringify({
           collections: [],
-          kind: "policy",
+          conceptType: "policy",
           sort: { column: "title", desc: true },
           page: 2,
         }),

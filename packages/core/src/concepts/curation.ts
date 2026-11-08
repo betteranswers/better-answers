@@ -43,7 +43,7 @@ const SORT_KEYS = {
 
 export const allKnowledgeInput = z.strictObject({
   collections: z.array(z.string().regex(COLLECTION)),
-  kind: boundarySchemas.conceptIndex.select.shape.kind.optional(),
+  conceptType: boundarySchemas.conceptIndex.select.shape.conceptType.optional(),
   sort: z.strictObject({ column: z.enum(SORT_COLUMNS), desc: z.boolean() }),
   page: z.int().min(1).default(1),
 });
@@ -53,7 +53,7 @@ export type AllKnowledgeInput = z.output<typeof allKnowledgeInput>;
 export type AllKnowledgeRow = {
   readonly iri: ConceptIri;
   readonly title: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly collection: string | null;
   readonly trust: Pick<Trust, "tier" | "status">;
   readonly trustWords: string;
@@ -70,7 +70,7 @@ export type AllKnowledge = {
 };
 
 export type KindCounted = {
-  readonly kind: string;
+  readonly conceptType: string;
   readonly count: number;
   readonly collections: readonly { readonly collection: string | null; readonly count: number }[];
 };
@@ -156,7 +156,7 @@ const rowOf = (row: PageRow, now: Date): AllKnowledgeRow => {
   return {
     iri: ids.conceptIri.parse(row.iri),
     title: row.title,
-    kind: row.kind,
+    conceptType: row.kind,
     collection: row.collection,
     trust: { tier: trust.tier, status: trust.status },
     trustWords: trustWords(trust),
@@ -185,10 +185,15 @@ const totalBehind = async (
 const pageRead = async (
   reader: UserPrincipal,
   tx: Tx,
-  { collections, kind, sort, page }: AllKnowledgeInput,
+  { collections, conceptType, sort, page }: AllKnowledgeInput,
   now: Date,
 ): Promise<AllKnowledge> => {
-  const filter = [reader.workspaceId, ...readableParameters(reader), collections, kind ?? null];
+  const filter = [
+    reader.workspaceId,
+    ...readableParameters(reader),
+    collections,
+    conceptType ?? null,
+  ];
   const { rows } = await tx.query<PageRow>(pageQuery(sort), [...filter, (page - 1) * PAGE_SIZE]);
   return {
     rows: rows.map((row) => rowOf(row, now)),
@@ -224,14 +229,14 @@ type KindRow = {
 
 const kindsOf = (rows: readonly KindRow[]): readonly KindCounted[] =>
   [...Map.groupBy(rows, (row) => row.kind)]
-    .map(([kind, held]) => ({
-      kind,
+    .map(([conceptType, held]) => ({
+      conceptType,
       count: held.reduce((sum, row) => sum + row.count, 0),
       collections: held
         .map(({ collection, count }) => ({ collection, count }))
         .toSorted(collectionOrder),
     }))
-    .toSorted((one, other) => byCodeUnit(one.kind, other.kind));
+    .toSorted((one, other) => byCodeUnit(one.conceptType, other.conceptType));
 
 export const readKinds = async (
   principal: UserPrincipal,

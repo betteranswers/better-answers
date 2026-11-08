@@ -58,7 +58,10 @@ export function ConceptLine(properties: {
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <TrustMark trust={match.trust} words={match.trustWords} dated />
-        <KindLine kind={match.kind} collection={match.collection ?? CONCEPT_WORDS.noCollection} />
+        <KindLine
+          conceptType={match.conceptType}
+          collection={match.collection ?? CONCEPT_WORDS.noCollection}
+        />
       </div>
     </div>
   );
@@ -94,7 +97,7 @@ export function PassageLine(properties: {
           {match.title}
         </Button>
         <SensitivityTag sensitivity={match.sensitivity} />
-        <KindLine kind={WORDS.document} className="basis-full" />
+        <KindLine conceptType={WORDS.document} className="basis-full" />
       </div>
       <p className="mt-1 break-words text-muted-foreground">{match.openingLine}</p>
       {opened === undefined || opening.beside ? null : (

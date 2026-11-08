@@ -28,20 +28,20 @@ const PAGE = KINDS_PAGE.path;
 
 const KINDS = [
   {
-    kind: "Ledger",
+    conceptType: "Ledger",
     count: 2,
     collections: [{ collection: "finance", count: 2 }],
   },
   {
-    kind: "Policy",
+    conceptType: "Policy",
     count: 3,
     collections: [
       { collection: "hr", count: 2 },
       { collection: null, count: 1 },
     ],
   },
-  { kind: "Procedure", count: 1, collections: [{ collection: "ops", count: 1 }] },
-  { kind: "Role", count: 2, collections: [{ collection: "hr", count: 2 }] },
+  { conceptType: "Procedure", count: 1, collections: [{ collection: "ops", count: 1 }] },
+  { conceptType: "Role", count: 2, collections: [{ collection: "hr", count: 2 }] },
 ];
 
 const aKindsApi = (kinds: readonly unknown[] = KINDS) => {
@@ -57,14 +57,14 @@ const disclosures = () =>
     .getAllByRole("button")
     .filter((each) => each.hasAttribute("aria-expanded"));
 
-const disclosureOf = (kind: string) =>
-  region().getByRole("button", { name: new RegExp(`^${kind}`) });
+const disclosureOf = (conceptType: string) =>
+  region().getByRole("button", { name: new RegExp(`^${conceptType}`) });
 
 const kindsListed = (): string[] =>
   disclosures().map((each) => each.textContent.replace(WORDS.byCollection, ""));
 
-const countOf = (kind: string): string | undefined => {
-  const row = disclosureOf(kind).closest("tr");
+const countOf = (conceptType: string): string | undefined => {
+  const row = disclosureOf(conceptType).closest("tr");
   return row === null ? undefined : within(row).getAllByRole("cell").at(1)?.textContent;
 };
 
@@ -190,7 +190,9 @@ describe("the Kinds page", () => {
   it("offers Clear Filters when the filter leaves no kinds", async () => {
     const router = await openAt(
       PAGE,
-      aKindsApi([{ kind: "Policy", count: 3, collections: [{ collection: "hr", count: 3 }] }]),
+      aKindsApi([
+        { conceptType: "Policy", count: 3, collections: [{ collection: "hr", count: 3 }] },
+      ]),
     );
     await table();
 
@@ -302,7 +304,9 @@ describe("the Kinds page", () => {
       WORDS.tail,
       WORDS.columns.kind,
       WORDS.columns.concepts,
-      ...["Ledger", "Policy", "Procedure", "Role"].map((kind) => `${kind}${WORDS.byCollection}`),
+      ...["Ledger", "Policy", "Procedure", "Role"].map(
+        (conceptType) => `${conceptType}${WORDS.byCollection}`,
+      ),
     ]);
   });
 

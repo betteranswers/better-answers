@@ -33,8 +33,8 @@ const treeOf = (page: Page): Locator => page.getByRole("tree", { name: WORDS.tre
 const itemOf = (page: Page, name: string): Locator =>
   treeOf(page).getByRole("treeitem", { name: new RegExp(`^${name},`) });
 
-const conceptsOf = (page: Page, kind: string, collection: string): Locator =>
-  page.getByRole("region", { name: `${kind} in ${collection}`, exact: true });
+const conceptsOf = (page: Page, conceptType: string, collection: string): Locator =>
+  page.getByRole("region", { name: `${conceptType} in ${collection}`, exact: true });
 
 const rowsOf = (concepts: Locator): Locator =>
   concepts.getByRole("row").filter({ has: concepts.page().getByRole("cell") });
@@ -44,8 +44,8 @@ const atTheKnowledgeBase = async (page: Page): Promise<void> => {
   await expect(treeOf(page)).toBeVisible();
 };
 
-const openedAt = (collection: string, kind: string): string =>
-  `${KNOWLEDGE_BASE}?base.collection=${encodeURIComponent(collection)}&base.kind=${encodeURIComponent(kind)}`;
+const openedAt = (collection: string, conceptType: string): string =>
+  `${KNOWLEDGE_BASE}?base.collection=${encodeURIComponent(collection)}&base.kind=${encodeURIComponent(conceptType)}`;
 
 const bottomOf = async (drawn: Locator): Promise<number> => {
   const box = await drawn.boundingBox();
@@ -108,13 +108,13 @@ test.describe("Knowledge Base", () => {
     const { seeded } = await seedConceptIndex(request, {
       workspaceId: workspace.workspaceId,
       batches: [
-        { collection: "company", kind: "Insurance Policy", count: A_KIND },
+        { collection: "company", conceptType: "Insurance Policy", count: A_KIND },
         ...COLLECTIONS.slice(1).map((collection) => ({
           collection,
-          kind: "Procedure",
+          conceptType: "Procedure",
           count: 200,
         })),
-        ...COLLECTIONS.map((collection) => ({ collection, kind: "Record", count: 80 })),
+        ...COLLECTIONS.map((collection) => ({ collection, conceptType: "Record", count: 80 })),
       ],
     });
     expect(seeded).toBe(CONCEPTS);

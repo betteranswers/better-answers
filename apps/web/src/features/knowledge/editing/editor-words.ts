@@ -12,7 +12,7 @@ export const EDITOR_WORDS = {
   headingSuggest: "Suggest an edit",
   headingNew: "New concept",
   title: "Title",
-  kind: "Type",
+  conceptType: "Type",
   description: "Description",
   tags: "Tags",
   tagsHint: "Separate tags with commas.",
@@ -55,7 +55,7 @@ export const EDITOR_WORDS = {
   cannotSave: {
     collection: "Choose a collection before you save.",
     title: "Add a title before you save.",
-    kind: "Add a type before you save.",
+    conceptType: "Add a type before you save.",
     body: "Add some text to the body before you save.",
   },
   saving: "Saving…",

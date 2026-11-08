@@ -61,7 +61,7 @@ const audienceIntersection = (audiences: readonly Audience[]): Audience | "nobod
 const KIND_FLOOR: ReadonlyMap<string, Sensitivity> = new Map([["Person", RESTRICTED]]);
 
 export type Derivation = {
-  readonly kind?: string | undefined;
+  readonly conceptType?: string | undefined;
   readonly from: readonly Visibility[];
 
   readonly fallback: Visibility;
@@ -79,7 +79,8 @@ const combined = (from: readonly Visibility[]): Visibility | undefined => {
 export const derivedVisibility = (derivation: Derivation): Visibility => {
   if (derivation.override !== undefined) return derivation.override;
   const inherited = combined(derivation.from) ?? derivation.fallback;
-  const floor = derivation.kind === undefined ? undefined : KIND_FLOOR.get(derivation.kind);
+  const floor =
+    derivation.conceptType === undefined ? undefined : KIND_FLOOR.get(derivation.conceptType);
   return floor === undefined
     ? inherited
     : { ...inherited, sensitivity: narrower(inherited.sensitivity, floor) };

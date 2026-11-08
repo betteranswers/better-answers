@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { TRUST_TIERS } from "@better-answers/core/answering";
 import {
-  foldKind,
+  foldConceptType,
   mergeKeyOf,
   nameOwner,
   nameOwnerInput,
@@ -114,7 +114,7 @@ const aConcept = z
   .object({
     title: z.string().min(1),
     collection: z.string().min(1).optional(),
-    kind: z.string().min(1).default("Answer"),
+    conceptType: z.string().min(1).default("Answer"),
     body: z.string().min(1),
     status: z.enum(CONCEPT_STATUSES).default(CONCEPT_STABLE_STATUS),
     sensitivity: z.enum(SENSITIVITIES).default("Internal"),
@@ -158,8 +158,8 @@ const pathOf = ({ title, collection }: Pick<AskedConcept, "title" | "collection"
     "/",
   );
 
-const mergeKeyFor = ({ kind, title }: Pick<AskedConcept, "kind" | "title">): string =>
-  mergeKeyOf(foldKind(kind), title);
+const mergeKeyFor = ({ conceptType, title }: Pick<AskedConcept, "conceptType" | "title">): string =>
+  mergeKeyOf(foldConceptType(conceptType), title);
 
 export const conceptsSeeding = z
   .object({
@@ -387,12 +387,12 @@ const conceptWritten = async (
     {
       mergeKey: mergeKeyFor(concept),
       path,
-      kind: concept.kind,
+      conceptType: concept.conceptType,
       title: concept.title,
       frontmatter: {
         ...concept.frontmatter,
         title: concept.title,
-        type: concept.kind,
+        type: concept.conceptType,
         sources: citations.map(({ id, title, resource, locator }) =>
           locator === undefined ? { id, title, resource } : { id, title, resource, locator },
         ),
@@ -771,7 +771,7 @@ const BID_LIBRARY = {
 const northgateConcept = (concept: Concept, trust: AskedConcept["trust"]) => ({
   title: concept.title,
   collection: NORTHGATE.collection,
-  kind: concept.kind,
+  conceptType: concept.conceptType,
   body: concept.body,
   trust,
   sources: [{ title: NORTHGATE_RECORDS, at: "register entry" }],
@@ -963,7 +963,7 @@ export const conceptIndexSeeding = z.strictObject({
     .array(
       z.strictObject({
         collection: z.string().regex(COLLECTION).nullable(),
-        kind: z.string().trim().min(1),
+        conceptType: z.string().trim().min(1),
         count: z.int().min(1).max(SEEDED_AT_MOST),
         title: z.string().trim().min(1).optional(),
         sensitivity: z.enum(SENSITIVITIES).optional(),
@@ -994,12 +994,12 @@ export const seedConceptIndex = async (
       await conceptIndexRows(client, {
         workspaceId,
         commitSha,
-        kind: batch.kind,
+        conceptType: batch.conceptType,
         sensitivity: batch.sensitivity ?? SEEDED_SENSITIVITY,
         audienceGroups: batch.audienceGroups ?? null,
         concepts: places.map((place) => ({
           path: seededPath(batch, `seeded-${commitSha.slice(0, 12)}-${at}-${place}`),
-          title: `${batch.title ?? batch.kind} ${String(place).padStart(width, "0")}`,
+          title: `${batch.title ?? batch.conceptType} ${String(place).padStart(width, "0")}`,
         })),
       });
       rows += batch.count;
@@ -1063,7 +1063,7 @@ export const seedEditSuggestion = async (
         {
           mergeKey: standing.merge_key,
           path: standing.path,
-          conceptKind: standing.kind,
+          conceptType: standing.kind,
           title,
           frontmatter: conceptFrontmatter.parse({ ...standing.frontmatter, title }),
           body: asked.body ?? standing.body,

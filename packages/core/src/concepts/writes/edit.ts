@@ -29,7 +29,7 @@ export type SourceEntry = string | FrontmatterSource;
 
 export type ConceptParts = {
   readonly title: string;
-  readonly kind: string;
+  readonly conceptType: string;
   readonly description: string | null;
   readonly tags: readonly string[];
   readonly body: string;
@@ -80,13 +80,19 @@ const tagsOf = (value: FrontmatterValue | undefined): readonly string[] =>
 
 const partsOf = (frontmatter: Frontmatter, body: string, held: Held): ConceptParts => ({
   title: stringOf(frontmatter["title"]) ?? held.title,
-  kind: stringOf(frontmatter["type"]) ?? held.kind,
+  conceptType: stringOf(frontmatter["type"]) ?? held.conceptType,
   description: stringOf(frontmatter["description"]),
   tags: tagsOf(frontmatter["tags"]),
   body,
 });
 
-const EMPTY_PARTS: ConceptParts = { title: "", kind: "", description: null, tags: [], body: "" };
+const EMPTY_PARTS: ConceptParts = {
+  title: "",
+  conceptType: "",
+  description: null,
+  tags: [],
+  body: "",
+};
 
 export type Opened = {
   readonly entry: SourceEntry;

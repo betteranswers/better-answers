@@ -715,7 +715,7 @@ describe("an `Answer` withheld from the asker", () => {
     });
     const entry = await conceptSeeded(db(), scenario.workspaceId, {
       collection: "audits",
-      kind: "Answer",
+      conceptType: "Answer",
       title: QUESTION.question,
       body: "Audit logs are kept for thirteen months.",
       linksTo: [first, second],
@@ -773,7 +773,7 @@ describe("an `Answer` withheld from the asker", () => {
     });
     const retention = await conceptCiting(scenario, scenario.editor, [], {
       title: RETENTION.title,
-      kind: "Answer",
+      conceptType: "Answer",
       sensitivity: "Internal",
       body: "Audit logs are kept for thirteen months.[^BM-1]",
       frontmatter: {
