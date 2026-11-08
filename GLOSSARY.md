@@ -29,8 +29,7 @@ service, or one sector. Each collection has its owners.
 
 **Concept type**:
 What sort of thing a concept is, in the word its producer chose rather than one drawn from a
-closed set. A concept file holds it in OKF's `type` key. The code calls it `conceptType`, and
-Postgres `concept_type`.
+closed set. A concept file holds it in OKF's `type` key.
 
 **Company language**:
 The concept types, names and links a company's concepts reveal. It is read off the knowledge base,
@@ -76,7 +75,7 @@ Admin accepting suggestions.
 
 **Consumer**:
 A person or an agent that reads knowledge and must tolerate what it did not expect, such as an
-unknown kind or a concept it may not see.
+unknown concept type or a concept it may not see.
 
 **Record**:
 Something the platform keeps because it runs a use case, such as a guide, a write-up, usage or an
