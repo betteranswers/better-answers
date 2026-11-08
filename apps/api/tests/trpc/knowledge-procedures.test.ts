@@ -189,11 +189,11 @@ const aConceptCitingRestrictedMinutes = async () => {
 
 const inCoresKeys = (hit: Rpc): Rpc => {
   if (hit["trust"] === undefined) return hit;
-  const { kind, ...concept } = hit;
+  const { type, ...concept } = hit;
   const { checkedBy, checkedAt, ...trust } = rpcOf(hit["trust"]);
   return {
     ...concept,
-    conceptType: kind,
+    conceptType: type,
     trust: { ...trust, verifiedBy: checkedBy, verifiedAt: checkedAt },
   };
 };

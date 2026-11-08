@@ -612,7 +612,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: MAP_DOOR,
     access: "read",
     reason:
-      "The map store may read this table because the delta builder resolves a link's target to a concept and reads its kind from the index inside the action's own transaction, and reads back the citers that wait on a landed concept's path, so the map is derived from the rows that the same transaction just wrote.",
+      "The map store may read this table because the delta builder resolves a link's target to a concept and reads its type from the index inside the action's own transaction, and reads back the citers that wait on a landed concept's path, so the map is derived from the rows that the same transaction just wrote.",
   },
   {
     table: "public.source_document",

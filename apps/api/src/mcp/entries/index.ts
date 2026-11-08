@@ -61,7 +61,7 @@ const coreTrust = ({ tier, status, checkedBy, checkedAt, rider }: WireTrust): Tr
     ? { tier, status, verifiedBy: checkedBy, verifiedAt: checkedAt, rider }
     : { tier, status, verifiedBy: checkedBy, verifiedAt: checkedAt, rider };
 
-const TYPE_KEY = "kind";
+const TYPE_KEY = "type";
 
 const typeField = { [TYPE_KEY]: z.string() };
 
@@ -140,7 +140,7 @@ const findEntry = defineEntry({
   name: "find",
   title: "Search Company Knowledge",
   description:
-    "Search the company's knowledge and get a preview of the results, one line per match. Use it to find what the company knows about a topic, then call `open` to read a match in full. A concept's line gives its kind, title, collection, trust state and `iri`. A document that no concept covers is marked 'Not company knowledge'. Its line gives its title, its sensitivity, its `locator` and, in quotes, the first line of the passage that matched. If there are more matches, the result includes `nextCursor`. Send it back as `cursor` to get the next page.",
+    "Search the company's knowledge and get a preview of the results, one line per match. Use it to find what the company knows about a topic, then call `open` to read a match in full. A concept's line gives its type, title, collection, trust state and `iri`. A document that no concept covers is marked 'Not company knowledge'. Its line gives its title, its sensitivity, its `locator` and, in quotes, the first line of the passage that matched. If there are more matches, the result includes `nextCursor`. Send it back as `cursor` to get the next page.",
   scopes: ["knowledge:read"],
   // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the answering slice's own schema; the emitted-schema test reads its keys
   input: findInput,

@@ -119,7 +119,6 @@ export const passageViewOf = (passage: {
 
 const documentMatch = z.object({
   layer: z.literal("sources"),
-  kind: z.literal("document"),
   title: z.string(),
   locator: z.string(),
   sensitivity: z.string(),

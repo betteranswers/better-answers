@@ -109,7 +109,7 @@ export const decisionReplyTo = (yes: ReadonlyMap<string, number>, body: string):
 export const conceptNumbersIn = (prompt: string): ReadonlyMap<string, string> =>
   new Map(
     [
-      ...prompt.matchAll(/<concept number="(\d+)">\n<kind>[^<]*<\/kind>\n<title>([^<]*)<\/title>/g),
+      ...prompt.matchAll(/<concept number="(\d+)">\n<type>[^<]*<\/type>\n<title>([^<]*)<\/title>/g),
     ].map(([, number = "", title = ""]) => [title, number]),
   );
 

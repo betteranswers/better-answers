@@ -521,7 +521,6 @@ describe("the MCP endpoint under either protocol version", () => {
     expect(structured(found)["hits"]).toEqual([
       {
         layer: "sources",
-        kind: "document",
         title: THE_TITLE,
         locator: landed.locator,
         sensitivity: "Internal",

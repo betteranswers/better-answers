@@ -280,7 +280,6 @@ describe("one uploaded document, read back through both tiers", () => {
       expect(found.matches).toEqual([
         {
           layer: "sources",
-          kind: "document",
           title: THE_TITLE,
           locator,
           sensitivity: "Internal",

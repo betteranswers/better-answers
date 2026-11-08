@@ -205,7 +205,6 @@ export const aConceptRead = (title: string, number: number) =>
 
 const aDocument = (title: string, locator: string, openingLine: string): Match => ({
   layer: "sources",
-  kind: "document",
   title,
   locator,
   sensitivity: "Internal",

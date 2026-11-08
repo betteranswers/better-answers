@@ -156,7 +156,7 @@ const A_RECORD = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
 const THE_FIT = {
   iri: "https://better-answers.com/c/01FIT",
   url: `${PUBLIC_URL}/knowledge/search/01FIT`,
-  kind: "Answer",
+  type: "Answer",
   title: "Who reads the audit log?",
   collection: "audits",
   trust: {
@@ -174,7 +174,7 @@ const THE_FIT = {
 const THE_PREVIEW = {
   iri: "https://better-answers.com/c/01PRE",
   url: `${PUBLIC_URL}/knowledge/search/01PRE`,
-  kind: "Answer",
+  type: "Answer",
   title: "Which audit information do buyers see on the dashboard?",
   collection: "audits",
   trust: { tier: "unverified", status: "current", checkedBy: null, checkedAt: null, rider: null },

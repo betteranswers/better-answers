@@ -592,7 +592,7 @@ describe("your questions over tRPC", () => {
 
 const wireConcept = z.looseObject({
   url: z.string(),
-  kind: z.string(),
+  type: z.string(),
   trust: z.looseObject({
     checkedBy: z.string().nullable(),
     checkedAt: z.string().nullable(),
@@ -607,11 +607,11 @@ const wireAnswer = z.looseObject({
 
 const inCoreTerms = (answered: Rpc, origin: string) => {
   const { answers, related, ...rest } = wireAnswer.parse(answered);
-  const core = ({ url, kind, trust, ...concept }: z.infer<typeof wireConcept>) => {
+  const core = ({ url, type, trust, ...concept }: z.infer<typeof wireConcept>) => {
     const { checkedBy, checkedAt, ...kept } = trust;
     return {
       ...concept,
-      conceptType: kind,
+      conceptType: type,
       url: url.slice(origin.length),
       trust: { ...kept, verifiedBy: checkedBy, verifiedAt: checkedAt },
     };

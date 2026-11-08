@@ -822,7 +822,7 @@ describe("the author a save commits as", () => {
   });
 });
 
-describe("a retitle or a rekind", () => {
+describe("a retitle or a new type", () => {
   const mileage = async (scenario: Scenario) =>
     committedIri(await saved(scenario, scenario.admin, newPolicy("Mileage Allowance")));
 
@@ -834,7 +834,7 @@ describe("a retitle or a rekind", () => {
     return iri;
   };
 
-  it("re-keys a concept after a retitle and a rekind", async () => {
+  it("re-keys a concept after a retitle and a new type", async () => {
     const scenario = await arrange();
     const iri = await mileage(scenario);
 

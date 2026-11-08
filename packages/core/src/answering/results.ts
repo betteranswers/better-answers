@@ -28,7 +28,6 @@ export type ConceptMatch<Iri extends string> = {
 
 export type DocumentMatch = {
   readonly layer: "sources";
-  readonly kind: "document";
   readonly title: string;
   readonly locator: string;
   readonly sensitivity: string;
@@ -84,7 +83,7 @@ type Opened<Iri extends string, View> =
       readonly locator?: string | undefined;
     };
 
-/** What the MCP entries keep: the web pages alone read `description`, `path`, and a concept's `collection` and `kind`. */
+/** What the MCP entries keep: a find match drops `description`, and an opened concept drops `path`, `collection` and `conceptType`, which the web pages alone read. */
 export type FoundForText<Iri extends string = string> = Omit<FindResult<Iri>, "matches"> & {
   readonly matches: readonly (Omit<ConceptMatch<Iri>, "description"> | DocumentMatch)[];
 };

@@ -72,7 +72,7 @@ const NO_COLLECTION = "none";
 const conceptBlock = (label: string, concept: OpenedConcept): string =>
   [
     `<concept number="${label}">`,
-    `<kind>${concept.conceptType}</kind>`,
+    `<type>${concept.conceptType}</type>`,
     `<title>${concept.title}</title>`,
     "<text>",
     concept.body.trimEnd(),

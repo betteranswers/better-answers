@@ -63,7 +63,7 @@ export const A_BUNDLE_COMMIT_WITH_A_PARENT = `INSERT INTO bundle_commit (workspa
 export const A_MAP_NODE =
   "INSERT INTO map_node (workspace_id, gen, uid, label) VALUES ($1, $2, $3, $4)";
 
-export const A_MAP_NODE_OF_KIND =
+export const A_MAP_NODE_OF_TYPE =
   "INSERT INTO map_node (workspace_id, gen, uid, label, concept_type) VALUES ($1, $2, $3, $4, $5)";
 
 export const A_MAP_NODE_CLASSED =

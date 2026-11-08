@@ -203,7 +203,6 @@ const conceptMatchOf = (concept: OpenedConcept, now: Date): ConceptMatch<Concept
 
 const documentMatchOf = (match: PassageMatchWithOpening): DocumentMatch => ({
   layer: "sources",
-  kind: "document",
   title: match.title,
   locator: match.locator,
   sensitivity: match.sensitivity,
