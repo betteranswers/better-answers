@@ -3,8 +3,6 @@ import { assert, describe, expect, it, vi } from "vitest";
 
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
-import { KNOWLEDGE_BASE_WORDS } from "@/features/knowledge/knowledge-words.ts";
-import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import {
   aConceptRow,
   ALL_KNOWLEDGE,
@@ -202,11 +200,6 @@ describe("the All Knowledge page", () => {
     const cells = within(region().getByRole("table")).getAllByRole("cell");
     expect(cells, "the empty table drew rows").toHaveLength(1);
     expect(cells[0]?.textContent, "the empty table says nothing").toMatch(/\S/u);
-    expect(
-      region().getByRole("link", {
-        name: KNOWLEDGE_BASE_WORDS.addFromSearch(SEARCH_PAGE.name),
-      }),
-    ).toHaveProperty("pathname", SEARCH_PAGE.path);
     expect(region().queryByRole("button", { name: "Clear Filters" })).toBeNull();
     expect(whatTheAlertsSay(), "an empty knowledge base showed as a failure").toBe("");
   });

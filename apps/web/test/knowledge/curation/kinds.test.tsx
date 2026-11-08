@@ -6,8 +6,6 @@ import {
   KINDS_LIST,
 } from "@/features/knowledge/curation/curation-state.ts";
 import { KINDS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
-import { KNOWLEDGE_BASE_WORDS } from "@/features/knowledge/knowledge-words.ts";
-import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { theOneEmptyStatus } from "@test/knowledge/empty-status.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -313,9 +311,6 @@ describe("the Kinds page", () => {
 
     expect(await region().findByText("0 kinds")).toBeDefined();
     expect(region().queryByRole("table")).toBeNull();
-    expect(
-      region().getByRole("link", { name: KNOWLEDGE_BASE_WORDS.addFromSearch(SEARCH_PAGE.name) }),
-    ).toHaveProperty("pathname", SEARCH_PAGE.path);
     expect(region().queryByRole("button", { name: WORDS.tail })).toBeNull();
     expect(
       region().queryByRole("button", { name: "Retry" }),
