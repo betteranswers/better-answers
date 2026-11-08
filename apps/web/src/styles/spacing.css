@@ -24,7 +24,7 @@
   --band-h: 48px;
   --measure-prose: 65ch;
   --measure-narrow: 52ch;
-  /* Geist's 0 is wide, so 65ch holds about 95 characters. 34em holds about 75. */
+  /* About 75 characters of Geist. */
   --measure-reading: 34em;
   --page-max: 1200px;
 }

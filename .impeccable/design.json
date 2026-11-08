@@ -188,7 +188,7 @@
       "Hairlines, not shadows, divide content.",
       "One interactive blue, ink blue.",
       "Trust as a pale tint and a dark word, never colour alone.",
-      "Geist for words, Geist Mono for references, sources and dates in the title block.",
+      "Geist for words. Geist Mono for references, source numbers and the dates in the title block's cells.",
       "Text selection, scrollbars and link underlines take their colours from the tokens."
     ],
     "rules": [
@@ -204,7 +204,7 @@
       },
       {
         "name": "The measure rule",
-        "body": "Running text stops at about 75 characters. Use `--measure-reading` (34em). In Geist one `ch` is 0.67em wide, and `65ch` holds about 95 characters.",
+        "body": "Running text stops at about 75 characters. Use `--measure-reading` (34em).",
         "section": "typography"
       },
       {
@@ -214,21 +214,21 @@
       },
       {
         "name": "The flat sheet rule",
-        "body": "Nothing on the page itself casts a shadow. A card, a title block or a table is a hairline box on the sheet.",
+        "body": "A card, a title block or a table casts no shadow. It is a hairline box on the sheet.",
         "section": "elevation"
       }
     ],
     "dos": [
       "**Do** write each trust state as its word, from the closed set in `PRODUCT.md`.",
       "**Do** keep ink blue for links, focus and the primary action.",
-      "**Do** set references, source numbers and dates in Geist Mono.",
+      "**Do** set references, source numbers and the title block's cell dates in Geist Mono.",
       "**Do** divide content with 1px hairlines.",
       "**Do** stop prose at `--measure-reading`.",
       "**Do** take every value from the tokens in `apps/web/src/styles/`."
     ],
     "donts": [
       "**Don't** round a corner other than the spinner, the radio or the avatar.",
-      "**Don't** cast a shadow from an object that sits on the page.",
+      "**Don't** cast a shadow from a card, a title block or a table.",
       "**Don't** add a second accent colour.",
       "**Don't** let colour carry trust without its word.",
       "**Don't** put a small uppercase label above a heading.",
