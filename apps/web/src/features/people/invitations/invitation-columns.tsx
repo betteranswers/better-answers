@@ -8,6 +8,7 @@ import {
 import { Address } from "@/shared/member/address.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
+import { INVITATIONS_WORDS } from "../invitation-words.ts";
 import { Day } from "../words.tsx";
 import { isActable } from "./invitations-address.ts";
 import type { InvitationStatus, ListedInvitation } from "./invitations-api.ts";
@@ -25,7 +26,7 @@ const SENT = { id: "sent", label: "Sent" } as const;
 
 const EXPIRY = { id: "expires", label: "Expires" } as const;
 
-const INVITED_BY = { id: "invitedBy", label: "Invited By" } as const;
+const INVITED_BY = { id: "invitedBy", label: INVITATIONS_WORDS.invitedBy } as const;
 
 const HIDEABLE = [ROLE, SENT, EXPIRY, INVITED_BY] as const;
 

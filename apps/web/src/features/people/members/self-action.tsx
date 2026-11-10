@@ -12,7 +12,7 @@ import { homeNowSaid, INCLUDES_YOU } from "../member-action-words.ts";
 import { useReaderId } from "../people-api.ts";
 import { roleOf } from "../role-meanings.ts";
 
-const ROLE_UNREAD = refusedWith("Your role has changed. Please reload the page.");
+const ROLE_UNREAD = refusedWith("Your role has changed. Reload the page.");
 
 const SENT_HOME = z.object({ homeOf: z.string().transform(roleOf) });
 

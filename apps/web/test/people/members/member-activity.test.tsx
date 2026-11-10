@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { MEMBERS_PAGE } from "@test/people/member-pages.ts";
@@ -121,7 +122,7 @@ describe("a member's Activity", () => {
     await waitFor(() => expect(alertsWithText(activityRegion())).toBe(1));
     expect(thePage().getByRole("region", { name: "Access" })).toBeDefined();
     expect(
-      thePage().getByRole("region", { name: "Remove and Sign Out" }),
+      thePage().getByRole("region", { name: MEMBER_PAGE_WORDS.removeAndSignOut }),
       "a failed Activity read hid the Remove and Sign Out section",
     ).toBeDefined();
 

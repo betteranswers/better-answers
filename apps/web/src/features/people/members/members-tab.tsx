@@ -21,8 +21,10 @@ import { CLEAR_WORDS, counted } from "@/shared/words.ts";
 import { useGroups } from "../groups-api.ts";
 import { useInviteAction } from "../invite-action.tsx";
 import {
+  BULK_WORDS,
   MEMBER_PAGE_WORDS,
   MEMBERS_LOADING,
+  MEMBERS_WORDS,
   NO_LONGER_LISTED,
   SELECTED_MEMBERS,
 } from "../member-action-words.ts";
@@ -169,10 +171,10 @@ const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>) => {
 };
 
 const ROW_ACTIONS: readonly { readonly label: string; readonly at: OpenedAt }[] = [
-  { label: "Open", at: "member" },
-  { label: "Change Role", at: "role" },
-  { label: "Add to Group", at: "groups" },
-  { label: "Remove", at: "removal" },
+  { label: MEMBERS_WORDS.open, at: "member" },
+  { label: BULK_WORDS.changeRole.action, at: "role" },
+  { label: BULK_WORDS.addToGroup.action, at: "groups" },
+  { label: BULK_WORDS.remove.action, at: "removal" },
 ];
 
 const rowMenuOf = (open: (personId: string, at: OpenedAt) => void) => (member: ListedMember) => (
@@ -199,7 +201,7 @@ function MemberFilters(properties: {
   const groupFilter = {
     label: "Group",
     value: narrowed.state.group,
-    anyLabel: "Any Group",
+    anyLabel: MEMBERS_WORDS.anyGroup,
     choices: groups.map((group) => ({ value: group.id, label: group.name })),
     onChange: (group: string | undefined) => {
       narrowed.write({ group, page: 1 });
@@ -218,7 +220,7 @@ function MemberFilters(properties: {
         {
           label: "Role",
           value: narrowed.state.role,
-          anyLabel: "Any Role",
+          anyLabel: MEMBERS_WORDS.anyRole,
           choices: ROLES.map((role) => ({ value: role, label: role })),
           onChange: (role) => {
             narrowed.write({ role: ROLES.find((each) => each === role), page: 1 });
@@ -272,8 +274,8 @@ function NoOneMatches(properties: {
         kind: "emptied",
         words:
           narrowed.search === ""
-            ? "No results found. Try adjusting your filters to see more results."
-            : `No results found for “${narrowed.search}”.`,
+            ? MEMBERS_WORDS.noneMatchFilters
+            : MEMBERS_WORDS.noneMatch(narrowed.search),
         clearWords: CLEAR_WORDS.filters,
         onClear: narrowed.clear,
         focusAfterClear: properties.focusAfterClear,
@@ -430,7 +432,6 @@ function MemberList(properties: {
           <ListPages
             pages={{
               kind: "pages",
-              label: "Pages of Members",
               pageIndex: narrowed.pageIndex,
               pageSize: PAGE_SIZE,
               total: narrowed.data.length,
@@ -438,6 +439,7 @@ function MemberList(properties: {
                 narrowed.write({ page: pageIndex + 1 });
               },
               keystrokes: { previous: KEY.previousPage, next: KEY.nextPage },
+              label: MEMBERS_WORDS.pages,
             }}
           />
         </MembersRead>

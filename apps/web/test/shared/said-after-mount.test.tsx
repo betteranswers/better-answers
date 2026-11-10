@@ -101,7 +101,7 @@ describe("live regions that fill in after mounting", () => {
     );
     const closed = seen.length;
 
-    fireEvent.click(screen.getByRole("button", { name: "Preview Passages" }));
+    fireEvent.click(screen.getByRole("button", { name: REVIEW_WORDS.preview.label }));
 
     const opened = seen.slice(closed);
     expect(seen.slice(0, closed).every((text) => text === undefined)).toBe(true);

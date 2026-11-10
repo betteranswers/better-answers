@@ -565,6 +565,16 @@
       }
     },
     {
+      "files": [
+        "apps/web/src/features/sources/**",
+        "apps/web/src/features/model-choices/**",
+        "apps/web/src/features/people/**"
+      ],
+      "rules": {
+        "better-answers/ui-copy-plain": "error"
+      }
+    },
+    {
       "files": ["packages/schema/scripts/roles-surface.ts"],
       "rules": {
         "max-lines-per-function": [

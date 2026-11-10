@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Toolbar, PagePanel, PageTabsRoot } from "@/app/shell/toolbar.tsx";
+import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { viewStateOf, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 import { openApp } from "@test/open-app.tsx";
 
@@ -120,7 +121,7 @@ describe("the page toolbar", () => {
       within(tabs()).getByRole("tab", { name: "Spend" }).id,
     );
     expect(panel.textContent).toMatch(/\S/v);
-    expect(screen.queryByRole("region", { name: "Model Choices" })).toBeNull();
+    expect(screen.queryByRole("region", { name: MODEL_CHOICES_WORDS.heading })).toBeNull();
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models and Spend");
   });
 
@@ -146,7 +147,7 @@ describe("the page toolbar", () => {
     expect(panel.getAttribute("aria-labelledby")).toBe(
       within(tabs()).getByRole("tab", { name: "Model Choices" }).id,
     );
-    expect(within(panel).getByRole("region", { name: "Model Choices" })).toBeDefined();
+    expect(within(panel).getByRole("region", { name: MODEL_CHOICES_WORDS.heading })).toBeDefined();
   });
 
   it("renders no toolbar or panel for a page without tabs", async () => {

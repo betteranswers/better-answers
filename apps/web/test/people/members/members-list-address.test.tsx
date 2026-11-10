@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { MEMBERS_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { choosing, placedWithoutMeasuring } from "@test/measuring.ts";
 import {
@@ -41,7 +42,7 @@ const apiOf = (...members: readonly object[]) => {
 
 const memberLink = (name: string) => listed().getByRole("link", { name });
 
-const pages = () => screen.getByRole("navigation", { name: "Pages of Members" });
+const pages = () => screen.getByRole("navigation", { name: MEMBERS_WORDS.pages });
 
 const picked = (filter: string, choice: string) => {
   choosing(listed().getByRole("combobox", { name: filter }), choice);
@@ -65,7 +66,7 @@ describe("the Members list's address", () => {
       listed().getAllByRole("status").at(0)?.textContent,
       "the count did not say one of three match",
     ).toMatch(/\b1\b\D+\b3\b/);
-    picked("Filter by Group", "Any Group");
+    picked("Filter by Group", MEMBERS_WORDS.anyGroup);
     await waitFor(() => {
       expect(namesShown()).toHaveLength(3);
     });
@@ -135,7 +136,7 @@ describe("keys after paging away from the focused member", () => {
     });
     expect(router.state.location.pathname, "the key opened another page").toBe(MEMBERS);
     expect(
-      screen.queryByRole("toolbar", { name: "Selected Members" }),
+      screen.queryByRole("toolbar", { name: SELECTED_MEMBERS }),
       "the key selected a member on another page",
     ).toBeNull();
   };

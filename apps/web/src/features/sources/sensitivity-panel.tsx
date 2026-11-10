@@ -132,7 +132,6 @@ export function SensitivityPanel(properties: {
   const offer = OFFERS[change];
   const words = SENSITIVITY_PANEL_WORDS[change];
   const [asked, setAsked] = useState(() => offer.opensOn(connectedSource));
-  const consequenceId = useId();
   const refusedWhyId = useId();
   const audiences = offer.audiences(connectedSource);
   const changes = termsThatChange(connectedSource, asked);
@@ -152,15 +151,8 @@ export function SensitivityPanel(properties: {
   }, [groupRef]);
 
   return (
-    <fieldset
-      ref={groupRef}
-      aria-describedby={consequenceId}
-      className="mt-3 grid min-w-0 gap-3 border border-border p-3"
-    >
+    <fieldset ref={groupRef} className="mt-3 grid min-w-0 gap-3 border border-border p-3">
       <legend className="float-left font-medium">{words.named(connectedSource.name)}</legend>
-      <p id={consequenceId} className="text-sm text-muted-foreground">
-        {words.consequence(connectedSource.publishedAt !== null)}
-      </p>
 
       <WordPicked
         id={SENSITIVITY_FIELD}

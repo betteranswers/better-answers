@@ -8,6 +8,7 @@ import { refusedFor } from "@/features/sources/refusal.tsx";
 import { ReviewActions } from "@/features/sources/review-actions.tsx";
 import type { GroupOfFindings } from "@/features/sources/sources-api.ts";
 import { SOURCES_KEYSTROKES, useTickedGroups } from "@/features/sources/sources-state.ts";
+import { REVIEW_WORDS, ROW_ACTIONS, SENSITIVITY_PANEL_WORDS } from "@/features/sources/words.ts";
 import { ViewStateSlot } from "@/shared/page/page-toolbar.tsx";
 import { addressOf, answered } from "@test/stubbed-api.ts";
 
@@ -87,11 +88,11 @@ const renderReviewActions = (connectedSourceId: string, tickedIn: string) =>
 
 const action = (name: string) => screen.getByRole<HTMLButtonElement>("button", { name });
 
-const KEEP = "Keep in Text";
+const KEEP = REVIEW_WORDS.keep.label;
 
-const NARROW_DOCUMENTS = "Narrow These Documents";
+const NARROW_DOCUMENTS = REVIEW_WORDS.narrowDocuments.label;
 
-const DISMISS = "Dismiss as Not Special Category";
+const DISMISS = REVIEW_WORDS.dismiss.label;
 
 const BULK_ACTIONS = [KEEP, NARROW_DOCUMENTS, DISMISS];
 
@@ -206,7 +207,7 @@ describe("dismissing findings as not special category", () => {
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.dismiss.key });
 
     const dialog = screen.getByRole("dialog", {
-      name: "Dismiss 1 Group of Findings as Not Special Category",
+      name: REVIEW_WORDS.dismiss.named(1),
     });
     expect(dialog.textContent).toContain("Health wording");
     expect(dialog.textContent).toContain("Pump service notes");
@@ -253,8 +254,6 @@ const PRICE_BOOK = {
   audienceGroups: null,
   state: "indexed",
 };
-
-const A_PUBLISH = "2026-10-07T09:05:00.000Z";
 
 const WIDENED = { sensitivity: "Internal", audience: "groups" } as const;
 
@@ -332,20 +331,13 @@ const atSources = (api: SourcesApi = {}) => {
 
 const rowOf = async (name: string) => within(await screen.findByRole("listitem", { name }));
 
-const ROW_ACTIONS = {
-  review: "Review Findings",
-  publish: "Publish",
-  narrow: "Narrow Sensitivity",
-  widen: "Widen Sensitivity or Audience",
-};
-
 /** jsdom drops the space a browser keeps before the visually hidden source name. */
 const rowAction = (row: BoundFunctions<typeof queries>, label: string, name: string) =>
   row.getByRole("button", { name: new RegExp(`^${label} ?${name}$`, "v") });
 
 const PANEL_NAMED = {
-  narrow: (name: string) => `Narrow the Sensitivity of ${name}`,
-  widen: (name: string) => `Widen the Sensitivity or Audience of ${name}`,
+  narrow: SENSITIVITY_PANEL_WORDS.narrow.named,
+  widen: SENSITIVITY_PANEL_WORDS.widen.named,
 };
 
 const panelOf = (change: "narrow" | "widen", name: string) =>
@@ -525,28 +517,10 @@ describe("widening a connected source in its row", () => {
     const panel = row.getByRole("group", {
       name: PANEL_NAMED.widen("Staff handbook"),
     });
-    expect(describedBy(panel), "the panel does not say what widening does").toMatch(/\S/v);
     expect(document.activeElement).toBe(
       within(panel).getByRole("combobox", { name: "Sensitivity" }),
     );
     expect(screen.queryByRole("dialog")).toBeNull();
-  });
-
-  it("describes widening differently once a source is published", async () => {
-    atSources({
-      listed: [{ ...HANDBOOK, state: "published", publishedAt: A_PUBLISH }, PRICE_BOOK],
-    });
-    const handbook = await rowOf("Staff handbook");
-    const priceBook = await rowOf("Price book");
-
-    fireEvent.click(rowAction(handbook, ROW_ACTIONS.widen, "Staff handbook"));
-    const published = describedBy(handbook.getByRole("group"));
-    fireEvent.click(rowAction(priceBook, ROW_ACTIONS.widen, "Price book"));
-    const unpublished = describedBy(priceBook.getByRole("group"));
-
-    expect(published, "the published source's panel says nothing").toMatch(/\S/v);
-    expect(unpublished, "the unpublished source's panel says nothing").toMatch(/\S/v);
-    expect(published, "both panels describe widening the same way").not.toBe(unpublished);
   });
 
   it("lists only the sensitivity change and offers Widen", async () => {

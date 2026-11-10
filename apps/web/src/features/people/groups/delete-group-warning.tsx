@@ -11,7 +11,7 @@ import {
 } from "@/shared/ui/alert-dialog.tsx";
 
 import { type ListedGroup } from "../groups-api.ts";
-import { consequenceOfDeleting } from "./group-words.ts";
+import { consequenceOfDeleting, GROUP_WORDS } from "./group-words.ts";
 
 export function DeleteGroupWarning(properties: {
   readonly group: ListedGroup;
@@ -30,7 +30,7 @@ export function DeleteGroupWarning(properties: {
         <AlertDialogDescription>{consequence}</AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>Keep Group</AlertDialogCancel>
+        <AlertDialogCancel>{GROUP_WORDS.keep}</AlertDialogCancel>
         <AlertDialogAction
           variant="destructive"
           onClick={() => {

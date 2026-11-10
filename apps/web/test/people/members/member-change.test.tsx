@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { changeRolePressed, removeMemberPressed } from "@test/people/member-pages.ts";
 import { type Api } from "@test/stubbed-api.ts";
 import {
   ADA,
@@ -44,7 +45,7 @@ const demotingHerself = async (api: Api, memberAfter: Parameters<Api["set"]>[1])
   });
   const router = await openAt(MEMBER_PAGE, api);
   fireEvent.click(await screen.findByRole("radio", { name: "Editor" }));
-  fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
+  changeRolePressed();
   return router;
 };
 
@@ -66,7 +67,7 @@ describe("changes to your own membership", () => {
     });
     const router = await openAt(MEMBER_PAGE, api);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Remove Member" }));
+    await removeMemberPressed();
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     await waitFor(() =>

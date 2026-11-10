@@ -30,13 +30,7 @@ import {
   useTickedGroups,
   type TickedGroups,
 } from "./sources-state.ts";
-import {
-  groupsCounted,
-  REVIEW_WORDS,
-  ruleWordOf,
-  spokenWord,
-  SYNC_OF_A_DISMISSAL,
-} from "./words.ts";
+import { REVIEW_WORDS, ruleWordOf, spokenWord, SYNC_OF_A_DISMISSAL } from "./words.ts";
 
 type Settled<Answer> = {
   readonly onSuccess: (answer: Answer) => void;
@@ -248,9 +242,12 @@ function NarrowDocumentsAction(properties: ActionProperties) {
 
   const confirm = () => {
     action.command<DocumentsNarrowed>({
-      pending: "Narrowing.",
+      pending: REVIEW_WORDS.narrowDocuments.pending,
       done: (narrowed) =>
-        `${counted(narrowed.documentIds.length, "document", "documents")} narrowed to ${NARROWEST} successfully. ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.writeUps.length, "write-up", "write-ups")} that cite them were also updated.`,
+        REVIEW_WORDS.narrowDocuments.done(narrowed.documentIds.length, NARROWEST, {
+          concepts: narrowed.concepts.length,
+          writeUps: narrowed.writeUps.length,
+        }),
       run: (ready, settled) => {
         narrow.mutate(askOf(ready), settled);
       },
@@ -268,9 +265,9 @@ function NarrowDocumentsAction(properties: ActionProperties) {
           open={action.open}
           onOpenChange={action.setOpen}
           content={{ onCloseAutoFocus: action.returnFocus }}
-          title={`Narrow ${counted(documents.length, "Document", "Documents")} to ${NARROWEST}`}
-          consequence="This limits who can read these documents. Concepts that cite them are updated too. This action cannot be undone."
-          commit={<Button onClick={confirm}>Narrow</Button>}
+          title={REVIEW_WORDS.narrowDocuments.named(documents.length, NARROWEST)}
+          consequence={REVIEW_WORDS.narrowDocuments.consequence}
+          commit={<Button onClick={confirm}>{REVIEW_WORDS.narrowDocuments.commit}</Button>}
         >
           <ul className="grid gap-1">
             {documents.map(([documentId, title]) => (
@@ -289,9 +286,11 @@ function SyncStatus(properties: { readonly connectedSourceId: string; readonly j
   const sync = connectedSources.data?.find(
     (connectedSource) => connectedSource.connectedSourceId === properties.connectedSourceId,
   )?.lastSync;
-  return SYNC_OF_A_DISMISSAL[
-    sync === undefined || sync === null || sync.jobId < properties.jobId ? "queued" : sync.status
-  ];
+  return REVIEW_WORDS.dismiss.sync(
+    SYNC_OF_A_DISMISSAL[
+      sync === undefined || sync === null || sync.jobId < properties.jobId ? "queued" : sync.status
+    ],
+  );
 }
 
 const isSpecialCategory = (group: GroupOfFindings): boolean => group.specialCategory;
@@ -301,16 +300,14 @@ function DismissAsNotSpecialCategoryAction(properties: ActionProperties) {
   const dismiss = useDismissAsNotSpecialCategory();
   const words = REVIEW_WORDS.dismiss;
   const ticked = action.ready?.groups.length ?? 0;
-  const named = groupsCounted(ticked);
 
   const dismissed = (reason: string) => {
     action.command<DismissedAsNotSpecialCategory>({
-      pending: "Dismissing.",
+      pending: words.pending,
       done: (answer) => (
         <>
-          {named} dismissed in {counted(answer.documentIds.length, "document", "documents")}{" "}
-          successfully. The sync that applies the change{" "}
-          <SyncStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />.
+          {words.done(ticked, answer.documentIds.length)}{" "}
+          <SyncStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />
         </>
       ),
       run: (ready, settled) => {

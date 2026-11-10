@@ -1,7 +1,7 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { NEEDS_OCR } from "@/features/sources/words.ts";
+import { CONNECT_WORDS, LIST_WORDS, NEEDS_OCR, ROW_ACTIONS } from "@/features/sources/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
   aConnectedSource,
@@ -40,18 +40,18 @@ describe("the Sources page's list of connected sources", () => {
         .getAllByRole("button")
         .map((button) => [button.textContent, button.getAttribute("aria-expanded")]),
     ).toEqual([
-      ["Review Findings Staff handbook", "false"],
-      ["Publish Staff handbook", null],
-      ["Narrow Sensitivity Staff handbook", "false"],
-      ["Widen Sensitivity or Audience Staff handbook", "false"],
-      ["More Details Staff handbook", "false"],
+      [`${ROW_ACTIONS.review} Staff handbook`, "false"],
+      [`${ROW_ACTIONS.publish} Staff handbook`, null],
+      [`${ROW_ACTIONS.narrow} Staff handbook`, "false"],
+      [`${ROW_ACTIONS.widen} Staff handbook`, "false"],
+      [`${LIST_WORDS.more} Staff handbook`, "false"],
     ]);
     expect(termsOf(handbook)).toEqual([
       ["Connector", "Upload"],
       ["Sensitivity", "Internal"],
       ["Audience", EVERYONE],
       ["State", "Indexed"],
-      ["Last Synced", expect.stringMatching(/^\d{2}:\d{2} · \d{1,2} \w+ \d{4}/v)],
+      [LIST_WORDS.lastSynced, expect.stringMatching(/^\d{2}:\d{2} · \d{1,2} \w+ \d{4}/v)],
     ]);
     const list = within(connectedSourcesRegion()).getByRole("list");
     for (const stored of ["received", "indexing", "indexed", "published", "upload"]) {
@@ -154,7 +154,7 @@ describe("the Sources page's list of connected sources", () => {
     expect(screen.queryByRole("region", { name: "Connected Sources" })).toBeNull();
     expect(document.body.textContent).not.toContain("Staff handbook");
     press("b");
-    expect(screen.queryByRole("dialog", { name: "Connect a Document" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: CONNECT_WORDS.action })).toBeNull();
     expect(server.asks.filter((ask) => ask.procedure.startsWith("sources."))).toEqual([]);
   });
 });

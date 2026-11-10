@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
+import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import {
   EVERY_AREA,
@@ -172,7 +173,9 @@ describe("the shell's regions", () => {
   it("shows the Model Choices card on Models and Spend", async () => {
     await openAs("Admin", "/models/models-and-spend");
 
-    expect(screen.getByRole("heading", { level: 2, name: "Model Choices" })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { level: 2, name: MODEL_CHOICES_WORDS.heading }),
+    ).toBeDefined();
   });
 
   it("shows Page Not Found for an unknown address", async () => {

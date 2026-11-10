@@ -4,6 +4,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import {
+  BULK_WORDS,
+  MEMBER_PAGE_WORDS,
+  SELECTED_MEMBERS,
+} from "@/features/people/member-action-words.ts";
+import {
   MemberBulkActions,
   MemberBulkDialogs,
   useMemberBulkActions,
@@ -53,7 +58,7 @@ const tickedMembers = (count: number, readable: boolean) =>
         </h1>
         <OutcomeLine outcome={outcome} />
         <SelectionBar
-          label="Selected Members"
+          label={SELECTED_MEMBERS}
           ticked={ticked}
           shown={[]}
           noun={["member", "members"]}
@@ -84,8 +89,8 @@ const ticking = async (count: number, readable = true) => {
 };
 
 const ACTIONS = [
-  ["Change Role", "C"],
-  ["Add to Group", "G"],
+  [MEMBER_PAGE_WORDS.changeRole, "C"],
+  [BULK_WORDS.addToGroup.action, "G"],
   ["Remove", "D"],
 ];
 
@@ -111,10 +116,10 @@ describe("the members' bulk actions", () => {
   it("opens Change Role with exactly 200 selected", async () => {
     await ticking(200);
 
-    fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
+    fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
 
     expect(
-      await screen.findByRole("dialog", { name: "Change Role for 200 Members" }),
+      await screen.findByRole("dialog", { name: BULK_WORDS.changeRole.title(200) }),
     ).toBeDefined();
     expect(outcomeSaid(), "a message appeared at the limit itself").toBe("");
   });
@@ -122,9 +127,9 @@ describe("the members' bulk actions", () => {
   it("shows a failed groups read, not an empty list", async () => {
     await ticking(2);
 
-    fireEvent.click(screen.getByRole("button", { name: "Add to Group" }));
+    fireEvent.click(screen.getByRole("button", { name: BULK_WORDS.addToGroup.action }));
 
-    const dialog = await screen.findByRole("dialog", { name: "Add 2 Members to a Group" });
+    const dialog = await screen.findByRole("dialog", { name: BULK_WORDS.addToGroup.title(2) });
     await waitFor(() => {
       expect(within(dialog).getByRole("alert").textContent).not.toBe("");
     });
@@ -161,7 +166,7 @@ describe("the members' bulk Remove", () => {
         await screen.findByRole("checkbox", { name: `Select ${member.displayName}` }),
       );
     }
-    const remove = within(screen.getByRole("toolbar", { name: "Selected Members" })).getByRole(
+    const remove = within(screen.getByRole("toolbar", { name: SELECTED_MEMBERS })).getByRole(
       "button",
       { name: "Remove" },
     );
@@ -171,12 +176,12 @@ describe("the members' bulk Remove", () => {
 
     fireEvent.click(remove);
 
-    const dialog = await screen.findByRole("dialog", { name: "Remove 2 Members" });
+    const dialog = await screen.findByRole("dialog", { name: BULK_WORDS.remove.title(2) });
     await waitFor(() => {
       expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" }));
     });
     expect(
-      screen.getByRole("dialog", { name: "Remove 2 Members", description: /\S/ }),
+      screen.getByRole("dialog", { name: BULK_WORDS.remove.title(2), description: /\S/ }),
       "the dialog has no description of what removing does",
     ).toBe(dialog);
     expect(
@@ -197,7 +202,7 @@ describe("the members' bulk Remove", () => {
     }
 
     fireEvent.click(remove);
-    const again = await screen.findByRole("dialog", { name: "Remove 2 Members" });
+    const again = await screen.findByRole("dialog", { name: BULK_WORDS.remove.title(2) });
     fireEvent.click(within(again).getByRole("button", { name: "Remove" }));
 
     await waitFor(() => {

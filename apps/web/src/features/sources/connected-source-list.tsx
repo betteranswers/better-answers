@@ -18,6 +18,7 @@ import {
   DESTINATIONS_TERM,
   instantWords,
   lastSyncedWords,
+  LIST_WORDS,
   NEEDS_OCR,
   RETENTION_MEANS,
   ROW_ACTIONS,
@@ -59,7 +60,7 @@ function MoreAbout(properties: { readonly connectedSource: ListedConnectedSource
     <Collapsible className="mt-2">
       <CollapsibleTrigger asChild>
         <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
-          More Details
+          {LIST_WORDS.more}
           <span className="sr-only"> {connectedSource.name}</span>
         </Button>
       </CollapsibleTrigger>
@@ -217,7 +218,7 @@ function ConnectedSourceItem(properties: {
         <Row term="State">
           <Pill>{STATE_WORDS[connectedSource.state]}</Pill>
         </Row>
-        <Row term="Last Synced">{lastSyncedWords(connectedSource.lastSync)}</Row>
+        <Row term={LIST_WORDS.lastSynced}>{lastSyncedWords(connectedSource.lastSync)}</Row>
       </dl>
 
       <MoreAbout connectedSource={connectedSource} />

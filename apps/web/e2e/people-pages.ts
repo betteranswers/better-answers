@@ -1,5 +1,7 @@
 import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
+import { INVITE_WORDS } from "@/features/people/invitation-words.ts";
+import { MEMBER_PAGE_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
 
 import { anAddress, invite, person } from "./harness.ts";
@@ -17,7 +19,7 @@ export const membersRegion = (page: Page) => page.getByRole("region", { name: "M
 export const outcomeOf = (page: Page): Locator => membersRegion(page).getByRole("status").nth(1);
 
 export const selectionBar = (page: Page): Locator =>
-  page.getByRole("toolbar", { name: "Selected Members" });
+  page.getByRole("toolbar", { name: SELECTED_MEMBERS });
 
 export const memberRows = (page: Page): Locator =>
   membersRegion(page)
@@ -53,7 +55,7 @@ export const inviteDialog = (page: Page) => page.getByRole("dialog", { name: INV
 
 export const inviteAction = (page: Page) => page.getByRole("button", { name: INVITE, exact: true });
 
-export const addressField = (page: Page) => inviteDialog(page).getByLabel("Email Addresses");
+export const addressField = (page: Page) => inviteDialog(page).getByLabel(INVITE_WORDS.field);
 
 export const everyone = (page: Page) => page.getByRole("region", { name: "Everyone" });
 
@@ -67,7 +69,7 @@ export const invitationHeading = (page: Page, workspace: string) =>
 
 export const joinButton = (page: Page) => page.getByRole("button", { name: "Join Workspace" });
 
-export const nameField = (page: Page) => page.getByLabel("Display Name");
+export const nameField = (page: Page) => page.getByLabel(MEMBER_PAGE_WORDS.displayName);
 
 export const invitedAs = (page: Page, role: Role) =>
   page

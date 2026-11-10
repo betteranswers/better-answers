@@ -1,6 +1,11 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  BULK_WORDS,
+  MEMBER_PAGE_WORDS,
+  SELECTED_MEMBERS,
+} from "@/features/people/member-action-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure, type Held } from "@test/stubbed-api.ts";
@@ -35,7 +40,7 @@ const HELD_BEFORE = [
   { workspace: CALDER, role: "Viewer" },
 ];
 
-const bar = () => within(screen.getByRole("toolbar", { name: "Selected Members" }));
+const bar = () => within(screen.getByRole("toolbar", { name: SELECTED_MEMBERS }));
 
 const tick = async (name: string) => {
   fireEvent.click(await screen.findByRole("checkbox", { name: `Select ${name}` }));
@@ -120,10 +125,10 @@ describe("bulk actions that include you", () => {
     const router = await openAt(MEMBERS, api);
     await tick(ADA.displayName);
 
-    const dialog = await dialogOpened("Change Role", "Change Role for 1 Member");
+    const dialog = await dialogOpened(MEMBER_PAGE_WORDS.changeRole, BULK_WORDS.changeRole.title(1));
     expect(linesIn(dialog), "the dialog did not add a line saying it includes you").toHaveLength(3);
     await editorPickedByKeyboard(within(dialog).getByRole("combobox", { name: "Role" }));
-    fireEvent.click(within(dialog).getByRole("button", { name: "Change Role" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "New Question" })).toBeDefined();
     expect(router.state.location.pathname).toBe(HOMES.Editor.path);
@@ -145,7 +150,7 @@ describe("bulk actions that include you", () => {
     await switcherOpenedAndDismissed(HOLME.name);
     await tick(ADA.displayName);
 
-    const dialog = await dialogOpened("Remove", "Remove 1 Member");
+    const dialog = await dialogOpened("Remove", BULK_WORDS.remove.title(1));
     expect(linesIn(dialog), "the dialog did not add a line saying it includes you").toHaveLength(2);
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
 
@@ -174,7 +179,7 @@ describe("bulk actions that include you", () => {
     const router = await openAt(MEMBERS, api);
     await tick(ADA.displayName);
 
-    await removedThroughTheBar("Remove 1 Member");
+    await removedThroughTheBar(BULK_WORDS.remove.title(1));
 
     expect(await screen.findByRole("heading", { level: 1, name: "New Question" })).toBeDefined();
     expect(router.state.location.pathname).toBe(HOMES.Viewer.path);
@@ -187,7 +192,7 @@ describe("bulk actions that include you", () => {
     await switcherOpenedAndDismissed();
     await tick(ADA.displayName);
 
-    await removedThroughTheBar("Remove 1 Member");
+    await removedThroughTheBar(BULK_WORDS.remove.title(1));
 
     expect(
       await screen.findByRole("heading", { level: 1, name: "No Workspace Yet" }),

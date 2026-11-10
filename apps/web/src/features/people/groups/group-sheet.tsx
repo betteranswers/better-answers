@@ -17,7 +17,7 @@ import { useMembers } from "../people-api.ts";
 import { outcomeOfFailure } from "../refusal.tsx";
 import { nameOf } from "../words.tsx";
 import { DeleteGroupWarning } from "./delete-group-warning.tsx";
-import { consequenceOfDeleting, membersWord } from "./group-words.ts";
+import { consequenceOfDeleting, GROUP_WORDS, membersWord } from "./group-words.ts";
 import { submitRename } from "./rename-group-form.ts";
 
 export type GroupOpenedAt = "group" | "members" | "rename" | "delete";
@@ -79,7 +79,7 @@ function RenameGroup(properties: {
   const { group, fieldRef } = properties;
   const [outcome, setOutcome] = useState<Outcome>();
   const renameGroup = useRenameGroup();
-  const ids = { field: useId(), hint: useId() };
+  const fieldId = useId();
 
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -92,22 +92,18 @@ function RenameGroup(properties: {
       <OutcomeLine outcome={outcome} className="contents" />
       <form onSubmit={submit} className="grid gap-3">
         <div className="grid gap-2">
-          <Label htmlFor={ids.field}>Name</Label>
+          <Label htmlFor={fieldId}>Name</Label>
           <Input
             ref={fieldRef}
-            id={ids.field}
+            id={fieldId}
             name="name"
             defaultValue={group.name}
             required
             autoComplete="off"
-            aria-describedby={ids.hint}
           />
-          <p id={ids.hint} className="text-sm text-muted-foreground">
-            Members stay in the group.
-          </p>
         </div>
         <Button type="submit" className="justify-self-start">
-          Rename Group
+          {GROUP_WORDS.rename.commit}
         </Button>
       </form>
     </SheetPart>
@@ -127,7 +123,7 @@ function DeleteGroup(properties: {
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button ref={buttonRef} variant="outline" className="justify-self-start">
-            Delete Group
+            {GROUP_WORDS.delete}
           </Button>
         </AlertDialogTrigger>
         <DeleteGroupWarning group={group} onDelete={onDelete} />

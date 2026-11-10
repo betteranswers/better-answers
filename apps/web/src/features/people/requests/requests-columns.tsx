@@ -5,6 +5,7 @@ import { Address } from "@/shared/member/address.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
+import { REQUEST_WORDS } from "../invitation-words.ts";
 import { PEOPLE_KEYSTROKES as KEY } from "../people-state.ts";
 import { Day } from "../words.tsx";
 import { requesterName, type WaitingRequest } from "./requests-api.ts";
@@ -14,7 +15,6 @@ export const requestsFeatures = tableFeatures({});
 const column = createColumnHelper<typeof requestsFeatures, WaitingRequest>();
 
 type RequestActions = {
-  readonly consequenceId: string;
   readonly onApprove: (request: WaitingRequest) => void;
   readonly onDecline: (request: WaitingRequest) => void;
 };
@@ -45,8 +45,7 @@ function Decisions(properties: { readonly request: WaitingRequest }) {
         size="sm"
         variant="outline"
         aria-haspopup="dialog"
-        aria-label={`Approve Request from ${name}`}
-        aria-describedby={actions?.consequenceId}
+        aria-label={REQUEST_WORDS.approveFrom(name)}
         aria-keyshortcuts={KEY.approve.key}
         onClick={() => {
           actions?.onApprove(request);
@@ -57,8 +56,7 @@ function Decisions(properties: { readonly request: WaitingRequest }) {
       <Button
         size="sm"
         variant="ghost"
-        aria-label={`Decline Request from ${name}`}
-        aria-describedby={actions?.consequenceId}
+        aria-label={REQUEST_WORDS.declineFrom(name)}
         aria-keyshortcuts={KEY.decline.key}
         onClick={() => {
           actions?.onDecline(request);

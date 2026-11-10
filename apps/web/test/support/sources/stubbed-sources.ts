@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 
 import type { GroupOfFindings, ListedConnectedSource } from "@/features/sources/sources-api.ts";
+import { LIST_WORDS, ROW_ACTIONS, SENSITIVITY_PANEL_WORDS } from "@/features/sources/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import type { Api } from "@test/stubbed-api.ts";
 import { adaAnAdmin, drawnAt, openAt, read } from "@test/two-workspaces.ts";
@@ -151,29 +152,19 @@ export const saidIn = (): HTMLElement | undefined =>
 export const rowOf = (name: string): Promise<HTMLElement> =>
   screen.findByRole("listitem", { name });
 
-const ROW_ACTIONS = {
-  review: "Review Findings",
-  publish: "Publish",
-  narrow: "Narrow Sensitivity",
-  widen: "Widen Sensitivity or Audience",
-} as const;
-
 /** jsdom's accessible name omits the space a browser keeps before the hidden source name. */
 export const rowAction = (row: HTMLElement, action: keyof typeof ROW_ACTIONS): HTMLElement =>
   within(row).getByRole("button", { name: new RegExp(`^${ROW_ACTIONS[action]} ?`, "v") });
 
 export const moreDetailsOf = (row: HTMLElement): HTMLElement =>
-  within(row).getByRole("button", { name: /^More Details ?/v });
+  within(row).getByRole("button", { name: new RegExp(`^${LIST_WORDS.more} ?`, "v") });
 
 export const reviewOf = (name: string): HTMLElement | null =>
   screen.queryByRole("region", { name: `Review of ${name}` });
 
 export const panelOf = (change: "narrow" | "widen", name: string): HTMLElement | null =>
   screen.queryByRole("group", {
-    name:
-      change === "narrow"
-        ? `Narrow the Sensitivity of ${name}`
-        : `Widen the Sensitivity or Audience of ${name}`,
+    name: SENSITIVITY_PANEL_WORDS[change].named(name),
   });
 
 export const thePanelOf = (change: "narrow" | "widen", name: string): HTMLElement => {

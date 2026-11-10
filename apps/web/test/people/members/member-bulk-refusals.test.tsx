@@ -1,6 +1,11 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  BULK_WORDS,
+  MEMBER_PAGE_WORDS,
+  SELECTED_MEMBERS,
+} from "@/features/people/member-action-words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { asked, listed, outcome, PRIYA, rowOf, SAM } from "@test/people/members-roster.ts";
 import { holdProcedure } from "@test/stubbed-api.ts";
@@ -36,7 +41,7 @@ const apiOf = (...members: readonly object[]) => {
   return api;
 };
 
-const bar = () => within(screen.getByRole("toolbar", { name: "Selected Members" }));
+const bar = () => within(screen.getByRole("toolbar", { name: SELECTED_MEMBERS }));
 
 const listHeading = () => listed().getByRole("heading", { level: 2, name: "Members" });
 
@@ -65,7 +70,7 @@ const refusedLines = (name: string): HTMLElement[] =>
 const searchBox = () => screen.getByRole("searchbox", { name: "Search by name or address" });
 
 const changeRoleOpened = async (title: string): Promise<HTMLElement> => {
-  fireEvent.click(bar().getByRole("button", { name: "Change Role" }));
+  fireEvent.click(bar().getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
   const dialog = await screen.findByRole("dialog", { name: title });
   await waitFor(() => {
     expect(document.activeElement).toBe(within(dialog).getByRole("combobox", { name: "Role" }));
@@ -74,7 +79,7 @@ const changeRoleOpened = async (title: string): Promise<HTMLElement> => {
 };
 
 const changeRoleSent = (dialog: HTMLElement) => {
-  fireEvent.click(within(dialog).getByRole("button", { name: "Change Role" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
 };
 
 const removedThroughTheBar = async (title: string) => {
@@ -88,7 +93,7 @@ const removalOfPriyaHeld = async () => {
   const removal = holdProcedure(api, "members.remove", read({}));
   await openAt(MEMBERS, api);
   fireEvent.click(await screen.findByRole("link", { name: PRIYA.displayName }));
-  fireEvent.click(await screen.findByRole("button", { name: "Remove Member" }));
+  fireEvent.click(await screen.findByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }));
   fireEvent.click(screen.getByRole("button", { name: "Remove" }));
   await waitFor(() => {
     expect(outcome()?.textContent).toContain(PRIYA.displayName);
@@ -113,7 +118,7 @@ describe("bulk actions on selected members", () => {
     });
     expect(bar().getByRole("status").textContent).toMatch(TWO_TICKED_ONE_HIDDEN);
 
-    const dialog = await changeRoleOpened("Change Role for 2 Members");
+    const dialog = await changeRoleOpened(BULK_WORDS.changeRole.title(2));
     changeRoleSent(dialog);
 
     await waitFor(() => {
@@ -124,7 +129,7 @@ describe("bulk actions on selected members", () => {
       expect(document.activeElement).toBe(listHeading());
     });
     fireEvent.keyDown(listHeading(), { key: "Escape" });
-    expect(screen.queryByRole("toolbar", { name: "Selected Members" })).toBeNull();
+    expect(screen.queryByRole("toolbar", { name: SELECTED_MEMBERS })).toBeNull();
     fireEvent.change(searchBox(), { target: { value: "" } });
     expect(await screen.findByRole("link", { name: ADA.displayName })).toBeDefined();
     expect(tickOf(ADA.displayName).getAttribute("aria-checked")).toBe("false");
@@ -144,7 +149,7 @@ describe("bulk actions on selected members", () => {
     await ticking(PRIYA.displayName, SAM.displayName);
 
     const refusedAsNoMember = async () => {
-      const dialog = await changeRoleOpened("Change Role for 2 Members");
+      const dialog = await changeRoleOpened(BULK_WORDS.changeRole.title(2));
       changeRoleSent(dialog);
       await waitFor(() => {
         expect(refusal().textContent).not.toBe("");
@@ -176,7 +181,7 @@ describe("bulk actions on selected members", () => {
     expect(within(refusal()).getByRole("listitem").textContent).not.toContain(SAM.displayName);
     expect(bar().getByRole("status").textContent).toMatch(TWO_TICKED_ONE_HIDDEN);
 
-    await removedThroughTheBar("Remove 2 Members");
+    await removedThroughTheBar(BULK_WORDS.remove.title(2));
     await waitFor(() => {
       expect(
         outcome()?.textContent,
@@ -194,7 +199,7 @@ describe("bulk actions on selected members", () => {
     await openAt(MEMBERS, api);
     await ticking(PRIYA.displayName, SAM.displayName);
 
-    const dialog = await changeRoleOpened("Change Role for 2 Members");
+    const dialog = await changeRoleOpened(BULK_WORDS.changeRole.title(2));
     changeRoleSent(dialog);
 
     await waitFor(() => {
@@ -214,10 +219,10 @@ describe("bulk actions on selected members", () => {
     const removal = holdProcedure(api, "members.bulkRemove");
     await openAt(MEMBERS, api);
     await ticking(PRIYA.displayName);
-    await removedThroughTheBar("Remove 1 Member");
+    await removedThroughTheBar(BULK_WORDS.remove.title(1));
     await removal.asked;
     await waitFor(() => {
-      expect(screen.queryByRole("toolbar", { name: "Selected Members" })).toBeNull();
+      expect(screen.queryByRole("toolbar", { name: SELECTED_MEMBERS })).toBeNull();
     });
     await ticking(SAM.displayName);
 
@@ -246,7 +251,7 @@ describe("bulk actions on selected members", () => {
     );
 
     await ticking(SAM.displayName);
-    const dialog = await changeRoleOpened("Change Role for 1 Member");
+    const dialog = await changeRoleOpened(BULK_WORDS.changeRole.title(1));
     changeRoleSent(dialog);
     await waitFor(() => {
       expect(
@@ -271,7 +276,7 @@ describe("bulk actions on selected members", () => {
     api.set("members.bulkChangeRole", () => changedMeanwhile({ [SAM.personId]: "no-such-member" }));
     await ticking(SAM.displayName);
     const unmarked = personCell(SAM.displayName);
-    const dialog = await changeRoleOpened("Change Role for 1 Member");
+    const dialog = await changeRoleOpened(BULK_WORDS.changeRole.title(1));
     changeRoleSent(dialog);
     await waitFor(() => {
       expect(personCell(SAM.displayName), "the refused row was not marked").not.toBe(unmarked);

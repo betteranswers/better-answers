@@ -13,7 +13,7 @@ import { Card } from "@/shared/ui/card.tsx";
 import { counted, nothingMatches } from "@/shared/words.ts";
 
 import { EMPTY_LINES } from "../empty-lines.ts";
-import { approvedOutcome } from "../invitation-words.ts";
+import { approvedOutcome, REQUEST_WORDS } from "../invitation-words.ts";
 import { useInviteAction } from "../invite-action.tsx";
 import type { Role } from "../people-api.ts";
 import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "../people-state.ts";
@@ -35,7 +35,7 @@ const REQUESTS_HEADING = "Requests";
 
 const SEARCH_LABEL = "Search by name or address";
 
-const LOADING = "The requests are still loading.";
+const LOADING = "Loading requests…";
 
 const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.request);
 
@@ -87,7 +87,6 @@ function RequestsList(properties: {
   const [approving, setApproving] = useState<WaitingRequest>();
   const searchRef = useRef<HTMLInputElement>(null);
   const openedFrom = useRef<HTMLElement | null>(null);
-  const consequenceId = useId();
   const approve = useApproveRequest();
   const decline = useDeclineRequest();
 
@@ -113,7 +112,7 @@ function RequestsList(properties: {
     setApproving(undefined);
     setOutcome({
       tone: "said",
-      words: `Approving the request from ${requesterName(request)} as ${aRole(role)}.`,
+      words: REQUEST_WORDS.approving(requesterName(request), aRole(role)),
     });
     approve.mutate(
       { requestId: request.id, role },
@@ -132,7 +131,7 @@ function RequestsList(properties: {
     heading.current?.focus();
     setOutcome({
       tone: "said",
-      words: `The request from ${requesterName(request)} has been declined. They can send a new request.`,
+      words: REQUEST_WORDS.declined(requesterName(request)),
     });
     decline.mutate(
       { requestId: request.id },
@@ -179,12 +178,7 @@ function RequestsList(properties: {
           failed={(failure) => outcomeOfRequestFailure(failure, "read").words}
           focusAfterRetry={searchRef}
         >
-          <p id={consequenceId} className="px-3 pt-3 text-muted-foreground">
-            Approving a request sends the person an invitation. Declining it sends them nothing.
-          </p>
-          <RequestsActionsContext
-            value={{ consequenceId, onApprove: toApprove, onDecline: declined }}
-          >
+          <RequestsActionsContext value={{ onApprove: toApprove, onDecline: declined }}>
             <GridTable
               table={table}
               caption="Requests to join this workspace."

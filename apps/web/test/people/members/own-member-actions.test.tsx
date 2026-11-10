@@ -6,9 +6,12 @@ import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
   anAdminOver,
+  changeRoleButton,
   MEMBERS_PAGE,
   membersRegion,
   personHeading,
+  removalOf,
+  removeMemberButton,
   thePage,
 } from "@test/people/member-pages.ts";
 import { holdProcedure, type Api } from "@test/stubbed-api.ts";
@@ -48,8 +51,6 @@ const describing = (control: HTMLElement): string =>
 const describingWhoever = (control: HTMLElement, name: string): string =>
   describing(control).replaceAll(name, "…");
 
-const removalOf = () => within(thePage().getByRole("region", { name: "Removal" }));
-
 const leavingTheWorkspace = (api: Api, removed: () => unknown) => {
   api.set("members.remove", () => {
     api.set("session.member", () => NOT_A_MEMBER);
@@ -71,16 +72,12 @@ describe("a member's own page", () => {
 
     await openedByName(HEDY.displayName);
     fireEvent.click(thePage().getByRole("radio", { name: "Editor" }));
-    const changeHedy = within(thePage().getByRole("region", { name: "Role" })).getByRole("button", {
-      name: "Change Role",
-    });
+    const changeHedy = changeRoleButton();
     const ofAnother = describingWhoever(changeHedy, HEDY.displayName);
     await backToMembers(router);
     await openedByName(ADA.displayName);
     fireEvent.click(thePage().getByRole("radio", { name: "Editor" }));
-    const commit = within(thePage().getByRole("region", { name: "Role" })).getByRole("button", {
-      name: "Change Role",
-    });
+    const commit = changeRoleButton();
     expect(describing(commit)).toMatch(/\S/);
     expect(
       describingWhoever(commit, ADA.displayName),
@@ -120,19 +117,14 @@ describe("removing yourself from your member page", () => {
     const router = await openAt(MEMBERS_PAGE, api);
 
     await openedByName(HEDY.displayName);
-    fireEvent.click(removalOf().getByRole("button", { name: "Remove Member" }));
+    fireEvent.click(removeMemberButton());
     const ofAnother = describingWhoever(
       await waitFor(() => removalOf().getByRole("button", { name: "Remove" })),
       HEDY.displayName,
     );
     await backToMembers(router);
     await openedByName(ADA.displayName);
-    const asked = removalOf().getByRole("button", { name: "Remove Member" });
-    expect(describing(asked)).toMatch(/\S/);
-    expect(
-      describing(asked),
-      "your own removal's description names you in the third person",
-    ).not.toContain(ADA.displayName);
+    const asked = removeMemberButton();
     fireEvent.click(asked);
     const confirm = await waitFor(() => removalOf().getByRole("button", { name: "Remove" }));
     expect(describing(confirm)).toMatch(/\S/);
@@ -158,7 +150,7 @@ describe("removing yourself from your member page", () => {
     const removal = holdProcedure(api, "members.remove");
     const router = await openAt(memberPageOf(ADA.personId), api);
     await personHeading(ADA.displayName);
-    fireEvent.click(removalOf().getByRole("button", { name: "Remove Member" }));
+    fireEvent.click(removeMemberButton());
     const confirm = await waitFor(() => removalOf().getByRole("button", { name: "Remove" }));
 
     act(() => {

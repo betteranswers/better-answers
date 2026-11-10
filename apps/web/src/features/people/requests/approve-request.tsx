@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { MountedActionDialog } from "@/shared/page/action-dialog.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
+import { REQUEST_WORDS } from "../invitation-words.ts";
 import type { Role } from "../people-api.ts";
 import { ROLE_OFFERED_FIRST, RoleChoice } from "../role-choice.tsx";
 import { requesterName, type WaitingRequest } from "./requests-api.ts";
@@ -23,8 +24,8 @@ export function ApproveRequest(properties: {
       onFocusBack={() => {
         properties.onFocusBack(sent.current);
       }}
-      title={`Approve Request from ${requesterName(request)}`}
-      consequence={`This will send ${request.requester.email} an invitation to join this workspace with the role below.`}
+      title={REQUEST_WORDS.approveFrom(requesterName(request))}
+      consequence={REQUEST_WORDS.approveConsequence(request.requester.email)}
       commit={
         <Button
           onClick={() => {

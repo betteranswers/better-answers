@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { INVITE_WORDS } from "@/features/people/invitation-words.ts";
+import { INVITATIONS_WORDS, INVITE_WORDS } from "@/features/people/invitation-words.ts";
 import { MOST_AT_ONCE } from "@/features/people/invitations/invite-addresses.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
@@ -115,7 +115,7 @@ describe("the People page's Invitations tab", () => {
     expect(heldAddresses()).toHaveLength(2);
     await focused(removeOf(ben));
     expect(sendButton().getAttribute("aria-disabled")).toBe("false");
-    expect(sendButton().textContent).toBe("Send 2 Invitations");
+    expect(sendButton().textContent).toBe(INVITE_WORDS.send(2));
     fireEvent.click(sendButton());
 
     await screen.findByRole("button", { name: "Done" });
@@ -159,7 +159,7 @@ describe("the People page's Invitations tab", () => {
     expect(heldAddresses()).toHaveLength(MOST_AT_ONCE);
     expect(addressField().value).toBe(late);
     expect(alertIn(inviteDialog()), "the alert did not give the limit").toMatch(/\b50\b/);
-    expect(sendButton().textContent).toBe("Send 50 Invitations");
+    expect(sendButton().textContent).toBe(INVITE_WORDS.send(50));
     fireEvent.click(sendButton());
 
     await waitFor(() => {
@@ -216,10 +216,14 @@ describe("the People page's Invitations tab", () => {
     typed(offline);
     fireEvent.click(sendButton());
 
-    const unsent = await within(inviteDialog()).findByRole("region", { name: "Unsent Emails" });
+    const unsent = await within(inviteDialog()).findByRole("region", {
+      name: INVITATIONS_WORDS.unsent,
+    });
     expect(alertIn(inviteDialog())).toContain(offline);
     expect(sentSaid()).toBe("");
-    const resend = within(unsent).getByRole("button", { name: `Resend Invitation to ${offline}` });
+    const resend = within(unsent).getByRole("button", {
+      name: INVITATIONS_WORDS.resendTo(offline),
+    });
     resend.focus();
     fireEvent.click(resend);
     await waitFor(() => {
@@ -249,7 +253,7 @@ describe("the People page's Invitations tab", () => {
       invite.resolve();
 
       expect(
-        await within(region).findByRole("button", { name: `Resend Invitation to ${offline}` }),
+        await within(region).findByRole("button", { name: INVITATIONS_WORDS.resendTo(offline) }),
       ).toBeDefined();
       expect(alertIn(region)).toContain(offline);
     });
@@ -290,22 +294,24 @@ describe("the People page's Invitations tab", () => {
     await dialogOpened();
     typed(`${offline}, ${other}`);
     fireEvent.click(sendButton());
-    const unsent = await within(inviteDialog()).findByRole("region", { name: "Unsent Emails" });
+    const unsent = await within(inviteDialog()).findByRole("region", {
+      name: INVITATIONS_WORDS.unsent,
+    });
     expect(within(unsent).getAllByRole("listitem")).toHaveLength(2);
 
     reachable(offline);
     fireEvent.click(
-      within(unsent).getByRole("button", { name: `Resend Invitation to ${offline}` }),
+      within(unsent).getByRole("button", { name: INVITATIONS_WORDS.resendTo(offline) }),
     );
     await waitFor(() => {
       expect(within(unsent).getAllByRole("listitem")).toHaveLength(1);
     });
     expect(within(unsent).getByRole("status").textContent).toContain(offline);
     expect(
-      within(unsent).getByRole("button", { name: `Resend Invitation to ${other}` }),
+      within(unsent).getByRole("button", { name: INVITATIONS_WORDS.resendTo(other) }),
     ).toBeDefined();
     expect(document.activeElement, "focus did not move to the Unsent Emails heading").toBe(
-      within(unsent).getByRole("heading", { name: "Unsent Emails" }),
+      within(unsent).getByRole("heading", { name: INVITATIONS_WORDS.unsent }),
     );
   });
 

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { GROUP_WORDS } from "@/features/people/groups/group-words.ts";
 import { GROUPS_KEYSTROKES } from "@/features/people/people-state.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -158,11 +159,13 @@ describe("the Groups page", () => {
 
   it("keeps focus in search while a new group is filtered", async () => {
     await openedWith(HR_TEAM, BID_WRITERS);
-    await userEvent.click(groupsRegion().getByRole("button", { name: "Create a Group" }));
-    const dialog = await screen.findByRole("dialog", { name: "Create a Group" });
+    await userEvent.click(
+      groupsRegion().getByRole("button", { name: GROUPS_KEYSTROKES.create.action }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: GROUPS_KEYSTROKES.create.action });
 
     await userEvent.type(
-      within(dialog).getByRole("textbox", { name: "New Group Name" }),
+      within(dialog).getByRole("textbox", { name: GROUP_WORDS.create.field }),
       "Site leads{Enter}",
     );
 
@@ -225,7 +228,7 @@ describe("the Groups page", () => {
     expect(describedBy(confirming), "the warning did not count the group's 2 members").toMatch(
       /\b2\b/,
     );
-    await focused(within(confirming).getByRole("button", { name: "Keep Group" }));
+    await focused(within(confirming).getByRole("button", { name: GROUP_WORDS.keep }));
     act(() => {
       within(confirming).getByRole("button", { name: "Delete" }).focus();
     });

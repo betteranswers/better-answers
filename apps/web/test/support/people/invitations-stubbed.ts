@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { expect } from "vitest";
 import { z } from "zod";
 
+import { INVITATIONS_WORDS, INVITE_WORDS } from "@/features/people/invitation-words.ts";
 import { INVITATION_STATUSES } from "@/features/people/invitations/invitations-address.ts";
 import type {
   InvitationStatus,
@@ -262,7 +263,7 @@ export const menuItemChosen = async (address: string, item: string) => {
   fireEvent.click(await screen.findByRole("menuitem", { name: item }));
 };
 
-const selectionBar = () => screen.getByRole("toolbar", { name: "Selected Invitations" });
+const selectionBar = () => screen.getByRole("toolbar", { name: INVITATIONS_WORDS.selected });
 
 export const selectionAction = (name: string) =>
   within(selectionBar()).getByRole("button", { name });
@@ -278,7 +279,7 @@ export const inviteAction = () => screen.getByRole("button", { name: INVITE });
 export const inviteDialog = () => screen.getByRole("dialog", { name: INVITE });
 
 export const addressField = (): HTMLInputElement => {
-  const field = within(inviteDialog()).getByLabelText("Email Addresses");
+  const field = within(inviteDialog()).getByLabelText(INVITE_WORDS.field);
   if (!(field instanceof HTMLInputElement)) throw new Error("the address field is not an input");
   return field;
 };
@@ -292,7 +293,7 @@ export const sendButton = () => within(inviteDialog()).getByRole("button", { nam
 export const doneButton = () => within(inviteDialog()).getByRole("button", { name: "Done" });
 
 export const heldAddresses = (): HTMLElement[] => {
-  const list = within(inviteDialog()).queryByRole("list", { name: "Addresses to Invite" });
+  const list = within(inviteDialog()).queryByRole("list", { name: INVITE_WORDS.list });
   return list === null ? [] : within(list).getAllByRole("listitem");
 };
 

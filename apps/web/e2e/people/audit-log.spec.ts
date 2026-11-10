@@ -1,6 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { AUDIT_LOG_KEYSTROKES as KEY } from "@/features/people/audit-log/audit-log-state.ts";
+import { AUDIT_LOG_WORDS } from "@/features/people/audit-log/audit-log-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -119,7 +120,7 @@ test.describe("the System group's Audit log page", () => {
       ).toHaveCount(0);
     }
 
-    await expect(familyFilter(page)).toHaveText("All Families");
+    await expect(familyFilter(page)).toHaveText(AUDIT_LOG_WORDS.everyFamily);
     await pickFamily(page, "Platform");
     await expect(linesOf(page)).toHaveCount(1);
     await expect(familyFilter(page)).toHaveText("Platform");

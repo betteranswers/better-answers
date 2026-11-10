@@ -1,6 +1,11 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  BULK_WORDS,
+  MEMBER_PAGE_WORDS,
+  SELECTED_MEMBERS,
+} from "@/features/people/member-action-words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { asked, MEMBERS, rowOf, SAM, siteLeads } from "@test/people/members-roster.ts";
 import { ADA, adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
@@ -43,9 +48,9 @@ describe("a member row's menu", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
-    ).toEqual(["Open", "Change Role", "Add to Group", "Remove"]);
+    ).toEqual(["Open", MEMBER_PAGE_WORDS.changeRole, BULK_WORDS.addToGroup.action, "Remove"]);
 
-    fireEvent.click(within(menu).getByRole("menuitem", { name: "Change Role" }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: MEMBER_PAGE_WORDS.changeRole }));
 
     await screen.findByRole("heading", { level: 1, name: SAM.displayName });
     expect(router.state.location.pathname).toMatch(/\/people\/members\/[0-9A-HJKMNP-TV-Z]{26}$/v);
@@ -54,7 +59,7 @@ describe("a member row's menu", () => {
     });
     fireEvent.click(thePage().getByRole("radio", { name: "Editor" }));
     const roleCard = within(screen.getByRole("region", { name: "Role" }));
-    fireEvent.click(roleCard.getByRole("button", { name: "Change Role" }));
+    fireEvent.click(roleCard.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
     await waitFor(() => {
       expect(roleCard.getByRole("status").textContent).toMatch(/Sam Okoro.*Editor/v);
     });
@@ -65,7 +70,7 @@ describe("a member row's menu", () => {
     await waitFor(() => {
       expect(cellOf(SAM.displayName, 2)).toBe("Editor");
     });
-    expect(screen.queryByRole("toolbar", { name: "Selected Members" })).toBeNull();
+    expect(screen.queryByRole("toolbar", { name: SELECTED_MEMBERS })).toBeNull();
   });
 
   it("Add to Group opens the member's Groups section", async () => {
@@ -79,7 +84,7 @@ describe("a member row's menu", () => {
     const router = await openAt(MEMBERS, api);
     const menu = await rowMenuOpened(SAM.displayName);
 
-    fireEvent.click(within(menu).getByRole("menuitem", { name: "Add to Group" }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: BULK_WORDS.addToGroup.action }));
 
     await screen.findByRole("heading", { level: 1, name: SAM.displayName });
     const box = await thePage().findByRole("checkbox", { name: "Site leads" });

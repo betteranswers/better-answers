@@ -23,14 +23,14 @@ const outcomeOfSending = (
 
 export const approvedOutcome = (sent: SentInvitation): Outcome =>
   outcomeOfSending(sent, {
-    went: `The request has been approved successfully. An invitation was sent to ${sent.address} as ${aRole(sent.role)} and expires on ${dayWords(sent.expiresAt)}.`,
-    didNotGo: `The request was approved, but the email to ${sent.address} could not be sent. The invitation is still valid. Please resend it from the Invitations tab.`,
+    went: `${sent.address} invited as ${aRole(sent.role)}. The invitation expires on ${dayWords(sent.expiresAt)}.`,
+    didNotGo: `Request approved, but the email to ${sent.address} wasn’t sent. Resend it from the Invitations tab.`,
   });
 
 export const resentOutcome = (sent: SentInvitation): Outcome =>
   outcomeOfSending(sent, {
-    went: `The invitation to ${sent.address} has been resent successfully. It expires on ${dayWords(sent.expiresAt)}.`,
-    didNotGo: `The email to ${sent.address} could not be sent, but the invitation is still valid. Please try again later, or contact better-answers support if the problem continues.`,
+    went: `Invitation to ${sent.address} resent. It expires on ${dayWords(sent.expiresAt)}.`,
+    didNotGo: `The email to ${sent.address} wasn’t sent. Try again later, or contact better-answers support.`,
   });
 
 const addressesOf = (sent: readonly SentInvitation[]): string =>
@@ -38,62 +38,53 @@ const addressesOf = (sent: readonly SentInvitation[]): string =>
 
 const unsentSaid = (unsent: readonly SentInvitation[]): string =>
   unsent.length === 1
-    ? `The email to ${addressesOf(unsent)} could not be sent, but the invitation is still valid. Please resend it below.`
-    : `The emails to ${addressesOf(unsent)} could not be sent, but the invitations are still valid. Please resend each one below.`;
+    ? `email to ${addressesOf(unsent)} wasn’t sent. Resend it below.`
+    : `emails to ${addressesOf(unsent)} weren’t sent. Resend them below.`;
 
 const lastsUntil = (sent: readonly SentInvitation[]): string => {
   const [first] = sent;
   return first === undefined ? "" : dayWords(first.expiresAt);
 };
 
-const emailsSaid = (sent: readonly SentInvitation[]): string => {
-  const unsent = sent.filter((one) => !one.emailSent);
-  if (unsent.length > 0) return unsentSaid(unsent);
-  return sent.length === 1
-    ? `The email was sent successfully, and the invitation expires on ${lastsUntil(sent)}.`
-    : `The emails were sent successfully, and the invitations expire on ${lastsUntil(sent)}.`;
-};
-
 const ledBy = (invited: readonly InvitedOne[], role: Role): string => {
   const [only] = invited;
   if (invited.length > 1 || only === undefined) {
-    return `${String(invited.length)} people have been invited as ${role}s.`;
+    return `${String(invited.length)} people invited as ${role}s`;
   }
   return only.replaced
-    ? `The invitation to ${only.address} has been resent as ${aRole(role)}, replacing the one that was waiting.`
-    : `${only.address} has been invited as ${aRole(role)}.`;
-};
-
-const resentSaid = (invited: readonly InvitedOne[]): string => {
-  const replaced = invited.filter((one) => one.replaced);
-  if (invited.length === 1 || replaced.length === 0) return "";
-  return replaced.length === 1
-    ? ` The invitation to ${addressesOf(replaced)} replaced the one that was waiting.`
-    : ` The invitations to ${addressesOf(replaced)} replaced the ones that were waiting.`;
+    ? `Invitation to ${only.address} resent as ${aRole(role)}`
+    : `${only.address} invited as ${aRole(role)}`;
 };
 
 export const invitedOutcome = (invited: readonly InvitedOne[], role: Role): Outcome => {
-  const words = `${ledBy(invited, role)}${resentSaid(invited)} ${emailsSaid(invited)}`;
-  return invited.every((one) => one.emailSent)
-    ? { tone: "said", words }
-    : { tone: "refused", words };
+  const lead = ledBy(invited, role);
+  const unsent = invited.filter((one) => !one.emailSent);
+  if (unsent.length === 0) {
+    const expires = invited.length === 1 ? "The invitation expires" : "The invitations expire";
+    return { tone: "said", words: `${lead}. ${expires} on ${lastsUntil(invited)}.` };
+  }
+  const notSent =
+    invited.length === 1 ? "the email wasn’t sent. Resend it below." : `the ${unsentSaid(unsent)}`;
+  return { tone: "refused", words: `${lead}, but ${notSent}` };
 };
 
 export const bulkResentOutcome = (resent: readonly SentInvitation[]): Outcome => {
-  const lead = `${counted(resent.length, "invitation has", "invitations have")} been resent`;
-  return resent.every((one) => one.emailSent)
-    ? {
-        tone: "said",
-        words: `${lead} successfully. ${resent.length === 1 ? "It expires" : "Each expires"} on ${lastsUntil(resent)}.`,
-      }
-    : { tone: "refused", words: `${lead}. ${unsentSaid(resent.filter((one) => !one.emailSent))}` };
+  const went = resent.filter((one) => one.emailSent);
+  const unsent = resent.filter((one) => !one.emailSent);
+  const lead = `${invitations(went.length)} resent`;
+  if (unsent.length === 0) {
+    const expires = went.length === 1 ? "It expires" : "Each expires";
+    return { tone: "said", words: `${lead}. ${expires} on ${lastsUntil(went)}.` };
+  }
+  if (went.length === 0) return { tone: "refused", words: `The ${unsentSaid(unsent)}` };
+  return { tone: "refused", words: `${lead}, but the ${unsentSaid(unsent)}` };
 };
 
 const cancelledSaid = (changed: number, skipped: number): string => {
   const done =
     changed === 0
-      ? "No invitations were cancelled"
-      : `${counted(changed, "invitation has", "invitations have")} been cancelled successfully. ${changed === 1 ? "Its link no longer works" : "Their links no longer work"}`;
+      ? "No invitations cancelled"
+      : `${counted(changed, "invitation", "invitations")} cancelled`;
   return skipped === 0
     ? `${done}.`
     : `${done}. ${counted(skipped, "invitation was", "invitations were")} already cancelled.`;
@@ -108,11 +99,12 @@ export const STATUS_WORDS = {
 
 export const INVITATIONS_WORDS = {
   status: "Status",
+  invitedBy: "Invited by",
   search: "Search by address",
-  selected: "Selected Invitations",
+  selected: "Selected invitations",
   everyOnThePage: "Select every invitation on this page",
-  pages: "Pages of Invitations",
-  loading: "The invitations are still loading.",
+  pages: "Pages of invitations",
+  loading: "Loading invitations…",
   caption: "Invitations to this workspace.",
   noneIn: {
     waiting: EMPTY_LINES.invitations,
@@ -120,7 +112,7 @@ export const INVITATIONS_WORDS = {
     expired: "No expired invitations",
     cancelled: "No cancelled invitations",
   } satisfies Readonly<Record<InvitationStatus, string>>,
-  noneMatch: (search: string) => `No results found for “${search}”.`,
+  noneMatch: (search: string) => `No invitations match “${search}”.`,
   counted: invitationsIn,
   matched: (status: InvitationStatus, shown: number, total: number, search: string) =>
     `${String(shown)} of ${invitationsIn(status, total)} match “${search}”.`,
@@ -128,8 +120,7 @@ export const INVITATIONS_WORDS = {
   cancel: "Cancel",
   noLongerListed: "An invitation no longer listed",
   resending: (address: string) => `Resending the invitation to ${address}.`,
-  cancelled: (address: string) =>
-    `The invitation to ${address} has been cancelled. Its link no longer works.`,
+  cancelled: (address: string) => `Invitation to ${address} cancelled.`,
   bulk: {
     resending: (count: number) => `Resending ${invitations(count)}.`,
     cancelling: (count: number) => `Cancelling ${invitations(count)}.`,
@@ -138,15 +129,15 @@ export const INVITATIONS_WORDS = {
       `No changes were made. There was a problem with ${invitations(count)}:`,
     tooMany: (most: number) => `You can select up to ${invitations(most)} at a time.`,
   },
-  unsent: "Unsent Emails",
-  resendTo: (address: string) => `Resend Invitation to ${address}`,
+  unsent: "Unsent emails",
+  resendTo: (address: string) => `Resend invitation to ${address}`,
 } as const;
 
 export const INVITE_WORDS = {
-  description: "Invite people to your workspace with a specific role.",
-  field: "Email Addresses",
+  description: "Invite people by email and choose their role.",
+  field: "Email addresses",
   hint: "Separate addresses with commas or new lines.",
-  list: "Addresses to Invite",
+  list: "Addresses to invite",
   remove: (address: string) => `Remove ${address}`,
   flag: {
     ready: "Ready",
@@ -157,19 +148,29 @@ export const INVITE_WORDS = {
     flagged === 0
       ? `${counted(ready, "address", "addresses")} ready.`
       : `${counted(ready, "address", "addresses")} ready, ${String(flagged)} to fix or remove.`,
-  send: (count: number) => (count <= 1 ? "Send Invitation" : `Send ${String(count)} Invitations`),
+  send: (count: number) => (count <= 1 ? "Send invitation" : `Send ${String(count)} invitations`),
   sending: (count: number) =>
-    count <= 1 ? "Sending Invitation" : `Sending ${String(count)} Invitations`,
+    count <= 1 ? "Sending invitation" : `Sending ${String(count)} invitations`,
   waiting: (count: number) =>
     count === 1
-      ? "1 more address is waiting. Please invite it next."
-      : `${String(count)} more addresses are waiting. Please invite them next.`,
+      ? "1 more address is waiting. Invite it next."
+      : `${String(count)} more addresses are waiting. Invite them next.`,
   done: "Done",
 } as const;
 
+export const REQUEST_WORDS = {
+  approving: (name: string, role: string): string =>
+    `Approving the request from ${name} as ${role}.`,
+  declined: (name: string): string => `Request from ${name} declined.`,
+  approveFrom: (name: string): string => `Approve request from ${name}`,
+  declineFrom: (name: string): string => `Decline request from ${name}`,
+  approveConsequence: (address: string): string =>
+    `Send ${address} an invitation with the role below.`,
+} as const;
+
 export const INVITE_REFUSED = {
-  flagged: "Please fix or remove the flagged addresses.",
-  none: "Please enter at least one email address.",
+  flagged: "Fix or remove the flagged addresses.",
+  none: "Enter at least one email address.",
   capped: (most: number): string => `You can send up to ${String(most)} addresses at a time.`,
   heldBack: (count: number): string =>
     `No invitations were sent. There was a problem with ${counted(count, "address", "addresses")}:`,

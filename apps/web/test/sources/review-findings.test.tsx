@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { REVIEW_WORDS } from "@/features/sources/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
   aConnectedSource,
@@ -79,7 +80,9 @@ describe("reviewing a connected source's findings", () => {
     press("x");
 
     expect(box.getAttribute("aria-checked"), "x selected a group not in focus").toBe("false");
-    const keep = within(row).getByRole<HTMLButtonElement>("button", { name: "Keep in Text" });
+    const keep = within(row).getByRole<HTMLButtonElement>("button", {
+      name: REVIEW_WORDS.keep.label,
+    });
     expect(keep.disabled).toBe(true);
     expect(describedBy(keep), "the disabled Keep in Text has no hint").toMatch(/\S/v);
   });
@@ -117,13 +120,13 @@ describe("reviewing a connected source's findings", () => {
   it("tells the Admin how to enable the three actions", async () => {
     const { row } = await openSupplierFormsReview();
     const review = within(within(row).getByRole("region", { name: "Review of Supplier forms" }));
-    const hint = describedBy(review.getByRole("button", { name: "Keep in Text" }));
+    const hint = describedBy(review.getByRole("button", { name: REVIEW_WORDS.keep.label }));
     expect(hint, "Keep in Text has no hint saying how to enable it").toMatch(/\S/v);
 
     for (const name of [
-      "Keep in Text",
-      "Narrow These Documents",
-      "Dismiss as Not Special Category",
+      REVIEW_WORDS.keep.label,
+      REVIEW_WORDS.narrowDocuments.label,
+      REVIEW_WORDS.dismiss.label,
     ]) {
       const action = review.getByRole<HTMLButtonElement>("button", {
         name,
@@ -134,12 +137,14 @@ describe("reviewing a connected source's findings", () => {
     fireEvent.click(review.getByRole("checkbox", { name: BANK_ACCOUNT_BOX }));
 
     expect(
-      review.queryByRole("button", { name: "Keep in Text", description: hint }),
+      review.queryByRole("button", { name: REVIEW_WORDS.keep.label, description: hint }),
       "Keep in Text kept its hint after a group was ticked",
     ).toBeNull();
     expect(
-      review.getByRole<HTMLButtonElement>("button", { name: "Keep in Text", description: "" })
-        .disabled,
+      review.getByRole<HTMLButtonElement>("button", {
+        name: REVIEW_WORDS.keep.label,
+        description: "",
+      }).disabled,
     ).toBe(false);
   });
 
@@ -173,7 +178,7 @@ describe("reviewing a connected source's findings", () => {
     const row = await rowOf("Staff handbook");
     fireEvent.click(rowAction(row, "review"));
 
-    fireEvent.click(within(row).getByRole("button", { name: "Preview Passages" }));
+    fireEvent.click(within(row).getByRole("button", { name: REVIEW_WORDS.preview.label }));
 
     const shown = await within(row).findAllByRole("listitem");
     expect(shown.map((passage) => passage.textContent)).toEqual(passages);

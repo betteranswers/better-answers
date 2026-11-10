@@ -117,7 +117,7 @@ export function ConnectAction() {
           setOpen(false);
           setOutcome({
             tone: "said",
-            words: `“${name}” has been connected successfully. ${file.name} is queued to sync.`,
+            words: CONNECT_WORDS.connected(name, file.name),
           });
         },
         onError: (failure) => {
@@ -135,12 +135,12 @@ export function ConnectAction() {
     <>
       <OutcomeLine outcome={open ? undefined : outcome} className="sr-only" />
       <Button size="sm" aria-keyshortcuts={SOURCES_KEYSTROKES.connect.key} onClick={show}>
-        Connect a Document
+        {CONNECT_WORDS.action}
       </Button>
       <ActionDialog
         open={open}
         onOpenChange={setOpen}
-        title="Connect a Document"
+        title={CONNECT_WORDS.action}
         consequence={CONNECT_WORDS.consequence}
         commit={
           <Button type="submit" form={ids.form} disabled={connect.isPending}>
@@ -173,7 +173,7 @@ export function ConnectAction() {
           <div className="grid gap-2">
             <Label htmlFor={ids.audience}>Audience</Label>
             <Select name="audience" defaultValue={EVERYONE}>
-              <SelectTrigger id={ids.audience} aria-describedby={`${ids.audience}-hint`}>
+              <SelectTrigger id={ids.audience}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -183,9 +183,6 @@ export function ConnectAction() {
                 </SelectItem>
               </SelectContent>
             </Select>
-            <p id={`${ids.audience}-hint`} className="text-sm text-muted-foreground">
-              {CONNECT_WORDS.audienceHint}
-            </p>
           </div>
 
           <div className="grid gap-2">

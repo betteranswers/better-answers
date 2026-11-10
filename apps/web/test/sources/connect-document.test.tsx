@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { CONNECT_WORDS } from "@/features/sources/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { anAdminWith, openSources, press } from "@test/sources/stubbed-sources.ts";
 
@@ -12,7 +13,7 @@ describe("connecting a document on the Sources page", () => {
   it("refuses an unsupported file and keeps the dialog open", async () => {
     await openSources(anAdminWith());
     press("b");
-    const dialog = await screen.findByRole("dialog", { name: "Connect a Document" });
+    const dialog = await screen.findByRole("dialog", { name: CONNECT_WORDS.action });
     const picture = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "shopfront.png", {
       type: "image/png",
     });

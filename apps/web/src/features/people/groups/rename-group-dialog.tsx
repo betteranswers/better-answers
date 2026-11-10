@@ -45,7 +45,7 @@ export function RenameGroupDialog(properties: {
       onFocusBack={properties.onFocusBack}
       commit={
         <Button type="submit" form={formId}>
-          Rename Group
+          {GROUP_WORDS.rename.commit}
         </Button>
       }
     >

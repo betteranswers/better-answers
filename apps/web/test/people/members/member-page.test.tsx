@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { MEMBER_PAGE_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -136,7 +137,7 @@ describe("a member's own page", () => {
   it("describes a role change only after another role is picked", async () => {
     await openAt(memberPageOf(PRIYA.personId), aWorkspaceOfThree());
     await personHeading("Priya Shah");
-    const commit = () => rolePicker().getByRole("button", { name: "Change Role" });
+    const commit = () => rolePicker().getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole });
 
     expect(commit().hasAttribute("disabled")).toBe(true);
     expect(describing(commit())).toMatch(/Priya Shah.*Editor/);
@@ -164,7 +165,7 @@ describe("a member's own page", () => {
     await waitFor(() => expect(outcome()?.textContent).toMatch(/\S/));
     expect(router.state.location.pathname, "the key opened another page").toBe(MEMBERS_PAGE);
     expect(screen.queryByRole("heading", { level: 1, name: "Priya Shah" })).toBeNull();
-    expect(screen.queryByRole("toolbar", { name: "Selected Members" })).toBeNull();
+    expect(screen.queryByRole("toolbar", { name: SELECTED_MEMBERS })).toBeNull();
   });
 
   it("clears the select-first message once a key selects a member", async () => {
@@ -208,17 +209,17 @@ describe("signing a member out of this workspace", () => {
 
     await waitFor(() => expect(outcome()?.textContent).toMatch(/\S/));
     expect(router.state.location.pathname).toBe(MEMBERS_PAGE);
-    expect(screen.queryByRole("toolbar", { name: "Selected Members" })).toBeNull();
+    expect(screen.queryByRole("toolbar", { name: SELECTED_MEMBERS })).toBeNull();
 
     focused(await linkTo("Sam Okoro"));
     keyPressed(endKey);
 
     const revoke = await waitFor(() =>
-      thePage().getByRole("button", { name: "Sign Out of This Workspace" }),
+      thePage().getByRole("button", { name: MEMBER_PAGE_WORDS.signOutHere }),
     );
     await waitFor(() => expect(document.activeElement).toBe(revoke));
     fireEvent.click(revoke);
-    const credentials = thePage().getByRole("region", { name: "Sign Out of This Workspace" });
+    const credentials = thePage().getByRole("region", { name: MEMBER_PAGE_WORDS.signOutHere });
     await waitFor(() =>
       expect(within(credentials).getByRole("status").textContent).toContain("Sam Okoro"),
     );
@@ -234,7 +235,7 @@ describe("flagging a member's display name", () => {
 
     await personHeading(UNNAMED.address);
     expect(crumbs().at(-1)?.textContent).toBe(UNNAMED.address);
-    const region = within(thePage().getByRole("region", { name: "Display Name" }));
+    const region = within(thePage().getByRole("region", { name: MEMBER_PAGE_WORDS.displayName }));
     expect(region.getByText(UNNAMED.address, { exact: false })).toBeDefined();
     expect(region.queryAllByRole("button")).toHaveLength(0);
   });
@@ -259,10 +260,12 @@ describe("flagging a member's display name", () => {
     focused(await linkTo("Priya Shah"));
     keyPressed(PEOPLE_KEYSTROKES.flagName.key);
 
-    const flag = await waitFor(() => thePage().getByRole("button", { name: "Flag Name" }));
+    const flag = await waitFor(() =>
+      thePage().getByRole("button", { name: MEMBER_PAGE_WORDS.flagName }),
+    );
     await waitFor(() => expect(document.activeElement).toBe(flag));
     fireEvent.click(flag);
-    const region = thePage().getByRole("region", { name: "Display Name" });
+    const region = thePage().getByRole("region", { name: MEMBER_PAGE_WORDS.displayName });
     await waitFor(() => expect(within(region).getByRole("status").textContent).toMatch(/\S/));
     expect(alertsWithText(region)).toBe(0);
     await waitFor(() =>

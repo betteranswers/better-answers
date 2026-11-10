@@ -1,6 +1,7 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect } from "vitest";
 
+import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import type { Api } from "@test/stubbed-api.ts";
 import { ADA, adaAnAdmin, GRACE, read } from "@test/two-workspaces.ts";
@@ -41,6 +42,25 @@ export const anAdminOver = (members: readonly object[]): Api => {
 };
 
 export const thePage = () => within(screen.getByRole("main"));
+
+export const changeRoleButton = () =>
+  within(thePage().getByRole("region", { name: "Role" })).getByRole("button", {
+    name: MEMBER_PAGE_WORDS.changeRole,
+  });
+
+export const removalOf = () =>
+  within(thePage().getByRole("region", { name: MEMBER_PAGE_WORDS.removal }));
+
+export const removeMemberButton = () =>
+  removalOf().getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember });
+
+export const changeRolePressed = () => {
+  fireEvent.click(changeRoleButton());
+};
+
+export const removeMemberPressed = async () => {
+  fireEvent.click(await waitFor(removeMemberButton));
+};
 
 export const membersRegion = () => within(screen.getByRole("region", { name: "Members" }));
 

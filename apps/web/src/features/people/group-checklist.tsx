@@ -6,6 +6,7 @@ import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
 import { useGroupMoves, type InGroup } from "./groups-api.ts";
+import { GROUP_WORDS } from "./groups/group-words.ts";
 import { outcomeOfGroupFailure } from "./refusal.tsx";
 
 type Choice = {
@@ -38,8 +39,8 @@ export function GroupChecklist(properties: {
     if (pair === undefined) return;
     setOutcome(undefined);
     const said = ticked
-      ? `${pair.person} has been added to ${pair.group} successfully.`
-      : `${pair.person} has been removed from ${pair.group} successfully.`;
+      ? GROUP_WORDS.added(pair.person, pair.group)
+      : GROUP_WORDS.removed(pair.person, pair.group);
     void (ticked ? moves.putIn : moves.takeOut)(pair.inGroup).then(
       () => {
         setOutcome({ tone: "said", words: said });

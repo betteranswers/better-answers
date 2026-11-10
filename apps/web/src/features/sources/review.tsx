@@ -84,7 +84,7 @@ function PreviewPassages(properties: {
 
   return (
     <div aria-live="polite" className="mt-2">
-      {said.isPending && properties.open ? <p>The passages are still loading.</p> : null}
+      {said.isPending && properties.open ? <p>Loading passages…</p> : null}
       {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
       {preview.data?.length === 0 ? <p>{REVIEW_WORDS.noPassages}</p> : null}
       {preview.data === undefined || preview.data.length === 0 ? null : (
@@ -108,13 +108,11 @@ function Preview(properties: { readonly connectedSource: ListedConnectedSource }
     <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
       <CollapsibleTrigger asChild>
         <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
-          Preview Passages
+          {REVIEW_WORDS.preview.label}
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <p className="mt-2 text-muted-foreground">
-          What readers will see once it is published. Only Admins can see this until then.
-        </p>
+        <p className="mt-2 text-muted-foreground">{REVIEW_WORDS.preview.lead}</p>
         <PreviewPassages preview={preview} open={open} />
       </CollapsibleContent>
     </Collapsible>
@@ -206,10 +204,9 @@ export function Review(properties: { readonly connectedSource: ListedConnectedSo
       <h4 id={REVIEW_HEADING} tabIndex={-1} className="font-medium text-foreground">
         {REVIEW_WORDS.heading(connectedSource.name)}
       </h4>
-      <p className="mt-2 text-muted-foreground">{REVIEW_WORDS.lead}</p>
 
       <div aria-live="polite" className="mt-4">
-        {said.isPending ? <p>The findings are still loading.</p> : null}
+        {said.isPending ? <p>Loading findings…</p> : null}
         {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
         {findings.data?.length === 0 ? <p>{NOTHING_FOUND[connectedSource.state]}</p> : null}
       </div>
