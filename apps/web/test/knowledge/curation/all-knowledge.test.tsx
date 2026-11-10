@@ -4,6 +4,7 @@ import { assert, describe, expect, it, vi } from "vitest";
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { CLEAR_WORDS } from "@/shared/words.ts";
 import {
   aConceptRow,
@@ -527,7 +528,7 @@ describe("the All Knowledge page as a worklist", () => {
 
     const heads = headsListed();
     expect(heads.filter((head) => head.startsWith(WORDS.columns.trust))).toHaveLength(1);
-    expect(heads.some((head) => head.includes("Last verified"))).toBe(false);
+    expect(heads.some((head) => head.includes(CONCEPT_WORDS.titleBlock.checkedBy))).toBe(false);
     expect(cellOf("Yard rota", WORDS.columns.trust)).toContain(THE_OUT_OF_DATE.trustWords);
     expect(cellOf("Yard rota", WORDS.columns.trust)).toContain("1 July 2025");
     expect(cellOf("Gate codes", WORDS.columns.trust)).toContain("9 May 2026");

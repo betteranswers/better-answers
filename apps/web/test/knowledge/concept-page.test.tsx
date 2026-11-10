@@ -64,7 +64,7 @@ describe("the concept page", () => {
   it("names the collection by its display name", async () => {
     const article = await opened({ collection: "multi-academy-trusts" });
 
-    expect(article.getByText("Collection").nextElementSibling?.textContent).toBe(
+    expect(article.getByText(CONCEPT_WORDS.collection).nextElementSibling?.textContent).toBe(
       "Multi academy trusts",
     );
   });
