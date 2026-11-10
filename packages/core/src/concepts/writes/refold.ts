@@ -17,7 +17,7 @@ const REFOLD_ACTIONS = declareActions("platform", {
   refolded: action("platform.concept.refolded", {}),
 });
 
-export type StoredType = {
+type StoredType = {
   readonly iri: string;
   readonly mergeKey: string;
   readonly conceptType: string | null;
@@ -25,13 +25,13 @@ export type StoredType = {
   readonly written: string | null;
 };
 
-export type Refold = {
+type Refold = {
   readonly iri: string;
   readonly conceptType: string;
   readonly mergeKey: string;
 };
 
-export type ConceptTypesRefolded = {
+type ConceptTypesRefolded = {
   readonly refolded: readonly Refold[];
   readonly clashed: readonly Refold[];
 };
@@ -47,7 +47,7 @@ const wantedOf = (stored: StoredType): Refold | undefined => {
   return { iri: stored.iri, conceptType, mergeKey };
 };
 
-export const refoldPlanOf = (stored: readonly StoredType[]): ConceptTypesRefolded => {
+const refoldPlanOf = (stored: readonly StoredType[]): ConceptTypesRefolded => {
   let refolded = stored.flatMap((each) => wantedOf(each) ?? []);
   const clashed: Refold[] = [];
   for (;;) {
