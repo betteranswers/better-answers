@@ -12,6 +12,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { byCodeUnit } from "@better-answers/schema/code-unit";
+
 import { WHILE_A_CEILING_HOLDS, type FailedDuring } from "@/shared/api/query-client.ts";
 import { ceilingLiftsIn, refusalOf, useTRPC } from "@/shared/api/trpc.ts";
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
@@ -43,6 +45,7 @@ import {
 import {
   ConceptEditor,
   openingMode,
+  type Choices,
   type EditorEvents,
   type EditorProps,
   type Leaving,
@@ -85,23 +88,34 @@ const BLANK: EditRead = {
   usedIn: { writeUps: 0, linkingConcepts: 0 },
 };
 
-const NO_COLLECTIONS: readonly string[] = [];
+const NO_CHOICES: Choices = { collections: [], conceptTypes: undefined };
 
-const namesOf = (tree: {
-  readonly collections: readonly { readonly collection: string | null }[];
-}): readonly string[] =>
-  tree.collections.flatMap(({ collection }) => (collection === null ? [] : [collection]));
+const choicesOf = (tree: {
+  readonly collections: readonly {
+    readonly collection: string | null;
+    readonly conceptTypes: readonly { readonly conceptType: string }[];
+  }[];
+}): Choices => ({
+  collections: tree.collections.flatMap(({ collection }) =>
+    collection === null ? [] : [collection],
+  ),
+  conceptTypes: [
+    ...new Set(
+      tree.collections.flatMap((held) => held.conceptTypes.map((each) => each.conceptType)),
+    ),
+  ].toSorted(byCodeUnit),
+});
 
-const useChoosableCollections = (enabled: boolean): readonly string[] => {
+const useChoices = (enabled: boolean): Choices => {
   const api = useTRPC();
   return (
     useQuery(
       api.knowledge.tree.queryOptions(undefined, {
         ...WHILE_A_CEILING_HOLDS,
         enabled,
-        select: namesOf,
+        select: choicesOf,
       }),
-    ).data ?? NO_COLLECTIONS
+    ).data ?? NO_CHOICES
   );
 };
 
@@ -449,11 +463,11 @@ export function ConceptSession(properties: SessionProps) {
     properties.onFinished?.(outcome);
   };
   const saving = useSaveFlow(session, draftKey, finish);
-  const collections = useChoosableCollections(target.kind === "new");
+  const expanded = OPEN_STAGES.has(state.stage);
+  const choices = useChoices(target.kind === "new" || expanded);
   const leaving = useLeaving(hasUnsaved(state, opening.baseline));
   useKeptDraft(draftKey, state, opening.baseline);
   usePresses(properties.presses, opening.press);
-  const expanded = OPEN_STAGES.has(state.stage);
   const { onExpanded } = properties;
   useEffect(() => {
     onExpanded(expanded);
@@ -505,7 +519,7 @@ export function ConceptSession(properties: SessionProps) {
         outcome={besideTheButtons ? outcome : undefined}
         state={state}
         target={target}
-        collections={collections}
+        choices={choices}
         generation={opening.generation}
         headingRef={headingRef}
         leaving={leaving}

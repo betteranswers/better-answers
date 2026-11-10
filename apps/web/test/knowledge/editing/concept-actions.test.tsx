@@ -18,6 +18,11 @@ import {
   unchanged,
   type Standing,
 } from "@test/knowledge/concept-editing-answers.ts";
+import {
+  choseAType,
+  conceptTypeShown,
+  withATypePicker,
+} from "@test/knowledge/concept-type-picker.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure, settlingAfter, type Api } from "@test/stubbed-api.ts";
 import { aRefusalAnswer, GRACE, NORTHERN, openAt, read } from "@test/two-workspaces.ts";
@@ -28,6 +33,8 @@ await import("@/features/knowledge/editing/concept-session.tsx");
 
 placedWithoutMeasuring();
 
+withATypePicker();
+
 beforeEach(() => {
   sessionStorage.clear();
 });
@@ -35,6 +42,8 @@ beforeEach(() => {
 const TO_EDIT = "knowledge.conceptToEdit";
 
 const SAVE = "knowledge.saveConcept";
+
+const TREE = "knowledge.tree";
 
 const USED_TWICE = { writeUps: 1, linkingConcepts: 1 };
 
@@ -107,11 +116,14 @@ describe("editing a concept on its own page", () => {
     await openAt(A_CONCEPT_PAGE, api);
     const button = await screen.findByRole("button", { name: "Edit" });
     expect(asksOf(TO_EDIT)).toHaveLength(0);
+    expect(asksOf(TREE)).toHaveLength(0);
 
     fireEvent.click(button);
     await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingEdit });
     expect(asksOf(TO_EDIT)).toHaveLength(1);
-    expect(asksOf("knowledge.tree")).toHaveLength(0);
+    await waitFor(() => {
+      expect(asksOf(TREE)).toHaveLength(1);
+    });
   });
 
   it("opens the editor and switches mode with their keys", async () => {
@@ -471,9 +483,7 @@ describe("editing a concept on its own page", () => {
 
     await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
     expect(titleField().value).toBe("Cyber Essentials Plus certificate");
-    expect(
-      screen.getByRole<HTMLInputElement>("textbox", { name: EDITOR_WORDS.conceptType }).value,
-    ).toBe("certification");
+    expect(conceptTypeShown()).toBe("certification");
     expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Tags" }).value).toBe(
       "cyber-essentials",
     );
@@ -504,9 +514,7 @@ describe("editing a concept on its own page", () => {
       target: { value: "policies" },
     });
     await screen.findByRole("button", { name: EDITOR_WORDS.save });
-    fireEvent.change(screen.getByRole("textbox", { name: EDITOR_WORDS.conceptType }), {
-      target: { value: "Policy" },
-    });
+    await choseAType("Policy");
     pressed(EDITOR_WORDS.save);
 
     await waitFor(() => {

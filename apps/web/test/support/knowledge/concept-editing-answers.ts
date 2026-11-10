@@ -48,11 +48,25 @@ const aConceptOpened = (standing: Standing) =>
     standing,
   });
 
+export const WORKSPACE_TYPES = ["Policy", "Procedure", "Sector"] as const;
+
+export const aTreeOfTypes = (conceptTypes: readonly string[] = WORKSPACE_TYPES) =>
+  read({
+    collections: [
+      {
+        collection: "policies",
+        count: conceptTypes.length,
+        conceptTypes: conceptTypes.map((conceptType) => ({ conceptType, count: 1 })),
+      },
+    ],
+  });
+
 export const aConceptApi = (
   standing: Standing,
   toEdit: Readonly<Record<string, unknown>> = {},
 ): Api => {
   const api = adaAnAdmin();
+  api.set("knowledge.tree", () => aTreeOfTypes());
   api.set("knowledge.open", () => aConceptOpened(standing));
   api.set("knowledge.conceptToEdit", () => aConceptToEdit({ standing, ...toEdit }));
   return api;
@@ -69,7 +83,7 @@ export const asksOf = (procedure: string): readonly unknown[] =>
   server.asks.filter((ask) => ask.procedure === procedure).map((ask) => ask.input);
 
 const SAVE_ASKED = z.object({
-  parts: z.object({ title: z.string(), body: z.string() }),
+  parts: z.object({ title: z.string(), conceptType: z.string(), body: z.string() }),
   sources: z.array(z.unknown()),
   withheld: z.array(z.number()),
   reuse: z.literal("confirmed").optional(),

@@ -13,6 +13,11 @@ export const EDITOR_WORDS = {
   headingNew: "New concept",
   title: "Title",
   conceptType: "Type",
+  conceptTypes: "Types",
+  chooseConceptType: "Choose a type",
+  searchConceptTypes: "Search or add a type",
+  noConceptTypes: "No types yet. Type a name to add one.",
+  addConceptType: (conceptType: string): string => `Add type “${conceptType}”`,
   description: "Description",
   tags: "Tags",
   tagsHint: "Separate tags with commas.",
@@ -63,6 +68,16 @@ export const EDITOR_WORDS = {
   unchanged: "No changes to save.",
   stale: "This concept changed after you opened it.",
   reload: "Reload the concept",
+} as const;
+
+export const FORMATTING_WORDS = {
+  toolbar: "Formatting",
+  bold: "Bold",
+  italic: "Italic",
+  heading: "Heading",
+  bulletedList: "Bulleted list",
+  numberedList: "Numbered list",
+  quote: "Quote",
 } as const;
 
 export const SAID_OF_EDITING = {
