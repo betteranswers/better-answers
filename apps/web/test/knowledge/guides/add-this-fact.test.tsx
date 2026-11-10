@@ -36,7 +36,7 @@ const field = (name: string) => screen.getByRole<HTMLInputElement>("textbox", { 
 const prefilled = async () => {
   await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
   expect(field("Title").value).toBe(LIABILITY_TITLE);
-  expect(conceptTypeShown()).toBe("Insurance policy");
+  expect(conceptTypeShown()).toBe("Insurance Policy");
   expect(field("Tags").value).toBe("employers-liability");
   expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "Collection" }).value).toBe(
     "northgate",
