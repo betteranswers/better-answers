@@ -2,6 +2,7 @@ import { assert, describe, expect, it } from "vitest";
 
 import {
   allKnowledgeInput,
+  collectionsAndOwners,
   exportBundleSnapshot,
   readAllKnowledge,
   readConceptTypes,
@@ -33,6 +34,13 @@ const readers = runtimePoolFor(db, 1);
 
 const FIRST_PAGE = allKnowledgeInput.parse({
   collections: [],
+  sort: { column: "title", desc: false },
+  page: 1,
+});
+
+const TRUSTED_PAGE = allKnowledgeInput.parse({
+  collections: [],
+  trust: "unverified",
   sort: { column: "title", desc: false },
   page: 1,
 });
@@ -76,6 +84,20 @@ describe("the Curation budgets at 3,000 concepts", () => {
         ),
       ),
     );
+    const trusted = await measured(async () =>
+      answered(
+        await readingAs(readers(), admin, (principal, tx) =>
+          readAllKnowledge(principal, tx, TRUSTED_PAGE, SNAPSHOT_AT),
+        ),
+      ),
+    );
+    const collections = await measured(async () =>
+      answered(
+        await readingAs(readers(), admin, (principal, tx) =>
+          collectionsAndOwners(principal, tx, SNAPSHOT_AT),
+        ),
+      ),
+    );
     const conceptTypes = await measured(async () =>
       answered(
         await readingAs(readers(), admin, (principal, tx) => readConceptTypes(principal, tx)),
@@ -83,10 +105,20 @@ describe("the Curation budgets at 3,000 concepts", () => {
     );
 
     await recordFigures("All knowledge's first page", figuresOf(page));
+    await recordFigures("All knowledge filtered by trust", figuresOf(trusted));
+    await recordFigures("Collections and Owners", figuresOf(collections));
     await recordFigures("Concept Types", figuresOf(conceptTypes));
     expect(
       percentile(page, 0.5),
       "All knowledge's first page at the median, in milliseconds",
+    ).toBeLessThan(PAGE_BUDGET_MS);
+    expect(
+      percentile(trusted, 0.5),
+      "All knowledge filtered by trust at the median, in milliseconds",
+    ).toBeLessThan(PAGE_BUDGET_MS);
+    expect(
+      percentile(collections, 0.5),
+      "Collections and Owners at the median, in milliseconds",
     ).toBeLessThan(PAGE_BUDGET_MS);
     expect(
       percentile(conceptTypes, 0.5),

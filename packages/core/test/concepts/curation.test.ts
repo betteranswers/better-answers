@@ -300,9 +300,12 @@ const checked = (priya: UserPrincipal, on: string) => [
   { actor: `human:${priya.userId}`, at: new Date(on) },
 ];
 
+const priyaIn = (seeded: Seeded) =>
+  joinedAs(db(), seeded.workspaceId, "Editor", { name: "Priya Anand" });
+
 const seededForSorting = async () => {
   const seeded = await seededWorkspace();
-  const priya = await joinedAs(db(), seeded.workspaceId, "Editor", { name: "Priya Anand" });
+  const priya = await priyaIn(seeded);
   await shelved(seeded, [
     {
       iri: FIXED("A"),
@@ -351,8 +354,8 @@ describe("sorting, filtering and paging All knowledge", () => {
     ["collection", true, "DCEAB"],
     ["owner", false, "ABCED"],
     ["owner", true, "DBCEA"],
-    ["checked", false, "CDABE"],
-    ["checked", true, "BEACD"],
+    ["trust", false, "CDABE"],
+    ["trust", true, "BEACD"],
   ] as const)("sorts by %s, descending %s", async (column, desc, letters) => {
     const seeded = await seededForSorting();
 
@@ -400,7 +403,7 @@ describe("sorting, filtering and paging All knowledge", () => {
     const read = await knowledgeRead(
       seeded,
       seeded.admin,
-      asked({ sort: { column: "checked", desc: true } }),
+      asked({ sort: { column: "trust", desc: true } }),
     );
 
     expect(read.rows.map(({ checkedOn }) => checkedOn)).toEqual([
@@ -426,6 +429,102 @@ describe("sorting, filtering and paging All knowledge", () => {
 
     expect(lettersOf(read.rows)).toBe(letters);
     expect(read.total).toBe(letters.length);
+  });
+
+  describe("by the trust word a concept shows", () => {
+    const seededForTrust = async () => {
+      const seeded = await seededWorkspace();
+      const priya = await priyaIn(seeded);
+      await shelved(seeded, [
+        { iri: FIXED("A"), path: "knowledge/company/a.md", title: "Unverified" },
+        {
+          iri: FIXED("B"),
+          path: "knowledge/company/b.md",
+          title: "Verified",
+          checks: checked(priya, "2026-10-01T09:00:00Z"),
+        },
+        {
+          iri: FIXED("C"),
+          path: "knowledge/people/c.md",
+          title: "Out of date",
+          staleAfter: "2026-10-01",
+        },
+        {
+          iri: FIXED("D"),
+          path: "knowledge/people/d.md",
+          title: "Out of date and verified",
+          staleAfter: "2026-10-01",
+          checks: checked(priya, "2026-09-01T09:00:00Z"),
+        },
+        { iri: FIXED("E"), path: "knowledge/company/e.md", title: "Deprecated", deprecated: true },
+        { iri: FIXED("F"), path: "knowledge/company/f.md", title: "Changed since verified" },
+      ]);
+      await seedingWith(db().pool, (seed) =>
+        seed.conceptVerification({
+          workspaceId: seeded.workspaceId,
+          iri: FIXED("F"),
+          actor: `human:${priya.userId}`,
+          verifiedAt: new Date("2026-10-03T09:00:00Z"),
+        }),
+      );
+      return seeded;
+    };
+
+    it.each<[NonNullable<Asked["trust"]>, string, string]>([
+      ["unverified", "A", "Unverified"],
+      ["out-of-date", "CD", "Out of date"],
+      ["changed-since-checked", "F", "Changed since verified"],
+      ["deprecated", "E", "Deprecated"],
+    ])("lists only %s concepts and counts only them", async (trust, letters, words) => {
+      const seeded = await seededForTrust();
+
+      const read = await knowledgeRead(seeded, seeded.admin, asked({ trust }));
+
+      expect(lettersOf(read.rows)).toBe(letters);
+      expect(read.total).toBe(letters.length);
+      expect(read.rows.map((row) => row.trustWords)).toEqual(Array.from(letters, () => words));
+    });
+
+    it("narrows by trust with a collection, type and sort", async () => {
+      const seeded = await seededForTrust();
+
+      const read = await knowledgeRead(
+        seeded,
+        seeded.admin,
+        asked({
+          trust: "out-of-date",
+          collections: ["people"],
+          conceptType: "Policy",
+          sort: { column: "trust", desc: true },
+        }),
+      );
+
+      expect(lettersOf(read.rows)).toBe("DC");
+      expect(read.total).toBe(2);
+    });
+
+    it("pages the concepts that show a trust word", async () => {
+      const seeded = await seededWorkspace();
+      const numbered = (at: number) => String(at).padStart(3, "0");
+      await shelved(
+        seeded,
+        Array.from({ length: 60 }, (_unused, at) => ({
+          path: `knowledge/company/old-${numbered(at)}.md`,
+          title: `Old ${numbered(at)}`,
+          staleAfter: "2026-10-01",
+        })),
+      );
+      await shelved(seeded, [{ path: "knowledge/company/new.md", title: "New" }]);
+
+      const reads = await Promise.all(
+        [1, 2, 3].map((page) =>
+          knowledgeRead(seeded, seeded.admin, asked({ trust: "out-of-date", page })),
+        ),
+      );
+
+      expect(reads.map((read) => read.rows.length)).toEqual([50, 10, 0]);
+      expect(reads.map((read) => read.total)).toEqual([60, 60, 60]);
+    });
   });
 
   it("pages fifty at a time and reports the total", async () => {

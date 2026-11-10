@@ -23,6 +23,8 @@ export type Shelved = {
   readonly sensitivity?: (typeof SENSITIVITIES)[number];
   readonly audienceGroups?: readonly string[];
   readonly draft?: true;
+  readonly deprecated?: true;
+  readonly staleAfter?: string;
   readonly checks?: readonly Check[];
 };
 
@@ -32,13 +34,25 @@ const audienceOf = (groups: readonly string[] | undefined) =>
 const draftOf = (draft: true | undefined) =>
   draft === undefined ? {} : { status: CONCEPT_DRAFT_STATUS, publishedAt: null };
 
+const deprecatedOf = (deprecated: true | undefined) =>
+  deprecated === undefined ? {} : { status: "deprecated" as const };
+
 const shelvedWith = async (
   seed: TestData,
   workspaceId: string,
   commitSha: string,
   shelved: Shelved,
 ): Promise<ConceptIri> => {
-  const { path, iri, audienceGroups, draft, checks = [], ...columns } = shelved;
+  const {
+    path,
+    iri,
+    audienceGroups,
+    draft,
+    deprecated,
+    staleAfter,
+    checks = [],
+    ...columns
+  } = shelved;
   const title = columns.title ?? path;
   if (iri !== undefined) await seed.conceptIdentity({ workspaceId, iri });
   const row = await seed.conceptIndex({
@@ -48,9 +62,14 @@ const shelvedWith = async (
     ...(iri === undefined ? {} : { iri }),
     ...columns,
     title,
-    frontmatter: { title, type: columns.conceptType ?? "Policy" },
+    frontmatter: {
+      title,
+      type: columns.conceptType ?? "Policy",
+      ...(staleAfter === undefined ? {} : { stale_after: staleAfter }),
+    },
     ...audienceOf(audienceGroups),
     ...draftOf(draft),
+    ...deprecatedOf(deprecated),
   });
   for (const check of checks) {
     await seed.conceptVerification({

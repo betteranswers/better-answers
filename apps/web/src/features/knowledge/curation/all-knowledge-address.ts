@@ -13,6 +13,7 @@ import {
   scopeOf,
   sortedOf,
   sortOf,
+  trustChosen,
 } from "./curation-state.ts";
 
 export type Standing = { readonly admin: boolean; readonly owned: readonly string[] };
@@ -50,8 +51,11 @@ export const useAllKnowledgeAddress = ({ admin, owned }: Standing) => {
     chooseConceptType: (conceptType: string | undefined) => {
       write({ type: conceptType ?? "", page: 1 });
     },
+    chooseTrust: (choice: string | undefined) => {
+      write({ trust: trustChosen(choice), page: 1 });
+    },
     clearFilters: () => {
-      write({ collection: heldFor(undefined, !admin), type: "", page: 1 });
+      write({ collection: heldFor(undefined, !admin), type: "", trust: undefined, page: 1 });
     },
   };
 };

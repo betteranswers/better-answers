@@ -87,7 +87,13 @@ describe("collection owners over tRPC", () => {
     });
     expect(listedOnceOwning).toEqual({
       collections: [
-        { collection: "policy", owner: { id: editor.id, name: editor.name }, overrides: 0 },
+        {
+          collection: "policy",
+          owner: { id: editor.id, name: editor.name },
+          overrides: 0,
+          concepts: 2,
+          verified: 0,
+        },
       ],
     });
   });
@@ -100,10 +106,18 @@ describe("collection owners over tRPC", () => {
     await api.knowledge.nameOwner.mutate({ collection: "policy", personId: viewer.id });
     const after = await api.knowledge.collections.query();
 
-    expect(before).toEqual({ collections: [{ collection: "policy", owner: null, overrides: 0 }] });
+    expect(before).toEqual({
+      collections: [{ collection: "policy", owner: null, overrides: 0, concepts: 2, verified: 0 }],
+    });
     expect(after).toEqual({
       collections: [
-        { collection: "policy", owner: { id: viewer.id, name: viewer.name }, overrides: 0 },
+        {
+          collection: "policy",
+          owner: { id: viewer.id, name: viewer.name },
+          overrides: 0,
+          concepts: 2,
+          verified: 0,
+        },
       ],
     });
   });

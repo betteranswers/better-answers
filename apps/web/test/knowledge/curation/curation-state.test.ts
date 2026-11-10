@@ -7,8 +7,11 @@ import { COLLECTION } from "@better-answers/schema";
 import {
   heldFor,
   scopeOf,
+  trustChosen,
+  TRUSTS,
   YOUR_COLLECTIONS,
 } from "@/features/knowledge/curation/curation-state.ts";
+import { ALL_KNOWLEDGE_WORDS } from "@/features/knowledge/curation/curation-words.ts";
 
 describe("the collection filter held in the address", () => {
   it("leaves every marker clear of a collection's name", () => {
@@ -37,5 +40,19 @@ describe("the collection filter held in the address", () => {
 
   it("opens an owner on the collections they own", () => {
     expect(scopeOf(heldFor(YOUR_COLLECTIONS, true), true)).toEqual({ kind: "owned" });
+  });
+});
+
+describe("the trust filter held in the address", () => {
+  it("offers each trust word the api filters by", () => {
+    expect(new Set(TRUSTS)).toEqual(
+      new Set(Object.keys(ALL_KNOWLEDGE_WORDS.filters.trust.choices)),
+    );
+  });
+
+  it("reads a stray trust value as none", () => {
+    expect(trustChosen("out-of-date")).toBe("out-of-date");
+    expect(trustChosen("draft")).toBeUndefined();
+    expect(trustChosen(undefined)).toBeUndefined();
   });
 });

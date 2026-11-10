@@ -30,6 +30,9 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
+import { trustOfRow, type TrustRow } from "./reading/browse.ts";
+import { latestVerificationOf } from "./reading/latest-verification.ts";
+import { standsOn } from "./trust.ts";
 
 const OWNER_ACTIONS = declareActions("knowledge", {
   named: action("knowledge.owner.named", {
@@ -217,6 +220,8 @@ type CollectionOwned = {
   readonly collection: string;
   readonly owner: { readonly id: UserId; readonly name: string } | null;
   readonly overrides: number;
+  readonly concepts: number;
+  readonly verified: number;
 };
 
 type CollectionsAndOwners = { readonly collections: readonly CollectionOwned[] };
@@ -247,10 +252,37 @@ type CollectionRow = {
   readonly overrides: number;
 };
 
-const ownedRow = (row: CollectionRow): CollectionOwned => ({
+const LATEST_VERIFICATION = latestVerificationOf("c");
+
+const COLLECTION_TRUSTS = `SELECT c.iri, c.collection, c.status, c.frontmatter, c.content_hash,
+         ${LATEST_VERIFICATION.columns}
+    FROM concept_index c
+    ${LATEST_VERIFICATION.joins}
+   WHERE c.workspace_id = $1 AND c.collection IS NOT NULL AND ${readableClause("c", 2)}`;
+
+type TrustedRow = TrustRow & { readonly collection: string };
+
+type Counted = { readonly concepts: number; readonly verified: number };
+
+const NONE_COUNTED: Counted = { concepts: 0, verified: 0 };
+
+const countedIn = (rows: readonly TrustedRow[], now: Date) => {
+  const counted = new Map<string, Counted>();
+  for (const row of rows) {
+    const held = counted.get(row.collection) ?? NONE_COUNTED;
+    counted.set(row.collection, {
+      concepts: held.concepts + 1,
+      verified: held.verified + (standsOn(trustOfRow(row, now), "machine-confirmed") ? 1 : 0),
+    });
+  }
+  return counted;
+};
+
+const ownedRow = (row: CollectionRow, counted: Counted): CollectionOwned => ({
   collection: row.collection,
   owner: row.person_id === null ? null : { id: row.person_id, name: row.person_name ?? "" },
   overrides: row.overrides,
+  ...counted,
 });
 
 const OWNS_A_COLLECTION = `SELECT 1 FROM concept_owner
@@ -266,14 +298,18 @@ export const collectionOwnerAdmits = async (
   return owning.rowCount === 0 ? "owner-forbids" : undefined;
 };
 
-const collectionsReadBy = async (reader: UserPrincipal, tx: Tx): Promise<CollectionsAndOwners> => {
-  const rows = await tx.query<CollectionRow>(COLLECTIONS_AND_OWNERS, [
-    reader.workspaceId,
-    ...readableParameters(reader),
-  ]);
+const collectionsReadBy = async (
+  reader: UserPrincipal,
+  tx: Tx,
+  now: Date,
+): Promise<CollectionsAndOwners> => {
+  const parameters = [reader.workspaceId, ...readableParameters(reader)];
+  const rows = await tx.query<CollectionRow>(COLLECTIONS_AND_OWNERS, parameters);
+  const trusts = await tx.query<TrustedRow>(COLLECTION_TRUSTS, parameters);
+  const counted = countedIn(trusts.rows, now);
   return {
     collections: rows.rows
-      .map(ownedRow)
+      .map((row) => ownedRow(row, counted.get(row.collection) ?? NONE_COUNTED))
       .toSorted((one, other) => byCodeUnit(one.collection, other.collection)),
   };
 };
@@ -281,6 +317,7 @@ const collectionsReadBy = async (reader: UserPrincipal, tx: Tx): Promise<Collect
 export const collectionsAndOwners = async (
   principal: UserPrincipal,
   tx: Tx,
+  now: Date,
 ): Promise<Result<CollectionsAndOwners, CollectionsAndOwnersRefusal>> => {
   const admitted = admit(collectionsAndOwnersAction, principal, {});
   if (!admitted.ok) return err(admitted.error);
@@ -288,7 +325,7 @@ export const collectionsAndOwners = async (
   const refused = await attempt(() => collectionOwnerAdmits(reader, tx));
   if (!refused.ok) return err(refused.error);
   if (refused.value !== undefined) return err(refused.value);
-  return attempt(() => collectionsReadBy(reader, tx));
+  return attempt(() => collectionsReadBy(reader, tx, now));
 };
 
 const OWNER_PERSON = boundarySchemas.conceptOwner.insert.shape.personId.nullable();

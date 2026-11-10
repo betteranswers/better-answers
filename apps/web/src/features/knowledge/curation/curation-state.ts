@@ -26,8 +26,8 @@ const SORTS = [
   "-collection",
   "owner",
   "-owner",
-  "checked",
-  "-checked",
+  "trust",
+  "-trust",
 ] as const;
 
 type Sort = (typeof SORTS)[number];
@@ -43,17 +43,30 @@ const SORTED = {
   "-collection": { column: "collection", desc: true },
   owner: { column: "owner", desc: false },
   "-owner": { column: "owner", desc: true },
-  checked: { column: "checked", desc: false },
-  "-checked": { column: "checked", desc: true },
+  trust: { column: "trust", desc: false },
+  "-trust": { column: "trust", desc: true },
 } as const satisfies Readonly<Record<Sort, Sorted>>;
 
 export const SORTABLE: ReadonlySet<string> = new Set(
   Object.values(SORTED).map(({ column }) => column),
 );
 
+type TrustAsked = NonNullable<AllKnowledgeAsked["trust"]>;
+
+export const TRUSTS = [
+  "unverified",
+  "out-of-date",
+  "changed-since-checked",
+  "deprecated",
+] as const satisfies readonly TrustAsked[];
+
+export const trustChosen = (choice: string | undefined): TrustAsked | undefined =>
+  TRUSTS.find((trust) => trust === choice);
+
 export const ALL_KNOWLEDGE_FIELDS = {
   collection: searchText(),
   type: searchText(),
+  trust: z.enum(TRUSTS).optional().catch(undefined),
   sort: z.enum(SORTS).optional().catch(undefined),
   page: PAGE_NUMBER,
 };
@@ -125,11 +138,12 @@ export const allKnowledgeAsked = (
     page: held.page,
   };
   if (held.type !== "") asked.conceptType = held.type;
+  if (held.trust !== undefined) asked.trust = held.trust;
   return asked;
 };
 
 export const isNarrowed = (held: Held, scope: CollectionScope): boolean =>
-  scope.kind !== "every" || held.type !== "";
+  scope.kind !== "every" || held.type !== "" || held.trust !== undefined;
 
 export const CONCEPT_TYPES_KEYSTROKES = {
   tail: { key: "t", action: "Show types with 2 or fewer concepts, or all types" },

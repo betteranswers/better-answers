@@ -49,6 +49,7 @@ export const aConceptRow = (
 const ASKED = z.object({
   collections: z.array(z.string()),
   conceptType: z.string().optional(),
+  trust: z.string().optional(),
   sort: z.object({ column: z.string(), desc: z.boolean() }),
   page: z.number().default(1),
 });
@@ -66,15 +67,21 @@ const keyOf = (row: ConceptRow, column: string): string =>
     conceptType: row.conceptType,
     collection: row.collection ?? "",
     owner: row.owner?.name ?? "",
-    checked: row.checkedOn ?? "",
+    trust: row.checkedOn ?? "",
   })[column] ?? row.title;
+
+const trustWordKeyOf = ({ trust }: ConceptRow): string => {
+  if (trust.status !== "current") return trust.status;
+  return trust.tier === "unverified" ? trust.tier : trust.status;
+};
 
 const inTheCollections = (row: ConceptRow, collections: readonly string[]): boolean =>
   collections.length === 0 || (row.collection !== null && collections.includes(row.collection));
 
 const matching = (asked: AllKnowledgeAsked) => (row: ConceptRow) =>
   inTheCollections(row, asked.collections) &&
-  (asked.conceptType === undefined || row.conceptType === asked.conceptType);
+  (asked.conceptType === undefined || row.conceptType === asked.conceptType) &&
+  (asked.trust === undefined || trustWordKeyOf(row) === asked.trust);
 
 const answeringFrom = (listed: () => readonly ConceptRow[]) => (): unknown => {
   const asked = ASKED.parse(

@@ -261,7 +261,11 @@ export const knowledgeRouter = router({
     ),
   ),
   collections: queryProcedure.query(({ ctx }) =>
-    crossing(ctx, collectionsAndOwners.name, collectionsAndOwners(ctx.principal, ctx.tx)),
+    crossing(
+      ctx,
+      collectionsAndOwners.name,
+      collectionsAndOwners(ctx.principal, ctx.tx, ctx.clock.now()),
+    ),
   ),
   nameOwner: mutationProcedure.input(parsedBy(nameOwnerInput)).mutation(answeredBy(nameOwner)),
   allKnowledge: queryProcedure.input(parsedBy(allKnowledgeInput)).query(({ ctx, input }) =>

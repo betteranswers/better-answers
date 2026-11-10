@@ -3,7 +3,7 @@ import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
 import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { counted } from "@/shared/words.ts";
 
-import type { GuideSummary, RecordsExported } from "../knowledge-api.ts";
+import type { AllKnowledgeAsked, GuideSummary, RecordsExported } from "../knowledge-api.ts";
 
 const conceptsCounted = (count: number): string => counted(count, "concept", "concepts");
 
@@ -21,18 +21,25 @@ export const ALL_KNOWLEDGE_WORDS = {
     collection: "Collection",
     trust: "Trust",
     owner: "Owner",
-    checked: "Last verified",
   },
   noCollection: CONCEPT_WORDS.noCollection,
   unowned: "No owner",
   unnamed: "Unnamed member",
   ownOwner: "Set on this concept",
-  notChecked: "Not yet",
-  checkedBy: (by: string): string => `by ${by}`,
-  automatically: "automatically",
+  lastVerified: (date: string): string => `Last verified ${date}`,
   filters: {
-    collection: { label: "Collection", any: "Any collection", yours: "Collections you own" },
-    type: { label: "Type", any: "Any type" },
+    collection: { label: "collection", any: "Any collection", yours: "Collections you own" },
+    type: { label: "type", any: "Any type" },
+    trust: {
+      label: "trust",
+      any: "Any trust",
+      choices: {
+        unverified: "Unverified",
+        "out-of-date": CONCEPT_WORDS.titleBlock.statuses["out-of-date"],
+        "changed-since-checked": CONCEPT_WORDS.titleBlock.statuses["changed-since-checked"],
+        deprecated: CONCEPT_WORDS.titleBlock.statuses.deprecated,
+      } satisfies Record<NonNullable<AllKnowledgeAsked["trust"]>, string>,
+    },
   },
   selected: "Selected concepts",
   everyOnThePage: "Select every concept on this page",

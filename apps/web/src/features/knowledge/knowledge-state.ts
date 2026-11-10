@@ -29,6 +29,7 @@ export const EDITOR_KEYSTROKES = {
 
 export const COLLECTIONS_KEYSTROKES = {
   changeOwner: { key: "c", action: "Change the selected collection’s owner" },
+  undo: { key: "u", action: "Undo the last owner change" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const KNOWLEDGE_BASE_KEYSTROKES = {

@@ -7,6 +7,7 @@ import {
   CONCEPT_TYPES_PAGE,
 } from "@/features/knowledge/curation/curation-state.ts";
 import { CONCEPT_TYPES_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { theOneEmptyStatus } from "@test/knowledge/empty-status.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure } from "@test/stubbed-api.ts";
@@ -164,11 +165,13 @@ describe("the Concept Types page", () => {
     const router = await openAt(PAGE, aConceptTypesApi());
     await table();
     expect(filterButton().getAttribute("aria-pressed")).toBe("false");
+    expect(filterButton().querySelector("svg"), "the unpressed toggle drew a mark").toBeNull();
 
     fireEvent.click(filterButton());
 
     await waitFor(() => expect(conceptTypesListed()).toEqual(["Ledger", "Procedure", "Role"]));
     expect(filterButton().getAttribute("aria-pressed")).toBe("true");
+    expect(filterButton().querySelector("svg"), "the pressed toggle drew no mark").not.toBeNull();
     expect(searchOf(router)).toContain(`${CONCEPT_TYPES_LIST}.tail=small`);
     expect(region().getByText(WORDS.count(3, 4))).toBeDefined();
 
@@ -176,6 +179,7 @@ describe("the Concept Types page", () => {
 
     await waitFor(() => expect(conceptTypesListed()).toHaveLength(4));
     expect(filterButton().getAttribute("aria-pressed")).toBe("false");
+    expect(filterButton().querySelector("svg")).toBeNull();
     expect(searchOf(router)).not.toContain(`${CONCEPT_TYPES_LIST}.tail`);
   });
 
@@ -231,7 +235,7 @@ describe("the Concept Types page", () => {
     const [named, unnamed] = within(list)
       .getAllByRole("listitem")
       .map((each) => [...each.children].map((part) => part.textContent));
-    expect(named, "the collections differ from the type's").toEqual(["hr", "2"]);
+    expect(named, "the collections differ from the type's").toEqual([collectionNameOf("hr"), "2"]);
     expect(unnamed?.[1], "the concepts in no collection are miscounted").toBe("1");
     expect(unnamed?.[0], "the concepts in no collection have no label").toMatch(/\S/u);
     expect(unnamed?.[0], "the missing collection shows as null").not.toMatch(/null/u);

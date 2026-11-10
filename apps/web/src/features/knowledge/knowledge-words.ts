@@ -1,3 +1,4 @@
+import { collectionLabelOf, collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { counted } from "@/shared/words.ts";
@@ -7,21 +8,21 @@ const quoted = (query: string): string => `“${query}”`;
 export const COLLECTIONS_WORDS = {
   loading: "Loading collections…",
   none: "No collections yet.",
+  caption: "Collections",
   count: (count: number): string => counted(count, "collection", "collections"),
-  owner: "Owner",
-  unowned: "No owner",
-  unnamed: "Unnamed member",
-  ownOwners: "Concepts with their own owner",
-  ownOwnersCount: (count: number): string => counted(count, "concept", "concepts"),
-  ofCollection: (collection: string): string => ` of ${collection}`,
+  columns: { collection: "Collection", owner: "Owner", concepts: "Concepts", verified: "Verified" },
   noOwner: "No owner",
-  save: "Save",
-  saveOf: (collection: string): string => ` the owner of ${collection}`,
+  unnamed: "Unnamed member",
+  ownOwners: (count: number): string => `Concepts with their own owner: ${String(count)}`,
+  ownerOf: (collection: string, owner: string): string => `Owner of ${collection}, ${owner}`,
+  people: "People",
+  searchPeople: "Search people",
+  nobody: "No one found.",
+  verifiedShare: (percent: number): string => `${String(percent)}%`,
   named: (name: string, collection: string): string => `${name} now owns ${quoted(collection)}.`,
   cleared: (collection: string): string => `${quoted(collection)} has no owner now.`,
-  alreadyOwns: (name: string, collection: string): string =>
-    `${name} already owns ${quoted(collection)}.`,
-  alreadyUnowned: (collection: string): string => `${quoted(collection)} already has no owner.`,
+  undo: "Undo",
+  undoOf: (collection: string): string => `Undo the owner change for ${collection}`,
 } as const;
 
 export const SAID_OF_COLLECTIONS = {
@@ -56,12 +57,9 @@ export const LAUNCH_WORDS = {
 
 const conceptsCounted = (count: number): string => counted(count, "concept", "concepts");
 
-const collectionNamed = (collection: string | null): string =>
-  collection ?? CONCEPT_WORDS.noCollection;
-
 export const KNOWLEDGE_BASE_WORDS = {
   tree: "Collections and types",
-  collection: collectionNamed,
+  collection: collectionLabelOf,
   labelled: (name: string, count: number): string => `${name}, ${conceptsCounted(count)}`,
   count: conceptsCounted,
   loading: "Loading the knowledge base…",
@@ -72,7 +70,7 @@ export const KNOWLEDGE_BASE_WORDS = {
   conceptTypeIn: (conceptType: string, collection: string | null): string =>
     collection === null
       ? `${conceptType}, ${CONCEPT_WORDS.noCollection}`
-      : `${conceptType} in ${collection}`,
+      : `${conceptType} in ${collectionNameOf(collection)}`,
   conceptsLoading: "Loading concepts…",
   noneOfTheType: "No concepts of this type yet.",
   columns: { title: "Title", trust: "Trust" },
