@@ -431,11 +431,11 @@ const guideFrom = (
   shown: Shown,
   cited: readonly CitedRead[],
 ): GuideRead => {
-  const { definition, coverage } = held;
+  const { definition } = held;
   const numbers = numberedIn(shown.map(({ row }) => row));
   const shapeOf = new Map(held.shapes.map((shape) => [shape.id, shape]));
   const citedBy = Map.groupBy(cited, (row) => row.write_up_id);
-  const everyFact = coverage.sections.flatMap((section) => section.facts);
+  const everyFact = shown.flatMap(({ section }) => section.facts);
   return {
     guideId,
     guideType: definition.guide_type,
