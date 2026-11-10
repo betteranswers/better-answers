@@ -3,6 +3,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { CONCEPT_TYPES_PAGE } from "@/features/knowledge/curation/curation-state.ts";
 import { COLLECTIONS_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -15,8 +16,14 @@ import {
   seedConcepts,
   signOutFromTheShell,
   skipLinkReachesThePage,
+  tabUntilFocused,
 } from "../harness.ts";
-import { knowledgeMenuOpened, listsItsKeystrokes, signedIn } from "../knowledge.ts";
+import {
+  knowledgeMenuOpened,
+  listsItsKeystrokes,
+  scrolledSideways,
+  signedIn,
+} from "../knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -28,6 +35,8 @@ const COLLECTIONS_AND_OWNERS = pageNamed(
 const EDITOR = "Ifan Morgan";
 
 const VIEWER = "Rhian Pryce";
+
+const NARROW = { width: 390, height: 844 } as const;
 
 type Member = { readonly id: string; readonly email: string };
 
@@ -87,21 +96,25 @@ const collections = (page: Page): Locator =>
 const signedInAtThePage = async (page: Page, api: APIRequestContext, email: string) => {
   await signedIn(page, api, email);
   await page.goto(COLLECTIONS_AND_OWNERS);
-  await expect(collections(page).getByRole("list")).toBeVisible();
+  await expect(collections(page).getByRole("table")).toBeVisible();
 };
 
-const ownerAt = (collection: string): string =>
-  `(//li[.//h3[.='${collection}']]//dt[.='Owner'])[1]/following-sibling::dd[1]`;
+const rowOf = (page: Page, collection: string): Locator =>
+  collections(page)
+    .getByRole("row")
+    .filter({ has: page.getByRole("cell", { name: collectionNameOf(collection), exact: true }) });
 
-const ownerOf = (page: Page, collection: string): Locator => page.locator(ownerAt(collection));
+const ownerOf = (page: Page, collection: string): Locator =>
+  rowOf(page, collection).getByRole("cell").nth(1);
 
-const pickerOf = (page: Page, collection: string): Locator =>
-  page.getByRole("combobox", { name: `${WORDS.owner}${WORDS.ofCollection(collection)}` });
+const pickerOf = (page: Page, collection: string, owner: string): Locator =>
+  page.getByRole("button", { name: WORDS.ownerOf(collectionNameOf(collection), owner) });
 
-const saveOf = (page: Page, collection: string): Locator =>
-  page.getByRole("button", { name: `${WORDS.save}${WORDS.saveOf(collection)}` });
-
-const statusOf = (page: Page): Locator => collections(page).getByRole("status").nth(1);
+const choosing = async (page: Page, typed: string): Promise<void> => {
+  await page.keyboard.press("Enter");
+  await page.keyboard.type(typed);
+  await page.keyboard.press("Enter");
+};
 
 test.describe("Collections and Owners", () => {
   test("a collection-owning Editor finds Collections and Owners under Curation", async ({
@@ -139,7 +152,7 @@ test.describe("Collections and Owners", () => {
 
     const started = Date.now();
     await page.goto(COLLECTIONS_AND_OWNERS);
-    await expect(ownerOf(page, "policy")).toHaveText(EDITOR);
+    await expect(ownerOf(page, "policy")).toContainText(EDITOR);
     const elapsed = Date.now() - started;
     test.info().annotations.push({ type: "collections", description: `${elapsed} ms` });
     expect(elapsed, "the collections took longer than the list time budget to render").toBeLessThan(
@@ -148,64 +161,69 @@ test.describe("Collections and Owners", () => {
 
     await expect(collections(page)).toMatchAriaSnapshot(`
       - region "Collections and Owners":
-        - /children: equal
         - heading "Collections and Owners" [level=2]
         - status: /\\b2\\b/
-        - status
-        - list:
-          - /children: equal
-          - listitem "policy":
-            - heading "policy" [level=3]
-            - term: Owner
-            - definition: ${JSON.stringify(EDITOR)}
-            - term: ${WORDS.ownOwners}
-            - definition: /\\b1\\b/
-          - listitem "safety":
-            - heading "safety" [level=3]
-            - term: Owner
-            - definition
+        - table "${WORDS.caption}":
+          - rowgroup:
+            - row:
+              - columnheader "${WORDS.columns.collection}"
+              - columnheader "${WORDS.columns.owner}"
+              - columnheader "${WORDS.columns.concepts}"
+              - columnheader "${WORDS.columns.verified}"
     `);
+    await expect(rowOf(page, "policy").getByRole("cell").nth(2)).toHaveText("2");
+    await expect(rowOf(page, "policy").getByRole("cell").nth(3)).toHaveText(
+      WORDS.verifiedShare(0, 2),
+    );
+    await expect(collections(page).getByRole("button")).toHaveCount(0);
     await passesTheAccessibilityGate();
 
-    await test.step("an Admin sets and clears collection owners by keyboard alone", async () => {
+    await test.step("an Admin changes, clears and undoes collection owners by keyboard alone", async () => {
       await signOutFromTheShell(page, EDITOR);
       await signedInAtThePage(page, request, at.admin.email);
 
       await skipLinkReachesThePage(page);
-      await listsItsKeystrokes(page, "Collections and Owners", KEY, [KEY.changeOwner.action]);
+      await listsItsKeystrokes(page, "Collections and Owners", KEY, [
+        KEY.changeOwner.action,
+        KEY.undo.action,
+      ]);
       await page.keyboard.press(KEY.changeOwner.key);
       await expect(
-        pickerOf(page, "held"),
-        "the change-owner key did not move focus to the first New Owner picker",
+        pickerOf(page, "held", WORDS.noOwner),
+        "the change-owner key did not move focus to the first owner picker",
       ).toBeFocused();
 
-      await page.keyboard.press("Tab");
-      await page.keyboard.press("Tab");
-      await expect(pickerOf(page, "policy")).toBeFocused();
-      await page.keyboard.press("n");
-      await expect(pickerOf(page, "policy")).toHaveValue("");
-      await page.keyboard.press("Tab");
-      await expect(saveOf(page, "policy")).toBeFocused();
-      await page.keyboard.press("Enter");
-      await expect(statusOf(page)).toHaveText(/\S/);
+      await tabUntilFocused(page, pickerOf(page, "policy", EDITOR));
+      await choosing(page, WORDS.noOwner);
+      await expect(pickerOf(page, "policy", WORDS.noOwner)).toBeFocused();
+      await expect(page.getByRole("button", { name: WORDS.undo })).toBeVisible();
 
-      await page.keyboard.press("Tab");
-      await expect(pickerOf(page, "safety")).toBeFocused();
-      await page.keyboard.press("r");
-      await expect(pickerOf(page, "safety")).toHaveValue(at.viewer.id);
-      await page.keyboard.press("Tab");
-      await page.keyboard.press("Enter");
-      await expect(statusOf(page)).toHaveText(new RegExp(VIEWER, "u"));
+      await page.keyboard.press(KEY.undo.key);
+      await expect(pickerOf(page, "policy", EDITOR)).toBeVisible();
+
+      await tabUntilFocused(page, pickerOf(page, "safety", WORDS.noOwner));
+      await choosing(page, VIEWER);
+      await expect(pickerOf(page, "safety", VIEWER)).toBeFocused();
 
       await page.keyboard.press(KEY.changeOwner.key);
       await expect(
-        pickerOf(page, "safety"),
+        pickerOf(page, "safety", VIEWER),
         "the change-owner key did not focus the picker of the collection in focus",
       ).toBeFocused();
 
       await page.reload();
-      await expect(pickerOf(page, "policy")).toHaveValue("");
-      await expect(pickerOf(page, "safety")).toHaveValue(at.viewer.id);
+      await expect(pickerOf(page, "policy", EDITOR)).toBeVisible();
+      await expect(pickerOf(page, "safety", VIEWER)).toBeVisible();
+    });
+
+    await test.step("the table keeps its owner and count on a narrow screen", async () => {
+      await page.setViewportSize(NARROW);
+
+      await expect(pickerOf(page, "policy", EDITOR)).toBeVisible();
+      await expect(rowOf(page, "policy").getByRole("cell").nth(2)).toHaveText("2");
+      expect(await scrolledSideways(page), "the narrow page scrolled sideways").toBeLessThanOrEqual(
+        0,
+      );
     });
   });
 });

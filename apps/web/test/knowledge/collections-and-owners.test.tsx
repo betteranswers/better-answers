@@ -1,76 +1,187 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { RHIAN } from "@test/knowledge/all-knowledge-answers.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { holdProcedure } from "@test/stubbed-api.ts";
-import {
-  ADA,
-  adaAnAdmin,
-  aRefusalAnswer,
-  GRACE,
-  NORTHERN,
-  openAt,
-  read,
-} from "@test/two-workspaces.ts";
+import { server } from "@test/stub-server.ts";
+import { ADA, adaAnAdmin, aRefusalAnswer, NORTHERN, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
+beforeEach(() => {
+  Element.prototype.scrollIntoView = () => undefined;
+});
+
+afterEach(() => {
+  Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+});
+
 const PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Collections and Owners").path;
 
-const RHIAN = { ...GRACE, personId: "01JRHIAN0000000000000000AA", displayName: "Rhian Pryce" };
+const POLICY = { collection: "policy", owner: null, overrides: 0, concepts: 3, verified: 1 };
 
-const PICKER = new RegExp(`^${WORDS.owner}\\s?${WORDS.ofCollection("policy").trim()}$`, "u");
-
-const SAVE = new RegExp(`^${WORDS.save}\\s?${WORDS.saveOf("policy").trim()}$`, "u");
-
-const POLICY = { collection: "policy", owner: null, overrides: 0 };
+const NAMED = collectionNameOf(POLICY.collection);
 
 const region = () => within(screen.getByRole("region", { name: "Collections and Owners" }));
 
-const policyRow = () =>
-  within(
-    region().getByRole("heading", { level: 3, name: "policy" }).closest("li") ?? document.body,
+const pickerOf = (owner: string) =>
+  screen.findByRole("button", { name: WORDS.ownerOf(NAMED, owner) });
+
+const choosing = async (person: string) => {
+  fireEvent.click(await screen.findByRole("option", { name: person }));
+};
+
+const cellsOf = (collection: string) => {
+  const row = region()
+    .getByRole("cell", { name: collectionNameOf(collection) })
+    .closest("tr");
+  assert(row !== null, `${collection} has no row`);
+  return within(row)
+    .getAllByRole("cell")
+    .map((cell) => cell.textContent);
+};
+
+const namingAsks = () =>
+  server.asks.filter((ask) => ask.procedure === "knowledge.nameOwner").map((ask) => ask.input);
+
+const aCollectionsApi = () => {
+  const api = adaAnAdmin();
+  api.set("members.list", () => read([ADA, RHIAN]));
+  api.set("knowledge.collections", () => read({ collections: [POLICY] }));
+  api.set("knowledge.nameOwner", () => read({ auditEventId: "01JEVENT", personId: null }));
+  return api;
+};
+
+const ownedByRhian = () => {
+  const api = aCollectionsApi();
+  api.set("knowledge.collections", () =>
+    read({
+      collections: [{ ...POLICY, owner: { id: RHIAN.personId, name: RHIAN.displayName } }],
+    }),
   );
+  return api;
+};
 
 describe("the Collections and Owners page", () => {
-  it("restores the old owner and alerts when the api refuses", async () => {
-    const api = adaAnAdmin();
-    api.set("members.list", () => read([ADA, RHIAN]));
-    api.set("knowledge.collections", () => read({ collections: [POLICY] }));
-    api.set("knowledge.nameOwner", () => {
-      api.set("members.list", () => read([ADA]));
-      return aRefusalAnswer("no-such-member", "precondition", 412);
-    });
+  it("shows each collection's display name, concepts and verified share", async () => {
+    const api = aCollectionsApi();
+    api.set("knowledge.collections", () =>
+      read({
+        collections: [
+          POLICY,
+          { collection: "safety-rules", owner: null, overrides: 2, concepts: 1, verified: 1 },
+        ],
+      }),
+    );
     await openAt(PAGE, api);
 
-    const picker = await screen.findByRole("combobox", { name: PICKER });
-    const reread = holdProcedure(api, "knowledge.collections");
-    fireEvent.change(picker, { target: { value: RHIAN.personId } });
-    fireEvent.click(screen.getByRole("button", { name: SAVE }));
+    await pickerOf(WORDS.noOwner);
 
-    await reread.asked;
-    expect(
-      policyRow().queryByText("Rhian Pryce", { selector: "dd" }),
-      "the refused owner was still shown before the list reloaded",
-    ).toBeNull();
-    reread.resolve();
+    expect(cellsOf("policy")).toEqual([NAMED, WORDS.noOwner, "3", WORDS.verifiedShare(1, 3)]);
+    expect(cellsOf("safety-rules")).toEqual([
+      collectionNameOf("safety-rules"),
+      `${WORDS.noOwner}${WORDS.ownOwners(2)}`,
+      "1",
+      WORDS.verifiedShare(1, 1),
+    ]);
+    expect(region().queryByText(POLICY.collection)).toBeNull();
+    expect(region().queryByText("safety-rules")).toBeNull();
+  });
+
+  it("saves a chosen owner at once, with Undo", async () => {
+    await openAt(PAGE, aCollectionsApi());
+
+    fireEvent.click(await pickerOf(WORDS.noOwner));
+    await choosing(RHIAN.displayName);
+
+    const undo = await screen.findByRole("button", { name: WORDS.undo });
+    expect(namingAsks()).toEqual([{ collection: POLICY.collection, personId: RHIAN.personId }]);
+
+    fireEvent.click(undo);
 
     await waitFor(() => {
+      expect(namingAsks()).toEqual([
+        { collection: POLICY.collection, personId: RHIAN.personId },
+        { collection: POLICY.collection, personId: null },
+      ]);
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: WORDS.undo })).toBeNull();
+    });
+  });
+
+  it("clears the owner when No owner is chosen", async () => {
+    await openAt(PAGE, ownedByRhian());
+
+    fireEvent.click(await pickerOf(RHIAN.displayName));
+    await choosing(WORDS.noOwner);
+
+    await screen.findByRole("button", { name: WORDS.undo });
+    expect(namingAsks()).toEqual([{ collection: POLICY.collection, personId: null }]);
+  });
+
+  it("asks nothing when the owner already chosen is chosen again", async () => {
+    await openAt(PAGE, ownedByRhian());
+
+    fireEvent.click(await pickerOf(RHIAN.displayName));
+    await choosing(RHIAN.displayName);
+
+    expect(namingAsks()).toEqual([]);
+    expect(screen.queryByRole("button", { name: WORDS.undo })).toBeNull();
+  });
+
+  it("finds a person by a part of the name", async () => {
+    await openAt(PAGE, aCollectionsApi());
+
+    fireEvent.click(await pickerOf(WORDS.noOwner));
+    fireEvent.change(await screen.findByPlaceholderText(WORDS.searchPeople), {
+      target: { value: "pryce" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+        RHIAN.displayName,
+      ]);
+    });
+  });
+
+  it("alerts beside the picker on a refusal", async () => {
+    const api = aCollectionsApi();
+    api.set("knowledge.nameOwner", () => aRefusalAnswer("no-such-member", "precondition", 412));
+    await openAt(PAGE, api);
+
+    fireEvent.click(await pickerOf(WORDS.noOwner));
+    await choosing(RHIAN.displayName);
+
+    await waitFor(() => {
+      const row = region().getByRole("row", { name: new RegExp(NAMED, "u") });
       expect(
-        region()
-          .queryAllByRole("alert")
-          .some((each) => /\S/u.test(each.textContent)),
-        "the refused naming raised no alert",
+        within(row)
+          .getAllByRole("alert")
+          .some((alert) => /\S/u.test(alert.textContent)),
+        "the refused naming raised no alert in its row",
       ).toBe(true);
     });
-    expect(policyRow().queryByText("Rhian Pryce", { selector: "dd" })).toBeNull();
-    await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: PICKER })).toHaveProperty("value", ""),
-    );
+    expect(screen.queryByRole("button", { name: WORDS.undo })).toBeNull();
+    expect(await pickerOf(WORDS.noOwner)).toBeDefined();
+  });
+
+  it("undoes the last owner change by its keystroke", async () => {
+    await openAt(PAGE, aCollectionsApi());
+    fireEvent.click(await pickerOf(WORDS.noOwner));
+    await choosing(RHIAN.displayName);
+    await screen.findByRole("button", { name: WORDS.undo });
+
+    fireEvent.keyDown(document.body, { key: "u" });
+
+    await waitFor(() => {
+      expect(namingAsks().at(-1)).toEqual({ collection: POLICY.collection, personId: null });
+    });
   });
 
   it("shows a Viewer who owns a collection no picker", async () => {
@@ -90,9 +201,8 @@ describe("the Collections and Owners page", () => {
     );
     await openAt(PAGE, api);
 
-    await screen.findByRole("heading", { level: 3, name: "policy" });
-    expect(await policyRow().findByText("Rhian Pryce", { selector: "dd" })).toBeDefined();
-    expect(region().queryAllByRole("combobox")).toHaveLength(0);
+    expect(await region().findByRole("cell", { name: NAMED })).toBeDefined();
+    expect(region().getByRole("cell", { name: "Rhian Pryce" })).toBeDefined();
     expect(region().queryAllByRole("button")).toHaveLength(0);
   });
 });
