@@ -78,7 +78,7 @@ for line in sys.stdin:
 }
 
 playwright_titles() {
-  (cd "$root/apps/web" && ./node_modules/.bin/playwright test --list) |
+  (cd "$root/apps/web" && node ./node_modules/@playwright/test/cli.js test --list) |
     grep ' › ' | sed -E 's#^ *\[[^]]*\] › ##; s#^([^:]*/)?([^/:]+):[0-9]+:[0-9]+ › #\2 :: #' | sort > "$out/playwright-web.txt"
 }
 
