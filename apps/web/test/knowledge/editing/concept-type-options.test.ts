@@ -57,9 +57,9 @@ describe("the type a field shows", () => {
     expect(storedNameOf(TYPES, "risk registers")).toBe("Risk Register");
   });
 
-  it("shows a name unchanged when nothing folds to it", () => {
-    expect(storedNameOf(TYPES, "certification")).toBe("certification");
-    expect(storedNameOf([], "policy")).toBe("policy");
+  it("shows the folded name when no stored name matches it", () => {
+    expect(storedNameOf(TYPES, "certifications")).toBe("Certification");
+    expect(storedNameOf([], "policy")).toBe("Policy");
     expect(storedNameOf(TYPES, "")).toBe("");
   });
 

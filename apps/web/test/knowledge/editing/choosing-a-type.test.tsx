@@ -167,6 +167,15 @@ describe("the concept type field", () => {
     expect(await screen.findByRole("option", { name: "Policy", checked: true })).toBeDefined();
   });
 
+  it("shows a new type as the write will store it", async () => {
+    await editorOpened(
+      aConceptApi("commits", { parts: { ...PARTS, conceptType: "certifications" } }),
+    );
+
+    expect(conceptTypeShown()).toBe("Certification");
+    await savedAs("certifications");
+  });
+
   it("says so when the workspace has no types yet", async () => {
     const api = aConceptApi("commits");
     api.set("knowledge.tree", () => aTreeOfTypes([]));
