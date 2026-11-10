@@ -38,47 +38,43 @@ const addressesOf = (sent: readonly SentInvitation[]): string =>
 
 const unsentSaid = (unsent: readonly SentInvitation[]): string =>
   unsent.length === 1
-    ? `The email to ${addressesOf(unsent)} wasn’t sent. Resend it below.`
-    : `The emails to ${addressesOf(unsent)} weren’t sent. Resend them below.`;
+    ? `email to ${addressesOf(unsent)} wasn’t sent. Resend it below.`
+    : `emails to ${addressesOf(unsent)} weren’t sent. Resend them below.`;
 
 const lastsUntil = (sent: readonly SentInvitation[]): string => {
   const [first] = sent;
   return first === undefined ? "" : dayWords(first.expiresAt);
 };
 
-const emailsSaid = (sent: readonly SentInvitation[]): string => {
-  const unsent = sent.filter((one) => !one.emailSent);
-  if (unsent.length > 0) return unsentSaid(unsent);
-  return sent.length === 1
-    ? `The invitation expires on ${lastsUntil(sent)}.`
-    : `The invitations expire on ${lastsUntil(sent)}.`;
-};
-
 const ledBy = (invited: readonly InvitedOne[], role: Role): string => {
   const [only] = invited;
   if (invited.length > 1 || only === undefined) {
-    return `${String(invited.length)} people invited as ${role}s.`;
+    return `${String(invited.length)} people invited as ${role}s`;
   }
   return only.replaced
-    ? `Invitation to ${only.address} resent as ${aRole(role)}.`
-    : `${only.address} invited as ${aRole(role)}.`;
+    ? `Invitation to ${only.address} resent as ${aRole(role)}`
+    : `${only.address} invited as ${aRole(role)}`;
 };
 
 export const invitedOutcome = (invited: readonly InvitedOne[], role: Role): Outcome => {
-  const words = `${ledBy(invited, role)} ${emailsSaid(invited)}`;
-  return invited.every((one) => one.emailSent)
-    ? { tone: "said", words }
-    : { tone: "refused", words };
+  const lead = ledBy(invited, role);
+  const unsent = invited.filter((one) => !one.emailSent);
+  if (unsent.length === 0) {
+    const expires = invited.length === 1 ? "The invitation expires" : "The invitations expire";
+    return { tone: "said", words: `${lead}. ${expires} on ${lastsUntil(invited)}.` };
+  }
+  const notSent =
+    invited.length === 1 ? "the email wasn’t sent. Resend it below." : `the ${unsentSaid(unsent)}`;
+  return { tone: "refused", words: `${lead}, but ${notSent}` };
 };
 
 export const bulkResentOutcome = (resent: readonly SentInvitation[]): Outcome => {
-  const lead = `${counted(resent.length, "invitation", "invitations")} resent`;
-  return resent.every((one) => one.emailSent)
-    ? {
-        tone: "said",
-        words: `${lead}. ${resent.length === 1 ? "It expires" : "Each expires"} on ${lastsUntil(resent)}.`,
-      }
-    : { tone: "refused", words: `${lead}. ${unsentSaid(resent.filter((one) => !one.emailSent))}` };
+  const went = resent.filter((one) => one.emailSent);
+  const unsent = resent.filter((one) => !one.emailSent);
+  const lead = `${invitations(went.length)} resent`;
+  if (unsent.length === 0) return { tone: "said", words: `${lead}.` };
+  if (went.length === 0) return { tone: "refused", words: `The ${unsentSaid(unsent)}` };
+  return { tone: "refused", words: `${lead}, but the ${unsentSaid(unsent)}` };
 };
 
 const cancelledSaid = (changed: number, skipped: number): string => {
