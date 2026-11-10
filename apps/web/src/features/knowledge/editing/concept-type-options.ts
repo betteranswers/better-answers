@@ -9,7 +9,7 @@ export const sameConceptType = (one: string, other: string): boolean =>
   foldConceptType(one) === foldConceptType(other);
 
 export const storedNameOf = (conceptTypes: readonly string[], value: string): string =>
-  conceptTypes.find((each) => sameConceptType(each, value)) ?? value;
+  conceptTypes.find((each) => sameConceptType(each, value)) ?? foldConceptType(value);
 
 export const optionsFor = (conceptTypes: readonly string[], typed: string): ConceptTypeOptions => {
   const named = typed.trim();

@@ -475,7 +475,7 @@ describe("editing a concept on its own page", () => {
     const address = newConceptAt({
       new: "Cyber Essentials Plus certificate",
       collection: "policies",
-      type: "certification",
+      type: "certifications",
       tags: "cyber-essentials",
       subject: A_CONCEPT_IRI,
     });
@@ -483,7 +483,7 @@ describe("editing a concept on its own page", () => {
 
     await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
     expect(titleField().value).toBe("Cyber Essentials Plus certificate");
-    expect(conceptTypeShown()).toBe("certification");
+    expect(conceptTypeShown()).toBe("Certification");
     expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Tags" }).value).toBe(
       "cyber-essentials",
     );

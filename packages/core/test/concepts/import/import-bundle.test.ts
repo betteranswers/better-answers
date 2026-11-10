@@ -974,6 +974,59 @@ describe("the second pass that rewrites relative links to IRIs", () => {
     }
   });
 
+  it("moves a held concept's merge key with its refolded type", async () => {
+    const { scenario, verifiers } = await arranged();
+    const byMona = { by: humanOf(verifiers.mona), at: VERIFIED_AT };
+    const standing = await standingConcept(scenario, "Analyse:quarterly margins", {
+      path: "knowledge/company/margins.md",
+      conceptType: "Analyses",
+      title: "Quarterly margins",
+      frontmatter: { title: "Quarterly margins", type: "Analyses" },
+      body: "Margins follow the [pricing policy](pricing.md).",
+    });
+    assert(standing.ok, `the standing concept was refused: ${inspect(standing)}`);
+    await db().pool.query(
+      "UPDATE concept_index SET concept_type = 'Analys' WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, standing.value.iri],
+    );
+    await db().pool.query(
+      "UPDATE concept_identity SET merge_key = 'Analys:quarterly margins' WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, standing.value.iri],
+    );
+
+    const run = await imported(
+      scenario,
+      treeOf({
+        "manifest.yaml": MANIFEST,
+        "company/margins.md": conceptFile({
+          type: "Analyses",
+          title: "Quarterly margins",
+          entry: "ENTRY-004",
+          verified: [byMona],
+          body: "Margins follow the [pricing policy](pricing.md).",
+        }),
+        "company/pricing.md": conceptFile({
+          title: "Pricing policy",
+          entry: "ENTRY-005",
+          verified: [byMona],
+          body: "Prices rise each April.",
+        }),
+      }),
+    );
+
+    expect(run.rewritten).toEqual([{ path: "knowledge/company/margins.md", links: 1 }]);
+    const held = await db().pool.query(
+      `SELECT c.concept_type, i.merge_key
+         FROM concept_index c
+         JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
+        WHERE c.workspace_id = $1 AND c.iri = $2`,
+      [scenario.workspaceId, standing.value.iri],
+    );
+    expect(held.rows).toEqual([
+      { concept_type: "Analyse", merge_key: "Analyse:quarterly margins" },
+    ]);
+  });
+
   it.each(["roles/%C3%A9quipe.md", "roles/%c3%a9quipe.md", "roles/%C3%A9quipe%2Emd"])(
     "resolves the encoded link %s to the concept it names",
     async (link) => {

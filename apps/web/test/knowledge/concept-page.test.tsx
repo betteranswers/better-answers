@@ -151,6 +151,22 @@ describe("the passkey offer on the concept page", () => {
 
     expect([...drawnInTheArticle]).toEqual([true]);
   });
+
+  it.each([
+    ["finds nothing", aRefusalAnswer("not-found", "not-found", 404)],
+    ["fails", aRefusalAnswer("unavailable", "unavailable", 503)],
+  ])("shows in the shell's slot when the read %s", async (_read, answer) => {
+    const api = anAdminWithoutPasskeys();
+    api.set("knowledge.open", () => answer);
+    await openAt(A_CONCEPT, api);
+
+    const offer = await screen.findByRole("region", { name: PASSKEY_WORDS.heading });
+
+    expect(offer.closest("article")).toBeNull();
+    expect(
+      within(screen.getByRole("main")).getByRole("region", { name: PASSKEY_WORDS.heading }),
+    ).toBe(offer);
+  });
 });
 
 describe("the sources of the concept page", () => {

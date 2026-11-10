@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { WAITING_ON_YOU } from "@/features/inbox/inbox-state.ts";
@@ -29,7 +29,32 @@ const orphanedEdit = {
     places: 0,
   },
   current: { state: "orphaned" },
-  proposed: { title: "Annual leave", body: "Everyone takes 28 days.", sources: undefined },
+  proposed: {
+    title: "Annual leave",
+    conceptType: "Policy",
+    body: "Everyone takes 28 days.",
+    sources: undefined,
+  },
+};
+
+const editOf = (current: string, proposed: string) => ({
+  ...orphanedEdit,
+  item: {
+    ...orphanedEdit.item,
+    target: "https://example.invalid/concepts/annual-leave",
+    baseMoved: false,
+  },
+  current: {
+    state: "shown",
+    version: { ...orphanedEdit.proposed, conceptType: current, body: "Everyone takes 25 days." },
+  },
+  proposed: { ...orphanedEdit.proposed, conceptType: proposed },
+});
+
+const typeShownIn = async (version: string): Promise<string | undefined> => {
+  const region = await screen.findByRole("region", { name: version });
+  const term = within(region).queryByText(EDIT_WORDS.type, { selector: "dt" });
+  return term?.nextElementSibling?.textContent ?? undefined;
 };
 
 const describedText = (field: HTMLElement): string =>
@@ -45,6 +70,24 @@ describe("a suggestion on Waiting on You", () => {
 
     expect(drawn.notFound).toBeDefined();
     expect(drawn.alerts).toHaveLength(0);
+  });
+
+  it("shows both types when the suggestion changes the type", async () => {
+    const api = adaAnAdmin();
+    api.set("inbox.item", () => read(editOf("Policy", "Guideline")));
+    await openAt(A_SUGGESTION, api);
+
+    expect(await typeShownIn(EDIT_WORDS.current)).toBe(`${EDIT_WORDS.changed}Policy`);
+    expect(await typeShownIn(EDIT_WORDS.proposed)).toBe(`${EDIT_WORDS.changed}Guideline`);
+  });
+
+  it("shows no type when the suggestion keeps the type", async () => {
+    const api = adaAnAdmin();
+    api.set("inbox.item", () => read(editOf("Policy", "Policy")));
+    await openAt(A_SUGGESTION, api);
+
+    expect(await typeShownIn(EDIT_WORDS.current)).toBeUndefined();
+    expect(await typeShownIn(EDIT_WORDS.proposed)).toBeUndefined();
   });
 
   it("tells the owner an orphaned edit's concept has changed", async () => {

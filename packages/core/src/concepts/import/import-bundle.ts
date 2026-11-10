@@ -26,6 +26,7 @@ import {
 import { type CommitAuthor, type GitDoor } from "../../store/git/index.ts";
 import { withMember, type PostgresDoor } from "../../store/postgres/index.ts";
 import { type FrontmatterSource } from "../file.ts";
+import { followedKeyOf } from "../writes/merge-key.ts";
 import { writeConcept, type WriteConceptRefusal, type WriteDoors } from "../writes/write.ts";
 import { cataloguedOf, evidenceOfSources } from "./landing.ts";
 import {
@@ -343,6 +344,7 @@ const landOne = async (
   return ok({
     iri: wrote.value.iri,
     mergeKey: concept.mergeKey,
+    title: concept.title,
     status: CONCEPT_STABLE_STATUS,
     body: concept.body,
     contentHash: wrote.value.contentHash,
@@ -413,7 +415,7 @@ const rewriteEach = async (
     // oxlint-disable-next-line eslint/no-await-in-loop -- each rewrite lands as its own commit, and the import stops at the first refused
     const wrote = await writeConcept(principal, doors, {
       iri: held.iri,
-      mergeKey: held.mergeKey,
+      mergeKey: followedKeyOf(held, concept),
       path: concept.path,
       conceptType: concept.conceptType,
       title: concept.title,

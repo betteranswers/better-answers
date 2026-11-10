@@ -10,6 +10,14 @@ export const mergeKeyMovedBy = (
   return proposedKey === mergeKeyOf(held.conceptType, held.title) ? undefined : proposedKey;
 };
 
+export const followedKeyOf = (
+  held: { readonly mergeKey: string; readonly title: string },
+  written: { readonly conceptType: string; readonly title: string },
+): string =>
+  held.mergeKey.endsWith(mergeKeyOf("", held.title))
+    ? mergeKeyOf(foldConceptType(written.conceptType), written.title)
+    : held.mergeKey;
+
 export const acceptedKeyOf = (
   suggested: string,
   held: Pick<Held, "conceptType" | "title"> | undefined,
