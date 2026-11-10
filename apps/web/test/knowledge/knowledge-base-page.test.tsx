@@ -1,11 +1,11 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
 import { CONCEPT_IRI_PREFIX } from "@better-answers/schema/concept-file";
 
 import { KNOWLEDGE_BASE_LIST } from "@/features/knowledge/knowledge-state.ts";
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { aSearchApi, placedForSearch } from "@test/knowledge/search-answers.ts";
 import { server } from "@test/stub-server.ts";

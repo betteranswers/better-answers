@@ -324,7 +324,7 @@ describe("a guide snapshot", () => {
 
     expect(guide.name).toBe("guide-company-2026-06-02.md");
     expect(guide.markdown).toMatch(
-      /^# company\n\nGuide snapshot, 2 June 2026\. Not maintained\. It does not change/u,
+      /^# Company\n\nGuide snapshot, 2 June 2026\. Not maintained\. It does not change/u,
     );
     expect(guide.markdown).toMatch(
       new RegExp(

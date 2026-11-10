@@ -2,9 +2,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import type { OpenConceptType } from "@/features/knowledge/knowledge-state.ts";
 import { initiallyExpanded, KnowledgeTree, toggled } from "@/features/knowledge/knowledge-tree.tsx";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 afterEach(cleanup);

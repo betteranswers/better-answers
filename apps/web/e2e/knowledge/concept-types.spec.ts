@@ -1,12 +1,13 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import {
   CONCEPT_TYPES_KEYSTROKES as KEY,
   CONCEPT_TYPES_LIST,
   CONCEPT_TYPES_PAGE,
 } from "@/features/knowledge/curation/curation-state.ts";
 import { CONCEPT_TYPES_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 import { expect, test } from "../browser.ts";

@@ -2,8 +2,9 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { RHIAN } from "@test/knowledge/all-knowledge-answers.ts";

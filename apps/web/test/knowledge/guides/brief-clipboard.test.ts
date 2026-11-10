@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { copyBrief, copyingWords } from "@/features/knowledge/guides/brief-clipboard.ts";
-import { GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
+import { BRIEF_WORDS, GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import type { BriefCopied } from "@/features/knowledge/knowledge-api.ts";
 import { clipboardTaking, partOf } from "@test/clipboard-stand-in.ts";
 import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
@@ -194,7 +194,7 @@ describe("copying a section on the guide page", () => {
     clipboardTaking();
     await openGuide();
     fireEvent.click(screen.getByRole("button", { name: "Edit Brief" }));
-    await screen.findByRole("textbox", { name: "Brief of section 1" });
+    await screen.findByRole("textbox", { name: BRIEF_WORDS.label("1") });
 
     fireEvent.click(copyButton());
 
@@ -202,7 +202,7 @@ describe("copying a section on the guide page", () => {
       expect(status().textContent, "Copy with the editor open said nothing").toMatch(/\S/u);
     });
     expect(asksOf(BRIEF_COPY)).toEqual([]);
-    expect(screen.getByRole("textbox", { name: "Brief of section 1" })).toBeDefined();
+    expect(screen.getByRole("textbox", { name: BRIEF_WORDS.label("1") })).toBeDefined();
   });
 
   it("announces that c has nothing to copy without Copy", async () => {

@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useId, useRef } from "react";
 
-import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
+import { guideTitleOf } from "@better-answers/schema/collection-name";
+
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { TypeLine } from "@/shared/knowledge/type-line.tsx";
 import { ListRead, ListState } from "@/shared/list/list-pages.tsx";

@@ -210,4 +210,49 @@ describe("saving a section's Brief", () => {
     expect(refused).toEqual({ ok: false, error: "not-found" });
     expect(await versionRows(section)).toEqual(versions);
   });
+
+  it.each([
+    ["a hidden section", "Company overview", "Company overview"],
+    ["a nested section", "Security testing", "Information security"],
+  ])("answers an Editor on %s as on none", async (_, prompt, hiding) => {
+    const section = await sectionOf(prompt);
+    const { editor } = section.guide.ng;
+    const versions = await versionRows(section);
+    await hide(section, hiding, true);
+
+    const refused = await saving(section, editor, `${briefCiting(section.ids)} Hidden.`);
+    const missing = await saveBriefAs(section.guide.ng.scenario, editor, {
+      writeUpId: ABSENT_WRITE_UP,
+      markdown: "Words.",
+      base: section.base,
+    });
+    await hide(section, hiding, false);
+
+    expect(refused).toEqual(missing);
+    expect(refused).toEqual({ ok: false, error: "not-found" });
+    expect(await versionRows(section)).toEqual(versions);
+  });
+
+  it("saves for an Admin in a hidden section", async () => {
+    const section = await sectionOf("Data protection");
+    await hide(section, "Data protection", true);
+
+    const saved = await saving(
+      section,
+      section.guide.ng.admin,
+      `${briefCiting(section.ids)} Admin.`,
+    );
+    await hide(section, "Data protection", false);
+
+    expect(answered(saved)).toEqual({ saved: true, version: section.base + 1 });
+  });
 });
+
+const ABSENT_WRITE_UP = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
+
+const hide = async (section: Section, prompt: string, hidden: boolean) => {
+  await db().pool.query(
+    "UPDATE guide_section SET hidden = $1 WHERE guide_id = $2 AND prompt = $3",
+    [hidden, section.guide.guideId, prompt],
+  );
+};

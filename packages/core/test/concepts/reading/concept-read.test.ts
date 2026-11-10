@@ -534,7 +534,7 @@ describe("what a concept read cannot open", () => {
 
     const viewer = await readFor(scenario.viewer, written.iri);
 
-    expect(viewer?.pane.evidence).toEqual([{ source: "A concept you cannot open" }]);
+    expect(viewer?.pane.evidence).toEqual([{ source: "A concept you can’t open" }]);
     expect(JSON.stringify(viewer)).not.toContain(withheld.iri);
   });
 

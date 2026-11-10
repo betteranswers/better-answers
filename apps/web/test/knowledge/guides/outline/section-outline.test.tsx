@@ -11,6 +11,7 @@ import {
   aSection,
   idOf,
 } from "@test/knowledge/guide-answers.ts";
+import { atWidth } from "@test/knowledge/search-answers.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { openAt } from "@test/two-workspaces.ts";
 
@@ -20,6 +21,7 @@ placedWithoutMeasuring();
 
 afterEach(() => {
   vi.restoreAllMocks();
+  atWidth(1280);
 });
 
 const FIRST = idOf(21);
@@ -99,6 +101,15 @@ const current = () =>
     .filter((link) => link.getAttribute("aria-current") === "location")
     .map((link) => link.textContent);
 
+/** Whether the outline comes after the first section in the page, at this width. */
+const outlineFollowsAt = async (width: number): Promise<boolean> => {
+  atWidth(width);
+  await openOutline();
+  const sections = screen.getByRole("heading", { name: GUIDE_WORDS.heading("1", "Racking") });
+  const nav = screen.getByRole("navigation", { name: GUIDE_WORDS.outline });
+  return (sections.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+};
+
 describe("the section outline", () => {
   it("lists each section with its coverage and trust words", async () => {
     await openOutline();
@@ -171,7 +182,19 @@ describe("the section outline", () => {
     Reflect.deleteProperty(Element.prototype, "scrollIntoView");
   });
 
+  it("follows the sections in tab order at 1280 px", async () => {
+    expect(await outlineFollowsAt(1280)).toBe(true);
+    expect(outline().queryByRole("button", { name: GUIDE_WORDS.outline })).toBeNull();
+  });
+
+  it("comes before the sections, folded, below 1280 px", async () => {
+    expect(await outlineFollowsAt(1024)).toBe(false);
+    const toggle = outline().getByRole("button", { name: GUIDE_WORDS.outline });
+    expect(toggle.querySelector("svg"), "the toggle draws no open or closed sign").not.toBeNull();
+  });
+
   it("folds behind a Sections button on a narrow page", async () => {
+    atWidth(1024);
     const expandedAtScroll: (string | null)[] = [];
     Object.defineProperty(Element.prototype, "scrollIntoView", {
       value: () => {
