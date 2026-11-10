@@ -103,12 +103,12 @@ signs in by email while the device holds a passkey.
 - **Find the shell by its landmarks:**
   - The top band is the `banner`.
   - The icon rail is the `navigation` named *Areas*, one link per area, which `railOf` finds.
-    Its foot holds *Keyboard Shortcuts*, which `keystrokesButton` finds.
+    Its foot holds *Keyboard shortcuts*, which `keystrokesButton` finds.
   - The menu is the `navigation` named for the open area, such as *Control Centre*, with each
     group a heading over its pages' links. `navOf` finds it.
   - The breadcrumb is the `navigation` named *Breadcrumb*, inside the banner. `crumbOf` finds a
     part of it.
-  - Jump-to is the banner's button named *Jump To*. It opens a `dialog` of the same name
+  - Jump-to is the banner's button named *Jump to*. It opens a `dialog` of the same name
     holding a `combobox`.
   - The workspace switcher is `switcherOf` and its menu `switcherMenuOf`. The avatar is
     `avatarOf`, and its menu is `personMenuOpened`.
