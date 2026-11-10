@@ -1,7 +1,7 @@
 import { readableClause, readableParameters } from "../access/index.ts";
 import type { UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { shownClause } from "./withheld.ts";
+import { shownClause } from "./read/withheld.ts";
 import { SECTION_HOME } from "./write-ups.ts";
 
 const GUIDES_CITING = `

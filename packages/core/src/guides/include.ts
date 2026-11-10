@@ -20,6 +20,7 @@ import type { Committed } from "../store/git/index.ts";
 import { withMemberUnheld, type Tx } from "../store/postgres/index.ts";
 import { definitionAt, type GuideDefinition } from "./definition.ts";
 import { firstMatchesSql, type FirstMatch } from "./match.ts";
+import { shownClause } from "./read/withheld.ts";
 import {
   renderSkeleton,
   writeSkeleton,
@@ -28,7 +29,6 @@ import {
   type SkeletonRefusal,
 } from "./skeleton.ts";
 import { recomputeWriteUpsIncluding } from "./visibility.ts";
-import { shownClause } from "./withheld.ts";
 import {
   EXPECTATION_UNMET,
   GUIDE_ACTIONS,

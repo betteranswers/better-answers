@@ -38,6 +38,33 @@ const openGuide = async (role: "Admin" | "Editor" | "Viewer", guide = aGuide()) 
 
 const sectionNamed = (name: string) => screen.getByRole("region", { name });
 
+type Cited = {
+  readonly id: string;
+  readonly source: string;
+  readonly at?: string;
+  readonly iri?: string;
+};
+
+/** A guide whose one section details the racking plan, citing the sources given. */
+const rackingCiting = (body: string, evidence: readonly Cited[]) =>
+  aGuide({
+    sections: [
+      aSection({
+        brief: aBrief({
+          detail: [
+            { iri: RACKING_IRI, title: RACKING_TITLE, conceptType: "Policy", body, evidence },
+          ],
+        }),
+      }),
+    ],
+  });
+
+const detailOpenedIn = async (guide: ReturnType<typeof aGuide>) => {
+  await openGuide("Viewer", guide);
+  fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
+  return within(await screen.findByRole("region", { name: GUIDE_WORDS.detailOf("1") }));
+};
+
 const guideArticle = () => within(screen.getByRole("article"));
 
 const status = () => guideArticle().getByRole("status");
@@ -305,25 +332,13 @@ describe("the Detail of a section", () => {
   });
 
   it("resolves the footnotes of a detailed concept to its sources", async () => {
-    const cited = aBrief({
-      detail: [
-        {
-          iri: RACKING_IRI,
-          title: RACKING_TITLE,
-          conceptType: "Policy",
-          body: "Each bay is racked by row.[^source-1] Loads are weighed.[^source-2]",
-          evidence: [
-            { id: "source-1", source: "Warehouse handbook", at: "p.4" },
-            { id: "source-2", source: "Load survey", iri: LOAD_SURVEY_IRI },
-          ],
-        },
-      ],
-    });
-    await openGuide("Viewer", aGuide({ sections: [aSection({ brief: cited })] }));
+    const detail = await detailOpenedIn(
+      rackingCiting("Each bay is racked by row.[^source-1] Loads are weighed.[^source-2]", [
+        { id: "source-1", source: "Warehouse handbook", at: "p.4" },
+        { id: "source-2", source: "Load survey", iri: LOAD_SURVEY_IRI },
+      ]),
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
-
-    const detail = within(await screen.findByRole("region", { name: GUIDE_WORDS.detailOf("1") }));
     expect(detail.queryByText(/\[\^source/u), "a raw footnote marker is drawn").toBeNull();
     expect(detail.getByText(/Each bay is racked by row\./u).textContent).toBe(
       "Each bay is racked by row.[1] Loads are weighed.[2]",
@@ -340,20 +355,11 @@ describe("the Detail of a section", () => {
   });
 
   it("links each detailed footnote number to its source", async () => {
-    const cited = aBrief({
-      detail: [
-        {
-          iri: RACKING_IRI,
-          title: RACKING_TITLE,
-          conceptType: "Policy",
-          body: "Each bay is racked by row.[^source-1]",
-          evidence: [{ id: "source-1", source: "Warehouse handbook", at: "p.4" }],
-        },
-      ],
-    });
-    await openGuide("Viewer", aGuide({ sections: [aSection({ brief: cited })] }));
-    fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
-    const detail = within(await screen.findByRole("region", { name: GUIDE_WORDS.detailOf("1") }));
+    const detail = await detailOpenedIn(
+      rackingCiting("Each bay is racked by row.[^source-1]", [
+        { id: "source-1", source: "Warehouse handbook", at: "p.4" },
+      ]),
+    );
 
     const number = detail.getByRole("link", {
       name: CONCEPT_WORDS.sourceNamed(1, "Warehouse handbook"),
@@ -368,11 +374,8 @@ describe("the Detail of a section", () => {
   });
 
   it("draws no sources for a detailed concept that cites none", async () => {
-    await openGuide("Viewer");
+    const detail = await detailOpenedIn(aGuide());
 
-    fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
-
-    const detail = within(await screen.findByRole("region", { name: GUIDE_WORDS.detailOf("1") }));
     expect(detail.queryByRole("list", { name: CONCEPT_WORDS.sources })).toBeNull();
   });
 

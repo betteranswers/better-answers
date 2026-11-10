@@ -21,8 +21,8 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { shownClause } from "./read/withheld.ts";
 import type { SourcedFootnote } from "./renderer.ts";
-import { shownClause } from "./withheld.ts";
 import { SECTION_HOME } from "./write-ups.ts";
 
 type TrustTier = (typeof TRUST_TIERS)[number];

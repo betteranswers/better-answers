@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { markersOf, replaceMarkers } from "../../src/knowledge/brief-marker.ts";
+import { markersOf, replaceMarkers } from "../../../src/knowledge/citing/brief-marker.ts";
 
 describe("the markers of a Brief", () => {
   it("lists each marker in order, including repeats", () => {

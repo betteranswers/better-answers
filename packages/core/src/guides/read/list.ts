@@ -13,8 +13,8 @@ import {
   type UserPrincipal,
 } from "../../kernel/index.ts";
 import type { Tx } from "../../store/postgres/index.ts";
-import { shownClause } from "../withheld.ts";
 import { SECTION_HOME } from "../write-ups.ts";
+import { shownClause } from "./withheld.ts";
 
 type GuideSummary = {
   readonly guideId: string;

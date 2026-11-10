@@ -101,6 +101,15 @@ const current = () =>
     .filter((link) => link.getAttribute("aria-current") === "location")
     .map((link) => link.textContent);
 
+/** Whether the outline comes after the first section in the page, at this width. */
+const outlineFollowsAt = async (width: number): Promise<boolean> => {
+  atWidth(width);
+  await openOutline();
+  const sections = screen.getByRole("heading", { name: GUIDE_WORDS.heading("1", "Racking") });
+  const nav = screen.getByRole("navigation", { name: GUIDE_WORDS.outline });
+  return (sections.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+};
+
 describe("the section outline", () => {
   it("lists each section with its coverage and trust words", async () => {
     await openOutline();
@@ -174,22 +183,12 @@ describe("the section outline", () => {
   });
 
   it("follows the sections in tab order at 1280 px", async () => {
-    atWidth(1280);
-    await openOutline();
-
-    const sections = screen.getByRole("heading", { name: GUIDE_WORDS.heading("1", "Racking") });
-    const nav = screen.getByRole("navigation", { name: GUIDE_WORDS.outline });
-    expect(sections.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(await outlineFollowsAt(1280)).toBe(true);
     expect(outline().queryByRole("button", { name: GUIDE_WORDS.outline })).toBeNull();
   });
 
   it("comes before the sections, folded, below 1280 px", async () => {
-    atWidth(1024);
-    await openOutline();
-
-    const sections = screen.getByRole("heading", { name: GUIDE_WORDS.heading("1", "Racking") });
-    const nav = screen.getByRole("navigation", { name: GUIDE_WORDS.outline });
-    expect(nav.compareDocumentPosition(sections) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(await outlineFollowsAt(1024)).toBe(false);
     const toggle = outline().getByRole("button", { name: GUIDE_WORDS.outline });
     expect(toggle.querySelector("svg"), "the toggle draws no open or closed sign").not.toBeNull();
   });

@@ -19,8 +19,8 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { folded, withMember, type Tx } from "../store/postgres/index.ts";
+import { shownClause } from "./read/withheld.ts";
 import type { GuideDoors } from "./skeleton.ts";
-import { shownClause } from "./withheld.ts";
 import {
   GUIDE_ACTIONS,
   includeSnapshot,
