@@ -28,6 +28,7 @@ import {
   type SkeletonRefusal,
 } from "./skeleton.ts";
 import { recomputeWriteUpsIncluding } from "./visibility.ts";
+import { shownClause } from "./withheld.ts";
 import {
   EXPECTATION_UNMET,
   GUIDE_ACTIONS,
@@ -66,7 +67,8 @@ const SECTION_WRITE_UP = `
     FROM write_up w
     JOIN guide_definition g ON g.workspace_id = w.workspace_id AND g.id = w.guide_id
    WHERE w.workspace_id = $1 AND w.id = $2 AND w.home = '${SECTION_HOME}'
-     AND ${readableClause("w", 3)}`;
+     AND ${readableClause("w", 3)}
+     AND ${shownClause({ guide: "w.guide_id", section: "w.section_id" }, 3)}`;
 
 const SECTION_FACTS = `(SELECT id, section_id, ordinal, concept_type, tags, collection
                           FROM guide_expected_fact

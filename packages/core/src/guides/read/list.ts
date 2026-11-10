@@ -13,7 +13,7 @@ import {
   type UserPrincipal,
 } from "../../kernel/index.ts";
 import type { Tx } from "../../store/postgres/index.ts";
-import { WITHHELD_SECTIONS } from "../citing.ts";
+import { shownClause } from "../withheld.ts";
 import { SECTION_HOME } from "../write-ups.ts";
 
 type GuideSummary = {
@@ -41,7 +41,7 @@ type SummaryRow = {
   readonly needs_review: number;
 };
 
-const GUIDES = `${WITHHELD_SECTIONS}
+const GUIDES = `
   SELECT g.id, g.guide_type, g.collection, g.subject_iri, c.title AS subject_title,
          count(s.id)::int AS sections,
          count(*) FILTER (WHERE ${readableClause("w", 2)} AND w.needs_review IS NOT NULL)::int
@@ -50,9 +50,7 @@ const GUIDES = `${WITHHELD_SECTIONS}
     LEFT JOIN concept_index c ON c.workspace_id = g.workspace_id AND c.iri = g.subject_iri
                              AND ${readableClause("c", 2)}
     LEFT JOIN guide_section s ON s.workspace_id = g.workspace_id AND s.guide_id = g.id
-                             AND ($2 = 'Admin' OR NOT EXISTS (
-                                   SELECT 1 FROM withheld h
-                                    WHERE h.guide_id = s.guide_id AND h.id = s.id))
+                             AND ${shownClause({ guide: "s.guide_id", section: "s.id" }, 2)}
     LEFT JOIN write_up w ON w.workspace_id = s.workspace_id AND w.home = '${SECTION_HOME}'
                         AND w.guide_id = s.guide_id AND w.section_id = s.id
    WHERE g.workspace_id = $1
