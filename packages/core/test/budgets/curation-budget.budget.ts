@@ -37,6 +37,13 @@ const FIRST_PAGE = allKnowledgeInput.parse({
   page: 1,
 });
 
+const TRUSTED_PAGE = allKnowledgeInput.parse({
+  collections: [],
+  trust: "unverified",
+  sort: { column: "title", desc: false },
+  page: 1,
+});
+
 const timed = async (work: () => Promise<unknown>): Promise<number> => {
   const started = performance.now();
   await work();
@@ -76,6 +83,13 @@ describe("the Curation budgets at 3,000 concepts", () => {
         ),
       ),
     );
+    const trusted = await measured(async () =>
+      answered(
+        await readingAs(readers(), admin, (principal, tx) =>
+          readAllKnowledge(principal, tx, TRUSTED_PAGE, SNAPSHOT_AT),
+        ),
+      ),
+    );
     const conceptTypes = await measured(async () =>
       answered(
         await readingAs(readers(), admin, (principal, tx) => readConceptTypes(principal, tx)),
@@ -83,10 +97,15 @@ describe("the Curation budgets at 3,000 concepts", () => {
     );
 
     await recordFigures("All knowledge's first page", figuresOf(page));
+    await recordFigures("All knowledge filtered by trust", figuresOf(trusted));
     await recordFigures("Concept Types", figuresOf(conceptTypes));
     expect(
       percentile(page, 0.5),
       "All knowledge's first page at the median, in milliseconds",
+    ).toBeLessThan(PAGE_BUDGET_MS);
+    expect(
+      percentile(trusted, 0.5),
+      "All knowledge filtered by trust at the median, in milliseconds",
     ).toBeLessThan(PAGE_BUDGET_MS);
     expect(
       percentile(conceptTypes, 0.5),
