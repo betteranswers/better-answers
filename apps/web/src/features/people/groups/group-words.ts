@@ -12,7 +12,6 @@ export const GROUP_WORDS = {
     commit: "Create group",
   },
   rename: {
-    consequence: "Enter the group’s new name.",
     commit: "Rename group",
   },
   delete: "Delete group",
