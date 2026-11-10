@@ -4,6 +4,7 @@ import { KNOWLEDGE_BASE_KEYSTROKES as KEY } from "@/features/knowledge/knowledge
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { LIST_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -142,7 +143,7 @@ test.describe("Knowledge Base", () => {
       await expect(countOf(concepts)).toHaveText(/\b400\b/);
       await expect(concepts.getByRole("link").first()).toHaveText("Insurance Policy 001");
 
-      const more = concepts.getByRole("button", { name: "Load More" });
+      const more = concepts.getByRole("button", { name: LIST_WORDS.loadMore });
       for (let shown = A_PAGE; shown < A_CONCEPT_TYPE; shown += A_PAGE) {
         const pagedAtMs = Date.now();
         await more.click();

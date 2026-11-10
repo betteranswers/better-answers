@@ -1,5 +1,6 @@
 import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
+import { INVITATION_WORDS } from "@/features/auth/workspace/invitation-words.ts";
 import { INVITE_WORDS } from "@/features/people/invitation-words.ts";
 import { MEMBER_PAGE_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
@@ -65,9 +66,9 @@ export const personButton = (page: Page, name: string): Locator =>
 export const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", { name });
 
 export const invitationHeading = (page: Page, workspace: string) =>
-  page.getByRole("heading", { level: 1, name: `Your Invitation to ${workspace}` });
+  page.getByRole("heading", { level: 1, name: INVITATION_WORDS.heading(workspace) });
 
-export const joinButton = (page: Page) => page.getByRole("button", { name: "Join Workspace" });
+export const joinButton = (page: Page) => page.getByRole("button", { name: INVITATION_WORDS.join });
 
 export const nameField = (page: Page) => page.getByLabel(MEMBER_PAGE_WORDS.displayName);
 

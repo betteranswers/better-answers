@@ -10,12 +10,17 @@ import {
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { useAsking } from "@/features/console/everyone/everyone-search.tsx";
+import { WORKSPACES_WORDS } from "@/features/console/list-words.ts";
+import { correctWords } from "@/features/console/names-waiting/correcting-words.ts";
 import {
   NAMES_WAITING_KEYSTROKES,
   PEOPLE_KEYSTROKES,
 } from "@/features/console/people-keystrokes.ts";
 import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
+import { CONSOLE_CLOSED, PERSON_WORDS } from "@/features/console/words.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 import { openApp } from "@test/open-app.tsx";
 import { addressOf, answered } from "@test/stubbed-api.ts";
 
@@ -241,7 +246,7 @@ describe("the console's shell", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "Access Denied",
+        name: CONSOLE_CLOSED,
       }),
     ).toBeDefined();
     const refused = screen.getByRole("alert").textContent;
@@ -279,7 +284,7 @@ describe("the console's lists", () => {
 
     expect(within(list).getAllByRole("columnheader").map(textOf)).toEqual([
       "Workspace",
-      "Short Name",
+      WORKSPACES_WORDS.columns.shortName,
       "Members",
       "Created",
     ]);
@@ -302,7 +307,9 @@ describe("the console's lists", () => {
     ).toBe(true);
 
     expect(within(list).queryByText(ACME.id)).toBeNull();
-    fireEvent.click(within(acme).getByRole("button", { name: `More About ${ACME.name}` }));
+    fireEvent.click(
+      within(acme).getByRole("button", { name: WORKSPACES_WORDS.moreAbout(ACME.name) }),
+    );
     expect(within(acme).getByText(ACME.id)).toBeDefined();
   });
 
@@ -317,7 +324,7 @@ describe("the console's lists", () => {
 
     searchFor(list, WORKSPACES_LIST.search, "nowhere");
     expect(countIn(list).textContent).toMatch(/\b0\b.*nowhere/);
-    fireEvent.click(within(list).getByRole("button", { name: "Clear Search" }));
+    fireEvent.click(within(list).getByRole("button", { name: CLEAR_WORDS.search }));
     expect(rowsOf(list)).toHaveLength(2);
     expect(countIn(list).textContent).toMatch(/\b2\b/);
   });
@@ -372,14 +379,14 @@ describe("the console's lists", () => {
 
     searchFor(list, NAMES_WAITING_LIST.search, "nobody");
     expect(countIn(list).textContent).toMatch(/\b0\b.*nobody/);
-    expect(within(list).getByRole("button", { name: "Clear Search" })).toBeDefined();
+    expect(within(list).getByRole("button", { name: CLEAR_WORDS.search })).toBeDefined();
   });
 
   it("does not correct a focused name the search hid", async () => {
     const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_LIST.heading, {
       "console.people.namesWaiting": NAMES_WAITING,
     });
-    const toCorrectPriya = "Correct Priya Shah’s Display Name";
+    const toCorrectPriya = correctWords("Priya Shah");
     const pressCorrect = () => {
       fireEvent.keyDown(document.body, { key: NAMES_WAITING_KEYSTROKES.correct.key });
     };
@@ -408,7 +415,7 @@ describe("the console's lists", () => {
     });
     expect(outcomeIn(list).textContent, "the list shows a message before any key").toBe("");
     within(list).getByRole("button", { name: PRIYA.displayName }).focus();
-    screen.getByRole("button", { name: "Keyboard Shortcuts" }).focus();
+    screen.getByRole("button", { name: KEYSTROKE_WORDS.button }).focus();
 
     for (const { key } of [
       PEOPLE_KEYSTROKES.open,
@@ -431,8 +438,10 @@ describe("the console's lists", () => {
       "console.people.namesWaiting": NAMES_WAITING,
     });
     expect(outcomeIn(list).textContent, "the list shows a message before any key").toBe("");
-    within(list).getByRole("button", { name: "Correct Priya Shah’s Display Name" }).focus();
-    screen.getByRole("button", { name: "Keyboard Shortcuts" }).focus();
+    within(list)
+      .getByRole("button", { name: correctWords("Priya Shah") })
+      .focus();
+    screen.getByRole("button", { name: KEYSTROKE_WORDS.button }).focus();
 
     press(NAMES_WAITING_KEYSTROKES.correct.key);
 
@@ -474,7 +483,7 @@ const PRIYA = {
   credentialsRevokedAt: null,
 };
 
-const CREDENTIALS_PART = "Sessions and Assistant Access";
+const CREDENTIALS_PART = PERSON_WORDS.sessionsAndAccess;
 
 /** Holds the person's details back until the part has drawn its loading state. */
 const sheetSaysWhenRefused = async (refusal: Answer): Promise<string> => {

@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
 
+import { PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
+
 import { expect, test } from "../browser.ts";
 import {
   anAddress,
@@ -11,7 +13,7 @@ import {
 } from "../harness.ts";
 
 const workspacesHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "Your Workspaces" });
+  page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading });
 
 test("sign-in opens the only workspace or the picked one", async ({
   page,

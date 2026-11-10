@@ -108,8 +108,7 @@ const wordsOf = (workspace: ListedWorkspace): string => `${workspace.name}\n${wo
 function NoneProvisioned() {
   return (
     <p className="px-4 py-10">
-      No workspaces yet. Use the ops command <code>provision-workspace</code> to create the first
-      one.
+      No workspaces yet. Run <code>provision-workspace</code> to create one.
     </p>
   );
 }

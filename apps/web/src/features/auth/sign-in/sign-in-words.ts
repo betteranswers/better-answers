@@ -10,34 +10,34 @@ const HINT = "Enter your work email address to sign in.";
 
 export const SIGN_IN_WORDS = {
   emailStep: {
-    nothing: { title: "Sign In", hint: HINT },
+    nothing: { title: "Sign in", hint: HINT },
     joining: {
-      title: "Sign In to Join a Workspace",
+      title: "Sign in to join a workspace",
       hint: "Enter the email address your invitation was sent to.",
     },
-    connecting: { title: "Sign In to Connect Claude", hint: HINT },
+    connecting: { title: "Sign in to connect Claude", hint: HINT },
   } satisfies Record<CarriedOn | "nothing", EmailStep>,
   arrived: {
-    "signed-out": "You have signed out successfully.",
+    "signed-out": "You’ve signed out.",
     "session-ended": STOCK.session,
-    "confirm-timed-out": "Your sign-in wasn’t confirmed within an hour. Please sign in again.",
+    "confirm-timed-out": "Your sign-in wasn’t confirmed within an hour. Sign in again.",
   } satisfies Record<Arrival, string>,
-  emailField: "Email Address",
-  send: "Send Code",
+  emailAddress: "Email address",
+  send: "Send code",
   sending: "Sending",
-  codeTitle: "Enter Your Code",
-  codeField: "Verification Code",
-  signIn: "Sign In",
-  signingIn: "Signing In",
-  sendAgain: "Send a New Code",
-  otherAddress: "Use a Different Email Address",
+  codeTitle: "Enter your code",
+  codeField: "Verification code",
+  signIn: "Sign in",
+  signingIn: "Signing in",
+  sendAgain: "Send a new code",
+  otherAddress: "Use a different email address",
   or: "Or",
-  passkey: "Sign In with a Passkey",
-  passkeyWaiting: "Waiting for your passkey.",
-  passkeyNotUsed: "No passkey was used. Please try again, or sign in by email.",
+  passkey: "Sign in with a passkey",
+  passkeyWaiting: "Waiting for your passkey…",
+  passkeyNotUsed: "No passkey was used. Try again, or sign in by email.",
 } as const;
 
-const ENTER_IT = "Please enter it below.";
+const ENTER_IT = "Enter it below.";
 
 export const codeSent = (address: string): string =>
   `We’ve sent a 6-digit code to ${address}. ${ENTER_IT}`;

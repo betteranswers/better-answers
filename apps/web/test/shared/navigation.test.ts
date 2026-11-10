@@ -1,6 +1,7 @@
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
+import { FAILED_PAGE, UNKNOWN_PAGE } from "@/app/words.ts";
 import { CONCEPT_TYPES_PAGE } from "@/features/knowledge/curation/curation-state.ts";
 import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
@@ -464,7 +465,7 @@ describe("a member detail page under Members", () => {
 
 const pageHeading = () => screen.getByRole("heading", { level: 1 }).textContent;
 
-const NOT_FOUND = "Page Not Found";
+const NOT_FOUND = UNKNOWN_PAGE.heading;
 
 const MOVED = [
   ["/people/audit-log", "/system/audit-log"],
@@ -503,7 +504,7 @@ describe("a moved path", () => {
       const { router } = await openApp(from, clients);
       await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
-      expect(pageHeading()).toBe("This Page Didn’t Load");
+      expect(pageHeading()).toBe(FAILED_PAGE.heading);
       expect(router.state.location.pathname).toBe(from);
     });
   }

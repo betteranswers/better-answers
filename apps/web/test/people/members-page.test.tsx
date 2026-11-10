@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { UNKNOWN_PAGE } from "@/app/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { idOf, PRIYA, SAM, TEST_PERSON } from "@test/people/member-pages.ts";
@@ -95,7 +96,7 @@ describe("the People group's Members page", () => {
     const main = screen.getByRole("main");
     await within(main).findByRole("link", { name: "Go to New Question" });
     expect(router.state.location.pathname).toBe(MEMBERS_PAGE);
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Page Not Found");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_PAGE.heading);
     expect(screen.queryByRole("region", { name: "Members" })).toBeNull();
     expect(document.body.textContent).not.toContain(TEST_PERSON.address);
     expect(server.asks.map((ask) => ask.procedure)).not.toContain("members.list");

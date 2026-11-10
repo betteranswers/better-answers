@@ -1,5 +1,9 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { SIGN_OUT } from "@/shared/words.ts";
+
 import { expect, test } from "../browser.ts";
 import {
   anAddress,
@@ -11,7 +15,8 @@ import {
 } from "../harness.ts";
 import { scrolledSideways } from "../knowledge.ts";
 
-const thePicker = (page: Page) => page.getByRole("heading", { level: 1, name: "Your Workspaces" });
+const thePicker = (page: Page) =>
+  page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading });
 
 const LIST_BUDGET_MS = 1000;
 
@@ -54,12 +59,12 @@ test("lists a member's workspaces within a second", async ({
 
     await expect(page.getByRole("main")).toMatchAriaSnapshot(`
       - main:
-        - heading "Your Workspaces" [level=1]
+        - heading ${JSON.stringify(PICKER_WORDS.heading)} [level=1]
         - paragraph
         - list
         - link "Account"
         - button "Sign Out"
-        - button "Keyboard Shortcuts"
+        - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
     `);
     await page.keyboard.press("Tab");
     await expect(workspaces.first(), "Tab did not reach the first workspace").toBeFocused();
@@ -71,11 +76,11 @@ test("lists a member's workspaces within a second", async ({
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Account" })).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("button", { name: "Sign Out" })).toBeFocused();
+    await expect(page.getByRole("button", { name: SIGN_OUT })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(keystrokesButton(page)).toBeFocused();
 
-    const listed = await keystrokesListed(page, "Your Workspaces");
+    const listed = await keystrokesListed(page, PICKER_WORDS.heading);
     await expect(listed.getByRole("term").filter({ hasText: /^w$/ })).toBeVisible();
     await keystrokesDismissed(page, listed);
     await page.keyboard.press("w");

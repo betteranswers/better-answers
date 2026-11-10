@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select.tsx";
+import { filterBy, LIST_WORDS } from "@/shared/words.ts";
 
 type Choice = { readonly value: string; readonly label: string };
 
@@ -112,7 +113,7 @@ function FilterSelect(properties: { readonly filter: Filter }) {
         onChange(picked === ANY ? undefined : picked.slice(CHOICE.length));
       }}
     >
-      <SelectTrigger aria-label={`Filter by ${label}`} className="min-w-32">
+      <SelectTrigger aria-label={filterBy(label)} className="min-w-32">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -141,11 +142,11 @@ function ColumnMenu(properties: { readonly control: ColumnControl }) {
       <DropdownMenuTrigger asChild>
         <Button variant="outline">
           <Icon name="columns" />
-          Columns
+          {LIST_WORDS.columns}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>Show Columns</DropdownMenuLabel>
+        <DropdownMenuLabel>{LIST_WORDS.showColumns}</DropdownMenuLabel>
         {columns.map((column) => (
           <DropdownMenuCheckboxItem
             key={column.id}

@@ -4,6 +4,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { YOUR_QUESTIONS_WORDS } from "@/features/ask/ask-words.ts";
 import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { LIST_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -151,7 +152,7 @@ test.describe("Your questions", () => {
       await expect(rowsOf(yourQuestions(page)).first()).toBeFocused();
       const more = page
         .getByRole("navigation", { name: YOUR_QUESTIONS_WORDS.more })
-        .getByRole("button", { name: "Load More" });
+        .getByRole("button", { name: LIST_WORDS.loadMore });
       await tabUntilFocused(page, more, 60);
       await passesTheAccessibilityGate();
 

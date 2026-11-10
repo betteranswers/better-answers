@@ -1,6 +1,8 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { UNKNOWN_PAGE } from "@/app/words.ts";
+import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace/workspace-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -42,7 +44,9 @@ const backToMembers = async (router: Awaited<ReturnType<typeof openAt>>) => {
 
 const leftForNoWorkspace = async (router: Awaited<ReturnType<typeof openAt>>) => {
   await waitFor(() => expect(router.state.location.pathname).toBe("/no-workspace"));
-  expect(await screen.findByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeDefined();
+  expect(
+    await screen.findByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING }),
+  ).toBeDefined();
 };
 
 const describing = (control: HTMLElement): string =>
@@ -105,7 +109,9 @@ describe("a member's own page", () => {
       router.history.back();
     });
     await waitFor(() => expect(router.state.location.pathname).toBe(MEMBERS_PAGE));
-    expect(await screen.findByRole("heading", { level: 1, name: "Page Not Found" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading }),
+    ).toBeDefined();
     expect(screen.getByRole("link", { name: "Go to New Question" })).toBeDefined();
   });
 });

@@ -1,7 +1,13 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { JUMP_TO } from "@/app/words.ts";
+import { NAMES_WAITING_WORDS } from "@/features/console/list-words.ts";
+import { correctWords } from "@/features/console/names-waiting/correcting-words.ts";
 import { NAMES_WAITING_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { DISPLAY_NAME_WORDS } from "@/shared/member/display-name-words.ts";
 import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -28,13 +34,13 @@ const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 
 const outcomeOf = (list: Locator): Locator => list.locator("output:has(+ [role='alert'])");
 
-const correctionOf = (name: string): string => `Correct ${name}’s Display Name`;
+const correctionOf = (name: string): string => correctWords(name);
 
 const dialogToCorrect = (page: Page, name: string): Locator =>
   page.getByRole("dialog", { name: correctionOf(name) });
 
 const nameFieldOf = (dialog: Locator): Locator =>
-  dialog.getByRole("textbox", { name: "Display Name" });
+  dialog.getByRole("textbox", { name: DISPLAY_NAME_WORDS.label });
 
 const namesWaiting = (page: Page) => page.getByRole("region", { name: "Flagged Names" });
 
@@ -107,10 +113,10 @@ test.describe("the console's Flagged Names page", () => {
       ).toHaveCount(0);
       const listed = await keystrokesListed(page, "Flagged Names");
       await expect(listed.getByRole("definition")).toHaveText([
-        "Search Flagged Names by Name or Workspace",
-        "Correct the Display Name in Focus",
-        "Show This List",
-        "Jump To",
+        NAMES_WAITING_KEYSTROKES.search.action,
+        NAMES_WAITING_KEYSTROKES.correct.action,
+        KEYSTROKE_WORDS.showTheList,
+        JUMP_TO.name,
       ]);
       await keystrokesDismissed(page, listed);
 
@@ -139,7 +145,7 @@ test.describe("the console's Flagged Names page", () => {
       await waitingSearch(page).fill(`nobody ${tag}`);
       await expect(waitingCount(page)).toHaveText(/\b0\b/);
       await expect(waitingRows(page)).toHaveCount(1);
-      await expect(waitingRows(page).getByRole("button")).toHaveText(["Clear Search"]);
+      await expect(waitingRows(page).getByRole("button")).toHaveText([CLEAR_WORDS.search]);
       const narrowed = await waitingCount(page).innerText();
       await passesTheAccessibilityGate();
 
@@ -169,9 +175,9 @@ test.describe("the console's Flagged Names page", () => {
           - table:
             - caption
             - rowgroup:
-              - row "Person Flagged By Actions":
+              - row ${JSON.stringify(Object.values(NAMES_WAITING_WORDS.columns).join(" "))}:
                 - columnheader "Person"
-                - columnheader "Flagged By"
+                - columnheader ${JSON.stringify(NAMES_WAITING_WORDS.columns.flaggedBy)}
                 - columnheader "Actions"
             - rowgroup:
               - row /${name}/:

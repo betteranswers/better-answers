@@ -1,11 +1,12 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { assert, describe, expect, it, vi } from "vitest";
 
+import { UNKNOWN_PAGE } from "@/app/words.ts";
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
-import { CLEAR_WORDS } from "@/shared/words.ts";
+import { CLEAR_WORDS, filterBy } from "@/shared/words.ts";
 import {
   aConceptRow,
   ALL_KNOWLEDGE,
@@ -46,9 +47,9 @@ const CONCEPTS: readonly ConceptRow[] = [THE_LEAVE, THE_EXPENSES, THE_DRILLS, TH
 
 const SET_OWNER = WORDS.setOwner.action;
 
-const FILTER_BY_COLLECTION = `Filter by ${WORDS.filters.collection.label}`;
+const FILTER_BY_COLLECTION = filterBy(WORDS.filters.collection.label);
 
-const FILTER_BY_TRUST = `Filter by ${WORDS.filters.trust.label}`;
+const FILTER_BY_TRUST = filterBy(WORDS.filters.trust.label);
 
 const region = () => within(screen.getByRole("region", { name: "All Knowledge" }));
 
@@ -204,7 +205,7 @@ describe("the All Knowledge page", () => {
       anAllKnowledgeApi(() => CONCEPTS),
     );
 
-    const clear = await region().findByRole("button", { name: "Clear Filters" });
+    const clear = await region().findByRole("button", { name: CLEAR_WORDS.filters });
     expect(region().queryAllByRole("link")).toHaveLength(0);
 
     fireEvent.click(clear);
@@ -224,7 +225,7 @@ describe("the All Knowledge page", () => {
     const cells = within(region().getByRole("table")).getAllByRole("cell");
     expect(cells, "the empty table drew rows").toHaveLength(1);
     expect(cells[0]?.textContent, "the empty table says nothing").toMatch(/\S/u);
-    expect(region().queryByRole("button", { name: "Clear Filters" })).toBeNull();
+    expect(region().queryByRole("button", { name: CLEAR_WORDS.filters })).toBeNull();
     expect(whatTheAlertsSay(), "an empty knowledge base showed as a failure").toBe("");
   });
 
@@ -611,7 +612,9 @@ describe("the All Knowledge page for an owner", () => {
     api.set("knowledge.allKnowledge", () => aRefusalAnswer("owner-forbids", "forbidden", 403));
     fireEvent.click(region().getByRole("button", { name: "Title" }));
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Page Not Found" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading }),
+    ).toBeDefined();
     expect(screen.queryByRole("region", { name: "All Knowledge" })).toBeNull();
   });
 
@@ -620,7 +623,9 @@ describe("the All Knowledge page for an owner", () => {
     asAnEditorOwning(api, []);
     await openAt(ALL_KNOWLEDGE, api);
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Page Not Found" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading }),
+    ).toBeDefined();
     expect(asked("knowledge.allKnowledge")).toEqual([]);
   });
 

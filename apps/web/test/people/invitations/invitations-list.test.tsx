@@ -1,8 +1,11 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { UNKNOWN_PAGE } from "@/app/words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
   actionBesideKey,
@@ -35,11 +38,11 @@ placedWithoutMeasuring();
 
 const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
 
-const keystrokesButton = () => screen.getByRole("button", { name: "Keyboard Shortcuts" });
+const keystrokesButton = () => screen.getByRole("button", { name: KEYSTROKE_WORDS.button });
 
 const keystrokesListed = () => {
   pressedOn("?");
-  return screen.findByRole("dialog", { name: "Keyboard Shortcuts on Members" });
+  return screen.findByRole("dialog", { name: keystrokesOn("Members") });
 };
 
 const inOrder = (...elements: readonly Element[]): boolean =>
@@ -161,7 +164,7 @@ describe("the People page's Invitations tab", () => {
     expect(invitationsRegion().textContent, "the empty list does not name the search").toContain(
       nobody,
     );
-    const clear = within(invitationsRegion()).getByRole("button", { name: "Clear Search" });
+    const clear = within(invitationsRegion()).getByRole("button", { name: CLEAR_WORDS.search });
     clear.focus();
     fireEvent.click(clear);
 
@@ -232,7 +235,7 @@ describe("the People page's Invitations tab", () => {
       await openAt(HOMES.Admin.path, api);
 
       expect(
-        await screen.findByRole("heading", { level: 1, name: "Page Not Found" }),
+        await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading }),
       ).toBeDefined();
       expect(screen.getByRole("link", { name: "Go to New Question" })).toBeDefined();
       expect(screen.queryByRole("tab", { name: "Invitations" })).toBeNull();

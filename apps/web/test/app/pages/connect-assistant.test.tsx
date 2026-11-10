@@ -28,9 +28,7 @@ describe("Ask › Connect Claude", () => {
   it("lists the steps, including Always allow, and the MCP address", async () => {
     const main = await openConnectClaude();
 
-    expect(
-      main.getByRole("heading", { level: 2, name: "Connect Claude as Your Assistant" }),
-    ).toBeDefined();
+    expect(main.getByRole("heading", { level: 2, name: CONNECT_ASSISTANT.heading })).toBeDefined();
     expect(
       steps(main)
         .getAllByRole("listitem")
@@ -45,7 +43,7 @@ describe("Ask › Connect Claude", () => {
     const clipboardWrites = clipboardAnswering(() => Promise.resolve());
     const main = await openConnectClaude();
 
-    fireEvent.click(main.getByRole("button", { name: "Copy Address" }));
+    fireEvent.click(main.getByRole("button", { name: CONNECT_ASSISTANT.copy }));
 
     await vi.waitFor(() => {
       expect(steps(main).getByRole("status").textContent).toBe(CONNECT_ASSISTANT.copied);
@@ -58,7 +56,7 @@ describe("Ask › Connect Claude", () => {
     clipboardAnswering(() => Promise.reject(new Error("refused")));
     const main = await openConnectClaude();
 
-    fireEvent.click(main.getByRole("button", { name: "Copy Address" }));
+    fireEvent.click(main.getByRole("button", { name: CONNECT_ASSISTANT.copy }));
 
     await vi.waitFor(() => {
       expect(steps(main).getByRole("alert").textContent).toBe(STOCK.copy);

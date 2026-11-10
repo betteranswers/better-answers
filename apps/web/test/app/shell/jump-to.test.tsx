@@ -224,7 +224,7 @@ describe("choosing Invite a person in the app", () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
     vi.stubGlobal("ResizeObserver", StubResizeObserver);
     const { router } = await openApp("/people/members?members.role=Editor");
-    await screen.findByRole("button", { name: "Jump To" });
+    await screen.findByRole("button", { name: JUMP_TO.name });
 
     fireEvent.keyDown(document, { key: "k", metaKey: true });
     fireEvent.click(await screen.findByRole("option", { name: new RegExp(INVITE) }));

@@ -1,7 +1,10 @@
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { z } from "zod";
 
-import { codeSpelled } from "@/features/auth/sign-in/link-words.ts";
+import { UNKNOWN_PAGE } from "@/app/words.ts";
+import { LINK_WORDS, codeSpelled } from "@/features/auth/sign-in/link-words.ts";
+import { SIGN_IN_WORDS } from "@/features/auth/sign-in/sign-in-words.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 
 import { expect, test as base } from "../browser.ts";
 import {
@@ -51,13 +54,14 @@ const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, w
   await addMember(api, { workspaceId: workspace.workspaceId, userId: editor.id, role: "Editor" });
   const page = await asking.newPage();
   await page.goto("/sign-in");
-  await page.getByLabel("Email Address").fill(email);
+  await page.getByLabel(SIGN_IN_WORDS.emailAddress).fill(email);
   await page.keyboard.press("Enter");
-  await expect(page.getByLabel("Verification Code", { exact: true })).toBeVisible();
+  await expect(page.getByLabel(SIGN_IN_WORDS.codeField, { exact: true })).toBeVisible();
   return { email, asking: page, token: await linkSentTo(api, email) };
 };
 
-const signInButton = (page: Page) => page.getByRole("button", { name: "Sign In", exact: true });
+const signInButton = (page: Page) =>
+  page.getByRole("button", { name: UNKNOWN_PAGE.signIn, exact: true });
 
 test("a sign-in link opened in another tab signs in both", async ({ page, context, request }) => {
   const { asking, token } = await aLinkAskedForIn(context, request, "Follow");
@@ -91,14 +95,14 @@ test("another browser shows the link's code, and c copies it", async ({
   );
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading "Enter This Code to Finish Signing In" [level=1]
+      - heading ${JSON.stringify(LINK_WORDS.elsewhereTitle)} [level=1]
       - status
       - paragraph: ${JSON.stringify(codeSpelled(code))}
       - paragraph: /${untilTime}/
-      - button "Copy Code"
+      - button ${JSON.stringify(LINK_WORDS.copy)}
       - paragraph:
         - strong
-      - button "Keyboard Shortcuts"
+      - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
   `);
   await expect(
     page.getByRole("status").first(),
@@ -107,18 +111,18 @@ test("another browser shows the link's code, and c copies it", async ({
 
   await clockTheNextKey(page, {
     at: "//main[(.//*[@role='status'])[last()][normalize-space(.)]]",
-    reads: "Enter This Code to Finish Signing In",
+    reads: LINK_WORDS.elsewhereTitle,
   });
   await page.keyboard.press("c");
   await actionWithinBudget(page, "copy");
 
   await page.keyboard.press("Tab");
   await expect(
-    page.getByRole("button", { name: "Copy Code" }),
+    page.getByRole("button", { name: LINK_WORDS.copy }),
     "Tab did not reach Copy Code",
   ).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Keyboard Shortcuts" })).toBeFocused();
+  await expect(page.getByRole("button", { name: KEYSTROKE_WORDS.button })).toBeFocused();
   await passesTheAccessibilityGate();
 
   await test.step("the earlier visit does not use up the link, so the first browser signs in", async () => {

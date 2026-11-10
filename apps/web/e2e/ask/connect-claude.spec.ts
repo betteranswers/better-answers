@@ -1,5 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
+import { CONNECT_ASSISTANT, JUMP_TO, UNKNOWN_PAGE } from "@/app/words.ts";
+import { keystrokesOn, KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { ASK, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -29,9 +31,10 @@ const aViewerSignedIn = async (page: Page, api: APIRequestContext) => {
   await signIn(page, api, email);
 };
 
-const unknownPage = (page: Page) => page.getByRole("heading", { level: 1, name: "Page Not Found" });
+const unknownPage = (page: Page) =>
+  page.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading });
 
-const copyAddress = (page: Page) => page.getByRole("button", { name: "Copy Address" });
+const copyAddress = (page: Page) => page.getByRole("button", { name: CONNECT_ASSISTANT.copy });
 
 test("shows only app-wide shortcuts on Connect Claude and unknown pages", async ({
   page,
@@ -45,7 +48,7 @@ test("shows only app-wide shortcuts on Connect Claude and unknown pages", async 
     .getByRole("link", { name: "Connect Claude" })
     .click();
   await expect(page).toHaveURL(new RegExp(`${CONNECT_CLAUDE.path}$`));
-  const appWideShortcuts = ["Show This List", "Jump To"];
+  const appWideShortcuts = [KEYSTROKE_WORDS.showTheList, JUMP_TO.name];
   const extraLineMessage = "Keyboard Shortcuts added a line for a page with no shortcuts";
 
   await test.step("renders Connect Claude within one second", async () => {
@@ -68,9 +71,9 @@ test("shows only app-wide shortcuts on Connect Claude and unknown pages", async 
   await test.step("shows only app-wide shortcuts on Connect Claude", async () => {
     await page
       .getByRole("navigation", { name: "Areas" })
-      .getByRole("button", { name: "Keyboard Shortcuts" })
+      .getByRole("button", { name: KEYSTROKE_WORDS.button })
       .click();
-    const onConnect = page.getByRole("dialog", { name: "Keyboard Shortcuts on Connect Claude" });
+    const onConnect = page.getByRole("dialog", { name: keystrokesOn("Connect Claude") });
     await expect(onConnect.getByRole("paragraph"), extraLineMessage).toHaveCount(2);
     await expect(onConnect.getByRole("definition")).toHaveText(appWideShortcuts);
     await passesTheAccessibilityGate();
@@ -80,7 +83,7 @@ test("shows only app-wide shortcuts on Connect Claude and unknown pages", async 
   await test.step("shows only app-wide shortcuts on an unknown page", async () => {
     await page.goto(HOMES.Admin.path);
     await expect(unknownPage(page)).toBeVisible();
-    const onUnknown = await keystrokesListed(page, "This Page");
+    const onUnknown = await keystrokesListed(page, KEYSTROKE_WORDS.thisPage);
     await expect(onUnknown.getByRole("paragraph"), extraLineMessage).toHaveCount(2);
     await expect(onUnknown.getByRole("definition")).toHaveText(appWideShortcuts);
     await keystrokesDismissed(page, onUnknown);

@@ -1,6 +1,9 @@
 import type { APIRequestContext, Locator, Page, Route } from "@playwright/test";
 import { z } from "zod";
 
+import { FAILED_PAGE, JUMP_TO, SKIP_TO_MAIN, TOGGLE, UNKNOWN_PAGE } from "@/app/words.ts";
+import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
+import { SETUP_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
 import { CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -58,7 +61,7 @@ const NARROW = { width: 320, height: 720 };
 
 const UNKNOWN_PATH = "/nothing-here";
 
-const FAILED_HEADING = "This Page Didn’t Load";
+const FAILED_HEADING = FAILED_PAGE.heading;
 
 const MALFORMED_LIST = { why: "a response the Model Choices card cannot render" };
 
@@ -78,13 +81,13 @@ const headerOf = (page: Page) => page.getByRole("banner");
 
 const logoOf = (page: Page) => headerOf(page).getByRole("link", { name: "better-answers" });
 
-const hideMenuButton = (page: Page) => page.getByRole("button", { name: "Hide Menu" });
+const hideMenuButton = (page: Page) => page.getByRole("button", { name: TOGGLE.hide });
 
 const menuButton = (page: Page) => page.getByRole("button", { name: "Menu", exact: true });
 
 const menuDialog = (page: Page) => page.getByRole("dialog", { name: "Menu", exact: true });
 
-const jumpToOf = (page: Page) => headerOf(page).getByRole("button", { name: "Jump To" });
+const jumpToOf = (page: Page) => headerOf(page).getByRole("button", { name: JUMP_TO.name });
 
 const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Models and Spend" });
 
@@ -94,9 +97,9 @@ const modelChoicesLoaded = (page: Page) =>
   expect(modelChoicesCardOf(page).getByRole("paragraph")).toHaveCount(3);
 
 const notFoundHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "Page Not Found" });
+  page.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading });
 
-const jumpToDialogOf = (page: Page) => page.getByRole("dialog", { name: "Jump To" });
+const jumpToDialogOf = (page: Page) => page.getByRole("dialog", { name: JUMP_TO.name });
 
 const jumpToOptionOf = (page: Page, name: string | RegExp) =>
   jumpToDialogOf(page).getByRole("option", { name });
@@ -220,11 +223,11 @@ test("the shell's header, rail, and menu work by keyboard", async ({
 
     await expect(notFoundHeading(page)).toBeVisible();
     await expect(headerOf(page)).toHaveText("better-answers", { useInnerText: true });
-    await expect(page.getByRole("main").getByRole("link")).toHaveText(["Sign In"]);
+    await expect(page.getByRole("main").getByRole("link")).toHaveText([UNKNOWN_PAGE.signIn]);
     await expect(page).toHaveURL(UNKNOWN_PATH);
     await passesTheAccessibilityGate();
 
-    await page.getByRole("link", { name: "Sign In" }).click();
+    await page.getByRole("link", { name: UNKNOWN_PAGE.signIn }).click();
     await expect(signInHeading(page)).toBeVisible();
   });
 
@@ -256,7 +259,7 @@ test("the shell's header, rail, and menu work by keyboard", async ({
     ).toBe(true);
 
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("link", { name: "Skip to Main Content" })).toBeFocused();
+    await expect(page.getByRole("link", { name: SKIP_TO_MAIN })).toBeFocused();
 
     for (const stop of headerControls) {
       await page.keyboard.press("Tab");
@@ -278,9 +281,9 @@ test("the shell's header, rail, and menu work by keyboard", async ({
 
     const offer = page.getByRole("region", { name: "Passkeys" });
     await page.keyboard.press("Tab");
-    await expect(offer.getByRole("link", { name: "Add a Passkey" })).toBeFocused();
+    await expect(offer.getByRole("link", { name: SETUP_WORDS.addPasskey })).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(offer.getByRole("button", { name: "Dismiss Passkey Offer" })).toBeFocused();
+    await expect(offer.getByRole("button", { name: PASSKEY_WORDS.dismissOffer })).toBeFocused();
 
     await page.keyboard.press("Tab");
     await expect(tabsOf(page).getByRole("tab", { name: "Model Choices" })).toBeFocused();
@@ -348,7 +351,7 @@ test("the shell's header, rail, and menu work by keyboard", async ({
     await page.keyboard.press("Tab");
     await expect(page.getByRole("tabpanel")).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("button", { name: "Try Again" })).toBeFocused();
+    await expect(page.getByRole("button", { name: FAILED_PAGE.retry })).toBeFocused();
 
     await passesTheAccessibilityGate();
   });

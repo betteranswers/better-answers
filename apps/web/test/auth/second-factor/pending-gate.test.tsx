@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
+import { UNKNOWN_PAGE } from "@/app/words.ts";
+import { AUTHENTICATOR_WORDS, PASSKEY_WORDS } from "@/features/auth/account-words.ts";
 import { detourTo } from "@/features/auth/second-factor-steps.ts";
+import { CONFIRM_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { openApp } from "@test/open-app.tsx";
 import {
@@ -82,7 +85,7 @@ describe("a session waiting on its second factor", () => {
     const { router } = await openAsAda("/people/members");
 
     expect(router.state.location.href).toBe("/confirm?redirect=%2Fpeople%2Fmembers");
-    expect(heading()).toBe("Confirm It’s You");
+    expect(heading()).toBe(CONFIRM_WORDS.heading);
   });
 
   it("sends a person with no second factor to setup", async () => {
@@ -143,7 +146,7 @@ describe("the api asking for confirmation mid-session", () => {
     const { router } = await openAsAda("/people/groups");
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Confirm It’s You" }),
+      await screen.findByRole("heading", { level: 1, name: CONFIRM_WORDS.heading }),
     ).toBeDefined();
     expect(router.state.location.href).toBe("/confirm?redirect=%2Fpeople%2Fgroups");
   });
@@ -164,8 +167,8 @@ describe("the api asking for confirmation mid-session", () => {
     vi.stubGlobal("fetch", ada.fetch);
     const router = await openInTheBrowser("/people/groups");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Dismiss Passkey Offer" }));
-    const field = await screen.findByRole("textbox", { name: "Authenticator Code" });
+    fireEvent.click(await screen.findByRole("button", { name: PASSKEY_WORDS.dismissOffer }));
+    const field = await screen.findByRole("textbox", { name: AUTHENTICATOR_WORDS.codeField });
     expect(router.state.location.href).toBe("/confirm?redirect=%2Fpeople%2Fgroups");
     fireEvent.change(field, { target: { value: "123456" } });
 
@@ -270,7 +273,7 @@ describe("the steps after a sign-in", () => {
     signedInByLink(held);
     const { router } = await openAsAda("/sign-in/link#abc123");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Sign In" }));
+    fireEvent.click(await screen.findByRole("button", { name: UNKNOWN_PAGE.signIn }));
 
     await waitFor(() => {
       expect(router.state.location.href).toBe(step);
@@ -283,7 +286,7 @@ describe("the steps after a sign-in", () => {
     signedInByLink(NOTHING_HELD);
     await openAsAda("/sign-in/link#abc123");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Sign In" }));
+    fireEvent.click(await screen.findByRole("button", { name: UNKNOWN_PAGE.signIn }));
 
     await waitFor(() => {
       expect(globalThis.localStorage.getItem(shownUnder)).toBeNull();
@@ -318,7 +321,7 @@ describe("the confirm page for a person just promoted", () => {
     expect(passkey).toMatch(/MacBook.*3 March 2026/v);
     expect(others).toEqual(["Authenticator"]);
     expect(list.nextElementSibling?.textContent, "no advice follows the list").toMatch(/\S/u);
-    const code = screen.getByRole("textbox", { name: "Authenticator Code" });
+    const code = screen.getByRole("textbox", { name: AUTHENTICATOR_WORDS.codeField });
     expect(list.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -327,7 +330,7 @@ describe("the confirm page for a person just promoted", () => {
 
     await openAsAda("/confirm");
 
-    await screen.findByRole("textbox", { name: "Authenticator Code" });
+    await screen.findByRole("textbox", { name: AUTHENTICATOR_WORDS.codeField });
     expect(screen.queryByRole("list", { name: /\S/u })).toBeNull();
   });
 
@@ -336,7 +339,7 @@ describe("the confirm page for a person just promoted", () => {
 
     await openAsAda("/confirm");
 
-    await screen.findByRole("textbox", { name: "Authenticator Code" });
+    await screen.findByRole("textbox", { name: AUTHENTICATOR_WORDS.codeField });
     expect(screen.getByRole("main").textContent).toContain("better-answers support");
   });
 
@@ -360,7 +363,7 @@ describe("a sign-in that expired before its second factor", () => {
     adasApi(() => WAITING_TO_CONFIRM);
 
     await openAsAda("/confirm");
-    await screen.findByRole("textbox", { name: "Authenticator Code" });
+    await screen.findByRole("textbox", { name: AUTHENTICATOR_WORDS.codeField });
 
     expect(globalThis.localStorage.getItem("better-answers.session")).toBe("pending");
   });

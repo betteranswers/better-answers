@@ -1,6 +1,11 @@
 import type { Page } from "@playwright/test";
 
-import { REASON_MAX_CHARACTERS } from "@/features/auth/workspace/ask-to-join-words.ts";
+import {
+  ASK_TO_JOIN_WORDS,
+  REASON_MAX_CHARACTERS,
+} from "@/features/auth/workspace/ask-to-join-words.ts";
+import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace/workspace-words.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -12,11 +17,11 @@ import {
 
 const REASON = "I run the estimating desk and need the tender library.";
 
-const shortNameField = (page: Page) => page.getByLabel("Workspace Short Name");
+const shortNameField = (page: Page) => page.getByLabel(ASK_TO_JOIN_WORDS.shortName);
 
 const reasonField = (page: Page) => page.getByLabel("Reason");
 
-const requestSent = (page: Page) => page.getByRole("alert", { name: "Request Sent" });
+const requestSent = (page: Page) => page.getByRole("alert", { name: ASK_TO_JOIN_WORDS.sent });
 
 test("a person with no workspace asks to join by keyboard", async ({
   page,
@@ -28,16 +33,16 @@ test("a person with no workspace asks to join by keyboard", async ({
 
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading "No Workspace Yet" [level=1]
-      - region "Ask to Join a Workspace":
-        - heading "Ask to Join a Workspace" [level=2]
+      - heading ${JSON.stringify(NO_WORKSPACE_HEADING)} [level=1]
+      - region ${JSON.stringify(ASK_TO_JOIN_WORDS.heading)}:
+        - heading ${JSON.stringify(ASK_TO_JOIN_WORDS.heading)} [level=2]
         - paragraph
-        - textbox "Workspace Short Name"
+        - textbox ${JSON.stringify(ASK_TO_JOIN_WORDS.shortName)}
         - paragraph
         - textbox "Reason"
-        - button "Ask to Join"
+        - button ${JSON.stringify(ASK_TO_JOIN_WORDS.ask)}
       - button "Sign Out"
-      - button "Keyboard Shortcuts"
+      - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
   `);
   await expect(
     shortNameField(page),
@@ -61,7 +66,7 @@ test("a person with no workspace asks to join by keyboard", async ({
 
   await expect(requestSent(page)).toBeFocused();
   await expect(requestSent(page)).toMatchAriaSnapshot(`
-    - alert "Request Sent":
+    - alert ${JSON.stringify(ASK_TO_JOIN_WORDS.sent)}:
       - paragraph
       - paragraph
   `);

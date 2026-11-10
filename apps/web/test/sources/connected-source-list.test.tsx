@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { UNKNOWN_PAGE } from "@/app/words.ts";
 import { CONNECT_WORDS, LIST_WORDS, NEEDS_OCR, ROW_ACTIONS } from "@/features/sources/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
@@ -149,7 +150,9 @@ describe("the Sources page's list of connected sources", () => {
 
     await openSources(api);
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Page Not Found" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading }),
+    ).toBeDefined();
     expect(screen.getByRole("link", { name: "Go to New Question" })).toBeDefined();
     expect(screen.queryByRole("region", { name: "Connected Sources" })).toBeNull();
     expect(document.body.textContent).not.toContain("Staff handbook");

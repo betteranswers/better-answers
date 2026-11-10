@@ -3,6 +3,7 @@ import { expect } from "vitest";
 import { z } from "zod";
 
 import { createAppClients } from "@/app/providers.tsx";
+import { FAILED_PAGE } from "@/app/words.ts";
 import { BULK_WORDS, MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import type { Role } from "@/shared/navigation.ts";
 
@@ -153,9 +154,7 @@ export const adminsAreaOffered = () =>
 
 export const drawnWithNoWorkspace = async () => {
   await waitFor(() => expect(screen.queryByText(NORTHERN.name, { exact: false })).toBeNull());
-  expect(
-    await screen.findByRole("heading", { level: 1, name: "This Page Didn’t Load" }),
-  ).toBeDefined();
+  expect(await screen.findByRole("heading", { level: 1, name: FAILED_PAGE.heading })).toBeDefined();
 };
 
 export const openAt = async (path: string, api: Api) => {

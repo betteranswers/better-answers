@@ -31,7 +31,7 @@ export const flaggedWords = (reason: FlagReason | null): string =>
 export const RECORD_WORDS = {
   questionGone: "Question no longer available",
   markedHelpful: "Marked helpful",
-  terms: { given: "Given", note: "Note", disputed: "Disputed Sentence" },
+  terms: { given: "Given", note: "Note", disputed: "Disputed sentence" },
 } as const;
 
 export const questionWords = (record: { readonly question: string | null }): string =>

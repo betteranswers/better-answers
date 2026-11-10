@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { TOGGLE } from "@/app/words.ts";
 import { openApp } from "@test/open-app.tsx";
 import { answeringAs } from "@test/stubbed-api.ts";
 
@@ -15,9 +16,9 @@ const openAt = async (path: string) => {
   return (await openApp(path)).rendered;
 };
 
-const hideButton = () => screen.getByRole("button", { name: "Hide Menu" });
+const hideButton = () => screen.getByRole("button", { name: TOGGLE.hide });
 
-const showButton = () => screen.getByRole("button", { name: "Show Menu" });
+const showButton = () => screen.getByRole("button", { name: TOGGLE.show });
 
 const menu = () => screen.queryByRole("navigation", { name: "Control Centre" });
 

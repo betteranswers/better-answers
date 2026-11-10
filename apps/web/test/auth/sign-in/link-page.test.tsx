@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { UNKNOWN_PAGE } from "@/app/words.ts";
+import { LINK_WORDS } from "@/features/auth/sign-in/link-words.ts";
 import { clipboardAnswering } from "@test/clipboard-stand-in.ts";
 import { openApp } from "@test/open-app.tsx";
 import { addressOf, answered } from "@test/stubbed-api.ts";
@@ -22,7 +24,7 @@ const aLinkWhoseSignIn =
 
 const ELSEWHERE = { state: "elsewhere", code: "482916", until: "2026-10-29T10:05:00.000Z" };
 
-const signInButton = () => screen.getByRole("button", { name: "Sign In" });
+const signInButton = () => screen.getByRole("button", { name: UNKNOWN_PAGE.signIn });
 
 describe("signing in from a link with no response", () => {
   it("shows an alert and keeps Sign In available", async () => {
@@ -32,7 +34,7 @@ describe("signing in from a link with no response", () => {
     vi.stubGlobal("fetch", aLinkWhoseSignIn(signIn));
     globalThis.history.replaceState(null, "", `/sign-in/link#${TOKEN}`);
     await openApp("/sign-in/link");
-    fireEvent.click(await screen.findByRole("button", { name: "Sign In" }));
+    fireEvent.click(await screen.findByRole("button", { name: UNKNOWN_PAGE.signIn }));
 
     await waitFor(() => {
       expect(screen.getByRole("alert").textContent).toMatch(/\S/u);
@@ -60,15 +62,15 @@ describe("a link opened in another browser", () => {
     expect(
       await screen.findByRole("heading", {
         level: 1,
-        name: "Enter This Code to Finish Signing In",
+        name: LINK_WORDS.elsewhereTitle,
       }),
     ).toBeDefined();
     expect(screen.getByText("482 916")).toBeDefined();
-    expect(screen.queryByRole("button", { name: "Sign In" })).toBeNull();
+    expect(screen.queryByRole("button", { name: UNKNOWN_PAGE.signIn })).toBeNull();
     const saidOfTheCopy = screen.getAllByRole("status").at(-1);
     expect(saidOfTheCopy?.textContent).toBe("");
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy Code" }));
+    fireEvent.click(screen.getByRole("button", { name: LINK_WORDS.copy }));
 
     await waitFor(() => {
       expect(saidOfTheCopy?.textContent).toMatch(/\S/u);

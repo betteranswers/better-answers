@@ -5,6 +5,7 @@ import type { Page } from "@playwright/test";
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
+import { AUTHENTICATOR_WORDS, RECOVERY_CODE_WORDS } from "@/features/auth/account-words.ts";
 import { THEME_KEPT_UNDER } from "@/shared/theme/theme-switch.ts";
 
 import { expect, test } from "../browser.ts";
@@ -27,12 +28,12 @@ import { openAccountFromPersonMenu, codesListed, regionOf } from "../second-fact
 
 const authenticatorPart = (page: Page) => regionOf(page, "Authenticator");
 
-const codesBlock = (page: Page) => regionOf(page, "Save Your Recovery Codes");
+const codesBlock = (page: Page) => regionOf(page, RECOVERY_CODE_WORDS.saveHeading);
 
-const codeField = (page: Page) => page.getByLabel("Authenticator Code");
+const codeField = (page: Page) => page.getByLabel(AUTHENTICATOR_WORDS.codeField);
 
 const setUpButton = (page: Page) =>
-  page.getByRole("button", { name: "Set Up an Authenticator", exact: true });
+  page.getByRole("button", { name: AUTHENTICATOR_WORDS.setUp, exact: true });
 
 const doneButton = (page: Page) => page.getByRole("button", { name: "Done" });
 
@@ -58,7 +59,7 @@ const doneClosesTheCodes = async (page: Page): Promise<void> => {
   await doneButton(page).click();
   await expect(codesBlock(page)).toHaveCount(0);
   await expect(
-    page.getByRole("heading", { level: 3, name: "Recovery Codes", exact: true }),
+    page.getByRole("heading", { level: 3, name: RECOVERY_CODE_WORDS.heading, exact: true }),
   ).toBeFocused();
 };
 
@@ -82,8 +83,8 @@ test("Done needs the checkbox ticked and reload hides the codes", async ({
 
   await tabUntilFocused(page, doneButton(page));
   await clockTheNextKey(page, {
-    at: `//section[h3[normalize-space(.)="Save Your Recovery Codes"]][.//*[@role='alert'][normalize-space(.)]]`,
-    reads: "Save Your Recovery Codes",
+    at: `//section[h3[normalize-space(.)="${RECOVERY_CODE_WORDS.saveHeading}"]][.//*[@role='alert'][normalize-space(.)]]`,
+    reads: RECOVERY_CODE_WORDS.saveHeading,
   });
   await page.keyboard.press("Enter");
   await actionWithinBudget(page, "unticked done");
@@ -99,7 +100,7 @@ test("Done needs the checkbox ticked and reload hides the codes", async ({
   const everyCodeLeft = new RegExp(
     String.raw`^\D*${String(RECOVERY_CODES_IN_A_SET)}\D+${String(RECOVERY_CODES_IN_A_SET)}\b`,
   );
-  const codesLeft = regionOf(page, "Recovery Codes").getByRole("paragraph");
+  const codesLeft = regionOf(page, RECOVERY_CODE_WORDS.heading).getByRole("paragraph");
   await expect(codesLeft).toHaveText(everyCodeLeft);
 
   await page.reload();
@@ -123,7 +124,7 @@ test("draws the QR code dark on light in dark mode", async ({ page, request }) =
   await keptOnThisBrowser(page, "dark");
   await signedInWithNoWorkspace(page, request, "theme-code");
   await page.goto("/account");
-  await page.getByRole("button", { name: "Set Up an Authenticator" }).click();
+  await page.getByRole("button", { name: AUTHENTICATOR_WORDS.setUp }).click();
   const code = page.getByRole("img", { name: "QR code for your authenticator app" });
   await expect(code).toBeVisible();
 

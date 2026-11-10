@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, assert, describe, expect, it } from "vitest";
 
+import { RECOVERY_CODE_WORDS } from "@/features/auth/account-words.ts";
 import { RecoveryCodes } from "@/features/auth/second-factor/recovery-codes.tsx";
 import { clipboardAnswering } from "@test/clipboard-stand-in.ts";
 
@@ -42,7 +43,7 @@ describe("the recovery codes section", () => {
   it("lists the ten codes", () => {
     drawn();
 
-    const list = screen.getByRole("list", { name: "Recovery Codes" });
+    const list = screen.getByRole("list", { name: RECOVERY_CODE_WORDS.heading });
     expect(
       within(list)
         .getAllByRole("listitem")
@@ -82,7 +83,7 @@ describe("the recovery codes section", () => {
     const written = clipboardAnswering(() => Promise.resolve());
     drawn();
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy Codes" }));
+    fireEvent.click(screen.getByRole("button", { name: RECOVERY_CODE_WORDS.copy }));
 
     await waitFor(() => {
       expect(screen.getByRole("status").textContent).toMatch(/\S/u);

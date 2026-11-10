@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
 import {
   BULK_WORDS,
   MEMBER_PAGE_WORDS,
@@ -157,7 +158,9 @@ describe("bulk actions that include you", () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/choose-workspace");
     });
-    expect(await screen.findByRole("heading", { level: 1, name: "Your Workspaces" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: PICKER_WORDS.heading }),
+    ).toBeDefined();
     expect(
       screen.queryByRole("button", { name: NORTHERN.name }),
       "the chooser lists the workspace that was left",
@@ -195,7 +198,7 @@ describe("bulk actions that include you", () => {
     await removedThroughTheBar(BULK_WORDS.remove.title(1));
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "No Workspace Yet" }),
+      await screen.findByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING }),
     ).toBeDefined();
   });
 });

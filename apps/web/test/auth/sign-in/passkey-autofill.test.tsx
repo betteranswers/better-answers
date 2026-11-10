@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { CodeRefused } from "@/features/auth/auth-hooks.ts";
 import { usePasskeySignIn } from "@/features/auth/passkey-hooks.ts";
+import { SIGN_IN_WORDS } from "@/features/auth/sign-in/sign-in-words.ts";
 import { openApp } from "@test/open-app.tsx";
 import { A_CHALLENGE, A_CREDENTIAL } from "@test/second-factor-api.ts";
 import { server, type Asked } from "@test/stub-server.ts";
@@ -109,9 +110,9 @@ describe("signing in with a passkey from the email step", () => {
     withAConditionalDevice(device);
     const user = userEvent.setup();
     await openApp("/sign-in");
-    const field = await screen.findByLabelText("Email Address");
+    const field = await screen.findByLabelText(SIGN_IN_WORDS.emailAddress);
     await user.type(field, ADDRESS);
-    const press = screen.getByRole("button", { name: "Sign In with a Passkey" });
+    const press = screen.getByRole("button", { name: SIGN_IN_WORDS.passkey });
     const alert = () => screen.getByRole("alert", { hidden: true });
 
     await user.click(press);

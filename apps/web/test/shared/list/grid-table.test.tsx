@@ -6,6 +6,7 @@ import { FilterRow } from "@/shared/list/filter-row.tsx";
 import { GridTable, RowLink } from "@/shared/list/grid-table.tsx";
 import { ListPages } from "@/shared/list/list-pages.tsx";
 import { rowInFocus } from "@/shared/list/row-focus.ts";
+import { CLEAR_WORDS, LIST_WORDS, filterBy } from "@/shared/words.ts";
 import { choosing, placedWithoutMeasuring } from "@test/measuring.ts";
 import { BareList, LIST_SAYS, MEMBERS, MembersList } from "@test/members-list.tsx";
 
@@ -43,7 +44,7 @@ const chooseFilter = (filter: string, choice: string) => {
 };
 
 const pickRole = (role: string) => {
-  chooseFilter("Filter by Role", role);
+  chooseFilter(filterBy("Role"), role);
 };
 
 const searchBox = () => screen.getByRole("searchbox", { name: "Search by name or address" });
@@ -86,7 +87,7 @@ describe("the shared table", () => {
     expect(rowCheckbox("Cy Twombly").getAttribute("aria-checked")).toBe("true");
     expect(rowCheckbox("Ada Lovelace").getAttribute("aria-checked")).toBe("true");
 
-    fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
+    fireEvent.click(screen.getByRole("button", { name: LIST_WORDS.nextPage }));
     expect(rowCheckbox("Ed Ruscha").getAttribute("aria-checked")).toBe("false");
     expect(rowCheckbox("Bo Diddley").getAttribute("aria-checked")).toBe("false");
     expect(pageCheckbox().getAttribute("aria-checked")).toBe("false");
@@ -227,7 +228,7 @@ describe("the list's empty, loading and failed states", () => {
     fireEvent.change(search, { target: { value: "Zed" } });
     expect(screen.getByText(LIST_SAYS.noneMatching("Zed"))).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: CLEAR_WORDS.filters }));
     expect(people()).toHaveLength(MEMBERS.length);
   });
 
@@ -254,18 +255,18 @@ describe("the list's empty, loading and failed states", () => {
     pickRole("Admin");
     expect(screen.getByText(LIST_SAYS.noneFiltered)).toBeTruthy();
 
-    clickWithFocus(screen.getByRole("button", { name: "Clear Filters" }));
+    clickWithFocus(screen.getByRole("button", { name: CLEAR_WORDS.filters }));
     expect(people()).toHaveLength(MEMBERS.length - 1);
     expect(document.activeElement).toBe(searchBox());
   });
 
   it("keeps focus in place when Clear Filters was not focused", () => {
     render(<MembersList />);
-    const role = screen.getByRole("combobox", { name: "Filter by Role" });
+    const role = screen.getByRole("combobox", { name: filterBy("Role") });
     fireEvent.change(searchBox(), { target: { value: "Zed" } });
     role.focus();
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: CLEAR_WORDS.filters }));
     expect(people()).toHaveLength(MEMBERS.length);
     expect(document.activeElement).toBe(role);
   });
@@ -278,14 +279,14 @@ describe("list pagination", () => {
 
     expect(numbersIn(within(pages).getByRole("status"))).toEqual(["1", "2", "5"]);
     expect(numbersIn(pages)).toEqual(["1", "2", "5", "1", "3"]);
-    const previous = within(pages).getByRole("button", { name: "Previous Page" });
+    const previous = within(pages).getByRole("button", { name: LIST_WORDS.previousPage });
     expect(previous.getAttribute("aria-disabled")).toBe("true");
 
-    fireEvent.click(within(pages).getByRole("button", { name: "Next Page" }));
-    fireEvent.click(within(pages).getByRole("button", { name: "Next Page" }));
+    fireEvent.click(within(pages).getByRole("button", { name: LIST_WORDS.nextPage }));
+    fireEvent.click(within(pages).getByRole("button", { name: LIST_WORDS.nextPage }));
     expect(numbersIn(within(pages).getByRole("status"))).toEqual(["5", "5", "5"]);
     expect(people()).toEqual(["Diana Featherstonehaugh-Whittingham"]);
-    const next = within(pages).getByRole("button", { name: "Next Page" });
+    const next = within(pages).getByRole("button", { name: LIST_WORDS.nextPage });
     expect(next.getAttribute("aria-disabled")).toBe("true");
   });
 
@@ -293,7 +294,7 @@ describe("list pagination", () => {
     render(<MembersList pageSize={2} />);
     const pages = screen.getByRole("navigation", { name: "Pages of Members" });
 
-    fireEvent.click(within(pages).getByRole("button", { name: "Next Page" }));
+    fireEvent.click(within(pages).getByRole("button", { name: LIST_WORDS.nextPage }));
     expect(
       within(pages)
         .getAllByRole("status")
@@ -309,7 +310,7 @@ describe("list pagination", () => {
 
   it("moves to the last page when later rows are removed", () => {
     const { rerender } = render(<MembersList pageSize={2} />);
-    fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
+    fireEvent.click(screen.getByRole("button", { name: LIST_WORDS.nextPage }));
     expect(people()).toEqual(["Ed Ruscha", "Bo Diddley"]);
 
     rerender(<MembersList pageSize={2} members={MEMBERS.slice(0, 2)} />);
@@ -319,7 +320,7 @@ describe("list pagination", () => {
 
   it("returns to the first page when a filter narrows", () => {
     render(<MembersList pageSize={1} />);
-    fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
+    fireEvent.click(screen.getByRole("button", { name: LIST_WORDS.nextPage }));
     expect(people()).toEqual(["Ada Lovelace"]);
 
     pickRole("Editor");
@@ -349,7 +350,7 @@ describe("list pagination", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: "Load More" }).getAttribute("aria-keyshortcuts"),
+      screen.getByRole("button", { name: LIST_WORDS.loadMore }).getAttribute("aria-keyshortcuts"),
     ).toBe("m");
 
     fireEvent.keyDown(document.body, { key: "m" });
@@ -379,7 +380,7 @@ describe("list pagination", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: "Next Page" }).getAttribute("aria-keyshortcuts"),
+      screen.getByRole("button", { name: LIST_WORDS.nextPage }).getAttribute("aria-keyshortcuts"),
     ).toBe("]");
 
     fireEvent.keyDown(document.body, { key: "]" });
@@ -413,7 +414,7 @@ describe("list pagination", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Load More" }));
+    fireEvent.click(screen.getByRole("button", { name: LIST_WORDS.loadMore }));
     expect(more).toHaveBeenCalledTimes(1);
 
     rerender(
@@ -421,7 +422,7 @@ describe("list pagination", () => {
         pages={{ kind: "more", label: "Older Events", more: false, loading: false, onMore: more }}
       />,
     );
-    expect(screen.queryByRole("button", { name: "Load More" })).toBeNull();
+    expect(screen.queryByRole("button", { name: LIST_WORDS.loadMore })).toBeNull();
   });
 });
 
@@ -460,7 +461,7 @@ describe("the filter row", () => {
       />,
     );
 
-    expect(screen.getByRole("combobox", { name: "Filter by Role" }).textContent).toBe("Any Role");
+    expect(screen.getByRole("combobox", { name: filterBy("Role") }).textContent).toBe("Any Role");
   });
 
   it("distinguishes a choice valued “any” from no filter", () => {
@@ -483,15 +484,15 @@ describe("the filter row", () => {
       />
     );
     const { rerender } = render(colourOf("any"));
-    const trigger = () => screen.getByRole("combobox", { name: "Filter by Colour" });
+    const trigger = () => screen.getByRole("combobox", { name: filterBy("Colour") });
     expect(trigger().textContent).toBe("Any colour at all");
 
     rerender(colourOf(undefined));
     expect(trigger().textContent).toBe("Every colour");
 
-    chooseFilter("Filter by Colour", "Any colour at all");
+    chooseFilter(filterBy("Colour"), "Any colour at all");
     rerender(colourOf("any"));
-    chooseFilter("Filter by Colour", "Every colour");
+    chooseFilter(filterBy("Colour"), "Every colour");
     expect(chose).toEqual(["any", undefined]);
   });
 

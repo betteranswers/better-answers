@@ -3,6 +3,8 @@ import type { APIRequestContext, Page } from "@playwright/test";
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
+import { AUTHENTICATOR_WORDS, RECOVERY_CODE_WORDS } from "@/features/auth/account-words.ts";
+import { CONFIRM_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -24,16 +26,17 @@ const MEMBERS = HOMES.Admin.path;
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
 
 const confirmHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "Confirm It’s You" });
+  page.getByRole("heading", { level: 1, name: CONFIRM_WORDS.heading });
 
-const codeField = (page: Page) => page.getByRole("textbox", { name: "Authenticator Code" });
+const codeField = (page: Page) =>
+  page.getByRole("textbox", { name: AUTHENTICATOR_WORDS.codeField });
 
 const currentUrl = (page: Page): URL => new URL(page.url());
 
-const recoveryCodesRegion = (page: Page) => regionOf(page, "Save Your Recovery Codes");
+const recoveryCodesRegion = (page: Page) => regionOf(page, RECOVERY_CODE_WORDS.saveHeading);
 
 const setUpButton = (page: Page) =>
-  page.getByRole("button", { name: "Set Up an Authenticator", exact: true });
+  page.getByRole("button", { name: AUTHENTICATOR_WORDS.setUp, exact: true });
 
 const removeButton = (page: Page) =>
   regionOf(page, "Authenticator").getByRole("button", { name: "Remove", exact: true });
@@ -93,7 +96,7 @@ test("Admins confirm before Members opens, and Editors add an authenticator", as
       page.getByRole("img", { name: "QR code for your authenticator app" }),
     ).toBeVisible();
     const key = await keyShown(page);
-    await page.getByLabel("Authenticator Code").fill(authenticatorCodeAt(key, new Date()));
+    await page.getByLabel(AUTHENTICATOR_WORDS.codeField).fill(authenticatorCodeAt(key, new Date()));
     await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
     const codes = await codesListed(page).allInnerTexts();
 
@@ -107,15 +110,15 @@ test("Admins confirm before Members opens, and Editors add an authenticator", as
     ).toBeVisible();
     await expect(removeButton(page), "the Authenticator region has no Remove button").toBeVisible();
     await expect(
-      recoveryCodesRegion(page).getByRole("heading", { name: "Save Your Recovery Codes" }),
+      recoveryCodesRegion(page).getByRole("heading", { name: RECOVERY_CODE_WORDS.saveHeading }),
     ).toBeFocused();
     await expect(recoveryCodesRegion(page)).toMatchAriaSnapshot(`
-      - region "Save Your Recovery Codes":
-        - heading "Save Your Recovery Codes" [level=3]
+      - region ${JSON.stringify(RECOVERY_CODE_WORDS.saveHeading)}:
+        - heading ${JSON.stringify(RECOVERY_CODE_WORDS.saveHeading)} [level=3]
         - paragraph
-        - list "Recovery Codes":
+        - list ${JSON.stringify(RECOVERY_CODE_WORDS.list)}:
 ${recoveryCodeItems}
-        - button "Copy Codes"
+        - button ${JSON.stringify(RECOVERY_CODE_WORDS.copy)}
         - link "Download"
         - button "Print"
         - checkbox "I have saved these codes"

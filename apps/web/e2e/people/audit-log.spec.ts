@@ -3,6 +3,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { AUDIT_LOG_KEYSTROKES as KEY } from "@/features/people/audit-log/audit-log-state.ts";
 import { AUDIT_LOG_WORDS } from "@/features/people/audit-log/audit-log-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { filterBy } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -31,7 +32,7 @@ const searchBox = (page: Page) =>
   auditLog(page).getByRole("searchbox", { name: "Search by person, group or action" });
 
 const familyFilter = (page: Page) =>
-  auditLog(page).getByRole("combobox", { name: "Filter by Family" });
+  auditLog(page).getByRole("combobox", { name: filterBy("Family") });
 
 const pickFamily = async (page: Page, family: string): Promise<void> => {
   await familyFilter(page).click();

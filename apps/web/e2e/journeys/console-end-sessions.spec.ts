@@ -1,5 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { PERSON_WORDS } from "@/features/console/words.ts";
 import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -25,7 +26,7 @@ const EVERYONE_PAGE = pageNamed(menuGroupIn(CONSOLE, "people"), "Everyone").path
 
 const INSTANT = /^\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}$/;
 
-const SIGN_OUT = "Sign Out Everywhere";
+const SIGN_OUT = PERSON_WORDS.signOutEverywhere;
 
 const ENDED_AT = /\d{2}:\d{2}/;
 
@@ -37,7 +38,7 @@ const regionOf = (sheet: Locator, name: string): Locator =>
 const sessionsOf = (sheet: Locator): Locator => regionOf(sheet, "Sessions").getByRole("listitem");
 
 const confirmationOf = (page: Page): Locator =>
-  page.getByRole("dialog", { name: "Sign Out Priya Shah Everywhere" });
+  page.getByRole("dialog", { name: PERSON_WORDS.signOutTitle("Priya Shah") });
 
 const theOperatorsWorkspace = async (api: APIRequestContext, tag: string) => {
   const email = anAddress(`${tag}-operator`);
@@ -104,7 +105,9 @@ test.describe("a person's sheet, opened from the Everyone page", () => {
     const { operators } = await priyaConnected(page, request, baseURL, tag);
     const sheet = await openPriya(page, tag);
     const signOut = sheet.getByRole("button", { name: SIGN_OUT });
-    const grant = regionOf(sheet, "Assistant Access").getByRole("listitem", { name: "Claude" });
+    const grant = regionOf(sheet, PERSON_WORDS.assistantAccess).getByRole("listitem", {
+      name: "Claude",
+    });
     await expect(grant).toBeVisible();
 
     await signOut.click();
@@ -137,14 +140,16 @@ test.describe("a person's sheet, opened from the Everyone page", () => {
         - definition: /\\d{4}/
         - term: Ended
         - definition: /\\d{4}/
-        - term: Ended By
+        - term: ${PERSON_WORDS.endedBy}
         - definition: ${operators.admin.name}
-        - term: Ended In
+        - term: ${PERSON_WORDS.endedIn}
         - definition: /^(?!${operators.name}$).+/
-        - button "More About Claude’s Access"
+        - button ${JSON.stringify(PERSON_WORDS.moreAbout("Claude"))}
     `;
     await expect(grant).toMatchAriaSnapshot(endedEverywhere);
-    await expect(regionOf(sheet, "Sign-In").getByRole("definition").nth(1)).toHaveText(INSTANT);
+    await expect(regionOf(sheet, PERSON_WORDS.signIn).getByRole("definition").nth(1)).toHaveText(
+      INSTANT,
+    );
 
     await page.reload();
     await personButton(page, "Priya Shah").click();

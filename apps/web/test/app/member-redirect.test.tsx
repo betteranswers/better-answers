@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppClients } from "@/app/providers.tsx";
+import { FAILED_PAGE, goHome, UNKNOWN_PAGE } from "@/app/words.ts";
 import { nextAfterSignIn } from "@/features/auth/carried-flow.ts";
 import { stepAfterTheCodes } from "@/features/auth/second-factor-steps.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
@@ -122,7 +123,7 @@ describe("a person whose member read fails", () => {
 
     const router = await openAt("/people/groups");
 
-    expect(heading()).toBe("Sign In");
+    expect(heading()).toBe(UNKNOWN_PAGE.signIn);
     expect(router.state.location.href).toBe("/sign-in?redirect=%2Fpeople%2Fgroups");
   });
 
@@ -152,7 +153,7 @@ describe("a person whose member read fails", () => {
 
     const router = await openAt("/sign-in");
 
-    expect(heading()).toBe("Sign In");
+    expect(heading()).toBe(UNKNOWN_PAGE.signIn);
     expect(router.state.location.href).toBe("/sign-in");
   });
 
@@ -163,7 +164,7 @@ describe("a person whose member read fails", () => {
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
     expect(heading()).toBe("Members");
-    expect(heading()).not.toBe("Page Not Found");
+    expect(heading()).not.toBe(UNKNOWN_PAGE.heading);
     expect(screen.getByRole("navigation", { name: "Areas" })).toBeDefined();
     expect(router.state.location.pathname).toBe("/people/members");
   });
@@ -176,7 +177,7 @@ describe("a person whose member read fails", () => {
       name: "Ask",
     });
 
-    expect(heading()).toBe("Page Not Found");
+    expect(heading()).toBe(UNKNOWN_PAGE.heading);
     expect(screen.getByRole("link", { name: "Go to New Question" })).toBeDefined();
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("button", { name: INVITE })).toBeNull();
@@ -234,7 +235,7 @@ describe("the index route", () => {
     const router = await openAt("/", clients);
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
-    expect(heading()).toBe("This Page Didn’t Load");
+    expect(heading()).toBe(FAILED_PAGE.heading);
     expect(router.state.location.pathname).toBe("/");
   });
 
@@ -244,7 +245,7 @@ describe("the index route", () => {
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
     vi.stubGlobal("fetch", answering(undefined, "Viewer"));
-    fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
+    fireEvent.click(screen.getByRole("button", { name: PICKER_WORDS.tryAgain }));
 
     await vi.waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Viewer.path));
   });
@@ -299,7 +300,9 @@ describe("a person in no workspace", () => {
 
     await openApp("/nothing-here");
 
-    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe("Page Not Found");
+    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe(
+      UNKNOWN_PAGE.heading,
+    );
     const banner = within(screen.getByRole("banner"));
     expect(banner.getAllByText("better-answers").length).toBeGreaterThan(0);
     expect(banner.queryAllByRole("link")).toEqual([]);
@@ -309,6 +312,6 @@ describe("a person in no workspace", () => {
       within(screen.getByRole("main"))
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Go to Your Home Page"]);
+    ).toEqual([goHome(undefined)]);
   });
 });

@@ -37,6 +37,7 @@ import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { useTRPC } from "@/shared/api/trpc.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
+import { SIGN_OUT } from "@/shared/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { server, type Asked } from "@test/stub-server.ts";
 import {
@@ -196,7 +197,7 @@ describe("the workspace switcher's list", () => {
 });
 
 describe("the workspace switcher's navigation items", () => {
-  it.each(["All Workspaces", "Console"])("disables %s while a switch is pending", async (name) => {
+  it.each([ALL_WORKSPACES, "Console"])("disables %s while a switch is pending", async (name) => {
     const router = await renderSwitcherMenu(true);
     const navigate = vi.spyOn(router, "navigate");
 
@@ -211,7 +212,7 @@ describe("the workspace switcher's navigation items", () => {
   it("opens All Workspaces when no switch is pending", async () => {
     const router = await renderSwitcherMenu(false);
 
-    const item = screen.getByRole("menuitem", { name: "All Workspaces" });
+    const item = screen.getByRole("menuitem", { name: ALL_WORKSPACES });
     fireEvent.click(item);
 
     expect(item.getAttribute("aria-disabled")).toBeNull();
@@ -382,7 +383,7 @@ describe("the workspace switcher in the app", () => {
     });
     const person = await screen.findByRole("menu", { name: ADA.displayName });
     expect(within(person).getByText(ADA.displayName)).toBeDefined();
-    expect(textOf(within(person).getAllByRole("menuitem"))).toEqual(["Account", "Sign Out"]);
+    expect(textOf(within(person).getAllByRole("menuitem"))).toEqual(["Account", SIGN_OUT]);
 
     cleanup();
     await openAt(MEMBERS, adaAnAdmin());

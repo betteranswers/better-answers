@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { FAILED_PAGE } from "@/app/words.ts";
+import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
+import { SIGN_OUT } from "@/shared/words.ts";
 import { server, type Asked } from "@test/stub-server.ts";
 import { addressOf, type Api, holdProcedure, settlingAfter } from "@test/stubbed-api.ts";
 import {
@@ -99,7 +102,7 @@ const openedWithTwo = async () => {
   return { api, picked, router };
 };
 
-const thePicker = () => screen.findByRole("heading", { level: 1, name: "Your Workspaces" });
+const thePicker = () => screen.findByRole("heading", { level: 1, name: PICKER_WORDS.heading });
 
 const refusal = () => screen.getByRole("alert").textContent;
 
@@ -142,7 +145,7 @@ it("skips the picker for a workspace joined after sign-in", async () => {
   expect((await screen.findByRole("menu", { name: ADA.displayName })).textContent).toContain(
     "Editor",
   );
-  expect(screen.queryByRole("heading", { level: 1, name: "Your Workspaces" })).toBeNull();
+  expect(screen.queryByRole("heading", { level: 1, name: PICKER_WORDS.heading })).toBeNull();
   expect(picked, "the only workspace was opened with a different id").toEqual([NORTHERN.id]);
 });
 
@@ -180,9 +183,11 @@ it("sends a person with no workspace to No Workspace Yet", async () => {
   const api = holding([]);
   const router = await openPageOutsideShell("/choose-workspace", api);
 
-  expect(await screen.findByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeDefined();
+  expect(
+    await screen.findByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING }),
+  ).toBeDefined();
   expect(router.state.location.pathname).toBe("/no-workspace");
-  expect(screen.getByRole("button", { name: "Sign Out" })).toBeDefined();
+  expect(screen.getByRole("button", { name: SIGN_OUT })).toBeDefined();
 });
 
 it("offers Try Again when the workspace list fails to load", async () => {
@@ -201,10 +206,10 @@ it("offers Try Again when the workspace list fails to load", async () => {
 
   expect(refusal()).toMatch(/\S/);
   expect(await thePicker()).toBeDefined();
-  expect(screen.queryByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeNull();
+  expect(screen.queryByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeNull();
 
   api.set("person.workspaces", () => listed?.());
-  fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
+  fireEvent.click(screen.getByRole("button", { name: FAILED_PAGE.retry }));
 
   expect(await screen.findByRole("button", { name: NORTHERN.name })).toBeDefined();
   expect(screen.getByRole("button", { name: HOLME.name })).toBeDefined();

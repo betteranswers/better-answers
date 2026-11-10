@@ -28,7 +28,7 @@ import {
   PersonName,
   WorkspacesAndRoles,
 } from "../person-words.tsx";
-import { readRefused } from "../words.ts";
+import { PERSON_WORDS, readRefused } from "../words.ts";
 import { EndEverySignInEverywhere } from "./end-every-sign-in-everywhere.tsx";
 import { endedByWords } from "./grant-words.ts";
 
@@ -39,7 +39,7 @@ export const personButtonId = (personId: string): string => `person-${personId}`
 function Sessions(properties: { readonly sessions: readonly HeldSession[] }) {
   const { sessions } = properties;
   return (
-    <SheetPart title="Sessions">
+    <SheetPart title={PERSON_WORDS.sessions}>
       <p>
         {sessions.length === 0
           ? "No open sessions"
@@ -50,10 +50,10 @@ function Sessions(properties: { readonly sessions: readonly HeldSession[] }) {
           {sessions.map((session) => (
             <li key={`${session.createdAt} ${session.expiresAt}`}>
               <Facts>
-                <SummaryRow term="Signed In">
+                <SummaryRow term="Signed in">
                   <At iso={session.createdAt} />
                 </SummaryRow>
-                <SummaryRow term="Last Used">
+                <SummaryRow term="Last used">
                   <At iso={session.lastUsedAt} />
                 </SummaryRow>
                 <SummaryRow term="Expires">
@@ -96,7 +96,7 @@ function GrantItem(properties: {
       <Collapsible className="mt-1">
         <CollapsibleTrigger asChild>
           <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
-            More About {assistant}’s Access
+            {PERSON_WORDS.moreAbout(assistant)}
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -119,7 +119,7 @@ function OpenGrant(properties: { readonly grant: HeldGrant; readonly nowMs: numb
       grant={grant}
       state={grantStateOf(grant, properties.nowMs)}
       facts={
-        <SummaryRow term="Last Used">
+        <SummaryRow term="Last used">
           <At iso={grant.lastUsedAt} />
         </SummaryRow>
       }
@@ -143,8 +143,8 @@ function Ended(properties: { readonly grant: EndedGrant }) {
           <SummaryRow term="Ended">
             <At iso={grant.endedAt} />
           </SummaryRow>
-          <SummaryRow term="Ended By">{endedByWords(grant.endedBy)}</SummaryRow>
-          <SummaryRow term="Ended In">
+          <SummaryRow term={PERSON_WORDS.endedBy}>{endedByWords(grant.endedBy)}</SummaryRow>
+          <SummaryRow term={PERSON_WORDS.endedIn}>
             {grant.scope === "everywhere" ? "Every workspace" : (grant.workspace?.name ?? "None")}
           </SummaryRow>
         </>
@@ -161,7 +161,7 @@ function Grants(properties: {
   const { grants, ended } = properties;
   const [openedAtMs] = useState(Date.now);
   return (
-    <SheetPart title="Assistant Access">
+    <SheetPart title={PERSON_WORDS.assistantAccess}>
       {grants.length === 0 && ended.length === 0 ? (
         <p>{properties.name} hasn’t connected an assistant yet.</p>
       ) : (
@@ -197,10 +197,10 @@ function HeldCredentials(properties: { readonly person: ListedPerson }) {
     );
   }
   return (
-    <SheetPart title="Sessions and Assistant Access">
+    <SheetPart title={PERSON_WORDS.sessionsAndAccess}>
       <p>
         {inspected.error === null
-          ? "The sessions and assistant access are still loading."
+          ? "Loading sessions and assistant access…"
           : readRefused(inspected.error)}
       </p>
     </SheetPart>
@@ -244,16 +244,16 @@ export function PersonSheet(properties: {
         </SheetDescription>
       </SheetHeader>
       <div className="grid gap-4 px-4 pb-4">
-        <SheetPart title="Workspaces">
+        <SheetPart title={PERSON_WORDS.workspaces}>
           <WorkspacesAndRoles person={person} />
         </SheetPart>
-        <SheetPart title="Sign-In">
+        <SheetPart title={PERSON_WORDS.signIn}>
           <Facts>
-            <SummaryRow term="Last Sign-In">
-              <Instant at={person.lastSignedInAt} none="Never" />
+            <SummaryRow term={PERSON_WORDS.lastSignIn}>
+              <Instant at={person.lastSignedInAt} none={PERSON_WORDS.never} />
             </SummaryRow>
-            <SummaryRow term="Signed Out Everywhere">
-              <Instant at={person.credentialsRevokedAt} none="Never" />
+            <SummaryRow term={PERSON_WORDS.signedOutEverywhere}>
+              <Instant at={person.credentialsRevokedAt} none={PERSON_WORDS.never} />
             </SummaryRow>
           </Facts>
         </SheetPart>

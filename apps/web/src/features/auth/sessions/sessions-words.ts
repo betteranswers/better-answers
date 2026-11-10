@@ -15,22 +15,20 @@ export const SESSIONS_WORDS = {
   heading: SESSIONS_HEADING_WORD,
   thisDevice: "This device",
   activeNow: "Active now",
-  signOutEverywhereElse: "Sign Out Everywhere Else",
+  signOutEverywhereElse: "Sign out everywhere else",
   onlySession: "This is your only session.",
-  standingLine: "Signing out here doesn’t disconnect Claude or end personal tokens.",
-  consequence:
-    "These sessions will be signed out now. Personal tokens keep working, and Claude stays connected.",
+  standingLine: "Claude and personal tokens stay connected when you sign out here.",
 } as const;
 
 export const lastActiveAt = (iso: string): string => `Last active ${instantWords(iso)}`;
 
-export const signOutNamed = (device: string): string => `Sign Out of ${device}`;
+export const signOutNamed = (device: string): string => `Sign out of ${device}`;
 
 export const everywhereTitle = (others: number): string =>
-  `Sign Out of ${counted(others, "Other Session", "Other Sessions")}`;
+  `Sign out of ${counted(others, "other session", "other sessions")}`;
 
 export const everywhereCommit = (others: number): string =>
-  `Sign Out ${counted(others, "Session", "Sessions")}`;
+  `Sign out ${counted(others, "session", "sessions")}`;
 
 export const signedOut = (device: string): string => `Signed out of ${device}.`;
 

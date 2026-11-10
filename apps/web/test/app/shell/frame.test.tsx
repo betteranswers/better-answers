@@ -4,8 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
+import { goHome, JUMP_TO as JUMP_TO_WORDS, SKIP_TO_MAIN, UNKNOWN_PAGE } from "@/app/words.ts";
 import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import {
   EVERY_AREA,
   HOMES,
@@ -41,7 +43,7 @@ const rail = () => screen.getByRole("navigation", { name: "Areas" });
 
 const menu = () => screen.getByRole("navigation", { name: "Control Centre" });
 
-const JUMP_TO = "Jump To";
+const JUMP_TO = JUMP_TO_WORDS.name;
 
 const namesIn = (region: HTMLElement, role: "link" | "heading" = "link") =>
   within(region)
@@ -76,7 +78,7 @@ describe("the shell's regions", () => {
     expect(screen.getByRole("main")).toBeDefined();
 
     const first = container.querySelector("a");
-    expect(first).toBe(screen.getByRole("link", { name: "Skip to Main Content" }));
+    expect(first).toBe(screen.getByRole("link", { name: SKIP_TO_MAIN }));
     expect(first?.getAttribute("href")).toBe(`#${screen.getByRole("main").id}`);
   });
 
@@ -181,20 +183,22 @@ describe("the shell's regions", () => {
   it("shows Page Not Found for an unknown address", async () => {
     await openApp("/not-a-page");
 
-    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe("Page Not Found");
+    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe(
+      UNKNOWN_PAGE.heading,
+    );
   });
 
   it("links a reader with an unknown role home through /", async () => {
     await openApp("/not-a-page");
 
-    const home = await screen.findByRole("link", { name: "Go to Your Home Page" });
+    const home = await screen.findByRole("link", { name: goHome(undefined) });
     expect(home.getAttribute("href")).toBe("/");
   });
 
   it("shows Page Not Found inside an area, keeping the rail", async () => {
     await openAs("Admin", "/system/not-a-page");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Page Not Found");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_PAGE.heading);
     expect(namesIn(rail())).toEqual(["Ask", "Knowledge", "Inbox", "Control Centre"]);
     expect(screen.getByRole("banner")).toBeDefined();
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
@@ -245,7 +249,7 @@ describe("jump to, while the role is unknown", () => {
       (each) => each.textContent,
     );
 
-    expect(actions).toContain("Show This List");
+    expect(actions).toContain(KEYSTROKE_WORDS.showTheList);
     expect(actions).not.toContain(JUMP_TO);
   });
 });

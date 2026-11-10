@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { JUMP_TO } from "@/app/words.ts";
+import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
 import { SEARCH_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { SEARCH_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
@@ -39,9 +41,10 @@ const searchBox = (page: Page) =>
 const matchesOf = (page: Page): Locator =>
   searchRegion(page).getByRole("list", { name: "Matches" }).getByRole("listitem");
 
-const jumpToDialog = (page: Page) => page.getByRole("dialog", { name: "Jump To" });
+const jumpToDialog = (page: Page) => page.getByRole("dialog", { name: JUMP_TO.name });
 
-const jumpToInput = (page: Page) => jumpToDialog(page).getByRole("combobox", { name: "Jump To" });
+const jumpToInput = (page: Page) =>
+  jumpToDialog(page).getByRole("combobox", { name: JUMP_TO.name });
 
 const statusOf = (page: Page) => searchRegion(page).getByRole("status").first();
 
@@ -278,7 +281,7 @@ test.describe("the Knowledge Search page", () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(asked("pallet"));
     await signIn(page, request, email);
-    const dismiss = page.getByRole("button", { name: "Dismiss Passkey Offer" });
+    const dismiss = page.getByRole("button", { name: PASSKEY_WORDS.dismissOffer });
     await expect(dismiss).toBeVisible();
 
     await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();

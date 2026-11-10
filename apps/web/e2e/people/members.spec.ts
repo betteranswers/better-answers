@@ -9,6 +9,7 @@ import {
   MEMBERS_WORDS,
 } from "@/features/people/member-action-words.ts";
 import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+import { filterBy } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -397,7 +398,7 @@ test.describe("the People group's Members page", () => {
           - status: /\\b3\\b/
           - button "Invite a Person"
           - searchbox "Search by name or address"
-          - combobox "Filter by Role": ${MEMBERS_WORDS.anyRole}
+          - combobox ${JSON.stringify(filterBy("Role"))}: ${MEMBERS_WORDS.anyRole}
           - button "Columns"
           - table:
             - caption

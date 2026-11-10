@@ -16,6 +16,9 @@ import type {
 } from "@better-answers/schema";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
+import { CONFIRM_WORDS, SETUP_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
+import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace/workspace-words.ts";
+
 import {
   authenticatorCodeField,
   emailField,
@@ -523,8 +526,8 @@ export const signInByEmail = async (
 const expectSecondFactorChoices = (page: Page) =>
   expect(
     page
-      .getByRole("link", { name: "Use a Recovery Code" })
-      .or(page.getByRole("button", { name: "Set Up an Authenticator Instead" })),
+      .getByRole("link", { name: CONFIRM_WORDS.recoveryCode })
+      .or(page.getByRole("button", { name: SETUP_WORDS.authenticatorInstead })),
   ).toBeVisible();
 
 const confirmWithANewAuthenticator = async (
@@ -616,7 +619,7 @@ export const signedInWithNoWorkspace = async (page: Page, api: APIRequestContext
   const signedIn = await person(api, email);
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
   return signedIn;
 };
 

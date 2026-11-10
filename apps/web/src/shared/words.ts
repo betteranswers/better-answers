@@ -19,7 +19,22 @@ export const instantWords = (iso: string): string => `${timeWords(iso)} · ${day
 export const counted = (count: number, one: string, many: string): string =>
   `${count} ${count === 1 ? one : many}`;
 
-export const CLEAR_WORDS = { search: "Clear Search", filters: "Clear Filters" } as const;
+export const CLEAR_WORDS = { search: "Clear search", filters: "Clear filters" } as const;
+
+export const filterBy = (label: string): string =>
+  `Filter by ${label.replace(/^\p{Lu}(?=\p{Ll})/u, (first) => first.toLowerCase())}`;
+
+export const SIGN_OUT = "Sign out";
+
+export const LIST_WORDS = {
+  columns: "Columns",
+  showColumns: "Show columns",
+  clearSelection: "Clear selection",
+  previousPage: "Previous page",
+  nextPage: "Next page",
+  loadMore: "Load more",
+  retry: "Retry",
+} as const;
 
 export const nothingMatches = (typed: string): string => `No results found for “${typed}”.`;
 

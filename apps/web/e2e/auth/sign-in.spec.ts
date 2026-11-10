@@ -1,7 +1,11 @@
 import type { APIRequestContext, Page, Route } from "@playwright/test";
 import { z } from "zod";
 
+import { SIGN_IN_WORDS } from "@/features/auth/sign-in/sign-in-words.ts";
+import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace/workspace-words.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { SIGN_OUT } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -29,7 +33,7 @@ import { scrolledSideways } from "../knowledge.ts";
 
 const SEND_PATH = "/email-otp/send-verification-otp";
 
-const codeField = (page: Page) => page.getByLabel("Verification Code", { exact: true });
+const codeField = (page: Page) => page.getByLabel(SIGN_IN_WORDS.codeField, { exact: true });
 
 const theSendsAnswer = (page: Page) =>
   page.waitForResponse((response) => new URL(response.url()).pathname === SEND_PATH);
@@ -46,8 +50,8 @@ const waitNamedBy = async (answered: ReturnType<typeof theSendsAnswer>): Promise
 };
 
 const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
-  await page.getByLabel("Email Address").fill(email);
-  await page.getByRole("button", { name: "Send Code" }).click();
+  await page.getByLabel(SIGN_IN_WORDS.emailAddress).fill(email);
+  await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
   await expect(codeField(page)).toBeVisible();
   await expect(
     page.getByRole("status"),
@@ -57,7 +61,7 @@ const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
 
 const saysANewEmailWent = async (page: Page, earlier: string): Promise<void> => {
   await expect(
-    page.getByRole("button", { name: "Send a New Code" }),
+    page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }),
     "the new email is still sending",
   ).toHaveAttribute("aria-disabled", "false");
   await regionShowsNewText(page.getByRole("status"), earlier);
@@ -144,7 +148,7 @@ test("a new code from Send a New Code signs in", async ({
   await aWrongCodeIsRefused(page);
   const saidOfTheFirst = await page.getByRole("status").innerText();
 
-  await page.getByRole("button", { name: "Send a New Code" }).click();
+  await page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }).click();
 
   await expect(
     codeField(page),
@@ -158,15 +162,15 @@ test("a new code from Send a New Code signs in", async ({
   await expect(refused, "Send a New Code left the wrong-code error in place").toBeEmpty();
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading "Enter Your Code" [level=1]
+      - heading ${JSON.stringify(SIGN_IN_WORDS.codeTitle)} [level=1]
       - status
-      - textbox "Verification Code"
-      - button "Sign In"
-      - button "Send a New Code"
-      - button "Use a Different Email Address"
-      - button "Keyboard Shortcuts"
+      - textbox ${JSON.stringify(SIGN_IN_WORDS.codeField)}
+      - button ${JSON.stringify(SIGN_IN_WORDS.signIn)}
+      - button ${JSON.stringify(SIGN_IN_WORDS.sendAgain)}
+      - button ${JSON.stringify(SIGN_IN_WORDS.otherAddress)}
+      - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
   `);
-  const row = page.getByRole("button", { name: "Send a New Code" }).locator("..");
+  const row = page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }).locator("..");
   const treatments = await Promise.all(
     (await row.getByRole("button").all()).map((button) =>
       button.evaluate((element) => {
@@ -211,10 +215,10 @@ test("Sign In works by keyboard and shows the rate-limit wait", async ({
 
     await expect(page.getByRole("main")).toHaveCount(1);
     await page.keyboard.press("Tab");
-    await expect(page.getByLabel("Email Address")).toBeFocused();
+    await expect(page.getByLabel(SIGN_IN_WORDS.emailAddress)).toBeFocused();
     await page.keyboard.type(keyboard);
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("button", { name: "Send Code" })).toBeFocused();
+    await expect(page.getByRole("button", { name: SIGN_IN_WORDS.send })).toBeFocused();
     await page.keyboard.press("Enter");
 
     await expect(codeField(page)).toBeVisible();
@@ -222,9 +226,9 @@ test("Sign In works by keyboard and shows the rate-limit wait", async ({
     await codeField(page).focus();
     await page.keyboard.type(sixDigits);
 
-    await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
     await expect(page.getByRole("main")).toHaveCount(1);
-    const signOut = page.getByRole("button", { name: "Sign Out" });
+    const signOut = page.getByRole("button", { name: SIGN_OUT });
     await tabUntilFocused(page, signOut);
 
     const ring = await signOut.evaluate((element) => getComputedStyle(element).boxShadow);
@@ -238,7 +242,7 @@ test("Sign In works by keyboard and shows the rate-limit wait", async ({
   await floodCodesTo(request, email, 4);
 
   await page.keyboard.press("Tab");
-  const listed = await keystrokesListed(page, "This Page");
+  const listed = await keystrokesListed(page, KEYSTROKE_WORDS.thisPage);
   await expect(listed.getByRole("term").filter({ hasText: /^n$/ })).toBeVisible();
   await expect(listed.getByRole("term").filter({ hasText: /^e$/ })).toBeVisible();
   await keystrokesDismissed(page, listed);
@@ -246,7 +250,7 @@ test("Sign In works by keyboard and shows the rate-limit wait", async ({
   const saidOfTheFirst = await page.getByRole("status").evaluate((status) => status.textContent);
   await clockTheNextKey(page, {
     at: `//main[.//*[@role='status'][string(.)!=${asXPath(saidOfTheFirst)}]]`,
-    reads: "Enter Your Code",
+    reads: SIGN_IN_WORDS.codeTitle,
   });
   const answered = theSendsAnswer(page);
   await page.keyboard.press("n");
@@ -257,10 +261,10 @@ test("Sign In works by keyboard and shows the rate-limit wait", async ({
 
   await page.keyboard.press("e");
   await expect(
-    page.getByLabel("Email Address"),
+    page.getByLabel(SIGN_IN_WORDS.emailAddress),
     "e did not move focus to Email Address",
   ).toBeFocused();
-  await expect(page.getByLabel("Email Address")).toHaveValue(email);
+  await expect(page.getByLabel(SIGN_IN_WORDS.emailAddress)).toHaveValue(email);
 });
 
 test("signs in from a code pasted with a space", async ({ page, request }) => {

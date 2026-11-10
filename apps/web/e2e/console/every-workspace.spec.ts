@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { JUMP_TO, SKIP_TO_MAIN, TOGGLE } from "@/app/words.ts";
+import { WORKSPACES_WORDS } from "@/features/console/list-words.ts";
 import { WORKSPACES_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -35,7 +38,7 @@ const workspaceRows = (page: Page): Locator =>
 
 const rowOf = (page: Page, name: string): Locator =>
   workspaceRows(page).filter({
-    has: page.getByRole("button", { name: `More About ${name}`, exact: true }),
+    has: page.getByRole("button", { name: WORKSPACES_WORDS.moreAbout(name), exact: true }),
   });
 
 const aNameOfItsOwn = (name: string): string =>
@@ -81,7 +84,10 @@ test.describe("the console's Workspaces page", () => {
       await expect(page.getByRole("heading", { level: 1, name: "Every Workspace" })).toBeVisible();
       await expect(ours).toBeVisible();
 
-      await expect(listOf(page).getByRole("columnheader")).toHaveText(["Workspace", "Short Name"]);
+      await expect(listOf(page).getByRole("columnheader")).toHaveText([
+        "Workspace",
+        WORKSPACES_WORDS.columns.shortName,
+      ]);
       const room = {
         page: await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -107,17 +113,17 @@ test.describe("the console's Workspaces page", () => {
 
     await skipLinkReachesThePage(page);
 
-    await page.getByRole("link", { name: "Skip to Main Content" }).focus();
+    await page.getByRole("link", { name: SKIP_TO_MAIN }).focus();
     for (const stop of [
       page.getByRole("banner").getByRole("link", { name: "better-answers" }),
       switcherOf(page, "Console"),
-      page.getByRole("button", { name: "Hide Menu" }),
+      page.getByRole("button", { name: TOGGLE.hide }),
       crumbOf(page, "Console"),
       crumbOf(page, "Workspaces"),
-      page.getByRole("banner").getByRole("button", { name: "Jump To" }),
+      page.getByRole("banner").getByRole("button", { name: JUMP_TO.name }),
       avatarOf(page, workspace.admin.name),
       railOf(page).getByRole("link", { name: "Console" }),
-      railOf(page).getByRole("button", { name: "Keyboard Shortcuts" }),
+      railOf(page).getByRole("button", { name: KEYSTROKE_WORDS.button }),
     ]) {
       await page.keyboard.press("Tab");
       await expect(stop).toBeFocused();
@@ -132,7 +138,7 @@ test.describe("the console's Workspaces page", () => {
         - list:
           - listitem:
             - link "Console"
-        - button "Keyboard Shortcuts"
+        - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
     `);
 
     await page.keyboard.press(WORKSPACES_KEYSTROKES.search.key);
@@ -149,15 +155,15 @@ test.describe("the console's Workspaces page", () => {
           - table:
             - caption
             - rowgroup:
-              - row "Workspace Short Name Members Created":
+              - row ${JSON.stringify(Object.values(WORKSPACES_WORDS.columns).join(" "))}:
                 - columnheader "Workspace"
-                - columnheader "Short Name"
+                - columnheader ${JSON.stringify(WORKSPACES_WORDS.columns.shortName)}
                 - columnheader "Members"
                 - columnheader "Created"
             - rowgroup:
               - row /${workspace.name}/:
                 - cell /${workspace.name}/:
-                  - button ${JSON.stringify(`More About ${workspace.name}`)}
+                  - button ${JSON.stringify(WORKSPACES_WORDS.moreAbout(workspace.name))}
                 - cell ${JSON.stringify(workspace.shortName)}
                 - cell /\\b1\\b/
                 - cell /\\d{1,2} [A-Z][a-z]+ \\d{4}/
@@ -165,7 +171,7 @@ test.describe("the console's Workspaces page", () => {
 
     await passesTheAccessibilityGate();
 
-    const more = ours.getByRole("button", { name: `More About ${workspace.name}` });
+    const more = ours.getByRole("button", { name: WORKSPACES_WORDS.moreAbout(workspace.name) });
     await more.focus();
     await page.keyboard.press("Enter");
     await expect(more).toHaveAttribute("aria-expanded", "true");

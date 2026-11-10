@@ -4,6 +4,7 @@ import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/c
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { filterBy } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -123,7 +124,7 @@ const selectedBar = (page: Page): Locator =>
   allKnowledge(page).getByRole("toolbar", { name: "Selected concepts" });
 
 const filterOf = (page: Page, name: string): Locator =>
-  allKnowledge(page).getByRole("combobox", { name: `Filter by ${name}` });
+  allKnowledge(page).getByRole("combobox", { name: filterBy(name) });
 
 test.describe("All Knowledge", () => {
   test("shows each role only the concepts they can curate", async ({
@@ -151,9 +152,9 @@ test.describe("All Knowledge", () => {
         - heading "All Knowledge" [level=2]
         - status: /\\b65\\b/
         - status
-        - combobox "Filter by ${WORDS.filters.collection.label}"
-        - combobox "Filter by ${WORDS.filters.type.label}"
-        - combobox "Filter by ${WORDS.filters.trust.label}"
+        - combobox ${JSON.stringify(filterBy(WORDS.filters.collection.label))}
+        - combobox ${JSON.stringify(filterBy(WORDS.filters.type.label))}
+        - combobox ${JSON.stringify(filterBy(WORDS.filters.trust.label))}
         - button "Columns"
         - table:
           - rowgroup:

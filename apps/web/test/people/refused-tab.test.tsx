@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { NO_WORKSPACE_WORDS } from "@/features/auth/workspace/workspace-words.ts";
 import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
@@ -227,7 +228,7 @@ describe("a tab after the workspace was switched in another tab", () => {
     expect(router.state.location.pathname).toBe("/");
 
     aSwitchInAnotherTab(api, "Viewer");
-    fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
+    fireEvent.click(screen.getByRole("button", { name: NO_WORKSPACE_WORDS.tryAgain }));
 
     await landedInHolme();
     expect(router.state.location.pathname).toBe(HOMES.Viewer.path);

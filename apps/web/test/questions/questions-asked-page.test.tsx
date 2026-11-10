@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { AskedRecord } from "@/features/questions/questions-api.ts";
 import { QUESTIONS_KEYSTROKES as KEY } from "@/features/questions/questions-state.ts";
 import { QUESTIONS_WORDS as WORDS } from "@/features/questions/questions-words.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure } from "@test/stubbed-api.ts";
@@ -157,7 +158,7 @@ describe("Questions asked", () => {
 
     press("?");
     const keystrokes = await screen.findByRole("dialog", {
-      name: "Keyboard Shortcuts on Questions Asked",
+      name: keystrokesOn("Questions Asked"),
     });
     for (const { key } of Object.values(KEY)) {
       expect(within(keystrokes).getByText(key, { selector: "dt, dt *" })).toBeDefined();
@@ -166,7 +167,9 @@ describe("Questions asked", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();
     });
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Keyboard Shortcuts" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: KEYSTROKE_WORDS.button }),
+    );
 
     api.set("questions.asked", () => pageOf(asked.slice(50), null));
     press(KEY.more.key);

@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
+import { UNKNOWN_PAGE } from "@/app/words.ts";
+import { AUTHENTICATOR_WORDS } from "@/features/auth/account-words.ts";
 import { STALE_CONFIRMATION } from "@/features/auth/refusal-words.ts";
 import { EXPORTS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
@@ -120,9 +122,12 @@ const theOneSaved = async (): Promise<SavedFile> => {
 
 const confirmedInTheDialog = async () => {
   const dialog = await screen.findByRole("dialog");
-  fireEvent.change(await within(dialog).findByRole("textbox", { name: "Authenticator Code" }), {
-    target: { value: "123456" },
-  });
+  fireEvent.change(
+    await within(dialog).findByRole("textbox", { name: AUTHENTICATOR_WORDS.codeField }),
+    {
+      target: { value: "123456" },
+    },
+  );
 };
 
 describe("the Exports page", () => {
@@ -298,7 +303,9 @@ describe("the Exports page", () => {
     api.set("session.member", () => adaAt("Editor"));
     await openAt(PAGE, api);
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Page Not Found" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading }),
+    ).toBeDefined();
     expect(screen.queryByRole("region", { name: "Exports" })).toBeNull();
   });
 });

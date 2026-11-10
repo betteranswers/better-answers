@@ -1,6 +1,10 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { JUMP_TO } from "@/app/words.ts";
+import { EVERYONE_WORDS } from "@/features/console/list-words.ts";
+import { CORRECT_DISPLAY_NAME } from "@/features/console/names-waiting/correcting-words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -65,10 +69,10 @@ test.describe("the console's Everyone page", () => {
           - table:
             - caption
             - rowgroup:
-              - row "Person Workspaces and Roles Last Sign-In":
+              - row ${JSON.stringify(Object.values(EVERYONE_WORDS.columns).join(" "))}:
                 - columnheader "Person"
-                - columnheader "Workspaces and Roles"
-                - columnheader "Last Sign-In"
+                - columnheader ${JSON.stringify(EVERYONE_WORDS.columns.workspacesAndRoles)}
+                - columnheader ${JSON.stringify(EVERYONE_WORDS.columns.lastSignIn)}
             - rowgroup:
               - row /Priya Shah/:
                 - cell /Priya Shah/:
@@ -99,18 +103,18 @@ test.describe("the console's Everyone page", () => {
 
     const listed = (await keystrokesListed(page, "Everyone")).getByRole("definition");
     await expect(listed).toHaveText([
-      "Search Everyone by Name or Address",
-      "Open the Person in Focus",
-      "Sign Out the Person in Focus Everywhere",
-      "Correct the Display Name of the Person in Focus",
-      "Show the Previous Page of People",
-      "Show the Next Page of People",
-      "Show This List",
-      "Jump To",
+      PEOPLE_KEYSTROKES.search.action,
+      PEOPLE_KEYSTROKES.open.action,
+      PEOPLE_KEYSTROKES.revoke.action,
+      PEOPLE_KEYSTROKES.correct.action,
+      PEOPLE_KEYSTROKES.previous.action,
+      PEOPLE_KEYSTROKES.next.action,
+      KEYSTROKE_WORDS.showTheList,
+      JUMP_TO.name,
     ]);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Keyboard Shortcuts" })).toBeFocused();
+    await expect(page.getByRole("button", { name: KEYSTROKE_WORDS.button })).toBeFocused();
 
     await page.keyboard.press(PEOPLE_KEYSTROKES.search.key);
     await expect(searchBox(page)).toBeFocused();
@@ -133,7 +137,7 @@ test.describe("the console's Everyone page", () => {
 
     await page.keyboard.press("c");
     await expect(
-      sheetOf(page, "Priya Shah").getByRole("button", { name: "Correct Display Name" }),
+      sheetOf(page, "Priya Shah").getByRole("button", { name: CORRECT_DISPLAY_NAME }),
     ).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(priya).toBeFocused();

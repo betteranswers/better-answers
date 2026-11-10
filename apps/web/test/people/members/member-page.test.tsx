@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MEMBER_PAGE_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
   anAdminOver,
@@ -247,7 +248,7 @@ describe("flagging a member's display name", () => {
     await linkTo("Priya Shah");
 
     keyPressed("?");
-    const keystrokes = await screen.findByRole("dialog", { name: "Keyboard Shortcuts on Members" });
+    const keystrokes = await screen.findByRole("dialog", { name: keystrokesOn("Members") });
     expect(
       within(keystrokes)
         .getAllByRole("term")
@@ -255,7 +256,9 @@ describe("flagging a member's display name", () => {
     ).toContain(PEOPLE_KEYSTROKES.flagName.key);
     keyPressed("Escape");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Keyboard Shortcuts" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: KEYSTROKE_WORDS.button }),
+    );
 
     focused(await linkTo("Priya Shah"));
     keyPressed(PEOPLE_KEYSTROKES.flagName.key);

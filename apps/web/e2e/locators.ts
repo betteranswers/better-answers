@@ -1,9 +1,14 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { z } from "zod";
 
+import { SKIP_TO_MAIN, UNKNOWN_PAGE } from "@/app/words.ts";
+import { AUTHENTICATOR_WORDS } from "@/features/auth/account-words.ts";
 import type { CarriedOn } from "@/features/auth/sign-in/sign-in-words.ts";
+import { SIGN_IN_WORDS } from "@/features/auth/sign-in/sign-in-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
+import { SIGN_OUT } from "@/shared/words.ts";
 
 import { actionAnnotationOf } from "./action-timing.ts";
 
@@ -19,7 +24,7 @@ export const personMenuOpened = async (page: Page, who: string): Promise<Locator
 
 export const signOutFromTheShell = async (page: Page, who: string): Promise<void> => {
   const menu = await personMenuOpened(page, who);
-  await menu.getByRole("menuitem", { name: "Sign Out" }).click();
+  await menu.getByRole("menuitem", { name: SIGN_OUT }).click();
 };
 
 export const switcherOf = (page: Page, here: string): Locator =>
@@ -48,7 +53,7 @@ export const countOf = (list: Locator): Locator => list.getByRole("status").firs
 
 export const skipLinkReachesThePage = async (page: Page): Promise<void> => {
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to Main Content" })).toBeFocused();
+  await expect(page.getByRole("link", { name: SKIP_TO_MAIN })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("main")).toBeFocused();
 };
@@ -98,9 +103,9 @@ export const editorPickedByKeyboard = async (page: Page, select: Locator): Promi
 };
 
 const SIGN_IN_HEADINGS = {
-  nothing: "Sign In",
-  joining: "Sign In to Join a Workspace",
-  connecting: "Sign In to Connect Claude",
+  nothing: SIGN_IN_WORDS.emailStep.nothing.title,
+  joining: SIGN_IN_WORDS.emailStep.joining.title,
+  connecting: SIGN_IN_WORDS.emailStep.connecting.title,
 } as const satisfies Readonly<Record<CarriedOn | "nothing", string>>;
 
 export const signInHeading = (page: Page, carriedOn: CarriedOn | "nothing" = "nothing"): Locator =>
@@ -114,20 +119,20 @@ export const signInStatusText = async (page: Page): Promise<string> => {
   return page.getByRole("status").innerText();
 };
 
-export const emailField = (page: Page): Locator => page.getByLabel("Email Address");
+export const emailField = (page: Page): Locator => page.getByLabel(SIGN_IN_WORDS.emailAddress);
 
 export const sendCodeButton = (page: Page): Locator =>
-  page.getByRole("button", { name: "Send Code" });
+  page.getByRole("button", { name: SIGN_IN_WORDS.send });
 
 export const verificationCodeField = (page: Page): Locator =>
-  page.getByLabel("Verification Code", { exact: true });
+  page.getByLabel(SIGN_IN_WORDS.codeField, { exact: true });
 
 export const authenticatorCodeField = (page: Page): Locator =>
-  page.getByLabel("Authenticator Code", { exact: true });
+  page.getByLabel(AUTHENTICATOR_WORDS.codeField, { exact: true });
 
 export const keystrokesListed = async (page: Page, named: string): Promise<Locator> => {
   await page.keyboard.press("?");
-  const listed = page.getByRole("dialog", { name: `Keyboard Shortcuts on ${named}` });
+  const listed = page.getByRole("dialog", { name: keystrokesOn(named) });
   await expect(listed).toBeVisible();
   return listed;
 };
@@ -136,7 +141,7 @@ export const keyListed = (keystrokes: Locator, key: string): Locator =>
   keystrokes.getByRole("term").getByText(key, { exact: true });
 
 export const keystrokesButton = (within: Page | Locator): Locator =>
-  within.getByRole("button", { name: "Keyboard Shortcuts", exact: true });
+  within.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true });
 
 export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<void> => {
   await page.keyboard.press("Escape");
@@ -158,7 +163,7 @@ export const landedAtHome = async (page: Page, role: Role): Promise<void> => {
 };
 
 export const notFoundOfferingHome = async (page: Page, role: Role): Promise<void> => {
-  await expect(page.getByRole("heading", { level: 1, name: "Page Not Found" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading })).toBeVisible();
   await expect(page.getByRole("link", { name: HOME_NAMES[role].link })).toBeVisible();
 };
 

@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 
 import type { Locator, Page } from "@playwright/test";
 
+import { INVITATION_WORDS } from "@/features/auth/workspace/invitation-words.ts";
 import { INVITE_WORDS } from "@/features/people/invitation-words.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { DISPLAY_NAME_WORDS } from "@/shared/member/display-name-words.ts";
+import { LIST_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -134,18 +138,18 @@ test("invited people join, and their Activity shows only the join", async ({
     await expect(page).toHaveURL(new RegExp(`${link}$`));
     await expect(page.getByRole("main")).toMatchAriaSnapshot(`
       - main:
-        - heading "Your Invitation to Calder Joinery" [level=1]
+        - heading ${JSON.stringify(INVITATION_WORDS.heading("Calder Joinery"))} [level=1]
         - paragraph
         - paragraph
-        - textbox "Display Name"
-        - button "Join Workspace"
+        - textbox ${JSON.stringify(DISPLAY_NAME_WORDS.label)}
+        - button ${JSON.stringify(INVITATION_WORDS.join)}
         - button "Sign Out"
-        - button "Keyboard Shortcuts"
+        - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
     `);
     await expect(invitedAs(page, "Editor")).toBeVisible();
     await passesTheAccessibilityGate();
 
-    const keystrokes = await keystrokesListed(page, "This Page");
+    const keystrokes = await keystrokesListed(page, KEYSTROKE_WORDS.thisPage);
     await expect(keystrokes.getByRole("term").filter({ hasText: /^j$/ })).toBeVisible();
     await keystrokesDismissed(page, keystrokes);
 
@@ -183,6 +187,8 @@ test("invited people join, and their Activity shows only the join", async ({
 
     await expect(activityItems(page)).toHaveCount(1);
     await expect(activityItems(page)).toContainText(/Ola Brennan.*Admin/);
-    await expect(activityOf(page).getByRole("button", { name: "Load More" })).toHaveCount(0);
+    await expect(activityOf(page).getByRole("button", { name: LIST_WORDS.loadMore })).toHaveCount(
+      0,
+    );
   });
 });

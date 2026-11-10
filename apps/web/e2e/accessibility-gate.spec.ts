@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
 
+import { JUMP_TO, UNKNOWN_PAGE } from "@/app/words.ts";
+
 import { expect, test } from "./browser.ts";
 
 const addImageWithoutAltText = (): void => {
@@ -141,7 +143,7 @@ const scrollButtonHalfUnderStickyHeader = (): boolean => {
   header.style.cssText =
     "position: sticky; top: 0; z-index: 30; box-sizing: border-box; height: 48px; padding: 8px 0;";
   const headerButton = document.createElement("button");
-  headerButton.textContent = "Jump To";
+  headerButton.textContent = JUMP_TO.name;
   headerButton.style.cssText = "display: block; width: 176px; height: 32px;";
   header.append(headerButton);
   document.body.prepend(header);
@@ -164,7 +166,7 @@ const scrollButtonHalfUnderStickyHeader = (): boolean => {
 
 const openSignInPage = async (page: Page): Promise<void> => {
   await page.goto("/sign-in");
-  await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.signIn })).toBeVisible();
 };
 
 test("audits a test's last page even without an explicit call", async ({ page }) => {
