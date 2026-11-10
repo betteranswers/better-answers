@@ -15,11 +15,10 @@ import {
 } from "@/shared/ui/kibo-ui/combobox.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
+import { optionsFor, sameConceptType, storedNameOf } from "./concept-type-options.ts";
 import { EDITOR_WORDS as WORDS } from "./editor-words.ts";
 
 const NONE: readonly string[] = [];
-
-const sameType = (one: string, other: string): boolean => one.toLowerCase() === other.toLowerCase();
 
 function ConceptTypeOptions(properties: {
   readonly conceptTypes: readonly string[] | undefined;
@@ -29,34 +28,29 @@ function ConceptTypeOptions(properties: {
 }) {
   const { typed, value } = properties;
   const read = properties.conceptTypes;
-  const conceptTypes = read ?? NONE;
-  const named = typed.trim();
-  const needle = named.toLowerCase();
-  const offersNew = named !== "" && !conceptTypes.some((each) => sameType(each, named));
+  const { listed, adds } = optionsFor(read ?? NONE, typed);
 
   return (
     <ComboboxList label={WORDS.conceptTypes}>
       {read?.length === 0 ? <ComboboxEmpty>{WORDS.noConceptTypes}</ComboboxEmpty> : null}
       <ComboboxGroup>
-        {conceptTypes
-          .filter((each) => each.toLowerCase().includes(needle))
-          .map((each) => (
-            <ComboboxItem key={each} value={each} aria-checked={sameType(each, value)}>
-              <span className="min-w-0 flex-1 truncate">{each}</span>
-              {sameType(each, value) ? <CheckIcon aria-hidden /> : null}
-            </ComboboxItem>
-          ))}
-        {offersNew ? (
+        {listed.map((each) => (
+          <ComboboxItem key={each} value={each} aria-checked={sameConceptType(each, value)}>
+            <span className="min-w-0 flex-1 truncate">{each}</span>
+            {sameConceptType(each, value) ? <CheckIcon aria-hidden /> : null}
+          </ComboboxItem>
+        ))}
+        {adds === undefined ? null : (
           <ComboboxItem
-            value={named}
+            value={adds}
             onSelect={() => {
-              properties.onAdd(named);
+              properties.onAdd(adds);
             }}
           >
             <PlusIcon aria-hidden />
-            {WORDS.addConceptType(named)}
+            {WORDS.addConceptType(adds)}
           </ComboboxItem>
-        ) : null}
+        )}
       </ComboboxGroup>
     </ComboboxList>
   );
@@ -70,6 +64,7 @@ export function ConceptTypeField(properties: {
 }) {
   const { value, locked, onChoose } = properties;
   const conceptTypes = properties.conceptTypes ?? NONE;
+  const shown = storedNameOf(conceptTypes, value);
   const id = useId();
   const listId = useId();
   const [open, setOpen] = useState(false);
@@ -101,14 +96,14 @@ export function ConceptTypeField(properties: {
           className="h-9 w-full justify-between border-input px-3 font-normal"
         >
           <span className={cn("truncate", value === "" && "text-muted-foreground")}>
-            {value === "" ? WORDS.chooseConceptType : value}
+            {value === "" ? WORDS.chooseConceptType : shown}
           </span>
           <Icon name="unsorted" className="text-muted-foreground" />
         </ComboboxTrigger>
         <ComboboxContent
           shouldFilter={false}
           label={WORDS.searchConceptTypes}
-          defaultValue={conceptTypes.find((each) => sameType(each, value)) ?? ""}
+          defaultValue={conceptTypes.includes(shown) ? shown : ""}
           className="[&_[data-slot=command-input-wrapper]:focus-within]:border-ring"
           popoverOptions={{ align: "start", id: listId }}
         >

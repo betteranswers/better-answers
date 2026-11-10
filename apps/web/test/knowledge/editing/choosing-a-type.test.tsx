@@ -119,7 +119,7 @@ describe("the concept type field", () => {
 
     await searchedTypesFor("pro");
 
-    expect(await optionNames()).toEqual(["Procedure", EDITOR_WORDS.addConceptType("pro")]);
+    expect(await optionNames()).toEqual(["Procedure", EDITOR_WORDS.addConceptType("Pro")]);
   });
 
   it("saves a type the workspace lacks as typed", async () => {
@@ -137,6 +137,34 @@ describe("the concept type field", () => {
     await searchedTypesFor("sector");
 
     expect(await optionNames()).toEqual(["Sector"]);
+  });
+
+  it.each(["sectors", "SECTOR", "Sectors"])(
+    "offers the listed type, not a new one, for %s",
+    async (typed) => {
+      await editorOpened();
+
+      await searchedTypesFor(typed);
+
+      expect(await optionNames()).toEqual(["Sector"]);
+    },
+  );
+
+  it("names a new type as the write will store it", async () => {
+    await editorOpened();
+
+    await addedAType("risk registers", "Risk Register");
+
+    expect(conceptTypeShown()).toBe("Risk Register");
+    await savedAs("Risk Register");
+  });
+
+  it("shows the stored name of a type written another way", async () => {
+    await editorOpened(aConceptApi("commits", { parts: { ...PARTS, conceptType: "policy" } }));
+
+    expect(conceptTypeShown()).toBe("Policy");
+    fireEvent.click(conceptTypeField());
+    expect(await screen.findByRole("option", { name: "Policy", checked: true })).toBeDefined();
   });
 
   it("says so when the workspace has no types yet", async () => {
@@ -176,6 +204,36 @@ describe("the concept type field", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(conceptTypeField());
     });
+  });
+
+  it("chooses the exact type on Enter, not a longer one", async () => {
+    const api = aConceptApi("commits", { parts: { ...PARTS, conceptType: "Procedure" } });
+    api.set("knowledge.tree", () => aTreeOfTypes(["Insurance Policy", "Policy", "Procedure"]));
+    await editorOpened(api);
+    const user = userEvent.setup();
+
+    conceptTypeField().focus();
+    await user.keyboard("{Enter}");
+    await user.type(conceptTypeSearch(), "policy");
+    expect(await optionNames()).toEqual(["Policy", "Insurance Policy"]);
+    await user.keyboard("{Enter}");
+
+    expect(conceptTypeShown()).toBe("Policy");
+    await savedAs("Policy");
+  });
+
+  it("chooses the listed type on Enter for its plural", async () => {
+    const api = aConceptApi("commits", { parts: { ...PARTS, conceptType: "Procedure" } });
+    await editorOpened(api);
+    const user = userEvent.setup();
+
+    conceptTypeField().focus();
+    await user.keyboard("{Enter}");
+    await user.type(conceptTypeSearch(), "policies");
+    await user.keyboard("{Enter}");
+
+    expect(conceptTypeShown()).toBe("Policy");
+    await savedAs("Policy");
   });
 
   it("closes on Escape and keeps the editor open", async () => {

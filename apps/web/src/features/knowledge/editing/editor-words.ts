@@ -16,7 +16,7 @@ export const EDITOR_WORDS = {
   conceptTypes: "Types",
   chooseConceptType: "Choose a type",
   searchConceptTypes: "Search or add a type",
-  noConceptTypes: "No types yet. Type a name to add one.",
+  noConceptTypes: "No types yet. Enter a name to add one.",
   addConceptType: (conceptType: string): string => `Add type “${conceptType}”`,
   description: "Description",
   tags: "Tags",

@@ -46,9 +46,9 @@ export const searchedTypesFor = async (typed: string): Promise<void> => {
   });
 };
 
-export const addedAType = async (conceptType: string): Promise<void> => {
-  await searchedTypesFor(conceptType);
+export const addedAType = async (typed: string, storedAs: string = typed): Promise<void> => {
+  await searchedTypesFor(typed);
   fireEvent.click(
-    await screen.findByRole("option", { name: EDITOR_WORDS.addConceptType(conceptType) }),
+    await screen.findByRole("option", { name: EDITOR_WORDS.addConceptType(storedAs) }),
   );
 };

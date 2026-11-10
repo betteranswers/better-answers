@@ -304,11 +304,15 @@ test.describe("the concept page", () => {
       await expect(types.getByRole("option", { name: "Team", exact: true })).toBeVisible();
       await passesTheAccessibilityGate();
 
-      await page.keyboard.type(NEW_TYPE_AS_TYPED);
-      await page
-        .getByRole("option", { name: EDITOR_WORDS.addConceptType(NEW_TYPE_AS_TYPED) })
-        .click();
-      await expect(field).toHaveText(NEW_TYPE_AS_TYPED);
+      const search = page.getByRole("combobox", { name: EDITOR_WORDS.searchConceptTypes });
+      await search.fill("teams");
+      await expect(types.getByRole("option"), "a plural of a listed type offered Add").toHaveText([
+        "Team",
+      ]);
+
+      await search.fill(NEW_TYPE_AS_TYPED);
+      await page.getByRole("option", { name: EDITOR_WORDS.addConceptType(NEW_TYPE) }).click();
+      await expect(field).toHaveText(NEW_TYPE);
       await expect(field, "focus did not return to the type field").toBeFocused();
 
       await page.keyboard.down("Control");
