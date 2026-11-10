@@ -1,7 +1,15 @@
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
-import { climbOf, placementOfFile, reachesRoot, ROOTS_HELPER } from "../shared/path-climb.ts";
+import {
+  climbOf,
+  importsToolchainRoot,
+  placementOfFile,
+  reachesRoot,
+  ROOTS_HELPER,
+  TOOLCHAIN_PATHS,
+  TOOLCHAIN_WORKSPACE,
+} from "../shared/path-climb.ts";
 
 const MOST_WRITTEN = 60;
 
@@ -13,6 +21,7 @@ export const noPathClimbRule = defineRule({
     },
     messages: {
       climbs: `\`{{written}}\` climbs to the root of \`{{workspace}}\` or above it, so the path breaks when the file moves. Import \`${ROOTS_HELPER.name}\` from \`${ROOTS_HELPER.specifier}\`, take \`repositoryRoot\` or \`workspaceRoot\` from \`${ROOTS_HELPER.name}(import.meta.url)\`, and join the path from there.`,
+      importsToolchainRoot: `\`{{workspace}}\` must take \`repositoryRoot\` from \`${ROOTS_HELPER.name}(import.meta.url)\`. Import \`${ROOTS_HELPER.name}\` from \`${ROOTS_HELPER.specifier}\`, not \`repositoryRoot\` from \`${TOOLCHAIN_PATHS}\`.`,
     },
   },
   createOnce(context) {
@@ -33,10 +42,21 @@ export const noPathClimbRule = defineRule({
         data: { written: textOf(node), workspace: placed.workspace },
       });
     };
+    const checkImport = (node: ESTree.ImportDeclaration): void => {
+      if (!importsToolchainRoot(node)) return;
+      const placed = placementOfFile(context.filename);
+      if (placed === null || placed.workspace === TOOLCHAIN_WORKSPACE) return;
+      context.report({
+        node,
+        messageId: "importsToolchainRoot",
+        data: { workspace: placed.workspace },
+      });
+    };
     return {
       NewExpression: checkClimb,
       CallExpression: checkClimb,
       TemplateLiteral: checkClimb,
+      ImportDeclaration: checkImport,
     };
   },
 });

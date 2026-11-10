@@ -78,6 +78,18 @@ describe("the no-path-climb rule", () => {
     expect(lint.flagged(reading(file, `export const at = ${expression};`))).toEqual([file]);
   });
 
+  it("refuses a toolchain repositoryRoot import and names rootsOf", () => {
+    const file = "apps/api/tests/ops/probe.test.ts";
+    const code =
+      'import { repositoryRoot } from "@better-answers/devtools/paths";\nexport const at = repositoryRoot;';
+    const tree = reading(file, code);
+
+    expect(lint.flagged(tree)).toEqual([file]);
+    expect(lint.output(tree)).toContain(
+      "`apps/api` must take `repositoryRoot` from `rootsOf(import.meta.url)`. Import `rootsOf` from `@better-answers/schema/testing/roots`, not `repositoryRoot` from `@better-answers/devtools/paths`.",
+    );
+  });
+
   it("refuses a climb that lands on the workspace root", () => {
     const file = "apps/api/tests/probe.test.ts";
 
@@ -142,10 +154,27 @@ describe("the no-path-climb rule accepts", () => {
     expect(lint.flagged(reading(file, code))).toEqual([]);
   });
 
-  it("a repositoryRoot import from the toolchain", () => {
-    const file = "apps/api/tests/ops/probe.test.ts";
+  it("a repositoryRoot import inside the toolchain", () => {
+    const file = "packages/devtools/test/probe.test.ts";
     const code =
       'import { repositoryRoot } from "@better-answers/devtools/paths";\nexport const at = repositoryRoot;';
+    const tree = { ...reading(file, code), "packages/devtools/package.json": "{}\n" };
+
+    expect(lint.flagged(tree)).toEqual([]);
+  });
+
+  it("another toolchain import outside the toolchain", () => {
+    const file = "apps/api/tests/ops/probe.test.ts";
+    const code =
+      'import { workspacePackages } from "@better-answers/devtools/paths";\nexport const at = workspacePackages;';
+
+    expect(lint.flagged(reading(file, code))).toEqual([]);
+  });
+
+  it("a repositoryRoot taken from the roots helper", () => {
+    const file = "apps/api/tests/ops/probe.test.ts";
+    const code =
+      'import { rootsOf } from "@better-answers/schema/testing/roots";\nconst { repositoryRoot } = rootsOf(import.meta.url);\nexport const at = repositoryRoot;';
 
     expect(lint.flagged(reading(file, code))).toEqual([]);
   });

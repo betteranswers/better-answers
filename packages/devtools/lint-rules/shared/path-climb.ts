@@ -9,6 +9,10 @@ export const ROOTS_HELPER = {
   name: "rootsOf",
 } as const;
 
+export const TOOLCHAIN_WORKSPACE = "packages/devtools";
+
+export const TOOLCHAIN_PATHS = "@better-answers/devtools/paths";
+
 export type Placement = {
   readonly workspace: string;
   readonly file: string;
@@ -180,3 +184,12 @@ export const climbOf = (node: ESTree.Node): Climb | undefined => {
   if (node.type !== "CallExpression") return undefined;
   return joinClimb(node) ?? dirnameClimb(node) ?? cwdClimb(node);
 };
+
+export const importsToolchainRoot = (node: ESTree.ImportDeclaration): boolean =>
+  node.source.value === TOOLCHAIN_PATHS &&
+  node.specifiers.some(
+    (specifier) =>
+      specifier.type === "ImportSpecifier" &&
+      specifier.imported.type === "Identifier" &&
+      specifier.imported.name === "repositoryRoot",
+  );
