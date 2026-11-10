@@ -144,8 +144,11 @@ const useDeciding = (edit: WaitingEdit, title: string) => {
     }),
     acceptNow,
     declineNow,
-    cancel: () => {
-      setAsking("nothing");
+    cancel: (focusAfter: RefObject<HTMLButtonElement | null>) => {
+      unlessActing(() => {
+        setAsking("nothing");
+        focusAfter.current?.focus();
+      })();
     },
     toTheList: () => {
       toTheList();
@@ -224,8 +227,7 @@ function DeclineForm(properties: {
           type="button"
           variant="outline"
           onClick={() => {
-            deciding.cancel();
-            returnFocus.current?.focus();
+            deciding.cancel(returnFocus);
           }}
         >
           {WORDS.cancel}
@@ -288,8 +290,7 @@ function EditShown(properties: { readonly edit: WaitingEdit }) {
           named={{ by: placesId }}
           onConfirm={deciding.acceptNow}
           onCancel={() => {
-            deciding.cancel();
-            acceptButton.current?.focus();
+            deciding.cancel(acceptButton);
           }}
         />
       ) : null}
