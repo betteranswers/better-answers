@@ -27,7 +27,7 @@ export const ASK_WORDS = {
   } satisfies Readonly<Record<QuestionVerdict, string>>,
   judge: JUDGE_WORDS satisfies Readonly<Record<JudgeState, string>>,
   noCollection: CONCEPT_WORDS.noCollection,
-  unmapped: CONCEPT_WORDS.notCompanyKnowledge,
+  unmapped: "Passages",
   unwritten: {
     refused: "No cited answer could be written.",
     failed: "Couldn’t write an answer. Ask the question again.",
@@ -52,7 +52,7 @@ export const ASK_WORDS = {
 export const YOUR_QUESTIONS_WORDS = {
   loading: "Loading your questions…",
   none: "No questions yet",
-  more: "Show more questions",
+  more: "More questions",
   recordLoading: "Loading the question…",
   feedback: "Your feedback",
 } as const;

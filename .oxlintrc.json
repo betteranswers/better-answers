@@ -554,13 +554,12 @@
       }
     },
     {
-      "files": ["apps/web/src/features/knowledge/**", "apps/web/src/shared/knowledge/**"],
-      "rules": {
-        "better-answers/ui-copy-plain": "error"
-      }
-    },
-    {
-      "files": ["apps/web/src/features/ask/**", "apps/web/src/features/questions/**"],
+      "files": [
+        "apps/web/src/features/knowledge/**",
+        "apps/web/src/shared/knowledge/**",
+        "apps/web/src/features/ask/**",
+        "apps/web/src/features/questions/**"
+      ],
       "rules": {
         "better-answers/ui-copy-plain": "error"
       }

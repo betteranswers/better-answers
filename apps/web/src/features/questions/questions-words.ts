@@ -36,7 +36,7 @@ export const QUESTIONS_WORDS = {
   others: "Other questions",
   notAnswered: verdictWords("refuse"),
   noCollection: CONCEPT_WORDS.noCollection,
-  more: "Show more questions",
+  more: "More questions",
   verdict: verdictWords,
   judge: (state: AskedRecord["judgeState"]): string =>
     state === null ? "Not finished" : JUDGE_WORDS[state],
