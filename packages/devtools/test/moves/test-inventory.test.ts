@@ -59,10 +59,16 @@ describe("the listing script", () => {
     writeUnder(root, "packages/core/vitest.config.ts", "export default {};\n");
     writeUnder(root, "packages/core/node_modules/vitest/vitest.mjs", hangingVitest(pidFile));
 
-    const caller = spawn("sh", ["-c", '"$0" "$1"; :', SCRIPT, path.join(scratch, "orphaned-out")], {
-      cwd: root,
-      stdio: "ignore",
-    });
+    const caller = spawn(
+      process.execPath,
+      [
+        "-e",
+        'require("node:child_process").spawnSync(process.argv[1], [process.argv[2]], { stdio: "ignore" });',
+        SCRIPT,
+        path.join(scratch, "orphaned-out"),
+      ],
+      { cwd: root, stdio: "ignore" },
+    );
     await untilTrue(() => existsSync(pidFile));
     const listing = Number(readFileSync(pidFile, "utf8"));
     caller.kill("SIGKILL");
