@@ -243,9 +243,9 @@ test.describe("All Knowledge", () => {
       await expect(rowOf(page, "Yard rota")).toContainText(
         WORDS.filters.trust.choices["out-of-date"],
       );
-      expect(await scrolledSideways(page), "the narrow page scrolled sideways").toBeLessThanOrEqual(
-        0,
-      );
+      await expect
+        .poll(() => scrolledSideways(page), { message: "the narrow page scrolled sideways" })
+        .toBeLessThanOrEqual(0);
       await page.setViewportSize(WIDE);
 
       await filterOf(page, WORDS.filters.trust.label).click();

@@ -219,9 +219,9 @@ test.describe("Collections and Owners", () => {
 
       await expect(pickerOf(page, "policy", EDITOR)).toBeVisible();
       await expect(rowOf(page, "policy").getByRole("cell").nth(2)).toHaveText("2");
-      expect(await scrolledSideways(page), "the narrow page scrolled sideways").toBeLessThanOrEqual(
-        0,
-      );
+      await expect
+        .poll(() => scrolledSideways(page), { message: "the narrow page scrolled sideways" })
+        .toBeLessThanOrEqual(0);
     });
   });
 });
