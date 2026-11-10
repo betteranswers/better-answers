@@ -112,9 +112,9 @@ test.describe("Ask › New question", () => {
     const flagging = await flagSent(page, result);
 
     await alertHasText(result.getByRole("alert"));
-    await expect(result.getByRole("button", { name: "Flagged" })).toHaveCount(0);
-    await expect(flagging.getByRole("radio", { name: "Incomplete" })).toBeChecked();
-    await expect(flagging.getByRole("textbox", { name: "Note" })).toHaveValue(NOTE);
+    await expect(result.getByRole("button", { name: ASK_WORDS.flagged })).toHaveCount(0);
+    await expect(flagging.getByRole("radio", { name: ASK_WORDS.reasons.incomplete })).toBeChecked();
+    await expect(flagging.getByRole("textbox", { name: ASK_WORDS.note })).toHaveValue(NOTE);
   });
 
   test("blocks questions at the spending limit without calling a model", async ({
