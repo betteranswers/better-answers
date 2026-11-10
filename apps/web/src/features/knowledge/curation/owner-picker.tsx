@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { collectionNameOf } from "@better-answers/schema/collection-name";
 
+import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 import {
   Combobox,
   ComboboxContent,
@@ -41,7 +42,7 @@ export function OwnerPicker(properties: {
   const people = withTheOwner(properties.choices, owned.owner);
   const current = owned.owner?.id ?? NOBODY;
   const items = [
-    { value: NOBODY, label: WORDS.noOwner },
+    { value: NOBODY, label: EMPTY_WORDS.owner },
     ...people.map((person) => ({ value: person.id, label: nameOf(person) })),
   ];
   const held = items.find((item) => item.value === current);
@@ -65,7 +66,10 @@ export function OwnerPicker(properties: {
     >
       <ComboboxTrigger
         id={pickerIdOf(owned.collection)}
-        aria-label={WORDS.ownerOf(collectionNameOf(owned.collection), held?.label ?? WORDS.noOwner)}
+        aria-label={WORDS.ownerOf(
+          collectionNameOf(owned.collection),
+          held?.label ?? EMPTY_WORDS.owner,
+        )}
         aria-disabled={saving ? true : undefined}
         className="w-full min-w-0 justify-between font-normal aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
       />

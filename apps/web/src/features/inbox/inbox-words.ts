@@ -55,6 +55,7 @@ export const EDIT_WORDS = {
   proposed: "Suggested version",
   changed: "Changed",
   title: "Title",
+  type: "Type",
   text: "Text",
   noText: "No text.",
   sources: "Suggested sources",

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { collectionNameOf } from "@better-answers/schema/collection-name";
 
 import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
+import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { RHIAN } from "@test/knowledge/all-knowledge-answers.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -85,7 +86,7 @@ const SAFETY = { collection: "safety", owner: null, overrides: 0, concepts: 1, v
 
 const pickerNamed = (collection: string) =>
   screen.findByRole("button", {
-    name: WORDS.ownerOf(collectionNameOf(collection), WORDS.noOwner),
+    name: WORDS.ownerOf(collectionNameOf(collection), EMPTY_WORDS.owner),
   });
 
 const chosenFor = async (collection: string, person: string) => {
@@ -182,12 +183,12 @@ describe("the Collections and Owners page", () => {
     );
     await openAt(PAGE, api);
 
-    await pickerOf(WORDS.noOwner);
+    await pickerOf(EMPTY_WORDS.owner);
 
-    expect(cellsOf("policy")).toEqual([NAMED, WORDS.noOwner, "3", "33%"]);
+    expect(cellsOf("policy")).toEqual([NAMED, EMPTY_WORDS.owner, "3", "33%"]);
     expect(cellsOf("safety-rules")).toEqual([
       collectionNameOf("safety-rules"),
-      `${WORDS.noOwner}${WORDS.ownOwners(2)}`,
+      `${EMPTY_WORDS.owner}${WORDS.ownOwners(2)}`,
       "1",
       "100%",
     ]);
@@ -219,7 +220,7 @@ describe("the Collections and Owners page", () => {
   it("names the owner search and the people list", async () => {
     await openAt(PAGE, aCollectionsApi());
 
-    fireEvent.click(await pickerOf(WORDS.noOwner));
+    fireEvent.click(await pickerOf(EMPTY_WORDS.owner));
 
     expect(await screen.findByRole("combobox", { name: WORDS.searchPeople })).toBeDefined();
     expect(screen.getByRole("listbox", { name: WORDS.people })).toBeDefined();
@@ -228,7 +229,7 @@ describe("the Collections and Owners page", () => {
   it("saves a chosen owner at once, with Undo", async () => {
     await openAt(PAGE, aCollectionsApi());
 
-    fireEvent.click(await pickerOf(WORDS.noOwner));
+    fireEvent.click(await pickerOf(EMPTY_WORDS.owner));
     await choosing(RHIAN.displayName);
 
     const undo = await screen.findByRole("button", { name: WORDS.undo });
@@ -251,7 +252,7 @@ describe("the Collections and Owners page", () => {
     await openAt(PAGE, ownedByRhian());
 
     fireEvent.click(await pickerOf(RHIAN.displayName));
-    await choosing(WORDS.noOwner);
+    await choosing(EMPTY_WORDS.owner);
 
     await screen.findByRole("button", { name: WORDS.undo });
     expect(namingAsks()).toEqual([{ collection: POLICY.collection, personId: null }]);
@@ -270,7 +271,7 @@ describe("the Collections and Owners page", () => {
   it("filters people by name and resets after a choice", async () => {
     await openAt(PAGE, aCollectionsApi());
 
-    fireEvent.click(await pickerOf(WORDS.noOwner));
+    fireEvent.click(await pickerOf(EMPTY_WORDS.owner));
     fireEvent.change(await screen.findByPlaceholderText(WORDS.searchPeople), {
       target: { value: "pryce" },
     });
@@ -281,7 +282,7 @@ describe("the Collections and Owners page", () => {
     });
     await choosing(RHIAN.displayName);
     await screen.findByRole("button", { name: WORDS.undo });
-    fireEvent.click(await pickerOf(WORDS.noOwner));
+    fireEvent.click(await pickerOf(EMPTY_WORDS.owner));
 
     const offered = await screen.findAllByRole("option");
     expect(offered.map((option) => option.textContent)).toContain(ADA.displayName);
@@ -301,7 +302,7 @@ describe("the Collections and Owners page", () => {
       );
     });
     expect(screen.queryByRole("button", { name: WORDS.undo })).toBeNull();
-    expect(await pickerOf(WORDS.noOwner)).toBeDefined();
+    expect(await pickerOf(EMPTY_WORDS.owner)).toBeDefined();
   });
 
   it("keeps each collection's refusal beside its own picker", async () => {
@@ -438,7 +439,7 @@ describe("the Collections and Owners page", () => {
     late.resolve(REFUSED);
     await rereading.reached;
 
-    await ownerShownFor(POLICY.collection, WORDS.noOwner);
+    await ownerShownFor(POLICY.collection, EMPTY_WORDS.owner);
     expect(
       await ownerShownFor(SAFETY.collection, ADA.displayName),
       "the late failure took the newer save's owner back",
@@ -474,7 +475,7 @@ describe("the Collections and Owners page", () => {
 
   it("undoes the last owner change by its keystroke", async () => {
     await openAt(PAGE, aCollectionsApi());
-    fireEvent.click(await pickerOf(WORDS.noOwner));
+    fireEvent.click(await pickerOf(EMPTY_WORDS.owner));
     await choosing(RHIAN.displayName);
     await screen.findByRole("button", { name: WORDS.undo });
 

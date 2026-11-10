@@ -26,6 +26,13 @@ export const paragraphsCompared = (current: string | null, proposed: string): Co
   return { current: markedAgainst(was, now), proposed: markedAgainst(now, was) };
 };
 
+type TypesShown = { readonly current?: string; readonly proposed?: string };
+
+export const typesShownOf = (current: ConceptParts | null, proposed: ConceptParts): TypesShown =>
+  current === null || current.conceptType === proposed.conceptType
+    ? {}
+    : { current: current.conceptType, proposed: proposed.conceptType };
+
 type Source = Extract<NonNullable<ConceptParts["sources"]>, readonly unknown[]>[number];
 
 const wordsOfField = (value: string | number | boolean | null | undefined): string | undefined =>

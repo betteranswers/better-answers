@@ -19,6 +19,9 @@ it.each([
   ["Bonus", "Bonus"],
   ["Analysis", "Analysis"],
   ["Rate  card", "Rate  Card"],
+  ["Gases", "Gas"],
+  ["Lenses", "Lens"],
+  ["natural gas", "Natural Gas"],
 ])("folds the type %s to %s", (conceptType, folded) => {
   expect(foldConceptType(conceptType)).toBe(folded);
 });
@@ -47,6 +50,10 @@ it.each([
   "Databases",
   "Crises",
   "Rate cards",
+  "Atlases",
+  "Aliases",
+  "Species",
+  "News",
   "ies",
   "s",
   "ßes",
@@ -54,3 +61,10 @@ it.each([
   const folded = foldConceptType(conceptType);
   expect(foldConceptType(folded)).toBe(folded);
 });
+
+it.each(["Gas", "Lens", "Atlas", "Alias", "Bias", "Canvas", "Series", "Species", "News"])(
+  "keeps the singular type %s as it is",
+  (conceptType) => {
+    expect(foldConceptType(conceptType)).toBe(conceptType);
+  },
+);

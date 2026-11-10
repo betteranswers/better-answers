@@ -1,7 +1,7 @@
 import type { JudgeState } from "@better-answers/schema";
 
 import { JUDGE_WORDS, REASON_WORDS, RECORD_WORDS, verdictWords } from "@/shared/answer-words.ts";
-import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 import type { Phase } from "./ask-api.ts";
 
@@ -21,7 +21,7 @@ export const ASK_WORDS = {
   verdict: verdictWords,
   refusedSaid: "Couldn’t find an answer to this question.",
   judge: JUDGE_WORDS satisfies Readonly<Record<JudgeState, string>>,
-  noCollection: CONCEPT_WORDS.noCollection,
+  noCollection: EMPTY_WORDS.collection,
   unmapped: "Passages",
   unwritten: {
     refused: "No answer could be written from this knowledge.",

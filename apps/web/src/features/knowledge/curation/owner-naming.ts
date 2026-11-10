@@ -3,6 +3,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { collectionNameOf } from "@better-answers/schema/collection-name";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
+import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import type { UndoNotice } from "@/shared/ui/kibo-ui/undo-toast.tsx";
 
@@ -16,7 +17,8 @@ import { COLLECTIONS_WORDS as WORDS, SAID_OF_COLLECTIONS } from "../knowledge-wo
 
 const { outcomeOfFailure } = refusalsOf(SAID_OF_COLLECTIONS);
 
-export const nameOf = (owner: Owner): string => (owner.name === "" ? WORDS.unnamed : owner.name);
+export const nameOf = (owner: Owner): string =>
+  owner.name === "" ? EMPTY_WORDS.member : owner.name;
 
 type Refused = { readonly state: "refused"; readonly words: ReactNode };
 

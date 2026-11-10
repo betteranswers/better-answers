@@ -4,6 +4,7 @@ import {
   importBundle,
   RECONCILER,
   reconcile,
+  refoldConceptTypes,
   updateConceptBody,
   type BundleImported,
   type BundleTree,
@@ -56,6 +57,30 @@ export const reconcileWatermark = async (
     return REFUSED;
   }
   io.say(`reconcile-watermark: done — ${found}`);
+  return DONE;
+};
+
+export const refoldConceptTypesCommand = async (
+  doors: Doors,
+  workspaceId: string,
+  io: OpsIo,
+): Promise<number> => {
+  const run = await refoldConceptTypes(RECONCILER, doors.postgres, { workspaceId });
+  if (!run.ok) return refused("refold-concept-types", workspaceId, run.error, io);
+  const { refolded, clashed } = run.value;
+  for (const each of clashed) {
+    io.say(
+      `refold-concept-types: another concept holds ${each.mergeKey}, so ${each.iri} keeps its type and merge key`,
+    );
+  }
+  io.say(
+    `refold-concept-types: done — refolded ${counted(refolded.length, "concept")}, ${clashed.length} kept by a clash`,
+  );
+  if (refolded.length > 0) {
+    io.say(
+      `refold-concept-types: run map-rebuild --workspace ${workspaceId} to carry the new types into the map`,
+    );
+  }
   return DONE;
 };
 

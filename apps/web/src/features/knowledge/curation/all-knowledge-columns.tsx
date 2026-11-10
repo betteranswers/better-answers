@@ -4,10 +4,12 @@ import { createContext, useContext } from "react";
 import { collectionLabelOf } from "@/shared/knowledge/collection-name.ts";
 import { conceptMatchKey } from "@/shared/knowledge/concept-address.ts";
 import { ConceptLink } from "@/shared/knowledge/concept-link.tsx";
+import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
 
 import type { AllKnowledgeRow } from "../knowledge-api.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "./curation-words.ts";
+import { nameOf } from "./owner-naming.ts";
 
 export const allKnowledgeFeatures = tableFeatures({});
 
@@ -49,10 +51,10 @@ function TitleCell(properties: { readonly concept: AllKnowledgeRow }) {
 
 function OwnerCell(properties: { readonly owner: AllKnowledgeRow["owner"] }) {
   const { owner } = properties;
-  if (owner === null) return <span className="text-muted-foreground">{WORDS.unowned}</span>;
+  if (owner === null) return <span className="text-muted-foreground">{EMPTY_WORDS.owner}</span>;
   return (
     <span className="flex flex-col leading-tight">
-      <span>{owner.name === "" ? WORDS.unnamed : owner.name}</span>
+      <span>{nameOf(owner)}</span>
       {owner.own ? <span className="text-xs text-muted-foreground">{WORDS.ownOwner}</span> : null}
     </span>
   );

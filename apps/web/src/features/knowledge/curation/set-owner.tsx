@@ -14,6 +14,7 @@ import { NativeSelect, NativeSelectOption } from "@/shared/ui/native-select.tsx"
 import { useOwnerChoices, useSetOwners, type Owner } from "../knowledge-api.ts";
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "./curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "./curation-words.ts";
+import { nameOf } from "./owner-naming.ts";
 
 const { outcomeOfFailure } = refusalsOf(WORDS.refusedOnSetOwner);
 
@@ -26,8 +27,6 @@ const NOTHING_SELECTED: Outcome = { tone: "said", words: WORDS.selectFirst };
 const STILL_GOING: Outcome = { tone: "said", words: WORDS.setOwner.stillGoing };
 
 const TOO_MANY: Outcome = { tone: "said", words: WORDS.setOwner.tooMany(MOST_OWNERS_AT_ONCE) };
-
-const nameOf = (owner: Owner): string => (owner.name === "" ? WORDS.unnamed : owner.name);
 
 type Chosen = {
   readonly personId: string | null;

@@ -315,8 +315,9 @@ function Actions(properties: {
   readonly events: EditorEvents;
   readonly outcome: Outcome | undefined;
   readonly saveRef: RefObject<HTMLButtonElement | null>;
+  readonly refusalRef: RefObject<HTMLDivElement | null>;
 }) {
-  const { shown, target, events, saveRef } = properties;
+  const { shown, target, events, saveRef, refusalRef } = properties;
   const said = (
     <OutcomeLine outcome={properties.outcome} className="mt-3 [&_[role=alert]]:text-destructive" />
   );
@@ -332,13 +333,15 @@ function Actions(properties: {
   if (shown.stage === "stale") {
     return (
       <>
+        <div ref={refusalRef} tabIndex={-1}>
+          {said}
+        </div>
         <div className="mt-4 flex flex-wrap gap-3">
           <Button type="button" variant="accent" onClick={events.reload}>
             {WORDS.reload}
           </Button>
           {closing}
         </div>
-        {said}
       </>
     );
   }
@@ -382,17 +385,20 @@ function Actions(properties: {
   );
 }
 
-/** A refused save swaps the buttons, so focus would fall to the page. It goes back to Save. */
-const useSaveRefocused = (
+/** A refused save swaps the buttons, so focus would fall to the page. It returns to Save, or to the refusal. */
+const useRefusalRefocused = (
   stage: EditorShown["stage"],
   saveRef: RefObject<HTMLButtonElement | null>,
+  refusalRef: RefObject<HTMLDivElement | null>,
 ) => {
   const was = useRef(stage);
   useEffect(() => {
     const leftSaving = was.current === "saving" && stage !== "saving";
     was.current = stage;
-    if (leftSaving && document.activeElement === document.body) saveRef.current?.focus();
-  }, [stage, saveRef]);
+    if (!leftSaving) return;
+    if (stage === "stale") refusalRef.current?.focus();
+    else if (document.activeElement === document.body) saveRef.current?.focus();
+  }, [stage, saveRef, refusalRef]);
 };
 
 export function ConceptEditor(properties: EditorProps) {
@@ -402,7 +408,8 @@ export function ConceptEditor(properties: EditorProps) {
   const locked = shown.stage !== "editing";
   const review = shown.stage === "stale" ? undefined : reviewOf(open, target);
   const saveRef = useRef<HTMLButtonElement>(null);
-  useSaveRefocused(shown.stage, saveRef);
+  const refusalRef = useRef<HTMLDivElement>(null);
+  useRefusalRefocused(shown.stage, saveRef, refusalRef);
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -483,6 +490,7 @@ export function ConceptEditor(properties: EditorProps) {
         events={events}
         outcome={properties.outcome}
         saveRef={saveRef}
+        refusalRef={refusalRef}
       />
       {properties.leaving === undefined ? null : (
         <LeavingAsk

@@ -39,7 +39,7 @@ export const MEMBER_PAGE_WORDS = {
   loading: "Loading the member…",
   noSuchMember: "Member not found",
   toMembers: "Go to Members",
-  removing: (name: string) => `Removing ${name} from this workspace.`,
+  removing: (name: string) => `Removing ${name} from this workspace…`,
   removed: (name: string) => `${name} removed from this workspace.`,
   removal: "Removal",
   removeMember: "Remove member",
@@ -87,17 +87,15 @@ export const BULK_WORDS = {
     action: "Change role",
     title: (count: number) => `Change role for ${members(count)}`,
     consequence: (role: Role) => `Each member becomes ${aRole(role)}.`,
-    pending: (count: number, role: Role) => `Changing ${members(count)} to ${role}.`,
+    pending: (count: number, role: Role) => `Changing ${members(count)} to ${role}…`,
     done: (changed: number, role: Role, skipped: number) =>
       `${changedSaid(changed, "No members were changed.", `changed to ${role}`)}${andAlready(skipped, `already in the ${role} role`)}`,
   },
   addToGroup: {
     action: "Add to group",
     title: (count: number) => `Add ${members(count)} to a group`,
-    consequence: (group: string | undefined) =>
-      group === undefined ? undefined : `Each member joins ${group}.`,
     choose: "Select a group",
-    pending: (count: number, group: string) => `Adding ${members(count)} to ${group}.`,
+    pending: (count: number, group: string) => `Adding ${members(count)} to ${group}…`,
     done: (changed: number, group: string, skipped: number) =>
       `${changedSaid(changed, "No members were added.", `added to ${group}`)}${andAlready(skipped, "already in it")}`,
   },
@@ -106,7 +104,7 @@ export const BULK_WORDS = {
     title: (count: number) => `Remove ${members(count)}`,
     consequence: (count: number) =>
       `${count === 1 ? "This member" : "These members"} will lose access to this workspace, along with their assistants.`,
-    pending: (count: number) => `Removing ${members(count)} from this workspace.`,
+    pending: (count: number) => `Removing ${members(count)} from this workspace…`,
     done: (changed: number, skipped: number) =>
       `${changedSaid(changed, "No members were removed.", "removed from this workspace")}${andAlready(skipped, "no longer a member")}`,
   },

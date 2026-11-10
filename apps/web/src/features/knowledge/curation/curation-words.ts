@@ -23,9 +23,6 @@ export const ALL_KNOWLEDGE_WORDS = {
     trust: "Trust",
     owner: "Owner",
   },
-  noCollection: CONCEPT_WORDS.noCollection,
-  unowned: "No owner",
-  unnamed: "Unnamed member",
   ownOwner: "Set on this concept",
   lastVerified: (date: string): string => `Last verified ${date}`,
   filters: {
@@ -36,9 +33,9 @@ export const ALL_KNOWLEDGE_WORDS = {
       any: "Any trust",
       choices: {
         unverified: "Unverified",
-        "out-of-date": CONCEPT_WORDS.titleBlock.statuses["out-of-date"],
-        "changed-since-checked": CONCEPT_WORDS.titleBlock.statuses["changed-since-checked"],
-        deprecated: CONCEPT_WORDS.titleBlock.statuses.deprecated,
+        "out-of-date": CONCEPT_WORDS.trustStatuses["out-of-date"],
+        "changed-since-checked": CONCEPT_WORDS.trustStatuses["changed-since-checked"],
+        deprecated: CONCEPT_WORDS.trustStatuses.deprecated,
       } satisfies Record<NonNullable<AllKnowledgeAsked["trust"]>, string>,
     },
   },
@@ -88,7 +85,6 @@ export const CONCEPT_TYPES_WORDS = {
   tail: "Types with 2 or fewer concepts",
   byCollection: "by collection",
   collectionsOf: (conceptType: string): string => `${conceptType} concepts by collection`,
-  noCollection: CONCEPT_WORDS.noCollection,
   selectFirst: "Select a type first.",
   refusals: {
     "owner-forbids":

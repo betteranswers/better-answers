@@ -309,15 +309,14 @@ const useReadingKeys = (wayBack: ReturnType<typeof useWayBack>, copy: () => void
   const listed = useMemo(() => listedWithWayBackTo(wayBack.name), [wayBack.name]);
   usePageKeystrokes(listed);
   useKeystroke(wayBackKeystroke(wayBack.name), wayBack.go);
-  const goToSources = () => {
+  useKeystroke(KEY.sources, () => {
     sources.current?.focus();
-  };
-  useKeystroke(KEY.sources, goToSources);
+  });
   useKeystroke(KEY.links, () => {
     links.current?.focus();
   });
   useKeystroke(KEY.copy, copy);
-  return { sources, links, goToSources };
+  return { sources, links };
 };
 
 const useOpening = (concept: Concept) => {
@@ -414,11 +413,7 @@ function ConceptShown(properties: {
             links={keys.links}
           />
         </div>
-        <TitleBlock
-          concept={concept}
-          onGoToSources={keys.goToSources}
-          className={cn(TITLE_BLOCK, INTERFACE)}
-        />
+        <TitleBlock concept={concept} className={cn(TITLE_BLOCK, INTERFACE)} />
         {sheet === undefined ? null : <EvidenceSheet opened={sheet} onClose={close} />}
       </article>
     </div>

@@ -74,6 +74,7 @@ export {
 } from "./writes/reconciler.ts";
 /** @public S5 */
 export type { ReconcilerHit } from "./writes/reconciler.ts";
+export { refoldConceptTypes } from "./writes/refold.ts";
 export {
   declineSuggestion,
   submitSuggestionSet,

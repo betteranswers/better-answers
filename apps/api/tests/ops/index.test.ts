@@ -5,6 +5,7 @@ import { initRepository } from "@better-answers/core/store/git";
 import { objectStoreForSuite } from "@better-answers/core/testing/objects";
 import {
   bundleCommit,
+  conceptIdentity,
   conceptIndex,
   conceptVerification,
   connectedSource,
@@ -50,6 +51,7 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "set-model-key": [modelKey],
   "set-model-choice": [modelChoice, modelPrice, decisionThreshold],
   "update-concept-body": [conceptIndex, bundleCommit],
+  "refold-concept-types": [conceptIndex, conceptIdentity],
 };
 
 const WELL_FORMED_FLAGS: Readonly<Record<string, readonly string[]>> = {

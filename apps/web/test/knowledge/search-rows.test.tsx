@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
 import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { KNOWLEDGE_BASE_PAGE } from "@/shared/knowledge/concept-address.ts";
-import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import { CONCEPT_WORDS, EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 import {
   aConceptMatch,
   aSearchApi,
@@ -96,7 +96,7 @@ describe("a concept's row on the Knowledge Search page", () => {
     const text = rowNamed("Safeguarding Contacts").textContent;
 
     expect(text).toContain("Unverified");
-    expect(text).toContain("CollectionNo collection");
+    expect(text).toContain(`${CONCEPT_WORDS.collection}${EMPTY_WORDS.collection}`);
     expect(text).not.toMatch(/\d{4}/);
   });
 

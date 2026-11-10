@@ -345,6 +345,7 @@ export const personIdsByEmail = async (
 export type StandingConcept = {
   readonly iri: string;
   readonly mergeKey: string;
+  readonly title: string;
   readonly status: string;
   readonly body: string;
   readonly contentHash: string;
@@ -354,6 +355,7 @@ type StandingRow = {
   readonly path: string;
   readonly iri: string;
   readonly merge_key: string;
+  readonly title: string;
   readonly status: string;
   readonly body: string;
   readonly content_hash: string;
@@ -366,7 +368,7 @@ export const standingAt = async (
 ): Promise<ReadonlyMap<string, StandingConcept>> => {
   if (paths.length === 0) return new Map();
   const found = await tx.query<StandingRow>(
-    `SELECT c.path, c.iri, i.merge_key, c.status, c.body, c.content_hash
+    `SELECT c.path, c.iri, i.merge_key, c.title, c.status, c.body, c.content_hash
        FROM concept_index c
        JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
       WHERE c.workspace_id = ${scopeClause(1)} AND c.path = ANY($2::text[])`,
@@ -378,6 +380,7 @@ export const standingAt = async (
       {
         iri: row.iri,
         mergeKey: row.merge_key,
+        title: row.title,
         status: row.status,
         body: row.body,
         contentHash: row.content_hash,

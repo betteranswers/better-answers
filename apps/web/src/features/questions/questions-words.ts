@@ -1,5 +1,5 @@
 import { flaggedWords, JUDGE_WORDS, RECORD_WORDS, verdictWords } from "@/shared/answer-words.ts";
-import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 import type { AskedRecord, ConceptRead, FlagClosing } from "./questions-api.ts";
 
@@ -35,7 +35,7 @@ export const QUESTIONS_WORDS = {
   flagged: "Flagged",
   others: "Other questions",
   notAnswered: verdictWords("refuse"),
-  noCollection: CONCEPT_WORDS.noCollection,
+  noCollection: EMPTY_WORDS.collection,
   more: "More questions",
   verdict: verdictWords,
   judge: (state: AskedRecord["judgeState"]): string =>

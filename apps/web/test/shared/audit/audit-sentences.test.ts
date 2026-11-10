@@ -9,6 +9,7 @@ import {
   sentenceOf,
   type SaidEvent,
 } from "@/shared/audit/audit-sentences.ts";
+import { unnamedWords } from "@/shared/audit/audit-subjects.ts";
 
 const HANNAH = {
   kind: "person",
@@ -257,9 +258,9 @@ describe("an audit event in current product terms", () => {
       named: { iri: withheld, personId: PRIYA },
     });
 
-    expect(sentenceOf(saved)).toBe("Hannah Wright saved a concept you don't have access to");
+    expect(sentenceOf(saved)).toBe(`Hannah Wright saved ${unnamedWords(withheld)}`);
     expect(sentenceOf(owned)).toBe(
-      "Hannah Wright named Priya Shah owner of a concept you don't have access to",
+      `Hannah Wright named Priya Shah owner of ${unnamedWords(withheld)}`,
     );
   });
 

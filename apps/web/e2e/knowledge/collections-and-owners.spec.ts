@@ -5,6 +5,7 @@ import { collectionNameOf } from "@better-answers/schema/collection-name";
 import { CONCEPT_TYPES_PAGE } from "@/features/knowledge/curation/curation-state.ts";
 import { COLLECTIONS_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
+import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -192,19 +193,19 @@ test.describe("Collections and Owners", () => {
       );
       await page.keyboard.press(KEY.changeOwner.key);
       await expect(
-        pickerOf(page, "held", WORDS.noOwner),
+        pickerOf(page, "held", EMPTY_WORDS.owner),
         "the change-owner key did not move focus to the first owner picker",
       ).toBeFocused();
 
       await tabUntilFocused(page, pickerOf(page, "policy", EDITOR));
-      await choosing(page, WORDS.noOwner);
-      await expect(pickerOf(page, "policy", WORDS.noOwner)).toBeFocused();
+      await choosing(page, EMPTY_WORDS.owner);
+      await expect(pickerOf(page, "policy", EMPTY_WORDS.owner)).toBeFocused();
       await expect(page.getByRole("button", { name: WORDS.undo })).toBeVisible();
 
       await page.keyboard.press(KEY.undo.key);
       await expect(pickerOf(page, "policy", EDITOR)).toBeVisible();
 
-      await tabUntilFocused(page, pickerOf(page, "safety", WORDS.noOwner));
+      await tabUntilFocused(page, pickerOf(page, "safety", EMPTY_WORDS.owner));
       await choosing(page, VIEWER);
       await expect(pickerOf(page, "safety", VIEWER)).toBeFocused();
 

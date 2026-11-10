@@ -208,16 +208,58 @@ describe("Waiting on you", () => {
         state: "shown",
         version: {
           title: "Expenses",
+          conceptType: "Policy",
           body: "Expenses are claimed within thirty days.",
           sources: undefined,
         },
       },
       proposed: {
         title: "Expenses",
+        conceptType: "Policy",
         body: "Expenses are claimed within ninety days.",
         sources: undefined,
       },
     });
+  });
+
+  it("opens an item with the type its acceptance stores", async () => {
+    const scenario = await arrange();
+    const standing = await conceptWritten(scenario);
+    const { suggestionId } = await proposedBy(scenario, scenario.viewer, standing, {
+      conceptType: "guidelines",
+      frontmatter: { title: "Expenses", type: "guidelines" },
+    });
+
+    const opened = answered(await openedBy(scenario.editor, suggestionId));
+
+    expect(opened).toEqual(
+      matching.objectContaining({
+        current: { state: "shown", version: matching.objectContaining({ conceptType: "Policy" }) },
+        proposed: matching.objectContaining({ conceptType: "Guideline" }),
+      }),
+    );
+  });
+
+  it("shows the current type as the index stores it", async () => {
+    const scenario = await arrange();
+    const standing = await conceptWritten(scenario);
+    await db().pool.query(
+      "UPDATE concept_index SET concept_type = 'Analys' WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, standing.written.iri],
+    );
+    const { suggestionId } = await proposedBy(scenario, scenario.viewer, standing, {
+      conceptType: "Analyses",
+      frontmatter: { title: "Expenses", type: "Analyses" },
+    });
+
+    const opened = answered(await openedBy(scenario.editor, suggestionId));
+
+    expect(opened).toEqual(
+      matching.objectContaining({
+        current: { state: "shown", version: matching.objectContaining({ conceptType: "Analys" }) },
+        proposed: matching.objectContaining({ conceptType: "Analyse" }),
+      }),
+    );
   });
 
   it("opens the requested item of a two-item set", async () => {
@@ -434,6 +476,7 @@ describe("Waiting on you", () => {
       state: "shown",
       version: {
         title: "Expenses",
+        conceptType: "Policy",
         body: "Expenses are claimed within thirty days.",
         sources: undefined,
       },

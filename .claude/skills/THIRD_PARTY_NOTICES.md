@@ -143,7 +143,9 @@ SOFTWARE.
 
 ## `trpc/trpc`
 
-Fifteen skills come from https://github.com/trpc/trpc, under the MIT licence: `adapter-fetch`, `auth`, `caching`, `client-setup`, `error-handling`, `links`, `middlewares`, `non-json-content-types`, `openapi`, `react-query-setup`, `server-setup`, `server-side-calls`, `subscriptions`, `trpc-router`, `validators`. Each was copied from the folder that `skills-lock.json` names as its `skillPath`. They are committed as installed, with no edits. `skills-lock.json` names each source and the hash of each folder.
+Fifteen skills come from https://github.com/trpc/trpc, under the MIT licence: `adapter-fetch`, `auth`, `caching`, `client-setup`, `error-handling`, `links`, `middlewares`, `non-json-content-types`, `openapi`, `react-query-setup`, `server-setup`, `server-side-calls`, `subscriptions`, `trpc-router`, `validators`. Each was copied from a `packages/*/skills/<name>/` folder of that repository. They are committed as installed, with no edits.
+
+tRPC deleted its agent skills in commit `4427f0bea4ceca48f3e15125e858ab9adddf3f3b` (pull request #7757, 31/10/2026), so nothing publishes updates to these copies any more. They are vendored. `skills-lock.json` has no row for them, and `pnpm run skills-update` leaves them alone. The last upstream commit that carries them is the parent of that commit, `a10d32a692c96118b0c5d5cf5553c79dc062c9b8`. At that commit, 14 of the 15 copies match byte for byte, apart from the added `paths:` line. In `links`, `references/link-options.md` keeps an older paragraph about the streaming `content-type`.
 
 The text below is the upstream `LICENSE`, read on 27/10/2026 at commit `e237729d3ca2f4bb34e6084424e62d12f70380d3`.
 
