@@ -1,11 +1,15 @@
 import { EditorView } from "@codemirror/view";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { FORMATTING_WORDS } from "@/features/knowledge/editing/editor-words.ts";
 import { SourceBody } from "@/features/knowledge/editing/source-body.tsx";
 import { VisualBody } from "@/features/knowledge/editing/visual-body.tsx";
 import "@test/jsdom/layout.ts";
+import { placedWithoutMeasuring } from "@test/measuring.ts";
+
+placedWithoutMeasuring();
 
 afterEach(cleanup);
 
@@ -77,9 +81,7 @@ describe("the visual body field", () => {
     const user = userEvent.setup();
     render(<VisualBody label="Body" value="Point one" onChange={onChange} />);
 
-    const toolbar = screen.getByRole("toolbar", { name: "Formatting" });
-    expect(toolbar.querySelectorAll("button")).toHaveLength(6);
-    const list = screen.getByRole("button", { name: "Bulleted list" });
+    const list = screen.getByRole("button", { name: FORMATTING_WORDS.bulletedList });
     expect(list.getAttribute("aria-pressed")).toBe("false");
 
     caretAtEnd(field());
@@ -87,6 +89,29 @@ describe("the visual body field", () => {
 
     expect(onChange).toHaveBeenLastCalledWith("- Point one");
     expect(list.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("names each toolbar button and tips it the same", async () => {
+    const user = userEvent.setup();
+    render(<VisualBody label="Body" value="Text" onChange={ignore} />);
+
+    const toolbar = screen.getByRole("toolbar", { name: FORMATTING_WORDS.toolbar });
+    const { toolbar: _own, ...buttons } = FORMATTING_WORDS;
+    const names = Object.values(buttons);
+    expect(
+      within(toolbar)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual(names);
+
+    for (const name of names) {
+      await user.hover(within(toolbar).getByRole("button", { name }));
+      expect((await screen.findByRole("tooltip")).textContent).toBe(name);
+      await user.keyboard("{Escape}");
+      await waitFor(() => {
+        expect(screen.queryByRole("tooltip")).toBeNull();
+      });
+    }
   });
 
   it("draws a footnote reference as a mark and keeps it", async () => {
