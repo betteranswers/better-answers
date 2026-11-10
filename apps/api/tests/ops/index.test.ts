@@ -43,7 +43,6 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "map-counts": [mapGeneration, mapNode, mapEdge],
   "unmapped-passage-rate": [questionAsked, questionFeedback],
   "reconcile-watermark": [conceptIndex, bundleCommit],
-  "refold-concept-types": [conceptIndex, conceptIdentity],
   "object-store-orphans": [sourceDocument],
   "reindex-connected-sources": [connectedSource, job],
   "erasure-rehearsal": [erasureRequest, suppression],
@@ -52,6 +51,7 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "set-model-key": [modelKey],
   "set-model-choice": [modelChoice, modelPrice, decisionThreshold],
   "update-concept-body": [conceptIndex, bundleCommit],
+  "refold-concept-types": [conceptIndex, conceptIdentity],
 };
 
 const WELL_FORMED_FLAGS: Readonly<Record<string, readonly string[]>> = {
