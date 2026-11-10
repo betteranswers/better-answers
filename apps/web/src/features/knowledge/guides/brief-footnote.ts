@@ -10,8 +10,6 @@ export const FOOTNOTE_NODE = FootnoteReference.name;
 const CHIP =
   "mx-0.5 inline-block min-h-6 border border-border bg-muted px-1.5 align-baseline font-sans! [font-size:var(--text-sm)]! leading-6!";
 
-const MARKER = /^\[\^([\w-]+)\]/u;
-
 type Direction = 1 | -1;
 
 type Titled = (label: string) => string;
@@ -29,18 +27,6 @@ const stepsOverAChip = (editor: Editor, direction: Direction): boolean => {
 
 const titledFootnote = (titleOf: Titled) =>
   FootnoteReference.extend({
-    markdownTokenizer: {
-      name: FOOTNOTE_NODE,
-      level: "inline",
-      start: (source) => source.indexOf("[^"),
-      tokenize: (source) => {
-        const found = MARKER.exec(source);
-        return found === null
-          ? undefined
-          : { type: FOOTNOTE_NODE, raw: found[0], text: found[1] ?? "" };
-      },
-    },
-
     renderHTML({ node, HTMLAttributes }) {
       const label = labelOf(node.attrs);
       return [

@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { losesMarkdown } from "@/features/knowledge/editing/markdown-round-trip.ts";
 import { BriefBody } from "@/features/knowledge/guides/brief-body.tsx";
 import { BRIEF_WORDS, GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
@@ -114,21 +115,13 @@ describe("moving among a Brief's footnote chips", () => {
     expect(chip?.textContent).toBe(`Footnote: ${RACKING_TITLE}`);
   });
 
-  it("draws a chip that a colon follows", () => {
-    render(
-      <BriefBody
-        label={LABEL}
-        value={`Pallets[^${AN_INCLUDE_ID}]: are racked.`}
-        includes={INCLUDES}
-        placed={new Set([AN_INCLUDE_ID])}
-        onChange={vi.fn<(markdown: string) => void>()}
-      />,
-    );
+  it("leaves the concept editor's reading of a definition alone", () => {
+    draw();
 
-    const chip = textField().querySelector("[data-footnote-reference]");
-    expect(chip?.getAttribute("data-footnote-reference")).toBe(AN_INCLUDE_ID);
-    expect(textField().textContent).toContain(": are racked.");
-    expect(textField().textContent).not.toContain(AN_INCLUDE_ID);
+    expect(
+      losesMarkdown("We keep audit logs.[^1]\n\n[^1]: The retention policy."),
+      "a Brief editor changed how the concept editor reads a footnote definition",
+    ).toBe(true);
   });
 
   it("moves past a footnote chip with one arrow key", async () => {
