@@ -1,10 +1,10 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UNKNOWN_PAGE } from "@/app/words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace/workspace-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
-import { HOMES } from "@/shared/navigation.ts";
+import { HOMES, NEW_QUESTION } from "@/shared/navigation.ts";
+import { notFoundLinksHome } from "@test/detail/not-found-detail.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
   anAdminOver,
@@ -109,10 +109,7 @@ describe("a member's own page", () => {
       router.history.back();
     });
     await waitFor(() => expect(router.state.location.pathname).toBe(MEMBERS_PAGE));
-    expect(
-      await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading }),
-    ).toBeDefined();
-    expect(screen.getByRole("link", { name: "Go to New Question" })).toBeDefined();
+    await notFoundLinksHome(NEW_QUESTION);
   });
 });
 

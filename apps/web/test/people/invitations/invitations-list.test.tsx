@@ -1,11 +1,11 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UNKNOWN_PAGE } from "@/app/words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
-import { HOMES } from "@/shared/navigation.ts";
+import { HOMES, NEW_QUESTION } from "@/shared/navigation.ts";
 import { CLEAR_WORDS } from "@/shared/words.ts";
+import { notFoundLinksHome } from "@test/detail/not-found-detail.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
   actionBesideKey,
@@ -234,10 +234,7 @@ describe("the People page's Invitations tab", () => {
 
       await openAt(HOMES.Admin.path, api);
 
-      expect(
-        await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading }),
-      ).toBeDefined();
-      expect(screen.getByRole("link", { name: "Go to New Question" })).toBeDefined();
+      await notFoundLinksHome(NEW_QUESTION);
       expect(screen.queryByRole("tab", { name: "Invitations" })).toBeNull();
       expect(screen.queryByRole("region", { name: "Invitations" })).toBeNull();
     });
