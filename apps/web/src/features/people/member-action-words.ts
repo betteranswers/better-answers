@@ -11,7 +11,7 @@ export const INCLUDES_YOU = "This includes you.";
 export const NO_LONGER_LISTED = "A member no longer listed";
 
 export const homeNowSaid = (role: Role): string =>
-  `Your role is now ${role}. This is your home page now.`;
+  `You are now ${aRole(role)}. This is your home page.`;
 
 export const MEMBERS_LOADING = "The members are still loading.";
 
