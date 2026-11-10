@@ -11,11 +11,16 @@ import {
   signIn,
 } from "./harness.ts";
 
+const CONNECTED_SOURCES = pageById(
+  menuGroupIn(CONTROL_CENTRE, "sources"),
+  "connected-sources",
+).name;
+
 const controlCentreNav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 
 export const connectedSourcesRegion = (page: Page) =>
   page.getByRole("region", {
-    name: pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name,
+    name: CONNECTED_SOURCES,
   });
 
 export const saidIn = (page: Page): Locator =>
@@ -65,13 +70,13 @@ export const anAdminAtSources = async (
   await signIn(page, api, email);
   await controlCentreNav(page)
     .getByRole("link", {
-      name: pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name,
+      name: CONNECTED_SOURCES,
     })
     .click();
   await expect(
     page.getByRole("heading", {
       level: 1,
-      name: pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name,
+      name: CONNECTED_SOURCES,
     }),
   ).toBeVisible();
   return { workspace, seeded };

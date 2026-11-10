@@ -10,7 +10,6 @@ import {
 } from "@tanstack/react-table";
 import { useMemo, useRef, useState, type RefObject } from "react";
 
-import { JUMP_TO } from "@/app/words.ts";
 import { FilterRow } from "@/shared/list/filter-row.tsx";
 import { GridTable, RowLink } from "@/shared/list/grid-table.tsx";
 import { ListPages, ListState, pageWithin } from "@/shared/list/list-pages.tsx";
@@ -181,7 +180,7 @@ export const LIST_SAYS = {
   none: "No one belongs to this workspace yet.",
   noneFiltered: "No one matches these filters.",
   noneMatching: (search: string): string => `No one matches “${search}”.`,
-  loading: JUMP_TO.membersLoading,
+  loading: "Loading members…",
   failed: "The members could not be read.",
 } as const;
 

@@ -1,5 +1,5 @@
 import { CONSOLE, menuGroupIn, pageById } from "@/shared/navigation.ts";
-import { counted } from "@/shared/words.ts";
+import { counted, nothingMatches } from "@/shared/words.ts";
 
 type Noun = readonly [one: string, many: string];
 
@@ -33,7 +33,7 @@ export const EVERYONE_WORDS = {
   counted: (total: number): string => `${counted(total, ...PEOPLE)} on the platform.`,
   matching: (total: number, search: string): string => matching(total, PEOPLE, search),
   noneYet: "No people yet",
-  noneMatch: (search: string): string => `No results found for “${search}”.`,
+  noneMatch: nothingMatches,
 } as const;
 
 const namesCounted = (count: number): string =>
@@ -49,7 +49,7 @@ export const NAMES_WAITING_WORDS = {
   matching: (count: number, search: string): string => matching(count, NAMES, search),
   noneWaiting: "No names waiting",
   whatWaits: "Names flagged by Admins will appear here.",
-  noneMatch: (search: string): string => `No results found for “${search}”.`,
+  noneMatch: nothingMatches,
 } as const;
 
 export const WORKSPACES_WORDS = {
@@ -65,6 +65,6 @@ export const WORKSPACES_WORDS = {
   loading: "Loading workspaces…",
   counted: (count: number): string => `${counted(count, ...WORKSPACES)} on the platform.`,
   matching: (count: number, search: string): string => matching(count, WORKSPACES, search),
-  noneMatch: (search: string): string => `No results found for “${search}”.`,
+  noneMatch: nothingMatches,
   moreAbout: (name: string): string => `More about ${name}`,
 } as const;

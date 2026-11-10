@@ -1,4 +1,5 @@
 import { Button } from "@/shared/ui/button.tsx";
+import { LIST_WORDS } from "@/shared/words.ts";
 
 import { PAGE_SIZE } from "../people-api.ts";
 
@@ -58,12 +59,17 @@ export function Pages(properties: {
         Showing {offset + 1}–{offset + shown} of {total}.
       </p>
       <PageTurn
-        label="Previous page"
+        label={LIST_WORDS.previousPage}
         keystroke={keystrokes.previous}
         offset={turns.previous}
         turnTo={turnTo}
       />
-      <PageTurn label="Next page" keystroke={keystrokes.next} offset={turns.next} turnTo={turnTo} />
+      <PageTurn
+        label={LIST_WORDS.nextPage}
+        keystroke={keystrokes.next}
+        offset={turns.next}
+        turnTo={turnTo}
+      />
     </nav>
   );
 }
