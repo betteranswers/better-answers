@@ -29,6 +29,8 @@ comment there says why it is not `pnpm run`. A spec builds its state through the
 `apps/web/e2e/harness.ts`, each of which calls `/__harness`, which
 `apps/api/tests/support/harness/harness-control.ts` mounts. Search both before adding an action.
 The actions include `provision`, `addMember`, `endEverySignInAndToken`, `markTheOperator`,
+`dismissedThePasskeyOffer` (a spec that walks a page by Tab from the skip link calls it before sign-in,
+because whether the shell draws the offer on the spec's page depends on where sign-in ends),
 `invite`, `seedModelChoices`, `seedConnectedSources`, `nameOwners`, `seedConceptIndex`, `seedGuide` (the
 Northgate guide and its concepts), `seedManifest` (the knowledge base's manifest, which a typed knowledge
 base lacks until an import writes one), `seedQuestions`,

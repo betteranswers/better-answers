@@ -84,6 +84,12 @@ export const markTheOperator = (
   email: string,
   change: "grant" | "revoke" = "grant",
 ) => postToHarness(api, "/operators", { email, change }, operatorMarked);
+
+const offerDismissed = z.object({ dismissed: z.boolean() });
+
+export const dismissedThePasskeyOffer = (api: APIRequestContext, email: string) =>
+  postToHarness(api, "/passkey-offer-dismissals", { email }, offerDismissed);
+
 const invitationWritten = z.object({ id: z.string() });
 
 /** The database stores Better Auth's spelling, "canceled". Specs use the glossary's spelling, "cancelled". */
