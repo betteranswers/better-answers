@@ -203,7 +203,7 @@ const partsOf = async (
   if (!resolved.ok) return err(resolved.error);
   return ok({
     title: concept.title,
-    conceptType: foldConceptType(concept.conceptType),
+    conceptType: concept.conceptType,
     body: concept.body,
     sources: projectedFrontmatter(concept.frontmatter, resolved.value)["sources"],
   });
@@ -257,7 +257,10 @@ export const waitingEdit = async (
   const { item, payload } = kept.value;
 
   const projecting = { principal: reader, tx, ...reads };
-  const proposed = await partsOf(projecting, payload);
+  const proposed = await partsOf(projecting, {
+    ...payload,
+    conceptType: foldConceptType(payload.conceptType),
+  });
   if (!proposed.ok) return err(proposed.error);
   const current = await standingOf(projecting, item);
   if (!current.ok) return err(current.error);

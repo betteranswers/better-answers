@@ -240,6 +240,28 @@ describe("Waiting on you", () => {
     );
   });
 
+  it("shows the current type as the index stores it", async () => {
+    const scenario = await arrange();
+    const standing = await conceptWritten(scenario);
+    await db().pool.query(
+      "UPDATE concept_index SET concept_type = 'Analys' WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, standing.written.iri],
+    );
+    const { suggestionId } = await proposedBy(scenario, scenario.viewer, standing, {
+      conceptType: "Analyses",
+      frontmatter: { title: "Expenses", type: "Analyses" },
+    });
+
+    const opened = answered(await openedBy(scenario.editor, suggestionId));
+
+    expect(opened).toEqual(
+      matching.objectContaining({
+        current: { state: "shown", version: matching.objectContaining({ conceptType: "Analys" }) },
+        proposed: matching.objectContaining({ conceptType: "Analyse" }),
+      }),
+    );
+  });
+
   it("opens the requested item of a two-item set", async () => {
     const scenario = await arrange();
     const one = await conceptWritten(scenario);

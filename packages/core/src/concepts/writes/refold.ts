@@ -41,7 +41,7 @@ const wantedOf = (stored: StoredType): Refold | undefined => {
   const conceptType = foldConceptType(stored.written);
   const mergeKey = followedKeyOf(
     { mergeKey: stored.mergeKey, title: stored.title },
-    { conceptType, title: stored.title },
+    { conceptType: stored.written, title: stored.title },
   );
   if (conceptType === stored.conceptType && mergeKey === stored.mergeKey) return undefined;
   return { iri: stored.iri, conceptType, mergeKey };
@@ -56,7 +56,8 @@ const refoldPlanOf = (stored: readonly StoredType[]): ConceptTypesRefolded => {
     const clashing = refolded.filter((each) => (holders.get(each.mergeKey)?.length ?? 0) > 1);
     if (clashing.length === 0) return { refolded, clashed };
     clashed.push(...clashing);
-    refolded = refolded.filter((each) => !clashing.includes(each));
+    const dropped = new Set(clashing);
+    refolded = refolded.filter((each) => !dropped.has(each));
   }
 };
 
