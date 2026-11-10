@@ -10,6 +10,7 @@ import {
   SUGGESTION_WAITING_STATUS,
   type ConceptIri,
 } from "@better-answers/schema";
+import { foldConceptType } from "@better-answers/schema/concept-type";
 
 import { readableParameters, sensitivityAndAudienceClause } from "../access/index.ts";
 import {
@@ -52,6 +53,7 @@ export type WaitingItem = {
 
 type ConceptParts = {
   readonly title: string;
+  readonly conceptType: string;
   readonly body: string;
   readonly sources: FrontmatterValue | undefined;
 };
@@ -180,11 +182,12 @@ const waitingEditAction = declareAction({
 
 type StandingRow = {
   readonly title: string;
+  readonly conceptType: string;
   readonly body: string;
   readonly frontmatter: Frontmatter;
 };
 
-const STANDING = `SELECT c.title, c.body, c.frontmatter FROM concept_index c
+const STANDING = `SELECT c.title, c.concept_type AS "conceptType", c.body, c.frontmatter FROM concept_index c
    WHERE c.workspace_id = $1 AND c.iri = $4 AND ${sensitivityAndAudienceClause("c", 2)}`;
 
 type Projecting = WaitingReads & {
@@ -200,6 +203,7 @@ const partsOf = async (
   if (!resolved.ok) return err(resolved.error);
   return ok({
     title: concept.title,
+    conceptType: foldConceptType(concept.conceptType),
     body: concept.body,
     sources: projectedFrontmatter(concept.frontmatter, resolved.value)["sources"],
   });

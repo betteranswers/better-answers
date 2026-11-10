@@ -5,7 +5,12 @@ import { keyed } from "@/shared/list/keyed.ts";
 import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
-import { paragraphsCompared, sourceLinesOf, type Paragraph } from "./edit-compared.ts";
+import {
+  paragraphsCompared,
+  sourceLinesOf,
+  typesShownOf,
+  type Paragraph,
+} from "./edit-compared.ts";
 import type { ConceptParts, CurrentVersion, WaitingEdit } from "./inbox-api.ts";
 import { EDIT_WORDS as WORDS } from "./inbox-words.ts";
 
@@ -17,6 +22,7 @@ function Version(properties: {
   readonly heading: string;
   readonly title: string;
   readonly titleChanged: boolean;
+  readonly conceptType: string | undefined;
   readonly paragraphs: readonly Paragraph[];
 }) {
   const headingId = useId();
@@ -30,6 +36,12 @@ function Version(properties: {
           {properties.titleChanged ? <ChangedTag /> : null}
           <span className="wrap-anywhere">{properties.title}</span>
         </Row>
+        {properties.conceptType === undefined ? null : (
+          <Row term={WORDS.type}>
+            <ChangedTag />
+            <span className="wrap-anywhere">{properties.conceptType}</span>
+          </Row>
+        )}
       </dl>
       <h4 className="mt-4 text-muted-foreground">{WORDS.text}</h4>
       {paragraphs.length === 0 ? (
@@ -65,6 +77,7 @@ export function EditCompared(properties: { readonly edit: WaitingEdit }) {
   const current = standing.state === "shown" ? standing.version : null;
   const compared = paragraphsCompared(current?.body ?? null, proposed.body);
   const titleChanged = current !== null && current.title !== proposed.title;
+  const types = typesShownOf(current, proposed);
 
   return (
     <div
@@ -75,6 +88,7 @@ export function EditCompared(properties: { readonly edit: WaitingEdit }) {
           heading={WORDS.current}
           title={standing.version.title}
           titleChanged={titleChanged}
+          conceptType={types.current}
           paragraphs={compared.current}
         />
       ) : (
@@ -84,6 +98,7 @@ export function EditCompared(properties: { readonly edit: WaitingEdit }) {
         heading={WORDS.proposed}
         title={proposed.title}
         titleChanged={titleChanged}
+        conceptType={types.proposed}
         paragraphs={compared.proposed}
       />
     </div>
