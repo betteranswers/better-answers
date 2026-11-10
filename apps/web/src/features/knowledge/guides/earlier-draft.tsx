@@ -1,4 +1,4 @@
-import { BRIEF_MARKER } from "@better-answers/schema/brief-marker";
+import { replaceMarkers } from "@better-answers/schema/brief-marker";
 
 import { Button } from "@/shared/ui/button.tsx";
 import { Textarea } from "@/shared/ui/textarea.tsx";
@@ -8,10 +8,7 @@ import { BRIEF_WORDS as WORDS } from "./guide-words.ts";
 
 const readableDraft = (markdown: string, includes: readonly Include[]): string => {
   const titles = new Map(includes.map((include) => [include.label, include.title]));
-  return markdown.replaceAll(
-    BRIEF_MARKER,
-    (_marker, label: string) => `[${WORDS.footnote}${titles.get(label) ?? label}]`,
-  );
+  return replaceMarkers(markdown, (label) => `[${WORDS.footnote}${titles.get(label) ?? label}]`);
 };
 
 export function EarlierDraft(properties: {

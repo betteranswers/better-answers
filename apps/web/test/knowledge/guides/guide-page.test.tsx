@@ -159,7 +159,7 @@ describe("the guide page", () => {
   });
 
   it("offers Edit Brief but no Copy for an empty Brief", async () => {
-    const empty = aBrief({ rendered: { markdown: "", footnotes: [] } });
+    const empty = aBrief({ rendered: { parts: [], footnotes: [] } });
     await openGuide("Editor", aGuide({ sections: [aSection({ brief: empty })] }));
 
     const section = within(sectionNamed(SECTION_ONE));

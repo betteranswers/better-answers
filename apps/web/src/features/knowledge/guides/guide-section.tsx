@@ -1,8 +1,10 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 
+import { isBlank } from "@better-answers/schema/cited-markdown";
+
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
-import { ConceptBody, LINK } from "@/shared/knowledge/concept-body.tsx";
+import { CitedBrief, ConceptBody, LINK } from "@/shared/knowledge/concept-body.tsx";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
 import { TypeLine } from "@/shared/knowledge/type-line.tsx";
@@ -119,14 +121,14 @@ function BriefText(properties: {
       })),
     [rendered.footnotes],
   );
-  if (rendered.markdown.trim() === "") {
+  if (isBlank(rendered.parts)) {
     return properties.assembled ? (
       <p className="mt-4 text-muted-foreground">{WORDS.noBrief}</p>
     ) : null;
   }
   return (
     <div className="mt-4">
-      <ConceptBody body={rendered.markdown} evidence={evidence} headingsFrom={properties.below} />
+      <CitedBrief parts={rendered.parts} evidence={evidence} headingsFrom={properties.below} />
       <Footnotes footnotes={rendered.footnotes} />
     </div>
   );
@@ -366,7 +368,7 @@ export function GuideSectionView(properties: SectionProps) {
             />
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {editing.actions}
-              {brief.rendered.markdown.trim() === "" ? null : (
+              {isBlank(brief.rendered.parts) ? null : (
                 <CopyAction section={section} copying={copying} editing={editing.open} />
               )}
               <Button
