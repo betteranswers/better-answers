@@ -60,14 +60,23 @@ const copyFile = (from: string, to: string): void => {
   else copyFileSync(from, to, constants.COPYFILE_FICLONE);
 };
 
-/** Copied relative links in a node_modules reach the copied sibling workspaces. */
-const copyModules = (from: string, to: string): void => {
+/** pnpm's shared store sits outside the tree, so the copy makes a relative link into it absolute. */
+const copyLink = (root: string, from: string, to: string): void => {
+  const written = readlinkSync(from);
+  const reached = path.resolve(path.dirname(from), written);
+  const fromRoot = path.relative(root, reached);
+  const leaves = fromRoot === ".." || fromRoot.startsWith(`..${path.sep}`);
+  symlinkSync(leaves ? reached : written, to);
+};
+
+const copyModules = (root: string, from: string, to: string): void => {
   mkdirSync(to, { recursive: true });
   for (const entry of readdirSync(from, { withFileTypes: true })) {
     const source = path.join(from, entry.name);
     const target = path.join(to, entry.name);
     if (entry.name === STORE) symlinkSync(source, target);
-    else if (entry.isDirectory()) copyModules(source, target);
+    else if (entry.isSymbolicLink()) copyLink(root, source, target);
+    else if (entry.isDirectory()) copyModules(root, source, target);
     else copyFile(source, target);
   }
 };
@@ -83,7 +92,7 @@ export const copyTree = (root: string, into: string): void => {
       if (!existsSync(source) || existsSync(target)) continue;
       // test-inventory.sh puts the copy's own src first on PYTHONPATH, ahead of this shared .venv.
       if (installed === ".venv") symlinkSync(source, target);
-      else copyModules(source, target);
+      else copyModules(root, source, target);
     }
   }
   execFileSync("git", ["init", "--quiet", "--template=", into], { stdio: "pipe" });
