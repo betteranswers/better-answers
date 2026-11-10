@@ -98,6 +98,20 @@ describe("the browser suite's second-factor harness", () => {
 
     expect(await (await pending.fetch("/get-session")).json()).toBeNull();
   });
+
+  it("records that a person dismissed the passkey offer", async () => {
+    const [dismissing, other] = [await app().person(), await app().person()];
+
+    await harnessAnswer("/__harness/passkey-offer-dismissals", dismissing.email);
+
+    const offerDismissedFor = async (email: string) =>
+      (await webClientOf(await signedInClient(app(), email)).api.person.secondFactor.query())
+        .passkeyOfferDismissed;
+    expect([
+      await offerDismissedFor(dismissing.email),
+      await offerDismissedFor(other.email),
+    ]).toEqual([true, false]);
+  });
 });
 
 const asked = (path: string, body: unknown) => askedOfTheHarness(app(), path, body);
