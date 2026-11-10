@@ -26,7 +26,13 @@ import {
   type WaitingPerson,
 } from "./inbox-api.ts";
 import { EDIT_KEYSTROKES as KEY, WAITING_ON_YOU, type DecidedOnItsPage } from "./inbox-state.ts";
-import { DECIDED_WORDS, EDIT_WORDS as WORDS, personWords, WAITING_WORDS } from "./inbox-words.ts";
+import {
+  DECIDED_WORDS,
+  EDIT_WORDS as WORDS,
+  personWords,
+  SAID_OF_DECIDING,
+  WAITING_WORDS,
+} from "./inbox-words.ts";
 import { WaitingFacts } from "./waiting-facts.tsx";
 
 const LISTED = Object.values(KEY);
@@ -95,8 +101,11 @@ const useDeciding = (edit: WaitingEdit, title: string) => {
     );
   };
 
-  const declineNow = (reason: string) => {
-    setAsking("nothing");
+  const declineNow = (reason: string, tooLong: () => void) => {
+    if (acting) {
+      say(STILL_GOING);
+      return;
+    }
     say({ tone: "said", words: WORDS.declining(title) });
     decline.mutate(
       { suggestionId: item.suggestionId, reason },
@@ -104,7 +113,15 @@ const useDeciding = (edit: WaitingEdit, title: string) => {
         onSuccess: () => {
           leaveSaying({ words: DECIDED_WORDS.declined, refused: false });
         },
-        onError: refused,
+        onError: (failure) => {
+          if (refusalOf(failure)?.word === "malformed") {
+            say(undefined);
+            tooLong();
+            return;
+          }
+          setAsking("nothing");
+          refused(failure);
+        },
       },
     );
   };
@@ -148,15 +165,16 @@ function DeclineForm(properties: {
   const hintId = useId();
   const neededId = useId();
   const [reason, setReason] = useState("");
-  const [needed, setNeeded] = useState(false);
+  const [needed, setNeeded] = useState<string | null>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const arrive = useCallback((textarea: HTMLTextAreaElement | null) => {
     field.current = textarea;
     textarea?.focus();
   }, []);
-  const describedBy = [...(proposer === null ? [] : [hintId]), ...(needed ? [neededId] : [])].join(
-    " ",
-  );
+  const describedBy = [
+    ...(proposer === null ? [] : [hintId]),
+    ...(needed === null ? [] : [neededId]),
+  ].join(" ");
 
   return (
     <form
@@ -164,12 +182,17 @@ function DeclineForm(properties: {
       className="mt-3 grid gap-2 border border-border p-3"
       onSubmit={(event) => {
         event.preventDefault();
-        if (reason.trim() === "") {
-          setNeeded(true);
+        const needs = (words: string) => {
+          setNeeded(words);
           field.current?.focus();
+        };
+        if (reason.trim() === "") {
+          needs(WORDS.reasonNeeded);
           return;
         }
-        deciding.declineNow(reason.trim());
+        deciding.declineNow(reason.trim(), () => {
+          needs(SAID_OF_DECIDING.malformed);
+        });
       }}
     >
       <Label htmlFor={fieldId}>{WORDS.reason}</Label>
@@ -182,19 +205,19 @@ function DeclineForm(properties: {
         ref={arrive}
         id={fieldId}
         required
-        aria-invalid={needed}
+        aria-invalid={needed !== null}
         aria-describedby={describedBy === "" ? undefined : describedBy}
         value={reason}
         onChange={(event) => {
           setReason(event.target.value);
-          setNeeded(false);
+          setNeeded(null);
         }}
       />
-      {needed ? (
+      {needed === null ? null : (
         <p id={neededId} className="text-foreground">
-          {WORDS.reasonNeeded}
+          {needed}
         </p>
-      ) : null}
+      )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit">{WORDS.declineSuggestion}</Button>
         <Button
@@ -222,6 +245,7 @@ function EditShown(properties: { readonly edit: WaitingEdit }) {
   const acceptButton = useRef<HTMLButtonElement>(null);
   const declineButton = useRef<HTMLButtonElement>(null);
   const deciding = useDeciding(edit, title);
+  const placesId = useId();
   const ownerShown = useRole() === "Admin";
   useBreadcrumbLastPart(title);
 
@@ -261,7 +285,7 @@ function EditShown(properties: { readonly edit: WaitingEdit }) {
       <OutcomeLine outcome={deciding.outcome} className="mt-2" />
       {deciding.asking === "reuse" ? (
         <ReuseConfirm
-          said={WORDS.places(item.places)}
+          named={{ by: placesId }}
           onConfirm={deciding.acceptNow}
           onCancel={() => {
             deciding.cancel();
@@ -272,7 +296,7 @@ function EditShown(properties: { readonly edit: WaitingEdit }) {
       {deciding.asking === "reason" ? (
         <DeclineForm deciding={deciding} proposer={item.proposer} returnFocus={declineButton} />
       ) : null}
-      <WaitingFacts item={item} ownerShown={ownerShown} />
+      <WaitingFacts item={item} ownerShown={ownerShown} placesId={placesId} />
       <EditCompared edit={edit} />
       <SuggestedSources sources={edit.proposed.sources} />
     </article>

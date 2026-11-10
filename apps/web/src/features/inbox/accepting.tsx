@@ -120,7 +120,7 @@ export const useAccepting = (list: AcceptedList) => {
 };
 
 export function ReuseConfirm(properties: {
-  readonly said: string;
+  readonly named: { readonly said: string } | { readonly by: string };
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
 }) {
@@ -128,9 +128,14 @@ export function ReuseConfirm(properties: {
     button?.focus();
   }, []);
 
+  const { named } = properties;
+
   return (
-    <fieldset className="mt-3 grid gap-3 border border-border p-3">
-      <legend className="float-left font-medium">{properties.said}</legend>
+    <fieldset
+      aria-labelledby={"by" in named ? named.by : undefined}
+      className="mt-3 grid gap-3 border border-border p-3"
+    >
+      {"said" in named ? <legend className="float-left font-medium">{named.said}</legend> : null}
       <div className="flex flex-wrap gap-2">
         <Button ref={focusOnArrival} onClick={properties.onConfirm}>
           {EDIT_WORDS.acceptEverywhere}

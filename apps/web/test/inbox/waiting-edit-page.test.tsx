@@ -1,12 +1,12 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { WAITING_ON_YOU } from "@/features/inbox/inbox-state.ts";
-import { EDIT_WORDS } from "@/features/inbox/inbox-words.ts";
+import { EDIT_WORDS, SAID_OF_DECIDING } from "@/features/inbox/inbox-words.ts";
 import { detailAt } from "@/shared/navigation.ts";
 import { openedWhereTheApiNamesNone } from "@test/detail/not-found-detail.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
+import { aRefusalAnswer, adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
@@ -32,6 +32,13 @@ const orphanedEdit = {
   proposed: { title: "Annual leave", body: "Everyone takes 28 days.", sources: undefined },
 };
 
+const describedText = (field: HTMLElement): string =>
+  String(field.getAttribute("aria-describedby"))
+    .split(" ")
+    .flatMap((id) => [...document.querySelectorAll(`[id="${id}"]`)])
+    .map((node) => node.textContent)
+    .join(" ");
+
 describe("a suggestion on Waiting on You", () => {
   it("shows Page Not Found when the suggestion does not exist", async () => {
     const drawn = await openedWhereTheApiNamesNone(A_SUGGESTION, "inbox.item");
@@ -55,7 +62,7 @@ describe("a suggestion on Waiting on You", () => {
     {
       reader: "a named proposer",
       proposer: orphanedEdit.item.proposer,
-      said: EDIT_WORDS.reasonShownTo("Owen Price"),
+      said: EDIT_WORDS.reasonShownTo(orphanedEdit.item.proposer.name),
     },
     { reader: "a former member", proposer: null, said: "" },
   ])("says who reads a decline reason: $reader", async ({ proposer, said }) => {
@@ -68,12 +75,25 @@ describe("a suggestion on Waiting on You", () => {
     fireEvent.click(await screen.findByRole("button", { name: EDIT_WORDS.decline }));
     const reason = await screen.findByRole("textbox", { name: EDIT_WORDS.reason });
 
-    const described = String(reason.getAttribute("aria-describedby"))
-      .split(" ")
-      .flatMap((id) => [...document.querySelectorAll(`[id="${id}"]`)])
-      .map((node) => node.textContent)
-      .join(" ");
+    expect(describedText(reason)).toBe(said);
+  });
 
-    expect(described).toBe(said);
+  it("keeps a too-long reason in focus with its message", async () => {
+    const api = adaAnAdmin();
+    api.set("inbox.item", () => read(orphanedEdit));
+    api.set("inbox.decline", () => aRefusalAnswer("malformed", "invalid", 400));
+    await openAt(A_SUGGESTION, api);
+    const typed = "x".repeat(2001);
+
+    fireEvent.click(await screen.findByRole("button", { name: EDIT_WORDS.decline }));
+    const reason = await screen.findByRole("textbox", { name: EDIT_WORDS.reason });
+    fireEvent.change(reason, { target: { value: typed } });
+    fireEvent.click(screen.getByRole("button", { name: EDIT_WORDS.declineSuggestion }));
+
+    await waitFor(() => {
+      expect(describedText(reason)).toContain(SAID_OF_DECIDING.malformed);
+    });
+    expect(reason).toHaveProperty("value", typed);
+    expect(document.activeElement).toBe(reason);
   });
 });

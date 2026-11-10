@@ -4,18 +4,21 @@ import { dayWords } from "@/shared/words.ts";
 import { suggestsNewConcept, type WaitingItem } from "./inbox-api.ts";
 import { personShown, WAITING_WORDS as WORDS } from "./inbox-words.ts";
 
-const notesOf = (item: WaitingItem): readonly string[] => [
-  ...(suggestsNewConcept(item) ? [WORDS.newConcept] : []),
-  ...(item.baseMoved ? [WORDS.baseMoved] : []),
-  ...(item.places > 1 ? [WORDS.places(item.places)] : []),
+type Note = { readonly words: string; readonly id?: string | undefined };
+
+const notesOf = (item: WaitingItem, placesId: string | undefined): readonly Note[] => [
+  ...(suggestsNewConcept(item) ? [{ words: WORDS.newConcept }] : []),
+  ...(item.baseMoved ? [{ words: WORDS.baseMoved }] : []),
+  ...(item.places > 1 ? [{ words: WORDS.places(item.places), id: placesId }] : []),
 ];
 
 export function WaitingFacts(properties: {
   readonly item: WaitingItem;
   readonly ownerShown: boolean;
+  readonly placesId?: string;
 }) {
   const { item, ownerShown } = properties;
-  const notes = notesOf(item);
+  const notes = notesOf(item, properties.placesId);
 
   return (
     <>
@@ -31,7 +34,9 @@ export function WaitingFacts(properties: {
       {notes.length === 0 ? null : (
         <ul className="mt-2 grid gap-1">
           {notes.map((note) => (
-            <li key={note}>{note}</li>
+            <li key={note.words} id={note.id}>
+              {note.words}
+            </li>
           ))}
         </ul>
       )}

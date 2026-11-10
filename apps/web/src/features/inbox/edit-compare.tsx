@@ -1,5 +1,6 @@
 import { useId } from "react";
 
+import { cn } from "@/shared/lib/utils.ts";
 import { keyed } from "@/shared/list/keyed.ts";
 import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -47,7 +48,7 @@ function Version(properties: {
   );
 }
 
-type NotShown = Exclude<CurrentVersion, { readonly state: "shown" }>["state"];
+type NotShown = Exclude<CurrentVersion["state"], "shown" | "new-concept">;
 
 function NoCurrentVersion(properties: { readonly state: NotShown }) {
   const headingId = useId();
@@ -66,8 +67,10 @@ export function EditCompared(properties: { readonly edit: WaitingEdit }) {
   const titleChanged = current !== null && current.title !== proposed.title;
 
   return (
-    <div className="mt-6 grid gap-4 md:grid-cols-2">
-      {standing.state === "shown" ? (
+    <div
+      className={cn("mt-6 grid gap-4", standing.state === "new-concept" ? "" : "md:grid-cols-2")}
+    >
+      {standing.state === "new-concept" ? null : standing.state === "shown" ? (
         <Version
           heading={WORDS.current}
           title={standing.version.title}
