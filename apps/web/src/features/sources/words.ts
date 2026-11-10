@@ -256,7 +256,7 @@ export const REVIEW_WORDS = {
 
 export const CONNECT_WORDS = {
   action: "Connect a document",
-  consequence: "Only Admins can read it until you publish it.",
+  consequence: "You review and publish it after it syncs.",
   connected: (name: string, fileName: string): string =>
     `“${name}” connected. ${fileName} is queued to sync.`,
 } as const;

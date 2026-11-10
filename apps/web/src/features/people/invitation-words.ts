@@ -38,8 +38,8 @@ const addressesOf = (sent: readonly SentInvitation[]): string =>
 
 const unsentSaid = (unsent: readonly SentInvitation[]): string =>
   unsent.length === 1
-    ? `The email to ${addressesOf(unsent)} wasn’t sent. Resend it below.`
-    : `The emails to ${addressesOf(unsent)} weren’t sent. Resend each one below.`;
+    ? `Resend the unsent email to ${addressesOf(unsent)} below.`
+    : `Resend the unsent emails to ${addressesOf(unsent)} below.`;
 
 const lastsUntil = (sent: readonly SentInvitation[]): string => {
   const [first] = sent;
