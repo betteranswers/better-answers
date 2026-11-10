@@ -2,6 +2,7 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
+import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -16,7 +17,8 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const modelChoicesCard = (page: Page) => page.getByRole("region", { name: "Model Choices" });
+const modelChoicesCard = (page: Page) =>
+  page.getByRole("region", { name: MODEL_CHOICES_WORDS.heading });
 
 const ANSWERING: SeedModelChoice = {
   purpose: "answering",
@@ -79,8 +81,8 @@ test.describe("the Model Choices card on the Models and Spend page", () => {
     await skipLinkReachesThePage(page);
 
     await expect(modelChoicesCard(page)).toMatchAriaSnapshot(`
-      - region "Model Choices":
-        - heading "Model Choices" [level=2]
+      - region ${JSON.stringify(MODEL_CHOICES_WORDS.heading)}:
+        - heading ${JSON.stringify(MODEL_CHOICES_WORDS.heading)} [level=2]
         - paragraph
         - paragraph
         - list:
@@ -92,21 +94,20 @@ test.describe("the Model Choices card on the Models and Spend page", () => {
             - paragraph
           - listitem:
             - heading "Answering" [level=3]
-            - term: Model Provider
+            - term: ${MODEL_CHOICES_WORDS.provider}
             - definition: "Anthropic"
-            - term: Model
+            - term: ${MODEL_CHOICES_WORDS.model}
             - definition: ${ANSWERING.model}
           - listitem:
             - heading "Judging" [level=3]
             - paragraph
           - listitem:
             - heading "Embedding" [level=3]
-            - term: Model Provider
+            - term: ${MODEL_CHOICES_WORDS.provider}
             - definition: "Mistral AI"
-            - term: Model
+            - term: ${MODEL_CHOICES_WORDS.model}
             - definition: ${EMBEDDING.model}
             - paragraph: /\\b${String(EMBEDDING_DIMENSIONS)}\\b/
-            - paragraph
     `);
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
@@ -116,7 +117,7 @@ test.describe("the Model Choices card on the Models and Spend page", () => {
           - tab "Spend"
         - tabpanel "Model Choices":
           - /children: equal
-          - region "Model Choices"
+          - region ${JSON.stringify(MODEL_CHOICES_WORDS.heading)}
     `);
 
     await passesTheAccessibilityGate();

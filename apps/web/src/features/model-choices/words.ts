@@ -1,14 +1,16 @@
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
 export const MODEL_CHOICES_WORDS = {
+  heading: "Model choices",
   lead: "The AI model used for each purpose.",
   whoSets: `Contact ${PRODUCT_NAME} support to set a model.`,
   noneSet: "No models set yet",
   unset: "Not set",
+  provider: "Provider",
+  model: "Model",
   fixed: "Fixed",
-  fixedReason: "This model can’t be changed.",
   loading: "The model choices are still loading.",
-  failed: "The model choices didn’t load. Please reload the page.",
+  failed: "The model choices didn’t load. Reload the page.",
 } as const;
 
 const PROVIDER_WORDS = new Map([

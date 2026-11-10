@@ -28,11 +28,11 @@ function ModelChoiceFields(properties: { readonly modelChoice: WorkspaceModelCho
   return (
     <dl className="mt-1 flex flex-col gap-1 sm:flex-row sm:gap-8">
       <div className="flex gap-2">
-        <dt className="text-muted-foreground">Model Provider</dt>
+        <dt className="text-muted-foreground">{MODEL_CHOICES_WORDS.provider}</dt>
         <dd>{providerWordOf(provider)}</dd>
       </div>
       <div className="flex gap-2">
-        <dt className="text-muted-foreground">Model</dt>
+        <dt className="text-muted-foreground">{MODEL_CHOICES_WORDS.model}</dt>
         <dd>{model}</dd>
       </div>
     </dl>
@@ -43,15 +43,12 @@ function FixedNote(properties: { readonly modelChoice: WorkspaceModelChoice }) {
   const { modelChoice } = properties;
   if (modelChoice.purpose !== FIXED_PURPOSE || !isSet(modelChoice)) return null;
   return (
-    <>
-      <p className="mt-2">
-        <Pill>{MODEL_CHOICES_WORDS.fixed}</Pill>{" "}
-        {modelChoice.dimensions === null ? null : (
-          <span className="text-muted-foreground">{modelChoice.dimensions} dimensions</span>
-        )}
-      </p>
-      <p className="mt-1 text-muted-foreground">{MODEL_CHOICES_WORDS.fixedReason}</p>
-    </>
+    <p className="mt-2">
+      <Pill>{MODEL_CHOICES_WORDS.fixed}</Pill>{" "}
+      {modelChoice.dimensions === null ? null : (
+        <span className="text-muted-foreground">{modelChoice.dimensions} dimensions</span>
+      )}
+    </p>
   );
 }
 
@@ -91,7 +88,7 @@ export function ModelChoicesCard() {
       <section aria-labelledby="model-choices">
         <CardHeader>
           <CardTitle asChild>
-            <h2 id="model-choices">Model Choices</h2>
+            <h2 id="model-choices">{MODEL_CHOICES_WORDS.heading}</h2>
           </CardTitle>
           <p className="text-muted-foreground">{MODEL_CHOICES_WORDS.lead}</p>
           {modelChoices.data === undefined ? null : <WhoSets modelChoices={modelChoices.data} />}
