@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { briefCopy, recordCopy } from "../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { addToGroup } from "../../src/members/index.ts";
-import { withMember } from "../../src/store/postgres/index.ts";
+import { briefCopy, recordCopy } from "@better-answers/core/concepts";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { addToGroup } from "@better-answers/core/members";
+import { withMember } from "@better-answers/core/store/postgres";
+
 import { principalFor, suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
 import { answered, readingAs, seedingWith } from "../support/suite-postgres.ts";
 import {

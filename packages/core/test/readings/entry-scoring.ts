@@ -1,4 +1,5 @@
-import type { DecisionModelCall, ModelOutcome, Probabilities } from "../../src/llm/index.ts";
+import type { DecisionModelCall, ModelOutcome, Probabilities } from "@better-answers/core/llm";
+
 import { recallAt, type RecallQuestion, type Recalls } from "../answering/recall.ts";
 import { percentile } from "../support/figures.ts";
 

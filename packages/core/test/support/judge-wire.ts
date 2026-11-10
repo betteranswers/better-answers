@@ -1,9 +1,8 @@
 import { z } from "zod";
 
+import type { ReturnedConcept } from "@better-answers/core/answering";
+import { openModelClient, type ModelAttemptLine, type ModelClient } from "@better-answers/core/llm";
 import { conceptIriOf, WELL_FORMED_ULID } from "@better-answers/schema";
-
-import type { ReturnedConcept } from "../../src/answering/index.ts";
-import { openModelClient, type ModelAttemptLine, type ModelClient } from "../../src/llm/index.ts";
 
 export const A_CANDIDATE: ReturnedConcept = {
   iri: conceptIriOf(WELL_FORMED_ULID.parse("01J6AAAAAAAAAAAAAAAAAAAAAA")),

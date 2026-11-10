@@ -1,6 +1,9 @@
 import { assert, describe, expect, it } from "vitest";
 
+import { eraseFromTheIdentitySet } from "@better-answers/core/erasure";
+import type { PlatformPrincipal, Result, UserPrincipal } from "@better-answers/core/kernel";
 import { withRepositoryLock } from "@better-answers/core/store/git";
+import { withMember } from "@better-answers/core/store/postgres";
 import { conceptIriOf, passageLocatorOf, ulid, type ConceptIri } from "@better-answers/schema";
 
 import {
@@ -16,9 +19,6 @@ import {
   type OwnedConcept,
   type WriteConceptInput,
 } from "../../src/concepts/index.ts";
-import { eraseFromTheIdentitySet } from "../../src/erasure/index.ts";
-import type { PlatformPrincipal, Result, UserPrincipal } from "../../src/kernel/index.ts";
-import { withMember } from "../../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts, gatingRefUpdates } from "../fixtures/bundle.ts";
 import { shelve, shelveOne, type Shelved } from "../fixtures/concept-shelf.ts";
 import { connectedSourceHolding } from "../fixtures/sourced-concept.ts";

@@ -2,11 +2,11 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it } from "vitest";
 
+import { ok, type UserPrincipal } from "@better-answers/core/kernel";
 import { conceptIriOf, MARK_THE_MATCH_LEAKPROOF, ulid } from "@better-answers/schema";
 import { UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 
 import { findConcepts } from "../../../src/concepts/index.ts";
-import { ok, type UserPrincipal } from "../../../src/kernel/index.ts";
 import { seededBy, visibilitySuite } from "../../fixtures/sourced-concept.ts";
 import { planned } from "../../support/planned.ts";
 

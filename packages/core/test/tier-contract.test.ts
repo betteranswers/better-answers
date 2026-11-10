@@ -14,6 +14,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { ulid } from "@better-answers/core/kernel";
 import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver, writeUnder } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
@@ -24,8 +25,6 @@ import {
   ULID_PATTERN,
 } from "@better-answers/schema";
 import { rootsOf } from "@better-answers/schema/testing/roots";
-
-import { ulid } from "../src/kernel/index.ts";
 
 const { repositoryRoot } = rootsOf(import.meta.url);
 

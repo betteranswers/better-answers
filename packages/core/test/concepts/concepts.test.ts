@@ -1,8 +1,19 @@
 import pg from "pg";
 import { assert, describe, expect, it } from "vitest";
 
+import { mapWords, open } from "@better-answers/core/answering";
+import type { FrontmatterValue, TrustStatus } from "@better-answers/core/answering";
+import type { Result, UserPrincipal } from "@better-answers/core/kernel";
+import { removeMember } from "@better-answers/core/members";
 import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
 import { walkFrom } from "@better-answers/core/store/map";
+import {
+  openPostgres,
+  type Foldable,
+  type Folded,
+  type Tx,
+  withMember,
+} from "@better-answers/core/store/postgres";
 import {
   conceptIriOf,
   CONCEPT_BODY_MAX,
@@ -13,8 +24,6 @@ import {
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { mapWords, open } from "../../src/answering/index.ts";
-import type { FrontmatterValue, TrustStatus } from "../../src/answering/index.ts";
 import {
   contentHashOf,
   conceptByIri,
@@ -28,15 +37,6 @@ import {
   type Trust,
   type WriteConceptInput,
 } from "../../src/concepts/index.ts";
-import type { Result, UserPrincipal } from "../../src/kernel/index.ts";
-import { removeMember } from "../../src/members/index.ts";
-import {
-  openPostgres,
-  type Foldable,
-  type Folded,
-  type Tx,
-  withMember,
-} from "../../src/store/postgres/index.ts";
 import {
   bundleHistory,
   bundlesForSuite,

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { consumeIngress, openPostgres } from "@better-answers/core/store/postgres";
 import { SWEEPS, sweepIdentitySet } from "@better-answers/core/sweeps";
 import { ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { consumeIngress, openPostgres } from "../../src/store/postgres/index.ts";
 import {
   parkedSecretFor,
   passkeyChallengeFor,

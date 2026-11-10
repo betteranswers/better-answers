@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { Role, UserPrincipal } from "@better-answers/core/kernel";
+import { withMember, type PostgresDoor } from "@better-answers/core/store/postgres";
 import type { ConceptIri } from "@better-answers/schema";
 
 import {
@@ -7,8 +9,6 @@ import {
   readKnowledgeTree,
   type ConceptsOfTypeInput,
 } from "../../../src/concepts/index.ts";
-import type { Role, UserPrincipal } from "../../../src/kernel/index.ts";
-import { withMember, type PostgresDoor } from "../../../src/store/postgres/index.ts";
 import { joinedAs, shelve as shelveInto, type Shelved } from "../../fixtures/concept-shelf.ts";
 import { principalFor } from "../../fixtures/workspace-with-bundle.ts";
 import { provisionedWorkspace } from "../../support/platform.ts";

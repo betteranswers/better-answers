@@ -3,11 +3,11 @@ import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
+import { writeConcept } from "@better-answers/core/concepts";
+import { attempt, err, ok, type Result, type UserPrincipal } from "@better-answers/core/kernel";
 import type { ConceptIri } from "@better-answers/schema";
 
 import { ASK_CAPS, askInput, find, planAnswer } from "../../src/answering/index.ts";
-import { writeConcept } from "../../src/concepts/index.ts";
-import { attempt, err, ok, type Result, type UserPrincipal } from "../../src/kernel/index.ts";
 import type { visibilitySuite } from "../fixtures/sourced-concept.ts";
 import { doorsOf, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { inputOf } from "../support/suite-input.ts";

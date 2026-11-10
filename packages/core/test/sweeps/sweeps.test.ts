@@ -2,12 +2,12 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it } from "vitest";
 
+import { listObjects, putObject } from "@better-answers/core/store/objects";
+import { openPostgres } from "@better-answers/core/store/postgres";
 import { SWEEPS, sweepEveryWorkspace, withSweepLock } from "@better-answers/core/sweeps";
 import { ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { listObjects, putObject } from "../../src/store/objects/index.ts";
-import { openPostgres } from "../../src/store/postgres/index.ts";
 import { principalOf, provisionedWorkspace } from "../support/platform.ts";
 import { rowsFrom } from "../support/rows.ts";
 import { objectStoreForSuite } from "../support/suite-objects.ts";

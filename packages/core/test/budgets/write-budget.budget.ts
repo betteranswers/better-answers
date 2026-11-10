@@ -1,16 +1,16 @@
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
-import { writeConceptDelta } from "@better-answers/core/store/map";
-import { citedSourcesOf } from "@better-answers/schema";
-import { testData, type TestData } from "@better-answers/schema/testing";
-
 import {
   writeConcept,
   type ConceptWritten,
   type WriteConceptInput,
-} from "../../src/concepts/index.ts";
-import type { Tx } from "../../src/store/postgres/index.ts";
+} from "@better-answers/core/concepts";
+import { writeConceptDelta } from "@better-answers/core/store/map";
+import type { Tx } from "@better-answers/core/store/postgres";
+import { citedSourcesOf } from "@better-answers/schema";
+import { testData, type TestData } from "@better-answers/schema/testing";
+
 import { doorsOf, suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { percentile, recordFigures } from "../support/figures.ts";
 import { answered, readingAs, seedingWith } from "../support/suite-postgres.ts";

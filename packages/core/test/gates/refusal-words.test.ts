@@ -2,20 +2,18 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { refusalWordsIn } from "@better-answers/devtools/refusal-unions";
-
 import type {
   AcceptSuggestionRefusal,
   ImportBundleRefusal,
   WriteConceptRefusal,
-} from "../../src/concepts/index.ts";
+} from "@better-answers/core/concepts";
 import {
   classesIn,
   REFUSAL_CLASSES,
   refusalsIn,
   type RefusedItems,
   type WordIn,
-} from "../../src/kernel/index.ts";
+} from "@better-answers/core/kernel";
 import type {
   AcceptInvitationRefusal,
   ApproveRefusal,
@@ -34,16 +32,18 @@ import type {
   RequestAccessRefusal,
   ResendInvitationRefusal,
   EndEverySignInAndTokenHereRefusal,
-} from "../../src/members/index.ts";
-import { REFUSAL_CATALOGUE } from "../../src/refusals/index.ts";
-import type { ConnectUploadRefusal, SourceRefusal } from "../../src/sources/index.ts";
-import type { CommitRefusal } from "../../src/store/git/index.ts";
+} from "@better-answers/core/members";
+import { REFUSAL_CATALOGUE } from "@better-answers/core/refusals";
+import type { ConnectUploadRefusal, SourceRefusal } from "@better-answers/core/sources";
+import type { CommitRefusal } from "@better-answers/core/store/git";
 import type {
   AddMemberRefusal,
   AddPersonRefusal,
   ProvisionRefusal,
   SetDisplayNameRefusal,
-} from "../../src/workspaces/index.ts";
+} from "@better-answers/core/workspaces";
+import { refusalWordsIn } from "@better-answers/devtools/refusal-unions";
+
 import {
   asSliceRelative,
   coreSourceFiles,

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ISSUE_WORDS, parse, ROOT_PATH, type IssueWord } from "../../src/kernel/index.ts";
 import {
   connectUploadFields,
   dismissAsNotSpecialCategoryInput,
@@ -12,7 +11,9 @@ import {
   previewPassagesInput,
   publishConnectedSourceInput,
   reprocessConnectedSourceInput,
-} from "../../src/sources/index.ts";
+} from "@better-answers/core/sources";
+
+import { ISSUE_WORDS, parse, ROOT_PATH, type IssueWord } from "../../src/kernel/index.ts";
 
 const A_WORKSPACE = "01JQ0000000000000000000WSP";
 const A_CONNECTED_SOURCE = "01J6NNNNNNNNNNNNNNNNNNNNN1";

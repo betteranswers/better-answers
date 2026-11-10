@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { find } from "@better-answers/core/answering";
+import { STORED_DETAIL_KEYS } from "@better-answers/core/audit";
 import { ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { find } from "../../src/answering/index.ts";
-import { STORED_DETAIL_KEYS } from "../../src/audit/index.ts";
 import {
   followSyncs,
   followSyncsInEveryWorkspace,

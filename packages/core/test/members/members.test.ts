@@ -1,12 +1,19 @@
 import { assert, describe, expect, it } from "vitest";
 
+import { attempt } from "@better-answers/core/kernel";
+import type { Result, Role, UserPrincipal } from "@better-answers/core/kernel";
+import {
+  folded,
+  type Foldable,
+  type Folded,
+  type Tx,
+  withPrincipal,
+} from "@better-answers/core/store/postgres";
 import { boundarySchemas, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 import { groupNameTakenAgain } from "@better-answers/schema/testing/probes";
 
-import { attempt } from "../../src/kernel/index.ts";
-import type { Result, Role, UserPrincipal } from "../../src/kernel/index.ts";
 import {
   addToGroup,
   createGroup,
@@ -16,13 +23,6 @@ import {
   removeFromGroup,
   renameGroup,
 } from "../../src/members/index.ts";
-import {
-  folded,
-  type Foldable,
-  type Folded,
-  type Tx,
-  withPrincipal,
-} from "../../src/store/postgres/index.ts";
 import {
   type ProvisionedWorkspace,
   provisionedWorkspace,

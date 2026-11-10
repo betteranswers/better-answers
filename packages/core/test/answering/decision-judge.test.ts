@@ -1,15 +1,16 @@
 import { assert, describe, expect, it } from "vitest";
 
-import { ASK_CAPS, decisionJudgeCall } from "../../src/answering/index.ts";
-import type { PlatformPrincipal, UserPrincipal } from "../../src/kernel/index.ts";
-import { openModelKeySetting } from "../../src/llm/index.ts";
-import { openPostgres } from "../../src/store/postgres/index.ts";
+import type { PlatformPrincipal, UserPrincipal } from "@better-answers/core/kernel";
+import { openModelKeySetting } from "@better-answers/core/llm";
+import { openPostgres } from "@better-answers/core/store/postgres";
 import {
   setDecisionThreshold,
   setModelKey,
   setModelPrice,
   setSpendingLimit,
-} from "../../src/workspaces/index.ts";
+} from "@better-answers/core/workspaces";
+
+import { ASK_CAPS, decisionJudgeCall } from "../../src/answering/index.ts";
 import { principalFor } from "../fixtures/workspace-with-bundle.ts";
 import {
   A_CANDIDATE,

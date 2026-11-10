@@ -1,16 +1,16 @@
 import { assert, describe, expect, it } from "vitest";
 
-import { head } from "@better-answers/core/store/git";
-
 import {
   conceptToEdit,
   saveConcept,
   writeConcept,
   type WriteConceptInput,
-} from "../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { passageAt } from "../../src/sources/index.ts";
-import type { Tx } from "../../src/store/postgres/index.ts";
+} from "@better-answers/core/concepts";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { passageAt } from "@better-answers/core/sources";
+import { head } from "@better-answers/core/store/git";
+import type { Tx } from "@better-answers/core/store/postgres";
+
 import { doorsOf, suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { inMs, percentile, recordFigures } from "../support/figures.ts";
 import { answered, readingAs } from "../support/suite-postgres.ts";

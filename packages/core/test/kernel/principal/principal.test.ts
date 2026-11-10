@@ -2,30 +2,14 @@ import { inspect } from "node:util";
 
 import { afterAll, assert, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import { NIGHTLY_AUDIT_KIND, ulid } from "@better-answers/schema";
-import { testData } from "@better-answers/schema/testing";
-import { configProbeWritten } from "@better-answers/schema/testing/probes";
-
 import {
   action,
   declareActions,
   declareIdentitySetActions,
   record,
   recordFor,
-} from "../../../src/audit/index.ts";
-import {
-  actorIdOfPerson,
-  attempt,
-  err,
-  ok,
-  type Claims,
-  type OperatorPrincipal,
-  type Principal,
-  type Result,
-  type UserId,
-  type UserPrincipal,
-} from "../../../src/kernel/index.ts";
-import { enqueueJobIn, enqueueJobInput } from "../../../src/runs/index.ts";
+} from "@better-answers/core/audit";
+import { enqueueJobIn, enqueueJobInput } from "@better-answers/core/runs";
 import {
   consumeCall,
   consumeIngress,
@@ -46,7 +30,23 @@ import {
   type Answered,
   type PostgresDoor,
   type Tx,
-} from "../../../src/store/postgres/index.ts";
+} from "@better-answers/core/store/postgres";
+import { NIGHTLY_AUDIT_KIND, ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
+import { configProbeWritten } from "@better-answers/schema/testing/probes";
+
+import {
+  actorIdOfPerson,
+  attempt,
+  err,
+  ok,
+  type Claims,
+  type OperatorPrincipal,
+  type Principal,
+  type Result,
+  type UserId,
+  type UserPrincipal,
+} from "../../../src/kernel/index.ts";
 import { sessionFor } from "../../support/identity-rows.ts";
 import { bootstrap, principalOf } from "../../support/platform.ts";
 import { inputOf } from "../../support/suite-input.ts";

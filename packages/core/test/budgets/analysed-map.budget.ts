@@ -1,11 +1,11 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { ASK_CAPS, type AnswerResult } from "@better-answers/core/answering";
+import { contentHashOf, renderConceptFile } from "@better-answers/core/concepts";
+import { enqueueJob } from "@better-answers/core/runs";
 import { conceptIriOf, ids, ulid, type ConceptIri } from "@better-answers/schema";
 import { policiesIndexedInBulk } from "@better-answers/schema/testing/probes";
 
-import { ASK_CAPS, type AnswerResult } from "../../src/answering/index.ts";
-import { contentHashOf, renderConceptFile } from "../../src/concepts/index.ts";
-import { enqueueJob } from "../../src/runs/index.ts";
 import { askedAsIs } from "../answering/asking.ts";
 import { treeCommitted } from "../fixtures/bundle.ts";
 import { suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";

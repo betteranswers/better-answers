@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { find, open, type FindResult, type OpenResult } from "@better-answers/core/answering";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import type { Tx } from "@better-answers/core/store/postgres";
 import type { ConceptIri } from "@better-answers/schema";
 
-import { find, open, type FindResult, type OpenResult } from "../../src/answering/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import type { Tx } from "../../src/store/postgres/index.ts";
 import { landRecallSet, theRecallSet } from "../answering/recall.ts";
 import {
   conceptCiting,

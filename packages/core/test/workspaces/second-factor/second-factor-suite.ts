@@ -1,4 +1,5 @@
-import { openPostgres } from "../../../src/store/postgres/index.ts";
+import { openPostgres } from "@better-answers/core/store/postgres";
+
 import { sessionFor } from "../../support/identity-rows.ts";
 import { postgresForSuite } from "../../support/suite-postgres.ts";
 

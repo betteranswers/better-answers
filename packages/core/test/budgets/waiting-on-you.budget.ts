@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { waitingOnYou } from "../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
+import { waitingOnYou } from "@better-answers/core/concepts";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+
 import { nameOwnerAs, suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
 import { inMs, percentile, recordFigures } from "../support/figures.ts";
 import {

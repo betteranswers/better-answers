@@ -3,11 +3,14 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { find, open, renderFind, renderOpen } from "../../src/answering/index.ts";
-import { followSyncsInEveryWorkspace, SYNC_CASCADE } from "../../src/concepts/index.ts";
-import { ERASURE, recordSubjectRequest, runErasure } from "../../src/erasure/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { enqueueJob } from "../../src/runs/index.ts";
+import { find, open, renderFind, renderOpen } from "@better-answers/core/answering";
+import { followSyncsInEveryWorkspace, SYNC_CASCADE } from "@better-answers/core/concepts";
+import { ERASURE, recordSubjectRequest, runErasure } from "@better-answers/core/erasure";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { enqueueJob } from "@better-answers/core/runs";
+import { getObject } from "@better-answers/core/store/objects";
+import type { Tx } from "@better-answers/core/store/postgres";
+
 import {
   dismissAsNotSpecialCategory,
   dismissAsNotSpecialCategoryInput,
@@ -24,8 +27,6 @@ import {
   reprocessConnectedSource,
   reprocessConnectedSourceInput,
 } from "../../src/sources/index.ts";
-import { getObject } from "../../src/store/objects/index.ts";
-import type { Tx } from "../../src/store/postgres/index.ts";
 import {
   bankDetailsGroupOf,
   connectTheHandbook,

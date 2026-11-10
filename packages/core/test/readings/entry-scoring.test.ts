@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { DecisionModelCall } from "../../src/llm/index.ts";
+import type { DecisionModelCall } from "@better-answers/core/llm";
+
 import {
   readEntryScoring,
   reranked,

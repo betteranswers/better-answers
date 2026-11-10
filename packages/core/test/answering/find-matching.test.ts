@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import type { Result, UserPrincipal } from "@better-answers/core/kernel";
+import type { Tx } from "@better-answers/core/store/postgres";
 import { conceptIriOf, ids, ulid, type ConceptIri } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
 import { find, findCursor, type FindPosition, type FindResult } from "../../src/answering/index.ts";
-import type { Result, UserPrincipal } from "../../src/kernel/index.ts";
-import type { Tx } from "../../src/store/postgres/index.ts";
 import { IMPORTED } from "../fixtures/northgate-concepts.ts";
 import {
   connectedSourceHolding,

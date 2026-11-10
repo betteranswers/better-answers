@@ -2,6 +2,16 @@ import { assert, describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
 import {
+  actorIdOfPerson,
+  err,
+  parse,
+  type Malformed,
+  type Result,
+  type Role,
+  type UserPrincipal,
+} from "@better-answers/core/kernel";
+import type { Foldable, Folded, Tx } from "@better-answers/core/store/postgres";
+import {
   conceptIriOf,
   ids,
   JUDGE_STATES,
@@ -42,16 +52,6 @@ import {
   type ReturnedConcept,
   type Trust,
 } from "../../src/answering/index.ts";
-import {
-  actorIdOfPerson,
-  err,
-  parse,
-  type Malformed,
-  type Result,
-  type Role,
-  type UserPrincipal,
-} from "../../src/kernel/index.ts";
-import type { Foldable, Folded, Tx } from "../../src/store/postgres/index.ts";
 import { principalFor } from "../fixtures/workspace-with-bundle.ts";
 import { rowsFrom } from "../support/rows.ts";
 import {

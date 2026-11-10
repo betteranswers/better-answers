@@ -7,7 +7,8 @@ import { promisify } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
-import type { PlatformPrincipal } from "../../../src/kernel/index.ts";
+import type { PlatformPrincipal } from "@better-answers/core/kernel";
+
 import {
   initRepository,
   openGit,

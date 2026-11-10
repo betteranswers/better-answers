@@ -3,6 +3,19 @@ import path from "node:path";
 
 import { afterAll, assert, describe, expect, expectTypeOf, it, vi } from "vitest";
 
+import type {
+  ActorId,
+  PlatformPrincipal,
+  UserPrincipal,
+  WorkspaceId,
+} from "@better-answers/core/kernel";
+import {
+  openPostgres,
+  withIdentityWrite,
+  withPrincipal,
+  withScope,
+  type PostgresDoor,
+} from "@better-answers/core/store/postgres";
 import { FAMILIES, ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -17,19 +30,6 @@ import {
   recordEach,
   recordFor,
 } from "../../src/audit/index.ts";
-import type {
-  ActorId,
-  PlatformPrincipal,
-  UserPrincipal,
-  WorkspaceId,
-} from "../../src/kernel/index.ts";
-import {
-  openPostgres,
-  withIdentityWrite,
-  withPrincipal,
-  withScope,
-  type PostgresDoor,
-} from "../../src/store/postgres/index.ts";
 import {
   asANewOperator,
   bootstrap,

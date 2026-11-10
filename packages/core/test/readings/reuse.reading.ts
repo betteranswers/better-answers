@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { openModelClient } from "../../src/llm/index.ts";
+import { openModelClient } from "@better-answers/core/llm";
+
 import { postgresForSuite } from "../support/suite-postgres.ts";
 import {
   poundsOf,

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { parse, type UserPrincipal } from "@better-answers/core/kernel";
 import { ulid } from "@better-answers/schema";
 
-import { parse, type UserPrincipal } from "../../src/kernel/index.ts";
 import {
   findPassages,
   passageAt,

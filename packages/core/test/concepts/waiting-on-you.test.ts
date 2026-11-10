@@ -2,6 +2,8 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it } from "vitest";
 
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { parseLocator, passageAt } from "@better-answers/core/sources";
 import { ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -13,8 +15,6 @@ import {
   waitingOnYou,
   type SuggestionRequest,
 } from "../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { parseLocator, passageAt } from "../../src/sources/index.ts";
 import {
   connectedSourceHolding,
   groupNamed,

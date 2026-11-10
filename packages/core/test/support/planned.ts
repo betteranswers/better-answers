@@ -1,10 +1,10 @@
 import pg from "pg";
 import { z } from "zod";
 
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import type { Answered, Tx } from "@better-answers/core/store/postgres";
 import type { MigratedPostgres } from "@better-answers/schema/testing";
 
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import type { Answered, Tx } from "../../src/store/postgres/index.ts";
 import { answered, readingAs } from "./suite-postgres.ts";
 
 /**

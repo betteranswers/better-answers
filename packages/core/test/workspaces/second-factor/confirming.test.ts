@@ -3,11 +3,11 @@ import { createHash } from "node:crypto";
 import pg from "pg";
 import { assert, describe, expect, it } from "vitest";
 
+import { CeilingMet } from "@better-answers/core/kernel";
+import { openPostgres } from "@better-answers/core/store/postgres";
+import { SWEEPS, sweepIdentitySet } from "@better-answers/core/sweeps";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { CeilingMet } from "../../../src/kernel/index.ts";
-import { openPostgres } from "../../../src/store/postgres/index.ts";
-import { SWEEPS, sweepIdentitySet } from "../../../src/sweeps/index.ts";
 import {
   acceptRestoreCode,
   confirmByAuthenticator,

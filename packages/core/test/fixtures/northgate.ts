@@ -1,13 +1,13 @@
-import type { MigratedPostgres } from "@better-answers/schema/testing";
-
 import {
   importBundle,
   overrideConceptSensitivity,
   writeConcept,
   type BundleTree,
   type ConceptWritten,
-} from "../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
+} from "@better-answers/core/concepts";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import type { MigratedPostgres } from "@better-answers/schema/testing";
+
 import { addressOf, answered, readingAs } from "../support/suite-postgres.ts";
 import {
   IMPORTED,

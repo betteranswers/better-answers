@@ -1,17 +1,17 @@
 import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { conceptIriOf, WELL_FORMED_ULID } from "@better-answers/schema";
-
-import { ask, askInput, ASK_CAPS, judgeCall, type AskCaps } from "../../src/answering/index.ts";
-import type { PlatformPrincipal, UserPrincipal } from "../../src/kernel/index.ts";
+import type { PlatformPrincipal, UserPrincipal } from "@better-answers/core/kernel";
 import {
   openModelClient,
   RESERVATION_LIFETIME_MS,
   settleExpiredSpend,
   type ModelClient,
-} from "../../src/llm/index.ts";
-import { openPostgres } from "../../src/store/postgres/index.ts";
+} from "@better-answers/core/llm";
+import { openPostgres } from "@better-answers/core/store/postgres";
+import { conceptIriOf, WELL_FORMED_ULID } from "@better-answers/schema";
+
+import { ask, askInput, ASK_CAPS, judgeCall, type AskCaps } from "../../src/answering/index.ts";
 import {
   A_CANDIDATE,
   candidatesIn,

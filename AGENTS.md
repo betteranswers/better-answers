@@ -85,7 +85,7 @@ If the script stops before it prints its report, run it again with the same tabl
 ### Test at the lowest layer that can see the claim
 
 - Test a pure function in-process, and import its module by path.
-- In `packages/core`, a test imports any module of the folder it mirrors, and any other folder only through that folder's `index.ts`. The `import-direction` lint enforces this.
+- In `packages/core`, a test imports any module of the folder it mirrors by relative path, and any other folder only as `@better-answers/core/<folder>`, its entry in the package's `exports` map. The `import-direction` lint enforces this, and `node scripts/respell-core-imports.mjs` rewrites the relative paths it refuses.
 - Test a transport through its interface. In `apps/api`, call `server.request(...)`. In `apps/worker`, call the job or the module entry point.
 - Test the behaviour of a page on a single screen with a component test that uses Testing Library.
 

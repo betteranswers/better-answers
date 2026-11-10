@@ -1,6 +1,7 @@
 import type pg from "pg";
 
-import type { PostgresDoor } from "../../src/store/postgres/index.ts";
+import type { PostgresDoor } from "@better-answers/core/store/postgres";
+
 import {
   holdingTable,
   isBlockedOnTable,

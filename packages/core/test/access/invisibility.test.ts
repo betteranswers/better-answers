@@ -1,10 +1,5 @@
 import { assert, describe, expect, it } from "vitest";
 
-import { walkFrom, walkFromEntries, walkTo, walkToEntries } from "@better-answers/core/store/map";
-import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
-import { matching } from "@better-answers/schema/testing/matching";
-
-import { readableClause, readableParameters } from "../../src/access/index.ts";
 import {
   ASK_CAPS,
   open,
@@ -12,12 +7,17 @@ import {
   renderOpen,
   type AnswerResult,
   type RelatedConcept,
-} from "../../src/answering/index.ts";
-import { conceptByIri, conceptsByIris } from "../../src/concepts/index.ts";
-import { footnotesOf } from "../../src/guides/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { addToGroup, deleteGroup } from "../../src/members/index.ts";
-import type { Tx } from "../../src/store/postgres/index.ts";
+} from "@better-answers/core/answering";
+import { conceptByIri, conceptsByIris } from "@better-answers/core/concepts";
+import { footnotesOf } from "@better-answers/core/guides";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { addToGroup, deleteGroup } from "@better-answers/core/members";
+import { walkFrom, walkFromEntries, walkTo, walkToEntries } from "@better-answers/core/store/map";
+import type { Tx } from "@better-answers/core/store/postgres";
+import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
+
+import { readableClause, readableParameters } from "../../src/access/index.ts";
 import {
   answerWritten,
   asked,

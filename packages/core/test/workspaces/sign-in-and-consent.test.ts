@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { openPostgres } from "@better-answers/core/store/postgres";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { openPostgres } from "../../src/store/postgres/index.ts";
 import { recordConsent, recordSignIn } from "../../src/workspaces/index.ts";
 import { bootstrap, provisionedWorkspace, seedPerson } from "../support/platform.ts";
 import { rowsFrom } from "../support/rows.ts";

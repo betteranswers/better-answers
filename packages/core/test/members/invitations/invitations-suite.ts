@@ -1,14 +1,15 @@
 import { createHash } from "node:crypto";
 
-import { ulid } from "@better-answers/schema";
-import type { MigratedPostgres } from "@better-answers/schema/testing";
-
 import {
   CeilingMet,
   type Result,
   type Role,
   type UserPrincipal,
-} from "../../../src/kernel/index.ts";
+} from "@better-answers/core/kernel";
+import type { Tx } from "@better-answers/core/store/postgres";
+import { ulid } from "@better-answers/schema";
+import type { MigratedPostgres } from "@better-answers/schema/testing";
+
 import {
   cancelInvitation,
   inviteMembers,
@@ -16,7 +17,6 @@ import {
   resendInvitation,
   type InvitationMinted,
 } from "../../../src/members/index.ts";
-import type { Tx } from "../../../src/store/postgres/index.ts";
 import { confirmedSessionFor } from "../../support/identity-rows.ts";
 import type { ProvisionedWorkspace } from "../../support/platform.ts";
 import { inputOf } from "../../support/suite-input.ts";

@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
-import { ulid } from "@better-answers/schema";
-
-import type { Sensitivity } from "../../src/access/index.ts";
-import { find, open } from "../../src/answering/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
+import type { Sensitivity } from "@better-answers/core/access";
+import type { UserPrincipal } from "@better-answers/core/kernel";
 import {
   narrowConnectedSource,
   narrowConnectedSourceInput,
@@ -16,7 +13,10 @@ import {
   previewPassagesInput,
   publishConnectedSource,
   publishConnectedSourceInput,
-} from "../../src/sources/index.ts";
+} from "@better-answers/core/sources";
+import { ulid } from "@better-answers/schema";
+
+import { find, open } from "../../src/answering/index.ts";
 import { seededBy, visibilitySuite } from "../fixtures/sourced-concept.ts";
 import type { Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { inputOf } from "../support/suite-input.ts";

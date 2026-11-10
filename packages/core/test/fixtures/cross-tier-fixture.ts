@@ -1,7 +1,8 @@
-import { ulid, type UserPrincipal } from "../../src/kernel/index.ts";
-import { connectUpload, connectUploadFields } from "../../src/sources/index.ts";
-import type { ObjectDoor } from "../../src/store/objects/index.ts";
-import type { PostgresDoor } from "../../src/store/postgres/index.ts";
+import { ulid, type UserPrincipal } from "@better-answers/core/kernel";
+import { connectUpload, connectUploadFields } from "@better-answers/core/sources";
+import type { ObjectDoor } from "@better-answers/core/store/objects";
+import type { PostgresDoor } from "@better-answers/core/store/postgres";
+
 import { inputOf } from "../support/suite-input.ts";
 
 export const THE_HANDBOOK =

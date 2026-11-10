@@ -1,5 +1,6 @@
 import { assert, describe, expect, it } from "vitest";
 
+import type { UserPrincipal } from "@better-answers/core/kernel";
 import { head, PLATFORM_BOT } from "@better-answers/core/store/git";
 import { ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
@@ -10,7 +11,6 @@ import {
   type ManifestWritten,
   type WriteManifestInput,
 } from "../../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../../src/kernel/index.ts";
 import {
   bundleHistory,
   commitFacts,

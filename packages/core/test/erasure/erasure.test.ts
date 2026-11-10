@@ -2,6 +2,7 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it } from "vitest";
 
+import type { PrincipalRefusal, Result, UserPrincipal } from "@better-answers/core/kernel";
 import { matching } from "@better-answers/schema/testing/matching";
 
 import {
@@ -16,7 +17,6 @@ import {
   type SubjectRequest,
   type SubjectRequestRecorded,
 } from "../../src/erasure/index.ts";
-import type { PrincipalRefusal, Result, UserPrincipal } from "../../src/kernel/index.ts";
 import { auditEventRowsOf } from "../fixtures/sourced-concept.ts";
 import { suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
 import { rowsFrom } from "../support/rows.ts";

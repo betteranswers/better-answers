@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { byCodeUnit } from "@better-answers/schema/code-unit";
-
 import {
   acceptSuggestions,
   submitSuggestionSet,
   type Frontmatter,
-} from "../../src/concepts/index.ts";
+} from "@better-answers/core/concepts";
+import { actorIdOfPerson, type UserPrincipal } from "@better-answers/core/kernel";
+import { byCodeUnit } from "@better-answers/schema/code-unit";
+
 import { ERASURE, runErasure } from "../../src/erasure/index.ts";
-import { actorIdOfPerson, type UserPrincipal } from "../../src/kernel/index.ts";
 import { authorLinesOf, everyObjectOf } from "../fixtures/bundle.ts";
 import {
   doorsOf,

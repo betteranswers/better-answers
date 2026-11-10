@@ -1,11 +1,12 @@
 import { assert, describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
 
+import { withBundleWrite } from "@better-answers/core/bundle";
+import { overrideConceptSensitivity, writeConcept } from "@better-answers/core/concepts";
+import type { UserPrincipal } from "@better-answers/core/kernel";
 import { head } from "@better-answers/core/store/git";
 import { ulid } from "@better-answers/schema";
 
-import { withBundleWrite } from "../../src/bundle/index.ts";
-import { overrideConceptSensitivity, writeConcept } from "../../src/concepts/index.ts";
 import {
   coverageOf,
   includeAvailable,
@@ -13,7 +14,6 @@ import {
   writeSkeleton,
   type Coverage,
 } from "../../src/guides/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit } from "../fixtures/bundle.ts";
 import { EMPLOYERS_LIABILITY } from "../fixtures/northgate-concepts.ts";
 import {

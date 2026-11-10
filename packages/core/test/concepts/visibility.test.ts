@@ -3,7 +3,20 @@ import { inspect } from "node:util";
 import { assert, describe, expect, it } from "vitest";
 import type { z } from "zod";
 
+import { find, open, type FindMatch } from "@better-answers/core/answering";
+import { STORED_DETAIL_KEYS } from "@better-answers/core/audit";
+import { footnotesOf } from "@better-answers/core/guides";
+import { attempt, ok, parse, type UserPrincipal } from "@better-answers/core/kernel";
+import {
+  narrowConnectedSource,
+  narrowConnectedSourceInput,
+  narrowDocuments,
+  narrowDocumentsInput,
+  widenConnectedSource,
+  widenConnectedSourceInput,
+} from "@better-answers/core/sources";
 import { head } from "@better-answers/core/store/git";
+import { withScope, type Folded, type Tx } from "@better-answers/core/store/postgres";
 import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
@@ -12,8 +25,6 @@ import {
   conceptIriTakenAgain,
 } from "@better-answers/schema/testing/probes";
 
-import { find, open, type FindMatch } from "../../src/answering/index.ts";
-import { STORED_DETAIL_KEYS } from "../../src/audit/index.ts";
 import {
   cascadingVisibility,
   findConcepts,
@@ -21,17 +32,6 @@ import {
   readableCollections,
   writeConcept,
 } from "../../src/concepts/index.ts";
-import { footnotesOf } from "../../src/guides/index.ts";
-import { attempt, ok, parse, type UserPrincipal } from "../../src/kernel/index.ts";
-import {
-  narrowConnectedSource,
-  narrowConnectedSourceInput,
-  narrowDocuments,
-  narrowDocumentsInput,
-  widenConnectedSource,
-  widenConnectedSourceInput,
-} from "../../src/sources/index.ts";
-import { withScope, type Folded, type Tx } from "../../src/store/postgres/index.ts";
 import { plannedOn } from "../answering/asking.ts";
 import { bundleHistory } from "../fixtures/bundle.ts";
 import {

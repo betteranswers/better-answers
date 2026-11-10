@@ -16,6 +16,8 @@ export type JscpdConfig = {
   readonly ignore: readonly string[];
 };
 
+const IMPORT_STATEMENT = String.raw`(?m)^import\s(?:[^;]*\sfrom\s+)?["'][^"']+["'];`;
+
 export const jscpdArgv = (config: JscpdConfig): readonly string[] => [
   "--min-lines",
   String(config.minLines),
@@ -25,6 +27,8 @@ export const jscpdArgv = (config: JscpdConfig): readonly string[] => [
   String(config.threshold),
   "--format",
   config.formats.join(","),
+  "--ignore-pattern",
+  IMPORT_STATEMENT,
 
   // jscpd reads an empty --ignore as every path, so it would scan nothing and report a clean tree.
   ...(config.ignore.length > 0 ? ["--ignore", config.ignore.join(",")] : []),

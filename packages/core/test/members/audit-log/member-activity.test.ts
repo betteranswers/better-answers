@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 
+import type { Result, Role, UserPrincipal } from "@better-answers/core/kernel";
+import {
+  openPostgres,
+  type Foldable,
+  type Folded,
+  type Tx,
+} from "@better-answers/core/store/postgres";
+import { addMember } from "@better-answers/core/workspaces";
 import { ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import type { Result, Role, UserPrincipal } from "../../../src/kernel/index.ts";
 import {
   acceptInvitation,
   addToGroup,
@@ -23,13 +30,6 @@ import {
   requestAccess,
   type ActivityPage,
 } from "../../../src/members/index.ts";
-import {
-  openPostgres,
-  type Foldable,
-  type Folded,
-  type Tx,
-} from "../../../src/store/postgres/index.ts";
-import { addMember } from "../../../src/workspaces/index.ts";
 import {
   bootstrap,
   provisionedWorkspace,

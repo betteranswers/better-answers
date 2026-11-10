@@ -4,7 +4,10 @@ import pg from "pg";
 import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { actorIdOf, type Result, type UserPrincipal } from "@better-answers/core/kernel";
+import { narrowConnectedSource, narrowConnectedSourceInput } from "@better-answers/core/sources";
 import { commit, withRepositoryLock } from "@better-answers/core/store/git";
+import { openPostgres } from "@better-answers/core/store/postgres";
 import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -29,9 +32,6 @@ import {
   type WorkspaceReconciled,
   type WriteConceptInput,
 } from "../../../src/concepts/index.ts";
-import { actorIdOf, type Result, type UserPrincipal } from "../../../src/kernel/index.ts";
-import { narrowConnectedSource, narrowConnectedSourceInput } from "../../../src/sources/index.ts";
-import { openPostgres } from "../../../src/store/postgres/index.ts";
 import {
   bundleHistory,
   commitFacts,

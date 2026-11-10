@@ -9,7 +9,8 @@ import {
   standingOf,
   type PendingStep,
   type SecondFactorFacts,
-} from "../../../src/kernel/index.ts";
+} from "@better-answers/core/kernel";
+
 import { judgeTheSession } from "../../../src/workspaces/index.ts";
 import { authenticatorFor, passkeyFor } from "../../support/identity-rows.ts";
 import { bootstrap, provisionedWorkspace, seedPerson } from "../../support/platform.ts";

@@ -2,12 +2,12 @@ import { inspect } from "node:util";
 
 import { assert, beforeAll, describe, expect, it } from "vitest";
 
+import { writeConcept, type WriteConceptInput } from "@better-answers/core/concepts";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { enqueueJob } from "@better-answers/core/runs";
 import { walkConceptsFromEntries, walkFrom } from "@better-answers/core/store/map";
 import { ids, type ConceptIri } from "@better-answers/schema";
 
-import { writeConcept, type WriteConceptInput } from "../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { enqueueJob } from "../../src/runs/index.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { alternating, inMs, percentile, recordFigures } from "../support/figures.ts";
 import { answered, readingAs, runtimePoolFor, seedingWith } from "../support/suite-postgres.ts";

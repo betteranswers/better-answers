@@ -2,9 +2,9 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it } from "vitest";
 
+import { openPostgres } from "@better-answers/core/store/postgres";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { openPostgres } from "../../../src/store/postgres/index.ts";
 import {
   endOneSession,
   endOneSessionInput,

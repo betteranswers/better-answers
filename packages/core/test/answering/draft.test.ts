@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import { err, type PrincipalRefusal, type UserPrincipal } from "@better-answers/core/kernel";
+import { openStreamingClient } from "@better-answers/core/llm";
+
 import {
   draftAnswer,
   type AnswerResult,
   type DraftEvent,
   type DraftSteps,
 } from "../../src/answering/index.ts";
-import { err, type PrincipalRefusal, type UserPrincipal } from "../../src/kernel/index.ts";
-import { openStreamingClient } from "../../src/llm/index.ts";
 import { abortingAt, holdingAt } from "../llm/stream-pauses.ts";
 import {
   conceptNumbersIn as numbersIn,

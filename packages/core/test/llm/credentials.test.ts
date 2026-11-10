@@ -2,12 +2,12 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it, vi } from "vitest";
 
+import { attempt } from "@better-answers/core/kernel";
+import { openPostgres, withIdentityRead, withScope } from "@better-answers/core/store/postgres";
+import { setModelKey } from "@better-answers/core/workspaces";
 import { boundarySchemas, type ModelProvider } from "@better-answers/schema";
 
-import { attempt } from "../../src/kernel/index.ts";
 import { openCredentials, openModelKeySetting, type Credentials } from "../../src/llm/index.ts";
-import { openPostgres, withIdentityRead, withScope } from "../../src/store/postgres/index.ts";
-import { setModelKey } from "../../src/workspaces/index.ts";
 import { bootstrap } from "../support/platform.ts";
 import { rowsFrom } from "../support/rows.ts";
 import { postgresForSuite, seedingWith, whileWritesAreRefused } from "../support/suite-postgres.ts";

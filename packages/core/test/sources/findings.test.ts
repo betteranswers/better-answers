@@ -1,9 +1,9 @@
 import type pg from "pg";
 import { assert, describe, expect, it } from "vitest";
 
+import { parse, type UserPrincipal } from "@better-answers/core/kernel";
 import { REDACTION_ALWAYS_TIER } from "@better-answers/schema";
 
-import { parse, type UserPrincipal } from "../../src/kernel/index.ts";
 import { restoreFinding, restoreFindingInput } from "../../src/sources/index.ts";
 import { visibilitySuite } from "../fixtures/sourced-concept.ts";
 import type { Scenario } from "../fixtures/workspace-with-bundle.ts";

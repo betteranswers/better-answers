@@ -3,6 +3,28 @@ import { randomBytes } from "node:crypto";
 import { assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import {
+  completeRecord,
+  giveFeedback,
+  open,
+  openRecord,
+  trustWords,
+} from "@better-answers/core/answering";
+import {
+  contentHashOf,
+  RECONCILER,
+  reconcile,
+  renderConceptFile,
+  writeConcept,
+  type Frontmatter,
+} from "@better-answers/core/concepts";
+import { seedGuide } from "@better-answers/core/guides";
+import { actorIdOfPerson, type Result, type UserPrincipal } from "@better-answers/core/kernel";
+import {
+  acceptInvitation,
+  approveRequest,
+  endEverySignInAndTokenHere,
+} from "@better-answers/core/members";
 import { commit, type GitDoor } from "@better-answers/core/store/git";
 import {
   getPlatformObject,
@@ -16,24 +38,10 @@ import {
   withScope,
   type Tx,
 } from "@better-answers/core/store/postgres";
+import { setDisplayName, setOperatorMark } from "@better-answers/core/workspaces";
 import { boundarySchemas, IDENTITY_SET, ulid, type ConceptIri } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import {
-  completeRecord,
-  giveFeedback,
-  open,
-  openRecord,
-  trustWords,
-} from "../../../src/answering/index.ts";
-import {
-  contentHashOf,
-  RECONCILER,
-  reconcile,
-  renderConceptFile,
-  writeConcept,
-  type Frontmatter,
-} from "../../../src/concepts/index.ts";
 import {
   beyondUseFrom,
   ERASURE,
@@ -50,14 +58,6 @@ import {
   type RunErasureRefusal,
 } from "../../../src/erasure/index.ts";
 import { NAMES_HEADING } from "../../../src/erasure/report.ts";
-import { seedGuide } from "../../../src/guides/index.ts";
-import { actorIdOfPerson, type Result, type UserPrincipal } from "../../../src/kernel/index.ts";
-import {
-  acceptInvitation,
-  approveRequest,
-  endEverySignInAndTokenHere,
-} from "../../../src/members/index.ts";
-import { setDisplayName, setOperatorMark } from "../../../src/workspaces/index.ts";
 import { asAnotherProcess } from "../../concepts/bundle-fence.ts";
 import {
   authorLinesOf,

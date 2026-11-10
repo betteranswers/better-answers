@@ -2,11 +2,11 @@ import type pg from "pg";
 import { assert, describe, expect, it } from "vitest";
 import type { z } from "zod";
 
+import { STORED_DETAIL_KEYS } from "@better-answers/core/audit";
+import { parse, type UserPrincipal } from "@better-answers/core/kernel";
 import { REASONS_EMPTYING_THE_CONNECTED_SOURCE } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { STORED_DETAIL_KEYS } from "../../src/audit/index.ts";
-import { parse, type UserPrincipal } from "../../src/kernel/index.ts";
 import {
   dismissAsNotSpecialCategory,
   dismissAsNotSpecialCategoryInput,

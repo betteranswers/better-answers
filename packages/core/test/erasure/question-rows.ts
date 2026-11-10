@@ -1,8 +1,8 @@
 import type pg from "pg";
 
+import { actorIdOfPerson } from "@better-answers/core/kernel";
 import { conceptIriOf, ulid } from "@better-answers/schema";
 
-import { actorIdOfPerson } from "../../src/kernel/index.ts";
 import { personIdOf } from "../support/platform.ts";
 import { rowsFrom } from "../support/rows.ts";
 import { seedingWith } from "../support/suite-postgres.ts";

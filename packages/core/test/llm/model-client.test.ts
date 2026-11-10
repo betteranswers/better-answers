@@ -1,9 +1,16 @@
 import { assert, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import type { PlatformPrincipal } from "@better-answers/core/kernel";
+import { openPostgres } from "@better-answers/core/store/postgres";
+import {
+  setDecisionThreshold,
+  setModelChoice,
+  setModelKey,
+  setModelPrice,
+} from "@better-answers/core/workspaces";
 import { ulid } from "@better-answers/schema";
 
-import type { PlatformPrincipal } from "../../src/kernel/index.ts";
 import {
   ATTEMPT_TIMEOUT_MS,
   LONGEST_RETRY_WAIT_MS,
@@ -20,13 +27,6 @@ import {
   type ModelCall,
   type ModelToCall,
 } from "../../src/llm/index.ts";
-import { openPostgres } from "../../src/store/postgres/index.ts";
-import {
-  setDecisionThreshold,
-  setModelChoice,
-  setModelKey,
-  setModelPrice,
-} from "../../src/workspaces/index.ts";
 import { principalFor } from "../fixtures/workspace-with-bundle.ts";
 import { bootstrap, provisionedWorkspace } from "../support/platform.ts";
 import { rowsFrom } from "../support/rows.ts";

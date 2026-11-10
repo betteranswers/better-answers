@@ -1,9 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ASK_CAPS, askInput, planAnswer } from "../../src/answering/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { openModelClient, type ModelClient, type ModelToCall } from "../../src/llm/index.ts";
+import { ASK_CAPS, askInput, planAnswer } from "@better-answers/core/answering";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { openModelClient, type ModelClient, type ModelToCall } from "@better-answers/core/llm";
+
 import {
   conceptsFoundBy,
   landRecallSet,

@@ -1,12 +1,12 @@
-import { head } from "@better-answers/core/store/git";
-
 import {
   submitSuggestionSet,
   writeConcept,
   type SuggestionRequest,
   type WriteConceptInput,
-} from "../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
+} from "@better-answers/core/concepts";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { head } from "@better-answers/core/store/git";
+
 import { doorsOf, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 
 let written = 0;

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { actorIdOfPerson, type UserPrincipal } from "@better-answers/core/kernel";
 import { commit, type GitDoor } from "@better-answers/core/store/git";
+import { withScope } from "@better-answers/core/store/postgres";
 import { SUBJECT_IDENTIFIER_KINDS, ulid } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
@@ -18,8 +20,6 @@ import {
   type SubjectIdentifiers,
   type SubjectRequest,
 } from "../../src/erasure/index.ts";
-import { actorIdOfPerson, type UserPrincipal } from "../../src/kernel/index.ts";
-import { withScope } from "../../src/store/postgres/index.ts";
 import { contractFixture } from "../fixtures/contract-fixture.ts";
 import {
   memberOf,

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { openPostgres } from "@better-answers/core/store/postgres";
 import { ulid } from "@better-answers/schema";
 
 import { acceptInvitation } from "../../../src/members/index.ts";
-import { openPostgres } from "../../../src/store/postgres/index.ts";
 import { bootstrap, provisionedWorkspace, seedPerson } from "../../support/platform.ts";
 import {
   addressOf,

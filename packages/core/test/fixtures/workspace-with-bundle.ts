@@ -1,22 +1,22 @@
 import type pg from "pg";
 
-import { initRepository, type GitDoor } from "@better-answers/core/store/git";
-import { analyseMap } from "@better-answers/core/store/map";
-import { testData, type MigratedPostgres } from "@better-answers/schema/testing";
-
-import { nameOwner, type NameOwnerInput } from "../../src/concepts/index.ts";
+import { nameOwner, type NameOwnerInput } from "@better-answers/core/concepts";
 import {
   systemClock,
   type Role,
   type UserPrincipal,
   type WorkspaceId,
-} from "../../src/kernel/index.ts";
+} from "@better-answers/core/kernel";
+import { initRepository, type GitDoor } from "@better-answers/core/store/git";
+import { analyseMap } from "@better-answers/core/store/map";
 import {
   openPostgres,
   withMember,
   withPrincipal,
   type PostgresDoor,
-} from "../../src/store/postgres/index.ts";
+} from "@better-answers/core/store/postgres";
+import { testData, type MigratedPostgres } from "@better-answers/schema/testing";
+
 import { confirmedSessionFor } from "../support/identity-rows.ts";
 import { provisionedWorkspace } from "../support/platform.ts";
 import { postgresForSuite, seedingWith } from "../support/suite-postgres.ts";

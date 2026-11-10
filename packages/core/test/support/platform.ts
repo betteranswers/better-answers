@@ -1,22 +1,22 @@
 import type pg from "pg";
 
-import { boundarySchemas, ulid } from "@better-answers/schema";
-import { type MigratedPostgres, testData } from "@better-answers/schema/testing";
-
 import type {
   OperatorPrincipal,
   PlatformPrincipal,
   UserPrincipal,
   WorkspaceId,
-} from "../../src/kernel/index.ts";
-import { ERASED_DOMAIN } from "../../src/store/git/index.ts";
+} from "@better-answers/core/kernel";
+import { ERASED_DOMAIN } from "@better-answers/core/store/git";
 import {
   openPostgres,
   type PostgresDoor,
   type Tx,
   withOperator,
-} from "../../src/store/postgres/index.ts";
-import { provisionWorkspace } from "../../src/workspaces/index.ts";
+} from "@better-answers/core/store/postgres";
+import { provisionWorkspace } from "@better-answers/core/workspaces";
+import { boundarySchemas, ulid } from "@better-answers/schema";
+import { type MigratedPostgres, testData } from "@better-answers/schema/testing";
+
 import { sessionFor } from "./identity-rows.ts";
 
 export const personIdOf = (id: string) => boundarySchemas.user.select.shape.id.parse(id);

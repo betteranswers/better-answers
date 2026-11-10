@@ -1,9 +1,21 @@
 import { assert, describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
+import type { writeConceptAction } from "@better-answers/core/concepts";
+import { enqueueJobAction, enqueueJobInput } from "@better-answers/core/runs";
+import {
+  reprocessConnectedSourceAction,
+  reprocessConnectedSourceInput,
+  type adminOnConnectedSource,
+  type dpiaInputFor,
+  type previewPassages,
+  type publishConnectedSource,
+  type reprocessConnectedSource,
+  type ReprocessConnectedSourceInput,
+  type ReprocessConnectedSourceRefusal,
+} from "@better-answers/core/sources";
 import { boundarySchemas } from "@better-answers/schema";
 
-import type { writeConceptAction } from "../../../src/concepts/index.ts";
 import {
   admit,
   declareAction,
@@ -21,18 +33,6 @@ import {
   type Role,
   type UserPrincipal,
 } from "../../../src/kernel/index.ts";
-import { enqueueJobAction, enqueueJobInput } from "../../../src/runs/index.ts";
-import {
-  reprocessConnectedSourceAction,
-  reprocessConnectedSourceInput,
-  type adminOnConnectedSource,
-  type dpiaInputFor,
-  type previewPassages,
-  type publishConnectedSource,
-  type reprocessConnectedSource,
-  type ReprocessConnectedSourceInput,
-  type ReprocessConnectedSourceRefusal,
-} from "../../../src/sources/index.ts";
 
 const person = (role: Role): UserPrincipal => ({
   kind: "user",

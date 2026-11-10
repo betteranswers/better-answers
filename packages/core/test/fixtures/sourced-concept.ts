@@ -1,24 +1,24 @@
 import type pg from "pg";
 
-import { head } from "@better-answers/core/store/git";
-import { passageLocatorOf } from "@better-answers/schema";
-import { testData, type MigratedPostgres, type TestData } from "@better-answers/schema/testing";
-
 import {
   overrideConceptSensitivity,
   writeConcept,
   type ConceptWritten,
   type FrontmatterSource,
   type WriteConceptInput,
-} from "../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { addToGroup, createGroup } from "../../src/members/index.ts";
+} from "@better-answers/core/concepts";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { addToGroup, createGroup } from "@better-answers/core/members";
 import {
   passageIdOf,
   publishConnectedSource,
   publishConnectedSourceInput,
-} from "../../src/sources/index.ts";
-import type { Foldable, Folded, Tx } from "../../src/store/postgres/index.ts";
+} from "@better-answers/core/sources";
+import { head } from "@better-answers/core/store/git";
+import type { Foldable, Folded, Tx } from "@better-answers/core/store/postgres";
+import { passageLocatorOf } from "@better-answers/schema";
+import { testData, type MigratedPostgres, type TestData } from "@better-answers/schema/testing";
+
 import { inputOf } from "../support/suite-input.ts";
 import { answered, readingAs } from "../support/suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";

@@ -9,9 +9,8 @@ import type { TestProject } from "vitest/node";
 import { parse } from "yaml";
 import { z } from "zod";
 
+import { type ObjectDoor, openObjects } from "@better-answers/core/store/objects";
 import { rootsOf } from "@better-answers/schema/testing/roots";
-
-import { type ObjectDoor, openObjects } from "../../src/store/objects/index.ts";
 
 const { repositoryRoot } = rootsOf(import.meta.url);
 
