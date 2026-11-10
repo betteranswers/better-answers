@@ -67,7 +67,7 @@ export const QUESTIONS_WORDS = {
     drafted: "Drafted answer",
     feedback: "Feedback",
   },
-  noConcepts: "No concepts.",
+  noConcepts: "No concepts you can read.",
   helpful: RECORD_WORDS.markedHelpful,
   closeTheFlag: "Close this flag",
   closedSaid: {
