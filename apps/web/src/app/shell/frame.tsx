@@ -31,7 +31,8 @@ import {
 } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import { BreadcrumbLastPartSlot } from "@/shared/page/breadcrumb-last-part.ts";
-import { NoticeSlotChoice, PageHeadSlot, type NoticeClaim } from "@/shared/page/page-head.tsx";
+import { PageHeadSlot } from "@/shared/page/page-head.tsx";
+import { NoticeSlotChoice, type NoticeClaim } from "@/shared/page/page-notice.tsx";
 import { isFilled, type PageTab, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 import { useWideLayout } from "@/shared/page/wide-layout.ts";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
