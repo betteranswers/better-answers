@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { JUMP_TO, UNKNOWN_PAGE } from "@/app/words.ts";
+import { UNKNOWN_PAGE } from "@/app/words.ts";
 
 import { expect, test } from "./browser.ts";
 
@@ -143,7 +143,7 @@ const scrollButtonHalfUnderStickyHeader = (): boolean => {
   header.style.cssText =
     "position: sticky; top: 0; z-index: 30; box-sizing: border-box; height: 48px; padding: 8px 0;";
   const headerButton = document.createElement("button");
-  headerButton.textContent = JUMP_TO.name;
+  headerButton.textContent = "Jump To";
   headerButton.style.cssText = "display: block; width: 176px; height: 32px;";
   header.append(headerButton);
   document.body.prepend(header);

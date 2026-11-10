@@ -6,7 +6,7 @@ import { INVITATION_WORDS } from "@/features/auth/workspace/invitation-words.ts"
 import { INVITE_WORDS } from "@/features/people/invitation-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { DISPLAY_NAME_WORDS } from "@/shared/member/display-name-words.ts";
-import { LIST_WORDS } from "@/shared/words.ts";
+import { LIST_WORDS, SIGN_OUT } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -143,7 +143,7 @@ test("invited people join, and their Activity shows only the join", async ({
         - paragraph
         - textbox ${JSON.stringify(DISPLAY_NAME_WORDS.label)}
         - button ${JSON.stringify(INVITATION_WORDS.join)}
-        - button "Sign Out"
+        - button ${JSON.stringify(SIGN_OUT)}
         - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
     `);
     await expect(invitedAs(page, "Editor")).toBeVisible();

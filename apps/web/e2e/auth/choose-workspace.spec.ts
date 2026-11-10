@@ -63,7 +63,7 @@ test("lists a member's workspaces within a second", async ({
         - paragraph
         - list
         - link "Account"
-        - button "Sign Out"
+        - button ${JSON.stringify(SIGN_OUT)}
         - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
     `);
     await page.keyboard.press("Tab");

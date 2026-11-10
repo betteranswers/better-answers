@@ -6,6 +6,7 @@ import {
 } from "@/features/auth/workspace/ask-to-join-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { SIGN_OUT } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -41,7 +42,7 @@ test("a person with no workspace asks to join by keyboard", async ({
         - paragraph
         - textbox "Reason"
         - button ${JSON.stringify(ASK_TO_JOIN_WORDS.ask)}
-      - button "Sign Out"
+      - button ${JSON.stringify(SIGN_OUT)}
       - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
   `);
   await expect(
