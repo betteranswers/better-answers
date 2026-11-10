@@ -432,7 +432,6 @@ function MemberList(properties: {
           <ListPages
             pages={{
               kind: "pages",
-              label: MEMBERS_WORDS.pages,
               pageIndex: narrowed.pageIndex,
               pageSize: PAGE_SIZE,
               total: narrowed.data.length,
@@ -440,6 +439,7 @@ function MemberList(properties: {
                 narrowed.write({ page: pageIndex + 1 });
               },
               keystrokes: { previous: KEY.previousPage, next: KEY.nextPage },
+              label: MEMBERS_WORDS.pages,
             }}
           />
         </MembersRead>

@@ -5,6 +5,7 @@ import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { changeRolePressed } from "@test/people/member-pages.ts";
 import { holdProcedure, type Api } from "@test/stubbed-api.ts";
 import {
   ADA,
@@ -65,7 +66,7 @@ const openGracesPage = async (api: Api) => {
 
 const changeGracesRole = () => {
   fireEvent.click(screen.getByRole("radio", { name: "Editor" }));
-  fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
+  changeRolePressed();
 };
 
 const landedInHolme = async () => {
