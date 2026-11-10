@@ -204,7 +204,6 @@ export function Review(properties: { readonly connectedSource: ListedConnectedSo
       <h4 id={REVIEW_HEADING} tabIndex={-1} className="font-medium text-foreground">
         {REVIEW_WORDS.heading(connectedSource.name)}
       </h4>
-      <p className="mt-2 text-muted-foreground">{REVIEW_WORDS.lead}</p>
 
       <div aria-live="polite" className="mt-4">
         {said.isPending ? <p>The findings are still loading.</p> : null}

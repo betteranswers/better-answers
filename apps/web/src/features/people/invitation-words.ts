@@ -135,7 +135,7 @@ export const INVITATIONS_WORDS = {
 } as const;
 
 export const INVITE_WORDS = {
-  description: "Invite people to your workspace with a specific role.",
+  description: "Invite people by email and choose their role.",
   field: "Email addresses",
   hint: "Separate addresses with commas or new lines.",
   list: "Addresses to invite",

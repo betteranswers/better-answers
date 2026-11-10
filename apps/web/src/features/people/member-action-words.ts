@@ -45,8 +45,8 @@ export const MEMBER_PAGE_WORDS = {
   removeMember: "Remove member",
   removeName: (name: string) => `Remove ${name}`,
   removeConfirm: (name: string) =>
-    `${name} will be signed out, and their assistants will lose access.`,
-  removeConfirmYou: "You will be signed out, and your assistants will lose access.",
+    `${name} will lose access to this workspace, along with their assistants.`,
+  removeConfirmYou: "You will lose access to this workspace, along with your assistants.",
   keepMember: "Keep member",
   displayName: "Display name",
   flagName: "Flag name",
@@ -105,7 +105,7 @@ export const BULK_WORDS = {
     action: "Remove",
     title: (count: number) => `Remove ${members(count)}`,
     consequence: (count: number) =>
-      `${count === 1 ? "This member" : "These members"} will be signed out, and their assistants will lose access.`,
+      `${count === 1 ? "This member" : "These members"} will lose access to this workspace, along with their assistants.`,
     pending: (count: number) => `Removing ${members(count)} from this workspace.`,
     done: (changed: number, skipped: number) =>
       `${changedSaid(changed, "No members were removed.", "removed from this workspace")}${andAlready(skipped, "no longer a member")}`,

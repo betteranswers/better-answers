@@ -202,7 +202,6 @@ type NamedGroup = RuleOfAGroup & { readonly title: string };
 
 export const REVIEW_WORDS = {
   heading: (name: string): string => `Review of ${name}`,
-  lead: "Findings from the last sync.",
   selectFirst: "Select a group of findings first.",
   select: (group: NamedGroup): string =>
     `Select ${spokenWord(group.category)} findings in ${group.title} found by the ${ruleWordOf(group)} rule`,
