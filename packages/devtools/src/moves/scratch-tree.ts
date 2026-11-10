@@ -64,7 +64,8 @@ const copyFile = (from: string, to: string): void => {
 const copyLink = (root: string, from: string, to: string): void => {
   const written = readlinkSync(from);
   const reached = path.resolve(path.dirname(from), written);
-  const leaves = path.relative(root, reached).startsWith("..");
+  const fromRoot = path.relative(root, reached);
+  const leaves = fromRoot === ".." || fromRoot.startsWith(`..${path.sep}`);
   symlinkSync(leaves ? reached : written, to);
 };
 
