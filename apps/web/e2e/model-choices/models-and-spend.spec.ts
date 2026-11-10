@@ -113,9 +113,9 @@ test.describe("the Model Choices card on the Models and Spend page", () => {
       - main "Page":
         - heading ${JSON.stringify(pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name)} [level=1]
         - tablist ${JSON.stringify(pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name)}:
-          - tab "Model Choices" [selected]
+          - tab ${JSON.stringify(MODEL_CHOICES_WORDS.heading)} [selected]
           - tab "Spend"
-        - tabpanel "Model Choices":
+        - tabpanel ${JSON.stringify(MODEL_CHOICES_WORDS.heading)}:
           - /children: equal
           - region ${JSON.stringify(MODEL_CHOICES_WORDS.heading)}
     `);

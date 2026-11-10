@@ -4,6 +4,7 @@ import { z } from "zod";
 import { FAILED_PAGE, JUMP_TO, SKIP_TO_MAIN, TOGGLE, UNKNOWN_PAGE } from "@/app/words.ts";
 import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
 import { SETUP_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
+import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import {
   CONTROL_CENTRE,
   HOMES,
@@ -98,7 +99,8 @@ const tabsOf = (page: Page) =>
     name: pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
   });
 
-const modelChoicesCardOf = (page: Page) => page.getByRole("region", { name: "Model Choices" });
+const modelChoicesCardOf = (page: Page) =>
+  page.getByRole("region", { name: MODEL_CHOICES_WORDS.heading });
 
 const modelChoicesLoaded = (page: Page) =>
   expect(modelChoicesCardOf(page).getByRole("paragraph")).toHaveCount(3);
@@ -293,12 +295,14 @@ test("the shell's header, rail, and menu work by keyboard", async ({
     await expect(offer.getByRole("button", { name: PASSKEY_WORDS.dismissOffer })).toBeFocused();
 
     await page.keyboard.press("Tab");
-    await expect(tabsOf(page).getByRole("tab", { name: "Model Choices" })).toBeFocused();
+    await expect(
+      tabsOf(page).getByRole("tab", { name: MODEL_CHOICES_WORDS.heading }),
+    ).toBeFocused();
 
     const panel = page.getByRole("tabpanel");
     await page.keyboard.press("Tab");
     await expect(panel).toBeFocused();
-    await expect(panel.getByRole("region", { name: "Model Choices" })).toBeVisible();
+    await expect(panel.getByRole("region", { name: MODEL_CHOICES_WORDS.heading })).toBeVisible();
 
     expect(
       await page.evaluate(mainFollowsHeaderWithNoPositiveTabindex),
@@ -358,7 +362,7 @@ test("the shell's header, rail, and menu work by keyboard", async ({
 
     await skipLinkReachesThePage(page);
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("tab", { name: "Model Choices" })).toBeFocused();
+    await expect(page.getByRole("tab", { name: MODEL_CHOICES_WORDS.heading })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(page.getByRole("tabpanel")).toBeFocused();
     await page.keyboard.press("Tab");
@@ -368,7 +372,7 @@ test("the shell's header, rail, and menu work by keyboard", async ({
   });
 
   await test.step("opens another tab and another page after the failure", async () => {
-    await expect(page.getByRole("tab", { name: "Model Choices" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: MODEL_CHOICES_WORDS.heading })).toHaveAttribute(
       "aria-selected",
       "true",
     );

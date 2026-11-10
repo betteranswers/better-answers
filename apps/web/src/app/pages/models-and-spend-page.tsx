@@ -1,4 +1,5 @@
 import { ModelChoicesCard } from "@/features/model-choices/model-choices-card.tsx";
+import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { useOpenTab, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
@@ -12,7 +13,7 @@ const SPEND = "spend";
 
 export const MODELS_AND_SPEND_TOOLBAR: PageToolbar = {
   tabs: [
-    { id: "model-choices", name: "Model Choices" },
+    { id: "model-choices", name: MODEL_CHOICES_WORDS.heading },
     { id: SPEND, name: "Spend" },
   ],
 };

@@ -110,8 +110,8 @@ describe("the page toolbar", () => {
       within(tabs())
         .getAllByRole("tab")
         .map((tab) => tab.textContent),
-    ).toEqual(["Model Choices", "Spend"]);
-    expect(selectedTab()).toBe("Model Choices");
+    ).toEqual([MODEL_CHOICES_WORDS.heading, "Spend"]);
+    expect(selectedTab()).toBe(MODEL_CHOICES_WORDS.heading);
   });
 
   it("opens the chosen tab and shows a placeholder when unbuilt", async () => {
@@ -156,7 +156,7 @@ describe("the page toolbar", () => {
 
     const panel = screen.getByRole("tabpanel");
     expect(panel.getAttribute("aria-labelledby")).toBe(
-      within(tabs()).getByRole("tab", { name: "Model Choices" }).id,
+      within(tabs()).getByRole("tab", { name: MODEL_CHOICES_WORDS.heading }).id,
     );
     expect(within(panel).getByRole("region", { name: MODEL_CHOICES_WORDS.heading })).toBeDefined();
   });
