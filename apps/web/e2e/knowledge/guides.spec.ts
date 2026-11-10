@@ -135,7 +135,7 @@ const sectionOf = (page: Page, heading: string): Locator =>
   page.getByRole("region", { name: heading, exact: true });
 
 const footnotesOf = (section: Locator): Locator =>
-  section.getByRole("list", { name: "Footnotes" }).getByRole("listitem");
+  section.getByRole("list", { name: GUIDE_WORDS.footnotes }).getByRole("listitem");
 
 const chipsOf = (page: Page): Locator => page.locator(FOOTNOTE_CHIP);
 
@@ -143,7 +143,7 @@ const namesVersion = (version: number): RegExp => new RegExp(`\\b${String(versio
 
 const editorOpened = async (page: Page, section: Locator): Promise<Locator> => {
   await section.getByRole("button", { name: "Edit Brief" }).click();
-  const text = page.getByRole("textbox", { name: "Brief of section 1" });
+  const text = page.getByRole("textbox", { name: BRIEF_WORDS.label("1") });
   await expect(text).toBeFocused();
   return text;
 };
@@ -218,7 +218,7 @@ test.describe("the guide page", () => {
     await test.step("resolves a detailed concept's footnotes to its sources", async () => {
       const insurance = sectionOf(page, INSURANCE);
       await insurance.getByRole("button", { name: GUIDE_WORDS.showDetail }).click();
-      const detail = insurance.getByRole("region", { name: "Detail of section 3" });
+      const detail = insurance.getByRole("region", { name: GUIDE_WORDS.detailOf("3") });
       await expect(
         detail.getByRole("heading", { name: PROFESSIONAL_INDEMNITY }),
         "the Editor in finance cannot read the restricted concept in the section's Detail",
@@ -233,7 +233,7 @@ test.describe("the guide page", () => {
       await expect(show).toHaveAttribute("aria-expanded", "false");
       await show.focus();
       await page.keyboard.press("Enter");
-      const detail = first.getByRole("region", { name: "Detail of section 1" });
+      const detail = first.getByRole("region", { name: GUIDE_WORDS.detailOf("1") });
       await expect(detail).toBeFocused();
       await expect(detail.getByRole("heading", { name: REGISTRATION })).toBeVisible();
       await page.keyboard.press(KEY.showDetail.key);
@@ -284,7 +284,7 @@ test.describe("the guide page", () => {
       await page.keyboard.type(` Sample ${String(sample)}.`);
 
       await page.keyboard.down("Control");
-      await clockTheNextKey(page, { at: STATUS_OF_THE_GUIDE, reads: "Saving the Brief." });
+      await clockTheNextKey(page, { at: STATUS_OF_THE_GUIDE, reads: BRIEF_WORDS.saving });
       await page.keyboard.press("Enter");
       await page.keyboard.up("Control");
       acknowledged.push(await actionClocked(page));
@@ -456,13 +456,13 @@ test.describe("the guide page", () => {
       await expect(footnotesOf(first)).toHaveCount(4);
       await expect(page.getByRole("button", { name: "Edit Brief" })).toHaveCount(0);
       await first.getByRole("button", { name: GUIDE_WORDS.showDetail }).click();
-      await expect(first.getByRole("region", { name: "Detail of section 1" })).toBeFocused();
+      await expect(first.getByRole("region", { name: GUIDE_WORDS.detailOf("1") })).toBeFocused();
     });
 
     await test.step("shows the insurance section's heading and coverage but not its text", async () => {
       const insurance = sectionOf(page, INSURANCE);
       await expect(insurance).toContainText("2 of 4");
-      await expect(insurance.getByRole("list", { name: "Footnotes" })).toHaveCount(0);
+      await expect(insurance.getByRole("list", { name: GUIDE_WORDS.footnotes })).toHaveCount(0);
       await expect(insurance.getByRole("button", { name: GUIDE_WORDS.showDetail })).toHaveCount(0);
       await expect(page.getByText(PROFESSIONAL_INDEMNITY)).toHaveCount(0);
     });

@@ -1,12 +1,13 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
 import { EDITOR_WORDS, FORMATTING_WORDS } from "@/features/knowledge/editing/editor-words.ts";
 import {
   CONCEPT_KEYSTROKES as KEY,
   EDITOR_KEYSTROKES,
 } from "@/features/knowledge/knowledge-state.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 

@@ -1,8 +1,15 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 
+import { isBlank } from "@better-answers/schema/cited-markdown";
+
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
-import { ConceptBody, LINK } from "@/shared/knowledge/concept-body.tsx";
+import {
+  CitedBrief,
+  ConceptBody,
+  LINK,
+  type SourceList,
+} from "@/shared/knowledge/concept-body.tsx";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
 import { TypeLine } from "@/shared/knowledge/type-line.tsx";
@@ -54,15 +61,19 @@ type Listed = {
   readonly at?: string | undefined;
 };
 
-function CitedList(properties: { readonly name: string; readonly items: readonly Listed[] }) {
-  const { name, items } = properties;
+function CitedList(properties: {
+  readonly name: string;
+  readonly items: readonly Listed[];
+  readonly list: SourceList;
+}) {
+  const { name, items, list } = properties;
   if (items.length === 0) return null;
   return (
     <ol aria-label={name} className="mt-3 list-decimal pl-6 [font-size:var(--text-sm)]">
-      {items.map((item) => {
+      {items.map((item, place) => {
         const page = item.iri === undefined ? undefined : conceptPageOf(item.iri);
         return (
-          <li key={item.key}>
+          <li key={item.key} id={list.idOf(place + 1)} tabIndex={-1}>
             {page === undefined ? (
               <span className="wrap-anywhere">{item.title}</span>
             ) : (
@@ -82,19 +93,35 @@ function CitedList(properties: { readonly name: string; readonly items: readonly
   );
 }
 
-function Footnotes(properties: { readonly footnotes: SectionBrief["rendered"]["footnotes"] }) {
+const useSourceList = (named: SourceList["named"]): SourceList => {
+  const listId = useId();
+  return useMemo(
+    () => ({ idOf: (number) => `${listId}-${String(number)}`, named }),
+    [listId, named],
+  );
+};
+
+function Footnotes(properties: {
+  readonly footnotes: SectionBrief["rendered"]["footnotes"];
+  readonly list: SourceList;
+}) {
   return (
     <CitedList
       name={WORDS.footnotes}
+      list={properties.list}
       items={properties.footnotes.map(({ label, iri, title }) => ({ key: label, iri, title }))}
     />
   );
 }
 
-function Sources(properties: { readonly evidence: SectionBrief["detail"][number]["evidence"] }) {
+function Sources(properties: {
+  readonly evidence: SectionBrief["detail"][number]["evidence"];
+  readonly list: SourceList;
+}) {
   return (
     <CitedList
       name={CONCEPT_WORDS.sources}
+      list={properties.list}
       items={properties.evidence.map(({ source, iri, at }, place) => ({
         key: `${String(place)}:${source}`,
         iri,
@@ -111,6 +138,7 @@ function BriefText(properties: {
   readonly below: number;
 }) {
   const { rendered } = properties.brief;
+  const list = useSourceList(WORDS.footnoteNamed);
   const evidence = useMemo(
     () =>
       rendered.footnotes.map((footnote) => ({
@@ -119,16 +147,55 @@ function BriefText(properties: {
       })),
     [rendered.footnotes],
   );
-  if (rendered.markdown.trim() === "") {
+  if (isBlank(rendered.parts)) {
     return properties.assembled ? (
       <p className="mt-4 text-muted-foreground">{WORDS.noBrief}</p>
     ) : null;
   }
   return (
     <div className="mt-4">
-      <ConceptBody body={rendered.markdown} evidence={evidence} headingsFrom={properties.below} />
-      <Footnotes footnotes={rendered.footnotes} />
+      <CitedBrief
+        parts={rendered.parts}
+        evidence={evidence}
+        headingsFrom={properties.below}
+        sources={list}
+      />
+      <Footnotes footnotes={rendered.footnotes} list={list} />
     </div>
+  );
+}
+
+type Detailed = SectionBrief["detail"][number];
+
+function DetailedConcept(properties: { readonly concept: Detailed; readonly level: number }) {
+  const { concept, level } = properties;
+  const list = useSourceList(CONCEPT_WORDS.sourceNamed);
+  const page = conceptPageOf(concept.iri);
+  const Title = HEADINGS[Math.min(level, HEADINGS.length - 1)] ?? "h6";
+  return (
+    <article>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <Title className="font-semibold [font-size:var(--text-md)]">
+          {page === undefined ? (
+            concept.title
+          ) : (
+            <Link to={page} className={cn(LINK, "wrap-anywhere")}>
+              {concept.title}
+            </Link>
+          )}
+        </Title>
+        <TypeLine type={concept.conceptType} />
+      </div>
+      <div className="mt-2">
+        <ConceptBody
+          body={concept.body}
+          evidence={concept.evidence}
+          headingsFrom={headingsBelow(level)}
+          sources={list}
+        />
+        <Sources evidence={concept.evidence} list={list} />
+      </div>
+    </article>
   );
 }
 
@@ -140,7 +207,6 @@ function Detail(properties: {
   readonly id: string;
 }) {
   const { brief, level, region } = properties;
-  const Title = HEADINGS[Math.min(level, HEADINGS.length - 1)] ?? "h6";
   return (
     <section
       ref={region}
@@ -150,33 +216,9 @@ function Detail(properties: {
       className="mt-4 grid gap-6 border-l border-border pl-4 outline-none focus-visible:[box-shadow:var(--focus-ring)]"
     >
       {brief.detail.length === 0 ? <p className="text-muted-foreground">{WORDS.noDetail}</p> : null}
-      {brief.detail.map((concept) => {
-        const page = conceptPageOf(concept.iri);
-        return (
-          <article key={concept.iri}>
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <Title className="font-semibold [font-size:var(--text-md)]">
-                {page === undefined ? (
-                  concept.title
-                ) : (
-                  <Link to={page} className={cn(LINK, "wrap-anywhere")}>
-                    {concept.title}
-                  </Link>
-                )}
-              </Title>
-              <TypeLine type={concept.conceptType} />
-            </div>
-            <div className="mt-2">
-              <ConceptBody
-                body={concept.body}
-                evidence={concept.evidence}
-                headingsFrom={headingsBelow(level)}
-              />
-              <Sources evidence={concept.evidence} />
-            </div>
-          </article>
-        );
-      })}
+      {brief.detail.map((concept) => (
+        <DetailedConcept key={concept.iri} concept={concept} level={level} />
+      ))}
     </section>
   );
 }
@@ -366,7 +408,7 @@ export function GuideSectionView(properties: SectionProps) {
             />
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {editing.actions}
-              {brief.rendered.markdown.trim() === "" ? null : (
+              {isBlank(brief.rendered.parts) ? null : (
                 <CopyAction section={section} copying={copying} editing={editing.open} />
               )}
               <Button

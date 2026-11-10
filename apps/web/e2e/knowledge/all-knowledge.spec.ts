@@ -1,8 +1,9 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { filterBy } from "@/shared/words.ts";

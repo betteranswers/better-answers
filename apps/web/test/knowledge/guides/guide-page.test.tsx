@@ -1,9 +1,10 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
 import { GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
 import {
@@ -37,6 +38,33 @@ const openGuide = async (role: "Admin" | "Editor" | "Viewer", guide = aGuide()) 
 };
 
 const sectionNamed = (name: string) => screen.getByRole("region", { name });
+
+type Cited = {
+  readonly id: string;
+  readonly source: string;
+  readonly at?: string;
+  readonly iri?: string;
+};
+
+/** A guide whose one section details the racking plan, citing the sources given. */
+const rackingCiting = (body: string, evidence: readonly Cited[]) =>
+  aGuide({
+    sections: [
+      aSection({
+        brief: aBrief({
+          detail: [
+            { iri: RACKING_IRI, title: RACKING_TITLE, conceptType: "Policy", body, evidence },
+          ],
+        }),
+      }),
+    ],
+  });
+
+const detailOpenedIn = async (guide: ReturnType<typeof aGuide>) => {
+  await openGuide("Viewer", guide);
+  fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
+  return within(await screen.findByRole("region", { name: GUIDE_WORDS.detailOf("1") }));
+};
 
 const guideArticle = () => within(screen.getByRole("article"));
 
@@ -140,9 +168,11 @@ describe("the guide page", () => {
     expect(section.getByText(/Pallets are racked/u).textContent).toBe(
       "Pallets are racked[1] by row.",
     );
-    const footnotes = within(section.getByRole("list", { name: "Footnotes" }));
+    const footnotes = within(section.getByRole("list", { name: GUIDE_WORDS.footnotes }));
     const link = footnotes.getByRole("link", { name: RACKING_TITLE });
     expect(link.getAttribute("href")).toContain(RACKING_IRI.slice(-26));
+    const number = section.getByRole("link", { name: GUIDE_WORDS.footnoteNamed(1, RACKING_TITLE) });
+    expect(number.getAttribute("href")).toBe(`#${footnotes.getByRole("listitem").id}`);
   });
 
   it("draws no Edit Brief for a Viewer", async () => {
@@ -159,13 +189,13 @@ describe("the guide page", () => {
   });
 
   it("offers Edit Brief but no Copy for an empty Brief", async () => {
-    const empty = aBrief({ rendered: { markdown: "", footnotes: [] } });
+    const empty = aBrief({ rendered: { parts: [], footnotes: [] } });
     await openGuide("Editor", aGuide({ sections: [aSection({ brief: empty })] }));
 
     const section = within(sectionNamed(SECTION_ONE));
     expect(section.getByRole("button", { name: "Edit Brief" })).toBeDefined();
     expect(section.queryByRole("button", { name: "Copy" })).toBeNull();
-    expect(section.queryByRole("list", { name: "Footnotes" })).toBeNull();
+    expect(section.queryByRole("list", { name: GUIDE_WORDS.footnotes })).toBeNull();
   });
 
   it("offers a way back to Guides for an unknown guide", async () => {
@@ -199,7 +229,7 @@ describe("a section the reader cannot read", () => {
     const section = within(sectionNamed("3. Insurance"));
     expect(section.getByText("Verified automatically")).toBeDefined();
     expect(section.getByText(/\b2 of 4\b/u)).toBeDefined();
-    expect(section.queryByRole("list", { name: "Footnotes" })).toBeNull();
+    expect(section.queryByRole("list", { name: GUIDE_WORDS.footnotes })).toBeNull();
     expect(section.queryByRole("button")).toBeNull();
     expect(section.queryByText(RACKING_TITLE)).toBeNull();
     expect(screen.queryByText("Each bay is racked by row.")).toBeNull();
@@ -255,7 +285,7 @@ describe("the Detail of a section", () => {
 
     fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
 
-    const detail = await screen.findByRole("region", { name: "Detail of section 1" });
+    const detail = await screen.findByRole("region", { name: GUIDE_WORDS.detailOf("1") });
     expect(within(detail).getByText("Each bay is racked by row.")).toBeDefined();
     expect(within(detail).getByRole("link", { name: RACKING_TITLE })).toBeDefined();
     await waitFor(() => {
@@ -271,10 +301,10 @@ describe("the Detail of a section", () => {
     const button = screen.getByRole("button", { name: GUIDE_WORDS.showDetail });
 
     fireEvent.click(button);
-    await screen.findByRole("region", { name: "Detail of section 1" });
+    await screen.findByRole("region", { name: GUIDE_WORDS.detailOf("1") });
     fireEvent.click(button);
 
-    expect(screen.queryByRole("region", { name: "Detail of section 1" })).toBeNull();
+    expect(screen.queryByRole("region", { name: GUIDE_WORDS.detailOf("1") })).toBeNull();
   });
 
   it("returns focus to Show Detail when d closes it", async () => {
@@ -282,13 +312,13 @@ describe("the Detail of a section", () => {
     const button = screen.getByRole("button", { name: GUIDE_WORDS.showDetail });
 
     fireEvent.click(button);
-    const detail = await screen.findByRole("region", { name: "Detail of section 1" });
+    const detail = await screen.findByRole("region", { name: GUIDE_WORDS.detailOf("1") });
     await waitFor(() => {
       expect(document.activeElement).toBe(detail);
     });
     fireEvent.keyDown(detail, { key: "d" });
 
-    expect(screen.queryByRole("region", { name: "Detail of section 1" })).toBeNull();
+    expect(screen.queryByRole("region", { name: GUIDE_WORDS.detailOf("1") })).toBeNull();
     expect(document.activeElement).toBe(button);
   });
 
@@ -296,32 +326,20 @@ describe("the Detail of a section", () => {
     const quoted = aGuide({ sections: [aSection({ layers: ["quoted"] })] });
     await openGuide("Viewer", quoted);
 
-    expect(screen.queryByRole("region", { name: "Detail of section 1" })).toBeNull();
+    expect(screen.queryByRole("region", { name: GUIDE_WORDS.detailOf("1") })).toBeNull();
     expect(
       screen.getByRole("button", { name: GUIDE_WORDS.showDetail }).getAttribute("aria-expanded"),
     ).toBe("false");
   });
 
   it("resolves the footnotes of a detailed concept to its sources", async () => {
-    const cited = aBrief({
-      detail: [
-        {
-          iri: RACKING_IRI,
-          title: RACKING_TITLE,
-          conceptType: "Policy",
-          body: "Each bay is racked by row.[^source-1] Loads are weighed.[^source-2]",
-          evidence: [
-            { id: "source-1", source: "Warehouse handbook", at: "p.4" },
-            { id: "source-2", source: "Load survey", iri: LOAD_SURVEY_IRI },
-          ],
-        },
-      ],
-    });
-    await openGuide("Viewer", aGuide({ sections: [aSection({ brief: cited })] }));
+    const detail = await detailOpenedIn(
+      rackingCiting("Each bay is racked by row.[^source-1] Loads are weighed.[^source-2]", [
+        { id: "source-1", source: "Warehouse handbook", at: "p.4" },
+        { id: "source-2", source: "Load survey", iri: LOAD_SURVEY_IRI },
+      ]),
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
-
-    const detail = within(await screen.findByRole("region", { name: "Detail of section 1" }));
     expect(detail.queryByText(/\[\^source/u), "a raw footnote marker is drawn").toBeNull();
     expect(detail.getByText(/Each bay is racked by row\./u).textContent).toBe(
       "Each bay is racked by row.[1] Loads are weighed.[2]",
@@ -337,12 +355,28 @@ describe("the Detail of a section", () => {
     );
   });
 
+  it("links each detailed footnote number to its source", async () => {
+    const detail = await detailOpenedIn(
+      rackingCiting("Each bay is racked by row.[^source-1]", [
+        { id: "source-1", source: "Warehouse handbook", at: "p.4" },
+      ]),
+    );
+
+    const number = detail.getByRole("link", {
+      name: CONCEPT_WORDS.sourceNamed(1, "Warehouse handbook"),
+    });
+    fireEvent.click(number);
+
+    const source = within(detail.getByRole("list", { name: CONCEPT_WORDS.sources })).getByRole(
+      "listitem",
+    );
+    expect(number.getAttribute("href")).toBe(`#${source.id}`);
+    expect(document.activeElement).toBe(source);
+  });
+
   it("draws no sources for a detailed concept that cites none", async () => {
-    await openGuide("Viewer");
+    const detail = await detailOpenedIn(aGuide());
 
-    fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
-
-    const detail = within(await screen.findByRole("region", { name: "Detail of section 1" }));
     expect(detail.queryByRole("list", { name: CONCEPT_WORDS.sources })).toBeNull();
   });
 
@@ -353,7 +387,7 @@ describe("the Detail of a section", () => {
     button.focus();
     fireEvent.keyDown(button, { key: "d" });
 
-    expect(await screen.findByRole("region", { name: "Detail of section 1" })).toBeDefined();
+    expect(await screen.findByRole("region", { name: GUIDE_WORDS.detailOf("1") })).toBeDefined();
   });
 
   it("opens only the section in focus on d", async () => {
@@ -371,8 +405,8 @@ describe("the Detail of a section", () => {
     second.focus();
     fireEvent.keyDown(second, { key: "d" });
 
-    expect(await screen.findByRole("region", { name: "Detail of section 2" })).toBeDefined();
-    expect(screen.queryByRole("region", { name: "Detail of section 1" })).toBeNull();
+    expect(await screen.findByRole("region", { name: GUIDE_WORDS.detailOf("2") })).toBeDefined();
+    expect(screen.queryByRole("region", { name: GUIDE_WORDS.detailOf("1") })).toBeNull();
   });
 
   it("asks for a section first when none is in focus", async () => {
@@ -383,7 +417,7 @@ describe("the Detail of a section", () => {
     await waitFor(() => {
       expect(status().textContent, "d with no section in focus said nothing").toMatch(/\S/u);
     });
-    expect(screen.queryByRole("region", { name: "Detail of section 1" })).toBeNull();
+    expect(screen.queryByRole("region", { name: GUIDE_WORDS.detailOf("1") })).toBeNull();
   });
 });
 

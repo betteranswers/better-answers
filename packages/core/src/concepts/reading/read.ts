@@ -5,7 +5,7 @@ import {
   isList,
   LINKS_TO_LABEL,
   MAP_EDGE_LABELS,
-  ULID_CHARACTERS,
+  namesADocument,
   type ConceptIri,
 } from "@better-answers/schema";
 import { CONCEPT_IRI_PREFIX, linksAndMarksOf } from "@better-answers/schema/concept-file";
@@ -137,10 +137,6 @@ const openingNamed = (
 const opensFor = (doors: Doors, opening: Opening): Promise<Result<boolean>> =>
   "locator" in opening ? readsPassage(doors, opening.locator) : readsConcept(doors, opening.iri);
 
-const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "iu");
-
-export const namesADocument = (locator: string): boolean => NAMES_A_DOCUMENT.test(locator);
-
 const placeOf = (doors: Doors, locator: string | null): string | undefined =>
   locator === null ||
   locator.trim() === "" ||
@@ -183,7 +179,7 @@ const resolvedOf = async (
   return ok({ entry, item: named(label), points: points.value, opens: false });
 };
 
-const WITHHELD_CONCEPT = "A concept you cannot open";
+const WITHHELD_CONCEPT = "A concept you can’t open";
 
 const MINTED_CONCEPT = "SELECT 1 FROM concept_identity WHERE workspace_id = $1 AND iri = $2";
 

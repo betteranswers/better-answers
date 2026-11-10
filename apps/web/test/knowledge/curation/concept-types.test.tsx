@@ -1,13 +1,14 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { assert, describe, expect, it, vi } from "vitest";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import {
   CONCEPT_TYPES_KEYSTROKES as KEY,
   CONCEPT_TYPES_LIST,
   CONCEPT_TYPES_PAGE,
 } from "@/features/knowledge/curation/curation-state.ts";
 import { CONCEPT_TYPES_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { CLEAR_WORDS } from "@/shared/words.ts";
 import { theOneEmptyStatus } from "@test/knowledge/empty-status.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";

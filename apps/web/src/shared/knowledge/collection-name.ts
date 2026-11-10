@@ -1,9 +1,6 @@
-import { EMPTY_WORDS } from "./concept-words.ts";
+import { collectionNameOf } from "@better-answers/schema/collection-name";
 
-export const collectionNameOf = (collection: string): string => {
-  const spaced = collection.replaceAll(/[-_]/gu, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-};
+import { EMPTY_WORDS } from "./concept-words.ts";
 
 export const collectionLabelOf = (collection: string | null | undefined): string =>
   collection == null ? EMPTY_WORDS.collection : collectionNameOf(collection);

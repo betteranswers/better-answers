@@ -586,7 +586,57 @@ describe("including an available concept", () => {
     expect(await counted("write_up_version", workspaceId)).toBe(8);
     expect(await head(ng.admin, git)).toBe(headBefore);
   });
+
+  it.each([
+    ["a hidden section", INSURANCE, INSURANCE],
+    ["a nested section", "Security testing", "Information security"],
+  ])("answers an Editor on %s as on none", async (_, prompt, hiding) => {
+    const { ng, guideId } = await typedTheMissingPolicy();
+    await hidden(guideId, hiding);
+    const writeUp = await writeUpOf(ng.scenario.workspaceId, guideId, prompt);
+    const before = await writtenIn(ng);
+
+    const refused = await includeAvailable(ng.editor, doorsOf(ng.scenario), {
+      writeUpId: writeUp.id,
+    });
+    const missing = await includeAvailable(ng.editor, doorsOf(ng.scenario), {
+      writeUpId: ABSENT_WRITE_UP,
+    });
+
+    expect(refused).toEqual(missing);
+    expect(refused).toEqual({ ok: false, error: "not-found" });
+    expect(await writtenIn(ng)).toEqual(before);
+  });
+
+  it("includes for an Admin in a hidden section", async () => {
+    const { ng, guideId } = await typedTheMissingPolicy();
+    const insurance = await writeUpOf(ng.scenario.workspaceId, guideId, INSURANCE);
+    await hidden(guideId, INSURANCE);
+
+    const included = answered(
+      await includeAvailable(ng.admin, doorsOf(ng.scenario), { writeUpId: insurance.id }),
+    );
+
+    expect(included).toMatchObject({ included: 1 });
+  });
 });
+
+const INSURANCE = "Insurance and financial standing";
+
+const ABSENT_WRITE_UP = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
+
+const writtenIn = async (ng: Northgate) => ({
+  includes: await counted("write_up_include", ng.scenario.workspaceId),
+  versions: await counted("write_up_version", ng.scenario.workspaceId),
+  head: await head(ng.admin, ng.scenario.git),
+});
+
+const hidden = async (guideId: string, prompt: string) => {
+  await db().pool.query(
+    "UPDATE guide_section SET hidden = true WHERE guide_id = $1 AND prompt = $2",
+    [guideId, prompt],
+  );
+};
 
 const marksBySection = async (workspaceId: string, guideId: string) => {
   const found = await db().pool.query<{ prompt: string; needs_review: string | null }>(

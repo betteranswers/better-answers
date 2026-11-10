@@ -2,6 +2,7 @@ import type pg from "pg";
 import { z } from "zod";
 
 import { boundarySchemas, BUNDLE_MANIFEST_PATH } from "@better-answers/schema";
+import { guideTitleOf } from "@better-answers/schema/collection-name";
 
 import { readableClause, readableParameters } from "../access/index.ts";
 import { action, declareActions, record } from "../audit/index.ts";
@@ -488,8 +489,6 @@ const guideRead =
     return ok({ guide, sections });
   };
 
-const titleOf = (guide: GuideRead): string => guide.subject?.title ?? guide.collection;
-
 const slugOf = (title: string): string =>
   title
     .toLowerCase()
@@ -512,7 +511,7 @@ const leftOutWords = (count: number): string[] =>
 
 const markdownOf = ({ guide, sections }: GuideCarried, at: Date): string =>
   `${[
-    `# ${titleOf(guide)}`,
+    `# ${guideTitleOf(guide)}`,
     `Guide snapshot, ${ukLongDate(at.toISOString())}. Not maintained. It does not change when the guide does.`,
     ...sections.map(sectionMarkdown),
     ...leftOutWords(guide.sections.length - sections.length),
@@ -538,7 +537,7 @@ export const exportGuideSnapshot = async (
       read: guideRead(input.guideId, input.at),
       made: (carried) =>
         ok({
-          name: `guide-${slugOf(titleOf(carried.guide))}-${dayOf(input.at)}.md`,
+          name: `guide-${slugOf(guideTitleOf(carried.guide))}-${dayOf(input.at)}.md`,
           markdown: markdownOf(carried, input.at),
           sections: carried.sections.length,
         }),

@@ -60,3 +60,8 @@ export const passageLocatorsIn = (text: string): readonly string[] =>
   [...text.matchAll(WRITTEN_LOCATOR)]
     .map(([written]) => written)
     .filter((written) => parsedPassageLocator(written) !== undefined);
+
+const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "iu");
+
+/** A locator that holds a document id, well formed or not, may name a document the reader cannot read. */
+export const namesADocument = (locator: string): boolean => NAMES_A_DOCUMENT.test(locator);

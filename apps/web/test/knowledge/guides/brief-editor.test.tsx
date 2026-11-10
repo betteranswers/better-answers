@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { losesMarkdown } from "@/features/knowledge/editing/markdown-round-trip.ts";
 import { BriefBody } from "@/features/knowledge/guides/brief-body.tsx";
 import { BRIEF_WORDS, GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
@@ -36,7 +37,7 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
-const LABEL = "Brief of section 1";
+const LABEL = BRIEF_WORDS.label("1");
 
 const INCLUDES = [{ label: AN_INCLUDE_ID, iri: RACKING_IRI, title: RACKING_TITLE }];
 
@@ -112,6 +113,15 @@ describe("moving among a Brief's footnote chips", () => {
     const chip = textField().querySelector("[data-footnote-reference]");
     expect(chip?.getAttribute("data-footnote-reference")).toBe(AN_INCLUDE_ID);
     expect(chip?.textContent).toBe(`Footnote: ${RACKING_TITLE}`);
+  });
+
+  it("leaves the concept editor's reading of a definition alone", () => {
+    draw();
+
+    expect(
+      losesMarkdown("We keep audit logs.[^1]\n\n[^1]: The retention policy."),
+      "a Brief editor changed how the concept editor reads a footnote definition",
+    ).toBe(true);
   });
 
   it("moves past a footnote chip with one arrow key", async () => {

@@ -1,3 +1,4 @@
+import { ChevronDownIcon } from "lucide-react";
 import { useId, useMemo, useState, type MouseEvent } from "react";
 import { flushSync } from "react-dom";
 
@@ -64,46 +65,76 @@ function Entry(properties: {
   );
 }
 
-export function SectionOutline(properties: { readonly sections: readonly Section[] }) {
-  const { sections } = properties;
-  const [open, setOpen] = useState(false);
-  const listId = useId();
+const BESIDE =
+  "sticky top-[calc(var(--band-drawn-h)+1rem)] col-start-2 row-start-1 -mx-1 mt-5 max-h-[calc(100vh-var(--band-drawn-h)-2rem)] self-start overflow-y-auto bg-background p-1";
+
+const FOLDED =
+  "mt-6 lg:sticky lg:top-[var(--band-drawn-h)] lg:z-10 lg:-mx-1 lg:bg-background lg:p-1";
+
+function Entries(properties: {
+  readonly sections: readonly Section[];
+  readonly id?: string;
+  readonly className: string;
+  readonly onChoose?: () => void;
+}) {
+  const { sections, onChoose } = properties;
   const ids = useMemo(() => sections.map(({ sectionId }) => headingIdOf(sectionId)), [sections]);
   const current = useCurrentSection(ids);
   return (
-    <nav
-      aria-label={WORDS.outline}
-      className="mt-6 xl:sticky xl:top-[calc(var(--band-drawn-h)+1rem)] xl:col-start-2 xl:row-start-1 xl:-mx-1 xl:mt-5 xl:max-h-[calc(100vh-var(--band-drawn-h)-2rem)] xl:self-start xl:overflow-y-auto xl:bg-background xl:p-1"
-    >
+    <ol id={properties.id} className={properties.className}>
+      {sections.map((section, at) => (
+        <Entry
+          key={section.sectionId}
+          section={section}
+          current={ids[at] === current}
+          onChoose={() => onChoose?.()}
+        />
+      ))}
+    </ol>
+  );
+}
+
+export function OutlineBeside(properties: { readonly sections: readonly Section[] }) {
+  return (
+    <nav aria-label={WORDS.outline} className={BESIDE}>
+      <Entries sections={properties.sections} className="border-l border-border" />
+    </nav>
+  );
+}
+
+export function OutlineFolded(properties: { readonly sections: readonly Section[] }) {
+  const [open, setOpen] = useState(false);
+  const listId = useId();
+  return (
+    <nav aria-label={WORDS.outline} className={FOLDED}>
       <Button
         type="button"
         variant="outline"
         aria-expanded={open}
         aria-controls={listId}
-        className="xl:hidden"
         onClick={() => {
           setOpen(!open);
         }}
       >
         {WORDS.outline}
+        <ChevronDownIcon
+          aria-hidden
+          className={cn("size-4 transition-transform", open && "rotate-180")}
+        />
       </Button>
-      <ol
+      <Entries
+        sections={properties.sections}
         id={listId}
-        className={cn("mt-2 xl:mt-0 xl:block xl:border-l xl:border-border", !open && "hidden")}
-      >
-        {sections.map((section, at) => (
-          <Entry
-            key={section.sectionId}
-            section={section}
-            current={ids[at] === current}
-            onChoose={() => {
-              flushSync(() => {
-                setOpen(false);
-              });
-            }}
-          />
-        ))}
-      </ol>
+        className={cn(
+          "mt-2 max-h-[calc(100vh-var(--band-drawn-h)-6rem)] overflow-y-auto",
+          !open && "hidden",
+        )}
+        onChoose={() => {
+          flushSync(() => {
+            setOpen(false);
+          });
+        }}
+      />
     </nav>
   );
 }

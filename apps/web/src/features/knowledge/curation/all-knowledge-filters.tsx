@@ -1,4 +1,5 @@
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import { FilterRow } from "@/shared/list/filter-row.tsx";
 
 import { useConceptTypes, type ConceptTypeCounted } from "../knowledge-api.ts";

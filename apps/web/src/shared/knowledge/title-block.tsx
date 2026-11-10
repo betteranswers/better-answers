@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import { Icon } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { keyed } from "@/shared/list/keyed.ts";
 import { Card } from "@/shared/ui/card.tsx";
 import { dayWords } from "@/shared/words.ts";
 
-import { collectionNameOf } from "./collection-name.ts";
 import { generatedOf, otherFieldsOf, staleAfterOf } from "./concept-frontmatter.ts";
 import { CONCEPT_WORDS, EMPTY_WORDS } from "./concept-words.ts";
 import type { Concept } from "./knowledge-reads.ts";

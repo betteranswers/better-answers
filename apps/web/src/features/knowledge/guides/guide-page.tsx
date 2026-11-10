@@ -1,18 +1,19 @@
 import { Link } from "@tanstack/react-router";
 import { useRef, useState, type RefObject } from "react";
 
+import { collectionNameOf, guideTitleOf } from "@better-answers/schema/collection-name";
+
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { LINK } from "@/shared/knowledge/concept-body.tsx";
-import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { TypeLine } from "@/shared/knowledge/type-line.tsx";
 import { ListState, RecordLoading } from "@/shared/list/list-pages.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
+import { useRoomBeside } from "@/shared/page/wide-layout.ts";
 
 import { useGuide, type Guide } from "../knowledge-api.ts";
 import { LeavingAsk, useLeavingGuard } from "./brief-actions.tsx";
@@ -26,7 +27,7 @@ import {
   type SectionAction,
 } from "./guide-state.ts";
 import { GUIDE_WORDS as WORDS, SAID_OF_GUIDES } from "./guide-words.ts";
-import { SectionOutline } from "./outline/section-outline.tsx";
+import { OutlineBeside, OutlineFolded } from "./outline/section-outline.tsx";
 
 const READING = [KEY.showDetail, KEY.addFact, KEY.copyBrief];
 
@@ -119,12 +120,13 @@ function GuideShown(properties: { readonly guide: Guide }) {
   const guard = useLeavingGuard();
   usePageKeystrokes(canEdit(guide) ? EDITING : READING);
   useSectionKeys(guide, say);
+  const beside = useRoomBeside();
 
   return (
     <article aria-label={title} className="mt-6">
       <GuideHeader guide={guide} />
       <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_17rem] xl:gap-10">
-        <SectionOutline sections={guide.sections} />
+        {beside ? null : <OutlineFolded sections={guide.sections} />}
         <div className="xl:col-start-1 xl:row-start-1">
           <OutcomeLine outcome={outcome} className={outcome === undefined ? "" : STATUS_BAR} />
           <LeavingAsk leaving={guard.leaving} />
@@ -140,6 +142,7 @@ function GuideShown(properties: { readonly guide: Guide }) {
             ))}
           </ol>
         </div>
+        {beside ? <OutlineBeside sections={guide.sections} /> : null}
       </div>
     </article>
   );

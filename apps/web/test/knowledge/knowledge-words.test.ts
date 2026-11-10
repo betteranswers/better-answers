@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import { KNOWLEDGE_BASE_WORDS } from "@/features/knowledge/knowledge-words.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 describe("the Knowledge Base's words", () => {
