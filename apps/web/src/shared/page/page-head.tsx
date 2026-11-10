@@ -3,6 +3,13 @@ import { createPortal } from "react-dom";
 
 export const PageHeadSlot = createContext<HTMLElement | null | undefined>(undefined);
 
+export const NoticeSlotChoice = createContext<(slot: HTMLElement | null) => void>(() => {});
+
+export function NoticeBelowTheTitle() {
+  const choose = useContext(NoticeSlotChoice);
+  return <div ref={choose} />;
+}
+
 export function PageHead(properties: {
   readonly title: string;
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
