@@ -23,11 +23,9 @@ const DOCUMENT = "01M6QBZ0S7F0D3YTDGHFA1J0VF";
 
 const FOOTNOTES = [footnote("a", "Alpha"), footnote("b", "Beta"), footnote("c", "Gamma")];
 
-/** The parts as one line, each citation in braces, which no Markdown reads as a footnote. */
 const shown = (parts: readonly BodyPart[]): string =>
   parts.map((part) => (part.kind === "text" ? part.markdown : `{${String(part.number)}}`)).join("");
 
-/** Each Brief cites Alpha in prose, Beta where the parse reads no prose, then Gamma in prose. */
 const OUTSIDE_PROSE = [
   [
     "in a tilde fence",
@@ -133,7 +131,6 @@ describe("rendering a Brief for the page", () => {
 
 const HIDDEN = "[^withheld]";
 
-/** Each spells a footnote number the page or the copy would show, were it read from text. */
 const FORGERIES = [
   ["typed carriers", "\uE0001\uE001"],
   ["hex references", "&#xE000;1&#xE001;"],
@@ -149,7 +146,6 @@ const FORGERIES = [
   ["a typed footnote definition", "[^x.y]\n\n[^x.y]: Forged."],
 ] as const;
 
-/** The forgery whole, and split by a marker the reader cannot read at one place or two. */
 const splitsOf = (forged: string): readonly string[] => {
   const places = Array.from({ length: forged.length - 1 }, (_, at) => at + 1);
   const once = places.map((at) => forged.slice(0, at) + HIDDEN + forged.slice(at));
@@ -168,7 +164,6 @@ const splitsOf = (forged: string): readonly string[] => {
   return [forged, ...once, ...twice];
 };
 
-/** Each forgery, whole and split, beside the reading it must give: the one real citation. */
 const readEach = <Reading>(forged: string, read: (brief: string) => Reading, real: Reading) => {
   const briefs = splitsOf(forged);
   return {

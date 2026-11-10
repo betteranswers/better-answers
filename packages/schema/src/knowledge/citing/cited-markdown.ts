@@ -37,7 +37,7 @@ export type Citations = ReadonlyMap<number, Pick<Citation, "place" | "number">>;
 
 export type CitedMarkdown = { readonly markdown: string; readonly citations: Citations };
 
-/** U+E000 opens no Markdown construct. Its brackets end a bare address and keep emphasis, as a marker's do. */
+/** U+E000 opens no Markdown construct. Its `<` ends a bare address, and its brackets flank emphasis as a marker's do. */
 const STAND_IN = "<>";
 
 const STRAY = new RegExp(STAND_IN, "gu");
@@ -99,7 +99,6 @@ const SYNTAX: SyntaxExtension = {
   },
 };
 
-/** A citation is the stand-in that ends where a citation part was placed. Any other reads as nothing. */
 const treeOf = (citations: Citations): TreeExtension => ({
   enter: {
     citation(this: CompileContext, token: Token) {
@@ -116,7 +115,7 @@ const treeOf = (citations: Citations): TreeExtension => ({
   },
 });
 
-/** Where the parser meets the stand-in outside prose, in code or an address, it shows nothing. */
+/** The parser reads no stand-in inside code or a link destination, so it is stripped there. */
 const withoutStrays = (tree: Root): Root => {
   const pending: Nodes[] = [tree];
   for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
@@ -148,7 +147,6 @@ const parsed = ({ markdown, citations }: CitedMarkdown): Root => {
   return processor.runSync(processor.parse(markdown));
 };
 
-/** The tree that the page and the copy both draw a body from. */
 export const citedTreeOf = (parts: readonly BodyPart[]): Root => parsed(citedMarkdownOf(parts));
 
 /** A body cut where its citations stand. Each citation keeps the text it replaced. */
@@ -162,7 +160,7 @@ export type Span<Cited> = {
   readonly cited: Cited | undefined;
 };
 
-/** A span with nothing cited is cut out, and the text either side joins. */
+/** A span whose `cited` is undefined is dropped. */
 export const cutAt = <Cited>(
   body: string,
   spans: readonly Span<Cited>[],
@@ -202,7 +200,6 @@ type Reading = { readonly drawn: ReadonlySet<number>; readonly inCode: ReadonlyS
 
 type Range = readonly [start: number, end: number];
 
-/** A typed footnote is drawn as nothing, so no node below one is shown. */
 const shownNodesOf = (tree: Root): readonly Nodes[] => {
   const shown: Nodes[] = [];
   const pending: Nodes[] = [tree];
@@ -231,29 +228,25 @@ const readingOf = (parts: readonly BodyPart[]): Reading => {
   };
 };
 
-/** Each cut's place among the citations, or -1 for text. */
-const placesOf = <Cited>(cuts: readonly Cut<Cited>[]): readonly number[] => {
-  const places: number[] = [];
+const placesOf = <Cited>(cuts: readonly Cut<Cited>[]): readonly (number | undefined)[] => {
+  const places: (number | undefined)[] = [];
   let next = 0;
   for (const cut of cuts) {
-    places.push(cut.kind === "citation" ? next : -1);
+    places.push(cut.kind === "citation" ? next : undefined);
     if (cut.kind === "citation") next += 1;
   }
   return places;
 };
 
-/**
- * A citation the parse cannot draw becomes text: as typed in code, empty elsewhere. That text can
- * move another citation, so parse again.
- */
+/** A citation the parse cannot draw becomes text: as typed in code, empty elsewhere. */
 export const drawnCuts = <Cited>(cuts: readonly Cut<Cited>[]): readonly Cut<Cited>[] => {
   const { drawn, inCode } = readingOf(bodyPartsOf(cuts, () => 0));
   const places = placesOf(cuts);
-  if (places.every((place) => place === -1 || drawn.has(place))) return cuts;
+  if (places.every((place) => place === undefined || drawn.has(place))) return cuts;
   return drawnCuts(
     cuts.map((cut, at): Cut<Cited> => {
-      const place = places[at] ?? -1;
-      if (cut.kind === "text" || drawn.has(place)) return cut;
+      const place = places[at];
+      if (cut.kind === "text" || place === undefined || drawn.has(place)) return cut;
       return { kind: "text", markdown: inCode.has(place) ? cut.written : "" };
     }),
   );

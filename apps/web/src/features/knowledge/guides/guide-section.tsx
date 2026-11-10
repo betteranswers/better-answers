@@ -93,7 +93,6 @@ function CitedList(properties: {
   );
 }
 
-/** Each number in a body links to its entry in the list beside it. */
 const useSourceList = (named: SourceList["named"]): SourceList => {
   const listId = useId();
   return useMemo(

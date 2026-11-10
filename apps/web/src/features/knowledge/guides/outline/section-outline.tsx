@@ -65,11 +65,9 @@ function Entry(properties: {
   );
 }
 
-/** Beside the sections it follows them in the page and in the tab order, drawn on the right. */
 const BESIDE =
   "sticky top-[calc(var(--band-drawn-h)+1rem)] col-start-2 row-start-1 -mx-1 mt-5 max-h-[calc(100vh-var(--band-drawn-h)-2rem)] self-start overflow-y-auto bg-background p-1";
 
-/** Folded above the sections from 1024 px it stays in view as the page scrolls. */
 const FOLDED =
   "mt-6 lg:sticky lg:top-[var(--band-drawn-h)] lg:z-10 lg:-mx-1 lg:bg-background lg:p-1";
 

@@ -55,7 +55,6 @@ export type SourceList = {
   readonly named: (number: number, label: string) => string;
 };
 
-/** A concept body cut where each of its marks stands, so the page reads no mark from its text. */
 const partsOf = (body: string, evidence: readonly Evidence[]): readonly BodyPart[] => {
   const { marks } = linksAndMarksOf(
     body,
@@ -474,7 +473,6 @@ export function ConceptBody(properties: BodyProperties & { readonly body: string
   return <CitedBody {...properties} parts={parts} handlers={CONCEPT_HANDLERS} />;
 }
 
-/** A Brief cites only through its parts. A footnote typed in its text is drawn as nothing, as the copy does. */
 const BRIEF_HANDLERS: Handlers = {
   citation: citationDrawnAs,
   footnoteReference: leftOut,

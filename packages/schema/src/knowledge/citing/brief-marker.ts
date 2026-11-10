@@ -1,20 +1,18 @@
 import { cutAt, drawnCuts } from "./cited-markdown.ts";
 
-/** `[^<include id>]`, unless a backslash escapes its bracket. */
-const WRITTEN = /(?<!\\)\[\^([\w-]+)\]/gu;
+const UNESCAPED_MARKER = /(?<!\\)\[\^([\w-]+)\]/gu;
 
 const OPENS_A_LINE = /^ {0,3}$/u;
 
-const opensALine = (text: string, at: number): boolean =>
-  OPENS_A_LINE.test(text.slice(text.lastIndexOf("\n", at - 1) + 1, at));
+const opensADefinition = (text: string, at: number, end: number): boolean =>
+  text[end] === ":" && OPENS_A_LINE.test(text.slice(text.lastIndexOf("\n", at - 1) + 1, at));
 
 export type Marker = { readonly label: string; readonly at: number; readonly end: number };
 
-/** A definition `[^x]:` opens its line, and is no marker. */
 const writtenIn = (markdown: string): readonly Marker[] =>
-  [...markdown.matchAll(WRITTEN)].flatMap(({ 0: found, 1: label, index: at }) => {
+  [...markdown.matchAll(UNESCAPED_MARKER)].flatMap(({ 0: found, 1: label, index: at }) => {
     const end = at + found.length;
-    if (label === undefined || (markdown[end] === ":" && opensALine(markdown, at))) return [];
+    if (label === undefined || opensADefinition(markdown, at, end)) return [];
     return [{ label, at, end }];
   });
 

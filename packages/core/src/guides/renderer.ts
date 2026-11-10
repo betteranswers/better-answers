@@ -27,7 +27,6 @@ type Placing<Cited extends Footnote> = {
   readonly cited: readonly Numbered<Cited>[];
 };
 
-/** The page draws its numbers from the citation parts, so no text in the Brief is read as one. */
 export type RenderedBrief = {
   readonly parts: readonly BodyPart[];
   readonly footnotes: readonly Numbered<Footnote>[];
@@ -35,10 +34,6 @@ export type RenderedBrief = {
 
 export type ClipboardBrief = Clipboard & { readonly footnotes: number };
 
-/**
- * A marker the reader cannot read leaves no part. Numbers follow the drawn citations, so each
- * listed footnote has a number on the page.
- */
 const placing = <Cited extends Footnote>(
   markdown: string,
   footnotes: readonly Cited[],

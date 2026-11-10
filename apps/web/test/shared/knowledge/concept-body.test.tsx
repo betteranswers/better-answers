@@ -573,7 +573,6 @@ describe("a concept body's links to other concepts", () => {
 
 const WITHHELD = "[^withheld]";
 
-/** Each spells a number or a footnote the page would draw, were it read from the Brief's text. */
 const SPELLINGS = [
   ["typed carriers", `${OPENS}1${CLOSES}`],
   ["hex references", "&#xE000;1&#xE001;"],
@@ -588,7 +587,6 @@ const SPELLINGS = [
   ["a joined footnote definition", "[^1]\n\n[^1]: Forged."],
 ] as const;
 
-/** The text the page gets for a spelling, whole or cut by a marker its reader cannot read. */
 const joinedOf = (forged: string): readonly string[] => {
   const cut = Array.from(
     { length: forged.length + 1 },
