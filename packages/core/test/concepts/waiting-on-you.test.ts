@@ -208,16 +208,36 @@ describe("Waiting on you", () => {
         state: "shown",
         version: {
           title: "Expenses",
+          conceptType: "Policy",
           body: "Expenses are claimed within thirty days.",
           sources: undefined,
         },
       },
       proposed: {
         title: "Expenses",
+        conceptType: "Policy",
         body: "Expenses are claimed within ninety days.",
         sources: undefined,
       },
     });
+  });
+
+  it("opens an item with the type its acceptance stores", async () => {
+    const scenario = await arrange();
+    const standing = await conceptWritten(scenario);
+    const { suggestionId } = await proposedBy(scenario, scenario.viewer, standing, {
+      conceptType: "guidelines",
+      frontmatter: { title: "Expenses", type: "guidelines" },
+    });
+
+    const opened = answered(await openedBy(scenario.editor, suggestionId));
+
+    expect(opened).toEqual(
+      matching.objectContaining({
+        current: { state: "shown", version: matching.objectContaining({ conceptType: "Policy" }) },
+        proposed: matching.objectContaining({ conceptType: "Guideline" }),
+      }),
+    );
   });
 
   it("opens the requested item of a two-item set", async () => {
@@ -434,6 +454,7 @@ describe("Waiting on you", () => {
       state: "shown",
       version: {
         title: "Expenses",
+        conceptType: "Policy",
         body: "Expenses are claimed within thirty days.",
         sources: undefined,
       },
