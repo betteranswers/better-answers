@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { Icon } from "@/shared/icon.tsx";
 import { Banner, BannerAction, BannerClose, BannerTitle } from "@/shared/ui/kibo-ui/banner.tsx";
@@ -30,7 +31,11 @@ export const useOfferPlace = (): OfferPlace => {
   return { heldAt, holdAt };
 };
 
-type OfferProperties = { readonly place: OfferPlace; readonly onDismissed: () => void };
+type OfferProperties = {
+  readonly place: OfferPlace;
+  readonly into: HTMLElement | null;
+  readonly onDismissed: () => void;
+};
 
 export function PasskeyOffer(properties: OfferProperties) {
   const [here] = useState(passkeysHere);
@@ -46,20 +51,20 @@ function OfferOnThisPage(properties: OfferProperties & { readonly address: strin
   const [owedOnArrival] = useState(() => heldAt === address || !passkeyOfferShown());
   const read = useSecondFactorOnce();
   const dismiss = useDismissPasskeyOffer();
-  const offering = owedOnArrival && offered(read.data);
+  const shownAt = owedOnArrival && offered(read.data) ? properties.into : null;
 
   useEffect(() => {
-    if (!offering) return;
+    if (shownAt === null) return;
     rememberThePasskeyOfferShown();
     holdAt(address);
-  }, [offering, address, holdAt]);
+  }, [shownAt, address, holdAt]);
 
-  if (!offering) return null;
+  if (shownAt === null) return null;
 
-  return (
+  return createPortal(
     <section aria-label={PASSKEY_WORDS.heading} className="my-4">
       <Banner className="flex-wrap py-2">
-        <BannerTitle>{PASSKEY_WORDS.offer}</BannerTitle>
+        <BannerTitle className="text-pretty">{PASSKEY_WORDS.offer}</BannerTitle>
         <BannerAction asChild>
           <Link to={ACCOUNT} hash={ADD_A_PASSKEY_BUTTON}>
             {PASSKEY_WORDS.add}
@@ -75,6 +80,7 @@ function OfferOnThisPage(properties: OfferProperties & { readonly address: strin
           <Icon name="remove" />
         </BannerClose>
       </Banner>
-    </section>
+    </section>,
+    shownAt,
   );
 }

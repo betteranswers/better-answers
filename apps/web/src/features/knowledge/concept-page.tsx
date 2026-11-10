@@ -31,7 +31,7 @@ import { RowLink } from "@/shared/list/grid-table.tsx";
 import { keyed } from "@/shared/list/keyed.ts";
 import { ListState, RecordLoading } from "@/shared/list/list-pages.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
-import { NoticeBelowTheTitle, PageHead } from "@/shared/page/page-head.tsx";
+import { NoticeBelowTheTitle, NoticeHeld, PageHead } from "@/shared/page/page-head.tsx";
 import { useRoomBeside } from "@/shared/page/wide-layout.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -429,7 +429,14 @@ function ConceptUnread(properties: {
   readonly heading: Heading;
 }) {
   const { concept } = properties;
-  if (concept.error === null) return <RecordLoading words={WORDS.loading} />;
+  if (concept.error === null) {
+    return (
+      <>
+        <NoticeHeld />
+        <RecordLoading words={WORDS.loading} />
+      </>
+    );
+  }
   if (namesNothing(concept.error)) return <NoSuchConcept />;
   return (
     <ListState

@@ -1,6 +1,5 @@
 import { Outlet, useRouterState } from "@tanstack/react-router";
 import { useId, useMemo, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 
 import { useArrivalTakenOnceRead, useHidden, VisibleTreeContext } from "@/app/visible-tree.ts";
 import { switchedInAnotherTab } from "@/app/words.ts";
@@ -32,7 +31,7 @@ import {
 } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import { BreadcrumbLastPartSlot } from "@/shared/page/breadcrumb-last-part.ts";
-import { NoticeSlotChoice, PageHeadSlot } from "@/shared/page/page-head.tsx";
+import { NoticeSlotChoice, PageHeadSlot, type NoticeClaim } from "@/shared/page/page-head.tsx";
 import { isFilled, type PageTab, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 import { useWideLayout } from "@/shared/page/wide-layout.ts";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
@@ -304,8 +303,8 @@ function ToolbarAndPage(properties: {
   const { region } = properties;
   const [headSlot, holdHeadSlot] = useState<HTMLElement | null>(null);
   const [noticeSlot, holdNoticeSlot] = useState<HTMLElement | null>(null);
-  const [pageNoticeSlot, choosePageNoticeSlot] = useState<HTMLElement | null>(null);
-  const noticeAt = pageNoticeSlot ?? noticeSlot;
+  const [claim, claimNotice] = useState<NoticeClaim | null>(null);
+  const noticeAt = claim === "held" ? null : (claim ?? noticeSlot);
 
   return (
     <PageTabsRoot tabs={region?.toolbar.tabs} picked={properties.picked}>
@@ -323,20 +322,16 @@ function ToolbarAndPage(properties: {
               ref={holdNoticeSlot}
               className="[body:has([data-beside-page])_&]:pr-[var(--container-md)]"
             />
-            {noticeAt === null
-              ? null
-              : createPortal(
-                  <PasskeyOffer
-                    place={properties.offerPlace}
-                    onDismissed={() => {
-                      document.getElementById(PAGE)?.focus();
-                    }}
-                  />,
-                  noticeAt,
-                )}
+            <PasskeyOffer
+              place={properties.offerPlace}
+              into={noticeAt}
+              onDismissed={() => {
+                document.getElementById(PAGE)?.focus();
+              }}
+            />
             {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
             <PageHeadSlot value={headSlot}>
-              <NoticeSlotChoice value={choosePageNoticeSlot}>
+              <NoticeSlotChoice value={claimNotice}>
                 <PagePanel>
                   {properties.handed === undefined ? <Outlet /> : properties.handed.draw}
                 </PagePanel>

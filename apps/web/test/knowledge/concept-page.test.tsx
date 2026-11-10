@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
@@ -10,6 +10,7 @@ import { clipboardAnswering } from "@test/clipboard-stand-in.ts";
 import { aConceptIri, anIssuedConcept } from "@test/knowledge/search-answers.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { BOTH_HELD, sessionStanding, withPasskeysHere } from "@test/second-factor-api.ts";
+import { holdProcedure } from "@test/stubbed-api.ts";
 import { adaAnAdmin, aRefusalAnswer, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -91,7 +92,7 @@ describe("the passkey offer on the concept page", () => {
     globalThis.localStorage.clear();
   });
 
-  it("sits under the title, inside the article", async () => {
+  const anAdminWithoutPasskeys = () => {
     withPasskeysHere();
     const api = adaAnAdmin();
     api.set("knowledge.open", () => read({ found: true, concept: anIssuedConcept() }));
@@ -102,13 +103,52 @@ describe("the passkey offer on the concept page", () => {
         thisSession: sessionStanding("confirmed", { confirmed: true }),
       }),
     );
-    await openAt(A_CONCEPT, api);
+    return api;
+  };
+
+  it("sits under the title, inside the article", async () => {
+    await openAt(A_CONCEPT, anAdminWithoutPasskeys());
     const article = within(await screen.findByRole("article"));
 
     const offer = await article.findByRole("region", { name: PASSKEY_WORDS.heading });
     const title = article.getByRole("heading", { level: 1 });
 
     expect(title.compareDocumentPosition(offer)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("waits for the concept and draws once, in the article", async () => {
+    const api = anAdminWithoutPasskeys();
+    const concept = holdProcedure(api, "knowledge.open");
+    const factor = holdProcedure(api, "person.secondFactor");
+    const drawnInTheArticle = new Set<boolean>();
+    const watching = new MutationObserver(() => {
+      for (const offer of document.querySelectorAll(
+        `section[aria-label="${PASSKEY_WORDS.heading}"]`,
+      )) {
+        drawnInTheArticle.add(offer.closest("article") !== null);
+      }
+    });
+    watching.observe(document.body, { childList: true, subtree: true });
+    await openAt(A_CONCEPT, api);
+    await Promise.all([concept.asked, factor.asked]);
+
+    factor.resolve();
+    await waitFor(() => {
+      expect(factor.pending).toBe(false);
+    });
+    await act(async () => {
+      await new Promise((settled) => {
+        setTimeout(settled, 0);
+      });
+    });
+    expect(screen.queryByRole("region", { name: PASSKEY_WORDS.heading })).toBeNull();
+
+    concept.resolve();
+    const article = within(await screen.findByRole("article"));
+    await article.findByRole("region", { name: PASSKEY_WORDS.heading });
+    watching.disconnect();
+
+    expect([...drawnInTheArticle]).toEqual([true]);
   });
 });
 

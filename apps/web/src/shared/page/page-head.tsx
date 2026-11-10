@@ -1,13 +1,26 @@
-import { createContext, useContext, type ReactNode, type RefObject } from "react";
+import { createContext, useCallback, useContext, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
 export const PageHeadSlot = createContext<HTMLElement | null | undefined>(undefined);
 
-export const NoticeSlotChoice = createContext<(slot: HTMLElement | null) => void>(() => {});
+export type NoticeClaim = HTMLElement | "held";
+
+export const NoticeSlotChoice = createContext<(claim: NoticeClaim | null) => void>(() => {});
 
 export function NoticeBelowTheTitle() {
   const choose = useContext(NoticeSlotChoice);
   return <div ref={choose} />;
+}
+
+export function NoticeHeld() {
+  const choose = useContext(NoticeSlotChoice);
+  const hold = useCallback(
+    (node: HTMLSpanElement | null) => {
+      choose(node === null ? null : "held");
+    },
+    [choose],
+  );
+  return <span hidden ref={hold} />;
 }
 
 export function PageHead(properties: {
