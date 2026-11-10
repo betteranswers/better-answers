@@ -1,7 +1,8 @@
 import { useRef, useState, type ReactNode } from "react";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import type { ApiError } from "@/shared/api/trpc.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import type { UndoNotice } from "@/shared/ui/kibo-ui/undo-toast.tsx";
 

@@ -1,7 +1,8 @@
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import { createContext, useContext } from "react";
 
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import { GridTable } from "@/shared/list/grid-table.tsx";
 import { ListState } from "@/shared/list/list-pages.tsx";
 import { useHiddenColumns } from "@/shared/page/wide-layout.ts";

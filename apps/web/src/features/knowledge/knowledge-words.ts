@@ -1,4 +1,6 @@
-import { collectionLabelOf, collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
+import { collectionLabelOf } from "@/shared/knowledge/collection-name.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { counted } from "@/shared/words.ts";

@@ -71,56 +71,70 @@ const BESIDE =
 const FOLDED =
   "mt-6 lg:sticky lg:top-[var(--band-drawn-h)] lg:z-10 lg:-mx-1 lg:bg-background lg:p-1";
 
-export function SectionOutline(properties: {
+function Entries(properties: {
   readonly sections: readonly Section[];
-  readonly beside: boolean;
+  readonly id?: string;
+  readonly className: string;
+  readonly onChoose?: () => void;
 }) {
-  const { sections, beside } = properties;
-  const [open, setOpen] = useState(false);
-  const listId = useId();
+  const { sections, onChoose } = properties;
   const ids = useMemo(() => sections.map(({ sectionId }) => headingIdOf(sectionId)), [sections]);
   const current = useCurrentSection(ids);
   return (
-    <nav aria-label={WORDS.outline} className={beside ? BESIDE : FOLDED}>
-      {beside ? null : (
-        <Button
-          type="button"
-          variant="outline"
-          aria-expanded={open}
-          aria-controls={listId}
-          onClick={() => {
-            setOpen(!open);
-          }}
-        >
-          {WORDS.outline}
-          <ChevronDownIcon
-            aria-hidden
-            className={cn("size-4 transition-transform", open && "rotate-180")}
-          />
-        </Button>
-      )}
-      <ol
+    <ol id={properties.id} className={properties.className}>
+      {sections.map((section, at) => (
+        <Entry
+          key={section.sectionId}
+          section={section}
+          current={ids[at] === current}
+          onChoose={() => onChoose?.()}
+        />
+      ))}
+    </ol>
+  );
+}
+
+export function OutlineBeside(properties: { readonly sections: readonly Section[] }) {
+  return (
+    <nav aria-label={WORDS.outline} className={BESIDE}>
+      <Entries sections={properties.sections} className="border-l border-border" />
+    </nav>
+  );
+}
+
+export function OutlineFolded(properties: { readonly sections: readonly Section[] }) {
+  const [open, setOpen] = useState(false);
+  const listId = useId();
+  return (
+    <nav aria-label={WORDS.outline} className={FOLDED}>
+      <Button
+        type="button"
+        variant="outline"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => {
+          setOpen(!open);
+        }}
+      >
+        {WORDS.outline}
+        <ChevronDownIcon
+          aria-hidden
+          className={cn("size-4 transition-transform", open && "rotate-180")}
+        />
+      </Button>
+      <Entries
+        sections={properties.sections}
         id={listId}
         className={cn(
-          beside
-            ? "border-l border-border"
-            : "mt-2 max-h-[calc(100vh-var(--band-drawn-h)-6rem)] overflow-y-auto",
-          !beside && !open && "hidden",
+          "mt-2 max-h-[calc(100vh-var(--band-drawn-h)-6rem)] overflow-y-auto",
+          !open && "hidden",
         )}
-      >
-        {sections.map((section, at) => (
-          <Entry
-            key={section.sectionId}
-            section={section}
-            current={ids[at] === current}
-            onChoose={() => {
-              flushSync(() => {
-                setOpen(false);
-              });
-            }}
-          />
-        ))}
-      </ol>
+        onChoose={() => {
+          flushSync(() => {
+            setOpen(false);
+          });
+        }}
+      />
     </nav>
   );
 }

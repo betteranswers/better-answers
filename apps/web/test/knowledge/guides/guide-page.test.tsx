@@ -1,9 +1,10 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
 import { GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
 import {

@@ -1,7 +1,8 @@
 import { CheckIcon } from "lucide-react";
 import { useState } from "react";
 
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import {
   Combobox,
   ComboboxContent,

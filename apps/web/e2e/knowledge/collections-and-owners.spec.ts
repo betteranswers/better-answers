@@ -1,9 +1,10 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import { CONCEPT_TYPES_PAGE } from "@/features/knowledge/curation/curation-state.ts";
 import { COLLECTIONS_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";

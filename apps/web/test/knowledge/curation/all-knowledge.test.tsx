@@ -1,10 +1,11 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { assert, describe, expect, it, vi } from "vitest";
 
+import { collectionNameOf } from "@better-answers/schema/collection-name";
+
 import { UNKNOWN_PAGE } from "@/app/words.ts";
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { CLEAR_WORDS, filterBy } from "@/shared/words.ts";

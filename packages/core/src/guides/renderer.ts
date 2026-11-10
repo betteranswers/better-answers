@@ -45,12 +45,13 @@ const placing = <Cited extends Footnote>(
       markersIn(markdown).map(({ label, at, end }) => ({ at, end, cited: byLabel.get(label) })),
     ),
   );
-  const inOrder = new Map(
-    cuts.flatMap((cut) => (cut.kind === "citation" ? [[cut.cited.label, cut.cited]] : [])),
-  );
-  const cited = [...inOrder.values()].map((footnote, at) => ({ ...footnote, number: at + 1 }));
-  const numbers = new Map(cited.map(({ label, number }) => [label, number]));
-  return { parts: bodyPartsOf(cuts, ({ label }) => numbers.get(label) ?? 0), cited };
+  const numbered = new Map<string, Numbered<Cited>>();
+  const parts = bodyPartsOf(cuts, (footnote) => {
+    const cited = numbered.get(footnote.label) ?? { ...footnote, number: numbered.size + 1 };
+    numbered.set(footnote.label, cited);
+    return cited.number;
+  });
+  return { parts, cited: [...numbered.values()] };
 };
 
 const page = (markdown: string, footnotes: readonly Footnote[]): RenderedBrief => {
