@@ -825,8 +825,10 @@ const nameOf = async (personId: string): Promise<string> => {
   return name;
 };
 
+const NOW = new Date("2026-11-05T10:00:00Z");
+
 const collectionsReadBy = (scenario: Scenario, reader: UserPrincipal) =>
-  withMember(reader, scenario.postgres, (fresh, tx) => collectionsAndOwners(fresh, tx));
+  withMember(reader, scenario.postgres, (fresh, tx) => collectionsAndOwners(fresh, tx, NOW));
 
 const ownedRead = (scenario: Scenario, reader: UserPrincipal) =>
   withMember(reader, scenario.postgres, (fresh, tx) => ownedBy(fresh, tx));
@@ -901,7 +903,12 @@ describe("reads that show a member what they own", () => {
 
     expect(editors).toEqual({
       ok: true,
-      value: { ok: true, value: { collections: [{ collection: "policy", owner, overrides: 1 }] } },
+      value: {
+        ok: true,
+        value: {
+          collections: [{ collection: "policy", owner, overrides: 1, concepts: 1, verified: 0 }],
+        },
+      },
     });
     expect(admins).toEqual({
       ok: true,
@@ -909,12 +916,53 @@ describe("reads that show a member what they own", () => {
         ok: true,
         value: {
           collections: [
-            { collection: "held", owner, overrides: 0 },
-            { collection: "policy", owner, overrides: 1 },
+            { collection: "held", owner, overrides: 0, concepts: 1, verified: 0 },
+            { collection: "policy", owner, overrides: 1, concepts: 1, verified: 0 },
           ],
         },
       },
     });
+  });
+
+  it("counts each collection's concepts and the ones that stand verified", async () => {
+    const scenario = await arrange();
+    const checker = `human:${scenario.editor.userId}`;
+    const shelved = await shelve(db().pool, scenario.workspaceId, [
+      { path: "knowledge/policy/a.md", checks: [{ actor: checker, at: new Date("2026-10-01") }] },
+      {
+        path: "knowledge/policy/b.md",
+        checks: [{ actor: "process:better-answers-test", at: new Date("2026-10-02") }],
+      },
+      { path: "knowledge/policy/c.md" },
+      { path: "knowledge/safety/d.md" },
+      { path: "knowledge/held/e.md", sensitivity: "Restricted" },
+    ]);
+    const edited = shelved[3];
+    assert(edited !== undefined, "the safety concept was not shelved");
+    await seedingWith(db().pool, (seed) =>
+      seed.conceptVerification({
+        workspaceId: scenario.workspaceId,
+        iri: edited,
+        actor: checker,
+        verifiedAt: new Date("2026-10-03"),
+      }),
+    );
+
+    const admins = answered(answered(await collectionsReadBy(scenario, scenario.admin)));
+    const editors = answered(answered(await collectionsReadBy(scenario, scenario.editor)));
+
+    expect(
+      admins.collections.map(({ collection, concepts, verified }) => [
+        collection,
+        concepts,
+        verified,
+      ]),
+    ).toEqual([
+      ["held", 1, 0],
+      ["policy", 3, 2],
+      ["safety", 1, 0],
+    ]);
+    expect(editors.collections.map(({ collection }) => collection)).toEqual(["policy", "safety"]);
   });
 
   it("refuses the collections read to an Editor who owns nothing", async () => {

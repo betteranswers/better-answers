@@ -20,11 +20,11 @@ import type { Tx } from "../store/postgres/index.ts";
 import { collectionOwnerAdmits, type OwnerRefusal } from "./owners.ts";
 import { collectionOrder, trustOfRow, type TrustRow } from "./reading/browse.ts";
 import { latestVerificationOf } from "./reading/latest-verification.ts";
-import { trustWords, ukLongDate, verifierWords, type Trust } from "./trust.ts";
+import { trustWords, ukLongDate, verifierWords, type Trust, type TrustStatus } from "./trust.ts";
 
 const PAGE_SIZE = 50;
 
-const SORT_COLUMNS = ["title", "type", "collection", "owner", "checked"] as const;
+const SORT_COLUMNS = ["title", "type", "collection", "owner", "trust"] as const;
 
 type SortColumn = (typeof SORT_COLUMNS)[number];
 
@@ -37,13 +37,26 @@ const SORT_KEYS = {
   type: `c.concept_type COLLATE "C"`,
   collection: `c.collection COLLATE "C"`,
   owner: `owner.name COLLATE "C"`,
-  checked: `COALESCE((SELECT max(verified_at) FROM concept_verification
+  trust: `COALESCE((SELECT max(verified_at) FROM concept_verification
                         WHERE workspace_id = c.workspace_id AND iri = c.iri), '-infinity')`,
 } as const satisfies Record<SortColumn, string>;
+
+const TRUST_FILTERS = [
+  "unverified",
+  "out-of-date",
+  "changed-since-checked",
+  "deprecated",
+] as const satisfies readonly (TrustStatus | "unverified")[];
+
+const shownAs = ({ tier, status }: Pick<Trust, "tier" | "status">): TrustStatus | "unverified" => {
+  if (status !== "current") return status;
+  return tier === "unverified" ? tier : status;
+};
 
 export const allKnowledgeInput = z.strictObject({
   collections: z.array(z.string().regex(COLLECTION)),
   conceptType: boundarySchemas.conceptIndex.select.shape.conceptType.optional(),
+  trust: z.enum(TRUST_FILTERS).optional(),
   sort: z.strictObject({ column: z.enum(SORT_COLUMNS), desc: z.boolean() }),
   page: z.int().min(1).default(1),
 });
@@ -104,7 +117,11 @@ const READABLE_AND_FILTERED = `c.workspace_id = $1 AND ${readableClause("c", 2)}
 
 const LATEST_VERIFICATION = latestVerificationOf("page");
 
-const pageQuery = ({ column, desc }: AllKnowledgeInput["sort"]): string => {
+const ONE_PAGE = `LIMIT ${PAGE_SIZE} OFFSET $6`;
+
+const EVERY_ROW = "";
+
+const pageQuery = ({ column, desc }: AllKnowledgeInput["sort"], limit: string): string => {
   const direction = desc ? "DESC" : "ASC";
   return `SELECT page.*, ${LATEST_VERIFICATION.columns}
     FROM (
@@ -123,7 +140,7 @@ const pageQuery = ({ column, desc }: AllKnowledgeInput["sort"]): string => {
         LEFT JOIN "user" owner ON owner.id = COALESCE(own.person_id, standing.person_id)
        WHERE ${READABLE_AND_FILTERED}
        ORDER BY sort_key ${direction}, c.iri
-       LIMIT ${PAGE_SIZE} OFFSET $6
+       ${limit}
     ) page
     ${LATEST_VERIFICATION.joins}
    ORDER BY page.sort_key ${direction}, page.iri`;
@@ -182,19 +199,41 @@ const totalBehind = async (
   return matched.rows[0]?.total ?? 0;
 };
 
+const trustFilteredPage = async (
+  tx: Tx,
+  filter: readonly unknown[],
+  { sort, page, trust }: AllKnowledgeInput,
+  now: Date,
+): Promise<AllKnowledge> => {
+  const { rows } = await tx.query<PageRow>(pageQuery(sort, EVERY_ROW), [...filter]);
+  const shown = rows.map((row) => rowOf(row, now)).filter((row) => shownAs(row.trust) === trust);
+  const first = (page - 1) * PAGE_SIZE;
+  return {
+    rows: shown.slice(first, first + PAGE_SIZE),
+    total: shown.length,
+    page,
+    pageSize: PAGE_SIZE,
+  };
+};
+
 const pageRead = async (
   reader: UserPrincipal,
   tx: Tx,
-  { collections, conceptType, sort, page }: AllKnowledgeInput,
+  input: AllKnowledgeInput,
   now: Date,
 ): Promise<AllKnowledge> => {
+  const { collections, conceptType, sort, page, trust } = input;
   const filter = [
     reader.workspaceId,
     ...readableParameters(reader),
     collections,
     conceptType ?? null,
   ];
-  const { rows } = await tx.query<PageRow>(pageQuery(sort), [...filter, (page - 1) * PAGE_SIZE]);
+  if (trust !== undefined) return trustFilteredPage(tx, filter, input, now);
+  const { rows } = await tx.query<PageRow>(pageQuery(sort, ONE_PAGE), [
+    ...filter,
+    (page - 1) * PAGE_SIZE,
+  ]);
   return {
     rows: rows.map((row) => rowOf(row, now)),
     total: await totalBehind(rows, page, tx, filter),

@@ -460,6 +460,15 @@ describe("the Curation reads over tRPC", () => {
       ...ask,
       collections: ["birds"],
     });
+    const unverified = await asTheAdmin.api.knowledge.allKnowledge.query({
+      ...ask,
+      trust: "unverified",
+      sort: { column: "trust", desc: true },
+    });
+    const deprecated = await asTheAdmin.api.knowledge.allKnowledge.query({
+      ...ask,
+      trust: "deprecated",
+    });
     const refused = await refusalOfCall(
       asTheAdmin.api.knowledge.allKnowledge.query({ ...ask, page: 0 }),
     );
@@ -467,6 +476,10 @@ describe("the Curation reads over tRPC", () => {
     expect(all.rows.map(({ title }) => title)).toEqual([FEEDING, SURVEY]);
     expect([all.total, all.pageSize]).toEqual([2, 50]);
     expect(birds.rows.map(({ title }) => title)).toEqual([FEEDING]);
+    expect(unverified.rows.map(({ title }) => title).toSorted()).toEqual(
+      [FEEDING, SURVEY].toSorted(),
+    );
+    expect([deprecated.rows, deprecated.total]).toEqual([[], 0]);
     expect(refused).toMatchObject(MALFORMED);
   });
 });
