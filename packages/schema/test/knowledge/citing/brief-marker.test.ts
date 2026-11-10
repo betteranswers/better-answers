@@ -45,6 +45,10 @@ describe("the markers in a Brief that holds code", () => {
     expect(markersOf("Cost \\`[^a] and`")).toEqual(["a"]);
   });
 
+  it("reads a marker after an escaped backslash only", () => {
+    expect(markersOf("One \\[^a] two \\\\[^b] three \\\\\\[^c]")).toEqual(["b"]);
+  });
+
   it.each([
     ["a tilde fence", "~~~\ncode [^b]\n~~~"],
     ["an unclosed fence", "~~~\ncode [^b]"],

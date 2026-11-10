@@ -1,6 +1,13 @@
 import { cutAt, drawnCuts } from "./cited-markdown.ts";
 
-const UNESCAPED_MARKER = /(?<!\\)\[\^([\w-]+)\]/gu;
+const MARKER = /\[\^([\w-]+)\]/gu;
+
+/** Markdown escapes a bracket after an odd run of backslashes; an even run escapes only itself. */
+const isEscaped = (text: string, at: number): boolean => {
+  let before = at;
+  while (before > 0 && text[before - 1] === "\\") before -= 1;
+  return (at - before) % 2 === 1;
+};
 
 const OPENS_A_LINE = /^ {0,3}$/u;
 
@@ -10,9 +17,11 @@ const opensADefinition = (text: string, at: number, end: number): boolean =>
 export type Marker = { readonly label: string; readonly at: number; readonly end: number };
 
 const writtenIn = (markdown: string): readonly Marker[] =>
-  [...markdown.matchAll(UNESCAPED_MARKER)].flatMap(({ 0: found, 1: label, index: at }) => {
+  [...markdown.matchAll(MARKER)].flatMap(({ 0: found, 1: label, index: at }) => {
     const end = at + found.length;
-    if (label === undefined || opensADefinition(markdown, at, end)) return [];
+    if (label === undefined || isEscaped(markdown, at) || opensADefinition(markdown, at, end)) {
+      return [];
+    }
     return [{ label, at, end }];
   });
 

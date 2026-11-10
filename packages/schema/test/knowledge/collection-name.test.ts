@@ -37,4 +37,12 @@ describe("a collection's display name", () => {
   ])("writes the acronym in %s in capitals", (slug, name) => {
     expect(collectionNameOf(slug)).toBe(name);
   });
+
+  it.each([
+    ["öl-lager", "Öl lager"],
+    ["-hr--policies_", "HR policies"],
+    ["--", "--"],
+  ])("shows %s as %s", (slug, name) => {
+    expect(collectionNameOf(slug)).toBe(name);
+  });
 });

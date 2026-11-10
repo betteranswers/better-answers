@@ -1,13 +1,15 @@
 const VOWEL = /[aeiouy]/iu;
 
-const LETTER = /\p{L}/u;
+const ASCII_WORD = /^[a-z0-9]*[a-z][a-z0-9]*$/iu;
 
-const isAnAcronym = (word: string): boolean => LETTER.test(word) && !VOWEL.test(word);
+const isAnAcronym = (word: string): boolean => ASCII_WORD.test(word) && !VOWEL.test(word);
 
 const wordShown = (word: string): string => (isAnAcronym(word) ? word.toUpperCase() : word);
 
 export const collectionNameOf = (collection: string): string => {
-  const spaced = collection.split(/[-_]/u).map(wordShown).join(" ");
+  const words = collection.split(/[-_]+/u).filter((word) => word !== "");
+  if (words.length === 0) return collection;
+  const spaced = words.map(wordShown).join(" ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 };
 
