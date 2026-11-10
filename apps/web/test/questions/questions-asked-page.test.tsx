@@ -15,7 +15,7 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
-const QUESTIONS_ASKED = pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").path;
+const THE_PAGE = pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked");
 
 const FLAGGED_QUESTION = "How long do you keep audit logs for buyers?";
 
@@ -70,9 +70,9 @@ const pageOf = (records: readonly AskedRecord[], nextCursor: unknown = null) =>
 const openQuestions = async (records: readonly AskedRecord[], nextCursor: unknown = null) => {
   const api = adaAnAdmin();
   api.set("questions.asked", () => pageOf(records, nextCursor));
-  await openAt(QUESTIONS_ASKED, api);
+  await openAt(THE_PAGE.path, api);
   const region = await screen.findByRole("region", {
-    name: pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
+    name: THE_PAGE.name,
   });
   await within(region).findByRole("button", { name: records[0]?.question ?? "" });
   return { api, region };
@@ -151,20 +151,12 @@ describe("Questions asked", () => {
       aRecord(`01JRECORD${String(nth).padStart(16, "0")}`, `Question number ${51 - nth}`),
     );
     const cursor = { id: asked[49]?.id, flagged: false };
-    const api = adaAnAdmin();
-    api.set("questions.asked", () => pageOf(asked.slice(0, 50), cursor));
-    await openAt(QUESTIONS_ASKED, api);
-    const region = await screen.findByRole("region", {
-      name: pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
-    });
-    await within(region).findByRole("button", { name: "Question number 51" });
+    const { api, region } = await openQuestions(asked.slice(0, 50), cursor);
     expect(rowsOf(region)).toHaveLength(50);
 
     press("?");
     const keystrokes = await screen.findByRole("dialog", {
-      name: keystrokesOn(
-        pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
-      ),
+      name: keystrokesOn(THE_PAGE.name),
     });
     for (const { key } of Object.values(KEY)) {
       expect(within(keystrokes).getByText(key, { selector: "dt, dt *" })).toBeDefined();

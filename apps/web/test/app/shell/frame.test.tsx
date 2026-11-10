@@ -13,10 +13,8 @@ import {
   CONTROL_CENTRE,
   EVERY_AREA,
   HOMES,
-  menuGroupIn,
   movedWithin,
   NEW_QUESTION,
-  pageById,
   pagesOf,
   readerOf,
   type Page,
@@ -53,6 +51,13 @@ const namesIn = (region: HTMLElement, role: "link" | "heading" = "link") =>
   within(region)
     .queryAllByRole(role, role === "heading" ? { level: 3 } : {})
     .map((each) => each.textContent);
+
+const controlCentrePage = (group: string, id: string): string => {
+  const pages = CONTROL_CENTRE.menuGroups.find((each) => each.id === group)?.pages ?? [];
+  const page: Page | undefined = pages.find((each) => each.id === id);
+  if (page === undefined) throw new Error(`the Control Centre has no page ${group}/${id}`);
+  return page.name;
+};
 
 describe("the shell's regions", () => {
   it("lists an Admin's areas in the rail", async () => {
@@ -97,13 +102,13 @@ describe("the shell's regions", () => {
       "System",
     ]);
     expect(namesIn(menu())).toEqual([
-      pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name,
-      pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
-      pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
-      pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "answer-tests").name,
+      controlCentrePage("sources", "connected-sources"),
+      controlCentrePage("models", "models-and-spend"),
+      controlCentrePage("questions", "questions-asked"),
+      controlCentrePage("questions", "answer-tests"),
       "Members",
       "Groups",
-      pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name,
+      controlCentrePage("system", "audit-log"),
     ]);
   });
 
@@ -127,7 +132,7 @@ describe("the shell's regions", () => {
     for (const name of [
       "Control Centre",
       "Models",
-      pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
+      controlCentrePage("models", "models-and-spend"),
     ]) {
       expect(within(bar).getByText(name, { exact: true })).toBeDefined();
     }

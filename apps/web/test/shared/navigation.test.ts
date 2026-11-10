@@ -72,26 +72,11 @@ const aPage = (name: string, built: boolean, owners?: Page["owners"]): Page => (
 describe("the navigation declaration", () => {
   it("declares the navigation list's areas, groups and pages in order", () => {
     expect(outline(AREAS)).toEqual([
-      [
-        "Ask",
-        [
-          [
-            null,
-            [
-              NEW_QUESTION.name,
-              pageById(menuGroupIn(ASK, "ask"), "your-questions").name,
-              "Connect Claude",
-            ],
-          ],
-        ],
-      ],
+      ASK_OUTLINE,
       [
         "Knowledge",
         [
-          [
-            "Browse",
-            ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
-          ],
+          BROWSE_OUTLINE,
           [
             "Curation",
             [
@@ -254,32 +239,22 @@ const ASK_OUTLINE = [
   ],
 ];
 
+const BROWSE_OUTLINE = [
+  "Browse",
+  ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
+];
+
 const OWNER_CURATION = [
   pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name,
   CONCEPT_TYPES_PAGE.name,
   pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").name,
 ];
 
-const KNOWLEDGE_WITH_OWNER_CURATION = [
-  "Knowledge",
-  [
-    [
-      "Browse",
-      ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
-    ],
-    ["Curation", OWNER_CURATION],
-  ],
-];
+const KNOWLEDGE_WITH_OWNER_CURATION = ["Knowledge", [BROWSE_OUTLINE, ["Curation", OWNER_CURATION]]];
 
 const KNOWLEDGE_WITH_ADMIN_CURATION = [
   "Knowledge",
-  [
-    [
-      "Browse",
-      ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
-    ],
-    ["Curation", [...OWNER_CURATION, "Exports"]],
-  ],
+  [BROWSE_OUTLINE, ["Curation", [...OWNER_CURATION, "Exports"]]],
 ];
 
 const INBOX_OUTLINE = [
@@ -292,34 +267,7 @@ describe("the navigation each person sees", () => {
     it(`shows ${aRole(role)} Ask as home, and Knowledge`, () => {
       const shown = visibleTo(readerOf(role), AREAS);
 
-      expect(outline(shown.areas)).toEqual([
-        [
-          "Ask",
-          [
-            [
-              null,
-              [
-                NEW_QUESTION.name,
-                pageById(menuGroupIn(ASK, "ask"), "your-questions").name,
-                "Connect Claude",
-              ],
-            ],
-          ],
-        ],
-        [
-          "Knowledge",
-          [
-            [
-              "Browse",
-              [
-                "Search",
-                "Guides",
-                pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name,
-              ],
-            ],
-          ],
-        ],
-      ]);
+      expect(outline(shown.areas)).toEqual([ASK_OUTLINE, ["Knowledge", [BROWSE_OUTLINE]]]);
       expect(shown.home).toBe(HOMES[role]);
       expect(shown.areas[0]?.opensAt).toBe(HOMES[role]);
     });
@@ -447,15 +395,7 @@ describe("the navigation each person sees", () => {
 
     expect(outline(visibleTo(overrideOwner, AREAS).areas)).toEqual([
       ASK_OUTLINE,
-      [
-        "Knowledge",
-        [
-          [
-            "Browse",
-            ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
-          ],
-        ],
-      ],
+      ["Knowledge", [BROWSE_OUTLINE]],
       INBOX_OUTLINE,
     ]);
     expect(hides(visibleTo(overrideOwner, AREAS), path)).toBe(false);
@@ -471,15 +411,7 @@ describe("the navigation each person sees", () => {
 
     expect(outline(visibleTo(owningNothing, AREAS).areas)).toEqual([
       ASK_OUTLINE,
-      [
-        "Knowledge",
-        [
-          [
-            "Browse",
-            ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
-          ],
-        ],
-      ],
+      ["Knowledge", [BROWSE_OUTLINE]],
     ]);
   });
 
@@ -488,15 +420,7 @@ describe("the navigation each person sees", () => {
 
     expect(outline(visibleTo(owner, AREAS.map(withAllPagesBuilt)).areas)).toEqual([
       ASK_OUTLINE,
-      [
-        "Knowledge",
-        [
-          [
-            "Browse",
-            ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
-          ],
-        ],
-      ],
+      ["Knowledge", [BROWSE_OUTLINE]],
       ["Inbox", [[null, [pageById(menuGroupIn(INBOX, "inbox"), "waiting-on-you").name]]]],
     ]);
   });
