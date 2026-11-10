@@ -117,11 +117,7 @@ const READABLE_AND_FILTERED = `c.workspace_id = $1 AND ${readableClause("c", 2)}
 
 const LATEST_VERIFICATION = latestVerificationOf("page");
 
-const ONE_PAGE = `LIMIT ${PAGE_SIZE} OFFSET $6`;
-
-const EVERY_ROW = "";
-
-const pageQuery = ({ column, desc }: AllKnowledgeInput["sort"], limit: string): string => {
+const pageQuery = ({ column, desc }: AllKnowledgeInput["sort"], paged: boolean): string => {
   const direction = desc ? "DESC" : "ASC";
   return `SELECT page.*, ${LATEST_VERIFICATION.columns}
     FROM (
@@ -140,7 +136,7 @@ const pageQuery = ({ column, desc }: AllKnowledgeInput["sort"], limit: string): 
         LEFT JOIN "user" owner ON owner.id = COALESCE(own.person_id, standing.person_id)
        WHERE ${READABLE_AND_FILTERED}
        ORDER BY sort_key ${direction}, c.iri
-       ${limit}
+       ${paged ? `LIMIT ${PAGE_SIZE} OFFSET $6` : ""}
     ) page
     ${LATEST_VERIFICATION.joins}
    ORDER BY page.sort_key ${direction}, page.iri`;
@@ -205,7 +201,7 @@ const trustFilteredPage = async (
   { sort, page, trust }: AllKnowledgeInput,
   now: Date,
 ): Promise<AllKnowledge> => {
-  const { rows } = await tx.query<PageRow>(pageQuery(sort, EVERY_ROW), [...filter]);
+  const { rows } = await tx.query<PageRow>(pageQuery(sort, false), [...filter]);
   const shown = rows.map((row) => rowOf(row, now)).filter((row) => shownAs(row.trust) === trust);
   const first = (page - 1) * PAGE_SIZE;
   return {
@@ -230,7 +226,7 @@ const pageRead = async (
     conceptType ?? null,
   ];
   if (trust !== undefined) return trustFilteredPage(tx, filter, input, now);
-  const { rows } = await tx.query<PageRow>(pageQuery(sort, ONE_PAGE), [
+  const { rows } = await tx.query<PageRow>(pageQuery(sort, true), [
     ...filter,
     (page - 1) * PAGE_SIZE,
   ]);

@@ -75,6 +75,7 @@ describe("the Collections and Owners page", () => {
         collections: [
           POLICY,
           { collection: "safety-rules", owner: null, overrides: 2, concepts: 1, verified: 1 },
+          { collection: "wide", owner: null, overrides: 0, concepts: 200, verified: 199 },
         ],
       }),
     );
@@ -82,13 +83,14 @@ describe("the Collections and Owners page", () => {
 
     await pickerOf(WORDS.noOwner);
 
-    expect(cellsOf("policy")).toEqual([NAMED, WORDS.noOwner, "3", WORDS.verifiedShare(1, 3)]);
+    expect(cellsOf("policy")).toEqual([NAMED, WORDS.noOwner, "3", "33%"]);
     expect(cellsOf("safety-rules")).toEqual([
       collectionNameOf("safety-rules"),
       `${WORDS.noOwner}${WORDS.ownOwners(2)}`,
       "1",
-      WORDS.verifiedShare(1, 1),
+      "100%",
     ]);
+    expect(cellsOf("wide").at(-1), "a share one short of all showed as complete").toBe("99%");
     expect(region().queryByText(POLICY.collection)).toBeNull();
     expect(region().queryByText("safety-rules")).toBeNull();
   });

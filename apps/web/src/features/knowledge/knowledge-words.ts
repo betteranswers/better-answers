@@ -1,4 +1,4 @@
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { collectionLabelOf, collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { counted } from "@/shared/words.ts";
@@ -18,8 +18,7 @@ export const COLLECTIONS_WORDS = {
   people: "People",
   searchPeople: "Search people",
   nobody: "No one found.",
-  verifiedShare: (verified: number, concepts: number): string =>
-    `${String(concepts === 0 ? 0 : Math.floor((verified * 100) / concepts))}%`,
+  verifiedShare: (percent: number): string => `${String(percent)}%`,
   named: (name: string, collection: string): string => `${name} now owns ${quoted(collection)}.`,
   cleared: (collection: string): string => `${quoted(collection)} has no owner now.`,
   undo: "Undo",
@@ -58,12 +57,9 @@ export const LAUNCH_WORDS = {
 
 const conceptsCounted = (count: number): string => counted(count, "concept", "concepts");
 
-const collectionNamed = (collection: string | null): string =>
-  collection === null ? CONCEPT_WORDS.noCollection : collectionNameOf(collection);
-
 export const KNOWLEDGE_BASE_WORDS = {
   tree: "Collections and types",
-  collection: collectionNamed,
+  collection: collectionLabelOf,
   labelled: (name: string, count: number): string => `${name}, ${conceptsCounted(count)}`,
   count: conceptsCounted,
   loading: "Loading the knowledge base…",

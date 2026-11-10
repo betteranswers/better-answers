@@ -8,14 +8,17 @@ import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
 
 import type { CollectionOwned } from "../knowledge-api.ts";
 import { COLLECTIONS_WORDS as WORDS } from "../knowledge-words.ts";
-import type { Naming } from "./owner-naming.ts";
-import { nameOf, OwnerPicker } from "./owner-picker.tsx";
+import { nameOf, type Naming } from "./owner-naming.ts";
+import { OwnerPicker } from "./owner-picker.tsx";
 
 const features = tableFeatures({});
 
 const column = createColumnHelper<typeof features, CollectionOwned>();
 
 const NARROW_HIDES: ReadonlySet<string> = new Set(["verified"]);
+
+const verifiedPercent = ({ verified, concepts }: CollectionOwned): number =>
+  concepts === 0 ? 0 : Math.floor((verified * 100) / concepts);
 
 const NamingContext = createContext<Naming | undefined>(undefined);
 
@@ -69,9 +72,7 @@ const COLUMNS = column.columns([
     id: "verified",
     header: WORDS.columns.verified,
     cell: ({ row }) => (
-      <span className="tabular-nums">
-        {WORDS.verifiedShare(row.original.verified, row.original.concepts)}
-      </span>
+      <span className="tabular-nums">{WORDS.verifiedShare(verifiedPercent(row.original))}</span>
     ),
   }),
 ]);

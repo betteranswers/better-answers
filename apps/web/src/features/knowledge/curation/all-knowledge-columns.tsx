@@ -1,7 +1,7 @@
 import { createColumnHelper, tableFeatures } from "@tanstack/react-table";
 import { createContext, useContext } from "react";
 
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { collectionLabelOf } from "@/shared/knowledge/collection-name.ts";
 import { conceptMatchKey } from "@/shared/knowledge/concept-address.ts";
 import { ConceptLink } from "@/shared/knowledge/concept-link.tsx";
 import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
@@ -85,10 +85,7 @@ export const allKnowledgeColumns = column.columns([
   column.accessor("collection", {
     id: "collection",
     header: WORDS.columns.collection,
-    cell: ({ getValue }) => {
-      const collection = getValue();
-      return collection === null ? WORDS.noCollection : collectionNameOf(collection);
-    },
+    cell: ({ getValue }) => collectionLabelOf(getValue()),
   }),
   column.accessor("trustWords", {
     id: "trust",

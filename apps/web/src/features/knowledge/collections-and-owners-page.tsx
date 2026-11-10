@@ -8,15 +8,16 @@ import { useRole } from "@/shared/member/member.ts";
 import { ownsNoLonger, useArrivalDecidedAgainOnceUnowned } from "@/shared/member/ownership.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
+import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { UndoToast, type UndoNotice } from "@/shared/ui/kibo-ui/undo-toast.tsx";
 
 import { CollectionsTable } from "./curation/collections-table.tsx";
-import { outcomeOfFailure, useOwnerNaming } from "./curation/owner-naming.ts";
+import { useOwnerNaming } from "./curation/owner-naming.ts";
 import { pickerIdOf } from "./curation/owner-picker.tsx";
 import { useCollections, useOwnerChoices, type CollectionOwned } from "./knowledge-api.ts";
 import { COLLECTIONS_KEYSTROKES as KEY } from "./knowledge-state.ts";
-import { COLLECTIONS_WORDS as WORDS } from "./knowledge-words.ts";
+import { COLLECTIONS_WORDS as WORDS, SAID_OF_COLLECTIONS } from "./knowledge-words.ts";
 
 const CURATION = menuGroupIn(KNOWLEDGE, "curation");
 
@@ -27,6 +28,8 @@ const OWNER_KEYSTROKES: readonly Keystroke[] = [KEY.changeOwner, KEY.undo];
 const NO_KEYSTROKES: readonly Keystroke[] = [];
 
 const NONE: readonly CollectionOwned[] = [];
+
+const { outcomeOfFailure } = refusalsOf(SAID_OF_COLLECTIONS);
 
 const readFailedWords = (failure: Error | ApiError) => outcomeOfFailure(failure, "read").words;
 

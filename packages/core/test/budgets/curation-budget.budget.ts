@@ -2,6 +2,7 @@ import { assert, describe, expect, it } from "vitest";
 
 import {
   allKnowledgeInput,
+  collectionsAndOwners,
   exportBundleSnapshot,
   readAllKnowledge,
   readConceptTypes,
@@ -90,6 +91,13 @@ describe("the Curation budgets at 3,000 concepts", () => {
         ),
       ),
     );
+    const collections = await measured(async () =>
+      answered(
+        await readingAs(readers(), admin, (principal, tx) =>
+          collectionsAndOwners(principal, tx, SNAPSHOT_AT),
+        ),
+      ),
+    );
     const conceptTypes = await measured(async () =>
       answered(
         await readingAs(readers(), admin, (principal, tx) => readConceptTypes(principal, tx)),
@@ -98,6 +106,7 @@ describe("the Curation budgets at 3,000 concepts", () => {
 
     await recordFigures("All knowledge's first page", figuresOf(page));
     await recordFigures("All knowledge filtered by trust", figuresOf(trusted));
+    await recordFigures("Collections and Owners", figuresOf(collections));
     await recordFigures("Concept Types", figuresOf(conceptTypes));
     expect(
       percentile(page, 0.5),
@@ -106,6 +115,10 @@ describe("the Curation budgets at 3,000 concepts", () => {
     expect(
       percentile(trusted, 0.5),
       "All knowledge filtered by trust at the median, in milliseconds",
+    ).toBeLessThan(PAGE_BUDGET_MS);
+    expect(
+      percentile(collections, 0.5),
+      "Collections and Owners at the median, in milliseconds",
     ).toBeLessThan(PAGE_BUDGET_MS);
     expect(
       percentile(conceptTypes, 0.5),

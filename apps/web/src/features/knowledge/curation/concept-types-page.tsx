@@ -8,7 +8,7 @@ import { useListAddress } from "@/shared/address/list-address.ts";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke, usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { collectionLabelOf } from "@/shared/knowledge/collection-name.ts";
 import { GridTable } from "@/shared/list/grid-table.tsx";
 import { ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { onTheRowInFocus, rowInFocus, type Saying } from "@/shared/list/row-focus.ts";
@@ -105,9 +105,7 @@ function ConceptTypeCell(properties: { readonly counted: ConceptTypeCounted }) {
         <ul aria-label={WORDS.collectionsOf(counted.conceptType)} className="grid max-w-sm gap-1">
           {counted.collections.map((held) => (
             <li key={JSON.stringify(held.collection)} className="flex justify-between gap-4">
-              <span className="wrap-anywhere">
-                {held.collection === null ? WORDS.noCollection : collectionNameOf(held.collection)}
-              </span>
+              <span className="wrap-anywhere">{collectionLabelOf(held.collection)}</span>
               <span className="tabular-nums">{held.count}</span>
             </li>
           ))}

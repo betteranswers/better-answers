@@ -3,7 +3,7 @@ import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { collectionLabelOf } from "@/shared/knowledge/collection-name.ts";
 import { conceptMatchKey, conceptPageOf, wayBackOf } from "@/shared/knowledge/concept-address.ts";
 import { ConceptBody, LINK, type MarkOpening } from "@/shared/knowledge/concept-body.tsx";
 import { descriptionOf, tagsOf, titleOf } from "@/shared/knowledge/concept-frontmatter.ts";
@@ -135,7 +135,7 @@ function Header(properties: {
       <div className="mt-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-border pb-5">
         <TypeLine
           type={concept.conceptType}
-          collection={collection == null ? WORDS.noCollection : collectionNameOf(collection)}
+          collection={collectionLabelOf(collection)}
           className="min-h-8 items-center [font-size:var(--text-sm)] [&_dd]:text-foreground"
         />
         <div className="flex flex-wrap items-start gap-2">

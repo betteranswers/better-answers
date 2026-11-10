@@ -14,13 +14,12 @@ import {
 
 import type { CollectionOwned, Owner } from "../knowledge-api.ts";
 import { COLLECTIONS_WORDS as WORDS } from "../knowledge-words.ts";
+import { nameOf } from "./owner-naming.ts";
 
 const NOBODY = "nobody";
 
 export const pickerIdOf = (collection: string): string =>
   `owner-of-${encodeURIComponent(collection)}`;
-
-export const nameOf = (owner: Owner): string => (owner.name === "" ? WORDS.unnamed : owner.name);
 
 const byName = (_value: string, search: string, keywords?: string[]): number =>
   keywords?.some((name) => name.toLowerCase().includes(search.toLowerCase())) === true ? 1 : 0;

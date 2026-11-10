@@ -172,9 +172,7 @@ test.describe("Collections and Owners", () => {
               - columnheader "${WORDS.columns.verified}"
     `);
     await expect(rowOf(page, "policy").getByRole("cell").nth(2)).toHaveText("2");
-    await expect(rowOf(page, "policy").getByRole("cell").nth(3)).toHaveText(
-      WORDS.verifiedShare(0, 2),
-    );
+    await expect(rowOf(page, "policy").getByRole("cell").nth(3)).toHaveText("0%");
     await expect(collections(page).getByRole("button")).toHaveCount(0);
     await passesTheAccessibilityGate();
 

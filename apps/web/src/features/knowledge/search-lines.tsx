@@ -1,6 +1,5 @@
-import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { collectionLabelOf } from "@/shared/knowledge/collection-name.ts";
 import { conceptMatchKey, conceptPageOf } from "@/shared/knowledge/concept-address.ts";
-import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import {
   EvidenceInline,
   SensitivityTag,
@@ -59,14 +58,7 @@ export function ConceptLine(properties: {
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <TrustMark trust={match.trust} words={match.trustWords} dated />
-        <TypeLine
-          type={match.conceptType}
-          collection={
-            match.collection === null
-              ? CONCEPT_WORDS.noCollection
-              : collectionNameOf(match.collection)
-          }
-        />
+        <TypeLine type={match.conceptType} collection={collectionLabelOf(match.collection)} />
       </div>
     </div>
   );
