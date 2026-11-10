@@ -1,4 +1,5 @@
 import { useId, useMemo, useState, type MouseEvent } from "react";
+import { flushSync } from "react-dom";
 
 import { cn } from "@/shared/lib/utils.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -32,8 +33,8 @@ function Entry(properties: {
   const { met, of } = section.coverage;
   const choose = (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
-    goTo(headingId);
     onChoose();
+    goTo(headingId);
   };
   return (
     <li>
@@ -96,7 +97,9 @@ export function SectionOutline(properties: { readonly sections: readonly Section
             section={section}
             current={ids[at] === current}
             onChoose={() => {
-              setOpen(false);
+              flushSync(() => {
+                setOpen(false);
+              });
             }}
           />
         ))}

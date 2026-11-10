@@ -70,6 +70,13 @@ const openOutline = async () => {
   await screen.findByRole("heading", { level: 1, name: "Northgate Ltd" });
 };
 
+const withSecondHeadingReached = (): Record<string, number> => ({
+  [headingIdOf(FIRST)]: -900,
+  [headingIdOf(SECOND)]: 60,
+  [headingIdOf(THIRD)]: 700,
+  [headingIdOf(FOURTH)]: 1400,
+});
+
 const placedAt = (tops: Readonly<Record<string, number>>) =>
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
     return new DOMRect(0, tops[this.id] ?? 0, 0, 0);
@@ -124,12 +131,7 @@ describe("the section outline", () => {
 
   it("marks the section being read as the page scrolls", async () => {
     aFrameLater();
-    const tops = {
-      [headingIdOf(FIRST)]: -900,
-      [headingIdOf(SECOND)]: 60,
-      [headingIdOf(THIRD)]: 700,
-      [headingIdOf(FOURTH)]: 1400,
-    };
+    const tops = withSecondHeadingReached();
     placedAt(tops);
     await openOutline();
 
@@ -170,8 +172,15 @@ describe("the section outline", () => {
   });
 
   it("folds behind a Sections button on a narrow page", async () => {
+    const expandedAtScroll: (string | null)[] = [];
     Object.defineProperty(Element.prototype, "scrollIntoView", {
-      value: vi.fn<() => void>(),
+      value: () => {
+        expandedAtScroll.push(
+          outline()
+            .getByRole("button", { name: GUIDE_WORDS.outline })
+            .getAttribute("aria-expanded"),
+        );
+      },
       configurable: true,
     });
     await openOutline();
@@ -183,6 +192,42 @@ describe("the section outline", () => {
 
     fireEvent.click(outline().getByRole("link", { name: /1\. Racking/u }));
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(expandedAtScroll, "the page scrolled before the list folded").toEqual(["false"]);
     Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  });
+
+  it("re-marks the section being read when the page's size changes", async () => {
+    aFrameLater();
+    const watchers: (() => void)[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        callback: () => void;
+        constructor(callback: () => void) {
+          this.callback = callback;
+        }
+        observe = () => {
+          watchers.push(this.callback);
+        };
+        unobserve = () => undefined;
+        disconnect = () => undefined;
+      },
+    );
+    const tops = withSecondHeadingReached();
+    placedAt(tops);
+    await openOutline();
+    await waitFor(() => {
+      expect(current()[0]).toContain(GUIDE_WORDS.heading("2", "Insurance"));
+    });
+
+    tops[headingIdOf(FIRST)] = 20;
+    tops[headingIdOf(SECOND)] = 900;
+    act(() => {
+      for (const resized of watchers) resized();
+    });
+
+    await waitFor(() => {
+      expect(current()[0]).toContain(GUIDE_WORDS.heading("1", "Racking"));
+    });
   });
 });

@@ -3,6 +3,7 @@ import { useRef, useState, type RefObject } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { LINK } from "@/shared/knowledge/concept-body.tsx";
 import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
@@ -96,7 +97,7 @@ function GuideHeader(properties: { readonly guide: Guide }) {
   const subjectPage = subject === null ? undefined : conceptPageOf(subject.iri);
   return (
     <header className="mt-4">
-      <TypeLine type={guide.guideType} collection={guide.collection} />
+      <TypeLine type={guide.guideType} collection={collectionNameOf(guide.collection)} />
       {subject === null || subjectPage === undefined ? null : (
         <p className="mt-2">
           <span className="text-muted-foreground">{WORDS.subject} </span>

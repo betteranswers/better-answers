@@ -34,12 +34,13 @@ export function useCurrentSection(ids: readonly string[]): string | undefined {
       if (frame === 0) frame = requestAnimationFrame(measure);
     };
     schedule();
+    const resized = new ResizeObserver(schedule);
+    resized.observe(document.body);
     window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
     return () => {
       cancelAnimationFrame(frame);
+      resized.disconnect();
       window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
     };
   }, [ids]);
   return ids[at];

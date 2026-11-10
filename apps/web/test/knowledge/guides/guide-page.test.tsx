@@ -66,6 +66,7 @@ describe("the guide page", () => {
     const article = within(screen.getByRole("article"));
     expect(article.getByText("Bid library")).toBeDefined();
     expect(article.getByRole("link", { name: "Northgate Ltd" })).toBeDefined();
+    expect(article.getByText(collectionNameOf("northgate"))).toBeDefined();
     expect(article.getAllByText(/\b3 of 4\b/u)).toHaveLength(3);
   });
 
