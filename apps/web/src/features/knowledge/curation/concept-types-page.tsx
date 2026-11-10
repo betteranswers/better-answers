@@ -1,4 +1,5 @@
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
+import { CheckIcon } from "lucide-react";
 import { createContext, useContext, useId, useMemo, useRef, useState, type RefObject } from "react";
 
 import { byCodeUnit } from "@better-answers/schema/code-unit";
@@ -7,6 +8,7 @@ import { useListAddress } from "@/shared/address/list-address.ts";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke, usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { GridTable } from "@/shared/list/grid-table.tsx";
 import { ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { onTheRowInFocus, rowInFocus, type Saying } from "@/shared/list/row-focus.ts";
@@ -103,7 +105,9 @@ function ConceptTypeCell(properties: { readonly counted: ConceptTypeCounted }) {
         <ul aria-label={WORDS.collectionsOf(counted.conceptType)} className="grid max-w-sm gap-1">
           {counted.collections.map((held) => (
             <li key={JSON.stringify(held.collection)} className="flex justify-between gap-4">
-              <span className="wrap-anywhere">{held.collection ?? WORDS.noCollection}</span>
+              <span className="wrap-anywhere">
+                {held.collection === null ? WORDS.noCollection : collectionNameOf(held.collection)}
+              </span>
               <span className="tabular-nums">{held.count}</span>
             </li>
           ))}
@@ -138,10 +142,11 @@ function TailSwitch(properties: {
         type="button"
         variant="outline"
         aria-pressed={pressed}
-        className="aria-pressed:border-[var(--border-strong)] aria-pressed:bg-accent aria-pressed:font-semibold"
+        className="aria-pressed:border-primary aria-pressed:bg-[var(--surface-selected)] aria-pressed:font-semibold aria-pressed:hover:bg-[var(--surface-selected)]"
         aria-keyshortcuts={KEY.tail.key}
         onClick={onPress}
       >
+        {pressed ? <CheckIcon aria-hidden /> : null}
         {WORDS.tail}
       </Button>
     </div>

@@ -199,6 +199,23 @@ const openIdOf = (open: OpenConceptType): string | undefined =>
 export const initiallyExpanded = (open: OpenConceptType): ReadonlySet<string | null> =>
   new Set(open === undefined ? [] : [open.collection]);
 
+const largestOf = <Counted extends { readonly count: number }>(
+  counted: readonly Counted[],
+): Counted | undefined =>
+  counted.reduce<Counted | undefined>(
+    (most, each) => (most === undefined || each.count > most.count ? each : most),
+    undefined,
+  );
+
+export const largestConceptType = (collections: readonly CollectionCounted[]): OpenConceptType => {
+  const named = collections.filter((held) => held.collection !== null);
+  const collection = largestOf(named.length > 0 ? named : collections);
+  const conceptType = largestOf(collection?.conceptTypes ?? []);
+  return collection === undefined || conceptType === undefined
+    ? undefined
+    : { collection: collection.collection, conceptType: conceptType.conceptType };
+};
+
 export function KnowledgeTree(properties: {
   readonly collections: readonly CollectionCounted[];
   readonly open: OpenConceptType;

@@ -236,6 +236,12 @@ describe("the owner of a concept", () => {
     expect(linesOf(block, "Owner")).toEqual(["Ifan Morgan", "Owner of Sectors"]);
   });
 
+  it("names the collection by its display name", () => {
+    const block = drawn(anIssuedConcept({ collection: "multi-academy-trusts" }));
+
+    expect(linesOf(block, "Owner")).toEqual(["Ifan Morgan", "Owner of Multi academy trusts"]);
+  });
+
   it("names the concept's own owner with no collection line", () => {
     const block = drawn(
       anIssuedConcept({

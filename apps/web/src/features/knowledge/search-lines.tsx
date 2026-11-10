@@ -1,3 +1,4 @@
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { conceptMatchKey, conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import {
@@ -60,7 +61,11 @@ export function ConceptLine(properties: {
         <TrustMark trust={match.trust} words={match.trustWords} dated />
         <TypeLine
           type={match.conceptType}
-          collection={match.collection ?? CONCEPT_WORDS.noCollection}
+          collection={
+            match.collection === null
+              ? CONCEPT_WORDS.noCollection
+              : collectionNameOf(match.collection)
+          }
         />
       </div>
     </div>

@@ -29,7 +29,12 @@ import {
   openConceptTypeAt,
   type OpenConceptType,
 } from "./knowledge-state.ts";
-import { initiallyExpanded, KnowledgeTree, toggled } from "./knowledge-tree.tsx";
+import {
+  initiallyExpanded,
+  KnowledgeTree,
+  largestConceptType,
+  toggled,
+} from "./knowledge-tree.tsx";
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "./knowledge-words.ts";
 
 const LISTED = Object.values(KEY);
@@ -250,9 +255,11 @@ function KnowledgeBaseRegion() {
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   const tree = useKnowledgeTree();
-  const { open, openConceptType } = useOpenConceptType();
-  const read = useConceptsOfType(open);
+  const { open: addressed, openConceptType } = useOpenConceptType();
   const collections = tree.data?.collections;
+  const open =
+    addressed ?? (collections === undefined ? undefined : largestConceptType(collections));
+  const read = useConceptsOfType(open);
 
   return (
     <section aria-labelledby={headingId} className="mt-6">

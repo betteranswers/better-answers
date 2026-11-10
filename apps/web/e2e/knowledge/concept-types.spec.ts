@@ -6,6 +6,7 @@ import {
   CONCEPT_TYPES_PAGE,
 } from "@/features/knowledge/curation/curation-state.ts";
 import { CONCEPT_TYPES_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -177,10 +178,15 @@ test.describe("Concept Types", () => {
       await expect(filter(page)).toBeFocused();
       await page.keyboard.press("Enter");
       await expect(filter(page)).toHaveAttribute("aria-pressed", "true");
+      await expect(
+        filter(page).locator("svg"),
+        "the pressed toggle drew no mark beside its name",
+      ).toBeVisible();
       await expect(page).toHaveURL(new RegExp(`${CONCEPT_TYPES_LIST}\\.tail=small`));
       expect(await rowTexts(page)).toEqual(["Procedure 2", "Term 1"]);
       await page.keyboard.press("Enter");
       await expect(filter(page)).toHaveAttribute("aria-pressed", "false");
+      await expect(filter(page).locator("svg")).toHaveCount(0);
       expect(await rowTexts(page)).toHaveLength(3);
     });
 
@@ -206,7 +212,9 @@ test.describe("Concept Types", () => {
       await expect(disclosureOf(page, "Policy")).toBeFocused();
       await page.keyboard.press(KEY.open.key);
       await expect(disclosureOf(page, "Policy")).toHaveAttribute("aria-expanded", "true");
-      await expect(collectionsOf(page, "Policy").getByRole("listitem")).toHaveText(["hr3"]);
+      await expect(collectionsOf(page, "Policy").getByRole("listitem")).toHaveText([
+        `${collectionNameOf("hr")}3`,
+      ]);
       await passesTheAccessibilityGate();
       await page.keyboard.press("Enter");
       await expect(disclosureOf(page, "Policy")).toHaveAttribute("aria-expanded", "false");
@@ -258,14 +266,18 @@ test.describe("Concept Types", () => {
 
     await test.step("counts each type in each collection the Editor can read", async () => {
       await disclosureOf(page, "Policy").click();
-      await expect(collectionsOf(page, "Policy").getByRole("listitem")).toHaveText(["hr2"]);
+      await expect(collectionsOf(page, "Policy").getByRole("listitem")).toHaveText([
+        `${collectionNameOf("hr")}2`,
+      ]);
       await disclosureOf(page, "Procedure").click();
       await expect(collectionsOf(page, "Procedure").getByRole("listitem")).toHaveText([
-        "safety1",
+        `${collectionNameOf("safety")}1`,
         "No collection1",
       ]);
       await disclosureOf(page, "Term").click();
-      await expect(collectionsOf(page, "Term").getByRole("listitem")).toHaveText(["hr1"]);
+      await expect(collectionsOf(page, "Term").getByRole("listitem")).toHaveText([
+        `${collectionNameOf("hr")}1`,
+      ]);
       await passesTheAccessibilityGate();
     });
   });

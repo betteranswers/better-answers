@@ -5,6 +5,7 @@ import {
   CONCEPT_KEYSTROKES as KEY,
   EDITOR_KEYSTROKES,
 } from "@/features/knowledge/knowledge-state.ts";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 
@@ -301,7 +302,9 @@ test.describe("the concept page", () => {
     await expect(rowOf("Trust")).toContainText(`Verified by ${workspace.admin.name}`);
     await expect(rowOf(CONCEPT_WORDS.titleBlock.checkedBy)).toContainText(workspace.admin.name);
     await expect(rowOf("Owner")).toContainText("Ifan Morgan");
-    await expect(rowOf("Owner")).toContainText(`Owner of ${CONTRACTS}`);
+    await expect(rowOf("Owner")).toContainText(
+      CONCEPT_WORDS.titleBlock.ownerOf(collectionNameOf(CONTRACTS)),
+    );
     await expect(rowOf("Review by")).toHaveText("1 March 2027");
     await expect(rowOf("Sources")).toHaveText("1");
     await expect(page.getByText(/details from the file/iu)).toHaveCount(0);

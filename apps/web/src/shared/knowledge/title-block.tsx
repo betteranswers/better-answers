@@ -7,6 +7,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { dayWords } from "@/shared/words.ts";
 
+import { collectionNameOf } from "./collection-name.ts";
 import { generatedOf, otherFieldsOf, staleAfterOf } from "./concept-frontmatter.ts";
 import { CONCEPT_WORDS } from "./concept-words.ts";
 import type { Concept } from "./knowledge-reads.ts";
@@ -148,7 +149,7 @@ const ROWS: readonly Row[] = [
         <>
           <span className="wrap-anywhere">{owner.name}</span>
           {owner.via === "collection" && collection !== null ? (
-            <Detail>{WORDS.ownerOf(collection)}</Detail>
+            <Detail>{WORDS.ownerOf(collectionNameOf(collection))}</Detail>
           ) : null}
         </>
       );

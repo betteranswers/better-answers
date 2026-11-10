@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { OpenConceptType } from "@/features/knowledge/knowledge-state.ts";
 import { initiallyExpanded, KnowledgeTree, toggled } from "@/features/knowledge/knowledge-tree.tsx";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 
 afterEach(cleanup);
 
@@ -46,12 +47,14 @@ const drawn = (open?: OpenConceptType) => {
 
 const item = (name: string) => screen.getByRole("treeitem", { name: new RegExp(`^${name},`) });
 
+const collectionItem = (collection: string) => item(collectionNameOf(collection));
+
 const focused = () => document.activeElement;
 
 const pressed = (key: string): boolean => fireEvent.keyDown(focused() ?? document.body, { key });
 
 const fromCompany = () => {
-  item("company").focus();
+  collectionItem("company").focus();
 };
 
 describe("the knowledge tree", () => {
@@ -60,26 +63,28 @@ describe("the knowledge tree", () => {
     fromCompany();
 
     pressed("ArrowDown");
-    expect(focused()).toBe(item("product"));
+    expect(focused()).toBe(collectionItem("product"));
     pressed("ArrowDown");
     expect(focused()).toBe(item("No collection"));
     pressed("ArrowDown");
     expect(focused(), "Down moved focus past the last item").toBe(item("No collection"));
     pressed("ArrowUp");
-    expect(focused()).toBe(item("product"));
-    expect(item("product").tabIndex).toBe(0);
-    expect(item("company").tabIndex).toBe(-1);
+    expect(focused()).toBe(collectionItem("product"));
+    expect(collectionItem("product").tabIndex).toBe(0);
+    expect(collectionItem("company").tabIndex).toBe(-1);
   });
 
   it("opens a collection with the right arrow", () => {
     drawn();
     fromCompany();
-    expect(item("company").getAttribute("aria-expanded")).toBe("false");
+    expect(collectionItem("company").getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByRole("treeitem", { name: /^lease,/ })).toBeNull();
 
     pressed("ArrowRight");
-    expect(item("company").getAttribute("aria-expanded")).toBe("true");
-    expect(focused(), "the first Right moved focus instead of opening").toBe(item("company"));
+    expect(collectionItem("company").getAttribute("aria-expanded")).toBe("true");
+    expect(focused(), "the first Right moved focus instead of opening").toBe(
+      collectionItem("company"),
+    );
     pressed("ArrowRight");
     expect(focused()).toBe(item("insurance policy"));
     expect(item("insurance policy").getAttribute("aria-level")).toBe("2");
@@ -96,7 +101,7 @@ describe("the knowledge tree", () => {
     pressed("l");
     expect(focused()).toBe(item("lease"));
     pressed("P");
-    expect(focused()).toBe(item("product"));
+    expect(focused()).toBe(collectionItem("product"));
     pressed("i");
     expect(focused(), "the letter did not wrap to the top").toBe(item("insurance policy"));
     pressed("z");
@@ -108,7 +113,7 @@ describe("the knowledge tree", () => {
     fromCompany();
 
     expect(pressed("?")).toBe(true);
-    expect(focused()).toBe(item("company"));
+    expect(focused()).toBe(collectionItem("company"));
   });
 
   it("reaches the first item by Home, the last by End", () => {
@@ -116,7 +121,7 @@ describe("the knowledge tree", () => {
     item("policy").focus();
 
     pressed("Home");
-    expect(focused()).toBe(item("company"));
+    expect(focused()).toBe(collectionItem("company"));
     pressed("End");
     expect(focused()).toBe(item("policy"));
   });
@@ -126,10 +131,10 @@ describe("the knowledge tree", () => {
     item("lease").focus();
 
     pressed("ArrowLeft");
-    expect(focused()).toBe(item("company"));
-    expect(item("company").getAttribute("aria-expanded")).toBe("true");
+    expect(focused()).toBe(collectionItem("company"));
+    expect(collectionItem("company").getAttribute("aria-expanded")).toBe("true");
     pressed("ArrowLeft");
-    expect(item("company").getAttribute("aria-expanded")).toBe("false");
+    expect(collectionItem("company").getAttribute("aria-expanded")).toBe("false");
   });
 
   it("opens a type with Enter or a click", () => {
@@ -139,7 +144,7 @@ describe("the knowledge tree", () => {
 
     pressed("Enter");
     expect(onOpen).toHaveBeenLastCalledWith("company", "insurance policy");
-    fireEvent.click(item("product"));
+    fireEvent.click(collectionItem("product"));
     expect(onOpen, "a click on a collection opened a type").toHaveBeenCalledTimes(1);
     fireEvent.click(item("datasheet"));
     expect(onOpen).toHaveBeenLastCalledWith("product", "datasheet");

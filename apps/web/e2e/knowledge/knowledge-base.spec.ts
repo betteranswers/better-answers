@@ -2,6 +2,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { KNOWLEDGE_BASE_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -33,8 +34,11 @@ const treeOf = (page: Page): Locator => page.getByRole("tree", { name: WORDS.tre
 const itemOf = (page: Page, name: string): Locator =>
   treeOf(page).getByRole("treeitem", { name: new RegExp(`^${name},`) });
 
+const collectionItemOf = (page: Page, collection: string): Locator =>
+  itemOf(page, collectionNameOf(collection));
+
 const conceptsOf = (page: Page, conceptType: string, collection: string): Locator =>
-  page.getByRole("region", { name: `${conceptType} in ${collection}`, exact: true });
+  page.getByRole("region", { name: WORDS.conceptTypeIn(conceptType, collection), exact: true });
 
 const rowsOf = (concepts: Locator): Locator =>
   concepts.getByRole("row").filter({ has: concepts.page().getByRole("cell") });
@@ -123,7 +127,7 @@ test.describe("Knowledge Base", () => {
     await test.step("shows the tree and each page of concepts within the list time budget", async () => {
       const startedAtMs = Date.now();
       await page.goto(openedAt("company", "Insurance Policy"));
-      await expect(itemOf(page, "sales")).toBeVisible();
+      await expect(collectionItemOf(page, "sales")).toBeVisible();
       await expect(rowsOf(concepts)).toHaveCount(A_PAGE);
       const elapsedMs = Date.now() - startedAtMs;
       test.info().annotations.push({ type: "knowledge tree", description: `${elapsedMs} ms` });
@@ -154,6 +158,14 @@ test.describe("Knowledge Base", () => {
       await expect(concepts.getByRole("link").last()).toHaveText("Insurance Policy 400");
     });
 
+    await test.step("opens on the largest collection with its largest type listed", async () => {
+      await atTheKnowledgeBase(page);
+
+      await expect(collectionItemOf(page, "company")).toHaveAttribute("aria-expanded", "true");
+      await expect(rowsOf(concepts)).toHaveCount(A_PAGE);
+      await expect(countOf(concepts)).toHaveText(/\b400\b/);
+    });
+
     await test.step("a Viewer moves through the tree and the concept list by keyboard alone", async () => {
       await atTheKnowledgeBase(page);
 
@@ -164,19 +176,29 @@ test.describe("Knowledge Base", () => {
         KEY.more.action,
       ]);
       await page.keyboard.press(KEY.tree.key);
-      await expect(itemOf(page, "company")).toBeFocused();
+      await expect(
+        itemOf(page, "Insurance Policy"),
+        "the tree key did not focus the type the page opened on",
+      ).toBeFocused();
+      await page.keyboard.press("Home");
+      await expect(collectionItemOf(page, "company")).toBeFocused();
+      await page.keyboard.press("ArrowLeft");
+      await expect(collectionItemOf(page, "company")).toHaveAttribute("aria-expanded", "false");
 
       await page.keyboard.press("ArrowDown");
-      await expect(itemOf(page, "estates")).toBeFocused();
+      await expect(collectionItemOf(page, "estates")).toBeFocused();
       await page.keyboard.press("End");
-      await expect(itemOf(page, "sales")).toBeFocused();
+      await expect(collectionItemOf(page, "sales")).toBeFocused();
       await page.keyboard.press("Home");
-      await expect(itemOf(page, "company")).toBeFocused();
+      await expect(collectionItemOf(page, "company")).toBeFocused();
       await page.keyboard.press("e");
-      await expect(itemOf(page, "estates"), "a typed letter did not move focus").toBeFocused();
+      await expect(
+        collectionItemOf(page, "estates"),
+        "a typed letter did not move focus",
+      ).toBeFocused();
       await page.keyboard.press("ArrowUp");
       await page.keyboard.press("ArrowRight");
-      await expect(itemOf(page, "company")).toHaveAttribute("aria-expanded", "true");
+      await expect(collectionItemOf(page, "company")).toHaveAttribute("aria-expanded", "true");
       await page.keyboard.press("ArrowRight");
       await expect(itemOf(page, "Insurance Policy")).toBeFocused();
       await page.keyboard.press("ArrowDown");
@@ -192,17 +214,17 @@ test.describe("Knowledge Base", () => {
       ).toBeFocused();
       await page.keyboard.press(KEY.concepts.key);
       await expect(
-        concepts.getByRole("heading", { name: "Insurance Policy in company" }),
+        concepts.getByRole("heading", { name: WORDS.conceptTypeIn("Insurance Policy", "company") }),
       ).toBeFocused();
       await page.keyboard.press(KEY.tree.key);
       await expect(itemOf(page, "Insurance Policy")).toBeFocused();
       await page.keyboard.press(KEY.concepts.key);
       await expect(
-        itemOf(page, "company"),
+        collectionItemOf(page, "company"),
         "the tree did not treat the concepts key as a typed letter",
       ).toBeFocused();
       await page.keyboard.press("ArrowLeft");
-      await expect(itemOf(page, "company")).toHaveAttribute("aria-expanded", "false");
+      await expect(collectionItemOf(page, "company")).toHaveAttribute("aria-expanded", "false");
       await passesTheAccessibilityGate();
     });
 
@@ -222,7 +244,7 @@ test.describe("Knowledge Base", () => {
     await page.keyboard.press(KEY.tree.key);
     await expect(itemOf(page, "Insurance Policy")).toBeFocused();
     await page.keyboard.press("Home");
-    await focusedBelowTheBanner(page, itemOf(page, "company"));
+    await focusedBelowTheBanner(page, collectionItemOf(page, "company"));
     await page.keyboard.press("Tab");
     await focusedBelowTheBanner(page, concepts.getByRole("link").first());
   });
