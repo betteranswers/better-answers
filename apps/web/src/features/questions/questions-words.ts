@@ -60,14 +60,14 @@ export const QUESTIONS_WORDS = {
     restedOn: "Cited concept",
     closed: "Closed",
   },
-  noneNamed: "None",
+  noneNamed: "All collections",
   parts: {
     answer: "Answer",
     concepts: "Concepts",
     drafted: "Drafted answer",
     feedback: "Feedback",
   },
-  noConcepts: "No concepts you have access to",
+  noConcepts: "No concepts.",
   helpful: RECORD_WORDS.markedHelpful,
   closeTheFlag: "Close this flag",
   closedSaid: {

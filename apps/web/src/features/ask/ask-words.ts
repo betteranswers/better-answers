@@ -1,4 +1,4 @@
-import type { JudgeState, QuestionVerdict } from "@better-answers/schema";
+import type { JudgeState } from "@better-answers/schema";
 
 import { JUDGE_WORDS, REASON_WORDS, RECORD_WORDS, verdictWords } from "@/shared/answer-words.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
@@ -19,17 +19,12 @@ export const ASK_WORDS = {
     drafting: "Writing an answer from related knowledge…",
   } satisfies Readonly<Record<Phase, string>>,
   verdict: verdictWords,
-  verdictSaid: {
-    ok: "Answered from the knowledge base.",
-    warn: "Answered from the knowledge base, with a warning.",
-    refuse: "Nothing in the knowledge base answers this question.",
-    related: "Found related knowledge.",
-  } satisfies Readonly<Record<QuestionVerdict, string>>,
+  refusedSaid: "Couldn’t find an answer to this question.",
   judge: JUDGE_WORDS satisfies Readonly<Record<JudgeState, string>>,
   noCollection: CONCEPT_WORDS.noCollection,
   unmapped: "Passages",
   unwritten: {
-    refused: "No cited answer could be written.",
+    refused: "No answer could be written from this knowledge.",
     failed: "Couldn’t write an answer. Ask the question again.",
     paused: "No answer was written. This workspace has reached its monthly AI spending limit.",
   } satisfies Readonly<Record<Unwritten, string>>,
@@ -51,7 +46,7 @@ export const ASK_WORDS = {
 
 export const YOUR_QUESTIONS_WORDS = {
   loading: "Loading your questions…",
-  none: "No questions yet",
+  none: "No questions yet. Ask a question to start.",
   more: "More questions",
   recordLoading: "Loading the question…",
   feedback: "Your feedback",

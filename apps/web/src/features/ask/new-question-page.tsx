@@ -34,7 +34,12 @@ const refusedWords = (failure: Error | ApiError): ReactNode => {
 const saidOf = (answering: Answering): Outcome | undefined => {
   const { failure, answer, streaming, phase } = answering;
   if (failure !== undefined) return { tone: "refused", words: refusedWords(failure) };
-  if (answer !== undefined) return { tone: "said", words: WORDS.verdictSaid[answer.verdict] };
+  if (answer?.verdict === "refuse") return { tone: "said", words: WORDS.refusedSaid };
+  if (answer !== undefined)
+    return {
+      tone: "said",
+      words: <span className="sr-only">{WORDS.verdict(answer.verdict)}</span>,
+    };
   return streaming ? { tone: "said", words: WORDS.phase[phase] } : undefined;
 };
 

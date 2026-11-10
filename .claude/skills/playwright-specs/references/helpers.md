@@ -106,7 +106,7 @@ Three modules hold what several pages' specs and the journeys share.
 | `anAuditWorkspace` | A workspace with its Admin and four seeded concepts, one of them unfiled. It answers `workspaceId`, `adminId` and `adminEmail` |
 | `QUESTION`, `POLICY`, `DRAFTED`, `DRAFTING` | The audit question, the policy concept, the drafted sentence, and the drafting script that cites it |
 | `questionBox`, `askButton` | The New Question region's textbox and its *Ask* button |
-| `answered` | A result region by its verdict's name, such as *Answered* or *Related Knowledge* |
+| `answered` | A result region by its verdict key, such as `"ok"` or `"related"`, named from `ASK_WORDS.verdict` |
 | `collectionIn` | A collection's region inside a result |
 
 `apps/web/e2e/people-pages.ts` is the People group's pages and the invitation a person is sent:
