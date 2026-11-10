@@ -5,6 +5,7 @@ import { initRepository } from "@better-answers/core/store/git";
 import { objectStoreForSuite } from "@better-answers/core/testing/objects";
 import {
   bundleCommit,
+  conceptIdentity,
   conceptIndex,
   conceptVerification,
   connectedSource,
@@ -42,6 +43,7 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "map-counts": [mapGeneration, mapNode, mapEdge],
   "unmapped-passage-rate": [questionAsked, questionFeedback],
   "reconcile-watermark": [conceptIndex, bundleCommit],
+  "refold-concept-types": [conceptIndex, conceptIdentity],
   "object-store-orphans": [sourceDocument],
   "reindex-connected-sources": [connectedSource, job],
   "erasure-rehearsal": [erasureRequest, suppression],
