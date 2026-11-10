@@ -114,6 +114,21 @@ describe("the visual body field", () => {
     }
   });
 
+  it("takes one tab stop and arrows across the toolbar", async () => {
+    const user = userEvent.setup();
+    render(<VisualBody label="Body" value="Text" onChange={ignore} />);
+    const toolbar = within(screen.getByRole("toolbar", { name: FORMATTING_WORDS.toolbar }));
+    const [first, second] = toolbar.getAllByRole("button");
+
+    await user.tab();
+    expect(document.activeElement).toBe(first);
+    await user.keyboard("{ArrowRight}");
+    expect(document.activeElement).toBe(second);
+    await user.tab();
+
+    expect(toolbar.getAllByRole("button")).not.toContain(document.activeElement);
+  });
+
   it("draws a footnote reference as a mark and keeps it", async () => {
     const onChange = vi.fn<(markdown: string) => void>();
     render(<VisualBody label="Body" value="We keep logs.[^source-1]" onChange={onChange} />);

@@ -9,6 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import type { ChainedCommands, Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
+import { Toolbar } from "radix-ui";
 
 import { Button } from "@/shared/ui/button.tsx";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui/tooltip.tsx";
@@ -67,34 +68,36 @@ export function FormattingToolbar(properties: { readonly editor: Editor }) {
 
   return (
     <TooltipProvider delayDuration={HOVER_DELAY_MS}>
-      <div role="toolbar" aria-label={WORDS.toolbar} className="flex flex-wrap gap-1">
+      <Toolbar.Root aria-label={WORDS.toolbar} className="flex flex-wrap gap-1">
         {CONTROLS.map((control, index) => {
           const on = pressed[index] ?? false;
           return (
             <Tooltip key={control.name}>
               <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  aria-label={control.name}
-                  aria-pressed={on}
-                  className="aria-pressed:border-[var(--border-strong)] aria-pressed:bg-accent"
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                  }}
-                  onClick={() => {
-                    control.apply(editor.chain().focus()).run();
-                  }}
-                >
-                  <control.glyph aria-hidden weight={on ? "bold" : "regular"} />
-                </Button>
+                <Toolbar.Button asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label={control.name}
+                    aria-pressed={on}
+                    className="aria-pressed:border-[var(--border-strong)] aria-pressed:bg-accent"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                    }}
+                    onClick={() => {
+                      control.apply(editor.chain().focus()).run();
+                    }}
+                  >
+                    <control.glyph aria-hidden weight={on ? "bold" : "regular"} />
+                  </Button>
+                </Toolbar.Button>
               </TooltipTrigger>
               <TooltipContent>{control.name}</TooltipContent>
             </Tooltip>
           );
         })}
-      </div>
+      </Toolbar.Root>
     </TooltipProvider>
   );
 }
