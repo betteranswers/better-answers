@@ -117,12 +117,22 @@ describe("an invite's outcome", () => {
 });
 
 describe("a bulk action's outcome", () => {
-  it("counts the invitations resent", () => {
+  it("counts the invitations resent and gives their expiry", () => {
     const outcome = bulkResentOutcome([invited("a@example.com"), invited("b@example.com")]);
+    const words = plain(outcome);
 
     expect(outcome.tone).toBe("said");
-    expect(countsIn(plain(outcome))).toEqual(["2"]);
-    expect(sentencesIn(plain(outcome))).toBe(1);
+    expect(countsIn(words.replace(THE_EXPIRY_SHOWN, ""))).toEqual(["2"]);
+    expect(words).toContain(THE_EXPIRY_SHOWN);
+    expect(sentencesIn(words)).toBe(2);
+  });
+
+  it("gives one invitation resent its own form", () => {
+    const one = plain(bulkResentOutcome([invited("a@example.com")]));
+    const two = plain(bulkResentOutcome([invited("a@example.com"), invited("b@example.com")]));
+
+    expect(formOf(one)).not.toBe(formOf(two));
+    expect(sentencesIn(one)).toBe(2);
   });
 
   it("counts only emails that went, and names the rest", () => {

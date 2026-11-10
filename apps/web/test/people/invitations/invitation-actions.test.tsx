@@ -161,7 +161,10 @@ describe("the People page's Invitations tab", () => {
     fireEvent.click(selectionAction("Resend"));
 
     await waitFor(() => {
-      expect(outcomeIn()?.textContent, "the outcome did not count one resent").toMatch(/\b1\b/);
+      expect(
+        outcomeIn()?.textContent,
+        "the outcome did not count one resent with its expiry",
+      ).toMatch(/\b1\b.*\d{4}/);
     });
     await waitFor(() => {
       expect(rowsOf(old)).toHaveLength(0);

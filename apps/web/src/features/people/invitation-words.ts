@@ -72,7 +72,10 @@ export const bulkResentOutcome = (resent: readonly SentInvitation[]): Outcome =>
   const went = resent.filter((one) => one.emailSent);
   const unsent = resent.filter((one) => !one.emailSent);
   const lead = `${invitations(went.length)} resent`;
-  if (unsent.length === 0) return { tone: "said", words: `${lead}.` };
+  if (unsent.length === 0) {
+    const expires = went.length === 1 ? "It expires" : "Each expires";
+    return { tone: "said", words: `${lead}. ${expires} on ${lastsUntil(went)}.` };
+  }
   if (went.length === 0) return { tone: "refused", words: `The ${unsentSaid(unsent)}` };
   return { tone: "refused", words: `${lead}, but the ${unsentSaid(unsent)}` };
 };
