@@ -320,7 +320,7 @@ describe("reading a guide", () => {
     ]);
     expect(cited(viewer)).toEqual([
       { id: "source-1", source: "Companies House register", at: "p.1" },
-      { id: "source-2", source: "A concept you cannot open" },
+      { id: "source-2", source: "A concept you can’t open" },
     ]);
     expect(JSON.stringify(viewer)).not.toContain(withheld);
   });

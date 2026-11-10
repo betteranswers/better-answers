@@ -179,7 +179,7 @@ const resolvedOf = async (
   return ok({ entry, item: named(label), points: points.value, opens: false });
 };
 
-const WITHHELD_CONCEPT = "A concept you cannot open";
+const WITHHELD_CONCEPT = "A concept you can’t open";
 
 const MINTED_CONCEPT = "SELECT 1 FROM concept_identity WHERE workspace_id = $1 AND iri = $2";
 

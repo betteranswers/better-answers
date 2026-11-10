@@ -1,12 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { useRef, useState, type RefObject } from "react";
 
+import { guideTitleOf } from "@better-answers/schema/collection-name";
+
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { LINK } from "@/shared/knowledge/concept-body.tsx";
-import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { TypeLine } from "@/shared/knowledge/type-line.tsx";
 import { ListState, RecordLoading } from "@/shared/list/list-pages.tsx";

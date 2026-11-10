@@ -1,5 +1,6 @@
+import { guideTitleOf } from "@better-answers/schema/collection-name";
+
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
-import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
 import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { counted } from "@/shared/words.ts";
 
