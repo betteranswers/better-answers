@@ -13,6 +13,7 @@ import { ListState, RecordLoading } from "@/shared/list/list-pages.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
+import { useRoomBeside } from "@/shared/page/wide-layout.ts";
 
 import { useGuide, type Guide } from "../knowledge-api.ts";
 import { LeavingAsk, useLeavingGuard } from "./brief-actions.tsx";
@@ -119,12 +120,13 @@ function GuideShown(properties: { readonly guide: Guide }) {
   const guard = useLeavingGuard();
   usePageKeystrokes(canEdit(guide) ? EDITING : READING);
   useSectionKeys(guide, say);
+  const beside = useRoomBeside();
 
   return (
     <article aria-label={title} className="mt-6">
       <GuideHeader guide={guide} />
       <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_17rem] xl:gap-10">
-        <SectionOutline sections={guide.sections} />
+        {beside ? null : <SectionOutline sections={guide.sections} beside={false} />}
         <div className="xl:col-start-1 xl:row-start-1">
           <OutcomeLine outcome={outcome} className={outcome === undefined ? "" : STATUS_BAR} />
           <LeavingAsk leaving={guard.leaving} />
@@ -140,6 +142,7 @@ function GuideShown(properties: { readonly guide: Guide }) {
             ))}
           </ol>
         </div>
+        {beside ? <SectionOutline sections={guide.sections} beside /> : null}
       </div>
     </article>
   );
