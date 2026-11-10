@@ -230,6 +230,52 @@ describe("pnpm ops", () => {
     });
   });
 
+  describe("refold-concept-types, which folds each stored type again", () => {
+    it("moves an old fold's type and merge key together", async () => {
+      const { workspaceId, admin } = await served().provision();
+      const git = openTestGit(served());
+      await initRepository(git, workspaceId);
+      const principal = await principalOf(served(), workspaceId, admin.id);
+      const wrote = await writeConcept(principal, bundleDoors(served()), {
+        mergeKey: "Gas:natural gas",
+        path: "knowledge/natural-gas.md",
+        conceptType: "Gas",
+        title: "Natural gas",
+        frontmatter: { title: "Natural gas", type: "Gas" },
+        body: "The boilers burn natural gas.",
+        message: "Record the natural gas note",
+        author: { name: admin.name, email: admin.email },
+        expects: { head: null },
+      });
+      assert(wrote.ok, "the concept was refused");
+      const superuser = served().database.superuser;
+      await superuser.query(
+        "UPDATE concept_index SET concept_type = 'Ga' WHERE workspace_id = $1 AND iri = $2",
+        [workspaceId, wrote.value.iri],
+      );
+      await superuser.query(
+        "UPDATE concept_identity SET merge_key = 'Ga:natural gas' WHERE workspace_id = $1 AND iri = $2",
+        [workspaceId, wrote.value.iri],
+      );
+
+      const run = await ops(served(), ["refold-concept-types", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        "refold-concept-types: done — refolded 1 concept, 0 kept by a clash",
+        "refold-concept-types: run map-rebuild to carry the new types into the map",
+      ]);
+      const held = await superuser.query(
+        `SELECT c.concept_type, i.merge_key
+           FROM concept_index c
+           JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
+          WHERE c.workspace_id = $1`,
+        [workspaceId],
+      );
+      expect(held.rows).toEqual([{ concept_type: "Gas", merge_key: "Gas:natural gas" }]);
+    });
+  });
+
   describe("import-bundle, which imports a company bundle through governed writes", () => {
     const BUNDLE_FIXTURE = fileURLToPath(new URL("../fixtures/bundle", import.meta.url));
     const BUNDLE_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";

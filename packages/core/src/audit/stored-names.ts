@@ -77,6 +77,7 @@ export const STORED_ACT_NAMES = [
   "knowledge.bundle.exported",
   "knowledge.records.exported",
   "knowledge.guide.exported",
+  "platform.concept.refolded",
 ] as const;
 
 export const STORED_DETAIL_KEYS = {
