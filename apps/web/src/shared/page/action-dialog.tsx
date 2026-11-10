@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import { useId, type ComponentProps, type ReactNode } from "react";
 
 import { Button } from "@/shared/ui/button.tsx";
 import {
@@ -17,17 +17,23 @@ export function ActionDialog(properties: {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly title: ReactNode;
-  readonly consequence: ReactNode;
+  readonly consequence?: ReactNode;
   readonly commit: ReactNode;
   readonly children?: ReactNode;
   readonly content?: Content;
 }) {
+  const descriptionId = useId();
   return (
     <Dialog open={properties.open} onOpenChange={properties.onOpenChange}>
-      <DialogContent {...properties.content}>
+      <DialogContent
+        aria-describedby={properties.consequence === undefined ? undefined : descriptionId}
+        {...properties.content}
+      >
         <DialogHeader>
           <DialogTitle>{properties.title}</DialogTitle>
-          <DialogDescription>{properties.consequence}</DialogDescription>
+          {properties.consequence === undefined ? null : (
+            <DialogDescription id={descriptionId}>{properties.consequence}</DialogDescription>
+          )}
         </DialogHeader>
         {properties.children}
         <DialogFooter>
