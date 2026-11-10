@@ -71,7 +71,7 @@ The script makes the move in a copy of the working tree first. It lists every te
 
 A listing runs each test module and no test, so it holds the title that the test runs under: a title built at run time, each row of `it.each`, and every skipped and todo case. It covers every vitest config in `packages/*` and `apps/*` except a stryker config, the worker's pytest collection, and Playwright's list of the web specs. It does not see a `describe` that holds no case. A listing points the temp folders that test modules make into its own folder and deletes them, and answers their `docker info` probes as if Docker were down. A move takes about a minute and a half, about as long as two listings.
 
-If the script stops before it prints its report, run it again with the same table. A run stopped while it lists has not changed the tree. A run killed while it moves the files leaves a journal in the git folder, and the next run undoes that part-done move first. If a file changed by hand since, the next run names it and undoes nothing. Keep or restore each file, then delete the journal it names.
+If the script stops before it prints its report, run it again with the same table. A run stopped while it lists has not changed the tree. A run killed while it moves the files leaves a journal in the git folder, and the next run undoes that part-done move first. If a file changed by hand since, or a moved file's old path exists again, the next run names it and undoes nothing. Undo that change and run the script again, or finish the move by hand and delete the journal it names.
 
 ## Coding
 

@@ -111,11 +111,17 @@ const editedSince = (root: string, written: Journal): readonly string[] => {
   });
 };
 
+/** A moved file whose old path is back cannot move back without losing one of the two. */
+const bothExist = (root: string, written: Journal): readonly string[] =>
+  written.moves
+    .filter(([from, to]) => existsSync(path.join(root, from)) && existsSync(path.join(root, to)))
+    .map(([from, to]) => `${from} and ${to} both exist`);
+
 const undoOrThrow = (root: string, file: string, written: Journal): void => {
-  const changed = editedSince(root, written);
+  const changed = [...bothExist(root, written), ...editedSince(root, written)];
   if (changed.length > 0) {
     throw new Error(
-      `files changed after the stopped run, so its move is not undone; restore or keep each by hand, then delete ${file}:\n${changed.join("\n")}`,
+      `files changed after the stopped run, so its move is not undone; undo each change and run move-files again, or finish the move by hand and delete ${file}:\n${changed.join("\n")}`,
     );
   }
   const failures = undo(root, written);
