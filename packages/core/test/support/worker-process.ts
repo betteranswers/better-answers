@@ -8,8 +8,9 @@ import { afterAll, expect } from "vitest";
 import { z } from "zod";
 
 import { CONTRACT_DIGEST, STAMP_THE_CONTRACT } from "@better-answers/schema";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
-import { repositoryRoot } from "./roots/roots.ts";
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const run = promisify(execFile);
 

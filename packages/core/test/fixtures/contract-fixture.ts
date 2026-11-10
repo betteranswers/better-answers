@@ -3,7 +3,9 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { repositoryRoot } from "../support/roots/roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const contractsDir = path.resolve(repositoryRoot, "contracts");
 

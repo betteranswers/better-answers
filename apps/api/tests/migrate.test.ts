@@ -4,9 +4,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { CONTRACT_DIGEST } from "@better-answers/schema";
 import { matchIsLeakproof, UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import { startTestDatabase, type TestDatabase } from "./support/postgres.ts";
-import { workspaceRoot } from "./support/roots/roots.ts";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 let database: TestDatabase;
 

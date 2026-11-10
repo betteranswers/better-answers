@@ -4,10 +4,13 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { type TestData, testData } from "./support/factory.ts";
 import { type MigratedPostgres, withRollback } from "./support/harness.ts";
-import { repositoryRoot } from "./support/roots/roots.ts";
 import { openMigratedPostgres } from "./support/warm-postgres.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const contractsDir = path.resolve(repositoryRoot, "contracts");
 const redactionContract = z.object({ categories: z.array(z.object({ category: z.string() })) });

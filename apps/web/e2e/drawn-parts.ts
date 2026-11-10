@@ -5,7 +5,9 @@ import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import react from "@vitejs/plugin-react";
 import { build } from "vite";
 
-import { workspaceRoot } from "@test/roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 type Built = Awaited<ReturnType<typeof build>>;
 

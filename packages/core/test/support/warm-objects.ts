@@ -9,8 +9,11 @@ import type { TestProject } from "vitest/node";
 import { parse } from "yaml";
 import { z } from "zod";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { type ObjectDoor, openObjects } from "../../src/store/objects/index.ts";
-import { repositoryRoot } from "./roots/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 export type WarmObjects = {
   readonly endpoint: string;

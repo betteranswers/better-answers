@@ -9,9 +9,9 @@ import { z } from "zod";
 import { CONTRACT_DIGEST, POSTGRES_IMAGE } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import { freePort } from "../support/loopback-port.ts";
-import { repositoryRoot } from "../support/roots/roots.ts";
 import {
   containersOf,
   imagesOf,
@@ -21,6 +21,8 @@ import {
   upOnATakenPort,
   volumesOf,
 } from "./compose-project.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const script = path.join(repositoryRoot, "deploy/local-database.sh");
 const readJson = (relative: string): unknown =>

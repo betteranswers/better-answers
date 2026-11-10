@@ -10,15 +10,17 @@ import {
   ANSWERING_WORKSPACE_HEADER,
   TAB_WORKSPACE_HEADER,
 } from "@better-answers/schema/tab-workspace";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { createApiProxy, TRPC_ENDPOINT, useTRPC } from "@/shared/api/trpc.ts";
 import { memberOptions, NEEDS_A_PICK } from "@/shared/member/member.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
-import { repositoryRoot } from "@test/roots.ts";
 import { addressOf, answered } from "@test/stubbed-api.ts";
 import { aRefusalAnswer, read } from "@test/two-workspaces.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 afterEach(() => {
   cleanup();

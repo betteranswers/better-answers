@@ -9,9 +9,9 @@ import { z } from "zod";
 
 import { POSTGRES_IMAGE } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import { freePort } from "../support/loopback-port.ts";
-import { repositoryRoot } from "../support/roots/roots.ts";
 import {
   containersOf,
   imagesOf,
@@ -22,6 +22,8 @@ import {
   upOnATakenPort,
   volumesOf,
 } from "./compose-project.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const script = path.join(repositoryRoot, "deploy/test-postgres.sh");
 const composeFile = path.join(repositoryRoot, "deploy/test-postgres.compose.yaml");

@@ -2,10 +2,13 @@ import path from "node:path";
 
 import { serve } from "@hono/node-server";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { hostnameOfUrl, originOfUrl } from "../src/ingress/hostnames.ts";
 import { PRODUCT_NAME } from "../src/product-name.ts";
 import { codeIn, startApp } from "./support/harness/harness.ts";
-import { repositoryRoot } from "./support/roots/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const PORT = 3200;
 const LOOPBACK_URL = `http://127.0.0.1:${PORT}`;

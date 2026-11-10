@@ -10,6 +10,7 @@ import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
 import { BOOTSTRAP } from "@better-answers/core/workspaces";
 import { ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import type { OpsIo } from "../../src/ops/index.ts";
 import type { TestApp } from "../support/harness/harness.ts";
@@ -20,8 +21,9 @@ import {
   rowsOfAction,
   auditLogOf,
 } from "../support/ops-run.ts";
-import { workspaceRoot } from "../support/roots/roots.ts";
 import { servedApp } from "../support/suite-app.ts";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 const objects = objectStoreForSuite();
 const { ops, help, opsWith } = opsRunner(objects);

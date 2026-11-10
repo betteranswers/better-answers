@@ -6,7 +6,9 @@ import { request, type APIRequestContext } from "@playwright/test";
 import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { workspaceRoot } from "@test/roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 const aHarness = z.object({
   seedConnectedSources: z.custom<

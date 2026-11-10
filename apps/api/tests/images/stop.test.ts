@@ -8,6 +8,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 
 import { until } from "@better-answers/core/testing/postgres";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import {
   AGENT_HOSTNAME,
@@ -18,7 +19,8 @@ import {
 } from "../support/harness/harness.ts";
 import { freePort } from "../support/loopback-port.ts";
 import { startTestDatabase, type TestDatabase } from "../support/postgres.ts";
-import { workspaceRoot } from "../support/roots/roots.ts";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 const DEFAULT_STOP_DEADLINE_MS = 10_000;
 

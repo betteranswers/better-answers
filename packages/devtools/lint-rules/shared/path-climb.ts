@@ -3,30 +3,11 @@ import path from "node:path";
 
 import type { ESTree } from "@oxlint/plugins";
 
-export type RootsHelper = {
-  readonly file: string;
-  readonly exports: readonly string[];
-};
-
-const ROOT_AND_WORKSPACE = ["repositoryRoot", "workspaceRoot"] as const;
-
-export const ROOTS_OF: ReadonlyMap<string, RootsHelper> = new Map([
-  ["apps/api", { file: "apps/api/tests/support/roots/roots.ts", exports: ROOT_AND_WORKSPACE }],
-  ["apps/web", { file: "apps/web/test/support/roots.ts", exports: ROOT_AND_WORKSPACE }],
-  [
-    "packages/core",
-    { file: "packages/core/test/support/roots/roots.ts", exports: ROOT_AND_WORKSPACE },
-  ],
-  ["packages/devtools", { file: "packages/devtools/src/paths.ts", exports: ["repositoryRoot"] }],
-  [
-    "packages/schema",
-    { file: "packages/schema/test/support/roots/roots.ts", exports: ROOT_AND_WORKSPACE },
-  ],
-]);
-
-export const TOOLCHAIN_WORKSPACE = "packages/devtools";
-
-export const TOOLCHAIN_PATHS = "@better-answers/devtools/paths";
+export const ROOTS_HELPER = {
+  specifier: "@better-answers/schema/testing/roots",
+  file: "packages/schema/test/support/roots.ts",
+  name: "rootsOf",
+} as const;
 
 export type Placement = {
   readonly workspace: string;
@@ -199,12 +180,3 @@ export const climbOf = (node: ESTree.Node): Climb | undefined => {
   if (node.type !== "CallExpression") return undefined;
   return joinClimb(node) ?? dirnameClimb(node) ?? cwdClimb(node);
 };
-
-export const importsToolchainRoot = (node: ESTree.ImportDeclaration): boolean =>
-  node.source.value === TOOLCHAIN_PATHS &&
-  node.specifiers.some(
-    (specifier) =>
-      specifier.type === "ImportSpecifier" &&
-      specifier.imported.type === "Identifier" &&
-      specifier.imported.name === "repositoryRoot",
-  );

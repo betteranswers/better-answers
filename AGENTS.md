@@ -58,7 +58,7 @@ Such a folder is `support/` or `fixtures/` for helpers, `gates/` at the test roo
 
 ### Paths to repository files
 
-A test or a script reaches repository files through its workspace's roots helper, never by climbing with `..`. `pnpm run lint` and `pnpm run climb-scan` name the helper in each error. Production source under `src/` and code at the repository root, such as `scripts/`, are exempt.
+A test or a script reaches repository files through a roots helper, never by climbing with `..`. In TypeScript the helper is `rootsOf(import.meta.url)` from `@better-answers/schema/testing/roots`, which returns `repositoryRoot` and `workspaceRoot`. In Python it is `roots.py` in `apps/worker/tests/support/` or in `packages/devtools/python/`. `pnpm run lint` and `pnpm run climb-scan` name the helper in each error. Production source under `src/` and code at the repository root, such as `scripts/`, are exempt.
 
 ### Folder size
 

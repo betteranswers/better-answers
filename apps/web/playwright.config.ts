@@ -3,7 +3,9 @@ import path from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
 
-import { repositoryRoot } from "./test/support/roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const inCi = Boolean(process.env["CI"]);
 

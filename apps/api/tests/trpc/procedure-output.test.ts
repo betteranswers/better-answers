@@ -5,9 +5,11 @@ import type { AnyProcedure, inferProcedureOutput } from "@trpc/server";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { Result } from "@better-answers/core/kernel";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import { appRouter, type AppRouter } from "../../src/trpc/router.ts";
-import { repositoryRoot, workspaceRoot } from "../support/roots/roots.ts";
+
+const { repositoryRoot, workspaceRoot } = rootsOf(import.meta.url);
 
 const API_SOURCE = path.join(workspaceRoot, "src/");
 const CORE_SOURCE = path.join(repositoryRoot, "packages/core/src/");

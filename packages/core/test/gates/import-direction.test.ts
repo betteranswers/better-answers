@@ -20,8 +20,9 @@ import {
   type PlannedLint,
   type Tree,
 } from "@better-answers/devtools/throwaway-tree";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
-import { repositoryRoot } from "../support/roots/roots.ts";
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const RULE = "better-answers/import-direction";
 const CORE = "packages/core";

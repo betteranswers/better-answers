@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { workspaceRoot } from "../roots/roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { run, warmPostgresModule } from "./child.ts";
 import { DURABILITY_OFF } from "./server.ts";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 describe("the warm harness", () => {
   it("starts its own database when no warm cluster exists", async () => {

@@ -23,9 +23,11 @@ import {
   contractDigest,
   ULID_PATTERN,
 } from "@better-answers/schema";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import { ulid } from "../src/kernel/index.ts";
-import { repositoryRoot } from "./support/roots/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const SPOKEN_AGREEMENTS = {
   citation: "fixtured",

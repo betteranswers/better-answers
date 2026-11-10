@@ -15,8 +15,9 @@ import {
   privilegesHeld,
   refusesEach,
 } from "@better-answers/schema/testing/probes";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
-import { repositoryRoot } from "../support/roots/roots.ts";
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const roleFile = readFileSync(path.resolve(repositoryRoot, "deploy/browse-role.sql"), "utf8");
 

@@ -10,8 +10,9 @@ import { z } from "zod";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
 import { endPool, testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
-import { repositoryRoot, workspaceRoot } from "../support/roots/roots.ts";
+const { repositoryRoot, workspaceRoot } = rootsOf(import.meta.url);
 
 const fenced = (script: string, step: string): string => {
   const text = readFileSync(path.join(repositoryRoot, script), "utf8");

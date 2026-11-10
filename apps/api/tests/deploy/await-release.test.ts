@@ -4,9 +4,12 @@ import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { serverFor, startApp, type TestApp } from "../support/harness/harness.ts";
 import { servedOnLoopback as serving } from "../support/loopback-port.ts";
-import { repositoryRoot } from "../support/roots/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const script = path.resolve(repositoryRoot, "deploy/await-release.sh");
 

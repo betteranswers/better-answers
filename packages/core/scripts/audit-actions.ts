@@ -1,10 +1,12 @@
 import path from "node:path";
 
 import { byCodeUnit } from "@better-answers/schema/code-unit";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import { ACTION_HEADLINES, declarations } from "../src/audit/index.ts";
 import { loadEveryEntryPoint } from "../test/audit/entry-points.ts";
-import { repositoryRoot } from "../test/support/roots/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 /** The web never imports core, so it reads the actions core declares from this copy. */
 export const AUDIT_ACTIONS_MODULE = path.resolve(

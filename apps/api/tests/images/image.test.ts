@@ -6,14 +6,16 @@ import { z } from "zod";
 
 import { workspacePackages } from "@better-answers/devtools/paths";
 import { legFor, matrixLegs } from "@better-answers/devtools/workflows";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
-import { repositoryRoot } from "../support/roots/roots.ts";
 import {
   fileFromTheWorkspace,
   IMAGE_PROBE_ALLOWANCE,
   nothingToProbeHere,
   readTheImage,
 } from "./image-probe.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const manifestSchema = z.object({
   packageManager: z.string().optional(),

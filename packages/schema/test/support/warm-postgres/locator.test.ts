@@ -1,12 +1,15 @@
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { POSTGRES_IMAGE } from "../../../src/postgres-image.ts";
 import { POSTGRES_COMMAND } from "../harness.ts";
-import { repositoryRoot } from "../roots/roots.ts";
 import { sharedUri } from "../warm-postgres.ts";
 import { POINTS_THE_WAY_UP, pointsTheWayUp, run, startInChild } from "./child.ts";
 import { adminUri, asAdmin, quoted } from "./server.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const refusesFor = (started: Awaited<ReturnType<typeof startInChild>>, cause: string) => ({
   ...pointsTheWayUp(started),
