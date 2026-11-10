@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import { COLLECTION, ids, parsedPassageLocator, type ConceptIri } from "@better-answers/schema";
+import {
+  COLLECTION,
+  ids,
+  namesADocument,
+  parsedPassageLocator,
+  type ConceptIri,
+} from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../../access/index.ts";
 import {
@@ -23,7 +29,7 @@ import {
   type PlacesUsing,
 } from "../import/landing.ts";
 import { ownerOf, standingConcept, type OwnedConcept } from "../owners.ts";
-import { namesADocument, resolvedSourcesOf, type PassageReader } from "../reading/read.ts";
+import { resolvedSourcesOf, type PassageReader } from "../reading/read.ts";
 
 export type SourceEntry = string | FrontmatterSource;
 

@@ -3,7 +3,7 @@ import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
 
-import { IRI, quotedPassageOf, type CitedSource } from "@better-answers/schema";
+import { IRI, namesADocument, type CitedSource } from "@better-answers/schema";
 
 const OPENS = "";
 
@@ -196,7 +196,7 @@ const FLOW: FlowReaders = {
 const sentence = (part: string): string => (/[.!?]$/u.test(part) ? part : `${part}.`);
 
 const sourceWords = (source: CitedSource): string =>
-  source.locator === null || quotedPassageOf(source) !== undefined
+  source.locator === null || namesADocument(source.locator)
     ? source.resource
     : `${source.resource}, ${source.locator}`;
 
