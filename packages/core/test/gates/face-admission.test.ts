@@ -17,6 +17,8 @@ const HOLDS_NO_ACTION = ["access", "kernel", "refusals", "store"];
 
 const STEPS: Readonly<Record<string, string>> = {
   "answering/completeRecord": "a step of ask, which admits the asker before it completes a record",
+  "answering/evidenceReaderFor":
+    "the guide read calls the reader it returns after it admits the person",
   "answering/keepDraft":
     "a step of the drafter, which admits the asker before it keeps a part's prose",
   "answering/openRecord": "a step of ask, which admits the asker before it opens a record",

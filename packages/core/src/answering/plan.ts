@@ -244,6 +244,11 @@ const passageReadOnce = (reader: UserPrincipal, tx: Tx) => {
   };
 };
 
+export const evidenceReadsOf = (reader: UserPrincipal, tx: Tx) => ({
+  passageAt: passageReadOnce(reader, tx),
+  namesPassage: (locator: string) => parseLocator(locator).ok,
+});
+
 const returnedBy = async (
   { reader, caps, now }: Asked,
   tx: Tx,
@@ -259,10 +264,7 @@ const returnedBy = async (
       : await conceptsByIris(reader, tx, beyond);
   if (!reached.ok) return reached;
   const byIri = new Map([...entries, ...reached.value].map((concept) => [concept.iri, concept]));
-  const reads = {
-    passageAt: passageReadOnce(reader, tx),
-    namesPassage: (locator: string) => parseLocator(locator).ok,
-  };
+  const reads = evidenceReadsOf(reader, tx);
   const returned: Returned[] = [];
   for (const concept of slots.flatMap((iri) => byIri.get(iri) ?? [])) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- every concept read runs on the one transaction the answer holds

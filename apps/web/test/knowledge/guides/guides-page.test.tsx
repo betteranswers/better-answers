@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
 import { GUIDES_WORDS } from "@/features/knowledge/guides/guide-words.ts";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import {
   A_GUIDE_ID,
   A_GUIDE_PAGE,
@@ -40,7 +41,9 @@ describe("the Guides list", () => {
     api.set("knowledge.guides", () => read([aGuideSummary({ subject: null })]));
     await openAt(GUIDES_PAGE.path, api);
 
-    expect(await main().findByRole("link", { name: "northgate" })).toBeDefined();
+    const named = await main().findByRole("link", { name: collectionNameOf("northgate") });
+    expect(named).toBeDefined();
+    expect(main().queryByRole("link", { name: "northgate" })).toBeNull();
   });
 
   for (const needsReview of [1, 2]) {

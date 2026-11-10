@@ -3,6 +3,7 @@ import { useRef, useState, type RefObject } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { LINK } from "@/shared/knowledge/concept-body.tsx";
 import { guideTitleOf } from "@/shared/knowledge/guide-title.ts";
@@ -25,6 +26,7 @@ import {
   type SectionAction,
 } from "./guide-state.ts";
 import { GUIDE_WORDS as WORDS, SAID_OF_GUIDES } from "./guide-words.ts";
+import { SectionOutline } from "./outline/section-outline.tsx";
 
 const READING = [KEY.showDetail, KEY.addFact, KEY.copyBrief];
 
@@ -95,7 +97,7 @@ function GuideHeader(properties: { readonly guide: Guide }) {
   const subjectPage = subject === null ? undefined : conceptPageOf(subject.iri);
   return (
     <header className="mt-4">
-      <TypeLine type={guide.guideType} collection={guide.collection} />
+      <TypeLine type={guide.guideType} collection={collectionNameOf(guide.collection)} />
       {subject === null || subjectPage === undefined ? null : (
         <p className="mt-2">
           <span className="text-muted-foreground">{WORDS.subject} </span>
@@ -121,19 +123,24 @@ function GuideShown(properties: { readonly guide: Guide }) {
   return (
     <article aria-label={title} className="mt-6">
       <GuideHeader guide={guide} />
-      <OutcomeLine outcome={outcome} className={outcome === undefined ? "" : STATUS_BAR} />
-      <LeavingAsk leaving={guard.leaving} />
-      <ol className="mt-6 grid gap-8">
-        {guide.sections.map((section) => (
-          <GuideSectionView
-            key={section.sectionId}
-            guide={guide}
-            section={section}
-            say={say}
-            reportUnsaved={guard.report}
-          />
-        ))}
-      </ol>
+      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_17rem] xl:gap-10">
+        <SectionOutline sections={guide.sections} />
+        <div className="xl:col-start-1 xl:row-start-1">
+          <OutcomeLine outcome={outcome} className={outcome === undefined ? "" : STATUS_BAR} />
+          <LeavingAsk leaving={guard.leaving} />
+          <ol className="mt-6 grid gap-8">
+            {guide.sections.map((section) => (
+              <GuideSectionView
+                key={section.sectionId}
+                guide={guide}
+                section={section}
+                say={say}
+                reportUnsaved={guard.report}
+              />
+            ))}
+          </ol>
+        </div>
+      </div>
     </article>
   );
 }

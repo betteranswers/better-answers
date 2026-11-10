@@ -2,6 +2,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { GUIDE_KEYSTROKES as KEY, guidePageOf } from "@/features/knowledge/guides/guide-state.ts";
 import { BRIEF_WORDS, GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -37,6 +38,8 @@ const SECTIONS = [
 ] as const;
 
 const FIRST_SECTION = "1. Company overview";
+
+const LAST_SECTION = "7. Support and service levels";
 
 const INSURANCE = "3. Insurance and financial standing";
 
@@ -191,10 +194,36 @@ test.describe("the guide page", () => {
       await expect(
         insurance.getByRole("link", { name: GUIDE_WORDS.addFact(EMPLOYERS_LIABILITY) }),
       ).toBeVisible();
+    });
+
+    await test.step("lists each section in an outline that follows the reading", async () => {
+      const outline = page.getByRole("navigation", { name: GUIDE_WORDS.outline });
+      const entryOf = (heading: string) => outline.getByRole("link", { name: heading });
+      await expect(outline.getByRole("link")).toHaveCount(SECTIONS.length);
+      await expect(entryOf(FIRST_SECTION)).toContainText("Unverified");
+      await expect(entryOf(INSURANCE)).toContainText("3 of 4");
+      await expect(entryOf(INSURANCE)).toContainText("Verified by");
+      await expect(entryOf(FIRST_SECTION)).toHaveAttribute("aria-current", "location");
+
+      await sectionOf(page, LAST_SECTION).scrollIntoViewIfNeeded();
+      await expect(outline, "the outline left the view with the page's scroll").toBeInViewport();
+      await expect(entryOf(LAST_SECTION)).toHaveAttribute("aria-current", "location");
+
+      await entryOf(FIRST_SECTION).click();
+      await expect(page.getByRole("heading", { name: FIRST_SECTION })).toBeFocused();
+      await expect(entryOf(FIRST_SECTION)).toHaveAttribute("aria-current", "location");
+    });
+
+    await test.step("resolves a detailed concept's footnotes to its sources", async () => {
+      const insurance = sectionOf(page, INSURANCE);
+      await insurance.getByRole("button", { name: GUIDE_WORDS.showDetail }).click();
+      const detail = insurance.getByRole("region", { name: "Detail of section 3" });
       await expect(
-        insurance.getByRole("heading", { name: PROFESSIONAL_INDEMNITY }),
+        detail.getByRole("heading", { name: PROFESSIONAL_INDEMNITY }),
         "the Editor in finance cannot read the restricted concept in the section's Detail",
       ).toBeVisible();
+      await expect(detail.getByRole("list", { name: CONCEPT_WORDS.sources }).first()).toBeVisible();
+      await expect(detail, "a footnote marker was drawn raw").not.toContainText("[^source");
     });
 
     await test.step("opens a section's Detail by keyboard and moves focus into it", async () => {

@@ -18,6 +18,8 @@ export const AN_INCLUDE_ID = idOf(41);
 
 export const RACKING_IRI = `${CONCEPT_IRI_PREFIX}${idOf(51)}`;
 
+export const LOAD_SURVEY_IRI = `${CONCEPT_IRI_PREFIX}${idOf(52)}`;
+
 export const RACKING_TITLE = "Racking plan";
 
 export const LIABILITY_TITLE = "Employers' liability insurance";
@@ -50,6 +52,7 @@ export const aBrief = (changes: Changes = {}) => ({
       title: RACKING_TITLE,
       conceptType: "Policy",
       body: "Each bay is racked by row.",
+      evidence: [],
     },
   ],
   editable: {

@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GUIDES_PAGE } from "@/features/knowledge/guides/guide-state.ts";
 import { GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { asksOf } from "@test/knowledge/concept-editing-answers.ts";
 import {
   A_GUIDE_PAGE,
@@ -16,6 +18,7 @@ import {
   idOf,
   INCLUDE,
   LIABILITY_TITLE,
+  LOAD_SURVEY_IRI,
   RACKING_IRI,
   RACKING_TITLE,
 } from "@test/knowledge/guide-answers.ts";
@@ -63,7 +66,29 @@ describe("the guide page", () => {
     const article = within(screen.getByRole("article"));
     expect(article.getByText("Bid library")).toBeDefined();
     expect(article.getByRole("link", { name: "Northgate Ltd" })).toBeDefined();
-    expect(article.getAllByText(/\b3 of 4\b/u)).toHaveLength(2);
+    expect(article.getByText(collectionNameOf("northgate"))).toBeDefined();
+    expect(article.getAllByText(/\b3 of 4\b/u)).toHaveLength(3);
+  });
+
+  it("titles a guide with no subject by its collection's name", async () => {
+    const api = aGuideApi("Viewer", aGuide({ subject: null, collection: "multi-academy-trusts" }));
+    await openAt(A_GUIDE_PAGE, api);
+
+    const title = await screen.findByRole("heading", {
+      level: 1,
+      name: collectionNameOf("multi-academy-trusts"),
+    });
+    expect(title).toBeDefined();
+    expect(screen.queryByRole("heading", { level: 1, name: "multi-academy-trusts" })).toBeNull();
+    expect(screen.getByRole("article", { name: title.textContent })).toBeDefined();
+  });
+
+  it("makes Copy the one prominent action of a section", async () => {
+    await openGuide("Editor");
+
+    const buttons = within(sectionNamed(SECTION_ONE)).getAllByRole("button");
+    const prominent = buttons.filter((button) => button.dataset["variant"] !== "outline");
+    expect(prominent.map((button) => button.textContent)).toEqual([GUIDE_WORDS.copy]);
   });
 
   it("names only Guides as current in the menu", async () => {
@@ -267,13 +292,58 @@ describe("the Detail of a section", () => {
     expect(document.activeElement).toBe(button);
   });
 
-  it("opens by default where no assembled layer shows", async () => {
+  it("stays closed where no assembled layer shows", async () => {
     const quoted = aGuide({ sections: [aSection({ layers: ["quoted"] })] });
     await openGuide("Viewer", quoted);
 
-    const detail = screen.getByRole("region", { name: "Detail of section 1" });
-    expect(within(detail).getByText("Each bay is racked by row.")).toBeDefined();
-    expect(document.activeElement).not.toBe(detail);
+    expect(screen.queryByRole("region", { name: "Detail of section 1" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: GUIDE_WORDS.showDetail }).getAttribute("aria-expanded"),
+    ).toBe("false");
+  });
+
+  it("resolves the footnotes of a detailed concept to its sources", async () => {
+    const cited = aBrief({
+      detail: [
+        {
+          iri: RACKING_IRI,
+          title: RACKING_TITLE,
+          conceptType: "Policy",
+          body: "Each bay is racked by row.[^source-1] Loads are weighed.[^source-2]",
+          evidence: [
+            { id: "source-1", source: "Warehouse handbook", at: "p.4" },
+            { id: "source-2", source: "Load survey", iri: LOAD_SURVEY_IRI },
+          ],
+        },
+      ],
+    });
+    await openGuide("Viewer", aGuide({ sections: [aSection({ brief: cited })] }));
+
+    fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
+
+    const detail = within(await screen.findByRole("region", { name: "Detail of section 1" }));
+    expect(detail.queryByText(/\[\^source/u), "a raw footnote marker is drawn").toBeNull();
+    expect(detail.getByText(/Each bay is racked by row\./u).textContent).toBe(
+      "Each bay is racked by row.[1] Loads are weighed.[2]",
+    );
+    const sources = within(detail.getByRole("list", { name: CONCEPT_WORDS.sources }));
+    expect(sources.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Warehouse handbookp.4",
+      "Load survey",
+    ]);
+    expect(sources.queryByRole("link", { name: "Warehouse handbook" })).toBeNull();
+    expect(sources.getByRole("link", { name: "Load survey" }).getAttribute("href")).toContain(
+      LOAD_SURVEY_IRI.slice(-26),
+    );
+  });
+
+  it("draws no sources for a detailed concept that cites none", async () => {
+    await openGuide("Viewer");
+
+    fireEvent.click(screen.getByRole("button", { name: GUIDE_WORDS.showDetail }));
+
+    const detail = within(await screen.findByRole("region", { name: "Detail of section 1" }));
+    expect(detail.queryByRole("list", { name: CONCEPT_WORDS.sources })).toBeNull();
   });
 
   it("opens on d for the section in focus", async () => {
@@ -412,6 +482,7 @@ describe("including an available fact", () => {
               title: LIABILITY_TITLE,
               conceptType: "Policy",
               body: "Cover is £5m.",
+              evidence: [],
             },
           ],
         }),
@@ -432,7 +503,7 @@ describe("including an available fact", () => {
       expect(status().textContent, "the include was not announced").toMatch(/\S/u);
     });
     await waitFor(() => {
-      expect(screen.getAllByText(/\b4 of 4\b/u)).toHaveLength(2);
+      expect(screen.getAllByText(/\b4 of 4\b/u)).toHaveLength(3);
     });
     expect(screen.queryByRole("button", { name: "Include" })).toBeNull();
     expect(asksOf(INCLUDE)).toEqual([{ writeUpId: A_WRITE_UP_ID }]);

@@ -1,13 +1,14 @@
 export { saveBrief, saveBriefInput } from "./brief.ts";
 export { briefToCopy, readActionThreshold, type BriefToCopy } from "./copy.ts";
 export { guideRowsOf } from "./definition.ts";
+export type { EvidenceOf } from "./read/evidence.ts";
 export { includeAvailable, includeAvailableInput } from "./include.ts";
+export { readGuides } from "./read/list.ts";
 export {
   coverageOf,
   footnotesOf,
   readGuide,
   readGuideInput,
-  readGuides,
   type Coverage,
   type GuideRead,
   type GuideReadRefusal,

@@ -178,6 +178,7 @@ export {
   type ConceptRead,
   type OpenedConcept,
 } from "./reading/lookup.ts";
+export type { EvidencePane } from "./reading/read.ts";
 export {
   acceptWaitingInput,
   declineWaitingInput,
