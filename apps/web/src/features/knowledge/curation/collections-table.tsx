@@ -18,13 +18,14 @@ const column = createColumnHelper<typeof features, CollectionOwned>();
 const NARROW_HIDES: ReadonlySet<string> = new Set(["verified"]);
 
 const verifiedPercent = ({ verified, concepts }: CollectionOwned): number =>
-  concepts === 0 ? 0 : Math.floor((verified * 100) / concepts);
+  concepts === 0 ? 0 : Math.max(Math.floor((verified * 100) / concepts), verified > 0 ? 1 : 0);
 
 const NamingContext = createContext<Naming | undefined>(undefined);
 
 function OwnerCell(properties: { readonly owned: CollectionOwned }) {
   const { owned } = properties;
   const naming = useContext(NamingContext);
+  const change = naming?.changeOf(owned.collection);
   return (
     <div className="grid max-w-64 min-w-36 gap-1">
       {naming === undefined ? (
@@ -33,13 +34,14 @@ function OwnerCell(properties: { readonly owned: CollectionOwned }) {
         <OwnerPicker
           owned={owned}
           choices={naming.choices}
+          saving={change?.state === "saving"}
           onPick={(chosen) => {
             naming.save(owned, chosen);
           }}
         />
       )}
       <div role="alert" className="empty:hidden">
-        {naming?.refusalOf(owned.collection)}
+        {change?.state === "refused" ? change.words : null}
       </div>
       {owned.overrides === 0 ? null : (
         <span className="text-xs text-muted-foreground">{WORDS.ownOwners(owned.overrides)}</span>

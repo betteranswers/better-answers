@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
@@ -46,11 +47,25 @@ const cellsOf = (collection: string) => {
     .map((cell) => cell.textContent);
 };
 
+const afterATick = () =>
+  act(async () => {
+    await new Promise((done) => {
+      setTimeout(done);
+    });
+  });
+
 const collectionsAsks = (): number =>
   server.asks.filter((ask) => ask.procedure === "knowledge.collections").length;
 
 const namingAsks = () =>
   server.asks.filter((ask) => ask.procedure === "knowledge.nameOwner").map((ask) => ask.input);
+
+const undoneByKey = async (collection: string) => {
+  fireEvent.keyDown(document.body, { key: "u" });
+  await waitFor(() => {
+    expect(namingAsks().at(-1)).toEqual({ collection, personId: null });
+  });
+};
 
 const aCollectionsApi = () => {
   const api = adaAnAdmin();
@@ -89,6 +104,64 @@ const ownedByRhian = () => {
   return api;
 };
 
+const SAVED = read({ auditEventId: "01JEVENT", personId: null });
+
+const REFUSED = aRefusalAnswer("no-such-member", "precondition", 412);
+
+const HEARD = z.object({ collection: z.string(), personId: z.string().nullable() });
+
+const peopleByIds = new Map([RHIAN, ADA].map((member) => [member.personId, member]));
+
+const aLedger = () => {
+  const api = aCollectionsApi();
+  const owners = new Map<string, { id: string; name: string }>();
+  const answers: Promise<unknown>[] = [];
+  let rereading: Promise<unknown> = Promise.resolve();
+  let asked = (): void => undefined;
+  api.set("knowledge.collections", async () => {
+    asked();
+    await rereading;
+    return read({
+      collections: [POLICY, SAFETY].map((each) => ({
+        ...each,
+        owner: owners.get(each.collection) ?? null,
+      })),
+    });
+  });
+  api.set("knowledge.nameOwner", async () => {
+    const heard = HEARD.parse(namingAsks().at(-1));
+    const answer = await answers.shift();
+    const person = peopleByIds.get(heard.personId ?? "");
+    if (answer === SAVED) {
+      if (person === undefined) owners.delete(heard.collection);
+      else owners.set(heard.collection, { id: person.personId, name: person.displayName });
+    }
+    return answer;
+  });
+  return {
+    api,
+    answer: (...next: Promise<unknown>[]) => answers.push(...next),
+    holdReads: () => {
+      const held = Promise.withResolvers<void>();
+      const reached = Promise.withResolvers<void>();
+      rereading = held.promise;
+      asked = reached.resolve;
+      return { release: held.resolve, reached: reached.promise };
+    },
+  };
+};
+
+const openedWithASlowFirstChange = async () => {
+  const ledger = aLedger();
+  const slow = Promise.withResolvers<unknown>();
+  ledger.answer(slow.promise, Promise.resolve(SAVED));
+  await openAt(PAGE, ledger.api);
+  return slow;
+};
+
+const ownerShownFor = (collection: string, owner: string) =>
+  screen.findByRole("button", { name: WORDS.ownerOf(collectionNameOf(collection), owner) });
+
 describe("the Collections and Owners page", () => {
   it("shows each collection's display name, concepts and verified share", async () => {
     const api = aCollectionsApi();
@@ -115,6 +188,35 @@ describe("the Collections and Owners page", () => {
     expect(cellsOf("wide").at(-1), "a share one short of all showed as complete").toBe("99%");
     expect(region().queryByText(POLICY.collection)).toBeNull();
     expect(region().queryByText("safety-rules")).toBeNull();
+  });
+
+  it("shows 1% for one verified concept in 101", async () => {
+    const api = aCollectionsApi();
+    api.set("knowledge.collections", () =>
+      read({
+        collections: [
+          { collection: "tiny", owner: null, overrides: 0, concepts: 101, verified: 1 },
+          { collection: "bare", owner: null, overrides: 0, concepts: 101, verified: 0 },
+        ],
+      }),
+    );
+    await openAt(PAGE, api);
+
+    await pickerNamed("tiny");
+
+    expect(cellsOf("tiny").at(-1), "one verified concept in 101 showed as nothing verified").toBe(
+      "1%",
+    );
+    expect(cellsOf("bare").at(-1)).toBe("0%");
+  });
+
+  it("names the owner search and the people list", async () => {
+    await openAt(PAGE, aCollectionsApi());
+
+    fireEvent.click(await pickerOf(WORDS.noOwner));
+
+    expect(await screen.findByRole("combobox", { name: WORDS.searchPeople })).toBeDefined();
+    expect(screen.getByRole("listbox", { name: WORDS.people })).toBeDefined();
   });
 
   it("saves a chosen owner at once, with Undo", async () => {
@@ -172,6 +274,7 @@ describe("the Collections and Owners page", () => {
       ]);
     });
     await choosing(RHIAN.displayName);
+    await screen.findByRole("button", { name: WORDS.undo });
     fireEvent.click(await pickerOf(WORDS.noOwner));
 
     const offered = await screen.findAllByRole("option");
@@ -229,16 +332,138 @@ describe("the Collections and Owners page", () => {
     await waitFor(() => {
       expect(collectionsAsks()).toBeGreaterThan(readsBefore);
     });
-    await act(async () => {
-      await new Promise((done) => {
-        setTimeout(done);
-      });
+    await afterATick();
+
+    await undoneByKey(SAFETY.collection);
+  });
+
+  it("holds a collection's picker until its change settles", async () => {
+    const slow = await openedWithASlowFirstChange();
+
+    await chosenFor(POLICY.collection, RHIAN.displayName);
+    const held = await ownerShownFor(POLICY.collection, RHIAN.displayName);
+    fireEvent.click(held);
+
+    expect(held.getAttribute("aria-disabled")).toBe("true");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    await waitFor(() => {
+      expect(namingAsks()).toEqual([{ collection: POLICY.collection, personId: RHIAN.personId }]);
     });
+
+    slow.resolve(SAVED);
+    await screen.findByRole("button", { name: WORDS.undo });
+
+    const settled = await ownerShownFor(POLICY.collection, RHIAN.displayName);
+    expect(settled.getAttribute("aria-disabled")).toBeNull();
+    expect(screen.getByText(WORDS.named(RHIAN.displayName, NAMED))).toBeDefined();
+    fireEvent.click(settled);
+    await choosing(ADA.displayName);
+    await screen.findByText(WORDS.named(ADA.displayName, NAMED));
+    expect(namingAsks()).toEqual([
+      { collection: POLICY.collection, personId: RHIAN.personId },
+      { collection: POLICY.collection, personId: ADA.personId },
+    ]);
+  });
+
+  it("ignores Undo while a later change to the collection saves", async () => {
+    const ledger = aLedger();
+    const slow = Promise.withResolvers<unknown>();
+    ledger.answer(Promise.resolve(SAVED), slow.promise);
+    await openAt(PAGE, ledger.api);
+    await chosenFor(POLICY.collection, RHIAN.displayName);
+    await screen.findByRole("button", { name: WORDS.undo });
+
+    fireEvent.click(await pickerOf(RHIAN.displayName));
+    await choosing(ADA.displayName);
+    await waitFor(() => {
+      expect(namingAsks()).toHaveLength(2);
+    });
+    fireEvent.keyDown(document.body, { key: "u" });
+    fireEvent.click(screen.getByRole("button", { name: WORDS.undo }));
+    slow.resolve(SAVED);
+    await screen.findByText(WORDS.named(ADA.displayName, NAMED));
     fireEvent.keyDown(document.body, { key: "u" });
 
     await waitFor(() => {
-      expect(namingAsks().at(-1)).toEqual({ collection: SAFETY.collection, personId: null });
+      expect(namingAsks()).toHaveLength(3);
     });
+    await afterATick();
+    expect(namingAsks()).toEqual([
+      { collection: POLICY.collection, personId: RHIAN.personId },
+      { collection: POLICY.collection, personId: ADA.personId },
+      { collection: POLICY.collection, personId: RHIAN.personId },
+    ]);
+  });
+
+  it("keeps a pending change's owner while another collection's change settles", async () => {
+    const slow = await openedWithASlowFirstChange();
+
+    await chosenFor(POLICY.collection, RHIAN.displayName);
+    await chosenFor(SAFETY.collection, ADA.displayName);
+    await screen.findByText(WORDS.named(ADA.displayName, collectionNameOf(SAFETY.collection)));
+
+    expect(
+      await ownerShownFor(POLICY.collection, RHIAN.displayName),
+      "the pending change's owner was replaced by a read that does not hold it yet",
+    ).toBeDefined();
+    slow.resolve(SAVED);
+    await waitFor(() => {
+      expect(
+        screen
+          .getByRole("button", {
+            name: WORDS.ownerOf(collectionNameOf(POLICY.collection), RHIAN.displayName),
+          })
+          .getAttribute("aria-disabled"),
+      ).toBeNull();
+    });
+  });
+
+  it("keeps a newer save when another collection's change fails", async () => {
+    const ledger = aLedger();
+    const late = Promise.withResolvers<unknown>();
+    ledger.answer(late.promise, Promise.resolve(SAVED));
+    await openAt(PAGE, ledger.api);
+    const safety = collectionNameOf(SAFETY.collection);
+
+    await chosenFor(POLICY.collection, RHIAN.displayName);
+    await chosenFor(SAFETY.collection, ADA.displayName);
+    await screen.findByText(WORDS.named(ADA.displayName, safety));
+    const rereading = ledger.holdReads();
+    late.resolve(REFUSED);
+    await rereading.reached;
+
+    await ownerShownFor(POLICY.collection, WORDS.noOwner);
+    expect(
+      await ownerShownFor(SAFETY.collection, ADA.displayName),
+      "the late failure took the newer save's owner back",
+    ).toBeDefined();
+    rereading.release();
+
+    await waitFor(() => {
+      expect(alertedIn(POLICY.collection), "the refused change raised no alert in its row").toBe(
+        true,
+      );
+    });
+    expect(alertedIn(SAFETY.collection), "the refusal was raised in the newer save's row").toBe(
+      false,
+    );
+    expect(screen.getByText(WORDS.named(ADA.displayName, safety))).toBeDefined();
+    await undoneByKey(SAFETY.collection);
+  });
+
+  it("clears a refusal when the change is made again", async () => {
+    const ledger = aLedger();
+    ledger.answer(Promise.resolve(REFUSED), Promise.resolve(SAVED));
+    await openAt(PAGE, ledger.api);
+
+    await chosenFor(POLICY.collection, RHIAN.displayName);
+    await waitFor(() => {
+      expect(alertedIn(POLICY.collection)).toBe(true);
+    });
+    await chosenFor(POLICY.collection, RHIAN.displayName);
+
+    await screen.findByText(WORDS.named(RHIAN.displayName, NAMED));
+    expect(alertedIn(POLICY.collection), "the earlier refusal outlived a saved change").toBe(false);
   });
 
   it("undoes the last owner change by its keystroke", async () => {

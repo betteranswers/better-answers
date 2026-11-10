@@ -3,12 +3,14 @@ import {
   skipToken,
   useInfiniteQuery,
   useMutation,
+  useMutationState,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
+import { z } from "zod";
 
-import { useOptimistic, type Undo } from "@/shared/api/optimistic.ts";
+import type { Undo } from "@/shared/api/optimistic.ts";
 import { WHILE_A_CEILING_HOLDS } from "@/shared/api/query-client.ts";
 import { useTRPC } from "@/shared/api/trpc.ts";
 import { memberOptions } from "@/shared/member/member.ts";
@@ -100,8 +102,6 @@ export type Owner = NonNullable<CollectionOwned["owner"]>;
 
 type Members = inferOutput<Api["members"]["list"]>;
 
-type OwnerAsked = inferInput<Api["knowledge"]["nameOwner"]>;
-
 export const useCollections = () => {
   const api = useTRPC();
   return useQuery(api.knowledge.collections.queryOptions());
@@ -135,39 +135,77 @@ const ownerFrom = (
   return member === undefined ? undefined : ownerOf(member);
 };
 
-const ownedAsAsked =
-  (asked: OwnerAsked, owner: Owner | null | undefined) =>
-  (held: Collections): Collections => ({
-    ...held,
-    collections: held.collections.map((owned) =>
-      owner !== undefined && "collection" in asked && owned.collection === asked.collection
-        ? { ...owned, owner }
-        : owned,
-    ),
-  });
+const ownedAs =
+  (collection: string | undefined, owner: Owner | null | undefined) =>
+  (held: Collections | undefined): Collections | undefined =>
+    held === undefined
+      ? held
+      : {
+          ...held,
+          collections: held.collections.map((owned) =>
+            owner !== undefined && owned.collection === collection ? { ...owned, owner } : owned,
+          ),
+        };
+
+const ASKED_OF_A_COLLECTION = z.object({ collection: z.string() });
+
+const collectionAsked = (mutation: { readonly state: { readonly variables: unknown } }) =>
+  ASKED_OF_A_COLLECTION.safeParse(mutation.state.variables).data?.collection;
+
+export const useOwnersSaving = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  const mutationKey = api.knowledge.nameOwner.mutationKey();
+  const saving: ReadonlySet<string | undefined> = new Set(
+    useMutationState({ filters: { mutationKey, status: "pending" }, select: collectionAsked }),
+  );
+  return {
+    saving,
+    isSaving: (collection: string): boolean =>
+      queryClient.isMutating({
+        mutationKey,
+        predicate: (mutation) => collectionAsked(mutation) === collection,
+      }) > 0,
+  };
+};
 
 export const useNameOwner = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
-  const optimistic = useOptimistic();
+  const collectionsKey = api.knowledge.collections.queryKey();
   return useMutation(
     api.knowledge.nameOwner.mutationOptions<Undo>({
-      onMutate: (asked) => {
+      onMutate: async (asked) => {
+        const collection = "collection" in asked ? asked.collection : undefined;
+        await queryClient.cancelQueries({ queryKey: collectionsKey });
         const members = queryClient.getQueryData(api.members.list.queryKey());
-        return optimistic(
-          api.knowledge.collections.queryKey(),
-          ownedAsAsked(asked, ownerFrom(members, asked.personId)),
+        const before = queryClient
+          .getQueryData(collectionsKey)
+          ?.collections.find((owned) => owned.collection === collection)?.owner;
+        queryClient.setQueryData(
+          collectionsKey,
+          ownedAs(collection, ownerFrom(members, asked.personId)),
         );
+        return {
+          undo: () => {
+            queryClient.setQueryData(collectionsKey, ownedAs(collection, before));
+          },
+        };
       },
       onError: (_refusal, _asked, taken) => {
         taken?.undo();
         void queryClient.invalidateQueries({ queryKey: api.members.list.queryKey() });
       },
-      onSettled: () =>
-        Promise.all([
-          queryClient.invalidateQueries({ queryKey: api.knowledge.collections.queryKey() }),
-          queryClient.invalidateQueries({ queryKey: memberOptions(api).queryKey }),
-        ]),
+      onSettled: () => {
+        const lastToSettle =
+          queryClient.isMutating({ mutationKey: api.knowledge.nameOwner.mutationKey() }) === 1;
+        return lastToSettle
+          ? Promise.all([
+              queryClient.invalidateQueries({ queryKey: collectionsKey }),
+              queryClient.invalidateQueries({ queryKey: memberOptions(api).queryKey }),
+            ])
+          : undefined;
+      },
     }),
   );
 };

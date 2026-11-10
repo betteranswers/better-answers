@@ -33,9 +33,10 @@ const withTheOwner = (choices: readonly Owner[], owner: Owner | null): readonly 
 export function OwnerPicker(properties: {
   readonly owned: CollectionOwned;
   readonly choices: readonly Owner[];
+  readonly saving: boolean;
   readonly onPick: (chosen: Owner | null) => void;
 }) {
-  const { owned, onPick } = properties;
+  const { owned, saving, onPick } = properties;
   const people = withTheOwner(properties.choices, owned.owner);
   const current = owned.owner?.id ?? NOBODY;
   const items = [
@@ -44,6 +45,7 @@ export function OwnerPicker(properties: {
   ];
   const held = items.find((item) => item.value === current);
   const [search, setSearch] = useState("");
+  const [opened, setOpened] = useState(false);
 
   return (
     <Combobox
@@ -54,23 +56,31 @@ export function OwnerPicker(properties: {
         if (picked === current) return;
         onPick(people.find((person) => person.id === picked) ?? null);
       }}
+      open={opened}
       onOpenChange={(open) => {
+        setOpened(open && !saving);
         if (!open) setSearch("");
       }}
     >
       <ComboboxTrigger
         id={pickerIdOf(owned.collection)}
         aria-label={WORDS.ownerOf(collectionNameOf(owned.collection), held?.label ?? WORDS.noOwner)}
-        className="w-full min-w-0 justify-between font-normal"
+        aria-disabled={saving ? true : undefined}
+        className="w-full min-w-0 justify-between font-normal aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
       />
-      <ComboboxContent filter={byName} popoverOptions={{ align: "start" }} className="min-w-56">
+      <ComboboxContent
+        label={WORDS.searchPeople}
+        filter={byName}
+        popoverOptions={{ align: "start" }}
+        className="min-w-56"
+      >
         <ComboboxInput
           value={search}
           onValueChange={setSearch}
           placeholder={WORDS.searchPeople}
           className="focus-visible:shadow-[inset_0_-2px_0_var(--accent-600)]!"
         />
-        <ComboboxList aria-label={WORDS.people}>
+        <ComboboxList label={WORDS.people}>
           <ComboboxEmpty>{WORDS.nobody}</ComboboxEmpty>
           <ComboboxGroup>
             {items.map((item) => (

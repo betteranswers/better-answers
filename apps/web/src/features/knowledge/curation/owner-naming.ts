@@ -5,47 +5,57 @@ import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import type { UndoNotice } from "@/shared/ui/kibo-ui/undo-toast.tsx";
 
-import { useNameOwner, type CollectionOwned, type Owner } from "../knowledge-api.ts";
+import {
+  useNameOwner,
+  useOwnersSaving,
+  type CollectionOwned,
+  type Owner,
+} from "../knowledge-api.ts";
 import { COLLECTIONS_WORDS as WORDS, SAID_OF_COLLECTIONS } from "../knowledge-words.ts";
 
 const { outcomeOfFailure } = refusalsOf(SAID_OF_COLLECTIONS);
 
 export const nameOf = (owner: Owner): string => (owner.name === "" ? WORDS.unnamed : owner.name);
 
+type Refused = { readonly state: "refused"; readonly words: ReactNode };
+
+type OwnerChange = { readonly state: "saving" } | Refused;
+
+const SAVING: OwnerChange = { state: "saving" };
+
 export type Naming = {
   readonly choices: readonly Owner[];
-  readonly refusalOf: (collection: string) => ReactNode;
+  readonly changeOf: (collection: string) => OwnerChange | undefined;
   readonly save: (owned: CollectionOwned, chosen: Owner | null) => void;
 };
 
-const NO_REFUSALS: ReadonlyMap<string, ReactNode> = new Map();
+const NO_REFUSALS: ReadonlyMap<string, Refused> = new Map();
 
 export const useOwnerNaming = (choices: readonly Owner[]) => {
   const naming = useNameOwner();
+  const { saving, isSaving } = useOwnersSaving();
   const [notice, setNotice] = useState<UndoNotice>();
   const [refusals, setRefusals] = useState(NO_REFUSALS);
   const started = useRef(0);
-  const shown = useRef(0);
 
-  const refused = (collection: string, words: ReactNode) => {
+  const refused = (collection: string, refusal: Refused | undefined) => {
     setRefusals((held) => {
       const next = new Map(held);
-      if (words === undefined) next.delete(collection);
-      else next.set(collection, words);
+      if (refusal === undefined) next.delete(collection);
+      else next.set(collection, refusal);
       return next;
     });
   };
 
   const name = (collection: string, chosen: Owner | null, before: Owner | null | undefined) => {
+    if (isSaving(collection)) return;
     started.current += 1;
     const sequence = started.current;
     refused(collection, undefined);
     void naming.mutateAsync({ collection, personId: chosen?.id ?? null }).then(
       () => {
-        if (sequence < shown.current) return;
-        shown.current = sequence;
         const named = collectionNameOf(collection);
-        setNotice({
+        const settled: UndoNotice = {
           id: sequence,
           words: chosen === null ? WORDS.cleared(named) : WORDS.named(nameOf(chosen), named),
           undo:
@@ -58,10 +68,11 @@ export const useOwnerNaming = (choices: readonly Owner[]) => {
                     name(collection, before, undefined);
                   },
                 },
-        });
+        };
+        setNotice((shown) => (shown !== undefined && shown.id > sequence ? shown : settled));
       },
       (failure: Error | ApiError) => {
-        refused(collection, outcomeOfFailure(failure, "action").words);
+        refused(collection, { state: "refused", words: outcomeOfFailure(failure, "action").words });
       },
     );
   };
@@ -69,7 +80,7 @@ export const useOwnerNaming = (choices: readonly Owner[]) => {
   return {
     naming: {
       choices,
-      refusalOf: (collection) => refusals.get(collection),
+      changeOf: (collection) => (saving.has(collection) ? SAVING : refusals.get(collection)),
       save: (owned, chosen) => {
         name(owned.collection, chosen, owned.owner);
       },
