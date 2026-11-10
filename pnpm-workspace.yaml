@@ -41,3 +41,9 @@ packageExtensions:
     peerDependencies: { '@types/react': '*' }
   better-auth:
     peerDependencies: { '@types/react': '*' }
+  # Node, too, resolves from the real path. `pnpm run` adds a fallback through `NODE_PATH`, but
+  # `node` run directly gets none, so these packages declare what they import without declaring it.
+  drizzle-kit:
+    peerDependencies: { drizzle-orm: '*' }
+  '@stryker-mutator/core':
+    peerDependencies: { '@stryker-mutator/vitest-runner': '*' }

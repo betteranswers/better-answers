@@ -615,6 +615,22 @@ describe("the test inventory a move holds", () => {
     );
   });
 
+  it("passes a move whose packages link relatively outside the tree", () => {
+    const root = coreRepositoryOf();
+    const store = `${root}-store`;
+    mkdirSync(store);
+    symlinkSync(VITEST, path.join(store, "vitest"));
+    const link = path.join(root, "packages/core/node_modules/vitest");
+    rmSync(link);
+    const from = realpathSync(path.dirname(link));
+    symlinkSync(path.relative(from, path.join(realpathSync(store), "vitest")), link);
+
+    const ran = moved(root, [[CORE_TEST, "packages/core/test/group/thing.test.ts"]]);
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toContain("test inventory unchanged; titles listed: 1");
+  });
+
   it("fails a move that rewrites a path in a title", () => {
     const root = coreRepositoryOf();
 
