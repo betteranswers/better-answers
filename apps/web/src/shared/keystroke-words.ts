@@ -4,7 +4,7 @@ export const KEYSTROKE_WORDS = {
   turnedOn: "Use single-key shortcuts on this browser",
   showTheList: "Show this list",
   noneOfItsOwn: "This page has no keyboard shortcuts of its own.",
-  thisPage: "This page",
+  thisPage: "this page",
 } as const;
 
 export const keystrokesOn = (page: string): string => `${KEYSTROKE_WORDS.button} on ${page}`;

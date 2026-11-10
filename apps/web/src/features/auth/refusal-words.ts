@@ -59,7 +59,7 @@ export const SAID_OF_SECOND_FACTOR = {
     "You need at least one passkey or authenticator. Add another before you remove this one.",
   "recovery-code-wrong": "That code is incorrect or has already been used.",
   "recovery-codes-held": "You already have recovery codes. Replace them if you need new ones.",
-  "changed-meanwhile": "These codes were replaced. Reload the page to see your current codes.",
+  "changed-meanwhile": "These codes were replaced. Reload the page for your current codes.",
   "restore-code-needed": `Enter the restore code ${PRODUCT_NAME} support gave you first.`,
 } satisfies OwnSentences;
 

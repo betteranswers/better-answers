@@ -22,7 +22,7 @@ export const CONFIRM_WORDS = {
 export const PROMOTION_WORDS = {
   lead: "You’re now an Admin. You can confirm your sign-in with:",
   authenticator: "Authenticator",
-  after: `Remove any you don’t recognise from your Account page. If you recognise none, sign out and contact ${PRODUCT_NAME} support.`,
+  after: `Confirm with one you recognise, then remove any you don’t from your Account page. If you recognise none, sign out and contact ${PRODUCT_NAME} support.`,
 } as const;
 
 export const passkeyThatConfirms = (name: string | null, createdAt: string): string =>

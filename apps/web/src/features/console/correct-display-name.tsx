@@ -5,7 +5,7 @@ import { OutcomeLine } from "@/shared/outcome.tsx";
 import { SheetPart } from "@/shared/page/sheet-part.tsx";
 
 import { CorrectNameDialog } from "./names-waiting/correct-name-dialog.tsx";
-import { CORRECT_DISPLAY_NAME, shownWhere } from "./names-waiting/correcting-words.ts";
+import { CORRECT_DISPLAY_NAME, replacesWhere } from "./names-waiting/correcting-words.ts";
 import { useCorrecting } from "./names-waiting/use-correcting.ts";
 import type { ListedPerson } from "./people-api.ts";
 import { nameOf } from "./person-words.tsx";
@@ -29,7 +29,7 @@ export function CorrectDisplayName(properties: {
   return (
     <SheetPart title={DISPLAY_NAME_WORDS.label}>
       <p id={consequenceId} className="text-muted-foreground">
-        {shownWhere(name)}
+        {replacesWhere(name)}
       </p>
       <SheetActionButton
         actionRef={actionRef}

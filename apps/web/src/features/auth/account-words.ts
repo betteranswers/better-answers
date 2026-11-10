@@ -49,7 +49,7 @@ export const PASSKEY_WORDS = {
   saving: "Saving",
   cancel: "Cancel",
   remove: "Remove",
-  removeConsequence: "This permanently removes the passkey from every device.",
+  removeConsequence: "This permanently removes the passkey from your account.",
   removeCommit: "Remove",
   offer: "Sign in with your fingerprint, face or device PIN instead of email.",
   dismissOffer: "Dismiss passkey offer",
@@ -106,7 +106,7 @@ export const AUTHENTICATOR_WORDS = {
   finishing: "Finishing setup",
   startAgain: "Try again",
   removeTitle: "Remove authenticator",
-  removeConsequence: "This permanently removes your authenticator.",
+  removeConsequence: "Your authenticator’s codes stop working at once.",
   removeCommit: "Remove",
 } as const;
 

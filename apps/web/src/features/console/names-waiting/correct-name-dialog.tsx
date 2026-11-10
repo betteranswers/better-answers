@@ -9,7 +9,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
-import { correctWords, shownWhere } from "./correcting-words.ts";
+import { correctWords, replacesWhere } from "./correcting-words.ts";
 import type { Refused } from "./use-correcting.ts";
 
 export function CorrectNameDialog(properties: {
@@ -40,7 +40,7 @@ export function CorrectNameDialog(properties: {
         properties.onFocusBack(saved.current);
       }}
       title={correctWords(name)}
-      consequence={shownWhere(name)}
+      consequence={replacesWhere(name)}
       commit={
         <Button type="submit" form={ids.form}>
           Save changes

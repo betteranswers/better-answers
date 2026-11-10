@@ -105,10 +105,12 @@ const NO_WORKSPACE: readonly ListedWorkspace[] = [];
 
 const wordsOf = (workspace: ListedWorkspace): string => `${workspace.name}\n${workspace.shortName}`;
 
+const PROVISION_COMMAND = "pnpm ops provision-workspace";
+
 function NoneProvisioned() {
   return (
     <p className="px-4 py-10">
-      No workspaces yet. Run <code>provision-workspace</code> to create one.
+      No workspaces yet. Run <code>{PROVISION_COMMAND}</code> to create one.
     </p>
   );
 }
