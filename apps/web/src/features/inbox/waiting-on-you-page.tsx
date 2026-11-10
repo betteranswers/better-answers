@@ -129,7 +129,6 @@ function WaitingRow(properties: {
           </RowLink>
         </h3>
         <WaitingFacts item={item} ownerShown={properties.ownerShown} />
-        <p className="mt-2 text-muted-foreground">{WORDS.next}</p>
       </div>
     </li>
   );
@@ -211,7 +210,7 @@ function WaitingRegion() {
         heading={WAITING_ON_YOU.name}
         headingId={headingId}
         headingRef={heading}
-        count={read.data === undefined ? "" : WORDS.count(items.length)}
+        count={items.length === 0 ? "" : WORDS.count(items.length)}
         action={
           items.length === 0 ? undefined : (
             <Button

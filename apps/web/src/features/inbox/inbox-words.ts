@@ -2,6 +2,7 @@ import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { counted } from "@/shared/words.ts";
 
 import type { DecidedWord, WaitingPerson } from "./inbox-api.ts";
+import { WAITING_ON_YOU } from "./inbox-state.ts";
 
 const quoted = (title: string): string => `“${title}”`;
 
@@ -18,100 +19,100 @@ export const personWords = (person: WaitingPerson | null): string => {
 
 export const personShown = (person: WaitingPerson | null): string => opening(personWords(person));
 
+const BASE_MOVED = "The concept has changed since this suggestion was made.";
+
 export const WAITING_WORDS = {
-  loading: "The suggestions are still loading.",
-  none: "No suggestions are waiting for you. When someone suggests a change to a concept you’re responsible for, it appears here.",
+  loading: "Loading suggestions…",
+  none: "No suggestions are waiting for you.",
   count: (count: number): string => `${counted(count, "suggestion", "suggestions")} waiting`,
-  proposedBy: "Suggested By",
-  proposedOn: "Suggested On",
+  proposedBy: "Suggested by",
+  proposedOn: "Suggested on",
   owner: "Owner",
-  noOwner: "No owner. An Admin decides.",
-  newConcept: "A new concept",
-  baseMoved: "The concept has changed since this suggestion was made.",
+  noOwner: "No owner",
+  newConcept: "New concept",
+  baseMoved: BASE_MOVED,
   places: (places: number): string => `Used in ${places} places`,
-  next: "Open it to compare the versions, or select it to accept it with others.",
   select: (title: string): string => `Select ${title}`,
-  selected: "Selected Suggestions",
-  acceptSelected: "Accept Selected",
-  selectFirst: "Please select a suggestion first.",
-  stillGoing: "The previous decision is still in progress. Please try again when it has finished.",
-  accepting: (count: number): string => `Accepting ${counted(count, "suggestion", "suggestions")}.`,
+  selected: "Selected suggestions",
+  acceptSelected: "Accept selected",
+  selectFirst: "Select a suggestion first.",
+  stillGoing: "Wait for the previous action to finish.",
+  accepting: (count: number): string => `Accepting ${counted(count, "suggestion", "suggestions")}…`,
   reuse: (count: number): string =>
     count === 1
-      ? "One selected concept is used in other places. Accepting changes it in every one."
-      : `${count} selected concepts are used in other places. Accepting changes them in every one.`,
-  noLongerListed: "A suggestion that is no longer listed",
+      ? "One selected concept is used in other places."
+      : `${count} selected concepts are used in other places.`,
+  noLongerListed: "A suggestion no longer listed",
 } as const;
 
 export const EDIT_WORDS = {
-  loading: "The suggestion is still loading.",
-  back: "Back to Waiting on You",
+  loading: "Loading the suggestion…",
+  back: `Back to ${WAITING_ON_YOU.name}`,
   accept: "Accept",
   decline: "Decline",
-  current: "Current Version",
-  proposed: "Suggested Version",
+  current: "Current version",
+  proposed: "Suggested version",
   changed: "Changed",
   title: "Title",
   text: "Text",
   noText: "No text.",
-  sources: "Suggested Sources",
+  sources: "Suggested sources",
   noSources: "No sources.",
   noCurrent: {
-    "new-concept": "This suggests a new concept, so there is no current version to compare.",
-    orphaned:
-      "The concept has been renamed or changed since this suggestion was made, so only the suggested version is shown.",
-    withheld:
-      "You can’t read the current version of this concept, so only the suggested version is shown.",
+    "new-concept": "This suggestion adds a new concept.",
+    orphaned: "The concept was renamed or moved after this suggestion was made.",
+    withheld: "You can’t read the current version of this concept.",
   },
-  places: (places: number): string =>
-    `Used in ${places} places. Accepting changes it in every one.`,
-  acceptEverywhere: "Accept in Every Place",
+  places: (places: number): string => `This concept is used in ${places} places.`,
+  acceptEverywhere: "Accept in every place",
   cancel: "Cancel",
-  reason: "Reason for Declining",
-  reasonHint: "The person who suggested this change reads your reason.",
-  reasonNeeded: "Please write a reason before declining.",
-  declineSuggestion: "Decline Suggestion",
-  accepting: (title: string): string => `Accepting ${quoted(title)}.`,
-  declining: (title: string): string => `Declining ${quoted(title)}.`,
+  reason: "Reason for declining",
+  reasonShownTo: (proposer: string): string => `Shown to ${proposer}.`,
+  reasonNeeded: "Write a reason for declining.",
+  declineSuggestion: "Decline suggestion",
+  accepting: (title: string): string => `Accepting ${quoted(title)}…`,
+  declining: (title: string): string => `Declining ${quoted(title)}…`,
 } as const;
 
 export const DECIDED_WORDS = {
-  accepted: (proposer: string): string =>
-    `Accepted. The change is saved with ${proposer} as its author.`,
-  declined: (proposer: string): string => `Declined. ${opening(proposer)} can read your reason.`,
-  returned: (proposer: string): string =>
-    `Returned to ${proposer}, because the concept changed after they made this suggestion.`,
+  accepted: (proposer: string): string => `Suggestion accepted, with ${proposer} as the author.`,
+  declined: "Suggestion declined.",
+  returned: (proposer: string): string => `Returned to ${proposer}. ${BASE_MOVED}`,
 } as const;
 
 export type Returned = "stale-precondition" | "resolution-moved";
 
-const CANT_SAVE = "This suggestion can’t be saved. Please decline it and give a reason.";
+const DECLINE_IT = "Decline it instead.";
 
-const RELOAD = "Please reload the page.";
+const CANT_SAVE = `This suggestion can’t be saved. ${DECLINE_IT}`;
+
+const RELOAD = "Reload the page.";
+
+const OWNS_NOT = "You don’t own this concept.";
 
 export const SAID_OF_ACCEPTING = {
   "role-forbids": "Your role can’t accept this suggestion.",
-  "owner-forbids": "You no longer own this concept, so an Admin will decide on this suggestion.",
-  "credentials-revoked": "Your sign-in has ended. Please sign in again.",
+  "owner-forbids": OWNS_NOT,
+  "credentials-revoked": "Your sign-in has ended. Sign in again.",
   "not-a-member": "You’re no longer a member of this workspace.",
   "role-unknown": `We couldn’t check your role. ${RELOAD}`,
   "role-disagrees": `Your role has changed. ${RELOAD}`,
   unconfirmed:
-    "We couldn’t confirm that this suggestion was saved. If it’s still listed in a minute, please accept it again.",
+    "We couldn’t confirm the change was saved. If this suggestion is still listed in a minute, accept it again.",
   "unrecorded-head":
-    "This workspace is still saving an earlier change. If this suggestion is still listed in a minute, please accept it again.",
+    "An earlier change is still saving. If this suggestion is still listed in a minute, accept it again.",
   "no-such-suggestion": "This suggestion is no longer waiting.",
-  "already-decided": "Someone has already decided this suggestion.",
-  "no-such-concept": "The concept this suggestion changes no longer exists.",
-  "no-such-document": `A source this suggestion cites no longer exists. ${CANT_SAVE}`,
-  "no-such-repository": "This workspace’s knowledge can’t be saved yet. Please try again later.",
-  "merge-key-taken": `Another concept already has this title. ${CANT_SAVE}`,
-  "path-taken": `Another concept already has this title. ${CANT_SAVE}`,
-  "rename-refused": "This suggestion would move the concept, which only an Admin can do.",
+  "already-decided": "Someone has already accepted or declined this suggestion.",
+  "no-such-concept": `The concept this suggestion changes no longer exists. ${DECLINE_IT}`,
+  "no-such-document": `A source this suggestion cites no longer exists. ${DECLINE_IT}`,
+  "no-such-repository": "The knowledge base can’t be saved yet. Try again later.",
+  "merge-key-taken": `Another concept already has this title. ${DECLINE_IT}`,
+  "path-taken": `Another concept already has this title. ${DECLINE_IT}`,
+  "rename-refused": "Only an Admin can accept a suggestion that moves a concept.",
   "reclassification-refused":
-    "This suggestion would change the concept’s sensitivity, which only an Admin can do.",
+    "Only an Admin can accept a suggestion that changes a concept’s sensitivity.",
   "widening-refused":
-    "This suggestion would share the concept more widely than your role allows, so an Admin will decide on it.",
+    "This suggestion shares the concept more widely than your role allows. An Admin can accept it.",
   "reuse-unconfirmed": CANT_SAVE,
   unchanged: CANT_SAVE,
   malformed: CANT_SAVE,
@@ -121,8 +122,8 @@ export const SAID_OF_ACCEPTING = {
 } as const satisfies Record<Exclude<DecidedWord, "accepted" | Returned>, string>;
 
 export const SAID_OF_DECIDING = {
-  malformed: "Please write a shorter reason and try again.",
-  "owner-forbids": SAID_OF_ACCEPTING["owner-forbids"],
+  malformed: "Write a shorter reason.",
+  "owner-forbids": OWNS_NOT,
   "no-such-suggestion": SAID_OF_ACCEPTING["no-such-suggestion"],
   "already-decided": SAID_OF_ACCEPTING["already-decided"],
 } satisfies OwnSentences;

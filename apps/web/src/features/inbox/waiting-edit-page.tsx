@@ -23,6 +23,7 @@ import {
   useDecline,
   useWaitingEdit,
   type WaitingEdit,
+  type WaitingPerson,
 } from "./inbox-api.ts";
 import { EDIT_KEYSTROKES as KEY, WAITING_ON_YOU, type DecidedOnItsPage } from "./inbox-state.ts";
 import { DECIDED_WORDS, EDIT_WORDS as WORDS, personWords, WAITING_WORDS } from "./inbox-words.ts";
@@ -101,10 +102,7 @@ const useDeciding = (edit: WaitingEdit, title: string) => {
       { suggestionId: item.suggestionId, reason },
       {
         onSuccess: () => {
-          leaveSaying({
-            words: DECIDED_WORDS.declined(personWords(item.proposer)),
-            refused: false,
-          });
+          leaveSaying({ words: DECIDED_WORDS.declined, refused: false });
         },
         onError: refused,
       },
@@ -142,9 +140,10 @@ type Deciding = ReturnType<typeof useDeciding>;
 
 function DeclineForm(properties: {
   readonly deciding: Deciding;
+  readonly proposer: WaitingPerson | null;
   readonly returnFocus: RefObject<HTMLButtonElement | null>;
 }) {
-  const { deciding, returnFocus } = properties;
+  const { deciding, proposer, returnFocus } = properties;
   const fieldId = useId();
   const hintId = useId();
   const neededId = useId();
@@ -155,9 +154,13 @@ function DeclineForm(properties: {
     field.current = textarea;
     textarea?.focus();
   }, []);
+  const describedBy = [...(proposer === null ? [] : [hintId]), ...(needed ? [neededId] : [])].join(
+    " ",
+  );
 
   return (
     <form
+      noValidate
       className="mt-3 grid gap-2 border border-border p-3"
       onSubmit={(event) => {
         event.preventDefault();
@@ -170,15 +173,17 @@ function DeclineForm(properties: {
       }}
     >
       <Label htmlFor={fieldId}>{WORDS.reason}</Label>
-      <p id={hintId} className="text-muted-foreground">
-        {WORDS.reasonHint}
-      </p>
+      {proposer === null ? null : (
+        <p id={hintId} className="text-muted-foreground">
+          {WORDS.reasonShownTo(personWords(proposer))}
+        </p>
+      )}
       <Textarea
         ref={arrive}
         id={fieldId}
         required
         aria-invalid={needed}
-        aria-describedby={needed ? `${hintId} ${neededId}` : hintId}
+        aria-describedby={describedBy === "" ? undefined : describedBy}
         value={reason}
         onChange={(event) => {
           setReason(event.target.value);
@@ -265,7 +270,7 @@ function EditShown(properties: { readonly edit: WaitingEdit }) {
         />
       ) : null}
       {deciding.asking === "reason" ? (
-        <DeclineForm deciding={deciding} returnFocus={declineButton} />
+        <DeclineForm deciding={deciding} proposer={item.proposer} returnFocus={declineButton} />
       ) : null}
       <WaitingFacts item={item} ownerShown={ownerShown} />
       <EditCompared edit={edit} />

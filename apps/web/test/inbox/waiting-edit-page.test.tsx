@@ -1,7 +1,8 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { WAITING_ON_YOU } from "@/features/inbox/inbox-state.ts";
+import { EDIT_WORDS } from "@/features/inbox/inbox-words.ts";
 import { detailAt } from "@/shared/navigation.ts";
 import { openedWhereTheApiNamesNone } from "@test/detail/not-found-detail.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -44,11 +45,35 @@ describe("a suggestion on Waiting on You", () => {
     api.set("inbox.item", () => read(orphanedEdit));
     await openAt(A_SUGGESTION, api);
 
-    const current = await screen.findByRole("region", { name: "Current Version" });
+    const current = await screen.findByRole("region", { name: EDIT_WORDS.current });
 
-    expect(current.textContent).toContain(
-      "The concept has been renamed or changed since this suggestion was made",
+    expect(current.textContent).toContain(EDIT_WORDS.noCurrent.orphaned);
+    expect(current.textContent).not.toContain(EDIT_WORDS.noCurrent.withheld);
+  });
+
+  it.each([
+    {
+      reader: "a named proposer",
+      proposer: orphanedEdit.item.proposer,
+      said: EDIT_WORDS.reasonShownTo("Owen Price"),
+    },
+    { reader: "a former member", proposer: null, said: "" },
+  ])("says who reads a decline reason: $reader", async ({ proposer, said }) => {
+    const api = adaAnAdmin();
+    api.set("inbox.item", () =>
+      read({ ...orphanedEdit, item: { ...orphanedEdit.item, proposer } }),
     );
-    expect(current.textContent).not.toContain("can’t read");
+    await openAt(A_SUGGESTION, api);
+
+    fireEvent.click(await screen.findByRole("button", { name: EDIT_WORDS.decline }));
+    const reason = await screen.findByRole("textbox", { name: EDIT_WORDS.reason });
+
+    const described = String(reason.getAttribute("aria-describedby"))
+      .split(" ")
+      .flatMap((id) => [...document.querySelectorAll(`[id="${id}"]`)])
+      .map((node) => node.textContent)
+      .join(" ");
+
+    expect(described).toBe(said);
   });
 });
