@@ -3,6 +3,7 @@ import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { STALE_CONFIRMATION } from "@/features/auth/refusal-words.ts";
 import { EXPORTS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { downloadsWatched, type SavedFile } from "@test/knowledge/downloads.ts";
 import { theOneEmptyStatus } from "@test/knowledge/empty-status.ts";
@@ -179,7 +180,7 @@ describe("the Exports page", () => {
       within(picker)
         .getAllByRole("option")
         .map((option) => option.textContent),
-    ).toEqual(["Northgate Ltd (Bid library)", "southgate (Tender pack)"]);
+    ).toEqual(["Northgate Ltd (Bid library)", `${collectionNameOf("southgate")} (Tender pack)`]);
     fireEvent.change(picker, { target: { value: OTHER_GUIDE.guideId } });
     fireEvent.click(await readyToDownload(GUIDE));
 

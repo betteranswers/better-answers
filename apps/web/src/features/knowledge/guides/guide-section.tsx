@@ -3,7 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "rea
 
 import { conceptPageOf } from "@/shared/knowledge/concept-address.ts";
 import { ConceptBody, LINK } from "@/shared/knowledge/concept-body.tsx";
-import type { Evidence } from "@/shared/knowledge/knowledge-reads.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { TrustMark } from "@/shared/knowledge/trust-mark.tsx";
 import { TypeLine } from "@/shared/knowledge/type-line.tsx";
 import { cn } from "@/shared/lib/utils.ts";
@@ -23,7 +23,13 @@ import { copyBrief, copyingWords } from "./brief-clipboard.ts";
 import type { Say } from "./brief-editing.ts";
 import { Coverage, type Gaps } from "./guide-coverage.tsx";
 import { failed, said } from "./guide-outcome.ts";
-import { actionNamed, addFactAt, GUIDE_KEYSTROKES as KEY, SECTION_ACTIONS } from "./guide-state.ts";
+import {
+  actionNamed,
+  addFactAt,
+  GUIDE_KEYSTROKES as KEY,
+  headingIdOf,
+  SECTION_ACTIONS,
+} from "./guide-state.ts";
 import { GUIDE_WORDS as WORDS } from "./guide-words.ts";
 
 export type SectionProps = {
@@ -41,28 +47,61 @@ const depthOf = (number: string): number => Math.min(number.split(".").length, H
 
 const headingsBelow = (level: number): number => Math.min(level + 3, 6);
 
-const NO_EVIDENCE: readonly Evidence[] = [];
+type Listed = {
+  readonly key: string;
+  readonly title: string;
+  readonly iri: string | undefined;
+  readonly at?: string | undefined;
+};
 
-function Footnotes(properties: { readonly footnotes: SectionBrief["rendered"]["footnotes"] }) {
-  const { footnotes } = properties;
-  if (footnotes.length === 0) return null;
+function CitedList(properties: { readonly name: string; readonly items: readonly Listed[] }) {
+  const { name, items } = properties;
+  if (items.length === 0) return null;
   return (
-    <ol aria-label={WORDS.footnotes} className="mt-3 list-decimal pl-6 [font-size:var(--text-sm)]">
-      {footnotes.map((footnote) => {
-        const page = conceptPageOf(footnote.iri);
+    <ol aria-label={name} className="mt-3 list-decimal pl-6 [font-size:var(--text-sm)]">
+      {items.map((item) => {
+        const page = item.iri === undefined ? undefined : conceptPageOf(item.iri);
         return (
-          <li key={footnote.label}>
+          <li key={item.key}>
             {page === undefined ? (
-              <span className="wrap-anywhere">{footnote.title}</span>
+              <span className="wrap-anywhere">{item.title}</span>
             ) : (
               <Link to={page} className={cn(LINK, "inline-block min-h-6 wrap-anywhere")}>
-                {footnote.title}
+                {item.title}
               </Link>
+            )}
+            {item.at === undefined ? null : (
+              <span className="ml-2 font-mono text-muted-foreground [font-size:var(--text-xs)]">
+                {item.at}
+              </span>
             )}
           </li>
         );
       })}
     </ol>
+  );
+}
+
+function Footnotes(properties: { readonly footnotes: SectionBrief["rendered"]["footnotes"] }) {
+  return (
+    <CitedList
+      name={WORDS.footnotes}
+      items={properties.footnotes.map(({ label, iri, title }) => ({ key: label, iri, title }))}
+    />
+  );
+}
+
+function Sources(properties: { readonly evidence: SectionBrief["detail"][number]["evidence"] }) {
+  return (
+    <CitedList
+      name={CONCEPT_WORDS.sources}
+      items={properties.evidence.map(({ source, iri, at }, place) => ({
+        key: `${String(place)}:${source}`,
+        iri,
+        title: source,
+        at,
+      }))}
+    />
   );
 }
 
@@ -130,9 +169,10 @@ function Detail(properties: {
             <div className="mt-2">
               <ConceptBody
                 body={concept.body}
-                evidence={NO_EVIDENCE}
+                evidence={concept.evidence}
                 headingsFrom={headingsBelow(level)}
               />
+              <Sources evidence={concept.evidence} />
             </div>
           </article>
         );
@@ -141,8 +181,8 @@ function Detail(properties: {
   );
 }
 
-const useDetail = (section: GuideSection, button: RefObject<HTMLButtonElement | null>) => {
-  const [open, setOpen] = useState(!section.layers.includes("assembled"));
+const useDetail = (button: RefObject<HTMLButtonElement | null>) => {
+  const [open, setOpen] = useState(false);
   const region = useRef<HTMLElement>(null);
   const pressed = useRef(false);
   useEffect(() => {
@@ -221,15 +261,16 @@ const useCopying = (section: GuideSection, say: Say, editing: boolean) => {
 function CopyAction(properties: {
   readonly section: GuideSection;
   readonly copying: ReturnType<typeof useCopying>;
+  readonly editing: boolean;
 }) {
-  const { section, copying } = properties;
+  const { section, copying, editing } = properties;
   if (section.copy === "below-action-threshold") {
     return <p className="text-muted-foreground">{WORDS.belowYourRole}</p>;
   }
   return (
     <Button
       type="button"
-      variant="outline"
+      variant={editing ? "outline" : "accent"}
       {...actionNamed(SECTION_ACTIONS.copyBrief)}
       aria-disabled={copying.copying}
       aria-keyshortcuts={KEY.copyBrief.key}
@@ -276,12 +317,12 @@ function SectionHead(properties: {
 export function GuideSectionView(properties: SectionProps) {
   const { guide, section, say } = properties;
   const { brief } = section;
-  const headingId = useId();
+  const headingId = headingIdOf(section.sectionId);
   const detailId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   const navigate = useNavigate();
   const showDetail = useRef<HTMLButtonElement>(null);
-  const detail = useDetail(section, showDetail);
+  const detail = useDetail(showDetail);
   const including = useIncluding(section, say, heading);
   const editing = useBriefEditing({
     sectionId: section.sectionId,
@@ -326,7 +367,7 @@ export function GuideSectionView(properties: SectionProps) {
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {editing.actions}
               {brief.rendered.markdown.trim() === "" ? null : (
-                <CopyAction section={section} copying={copying} />
+                <CopyAction section={section} copying={copying} editing={editing.open} />
               )}
               <Button
                 ref={showDetail}

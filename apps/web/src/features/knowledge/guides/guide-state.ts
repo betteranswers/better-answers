@@ -17,6 +17,8 @@ export const GUIDE_ID = z.string().regex(ULID);
 
 export const guidePageOf = (guideId: string): string => detailAt(GUIDES_PAGE, guideId);
 
+export const headingIdOf = (sectionId: string): string => `section-${sectionId}`;
+
 export const GUIDE_KEYSTROKES = {
   showDetail: { key: "d", action: "Show or hide the detail of the focused section" },
   addFact: { key: "a", action: "Add the missing fact of the focused section" },

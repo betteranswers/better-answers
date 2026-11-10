@@ -25,6 +25,7 @@ import {
   type SectionAction,
 } from "./guide-state.ts";
 import { GUIDE_WORDS as WORDS, SAID_OF_GUIDES } from "./guide-words.ts";
+import { SectionOutline } from "./outline/section-outline.tsx";
 
 const READING = [KEY.showDetail, KEY.addFact, KEY.copyBrief];
 
@@ -121,19 +122,24 @@ function GuideShown(properties: { readonly guide: Guide }) {
   return (
     <article aria-label={title} className="mt-6">
       <GuideHeader guide={guide} />
-      <OutcomeLine outcome={outcome} className={outcome === undefined ? "" : STATUS_BAR} />
-      <LeavingAsk leaving={guard.leaving} />
-      <ol className="mt-6 grid gap-8">
-        {guide.sections.map((section) => (
-          <GuideSectionView
-            key={section.sectionId}
-            guide={guide}
-            section={section}
-            say={say}
-            reportUnsaved={guard.report}
-          />
-        ))}
-      </ol>
+      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_17rem] xl:gap-10">
+        <SectionOutline sections={guide.sections} />
+        <div className="xl:col-start-1 xl:row-start-1">
+          <OutcomeLine outcome={outcome} className={outcome === undefined ? "" : STATUS_BAR} />
+          <LeavingAsk leaving={guard.leaving} />
+          <ol className="mt-6 grid gap-8">
+            {guide.sections.map((section) => (
+              <GuideSectionView
+                key={section.sectionId}
+                guide={guide}
+                section={section}
+                say={say}
+                reportUnsaved={guard.report}
+              />
+            ))}
+          </ol>
+        </div>
+      </div>
     </article>
   );
 }

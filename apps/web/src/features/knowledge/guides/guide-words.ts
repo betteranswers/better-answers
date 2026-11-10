@@ -25,6 +25,7 @@ export const GUIDE_WORDS = {
   subject: "Subject",
   total: factsCounted,
   heading: (number: string, prompt: string): string => `${number}. ${prompt}`,
+  outline: "Sections",
   needsReview: "Needs review",
   reasons: {
     "concept-changed": "Cites a concept that changed",
