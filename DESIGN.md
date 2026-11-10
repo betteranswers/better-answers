@@ -275,7 +275,7 @@ The signature of the system. A 352px card with a 1px ink frame and registration 
 - Each fact shows once. Last verified appears only when the trust word is a status, which hides who verified and when. Earlier verifications appears only when there are earlier ones. The status is the trust word. The sources count is on the Sources heading, and a concept with no sources says None in a Sources cell.
 - Earlier verifications lists the verifications before the latest. OKF v0.2 records no revision number. The block has no revision cell.
 - A review date that has passed takes the stale word colour.
-- A cell with nothing to show reads its word from `EMPTY_WORDS` in `shared/knowledge/concept-words.ts`, one word for each empty state. A half-width cell with no partner takes the full width.
+- A cell with nothing to show reads its word from `EMPTY_WORDS` in `apps/web/src/shared/knowledge/concept-words.ts`, one word for each empty state. A half-width cell with no partner takes the full width.
 
 ## Do's and Don'ts
 
