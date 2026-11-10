@@ -341,6 +341,23 @@ describe("editing a concept on its own page", () => {
     expect(wordsIn("status"), "the stale notice outlived the reload").toBe("");
   });
 
+  it("moves focus to the refusal when someone else saved first", async () => {
+    const api = aConceptApi("commits");
+    api.set(SAVE, () => aRefusalAnswer("stale-precondition", "conflict", 409));
+    await editorOpened(api);
+
+    retitled("Audit Log Retention");
+    screen.getByRole("button", { name: EDITOR_WORDS.save }).focus();
+    pressed(EDITOR_WORDS.save);
+
+    await screen.findByRole("button", { name: EDITOR_WORDS.reload });
+    await waitFor(() => {
+      expect(document.activeElement?.textContent, "focus is not on the refusal").toBe(
+        EDITOR_WORDS.stale,
+      );
+    });
+  });
+
   it("keeps the draft while an earlier change is still saving", async () => {
     const api = aConceptApi("commits");
     api.set(SAVE, () => aRefusalAnswer("unrecorded-head", "precondition", 412));
