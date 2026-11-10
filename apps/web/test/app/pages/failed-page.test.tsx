@@ -6,7 +6,7 @@ import { FailedPage } from "@/app/pages/failed-page.tsx";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { FAILED_PAGE, TOGGLE, UNKNOWN_PAGE } from "@/app/words.ts";
-import { HOMES } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, HOMES, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { openApp } from "@test/open-app.tsx";
 
 afterEach(() => {
@@ -81,7 +81,11 @@ describe("a page that throws", () => {
     const rail = screen.getByRole("navigation", { name: "Areas" });
     expect(within(rail).getByRole("link", { name: "Control Centre" })).toBeDefined();
     const nav = screen.getByRole("navigation", { name: "Control Centre" });
-    expect(within(nav).getByRole("link", { name: "Models and Spend" })).toBeDefined();
+    expect(
+      within(nav).getByRole("link", {
+        name: pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
+      }),
+    ).toBeDefined();
 
     expect(nonEmptyAlerts().map((alert) => screen.getByRole("main").contains(alert))).toEqual([
       true,

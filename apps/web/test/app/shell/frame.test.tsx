@@ -9,15 +9,19 @@ import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import {
+  AREAS,
+  CONTROL_CENTRE,
   EVERY_AREA,
   HOMES,
+  menuGroupIn,
   movedWithin,
-  readerOf,
+  NEW_QUESTION,
+  pageById,
   pagesOf,
-  AREAS,
-  visibleTo,
-  type Role,
+  readerOf,
   type Page,
+  type Role,
+  visibleTo,
 } from "@/shared/navigation.ts";
 import { openApp } from "@test/open-app.tsx";
 import { answeringAs, withTheApiDown } from "@test/stubbed-api.ts";
@@ -93,13 +97,13 @@ describe("the shell's regions", () => {
       "System",
     ]);
     expect(namesIn(menu())).toEqual([
-      "Connected Sources",
-      "Models and Spend",
-      "Questions Asked",
-      "Answer Tests",
+      pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name,
+      pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
+      pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
+      pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "answer-tests").name,
       "Members",
       "Groups",
-      "Audit Log",
+      pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name,
     ]);
   });
 
@@ -120,7 +124,11 @@ describe("the shell's regions", () => {
     await openAs("Admin", "/models/models-and-spend");
 
     const bar = screen.getByRole("banner");
-    for (const name of ["Control Centre", "Models", "Models and Spend"]) {
+    for (const name of [
+      "Control Centre",
+      "Models",
+      pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
+    ]) {
       expect(within(bar).getByText(name, { exact: true })).toBeDefined();
     }
     expect(within(bar).getByRole("button", { name: JUMP_TO })).toBeDefined();
@@ -208,14 +216,14 @@ describe("the shell's regions", () => {
 describe("a page's old address", () => {
   it("matches a missing page for a Viewer without access", async () => {
     const missingPage = await openAs("Viewer", "/people/not-a-page");
-    await screen.findByRole("link", { name: "Go to New Question" });
+    await screen.findByRole("link", { name: goHome(NEW_QUESTION) });
     const missingPageMain = screen.getByRole("main").innerHTML;
     missingPage.unmount();
 
     vi.stubGlobal("fetch", answeringAs("Viewer"));
     const { router } = await openApp("/people/audit-log");
 
-    await screen.findByRole("link", { name: "Go to New Question" });
+    await screen.findByRole("link", { name: goHome(NEW_QUESTION) });
     expect(router.history.location.pathname).toBe("/people/audit-log");
     expect(
       screen.getByRole("main").innerHTML,

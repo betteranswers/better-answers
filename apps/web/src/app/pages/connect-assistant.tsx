@@ -2,14 +2,14 @@ import { useId, useState } from "react";
 
 import { CONNECT_ASSISTANT } from "@/app/words.ts";
 import { copiedToTheClipboard } from "@/shared/lib/clipboard.ts";
-import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { ASK, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
-const CONNECT_CLAUDE = pageNamed(menuGroupIn(ASK, "ask"), "Connect Claude");
+const CONNECT_CLAUDE = pageById(menuGroupIn(ASK, "ask"), "connect-claude");
 
 const ADDRESS = `${window.location.origin}/mcp`;
 

@@ -3,17 +3,23 @@ import { expect, type APIRequestContext, type Locator, type Page } from "@playwr
 import { INVITATION_WORDS } from "@/features/auth/workspace/invitation-words.ts";
 import { INVITE_WORDS } from "@/features/people/invitation-words.ts";
 import { MEMBER_PAGE_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
+import {
+  CONTROL_CENTRE,
+  INVITE_A_PERSON,
+  menuGroupIn,
+  pageById,
+  type Role,
+} from "@/shared/navigation.ts";
 
 import { anAddress, invite, person } from "./harness.ts";
 
 const INVITER = "Morgan Reid";
 
-export const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
+export const MEMBERS_PAGE = pageById(menuGroupIn(CONTROL_CENTRE, "people"), "members").path;
 
 const MEMBER_PAGE_URL = new RegExp(`${MEMBERS_PAGE}/[0-9A-HJKMNP-TV-Z]{26}$`);
 
-const INVITE = "Invite a Person";
+const INVITE = INVITE_A_PERSON.name;
 
 export const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
 

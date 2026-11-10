@@ -38,8 +38,6 @@ const A_PLAIN_WORD = /^[\p{L}’'-]+[,;:!?…]?$/u;
 
 const PLACEHOLDER_WORD = "item";
 
-const LOOKUPS: ReadonlySet<string> = new Set(["pageNamed"]);
-
 const COPY_ATTRIBUTES: ReadonlySet<string> = new Set([
   "alt",
   "aria-description",
@@ -110,15 +108,6 @@ const isPropertyKey = (node: Text): boolean => {
   return parent.type === "Property" && parent.key === node;
 };
 
-const isLookupKey = (node: Text): boolean => {
-  const { parent } = node;
-  return (
-    parent.type === "CallExpression" &&
-    parent.callee.type === "Identifier" &&
-    LOOKUPS.has(parent.callee.name)
-  );
-};
-
 const isErrorMessage = (node: Text): boolean => {
   const { parent } = node;
   return (
@@ -128,12 +117,7 @@ const isErrorMessage = (node: Text): boolean => {
   );
 };
 
-const NOT_COPY: readonly ((node: Text) => boolean)[] = [
-  isSpecifier,
-  isPropertyKey,
-  isLookupKey,
-  isErrorMessage,
-];
+const NOT_COPY: readonly ((node: Text) => boolean)[] = [isSpecifier, isPropertyKey, isErrorMessage];
 
 const isCopyAttribute = (node: Text): boolean => {
   const { parent } = node;

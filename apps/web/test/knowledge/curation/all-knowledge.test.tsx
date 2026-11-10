@@ -6,6 +6,7 @@ import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/c
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { CLEAR_WORDS, filterBy } from "@/shared/words.ts";
 import {
   aConceptRow,
@@ -51,7 +52,12 @@ const FILTER_BY_COLLECTION = filterBy(WORDS.filters.collection.label);
 
 const FILTER_BY_TRUST = filterBy(WORDS.filters.trust.label);
 
-const region = () => within(screen.getByRole("region", { name: "All Knowledge" }));
+const region = () =>
+  within(
+    screen.getByRole("region", {
+      name: pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name,
+    }),
+  );
 
 const rowOf = (title: string) => {
   const row = region().getByRole("link", { name: title }).closest("tr");
@@ -615,7 +621,11 @@ describe("the All Knowledge page for an owner", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading }),
     ).toBeDefined();
-    expect(screen.queryByRole("region", { name: "All Knowledge" })).toBeNull();
+    expect(
+      screen.queryByRole("region", {
+        name: pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name,
+      }),
+    ).toBeNull();
   });
 
   it("shows Page Not Found to an owner who owns nothing", async () => {

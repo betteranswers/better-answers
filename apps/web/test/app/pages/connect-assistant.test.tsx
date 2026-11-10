@@ -3,7 +3,7 @@ import type { BoundFunctions, queries } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CONNECT_ASSISTANT } from "@/app/words.ts";
-import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { ASK, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { clipboardAnswering } from "@test/clipboard-stand-in.ts";
 import { openApp } from "@test/open-app.tsx";
@@ -14,7 +14,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const CONNECT_CLAUDE = pageNamed(menuGroupIn(ASK, "ask"), "Connect Claude");
+const CONNECT_CLAUDE = pageById(menuGroupIn(ASK, "ask"), "connect-claude");
 
 const openConnectClaude = async () => {
   vi.stubGlobal("fetch", answeringAs("Viewer"));

@@ -6,7 +6,7 @@ import { CONCEPT_IRI_PREFIX } from "@better-answers/schema/concept-file";
 import { KNOWLEDGE_BASE_LIST } from "@/features/knowledge/knowledge-state.ts";
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { aSearchApi, placedForSearch } from "@test/knowledge/search-answers.ts";
 import { server } from "@test/stub-server.ts";
 import { openAt, read } from "@test/two-workspaces.ts";
@@ -15,7 +15,7 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedForSearch();
 
-const KNOWLEDGE_BASE = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Knowledge Base").path;
+const KNOWLEDGE_BASE = pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").path;
 
 const concept = (place: number, title: string) => ({
   iri: `${CONCEPT_IRI_PREFIX}${String(place).padStart(26, "0")}`,

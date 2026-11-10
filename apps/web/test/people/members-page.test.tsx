@@ -1,8 +1,8 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UNKNOWN_PAGE } from "@/app/words.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { goHome, UNKNOWN_PAGE } from "@/app/words.ts";
+import { CONTROL_CENTRE, menuGroupIn, NEW_QUESTION, pageById } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { idOf, PRIYA, SAM, TEST_PERSON } from "@test/people/member-pages.ts";
 import { server } from "@test/stub-server.ts";
@@ -14,9 +14,9 @@ placedWithoutMeasuring();
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 
-const MEMBERS_PAGE = pageNamed(people, "Members").path;
+const MEMBERS_PAGE = pageById(people, "members").path;
 
-const GROUPS_PAGE = pageNamed(people, "Groups").path;
+const GROUPS_PAGE = pageById(people, "groups").path;
 
 const A_STRANGER = {
   ...GRACE,
@@ -94,7 +94,7 @@ describe("the People group's Members page", () => {
     const router = await openAt(MEMBERS_PAGE, api);
 
     const main = screen.getByRole("main");
-    await within(main).findByRole("link", { name: "Go to New Question" });
+    await within(main).findByRole("link", { name: goHome(NEW_QUESTION) });
     expect(router.state.location.pathname).toBe(MEMBERS_PAGE);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_PAGE.heading);
     expect(screen.queryByRole("region", { name: "Members" })).toBeNull();

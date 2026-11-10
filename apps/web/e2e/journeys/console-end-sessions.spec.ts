@@ -1,7 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { EVERYONE_PATH } from "@/features/console/people-address.ts";
 import { PERSON_WORDS } from "@/features/console/words.ts";
-import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -22,7 +22,7 @@ import {
 } from "../harness.ts";
 import { personButton, sheetOf } from "../people-pages.ts";
 
-const EVERYONE_PAGE = pageNamed(menuGroupIn(CONSOLE, "people"), "Everyone").path;
+const EVERYONE_PAGE = EVERYONE_PATH;
 
 const INSTANT = /^\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}$/;
 

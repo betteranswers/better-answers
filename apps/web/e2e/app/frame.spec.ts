@@ -4,7 +4,13 @@ import { z } from "zod";
 import { FAILED_PAGE, JUMP_TO, SKIP_TO_MAIN, TOGGLE, UNKNOWN_PAGE } from "@/app/words.ts";
 import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
 import { SETUP_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
-import { CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import {
+  CONTROL_CENTRE,
+  HOMES,
+  INVITE_A_PERSON,
+  menuGroupIn,
+  pageById,
+} from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -37,25 +43,25 @@ const LIST_BUDGET_MS = 1000;
 
 const MODELS = menuGroupIn(CONTROL_CENTRE, "models");
 
-const MODELS_AND_SPEND = pageNamed(MODELS, "Models and Spend");
+const MODELS_AND_SPEND = pageById(MODELS, "models-and-spend");
 
 const PEOPLE = menuGroupIn(CONTROL_CENTRE, "people");
 
-const MEMBERS = pageNamed(PEOPLE, "Members");
+const MEMBERS = pageById(PEOPLE, "members");
 
 const PAGE_NAMES = [
-  "Connected Sources",
-  "Models and Spend",
-  "Questions Asked",
-  "Answer Tests",
+  pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name,
+  pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
+  pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
+  pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "answer-tests").name,
   "Members",
   "Groups",
-  "Audit Log",
+  pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name,
 ];
 
 const AREA_NAMES = ["Ask", "Knowledge", "Inbox", "Control Centre"];
 
-const MODELS_HEADING = "Models and Spend";
+const MODELS_HEADING = pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name;
 
 const NARROW = { width: 320, height: 720 };
 
@@ -66,8 +72,6 @@ const FAILED_HEADING = FAILED_PAGE.heading;
 const MALFORMED_LIST = { why: "a response the Model Choices card cannot render" };
 
 const MODEL_CHOICES_LIST = "modelChoices.list";
-
-const INVITE_A_PERSON = "Invite a Person";
 
 const PRIYA = "Priya Shah";
 
@@ -89,7 +93,10 @@ const menuDialog = (page: Page) => page.getByRole("dialog", { name: "Menu", exac
 
 const jumpToOf = (page: Page) => headerOf(page).getByRole("button", { name: JUMP_TO.name });
 
-const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Models and Spend" });
+const tabsOf = (page: Page) =>
+  page.getByRole("tablist", {
+    name: pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
+  });
 
 const modelChoicesCardOf = (page: Page) => page.getByRole("region", { name: "Model Choices" });
 
@@ -249,7 +256,7 @@ test("the shell's header, rail, and menu work by keyboard", async ({
       hideMenuButton(page),
       crumbOf(page, "Control Centre"),
       crumbOf(page, "Models"),
-      crumbOf(page, "Models and Spend"),
+      crumbOf(page, pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name),
       jumpToOf(page),
       avatarOf(page, workspace.admin.name),
     ];
@@ -322,7 +329,7 @@ test("the shell's header, rail, and menu work by keyboard", async ({
 
     await expect(jumpToDialogOf(page).getByRole("group", { name: "Pages" })).toBeVisible();
     await expect(jumpToOptionOf(page, new RegExp(PRIYA))).toBeVisible();
-    await expect(jumpToOptionOf(page, INVITE_A_PERSON)).toBeVisible();
+    await expect(jumpToOptionOf(page, INVITE_A_PERSON.name)).toBeVisible();
   });
 
   await page.route("**/trpc/**", breakModelChoicesList);
@@ -343,7 +350,11 @@ test("the shell's header, rail, and menu work by keyboard", async ({
 
     await expect(headerOf(page).getByText(workspace.name)).toBeVisible();
     await expect(railOf(page).getByRole("link")).toHaveText(AREA_NAMES);
-    await expect(navigation.getByRole("link", { name: "Audit Log" })).toBeVisible();
+    await expect(
+      navigation.getByRole("link", {
+        name: pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name,
+      }),
+    ).toBeVisible();
 
     await skipLinkReachesThePage(page);
     await page.keyboard.press("Tab");

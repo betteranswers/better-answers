@@ -6,7 +6,7 @@ import { correctWords } from "@/features/console/names-waiting/correcting-words.
 import { NAMES_WAITING_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { DISPLAY_NAME_WORDS } from "@/shared/member/display-name-words.ts";
-import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONSOLE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
@@ -26,7 +26,7 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const NAMES_WAITING_PAGE = pageNamed(menuGroupIn(CONSOLE, "people"), "Flagged Names").path;
+const NAMES_WAITING_PAGE = pageById(menuGroupIn(CONSOLE, "people"), "flagged-names").path;
 
 const INSTANT_WORDS = String.raw`\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}`;
 
@@ -42,7 +42,10 @@ const dialogToCorrect = (page: Page, name: string): Locator =>
 const nameFieldOf = (dialog: Locator): Locator =>
   dialog.getByRole("textbox", { name: DISPLAY_NAME_WORDS.label });
 
-const namesWaiting = (page: Page) => page.getByRole("region", { name: "Flagged Names" });
+const namesWaiting = (page: Page) =>
+  page.getByRole("region", {
+    name: pageById(menuGroupIn(CONSOLE, "people"), "flagged-names").name,
+  });
 
 const waitingCount = (page: Page): Locator => countOf(namesWaiting(page));
 
@@ -111,7 +114,10 @@ test.describe("the console's Flagged Names page", () => {
         page.getByRole("dialog"),
         "c opened a dialog when no name had focus",
       ).toHaveCount(0);
-      const listed = await keystrokesListed(page, "Flagged Names");
+      const listed = await keystrokesListed(
+        page,
+        pageById(menuGroupIn(CONSOLE, "people"), "flagged-names").name,
+      );
       await expect(listed.getByRole("definition")).toHaveText([
         NAMES_WAITING_KEYSTROKES.search.action,
         NAMES_WAITING_KEYSTROKES.correct.action,
@@ -167,9 +173,9 @@ test.describe("the console's Flagged Names page", () => {
     await expect(waitingRows(page)).toHaveCount(1);
     await expect(thePage(page)).toMatchAriaSnapshot(`
       - main "Page":
-        - heading "Flagged Names" [level=1]
-        - region "Flagged Names":
-          - heading "Flagged Names" [level=2]
+        - heading ${JSON.stringify(pageById(menuGroupIn(CONSOLE, "people"), "flagged-names").name)} [level=1]
+        - region ${JSON.stringify(pageById(menuGroupIn(CONSOLE, "people"), "flagged-names").name)}:
+          - heading ${JSON.stringify(pageById(menuGroupIn(CONSOLE, "people"), "flagged-names").name)} [level=2]
           - status: /\\b1\\b/
           - searchbox "Search by name or workspace": ${JSON.stringify(name)}
           - table:

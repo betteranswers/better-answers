@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type { ReadAuditEvent } from "@/shared/audit/audit-event.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure } from "@test/stubbed-api.ts";
 import { adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
@@ -58,7 +59,12 @@ const EVERYONES = [
 const pageOf = (events: readonly ReadAuditEvent[]) =>
   read({ events, nextCursor: null, searchTooBroad: false });
 
-const log = () => within(screen.getByRole("region", { name: "Audit Log" }));
+const log = () =>
+  within(
+    screen.getByRole("region", {
+      name: pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name,
+    }),
+  );
 
 const lines = () => log().queryAllByRole("listitem");
 

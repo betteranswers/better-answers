@@ -5,13 +5,13 @@ import { ULID } from "@better-answers/schema/ulid";
 import { ADDRESS_QUERY } from "@/shared/address/address-query.ts";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 import { BROWSE, SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
-import { detailAt, pageNamed } from "@/shared/navigation.ts";
+import { detailAt, pageById } from "@/shared/navigation.ts";
 
 import type { Guide, SectionFact } from "../knowledge-api.ts";
 import { SEARCH_LIST } from "../knowledge-state.ts";
 import type { NewConceptHeld } from "../new-concept.tsx";
 
-export const GUIDES_PAGE = pageNamed(BROWSE, "Guides");
+export const GUIDES_PAGE = pageById(BROWSE, "guides");
 
 export const GUIDE_ID = z.string().regex(ULID);
 

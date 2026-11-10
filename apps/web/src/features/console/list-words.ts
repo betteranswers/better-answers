@@ -1,3 +1,4 @@
+import { CONSOLE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { counted } from "@/shared/words.ts";
 
 type Noun = readonly [one: string, many: string];
@@ -13,8 +14,10 @@ const WORKSPACES: Noun = ["workspace", "workspaces"];
 
 const PERSON = "Person";
 
+const PEOPLE_PAGES = menuGroupIn(CONSOLE, "people");
+
 export const EVERYONE_WORDS = {
-  heading: "Everyone",
+  heading: pageById(PEOPLE_PAGES, "everyone").name,
   columns: {
     person: PERSON,
     workspacesAndRoles: "Workspaces and roles",
@@ -37,7 +40,7 @@ const namesCounted = (count: number): string =>
   count === 0 ? "" : `${counted(count, ...NAMES)} waiting to be corrected.`;
 
 export const NAMES_WAITING_WORDS = {
-  heading: "Flagged Names",
+  heading: pageById(PEOPLE_PAGES, "flagged-names").name,
   columns: { person: PERSON, flaggedBy: "Flagged by", actions: "Actions" },
   search: "Search by name or workspace",
   caption: "Display names waiting to be corrected.",
@@ -50,7 +53,7 @@ export const NAMES_WAITING_WORDS = {
 } as const;
 
 export const WORKSPACES_WORDS = {
-  heading: "Every Workspace",
+  heading: pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace").name,
   search: "Search by name or short name",
   columns: {
     workspace: "Workspace",

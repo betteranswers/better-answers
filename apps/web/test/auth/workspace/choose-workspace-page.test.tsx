@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { FAILED_PAGE } from "@/app/words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
-import { HOMES, type Role } from "@/shared/navigation.ts";
+import { HOMES, NEW_QUESTION, type Role } from "@/shared/navigation.ts";
 import { SIGN_OUT } from "@/shared/words.ts";
 import { server, type Asked } from "@test/stub-server.ts";
 import { addressOf, type Api, holdProcedure, settlingAfter } from "@test/stubbed-api.ts";
@@ -138,7 +138,7 @@ it("skips the picker for a workspace joined after sign-in", async () => {
   const router = await openPageOutsideShell("/choose-workspace", api, watching);
 
   await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Editor.path));
-  expect(await screen.findByRole("heading", { level: 1, name: "New Question" })).toBeDefined();
+  expect(await screen.findByRole("heading", { level: 1, name: NEW_QUESTION.name })).toBeDefined();
   expect(await switcher(NORTHERN)).toBeDefined();
   const you = within(screen.getByRole("banner")).getByRole("button", { name: ADA.displayName });
   fireEvent.keyDown(you, { key: "Enter" });

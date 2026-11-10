@@ -2,7 +2,7 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { CONNECT_WORDS, LIST_WORDS, NEEDS_OCR, ROW_ACTIONS } from "@/features/sources/words.ts";
-import { NEW_QUESTION } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, NEW_QUESTION, pageById } from "@/shared/navigation.ts";
 import { notFoundLinksHome } from "@test/detail/not-found-detail.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
@@ -152,7 +152,11 @@ describe("the Sources page's list of connected sources", () => {
     await openSources(api);
 
     await notFoundLinksHome(NEW_QUESTION);
-    expect(screen.queryByRole("region", { name: "Connected Sources" })).toBeNull();
+    expect(
+      screen.queryByRole("region", {
+        name: pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name,
+      }),
+    ).toBeNull();
     expect(document.body.textContent).not.toContain("Staff handbook");
     press("b");
     expect(screen.queryByRole("dialog", { name: CONNECT_WORDS.action })).toBeNull();

@@ -6,7 +6,7 @@ import { AUTHENTICATOR_WORDS } from "@/features/auth/account-words.ts";
 import { STALE_CONFIRMATION } from "@/features/auth/refusal-words.ts";
 import { EXPORTS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { downloadsWatched, type SavedFile } from "@test/knowledge/downloads.ts";
 import { theOneEmptyStatus } from "@test/knowledge/empty-status.ts";
 import { aGuideSummary, idOf } from "@test/knowledge/guide-answers.ts";
@@ -26,7 +26,7 @@ afterEach(() => {
   cleanup();
 });
 
-const PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Exports").path;
+const PAGE = pageById(menuGroupIn(KNOWLEDGE, "curation"), "exports").path;
 
 const KNOWLEDGE_BASE = WORDS.knowledgeBase.name;
 

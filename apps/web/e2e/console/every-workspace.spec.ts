@@ -6,7 +6,7 @@ import { JUMP_TO, SKIP_TO_MAIN, TOGGLE } from "@/app/words.ts";
 import { WORKSPACES_WORDS } from "@/features/console/list-words.ts";
 import { WORKSPACES_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { HOMES } from "@/shared/navigation.ts";
+import { CONSOLE, HOMES, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -26,7 +26,10 @@ const LIST_BUDGET_MS = 1000;
 
 const EVERY_WORKSPACE = HOMES.operator.path;
 
-const listOf = (page: Page) => page.getByRole("region", { name: "Every Workspace" });
+const listOf = (page: Page) =>
+  page.getByRole("region", {
+    name: pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace").name,
+  });
 
 const searchOf = (page: Page) =>
   listOf(page).getByRole("searchbox", { name: "Search by name or short name" });
@@ -81,7 +84,12 @@ test.describe("the console's Workspaces page", () => {
       assert.ok(desktop !== null, "the page has no viewport");
       await page.setViewportSize({ width: 320, height: 720 });
       await page.goto(EVERY_WORKSPACE);
-      await expect(page.getByRole("heading", { level: 1, name: "Every Workspace" })).toBeVisible();
+      await expect(
+        page.getByRole("heading", {
+          level: 1,
+          name: pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace").name,
+        }),
+      ).toBeVisible();
       await expect(ours).toBeVisible();
 
       await expect(listOf(page).getByRole("columnheader")).toHaveText([
@@ -128,7 +136,11 @@ test.describe("the console's Workspaces page", () => {
       await page.keyboard.press("Tab");
       await expect(stop).toBeFocused();
     }
-    for (const name of ["Everyone", "Flagged Names", "Every Workspace"]) {
+    for (const name of [
+      "Everyone",
+      pageById(menuGroupIn(CONSOLE, "people"), "flagged-names").name,
+      pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace").name,
+    ]) {
       await page.keyboard.press("Tab");
       await expect(navOf(page, "Console").getByRole("link", { name })).toBeFocused();
     }
@@ -147,9 +159,9 @@ test.describe("the console's Workspaces page", () => {
     await expect(workspaceRows(page)).toHaveCount(1);
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
-        - heading "Every Workspace" [level=1]
-        - region "Every Workspace":
-          - heading "Every Workspace" [level=2]
+        - heading ${JSON.stringify(pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace").name)} [level=1]
+        - region ${JSON.stringify(pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace").name)}:
+          - heading ${JSON.stringify(pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace").name)} [level=2]
           - status: /\\b1\\b/
           - searchbox "Search by name or short name": ${JSON.stringify(workspace.name)}
           - table:

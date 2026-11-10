@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { PAGE_NUMBER, searchText } from "@/shared/address/list-address.ts";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import type { AllKnowledgeAsked } from "../knowledge-api.ts";
 
@@ -150,7 +150,7 @@ export const CONCEPT_TYPES_KEYSTROKES = {
   open: { key: "o", action: "Show or hide the focused type’s collections" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
-export const CONCEPT_TYPES_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Concept Types");
+export const CONCEPT_TYPES_PAGE = pageById(menuGroupIn(KNOWLEDGE, "curation"), "concept-types");
 
 export const CONCEPT_TYPES_LIST = "types";
 

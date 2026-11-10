@@ -1,31 +1,33 @@
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
-import { FAILED_PAGE, UNKNOWN_PAGE } from "@/app/words.ts";
+import { FAILED_PAGE, goHome, UNKNOWN_PAGE } from "@/app/words.ts";
 import { CONCEPT_TYPES_PAGE } from "@/features/knowledge/curation/curation-state.ts";
 import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
 import {
+  AREAS,
+  ASK,
   CONSOLE,
   CONTROL_CENTRE,
   detailAt,
-  menuGroupIn,
   hides,
   HOMES,
   INBOX,
   KNOWLEDGE,
+  menuGroupIn,
   movedWithin,
+  NEW_QUESTION,
   OWNS_NOTHING,
+  pageById,
+  pagesOf,
   placeAt,
   readerOf,
-  pageNamed,
-  pagesOf,
-  AREAS,
-  visibleTo,
-  type Owns,
-  type Role,
-  type Page,
   type Area,
+  type Owns,
+  type Page,
+  type Role,
+  visibleTo,
 } from "@/shared/navigation.ts";
 import { appAt, openApp } from "@test/open-app.tsx";
 import { addressOf, answeringAs, withTheApiDown } from "@test/stubbed-api.ts";
@@ -58,6 +60,7 @@ const groupsFor = (role: Role, owns: Owns) =>
   ]);
 
 const aPage = (name: string, built: boolean, owners?: Page["owners"]): Page => ({
+  id: name.toLowerCase(),
   name,
   path: `/a/${name.toLowerCase()}`,
   icon: "map",
@@ -69,46 +72,94 @@ const aPage = (name: string, built: boolean, owners?: Page["owners"]): Page => (
 describe("the navigation declaration", () => {
   it("declares the navigation list's areas, groups and pages in order", () => {
     expect(outline(AREAS)).toEqual([
-      ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]],
+      [
+        "Ask",
+        [
+          [
+            null,
+            [
+              NEW_QUESTION.name,
+              pageById(menuGroupIn(ASK, "ask"), "your-questions").name,
+              "Connect Claude",
+            ],
+          ],
+        ],
+      ],
       [
         "Knowledge",
         [
-          ["Browse", ["Search", "Guides", "Knowledge Base"]],
+          [
+            "Browse",
+            ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
+          ],
           [
             "Curation",
             [
-              "All Knowledge",
-              "Due for Verification",
+              pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name,
+              pageById(menuGroupIn(KNOWLEDGE, "curation"), "due-for-verification").name,
               "Conflicts",
               CONCEPT_TYPES_PAGE.name,
-              "Collections and Owners",
+              pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").name,
               "Exports",
             ],
           ],
         ],
       ],
-      ["Inbox", [[null, ["Waiting on You"]]]],
+      ["Inbox", [[null, [pageById(menuGroupIn(INBOX, "inbox"), "waiting-on-you").name]]]],
       [
         "Control Centre",
         [
           ["Overview", ["Overview"]],
-          ["Suggestions", ["To Decide"]],
+          ["Suggestions", [pageById(menuGroupIn(CONTROL_CENTRE, "suggestions"), "to-decide").name]],
           [
             "Sources",
             [
-              "Connected Sources",
-              "Publishing Rules",
-              "Cost Estimates",
+              pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name,
+              pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "publishing-rules").name,
+              pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "cost-estimates").name,
               "Backlogs",
-              "Removed at Source",
-              "Share Agents",
+              pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "removed-at-source").name,
+              pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "share-agents").name,
             ],
           ],
-          ["Models", ["Models and Spend", "Spending Limit"]],
-          ["Questions", ["Questions Asked", "Answer Tests"]],
-          ["People", ["Members", "Groups", "Personal Tokens"]],
-          ["Personal Data", ["Erasure and Suppression"]],
-          ["System", ["Audit Log", "Signals", "Health", "Backups"]],
+          [
+            "Models",
+            [
+              pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
+              pageById(menuGroupIn(CONTROL_CENTRE, "models"), "spending-limit").name,
+            ],
+          ],
+          [
+            "Questions",
+            [
+              pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
+              pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "answer-tests").name,
+            ],
+          ],
+          [
+            "People",
+            [
+              "Members",
+              "Groups",
+              pageById(menuGroupIn(CONTROL_CENTRE, "people"), "personal-tokens").name,
+            ],
+          ],
+          [
+            menuGroupIn(CONTROL_CENTRE, "personal-data").name,
+            [
+              pageById(menuGroupIn(CONTROL_CENTRE, "personal-data"), "erasure-and-suppression")
+                .name,
+            ],
+          ],
+          [
+            "System",
+            [
+              pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name,
+              "Signals",
+              "Health",
+              "Backups",
+            ],
+          ],
         ],
       ],
     ]);
@@ -119,8 +170,8 @@ describe("the navigation declaration", () => {
       [
         "Console",
         [
-          ["People", ["Everyone", "Flagged Names"]],
-          ["Workspaces", ["Every Workspace"]],
+          ["People", ["Everyone", pageById(menuGroupIn(CONSOLE, "people"), "flagged-names").name]],
+          ["Workspaces", [pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace").name]],
         ],
       ],
     ]);
@@ -189,14 +240,33 @@ describe("the navigation declaration", () => {
   });
 });
 
-const ASK_OUTLINE = ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]];
+const ASK_OUTLINE = [
+  "Ask",
+  [
+    [
+      null,
+      [
+        NEW_QUESTION.name,
+        pageById(menuGroupIn(ASK, "ask"), "your-questions").name,
+        "Connect Claude",
+      ],
+    ],
+  ],
+];
 
-const OWNER_CURATION = ["All Knowledge", CONCEPT_TYPES_PAGE.name, "Collections and Owners"];
+const OWNER_CURATION = [
+  pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name,
+  CONCEPT_TYPES_PAGE.name,
+  pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").name,
+];
 
 const KNOWLEDGE_WITH_OWNER_CURATION = [
   "Knowledge",
   [
-    ["Browse", ["Search", "Guides", "Knowledge Base"]],
+    [
+      "Browse",
+      ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
+    ],
     ["Curation", OWNER_CURATION],
   ],
 ];
@@ -204,12 +274,18 @@ const KNOWLEDGE_WITH_OWNER_CURATION = [
 const KNOWLEDGE_WITH_ADMIN_CURATION = [
   "Knowledge",
   [
-    ["Browse", ["Search", "Guides", "Knowledge Base"]],
+    [
+      "Browse",
+      ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
+    ],
     ["Curation", [...OWNER_CURATION, "Exports"]],
   ],
 ];
 
-const INBOX_OUTLINE = ["Inbox", [[null, ["Waiting on You"]]]];
+const INBOX_OUTLINE = [
+  "Inbox",
+  [[null, [pageById(menuGroupIn(INBOX, "inbox"), "waiting-on-you").name]]],
+];
 
 describe("the navigation each person sees", () => {
   for (const role of ["Editor", "Viewer"] as const) {
@@ -217,8 +293,32 @@ describe("the navigation each person sees", () => {
       const shown = visibleTo(readerOf(role), AREAS);
 
       expect(outline(shown.areas)).toEqual([
-        ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]],
-        ["Knowledge", [["Browse", ["Search", "Guides", "Knowledge Base"]]]],
+        [
+          "Ask",
+          [
+            [
+              null,
+              [
+                NEW_QUESTION.name,
+                pageById(menuGroupIn(ASK, "ask"), "your-questions").name,
+                "Connect Claude",
+              ],
+            ],
+          ],
+        ],
+        [
+          "Knowledge",
+          [
+            [
+              "Browse",
+              [
+                "Search",
+                "Guides",
+                pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name,
+              ],
+            ],
+          ],
+        ],
       ]);
       expect(shown.home).toBe(HOMES[role]);
       expect(shown.areas[0]?.opensAt).toBe(HOMES[role]);
@@ -235,11 +335,17 @@ describe("the navigation each person sees", () => {
       [
         "Control Centre",
         [
-          ["Sources", ["Connected Sources"]],
-          ["Models", ["Models and Spend"]],
-          ["Questions", ["Questions Asked", "Answer Tests"]],
+          ["Sources", [pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name]],
+          ["Models", [pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name]],
+          [
+            "Questions",
+            [
+              pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
+              pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "answer-tests").name,
+            ],
+          ],
           ["People", ["Members", "Groups"]],
-          ["System", ["Audit Log"]],
+          ["System", [pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name]],
         ],
       ],
     ]);
@@ -323,7 +429,7 @@ describe("the navigation each person sees", () => {
 
   it("shows an Editor who owns a collection Curation without Exports", () => {
     const owner = readerOf("Editor", { collections: ["policy"], concepts: 0 });
-    const exports = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Exports");
+    const exports = pageById(menuGroupIn(KNOWLEDGE, "curation"), "exports");
     const shown = visibleTo(owner, AREAS);
 
     expect(pagesOf(shown.areas).map((each) => each.name)).not.toContain("Exports");
@@ -332,7 +438,7 @@ describe("the navigation each person sees", () => {
   });
 
   it("shows Waiting on You to owners and Admins", () => {
-    const waiting = pageNamed(menuGroupIn(INBOX, "inbox"), "Waiting on You");
+    const waiting = pageById(menuGroupIn(INBOX, "inbox"), "waiting-on-you");
     const { path } = waiting;
     const item = detailAt(waiting, "01JBZ6Q2V7Y9K3M5N8P0R2T4W7");
     const overrideOwner = readerOf("Viewer", { collections: [], concepts: 1 });
@@ -341,7 +447,15 @@ describe("the navigation each person sees", () => {
 
     expect(outline(visibleTo(overrideOwner, AREAS).areas)).toEqual([
       ASK_OUTLINE,
-      ["Knowledge", [["Browse", ["Search", "Guides", "Knowledge Base"]]]],
+      [
+        "Knowledge",
+        [
+          [
+            "Browse",
+            ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
+          ],
+        ],
+      ],
       INBOX_OUTLINE,
     ]);
     expect(hides(visibleTo(overrideOwner, AREAS), path)).toBe(false);
@@ -357,7 +471,15 @@ describe("the navigation each person sees", () => {
 
     expect(outline(visibleTo(owningNothing, AREAS).areas)).toEqual([
       ASK_OUTLINE,
-      ["Knowledge", [["Browse", ["Search", "Guides", "Knowledge Base"]]]],
+      [
+        "Knowledge",
+        [
+          [
+            "Browse",
+            ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
+          ],
+        ],
+      ],
     ]);
   });
 
@@ -366,13 +488,21 @@ describe("the navigation each person sees", () => {
 
     expect(outline(visibleTo(owner, AREAS.map(withAllPagesBuilt)).areas)).toEqual([
       ASK_OUTLINE,
-      ["Knowledge", [["Browse", ["Search", "Guides", "Knowledge Base"]]]],
-      ["Inbox", [[null, ["Waiting on You"]]]],
+      [
+        "Knowledge",
+        [
+          [
+            "Browse",
+            ["Search", "Guides", pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name],
+          ],
+        ],
+      ],
+      ["Inbox", [[null, [pageById(menuGroupIn(INBOX, "inbox"), "waiting-on-you").name]]]],
     ]);
   });
 
   it("hides Curation from people who own no collection", () => {
-    const path = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Collections and Owners").path;
+    const path = pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").path;
     const owns = { collections: ["policy"], concepts: 0 };
 
     expect(hides(visibleTo(readerOf("Editor", owns), AREAS), path)).toBe(false);
@@ -393,7 +523,7 @@ describe("the navigation each person sees", () => {
       "Models",
       "Questions",
       "People",
-      "Personal Data",
+      menuGroupIn(CONTROL_CENTRE, "personal-data").name,
       "System",
     ];
 
@@ -417,7 +547,7 @@ describe("the navigation each person sees", () => {
   });
 });
 
-const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
+const MEMBERS = pageById(menuGroupIn(CONTROL_CENTRE, "people"), "members");
 
 const A_PERSON = "01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
 
@@ -556,12 +686,12 @@ describe("a path the person cannot access", () => {
 
     const hidden = await openApp("/people/members");
     const main = screen.getByRole("main");
-    await within(main).findByRole("link", { name: "Go to New Question" });
+    await within(main).findByRole("link", { name: goHome(NEW_QUESTION) });
     const hiddenPage = { main: main.innerHTML, banner: screen.getByRole("banner").textContent };
     hidden.rendered.unmount();
 
     await openApp("/people/not-a-page");
-    await within(screen.getByRole("main")).findByRole("link", { name: "Go to New Question" });
+    await within(screen.getByRole("main")).findByRole("link", { name: goHome(NEW_QUESTION) });
 
     expect(pageHeading()).toBe(NOT_FOUND);
     expect(screen.getByRole("main").innerHTML).toBe(hiddenPage.main);
@@ -574,7 +704,7 @@ describe("a path the person cannot access", () => {
       vi.stubGlobal("fetch", answeringAs(role));
 
       await openApp(`${MEMBERS.path}/${A_PERSON}`);
-      await within(screen.getByRole("main")).findByRole("link", { name: "Go to New Question" });
+      await within(screen.getByRole("main")).findByRole("link", { name: goHome(NEW_QUESTION) });
 
       expect(pageHeading()).toBe(NOT_FOUND);
     });

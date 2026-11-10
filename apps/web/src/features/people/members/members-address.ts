@@ -5,15 +5,15 @@ import { ULID } from "@better-answers/schema/ulid";
 
 import type { Here } from "@/shared/address/address-ask.ts";
 import { PAGE_NUMBER, searchText } from "@/shared/address/list-address.ts";
-import { CONTROL_CENTRE, detailAt, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, detailAt, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import type { Role } from "../people-api.ts";
 
 const PEOPLE = menuGroupIn(CONTROL_CENTRE, "people");
 
-export const MEMBERS_PAGE = pageNamed(PEOPLE, "Members");
+export const MEMBERS_PAGE = pageById(PEOPLE, "members");
 
-export const GROUPS_PATH = pageNamed(PEOPLE, "Groups").path;
+export const GROUPS_PATH = pageById(PEOPLE, "groups").path;
 
 export const MEMBERS_LIST = "members";
 

@@ -3,7 +3,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { KNOWLEDGE_BASE_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { LIST_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
@@ -23,7 +23,7 @@ const LIST_BUDGET_MS = 1000;
 
 const A_PAGE = 50;
 
-const KNOWLEDGE_BASE = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Knowledge Base").path;
+const KNOWLEDGE_BASE = pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").path;
 
 const signedIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
   await page.goto("/sign-in");
@@ -171,11 +171,12 @@ test.describe("Knowledge Base", () => {
       await atTheKnowledgeBase(page);
 
       await skipLinkReachesThePage(page);
-      await listsItsKeystrokes(page, "Knowledge Base", KEY, [
-        KEY.tree.action,
-        KEY.concepts.action,
-        KEY.more.action,
-      ]);
+      await listsItsKeystrokes(
+        page,
+        pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name,
+        KEY,
+        [KEY.tree.action, KEY.concepts.action, KEY.more.action],
+      );
       await page.keyboard.press(KEY.tree.key);
       await expect(
         itemOf(page, "Insurance Policy"),

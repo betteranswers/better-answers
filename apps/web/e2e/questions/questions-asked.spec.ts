@@ -1,6 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -18,16 +18,22 @@ const LIST_BUDGET_MS = 1000;
 
 const QUESTIONS = menuGroupIn(CONTROL_CENTRE, "questions");
 
-const QUESTIONS_ASKED = pageNamed(QUESTIONS, "Questions Asked").path;
+const QUESTIONS_ASKED = pageById(QUESTIONS, "questions-asked").path;
 
 const QUESTIONS_PAGES = [
-  ["Questions Asked", QUESTIONS_ASKED],
-  ["Answer Tests", pageNamed(QUESTIONS, "Answer Tests").path],
+  [pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name, QUESTIONS_ASKED],
+  [
+    pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "answer-tests").name,
+    pageById(QUESTIONS, "answer-tests").path,
+  ],
 ] as const;
 
 const AUDIT_CONCEPT = "Audit Logs Retention";
 
-const questionsAsked = (page: Page) => page.getByRole("region", { name: "Questions Asked" });
+const questionsAsked = (page: Page) =>
+  page.getByRole("region", {
+    name: pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
+  });
 
 const rowsOf = (region: Locator) => region.getByRole("listitem").getByRole("button");
 
@@ -69,7 +75,9 @@ const signedInAtTheQuestions = async (page: Page, api: APIRequestContext, at: At
   await signIn(page, api, at.adminEmail);
   await page
     .getByRole("navigation", { name: "Control Centre" })
-    .getByRole("link", { name: "Questions Asked" })
+    .getByRole("link", {
+      name: pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
+    })
     .click();
   await expect(page).toHaveURL(new RegExp(`${QUESTIONS_ASKED}$`));
 };

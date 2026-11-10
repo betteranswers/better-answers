@@ -90,7 +90,7 @@ describe("a member's own page", () => {
     fireEvent.click(commit);
 
     await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Editor.path));
-    expect(screen.getByRole("heading", { level: 1, name: "New Question" })).toBeDefined();
+    expect(screen.getByRole("heading", { level: 1, name: NEW_QUESTION.name })).toBeDefined();
     const said = screen.getAllByRole("status").filter((each) => /\S/.test(each.textContent));
     expect(said).toHaveLength(1);
     expect(said[0]?.textContent).toMatch(/\bEditor\b/);

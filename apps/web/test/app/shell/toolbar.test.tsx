@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { Toolbar, PagePanel, PageTabsRoot } from "@/app/shell/toolbar.tsx";
 import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { viewStateOf, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 import { openApp } from "@test/open-app.tsx";
 
@@ -13,7 +14,10 @@ const MODELS_AND_SPEND = "/models/models-and-spend";
 
 const shellAt = async (path: string) => (await openApp(path)).router;
 
-const tabs = () => screen.getByRole("tablist", { name: "Models and Spend" });
+const tabs = () =>
+  screen.getByRole("tablist", {
+    name: pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
+  });
 
 const selectedTab = () => within(tabs()).getByRole("tab", { selected: true }).textContent;
 
@@ -122,7 +126,9 @@ describe("the page toolbar", () => {
     );
     expect(panel.textContent).toMatch(/\S/v);
     expect(screen.queryByRole("region", { name: MODEL_CHOICES_WORDS.heading })).toBeNull();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models and Spend");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+      pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
+    );
   });
 
   it("opens a different page on that page's first tab", () => {
@@ -131,7 +137,12 @@ describe("the page toolbar", () => {
         <Toolbar name={name} toolbar={toolbar} />
       </PageTabsRoot>
     );
-    const { rerender } = render(toolbarFor(A_TABBED_PAGE, "Connected Sources"));
+    const { rerender } = render(
+      toolbarFor(
+        A_TABBED_PAGE,
+        pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name,
+      ),
+    );
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Gone at source" }));
     expect(screen.getByRole("tab", { selected: true }).textContent).toBe("Gone at source");
 
@@ -163,7 +174,7 @@ describe("the page toolbar", () => {
     const page = screen.getByRole("main");
     const heading = await within(page).findByRole("heading", {
       level: 1,
-      name: "Models and Spend",
+      name: pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
     });
 
     expect(within(page).getByRole("tablist")).toBe(tabs());

@@ -6,7 +6,7 @@ import type { AskedRecord } from "@/features/questions/questions-api.ts";
 import { QUESTIONS_KEYSTROKES as KEY } from "@/features/questions/questions-state.ts";
 import { QUESTIONS_WORDS as WORDS } from "@/features/questions/questions-words.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure } from "@test/stubbed-api.ts";
 import { adaAnAdmin, FORBIDDEN, openAt, read } from "@test/two-workspaces.ts";
@@ -15,7 +15,7 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
-const QUESTIONS_ASKED = pageNamed(menuGroupIn(CONTROL_CENTRE, "questions"), "Questions Asked").path;
+const QUESTIONS_ASKED = pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").path;
 
 const FLAGGED_QUESTION = "How long do you keep audit logs for buyers?";
 
@@ -71,7 +71,9 @@ const openQuestions = async (records: readonly AskedRecord[], nextCursor: unknow
   const api = adaAnAdmin();
   api.set("questions.asked", () => pageOf(records, nextCursor));
   await openAt(QUESTIONS_ASKED, api);
-  const region = await screen.findByRole("region", { name: "Questions Asked" });
+  const region = await screen.findByRole("region", {
+    name: pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
+  });
   await within(region).findByRole("button", { name: records[0]?.question ?? "" });
   return { api, region };
 };
@@ -152,13 +154,17 @@ describe("Questions asked", () => {
     const api = adaAnAdmin();
     api.set("questions.asked", () => pageOf(asked.slice(0, 50), cursor));
     await openAt(QUESTIONS_ASKED, api);
-    const region = await screen.findByRole("region", { name: "Questions Asked" });
+    const region = await screen.findByRole("region", {
+      name: pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
+    });
     await within(region).findByRole("button", { name: "Question number 51" });
     expect(rowsOf(region)).toHaveLength(50);
 
     press("?");
     const keystrokes = await screen.findByRole("dialog", {
-      name: keystrokesOn("Questions Asked"),
+      name: keystrokesOn(
+        pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
+      ),
     });
     for (const { key } of Object.values(KEY)) {
       expect(within(keystrokes).getByText(key, { selector: "dt, dt *" })).toBeDefined();

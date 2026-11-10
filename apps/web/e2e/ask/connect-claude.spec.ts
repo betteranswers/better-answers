@@ -2,7 +2,7 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { CONNECT_ASSISTANT, JUMP_TO, UNKNOWN_PAGE } from "@/app/words.ts";
 import { keystrokesOn, KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { ASK, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { ASK, HOMES, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -19,7 +19,7 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const CONNECT_CLAUDE = pageNamed(menuGroupIn(ASK, "ask"), "Connect Claude");
+const CONNECT_CLAUDE = pageById(menuGroupIn(ASK, "ask"), "connect-claude");
 
 const aViewerSignedIn = async (page: Page, api: APIRequestContext) => {
   const email = anAddress("viewer");

@@ -9,7 +9,7 @@ import { cn } from "@/shared/lib/utils.ts";
 import { RowLink } from "@/shared/list/grid-table.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
-import { ASK, detailAt, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { ASK, detailAt, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
@@ -26,9 +26,9 @@ import { shownAnswerOf } from "./shown-answer.ts";
 
 const ASKING = menuGroupIn(ASK, "ask");
 
-const YOUR_QUESTIONS = pageNamed(ASKING, "Your Questions");
+const YOUR_QUESTIONS = pageById(ASKING, "your-questions");
 
-const NEW_QUESTION = pageNamed(ASKING, "New Question");
+const NEW_QUESTION = pageById(ASKING, "new-question");
 
 const LISTED = Object.values(KEY);
 

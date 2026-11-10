@@ -75,11 +75,6 @@ const SYNTAX: readonly (readonly [string, string, string])[] = [
     'export const keys = { ["Some Odd Key"]: 1 };\n',
   ],
   [
-    "a page looked up by its menu name",
-    "apps/web/src/g.ts",
-    'export const page = pageNamed(CURATION, "Collections and Owners");\n',
-  ],
-  [
     "a lower case fragment of a sentence",
     "apps/web/src/h.ts",
     'export const gone = "a former member";\n',

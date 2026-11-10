@@ -4,7 +4,7 @@ import { CONCEPT_TYPES_PAGE } from "@/features/knowledge/curation/curation-state
 import { COLLECTIONS_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -27,9 +27,9 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const COLLECTIONS_AND_OWNERS = pageNamed(
+const COLLECTIONS_AND_OWNERS = pageById(
   menuGroupIn(KNOWLEDGE, "curation"),
-  "Collections and Owners",
+  "collections-and-owners",
 ).path;
 
 const EDITOR = "Ifan Morgan";
@@ -91,7 +91,9 @@ const ownersNamed = (api: APIRequestContext, at: Curated, owners: readonly Owned
   nameOwners(api, { workspaceId: at.workspaceId, userId: at.admin.id, owners });
 
 const collections = (page: Page): Locator =>
-  page.getByRole("region", { name: "Collections and Owners" });
+  page.getByRole("region", {
+    name: pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").name,
+  });
 
 const signedInAtThePage = async (page: Page, api: APIRequestContext, email: string) => {
   await signedIn(page, api, email);
@@ -139,15 +141,15 @@ test.describe("Collections and Owners", () => {
           - listitem:
             - link "Guides"
           - listitem:
-            - link "Knowledge Base"
+            - link ${JSON.stringify(pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name)}
         - heading "Curation" [level=3]
         - list:
           - listitem:
-            - link "All Knowledge"
+            - link ${JSON.stringify(pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name)}
           - listitem:
             - link "${CONCEPT_TYPES_PAGE.name}"
           - listitem:
-            - link "Collections and Owners"
+            - link ${JSON.stringify(pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").name)}
     `);
 
     const started = Date.now();
@@ -160,8 +162,8 @@ test.describe("Collections and Owners", () => {
     );
 
     await expect(collections(page)).toMatchAriaSnapshot(`
-      - region "Collections and Owners":
-        - heading "Collections and Owners" [level=2]
+      - region ${JSON.stringify(pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").name)}:
+        - heading ${JSON.stringify(pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").name)} [level=2]
         - status: /\\b2\\b/
         - table "${WORDS.caption}":
           - rowgroup:
@@ -181,10 +183,12 @@ test.describe("Collections and Owners", () => {
       await signedInAtThePage(page, request, at.admin.email);
 
       await skipLinkReachesThePage(page);
-      await listsItsKeystrokes(page, "Collections and Owners", KEY, [
-        KEY.changeOwner.action,
-        KEY.undo.action,
-      ]);
+      await listsItsKeystrokes(
+        page,
+        pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").name,
+        KEY,
+        [KEY.changeOwner.action, KEY.undo.action],
+      );
       await page.keyboard.press(KEY.changeOwner.key);
       await expect(
         pickerOf(page, "held", WORDS.noOwner),

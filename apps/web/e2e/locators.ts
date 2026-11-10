@@ -1,13 +1,13 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { z } from "zod";
 
-import { SKIP_TO_MAIN, UNKNOWN_PAGE } from "@/app/words.ts";
+import { goHome, SKIP_TO_MAIN, UNKNOWN_PAGE } from "@/app/words.ts";
 import { AUTHENTICATOR_WORDS } from "@/features/auth/account-words.ts";
 import type { CarriedOn } from "@/features/auth/sign-in/sign-in-words.ts";
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in/sign-in-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
-import { HOMES, type Role } from "@/shared/navigation.ts";
+import { HOMES, NEW_QUESTION, type Role } from "@/shared/navigation.ts";
 import { SIGN_OUT } from "@/shared/words.ts";
 
 import { actionAnnotationOf } from "./action-timing.ts";
@@ -151,8 +151,8 @@ export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<
 
 const HOME_NAMES = {
   Admin: { heading: "Members", link: "Go to Members" },
-  Editor: { heading: "New Question", link: "Go to New Question" },
-  Viewer: { heading: "New Question", link: "Go to New Question" },
+  Editor: { heading: NEW_QUESTION.name, link: goHome(NEW_QUESTION) },
+  Viewer: { heading: NEW_QUESTION.name, link: goHome(NEW_QUESTION) },
 } as const satisfies Readonly<Record<Role, { readonly heading: string; readonly link: string }>>;
 
 export const landedAtHome = async (page: Page, role: Role): Promise<void> => {

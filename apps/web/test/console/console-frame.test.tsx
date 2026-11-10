@@ -19,7 +19,7 @@ import {
 import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE_CLOSED, PERSON_WORDS } from "@/features/console/words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { HOMES } from "@/shared/navigation.ts";
+import { CONSOLE, HOMES, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { CLEAR_WORDS } from "@/shared/words.ts";
 import { openApp } from "@test/open-app.tsx";
 import { addressOf, answered } from "@test/stubbed-api.ts";
@@ -220,7 +220,11 @@ describe("the console's shell", () => {
     expect(router.state.location.pathname).toBe("/console/workspaces/every-workspace");
     expect(linksIn(screen.getByRole("navigation", { name: "Areas" }))).toEqual(["Console"]);
     expect(groupHeadingsIn(nav)).toEqual(["People", "Workspaces"]);
-    expect(linksIn(nav)).toEqual(["Everyone", "Flagged Names", "Every Workspace"]);
+    expect(linksIn(nav)).toEqual([
+      "Everyone",
+      pageById(menuGroupIn(CONSOLE, "people"), "flagged-names").name,
+      pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace").name,
+    ]);
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
   });
 
@@ -270,9 +274,15 @@ const EVERYONE_PAGE = "/console/people/everyone";
 
 const NAMES_WAITING_PAGE = "/console/people/names-waiting";
 
-const WORKSPACES_LIST = { heading: "Every Workspace", search: "Search by name or short name" };
+const WORKSPACES_LIST = {
+  heading: pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace").name,
+  search: "Search by name or short name",
+};
 
-const NAMES_WAITING_LIST = { heading: "Flagged Names", search: "Search by name or workspace" };
+const NAMES_WAITING_LIST = {
+  heading: pageById(menuGroupIn(CONSOLE, "people"), "flagged-names").name,
+  search: "Search by name or workspace",
+};
 
 const EVERYONE_LIST = { heading: "Everyone", search: "Search by name or address" };
 

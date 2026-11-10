@@ -3,7 +3,7 @@ import type { APIRequestContext, Page } from "@playwright/test";
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
 import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -36,7 +36,7 @@ const ANSWERING_AND_EMBEDDING: readonly SeedModelChoice[] = [ANSWERING, EMBEDDIN
 
 const models = menuGroupIn(CONTROL_CENTRE, "models");
 
-const MODELS_AND_SPEND = pageNamed(models, "Models and Spend");
+const MODELS_AND_SPEND = pageById(models, "models-and-spend");
 
 const signedInWith = async (
   page: Page,
@@ -111,8 +111,8 @@ test.describe("the Model Choices card on the Models and Spend page", () => {
     `);
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
-        - heading "Models and Spend" [level=1]
-        - tablist "Models and Spend":
+        - heading ${JSON.stringify(pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name)} [level=1]
+        - tablist ${JSON.stringify(pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name)}:
           - tab "Model Choices" [selected]
           - tab "Spend"
         - tabpanel "Model Choices":

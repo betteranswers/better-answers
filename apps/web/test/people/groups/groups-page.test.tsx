@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { GROUP_WORDS } from "@/features/people/groups/group-words.ts";
 import { GROUPS_KEYSTROKES } from "@/features/people/people-state.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { CLEAR_WORDS } from "@/shared/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { idOf } from "@test/people/member-pages.ts";
@@ -16,7 +16,7 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
-const GROUPS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Groups").path;
+const GROUPS_PAGE = pageById(menuGroupIn(CONTROL_CENTRE, "people"), "groups").path;
 
 type Group = {
   readonly id: string;

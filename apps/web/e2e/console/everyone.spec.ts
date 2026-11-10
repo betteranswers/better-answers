@@ -3,9 +3,9 @@ import type { Locator, Page } from "@playwright/test";
 import { JUMP_TO } from "@/app/words.ts";
 import { EVERYONE_WORDS } from "@/features/console/list-words.ts";
 import { CORRECT_DISPLAY_NAME } from "@/features/console/names-waiting/correcting-words.ts";
+import { EVERYONE_PATH } from "@/features/console/people-address.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -19,7 +19,7 @@ import { everyone, personButton, sheetOf } from "../people-pages.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-const EVERYONE_PAGE = pageNamed(menuGroupIn(CONSOLE, "people"), "Everyone").path;
+const EVERYONE_PAGE = EVERYONE_PATH;
 
 const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 

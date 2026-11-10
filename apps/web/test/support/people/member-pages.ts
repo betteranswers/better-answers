@@ -2,11 +2,11 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect } from "vitest";
 
 import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import type { Api } from "@test/stubbed-api.ts";
 import { ADA, adaAnAdmin, GRACE, read } from "@test/two-workspaces.ts";
 
-export const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
+export const MEMBERS_PAGE = pageById(menuGroupIn(CONTROL_CENTRE, "people"), "members").path;
 
 export const idOf = (seed: string): string => `01J${seed}`.padEnd(26, "0");
 

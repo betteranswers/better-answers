@@ -3,6 +3,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { GUIDE_KEYSTROKES as KEY, guidePageOf } from "@/features/knowledge/guides/guide-state.ts";
 import { BRIEF_WORDS, GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -347,7 +348,11 @@ test.describe("the guide page", () => {
       const again = await editorOpened(page, sectionOf(page, FIRST_SECTION));
       await again.press(END_OF_THE_BRIEF);
       await page.keyboard.type(" Not saved.");
-      await page.getByRole("link", { name: "Knowledge Base" }).click();
+      await page
+        .getByRole("link", {
+          name: pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name,
+        })
+        .click();
       const ask = page.getByRole("alertdialog");
       await expect(ask).toBeVisible();
       await ask.getByRole("button", { name: BRIEF_WORDS.keepEditing }).click();

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { SIGN_OUT } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
@@ -366,8 +366,10 @@ test("signing in after an expired session returns to the page", async ({
   const workspace = await provision(request, { name: "Returning", adminEmail: email });
   await page.goto("/sign-in");
   await signIn(page, request, email);
-  const elsewhere = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log");
-  await page.getByRole("link", { name: "Audit Log" }).click();
+  const elsewhere = pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log");
+  await page
+    .getByRole("link", { name: pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name })
+    .click();
   await expect(page).toHaveURL(new RegExp(`${elsewhere.path}$`));
 
   await context.clearCookies();

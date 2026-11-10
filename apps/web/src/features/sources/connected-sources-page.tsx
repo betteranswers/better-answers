@@ -4,7 +4,7 @@ import { flushSync } from "react-dom";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { onTheRowInFocus, rowInFocus } from "@/shared/list/row-focus.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { EmptyState } from "@/shared/page/empty-state.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
@@ -43,7 +43,7 @@ import {
 
 const sources = menuGroupIn(CONTROL_CENTRE, "sources");
 
-const THIS_PAGE = pageNamed(sources, "Connected Sources");
+const THIS_PAGE = pageById(sources, "connected-sources");
 
 const LISTED = Object.values(SOURCES_KEYSTROKES);
 

@@ -7,7 +7,15 @@ import { nextAfterSignIn } from "@/features/auth/carried-flow.ts";
 import { stepAfterTheCodes } from "@/features/auth/second-factor-steps.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
 import { ROLES } from "@/features/people/role-meanings.ts";
-import { HOMES, type Role } from "@/shared/navigation.ts";
+import {
+  CONSOLE,
+  HOMES,
+  INVITE_A_PERSON,
+  menuGroupIn,
+  NEW_QUESTION,
+  pageById,
+  type Role,
+} from "@/shared/navigation.ts";
 import { appAt, openApp } from "@test/open-app.tsx";
 import { addressOf, answered, answeringAs, withTheApiDown } from "@test/stubbed-api.ts";
 
@@ -97,7 +105,7 @@ const droppingFirstMemberRead = (role: Role) => {
 
 const ACCESS_ALLOWED = { hidden: false, unread: false };
 
-const INVITE = "Invite a Person";
+const INVITE = INVITE_A_PERSON.name;
 
 const memberRequestCount = () => requested.filter((name) => name === "session.member").length;
 
@@ -178,7 +186,7 @@ describe("a person whose member read fails", () => {
     });
 
     expect(heading()).toBe(UNKNOWN_PAGE.heading);
-    expect(screen.getByRole("link", { name: "Go to New Question" })).toBeDefined();
+    expect(screen.getByRole("link", { name: goHome(NEW_QUESTION) })).toBeDefined();
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("button", { name: INVITE })).toBeNull();
   });
@@ -254,7 +262,10 @@ describe("the index route", () => {
 type Router = Awaited<ReturnType<typeof openApp>>["router"];
 
 const consoleLanding = async (router: Router) => {
-  await screen.findByRole("heading", { level: 1, name: "Every Workspace" });
+  await screen.findByRole("heading", {
+    level: 1,
+    name: pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace").name,
+  });
   return {
     at: router.state.location.pathname,
     inTheConsole:

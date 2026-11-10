@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { INVITE_A_PERSON } from "@/shared/navigation.ts";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { sourceFiles } from "@test/source-files.ts";
 
@@ -51,7 +52,7 @@ describe("a list's head", () => {
       heading="Members"
       headingId="members"
       count="8 members"
-      action={<button type="button">Invite a Person</button>}
+      action={<button type="button">{INVITE_A_PERSON.name}</button>}
     />
   );
 
@@ -60,7 +61,7 @@ describe("a list's head", () => {
 
     const heading = screen.getByRole("heading", { level: 2, name: "Members" });
     const count = screen.getByRole("status");
-    const action = screen.getByRole("button", { name: "Invite a Person" });
+    const action = screen.getByRole("button", { name: INVITE_A_PERSON.name });
     expect(count.textContent).toBe("8 members");
     expect(follows(heading, count), "the count comes after the heading").toBe(true);
     expect(follows(count, action), "the primary action comes after the count").toBe(true);
