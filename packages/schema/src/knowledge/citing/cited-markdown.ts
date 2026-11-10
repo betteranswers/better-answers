@@ -160,11 +160,7 @@ export type Span<Cited> = {
   readonly cited: Cited | undefined;
 };
 
-/** A span whose `cited` is undefined is dropped. */
-export const cutAt = <Cited>(
-  body: string,
-  spans: readonly Span<Cited>[],
-): readonly Cut<Cited>[] => {
+const cutAt = <Cited>(body: string, spans: readonly Span<Cited>[]): readonly Cut<Cited>[] => {
   const cuts: Cut<Cited>[] = [];
   let from = 0;
   for (const { at, end, cited } of spans) {
@@ -238,8 +234,7 @@ const placesOf = <Cited>(cuts: readonly Cut<Cited>[]): readonly (number | undefi
   return places;
 };
 
-/** A citation the parse cannot draw becomes text: as typed in code, empty elsewhere. */
-export const drawnCuts = <Cited>(cuts: readonly Cut<Cited>[]): readonly Cut<Cited>[] => {
+const drawnCuts = <Cited>(cuts: readonly Cut<Cited>[]): readonly Cut<Cited>[] => {
   const { drawn, inCode } = readingOf(bodyPartsOf(cuts, () => 0));
   const places = placesOf(cuts);
   if (places.every((place) => place === undefined || drawn.has(place))) return cuts;
@@ -251,3 +246,9 @@ export const drawnCuts = <Cited>(cuts: readonly Cut<Cited>[]): readonly Cut<Cite
     }),
   );
 };
+
+/** The body cut at its spans, citing only where the parse draws. An undrawn citation shows as typed in code, elsewhere as nothing. */
+export const drawnCutsOf = <Cited>(
+  body: string,
+  spans: readonly Span<Cited>[],
+): readonly Cut<Cited>[] => drawnCuts(cutAt(body, spans));

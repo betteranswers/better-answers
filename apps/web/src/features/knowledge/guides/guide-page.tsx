@@ -1,8 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useRef, useState, type RefObject } from "react";
 
-import { guideTitleOf } from "@better-answers/schema/collection-name";
-import { collectionNameOf } from "@better-answers/schema/collection-name";
+import { collectionNameOf, guideTitleOf } from "@better-answers/schema/collection-name";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";

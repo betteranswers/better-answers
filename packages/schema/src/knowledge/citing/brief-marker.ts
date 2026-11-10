@@ -1,4 +1,4 @@
-import { cutAt, drawnCuts } from "./cited-markdown.ts";
+import { drawnCutsOf } from "./cited-markdown.ts";
 
 const MARKER = /\[\^([\w-]+)\]/gu;
 
@@ -27,11 +27,9 @@ const writtenIn = (markdown: string): readonly Marker[] =>
 
 /** The markers the Brief's parse draws. One in code, raw HTML, alt text or a typed footnote stays as typed. */
 export const markersIn = (markdown: string): readonly Marker[] =>
-  drawnCuts(
-    cutAt(
-      markdown,
-      writtenIn(markdown).map((marker) => ({ ...marker, cited: marker })),
-    ),
+  drawnCutsOf(
+    markdown,
+    writtenIn(markdown).map((marker) => ({ ...marker, cited: marker })),
   ).flatMap((cut) => (cut.kind === "citation" ? [cut.cited] : []));
 
 export const markersOf = (markdown: string): readonly string[] =>

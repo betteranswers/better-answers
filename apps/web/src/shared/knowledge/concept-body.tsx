@@ -14,8 +14,7 @@ import remarkGfm from "remark-gfm";
 import {
   bodyPartsOf,
   citedMarkdownOf,
-  cutAt,
-  drawnCuts,
+  drawnCutsOf,
   remarkCitations,
   type BodyPart,
   type Citation,
@@ -61,7 +60,7 @@ const partsOf = (body: string, evidence: readonly Evidence[]): readonly BodyPart
     evidence.map((item) => ({ resource: item.source, locator: null, id: item.id ?? null })),
   );
   const spans = marks.map(({ at, mark, source }) => ({ at, end: at + mark.length, cited: source }));
-  return bodyPartsOf(drawnCuts(cutAt(body, spans)), (source) => source + 1);
+  return bodyPartsOf(drawnCutsOf(body, spans), (source) => source + 1);
 };
 
 type Handlers = NonNullable<NonNullable<Options["remarkRehypeOptions"]>["handlers"]>;

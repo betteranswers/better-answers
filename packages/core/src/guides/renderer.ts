@@ -1,11 +1,6 @@
 import type { CitedSource } from "@better-answers/schema";
 import { markersIn } from "@better-answers/schema/brief-marker";
-import {
-  bodyPartsOf,
-  cutAt,
-  drawnCuts,
-  type BodyPart,
-} from "@better-answers/schema/cited-markdown";
+import { bodyPartsOf, drawnCutsOf, type BodyPart } from "@better-answers/schema/cited-markdown";
 
 import { clipboardOf, sourceLineOf, type Clipboard } from "./clipboard.ts";
 
@@ -39,11 +34,9 @@ const placing = <Cited extends Footnote>(
   footnotes: readonly Cited[],
 ): Placing<Cited> => {
   const byLabel = new Map(footnotes.map((footnote) => [footnote.label, footnote]));
-  const cuts = drawnCuts(
-    cutAt<Cited>(
-      markdown,
-      markersIn(markdown).map(({ label, at, end }) => ({ at, end, cited: byLabel.get(label) })),
-    ),
+  const cuts = drawnCutsOf<Cited>(
+    markdown,
+    markersIn(markdown).map(({ label, at, end }) => ({ at, end, cited: byLabel.get(label) })),
   );
   const numbered = new Map<string, Numbered<Cited>>();
   const parts = bodyPartsOf(cuts, (footnote) => {
