@@ -32,6 +32,7 @@ import {
 import { REVIEW_HEADING, SENSITIVITY_FIELD, SOURCES_KEYSTROKES } from "./sources-state.ts";
 import {
   NOTHING_CONNECTED,
+  OUTCOME_WORDS,
   PUBLISH_PENDING,
   SELECT_A_CONNECTED_SOURCE_FIRST,
   SENSITIVITY_PANEL_WORDS,
@@ -57,18 +58,18 @@ const waitsForItsSync = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
   words:
     connectedSource.state === "published"
-      ? `“${connectedSource.name}” is already published.`
-      : `“${connectedSource.name}” can be published once its sync finishes.`,
+      ? OUTCOME_WORDS.alreadyPublished(connectedSource.name)
+      : OUTCOME_WORDS.publishAfterSync(connectedSource.name),
 });
 
 const narrowestAlready = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
-  words: `“${connectedSource.name}” is already ${connectedSource.sensitivity}.`,
+  words: OUTCOME_WORDS.already(connectedSource.name, connectedSource.sensitivity),
 });
 
 const nothingWider = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
-  words: `“${connectedSource.name}” is already ${sensitivityAndAudienceWords(connectedSource)}.`,
+  words: OUTCOME_WORDS.already(connectedSource.name, sensitivityAndAudienceWords(connectedSource)),
 });
 
 type Tell = (outcome: Outcome | undefined) => void;
@@ -146,8 +147,7 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
         },
         settledSaying(tell, (narrowed: ConnectedSourceNarrowed) => (
           <>
-            “{name}” has been narrowed to {narrowed.visibility.sensitivity} successfully.{" "}
-            {movedWords(narrowed)}
+            {OUTCOME_WORDS.narrowed(name, narrowed.visibility.sensitivity)} {movedWords(narrowed)}
           </>
         )),
       );
@@ -161,8 +161,8 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
       },
       settledSaying(tell, (widened: ConnectedSourceWidened) => (
         <>
-          “{name}” has been widened to {sensitivityAndAudienceWords(widened.visibility)}{" "}
-          successfully. {movedWords(widened)}
+          {OUTCOME_WORDS.widened(name, sensitivityAndAudienceWords(widened.visibility))}{" "}
+          {movedWords(widened)}
         </>
       )),
     );
@@ -274,7 +274,7 @@ export function ConnectedSourcesPage() {
 
       <section aria-labelledby={listId} className="mt-6">
         <ListHead
-          heading="Connected Sources"
+          heading={THIS_PAGE.name}
           headingId={listId}
           count={
             listed.length === 0
@@ -317,10 +317,8 @@ export function ConnectedSourcesPage() {
             setOutcome({ tone: "said", words: PUBLISH_PENDING });
             publishAction.mutate(
               { connectedSourceId: toPublish.connectedSourceId, confirmations },
-              settledSaying(
-                setOutcome,
-                () =>
-                  `“${toPublish.name}” has been published as ${sensitivityAndAudienceWords(toPublish)} successfully.`,
+              settledSaying(setOutcome, () =>
+                OUTCOME_WORDS.published(toPublish.name, sensitivityAndAudienceWords(toPublish)),
               ),
             );
           }}

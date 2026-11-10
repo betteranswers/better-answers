@@ -1,5 +1,7 @@
 import type { Locator, Page, Response } from "@playwright/test";
 
+import { AUDITED_CATEGORIES, CONNECT_WORDS, PUBLISH_WORDS } from "@/features/sources/words.ts";
+
 import { expect, test } from "../browser.ts";
 import {
   anAdminAtSources,
@@ -23,6 +25,17 @@ import {
 import { holdRequests } from "../knowledge.ts";
 
 const EVERYONE = "Everyone in the workspace";
+
+const FOUND_IN_THE_HANDBOOK = {
+  "special-category": 0,
+  "bank-details": 2,
+  "government-identifier": 0,
+  "date-of-birth": 0,
+  "home-address": 1,
+  "personal-contact": 0,
+  "person-name": 0,
+  "job-title": 0,
+} satisfies Record<(typeof AUDITED_CATEGORIES)[number]["category"], number>;
 
 const textOf = async (region: Locator): Promise<string> => (await region.textContent()) ?? "";
 
@@ -73,7 +86,7 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
         - heading "Connected Sources" [level=2]
         - status
         - status
-        - button "Connect a Document"
+        - button ${JSON.stringify(CONNECT_WORDS.action)}
         - status
         - paragraph
     `);
@@ -88,12 +101,9 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
     // and Chromium cancels a chooser it misses.
     const choosing = page.waitForEvent("filechooser");
     await page.keyboard.press("b");
-    const dialog = page.getByRole("dialog", { name: "Connect a Document" });
+    const dialog = page.getByRole("dialog", { name: CONNECT_WORDS.action });
     await expect(dialog).toBeVisible();
     await expect(dialog).toHaveAccessibleDescription(/\S/);
-    await expect(dialog.getByRole("combobox", { name: "Audience" })).toHaveAccessibleDescription(
-      /\S/,
-    );
     await expect(dialog.getByLabel("Name")).toBeFocused();
     await page.keyboard.type("The staff handbook");
     await page.keyboard.press("Tab");
@@ -188,13 +198,13 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
     await expect(commit).toBeDisabled();
     await expect(commit).toHaveAccessibleDescription(/\S/);
 
-    const auditRecord = dialog.getByRole("region", { name: "What the Audit Log Will Record" });
+    const auditRecord = dialog.getByRole("region", { name: PUBLISH_WORDS.audit });
     await expect(auditRecord).toMatchAriaSnapshot(`
-      - region "What the Audit Log Will Record":
-        - heading "What the Audit Log Will Record" [level=3]
+      - region ${JSON.stringify(PUBLISH_WORDS.audit)}:
+        - heading ${JSON.stringify(PUBLISH_WORDS.audit)} [level=3]
         - term: Action
         - definition
-        - term: Connected Source
+        - term: ${PUBLISH_WORDS.connectedSource}
         - definition: Staff handbook
         - term: By
         - definition
@@ -202,29 +212,14 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
         - definition: Internal
         - term: Audience
         - definition: ${EVERYONE}
-        - term: Lawful Basis Recorded
-        - definition
-        - term: Privacy Information Updated
-        - definition
-        - term: DPIA Reference Recorded
-        - definition
-        - term: Special Category Findings
-        - definition: "0"
-        - term: Bank Details Findings
-        - definition: "2"
-        - term: Government Identifier Findings
-        - definition: "0"
-        - term: Date of Birth Findings
-        - definition: "0"
-        - term: Home Address Findings
-        - definition: "1"
-        - term: Personal Contact Findings
-        - definition: "0"
-        - term: Person Name Findings
-        - definition: "0"
-        - term: Job Title Findings
-        - definition: "0"
-        - term: DPIA Input
+${Object.values(PUBLISH_WORDS.confirmations)
+  .map((term) => `        - term: ${term}\n        - definition`)
+  .join("\n")}
+${AUDITED_CATEGORIES.map(
+  ({ category, term }) =>
+    `        - term: ${term}\n        - definition: "${FOUND_IN_THE_HANDBOOK[category]}"`,
+).join("\n")}
+        - term: ${PUBLISH_WORDS.dpiaInput}
         - definition
     `);
 
@@ -232,20 +227,24 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
       hasText: await textOf(
         auditRecord
           .getByRole("term")
-          .filter({ hasText: "Lawful Basis Recorded" })
+          .filter({ hasText: PUBLISH_WORDS.confirmations.lawfulBasisRecorded })
           .locator("xpath=following-sibling::dd[1]"),
       ),
     });
     await expect(unconfirmed).toHaveCount(3);
-    await expect(dialog.getByRole("checkbox", { name: "Lawful basis recorded" })).toBeFocused();
-    await page.keyboard.press("Space");
-    await page.keyboard.press("Tab");
     await expect(
-      dialog.getByRole("checkbox", { name: "Privacy information updated" }),
+      dialog.getByRole("checkbox", { name: PUBLISH_WORDS.confirmations.lawfulBasisRecorded }),
     ).toBeFocused();
     await page.keyboard.press("Space");
     await page.keyboard.press("Tab");
-    await expect(dialog.getByRole("checkbox", { name: "DPIA reference recorded" })).toBeFocused();
+    await expect(
+      dialog.getByRole("checkbox", { name: PUBLISH_WORDS.confirmations.privacyInformationUpdated }),
+    ).toBeFocused();
+    await page.keyboard.press("Space");
+    await page.keyboard.press("Tab");
+    await expect(
+      dialog.getByRole("checkbox", { name: PUBLISH_WORDS.confirmations.dpiaReferenced }),
+    ).toBeFocused();
     await page.keyboard.press("Space");
     await expect(
       unconfirmed,

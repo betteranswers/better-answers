@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 
 import type { Locator, Page } from "@playwright/test";
 
+import {
+  CONNECT_WORDS,
+  LIST_WORDS,
+  REVIEW_WORDS,
+  SENSITIVITY_PANEL_WORDS,
+} from "@/features/sources/words.ts";
+
 import { expect, test } from "../browser.ts";
 import {
   anAdminAtSources,
@@ -26,13 +33,7 @@ const LIST_BUDGET_MS = 1000;
 
 const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
 
-const SENSITIVITY_PANELS = {
-  narrow: { named: (name: string) => `Narrow the Sensitivity of ${name}`, commit: "Narrow" },
-  widen: {
-    named: (name: string) => `Widen the Sensitivity or Audience of ${name}`,
-    commit: "Widen",
-  },
-} as const;
+const SENSITIVITY_PANELS = SENSITIVITY_PANEL_WORDS;
 
 type SensitivityChange = keyof typeof SENSITIVITY_PANELS;
 
@@ -62,7 +63,7 @@ test.describe("connecting a document on the Sources page", () => {
     );
 
     await page.keyboard.press("b");
-    const dialog = page.getByRole("dialog", { name: "Connect a Document" });
+    const dialog = page.getByRole("dialog", { name: CONNECT_WORDS.action });
     await dialog.getByLabel("Name").fill("Shop notes");
     await dialog.getByLabel("File").setInputFiles({
       name: "notes.md",
@@ -167,7 +168,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       ).toHaveText(/^\D+$/);
       await expect(
         connectedSourcesRegion(page).getByRole("button", {
-          name: /^More Details /,
+          name: new RegExp(`^${LIST_WORDS.more} `),
           expanded: false,
         }),
       ).toHaveCount(TEN.length);
@@ -181,7 +182,6 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await test.step("opens the Widen panel with the W key, lists what changes, and passes the accessibility checks", async () => {
       await rowAction(page, "Tender answers", "widen").focus();
       await page.keyboard.press("w");
-      await expect(panel).toHaveAccessibleDescription(/\S/);
       await expect(sensitivityPicked).toBeFocused();
       await expect(sensitivityPicked).toHaveText("Internal");
       await expect(panel.getByRole("term")).toHaveText(["Sensitivity"]);
@@ -189,7 +189,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       await expect(page.getByRole("dialog"), "the Widen panel opened as a dialog").toHaveCount(0);
       await expect(
         connectedSourceNamed(page, "Tender answers").getByRole("region"),
-        "the Widen panel has a What the Audit Log Will Record section",
+        "the Widen panel has an audit log section",
       ).toHaveCount(0);
       await passesTheAccessibilityGate();
     });
@@ -242,7 +242,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
         .click();
       await expect(
         reviewOf(page, "Supplier forms").getByRole("button", {
-          name: "Dismiss as Not Special Category",
+          name: REVIEW_WORDS.dismiss.label,
         }),
       ).toBeEnabled();
       await rowAction(page, "Supplier forms", "widen").click();

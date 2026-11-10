@@ -1,5 +1,7 @@
 import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
+import { LIST_WORDS, ROW_ACTIONS } from "@/features/sources/words.ts";
+
 import {
   anAddress,
   provision,
@@ -31,17 +33,10 @@ const firstDefinitionOf = (page: Page, name: string, term: string): Locator =>
 export const stateOf = (page: Page, name: string) => firstDefinitionOf(page, name, "State");
 
 export const lastSyncedOf = (page: Page, name: string) =>
-  firstDefinitionOf(page, name, "Last Synced");
+  firstDefinitionOf(page, name, LIST_WORDS.lastSynced);
 
 export const sensitivityOf = (page: Page, name: string) =>
   firstDefinitionOf(page, name, "Sensitivity");
-
-const ROW_ACTIONS = {
-  review: "Review Findings",
-  publish: "Publish",
-  narrow: "Narrow Sensitivity",
-  widen: "Widen Sensitivity or Audience",
-} as const;
 
 export const rowAction = (page: Page, name: string, action: keyof typeof ROW_ACTIONS): Locator =>
   connectedSourceNamed(page, name).getByRole("button", {

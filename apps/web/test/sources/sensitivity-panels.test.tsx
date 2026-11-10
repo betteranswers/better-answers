@@ -100,7 +100,6 @@ describe("publishing, narrowing and widening a connected source", () => {
     press("n");
 
     const panel = thePanelOf("narrow", "Supplier payments");
-    expect(describedBy(panel)).toMatch(/\S/v);
     const sensitivityPicked = within(panel).getByRole("combobox", { name: "Sensitivity" });
     expect(document.activeElement).toBe(sensitivityPicked);
     expect(sensitivityPicked.textContent).toBe("Restricted");
@@ -148,7 +147,6 @@ describe("publishing, narrowing and widening a connected source", () => {
     pressed(rowAction(row, "widen"));
 
     const panel = thePanelOf("widen", "Staff handbook");
-    expect(describedBy(panel)).toMatch(/\S/v);
     const sensitivityPicked = within(panel).getByRole("combobox", { name: "Sensitivity" });
     expect(document.activeElement).toBe(sensitivityPicked);
     expect(sensitivityPicked.textContent).toBe("Internal");

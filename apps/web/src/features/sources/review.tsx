@@ -108,13 +108,11 @@ function Preview(properties: { readonly connectedSource: ListedConnectedSource }
     <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
       <CollapsibleTrigger asChild>
         <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
-          Preview Passages
+          {REVIEW_WORDS.preview.label}
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <p className="mt-2 text-muted-foreground">
-          What readers will see once it is published. Only Admins can see this until then.
-        </p>
+        <p className="mt-2 text-muted-foreground">{REVIEW_WORDS.preview.lead}</p>
         <PreviewPassages preview={preview} open={open} />
       </CollapsibleContent>
     </Collapsible>

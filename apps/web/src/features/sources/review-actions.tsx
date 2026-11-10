@@ -31,9 +31,9 @@ import {
   type TickedGroups,
 } from "./sources-state.ts";
 import {
-  groupsCounted,
   REVIEW_WORDS,
   ruleWordOf,
+  SENSITIVITY_PANEL_WORDS,
   spokenWord,
   SYNC_OF_A_DISMISSAL,
 } from "./words.ts";
@@ -248,9 +248,12 @@ function NarrowDocumentsAction(properties: ActionProperties) {
 
   const confirm = () => {
     action.command<DocumentsNarrowed>({
-      pending: "Narrowing.",
+      pending: REVIEW_WORDS.narrowDocuments.pending,
       done: (narrowed) =>
-        `${counted(narrowed.documentIds.length, "document", "documents")} narrowed to ${NARROWEST} successfully. ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.writeUps.length, "write-up", "write-ups")} that cite them were also updated.`,
+        REVIEW_WORDS.narrowDocuments.done(narrowed.documentIds.length, NARROWEST, {
+          concepts: narrowed.concepts.length,
+          writeUps: narrowed.writeUps.length,
+        }),
       run: (ready, settled) => {
         narrow.mutate(askOf(ready), settled);
       },
@@ -268,9 +271,9 @@ function NarrowDocumentsAction(properties: ActionProperties) {
           open={action.open}
           onOpenChange={action.setOpen}
           content={{ onCloseAutoFocus: action.returnFocus }}
-          title={`Narrow ${counted(documents.length, "Document", "Documents")} to ${NARROWEST}`}
-          consequence="This limits who can read these documents. Concepts that cite them are updated too. This action cannot be undone."
-          commit={<Button onClick={confirm}>Narrow</Button>}
+          title={REVIEW_WORDS.narrowDocuments.named(documents.length, NARROWEST)}
+          consequence={REVIEW_WORDS.narrowDocuments.consequence}
+          commit={<Button onClick={confirm}>{SENSITIVITY_PANEL_WORDS.narrow.commit}</Button>}
         >
           <ul className="grid gap-1">
             {documents.map(([documentId, title]) => (
@@ -301,15 +304,13 @@ function DismissAsNotSpecialCategoryAction(properties: ActionProperties) {
   const dismiss = useDismissAsNotSpecialCategory();
   const words = REVIEW_WORDS.dismiss;
   const ticked = action.ready?.groups.length ?? 0;
-  const named = groupsCounted(ticked);
 
   const dismissed = (reason: string) => {
     action.command<DismissedAsNotSpecialCategory>({
-      pending: "Dismissing.",
+      pending: words.pending,
       done: (answer) => (
         <>
-          {named} dismissed in {counted(answer.documentIds.length, "document", "documents")}{" "}
-          successfully. The sync that applies the change{" "}
+          {words.done(ticked, answer.documentIds.length)}{" "}
           <SyncStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />.
         </>
       ),

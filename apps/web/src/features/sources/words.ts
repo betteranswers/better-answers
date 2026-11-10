@@ -4,7 +4,7 @@ import type { ListedConnectedSource, Sensitivity } from "./sources-api.ts";
 
 export { instantWords };
 
-export const SELECT_A_CONNECTED_SOURCE_FIRST = "Please select a connected source first.";
+export const SELECT_A_CONNECTED_SOURCE_FIRST = "Select a connected source first.";
 
 export const STATE_WORDS = {
   received: "Received",
@@ -25,10 +25,10 @@ export const CONNECTOR_WORDS = {
 } satisfies Record<ListedConnectedSource["connector"], string>;
 
 export const ROW_ACTIONS = {
-  review: "Review Findings",
+  review: "Review findings",
   publish: "Publish",
-  narrow: "Narrow Sensitivity",
-  widen: "Widen Sensitivity or Audience",
+  narrow: "Narrow sensitivity",
+  widen: "Widen sensitivity or audience",
 } as const;
 
 type Sync = NonNullable<ListedConnectedSource["lastSync"]>;
@@ -64,7 +64,7 @@ const AUDIENCE_IN_A_SENTENCE = {
   groups: "named groups",
 } satisfies Record<ListedConnectedSource["audience"], string>;
 
-export const NOTHING_CONNECTED = "No connected sources yet";
+export const NOTHING_CONNECTED = "No connected sources yet. Connect a document to add one.";
 
 export const DESTINATIONS_TERM = "Destinations";
 
@@ -100,14 +100,14 @@ export const unreadableCounted = (unreadable: number, needingOcr: number): strin
 };
 
 export const AUDITED_CATEGORIES = [
-  { category: "special-category", term: "Special Category Findings" },
-  { category: "bank-details", term: "Bank Details Findings" },
-  { category: "government-identifier", term: "Government Identifier Findings" },
-  { category: "date-of-birth", term: "Date of Birth Findings" },
-  { category: "home-address", term: "Home Address Findings" },
-  { category: "personal-contact", term: "Personal Contact Findings" },
-  { category: "person-name", term: "Person Name Findings" },
-  { category: "job-title", term: "Job Title Findings" },
+  { category: "special-category", term: "Special category findings" },
+  { category: "bank-details", term: "Bank details findings" },
+  { category: "government-identifier", term: "Government identifier findings" },
+  { category: "date-of-birth", term: "Date of birth findings" },
+  { category: "home-address", term: "Home address findings" },
+  { category: "personal-contact", term: "Personal contact findings" },
+  { category: "person-name", term: "Person name findings" },
+  { category: "job-title", term: "Job title findings" },
 ] as const;
 
 export const spokenWord = (word: string): string => word.replaceAll("-", " ");
@@ -167,25 +167,14 @@ export const termsThatChange = (
       ]),
 ];
 
-const NARROWER_DOCUMENTS_STAY = "Narrower documents stay as they are.";
-
-const WHAT_CITES_IT_FOLLOWS = "Concepts and write-ups that cite it are updated too.";
-
 export const SENSITIVITY_PANEL_WORDS = {
   narrow: {
-    named: (name: string): string => `Narrow the Sensitivity of ${name}`,
-    consequence: (): string => `This limits who can read it. ${WHAT_CITES_IT_FOLLOWS}`,
+    named: (name: string): string => `Narrow the sensitivity of ${name}`,
     commit: "Narrow",
     pending: "Narrowing.",
   },
   widen: {
-    named: (name: string): string => `Widen the Sensitivity or Audience of ${name}`,
-    consequence: (published: boolean): string =>
-      `${
-        published
-          ? `More people will be able to read it straight away. ${WHAT_CITES_IT_FOLLOWS}`
-          : "Only Admins can read it until you publish it."
-      } ${NARROWER_DOCUMENTS_STAY}`,
+    named: (name: string): string => `Widen the sensitivity or audience of ${name}`,
     commit: "Widen",
     pending: "Widening.",
   },
@@ -193,31 +182,39 @@ export const SENSITIVITY_PANEL_WORDS = {
 
 export const PUBLISH_PENDING = "Publishing.";
 
-export const THE_CHANGE_BEFORE_IS_STILL_GOING = "Please wait for the previous change to finish.";
+export const THE_CHANGE_BEFORE_IS_STILL_GOING = "Wait for the previous change to finish.";
 
-export const THE_ACTION_BEFORE_IS_STILL_GOING = "Please wait for the previous action to finish.";
+export const THE_ACTION_BEFORE_IS_STILL_GOING = "Wait for the previous action to finish.";
 
 export const groupsCounted = (groups: number): string =>
   counted(groups, "group of findings", "groups of findings");
 
-const groupsCountedInATitle = (groups: number): string =>
-  counted(groups, "Group of Findings", "Groups of Findings");
-
 const findingsCounted = (findings: number): string => counted(findings, "finding", "findings");
+
+const documentsCounted = (documents: number): string => counted(documents, "document", "documents");
+
+type Cited = { readonly concepts: number; readonly writeUps: number };
+
+const citedWords = (cited: Cited): string =>
+  `${counted(cited.concepts, "concept", "concepts")} and ${counted(cited.writeUps, "write-up", "write-ups")}`;
 
 type NamedGroup = RuleOfAGroup & { readonly title: string };
 
 export const REVIEW_WORDS = {
   heading: (name: string): string => `Review of ${name}`,
-  lead: "These findings come from the last sync. The personal data itself is never shown.",
+  lead: "Findings from the last sync.",
   selectFirst: "Select a group of findings first.",
   select: (group: NamedGroup): string =>
     `Select ${spokenWord(group.category)} findings in ${group.title} found by the ${ruleWordOf(group)} rule`,
   tier: (tier: string): string => `Redaction: ${sentenceCased(tier)}`,
   noPassages: "No passages yet",
+  preview: {
+    label: "Preview passages",
+    lead: "Passages as readers see them once you publish.",
+  },
   alreadyNarrowed: {
     tag: "Already narrowed",
-    says: "This document was narrowed because it contains special category data.",
+    says: "This document holds special category data.",
   },
   dismissed: {
     tag: "Dismissed",
@@ -227,28 +224,69 @@ export const REVIEW_WORDS = {
   keptStillWithheld: {
     tag: "Still withheld",
     says: (findings: number): string =>
-      `${findingsCounted(findings)} kept in text, but still withheld because of an erasure request.`,
+      `${findingsCounted(findings)} kept in text and withheld by an erasure request.`,
   },
   keep: {
-    label: "Keep in Text",
-    named: (groups: number): string => `Keep ${groupsCountedInATitle(groups)} in Text`,
-    consequence:
-      "These findings will be shown in the text after the next sync. Your reason will be recorded.",
+    label: "Keep in text",
+    named: (groups: number): string => `Keep ${groupsCounted(groups)} in text`,
+    consequence: "The findings show in the text after the next sync.",
     pending: "Keeping in text.",
     done: (groups: number, findings: number): string =>
-      `${groupsCounted(groups)} kept in text successfully. ${findingsCounted(findings)} will be shown after the next sync.`,
+      `${groupsCounted(groups)} kept in text. ${findingsCounted(findings)} show after the next sync.`,
   },
-  narrowDocuments: { label: "Narrow These Documents" },
+  narrowDocuments: {
+    label: "Narrow these documents",
+    named: (documents: number, sensitivity: string): string =>
+      `Narrow ${documentsCounted(documents)} to ${sensitivity}`,
+    consequence: "You can’t undo this.",
+    pending: "Narrowing.",
+    done: (documents: number, sensitivity: string, cited: Cited): string =>
+      `${documentsCounted(documents)} narrowed to ${sensitivity}. ${citedWords(cited)} that cite them were also updated.`,
+  },
   dismiss: {
-    label: "Dismiss as Not Special Category",
-    named: (groups: number): string =>
-      `Dismiss ${groupsCountedInATitle(groups)} as Not Special Category`,
+    label: "Dismiss as not special category",
+    named: (groups: number): string => `Dismiss ${groupsCounted(groups)} as not special category`,
     consequence:
-      "These findings stay withheld. A document with no other special category findings returns to its earlier sensitivity after the next sync. Your reason will be recorded.",
+      "Documents with no other special category findings go back to their earlier sensitivity after the next sync.",
+    pending: "Dismissing.",
+    done: (groups: number, documents: number): string =>
+      `${groupsCounted(groups)} dismissed in ${documentsCounted(documents)}. The sync that applies the change`,
   },
 } as const;
 
 export const CONNECT_WORDS = {
+  action: "Connect a document",
   consequence: "Only Admins can read it until you publish it.",
-  audienceHint: "Named groups cannot be chosen here yet.",
+  connected: (name: string, fileName: string): string =>
+    `“${name}” connected. ${fileName} is queued to sync.`,
+} as const;
+
+export const LIST_WORDS = {
+  more: "More details",
+  lastSynced: "Last synced",
+} as const;
+
+export const OUTCOME_WORDS = {
+  alreadyPublished: (name: string): string => `“${name}” is already published.`,
+  publishAfterSync: (name: string): string => `“${name}” can be published once its sync finishes.`,
+  already: (name: string, what: string): string => `“${name}” is already ${what}.`,
+  narrowed: (name: string, sensitivity: string): string => `“${name}” narrowed to ${sensitivity}.`,
+  widened: (name: string, what: string): string => `“${name}” widened to ${what}.`,
+  published: (name: string, what: string): string => `“${name}” published as ${what}.`,
+  cited: (cited: Cited): string => `${citedWords(cited)} that cite it were also updated.`,
+} as const;
+
+export const PUBLISH_WORDS = {
+  named: (name: string): string => `Publish ${name}`,
+  consequence: (what: string): string => `It will be published as ${what}. You can’t undo this.`,
+  confirmations: {
+    lawfulBasisRecorded: "Lawful basis recorded",
+    privacyInformationUpdated: "Privacy information updated",
+    dpiaReferenced: "DPIA reference recorded",
+  },
+  confirm: "Confirm before publishing",
+  allRequired: "Tick all three confirmations to publish.",
+  audit: "Audit log entry",
+  connectedSource: "Connected source",
+  dpiaInput: "DPIA input",
 } as const;
