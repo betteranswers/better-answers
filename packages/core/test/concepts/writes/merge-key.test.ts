@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { foldConceptType } from "../../../src/bundle/index.ts";
+import { foldConceptType } from "@better-answers/schema/concept-type";
+
 import { mergeKeyMovedBy } from "../../../src/concepts/writes/merge-key.ts";
 
 describe("the new merge key after an edit", () => {

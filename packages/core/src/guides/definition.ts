@@ -1,4 +1,5 @@
-import { foldConceptType } from "../bundle/index.ts";
+import { foldConceptType } from "@better-answers/schema/concept-type";
+
 import type { UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import type {

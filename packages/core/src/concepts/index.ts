@@ -40,7 +40,6 @@ export {
   type ConceptBodyUpdate,
   type UpdateConceptBodyRefusal,
 } from "./writes/update-concept-body.ts";
-export { foldConceptType } from "../bundle/index.ts";
 export { carryVerificationsOntoRewrite, mergeKeyOf, moveBundleCommits } from "./import/landing.ts";
 export {
   ERASURE_REHEARSAL_PATH,
