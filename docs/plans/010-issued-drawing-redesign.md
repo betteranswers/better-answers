@@ -31,8 +31,15 @@ Status 07/11/2026. The units ran as the table shows. Three things differ from th
 | C2 | BA-345 | Merged, #1032 (`aea74a7dc`). `DESIGN.md` is the design authority. The critique scores 26/40 |
 | D1 | BA-346 | Merged, #1030 (`fd3050040`). The `ui-copy-plain` rule is on `main` and off for every folder |
 | D2 | BA-347 | Merged, #1033 (`a213841bd`). The `ui-copy-plain` rule is on for both Knowledge folders |
-| E | BA-348 to BA-351 | Branch `liam/ba-348-rewrite-the-ask-and-questions-copy-with-clarify` holds only the commit that turns the rule on for its feature folders. It can restart now that C1 has merged |
-| F | BA-352 to BA-355 | Ready to start |
+| E1 | BA-348 | Merged, #1045 (`cca34d868`) |
+| E2 | BA-349 | Merged, #1049 (`c233609d9`) |
+| E3 | BA-350 | Merged, #1046 (`ead77b59e`) |
+| E4 | BA-351 | Merged, #1050 (`0fd5dc5f0`). The `ui-copy-plain` rule is on for `apps/web/src/**`, and pages are looked up by a stable id |
+| F1 | BA-352 | Merged, #1047 (`874b75644`) |
+| F2 | BA-353, BA-354 | Merged, #1048 (`54ea1dbbb`). One owner, because both edit `curation/` |
+| F3 | BA-355 | Merged, #1051 (`5dde5d139`). `foldConceptType` moved to `@better-answers/schema` |
+
+Status 10/11/2026. Units E and F ran in a new session from `main`. Each PR had one owner and a verifier from the other model family, who read every string the reader sees. Each verdict came from a live drive. Most PRs took two or three verify rounds, and the coordinator set the wording when a round failed on copy. #1048 merged before #1050, so #1050 rebased and reran its page-id script. #1051 merged before #1050 after a local check that the two combine with the whole-tree rule on. Draft was left out of the All Knowledge trust filter, because a draft concept is readable on no list. The follow-ups are BA-361 to BA-368.
 
 The run paused at 01:13 on 07/11/2026, when the model's usage limit ran out. A new session took it up from the saved worktrees the same day.
 
@@ -1170,10 +1177,10 @@ Each live lane runs in its own worktree at the PR head. It drives the served app
 
 ## Close the program
 
-- [ ] Every box above is checked with its evidence.
-- [ ] `git ls-files packages/design-system` prints nothing on `main`, and `DESIGN.md` is at the repository root.
-- [ ] `.oxlintrc.json` on `main` turns `better-answers/ui-copy-plain` on for `apps/web/src/**`.
-- [ ] Run `/impeccable critique` on the Knowledge area at `main` and record the closing score in Appendix A.
+- [ ] Every box above is checked with its evidence. The units' PRs carry the evidence; the per-PR boxes were not checked here one by one.
+- [x] `git ls-files packages/design-system` prints nothing on `main`, and `DESIGN.md` is at the repository root. Checked at `0fd5dc5f0`.
+- [x] `.oxlintrc.json` on `main` turns `better-answers/ui-copy-plain` on for `apps/web/src/**`. Checked at `0fd5dc5f0`.
+- [x] Run `/impeccable critique` on the Knowledge area at `main` and record the closing score in Appendix A. 28/40 at `0fd5dc5f0`.
 - [ ] Reply to the operator with the report the execution playbook names.
 
 ## Appendix A. Prototype evidence
@@ -1201,6 +1208,10 @@ Five challengers were declined, each with the lines worth keeping recorded in th
   - The search field is narrower than the results box.
   - The title block shows dates in two fonts.
   - The title block has no footer row for the workspace and the sheet.
+- Close, 10/11/2026: 28/40, Good, at `main` `0fd5dc5f0`. The trend is 21, then 26, then 28. A dual-agent critique ran the design review first and the detector second, on the seeded Northbridge set at 1440px and 390px. 17 of 20 detector scans were clean. The real findings are the editor's h1-to-h3 jump and two one-word lines on Search at 390px. The record is [critique-2026-11-10.md](media/010-issued-drawing/critique-2026-11-10.md). None of BA-345's four items is fixed. `DESIGN.md` now makes the two date fonts a rule, so that item may close as intended. Three P1 issues stand:
+  - The guide shows about 35 equal buttons and no first step.
+  - A concept page has no action to verify the concept or ask its owner to check it, and a deprecated concept does not link to its replacement.
+  - The title block comes after the body in the page code, so a screen reader reaches trust last.
 
 **Unproven.** Two questions stay open. The first is whether the title block's density holds at 390px, which BA-342's lane 8 checks. The second is whether matching the kind in search raises false matches, which BA-343's lanes 3, 4 and 7 check.
 
