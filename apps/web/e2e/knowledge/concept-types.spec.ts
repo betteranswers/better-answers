@@ -1,5 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
 import {
   CONCEPT_TYPES_KEYSTROKES as KEY,
   CONCEPT_TYPES_LIST,
@@ -172,6 +173,15 @@ test.describe("Concept Types", () => {
     await passesTheAccessibilityGate();
 
     await skipLinkReachesThePage(page);
+
+    await test.step("passes the passkey offer under the title by keyboard", async () => {
+      const offer = page.getByRole("main").getByRole("region", { name: PASSKEY_WORDS.heading });
+      await expect(offer).toBeVisible();
+      await page.keyboard.press("Tab");
+      await expect(offer.getByRole("link", { name: PASSKEY_WORDS.add })).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(offer.getByRole("button", { name: PASSKEY_WORDS.dismissOffer })).toBeFocused();
+    });
 
     await test.step("turns the Types With Two or Fewer Concepts filter on and off by keyboard alone", async () => {
       await page.keyboard.press("Tab");
