@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { AskedRecord } from "@/features/questions/questions-api.ts";
 import { QUESTIONS_KEYSTROKES as KEY } from "@/features/questions/questions-state.ts";
+import { QUESTIONS_WORDS as WORDS } from "@/features/questions/questions-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure } from "@test/stubbed-api.ts";
@@ -98,8 +99,8 @@ describe("Questions asked", () => {
     const record = await screen.findByRole("dialog", { name: FLAGGED_QUESTION });
 
     fireEvent.click(
-      within(within(record).getByRole("group", { name: "Close This Flag" })).getByRole("button", {
-        name: "Knowledge Was Correct",
+      within(within(record).getByRole("group", { name: WORDS.closeTheFlag })).getByRole("button", {
+        name: WORDS.closing["no-fault-in-the-knowledge"],
       }),
     );
     closeFlag.reject(FORBIDDEN);
@@ -112,8 +113,8 @@ describe("Questions asked", () => {
     });
     await waitFor(() => {
       expect(document.activeElement).toBe(
-        within(screen.getByRole("group", { name: "Close This Flag" })).getByRole("button", {
-          name: "Fixed in the Knowledge",
+        within(screen.getByRole("group", { name: WORDS.closeTheFlag })).getByRole("button", {
+          name: WORDS.closing["fixed-in-the-knowledge"],
         }),
       );
     });
@@ -121,7 +122,7 @@ describe("Questions asked", () => {
     await waitFor(() => {
       expect(recordOf(FLAGGED_QUESTION)).toBeNull();
     });
-    const flagged = within(region).getByRole("region", { name: "Flagged" });
+    const flagged = within(region).getByRole("region", { name: WORDS.flagged });
     expect(rowsOf(flagged).map((row) => row.textContent)).toEqual([
       expect.stringContaining(FLAGGED_QUESTION),
     ]);

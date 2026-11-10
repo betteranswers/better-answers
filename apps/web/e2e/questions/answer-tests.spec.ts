@@ -1,5 +1,6 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
+import { ANSWER_TESTS_WORDS } from "@/features/questions/questions-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -9,7 +10,7 @@ const LIST_BUDGET_MS = 1000;
 
 const ANSWER_TESTS = pageNamed(menuGroupIn(CONTROL_CENTRE, "questions"), "Answer Tests");
 
-const emptyState = (page: Page) => page.getByText("No answer tests yet", { exact: true });
+const emptyState = (page: Page) => page.getByText(ANSWER_TESTS_WORDS.empty, { exact: true });
 
 const anAdminSignedIn = async (page: Page, api: APIRequestContext, workspace: string) => {
   const email = anAddress("admin");

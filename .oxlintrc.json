@@ -554,7 +554,12 @@
       }
     },
     {
-      "files": ["apps/web/src/features/knowledge/**", "apps/web/src/shared/knowledge/**"],
+      "files": [
+        "apps/web/src/features/knowledge/**",
+        "apps/web/src/shared/knowledge/**",
+        "apps/web/src/features/ask/**",
+        "apps/web/src/features/questions/**"
+      ],
       "rules": {
         "better-answers/ui-copy-plain": "error"
       }

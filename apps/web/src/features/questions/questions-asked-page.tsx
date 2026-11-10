@@ -177,7 +177,7 @@ function QuestionsAskedRegion() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      <ListHead heading={WORDS.heading} headingId={headingId} headingRef={headingRef} count="" />
+      <ListHead heading={THIS_PAGE.name} headingId={headingId} headingRef={headingRef} count="" />
       <Card className="mt-4 gap-0 py-0">
         <ListRead
           read={asked}

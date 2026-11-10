@@ -24,7 +24,7 @@ import {
   type Feedback,
   type FlagClosing,
 } from "./questions-api.ts";
-import { CLOSE_AS, CLOSINGS, QUESTIONS_WORDS as WORDS } from "./questions-words.ts";
+import { CLOSINGS, QUESTIONS_WORDS as WORDS } from "./questions-words.ts";
 
 const SEARCH_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Search");
 
@@ -151,7 +151,7 @@ function CloseActions(properties: {
               properties.onClose(closing);
             }}
           >
-            {CLOSE_AS[closing]}
+            {WORDS.closing[closing]}
           </Button>
         ))}
       </div>

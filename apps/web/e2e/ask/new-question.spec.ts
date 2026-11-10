@@ -1,5 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { ASK_WORDS } from "@/features/ask/ask-words.ts";
+
 import {
   anAuditWorkspace,
   answered,
@@ -81,11 +83,11 @@ const asked = async (page: Page, question = QUESTION): Promise<void> => {
 const NOTE = "It leaves out the LMS.";
 
 const flagSent = async (page: Page, result: Locator): Promise<Locator> => {
-  await result.getByRole("button", { name: "Flag This Answer" }).click();
-  const flagging = page.getByRole("dialog", { name: "Flag This Answer" });
-  await flagging.getByRole("radio", { name: "Incomplete" }).check();
-  await flagging.getByRole("textbox", { name: "Note" }).fill(NOTE);
-  await flagging.getByRole("button", { name: "Send Flag" }).click();
+  await result.getByRole("button", { name: ASK_WORDS.flagAnswer }).click();
+  const flagging = page.getByRole("dialog", { name: ASK_WORDS.flagAnswer });
+  await flagging.getByRole("radio", { name: ASK_WORDS.reasons.incomplete }).check();
+  await flagging.getByRole("textbox", { name: ASK_WORDS.note }).fill(NOTE);
+  await flagging.getByRole("button", { name: ASK_WORDS.sendFlag }).click();
   return flagging;
 };
 
@@ -101,7 +103,7 @@ test.describe("Ask › New question", () => {
   test("keeps the flag's draft and shows why sending failed", async ({ page, request }) => {
     await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
     await asked(page);
-    const result = answered(page, "Answered");
+    const result = answered(page, "ok");
     await page.route(
       (url) => url.pathname.includes("ask.giveFeedback"),
       (route) => route.abort(),
@@ -110,9 +112,9 @@ test.describe("Ask › New question", () => {
     const flagging = await flagSent(page, result);
 
     await alertHasText(result.getByRole("alert"));
-    await expect(result.getByRole("button", { name: "Flagged" })).toHaveCount(0);
-    await expect(flagging.getByRole("radio", { name: "Incomplete" })).toBeChecked();
-    await expect(flagging.getByRole("textbox", { name: "Note" })).toHaveValue(NOTE);
+    await expect(result.getByRole("button", { name: ASK_WORDS.flagged })).toHaveCount(0);
+    await expect(flagging.getByRole("radio", { name: ASK_WORDS.reasons.incomplete })).toBeChecked();
+    await expect(flagging.getByRole("textbox", { name: ASK_WORDS.note })).toHaveValue(NOTE);
   });
 
   test("blocks questions at the spending limit without calling a model", async ({
@@ -142,8 +144,8 @@ test.describe("Ask › New question", () => {
     );
     expect(await modelCallsIn(request, workspaceId)).toEqual({ judge: 0, draft: 0 });
     await alertHasText(alertOf(page));
-    await expect(answered(page, "Answered")).toHaveCount(0);
-    await expect(answered(page, "Related Knowledge")).toHaveCount(0);
+    await expect(answered(page, "ok")).toHaveCount(0);
+    await expect(answered(page, "related")).toHaveCount(0);
     await pageHidesRefusalWord(page, "spending-limit-met");
   });
 
@@ -161,7 +163,7 @@ test.describe("Ask › New question", () => {
     await askButton(page).click({ force: true });
     await releaseTheModel(request, workspaceId);
 
-    await expect(answered(page, "Answered")).toBeVisible();
+    await expect(answered(page, "ok")).toBeVisible();
     await expect(askButton(page)).not.toHaveAttribute("aria-disabled", "true");
     expect(asks, "the question was not sent exactly once").toEqual(["POST"]);
     expect(await modelCallsIn(request, workspaceId)).toEqual({ judge: 1, draft: 0 });
@@ -190,13 +192,13 @@ test.describe("Ask › New question", () => {
     );
     await railOf(page).getByRole("link", { name: "Ask" }).click();
     await asked(page);
-    await expect(answered(page, "Not Answered")).toBeVisible();
+    await expect(answered(page, "refuse")).toBeVisible();
 
     await switched(page, first.name, second.name);
     await landedAtHome(page, "Viewer");
 
     await expect(questionBox(page)).toHaveValue("");
-    await expect(answered(page, "Not Answered")).toHaveCount(0);
+    await expect(answered(page, "refuse")).toHaveCount(0);
   });
 
   test("opens related knowledge in a panel that Tab leaves open", async ({
@@ -213,7 +215,7 @@ test.describe("Ask › New question", () => {
       await questionBox(page).fill(QUESTION);
       const started = Date.now();
       await questionBox(page).press("Enter");
-      const result = answered(page, "Answered");
+      const result = answered(page, "ok");
       const audits = collectionIn(result, "audits");
       await expect(audits.getByRole("heading", { level: 4, name: USERS.title })).toBeVisible();
       const elapsed = Date.now() - started;
@@ -232,7 +234,7 @@ test.describe("Ask › New question", () => {
 
     await scriptAsking(request, { workspaceId, judging: { fits: [] }, drafting: DRAFTING });
     await asked(page);
-    const audits = collectionIn(answered(page, "Related Knowledge"), "audits");
+    const audits = collectionIn(answered(page, "related"), "audits");
     await expect(audits.getByText(DRAFTED)).toBeVisible();
 
     const opener = audits.getByRole("button", { name: POLICY.title, exact: true });
@@ -249,7 +251,7 @@ test.describe("Ask › New question", () => {
     await page.setViewportSize({ width: 320, height: 720 });
     await aViewerAsking(page, request, { judging: { fits: [] }, drafting: DRAFTING });
     await asked(page);
-    const audits = collectionIn(answered(page, "Related Knowledge"), "audits");
+    const audits = collectionIn(answered(page, "related"), "audits");
     const footnote = audits.getByRole("button", { name: `Cites ${POLICY.title}` });
 
     await footnote.click();
