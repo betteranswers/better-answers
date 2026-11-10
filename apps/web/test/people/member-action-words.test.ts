@@ -49,6 +49,23 @@ describe("an activity line's marker", () => {
   });
 });
 
+describe("a bulk action's in-flight line", () => {
+  const pending = (count: number): readonly string[] => [
+    BULK_WORDS.changeRole.pending(count, "Viewer"),
+    BULK_WORDS.addToGroup.pending(count, "Site leads"),
+    BULK_WORDS.remove.pending(count),
+    MEMBER_PAGE_WORDS.removing(AMARA),
+  ];
+
+  it("ends in an ellipsis, as every other in-flight line does", () => {
+    for (const said of pending(2)) expect(said).toMatch(/…$/u);
+  });
+
+  it("counts the members it acts on", () => {
+    for (const said of pending(2).slice(0, 3)) expect(said).toMatch(/\b2 members\b/);
+  });
+});
+
 describe("a bulk action's done line", () => {
   const doneWith = (changed: number): readonly string[] => [
     BULK_WORDS.changeRole.done(changed, "Viewer", 3),

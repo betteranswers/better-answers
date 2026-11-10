@@ -8,6 +8,7 @@ import {
 } from "@/features/knowledge/curation/curation-state.ts";
 import { CONCEPT_TYPES_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -282,7 +283,7 @@ test.describe("Concept Types", () => {
       await disclosureOf(page, "Procedure").click();
       await expect(collectionsOf(page, "Procedure").getByRole("listitem")).toHaveText([
         `${collectionNameOf("safety")}1`,
-        "No collection1",
+        `${EMPTY_WORDS.collection}1`,
       ]);
       await disclosureOf(page, "Term").click();
       await expect(collectionsOf(page, "Term").getByRole("listitem")).toHaveText([

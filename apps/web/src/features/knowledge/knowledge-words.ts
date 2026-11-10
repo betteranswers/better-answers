@@ -1,5 +1,5 @@
 import { collectionLabelOf, collectionNameOf } from "@/shared/knowledge/collection-name.ts";
-import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { counted } from "@/shared/words.ts";
 
@@ -11,8 +11,6 @@ export const COLLECTIONS_WORDS = {
   caption: "Collections",
   count: (count: number): string => counted(count, "collection", "collections"),
   columns: { collection: "Collection", owner: "Owner", concepts: "Concepts", verified: "Verified" },
-  noOwner: "No owner",
-  unnamed: "Unnamed member",
   ownOwners: (count: number): string => `Concepts with their own owner: ${String(count)}`,
   ownerOf: (collection: string, owner: string): string => `Owner of ${collection}, ${owner}`,
   people: "People",
@@ -69,7 +67,7 @@ export const KNOWLEDGE_BASE_WORDS = {
   chooseAType: "Choose a type to see its concepts.",
   conceptTypeIn: (conceptType: string, collection: string | null): string =>
     collection === null
-      ? `${conceptType}, ${CONCEPT_WORDS.noCollection}`
+      ? `${conceptType}, ${EMPTY_WORDS.collection}`
       : `${conceptType} in ${collectionNameOf(collection)}`,
   conceptsLoading: "Loading concepts…",
   noneOfTheType: "No concepts of this type yet.",
