@@ -1,6 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { EDITOR_WORDS } from "@/features/knowledge/editing/editor-words.ts";
+import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
+import { EDITOR_WORDS, FORMATTING_WORDS } from "@/features/knowledge/editing/editor-words.ts";
 import {
   CONCEPT_KEYSTROKES as KEY,
   EDITOR_KEYSTROKES,
@@ -29,6 +30,7 @@ import {
   listsItsKeystrokes,
   scrolledSideways,
 } from "../knowledge.ts";
+import { aVirtualAuthenticator } from "../virtual-authenticator.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -183,6 +185,15 @@ const atTheConcept = async (page: Page, seeded: Workspace, title: string): Promi
   return concept;
 };
 
+const NEW_TYPE = "Risk Register";
+
+const NEW_TYPE_AS_TYPED = NEW_TYPE.toLowerCase();
+
+const typeOf = (page: Page, title: string): Locator =>
+  conceptOf(page, title).locator(
+    `xpath=.//dt[normalize-space()="${CONCEPT_WORDS.type}"]/following-sibling::dd[1]`,
+  );
+
 const STATUS_OF_THE_EDITOR = "//article//section[.//h3]//output";
 
 const edges = (drawn: Locator) =>
@@ -256,6 +267,78 @@ test.describe("the concept page", () => {
 
     await page.reload();
     await expect(conceptOf(page, title)).toBeVisible();
+  });
+
+  test("an Admin picks a type and formats in the editor", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    const seeded = await aWorkspaceOfConcepts(request, "Test Pickers");
+    await signedInAsTheAdmin(page, request, seeded);
+    const title = COMMITTEE;
+    await atTheConcept(page, seeded, title);
+
+    await test.step("names each formatting button and tips it", async () => {
+      await page.keyboard.press(EDITOR_KEYSTROKES.edit.key);
+      const editor = page.getByRole("region", { name: EDITOR_WORDS.headingEdit });
+      const toolbar = editor.getByRole("toolbar", { name: FORMATTING_WORDS.toolbar });
+      const { toolbar: _own, ...buttons } = FORMATTING_WORDS;
+
+      for (const name of Object.values(buttons)) {
+        await toolbar.getByRole("button", { name, exact: true }).hover();
+        await expect(page.getByRole("tooltip"), `${name} showed no tooltip`).toHaveText(name);
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("tooltip")).toHaveCount(0);
+      }
+      await editor.getByRole("button", { name: EDITOR_WORDS.close }).click();
+      await expect(editor).toHaveCount(0);
+    });
+
+    await test.step("picks from the workspace's types and saves a new one", async () => {
+      await page.keyboard.press(EDITOR_KEYSTROKES.edit.key);
+      const editor = page.getByRole("region", { name: EDITOR_WORDS.headingEdit });
+      const field = editor.getByRole("combobox", { name: EDITOR_WORDS.conceptType });
+      await field.click();
+      const types = page.getByRole("listbox", { name: EDITOR_WORDS.conceptTypes });
+      await expect(types.getByRole("option", { name: "Team", exact: true })).toBeVisible();
+      await passesTheAccessibilityGate();
+
+      await page.keyboard.type(NEW_TYPE_AS_TYPED);
+      await page
+        .getByRole("option", { name: EDITOR_WORDS.addConceptType(NEW_TYPE_AS_TYPED) })
+        .click();
+      await expect(field).toHaveText(NEW_TYPE_AS_TYPED);
+      await expect(field, "focus did not return to the type field").toBeFocused();
+
+      await page.keyboard.down("Control");
+      await page.keyboard.press("Enter");
+      await page.keyboard.up("Control");
+      await expect(editor, "the editor stayed open after the save").toHaveCount(0);
+
+      await page.reload();
+      await expect(typeOf(page, title)).toHaveText(NEW_TYPE);
+
+      await page.keyboard.press(EDITOR_KEYSTROKES.edit.key);
+      await editor.getByRole("combobox", { name: EDITOR_WORDS.conceptType }).click();
+      await expect(types.getByRole("option", { name: NEW_TYPE, exact: true })).toBeVisible();
+    });
+  });
+
+  test("the passkey offer sits under the concept title", async ({ page, request }) => {
+    await aVirtualAuthenticator(page);
+    const seeded = await aWorkspaceOfConcepts(request, "Kennet Offers");
+    await page.goto(pageOf(seeded.concepts, COMMITTEE));
+    await signIn(page, request, seeded.adminEmail);
+
+    const concept = conceptOf(page, COMMITTEE);
+    const offer = concept.getByRole("region", { name: PASSKEY_WORDS.heading });
+    await expect(offer).toBeVisible();
+    const title = await edges(concept.getByRole("heading", { level: 1 }));
+    const offered = await edges(offer);
+    expect(offered.top, "the offer is above the concept's title").toBeGreaterThanOrEqual(
+      title.bottom,
+    );
   });
 
   test("an Admin reads who checked and owns a concept", async ({
