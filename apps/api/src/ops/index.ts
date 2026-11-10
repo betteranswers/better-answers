@@ -142,7 +142,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   map-counts --workspace <id>                               Prints the map's nodes per label and its edges as JSON, for the restore drill to compare.
   unmapped-passage-rate --workspace <id>                    Prints as JSON, for each map state, how many questions asked were flagged incomplete and how many of those showed unmapped passages.
   reconcile-watermark --workspace <id>                      Replays the bundle commits that the database rows are missing. This is step 2 of the recovery order.
-  refold-concept-types --workspace <id>                     Folds each concept's type again from its file, and moves its merge key with the type. Run it after the fold changes.
+  refold-concept-types --workspace <id>                     Folds each concept's stored frontmatter type again, and moves its merge key with the type. Run it after the fold changes.
   object-store-orphans --workspace <id> [--list]            Removes uploaded files that no document row names and that are older than ${ORPHANED_UPLOAD_GRACE_HOURS} hours, such as those a failed connect left. This is step 5 of the recovery order.
     --list         Prints how many there are and removes none.
   reindex-connected-sources --workspace <id>                Clears every connected source's passages and queues each source to index again. Run it after a release that renames the table the worker's index engine tracks.

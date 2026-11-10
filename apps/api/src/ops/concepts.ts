@@ -77,7 +77,9 @@ export const refoldConceptTypesCommand = async (
     `refold-concept-types: done — refolded ${counted(refolded.length, "concept")}, ${clashed.length} kept by a clash`,
   );
   if (refolded.length > 0) {
-    io.say("refold-concept-types: run map-rebuild to carry the new types into the map");
+    io.say(
+      `refold-concept-types: run map-rebuild --workspace ${workspaceId} to carry the new types into the map`,
+    );
   }
   return DONE;
 };

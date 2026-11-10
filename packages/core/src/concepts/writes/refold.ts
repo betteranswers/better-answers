@@ -99,7 +99,7 @@ const landRefolds = async (
     ],
   );
   await tx.query(
-    `UPDATE concept_index AS c SET concept_type = m.concept_type
+    `UPDATE concept_index AS c SET concept_type = m.concept_type, updated_at = now()
        FROM unnest($2::text[], $3::text[]) AS m(iri, concept_type)
       WHERE c.workspace_id = ${scopeClause(1)} AND c.iri = m.iri
         AND c.concept_type IS DISTINCT FROM m.concept_type`,

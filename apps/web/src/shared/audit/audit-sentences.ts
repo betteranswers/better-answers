@@ -191,7 +191,8 @@ const SENTENCES = {
   "people.subject_request.received": ({ by }) => `${by} recorded a subject request`,
   "platform.audit_log.exported": ({ by, detail }) =>
     `${by} exported ${exported(detail)} from the audit log`,
-  "platform.concept.refolded": ({ by }) => `${by} corrected a concept’s type`,
+  "platform.concept.refolded": ({ by, subject }) =>
+    `${by} corrected the type of ${conceptNamed(subject)}`,
   "platform.erasure.rehearsed": ({ by }) => `${by} tested an erasure on a test copy`,
   "platform.erasure.replayed": ({ by }) => `${by} re-applied an erasure to a restored backup`,
   "platform.graph.swept": ({ by }) => `${by} cleared older copies of the map`,

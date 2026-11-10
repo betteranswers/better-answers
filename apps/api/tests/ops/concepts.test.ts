@@ -263,7 +263,7 @@ describe("pnpm ops", () => {
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
         "refold-concept-types: done — refolded 1 concept, 0 kept by a clash",
-        "refold-concept-types: run map-rebuild to carry the new types into the map",
+        `refold-concept-types: run map-rebuild --workspace ${workspaceId} to carry the new types into the map`,
       ]);
       const held = await superuser.query(
         `SELECT c.concept_type, i.merge_key
