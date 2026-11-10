@@ -17,7 +17,7 @@ export const SESSIONS_WORDS = {
   activeNow: "Active now",
   signOutEverywhereElse: "Sign out everywhere else",
   onlySession: "This is your only session.",
-  standingLine: "Claude and personal tokens stay connected when you sign out here.",
+  standingLine: "Signing out here leaves Claude’s access and personal tokens as they are.",
 } as const;
 
 export const lastActiveAt = (iso: string): string => `Last active ${instantWords(iso)}`;

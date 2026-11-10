@@ -14,7 +14,7 @@ import { PERSON_WORDS, revocationRefused } from "../words.ts";
 type Revocation = ReturnType<typeof useEndEverySignInEverywhere>;
 
 const endsWhat = (name: string): string =>
-  `Ends ${name}’s sessions on every device and every assistant’s access, in every workspace.`;
+  `Ends all of ${name}’s sessions and assistant access, in every workspace.`;
 
 const outcomeOf = (revocation: Revocation, name: string): Outcome | undefined => {
   if (revocation.isPending) {

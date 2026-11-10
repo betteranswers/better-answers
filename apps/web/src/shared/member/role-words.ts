@@ -4,7 +4,7 @@ export const aRole = (role: string): string => `${role === "Viewer" ? "a" : "an"
 
 export const ROLE_MEANINGS = {
   Admin: "Manages people and sources, and does everything an Editor does.",
-  Editor: "Verifies concepts, asks question sets and saves Answers.",
+  Editor: "Verifies concepts, asks question sets and saves answers.",
   Viewer: "Asks questions, flags answers and suggests changes.",
 } as const satisfies Readonly<Record<Role, string>>;
 

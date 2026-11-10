@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { detailAt } from "@/shared/navigation.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { clipboardAnswering } from "@test/clipboard-stand-in.ts";
 import { aConceptIri, anIssuedConcept } from "@test/knowledge/search-answers.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -156,7 +157,7 @@ describe("copying the concept", () => {
 
     fireEvent.click(article.getByRole("button", { name: "Copy" }));
 
-    expect(await article.findByText(/Couldn't copy/u)).toBeDefined();
+    expect(await article.findByText(STOCK.copy)).toBeDefined();
     expect(article.queryByText("Copied")).toBeNull();
   });
 });

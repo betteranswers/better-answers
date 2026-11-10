@@ -105,7 +105,8 @@ const NO_WORKSPACE: readonly ListedWorkspace[] = [];
 
 const wordsOf = (workspace: ListedWorkspace): string => `${workspace.name}\n${workspace.shortName}`;
 
-const PROVISION_COMMAND = "pnpm ops provision-workspace";
+const PROVISION_COMMAND =
+  "pnpm ops provision-workspace --name <name> --short-name <short name> --admin <email>";
 
 function NoneProvisioned() {
   return (

@@ -10,10 +10,10 @@ export const STOCK = {
   changed: "This has changed since you opened it. Reload the page.",
   notYet: "This can't be done yet.",
   general: "Something went wrong. Try again.",
-  tryAgain: "We couldn't process your request. Try again.",
-  unconfirmed: "We couldn't confirm that. Reload the page to check.",
-  notLoaded: "This didn't load. Try again.",
-  copy: "Couldn't copy. Select the text and copy it yourself.",
+  tryAgain: "We couldn’t process your request. Try again.",
+  unconfirmed: "We couldn’t confirm that. Reload the page to check.",
+  notLoaded: "This didn’t load. Try again.",
+  copy: "Couldn’t copy. Select the text and copy it yourself.",
 } as const;
 
 export const stockWait = (liftsInSeconds: number | undefined): string =>
@@ -38,7 +38,7 @@ export type OwnSentences = Partial<Record<RefusalWord, string>>;
 
 const OWN_ON_EVERY_SURFACE = {
   "workspace-switched": "This tab now shows the workspace you switched to in another tab.",
-  "workspace-unnamed": "This tab couldn't load your workspace. Reload the page.",
+  "workspace-unnamed": "This tab couldn’t load your workspace. Reload the page.",
   "confirmation-too-old":
     "Confirm your second factor again. Your last confirmation is over an hour old.",
 } satisfies OwnSentences;

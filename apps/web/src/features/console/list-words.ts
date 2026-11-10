@@ -27,7 +27,7 @@ export const EVERYONE_WORDS = {
   search: "Search by name or address",
   caption: "Every person on the platform.",
   loading: "Loading people…",
-  readingAgain: "Updating the list.",
+  readingAgain: "Updating the list…",
   onTheFirstPage: "You’re already on the first page.",
   onTheLastPage: "You’re already on the last page.",
   counted: (total: number): string => `${counted(total, ...PEOPLE)} on the platform.`,

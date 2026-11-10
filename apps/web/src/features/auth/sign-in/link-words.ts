@@ -22,7 +22,7 @@ export const LINK_ACTIONS = {
   backToSignIn: "Go back to sign-in",
 } as const;
 
-export const signingInAs = (address: string): string => `Signing in as ${address}.`;
+export const signingInAs = (address: string): string => `This link signs you in as ${address}.`;
 
 export const worksUntil = (until: string): string =>
   `This code works until ${instantWords(until)}.`;
@@ -32,6 +32,6 @@ export const codeShown = (code: string): string => `${code.slice(0, 3)} ${code.s
 export const codeSpelled = (code: string): string => code.split("").join(" ");
 
 export const CODE_NOT_COPIED =
-  "Couldn't copy the code. Type it in the browser where you started signing in.";
+  "Couldn’t copy the code. Type it in the browser where you started signing in.";
 
-export const SIGN_IN_UNCONFIRMED = "We couldn't confirm that. Try again.";
+export const SIGN_IN_UNCONFIRMED = "We couldn’t confirm that. Try again.";

@@ -13,7 +13,7 @@ export const saidOfASignOutRefused = (failure: Error): string =>
   saidOfAFailure(failure, STOCK.tryAgain);
 
 const INVITATION_LINK_INVALID =
-  "This invitation link isn't valid. Ask the person who invited you for a new one.";
+  "This invitation link isn’t valid. Ask the person who invited you for a new one.";
 
 export const SAID_OF_ACCEPTING = {
   "no-such-invitation": INVITATION_LINK_INVALID,
@@ -32,7 +32,7 @@ export const saidOfAnAskToJoinRefusal = (refusal: Refusal): string =>
   refusal.class === "malformed" ? REASON_REFUSED : STOCK.general;
 
 export const CODE_NOT_SENT =
-  "We couldn't send a code to that address. Check it, or use a different email address.";
+  "We couldn’t send a code to that address. Check it, or use a different email address.";
 
 const CODE_SPENT = "This code has expired. Request a new one.";
 
@@ -50,7 +50,7 @@ export const noLongerAMemberOf = (workspace: string): string =>
 export const SOLE_PICK_REFUSED = "Something went wrong. Reload the page.";
 
 export const CONNECTION_UNFINISHED =
-  "The connection couldn't be completed. Start it again from the app you were connecting.";
+  "The connection couldn’t be completed. Start it again from the app you were connecting.";
 
 export const SAID_OF_SECOND_FACTOR = {
   "passkey-name-empty": "Enter a name.",
@@ -66,13 +66,13 @@ export const SAID_OF_SECOND_FACTOR = {
 export const saidOfASecondFactorRefusal = (refusal: Refusal): string =>
   refusalSentence(SAID_OF_SECOND_FACTOR, refusal.word, refusal.class);
 
-export const CODES_NOT_TICKED = "Confirm you've saved your codes.";
+export const CODES_NOT_TICKED = "Confirm you’ve saved your codes.";
 
 export const PASSKEY_HELD =
   "This device already has one of your passkeys. Use another device, or remove the old passkey first.";
 
 export const PASSKEY_NOT_VERIFIED =
-  "Your device couldn't confirm it's you. Use a device with a fingerprint, face or PIN check.";
+  "Your device couldn’t confirm it’s you. Use a device with a fingerprint, face or PIN check.";
 
 export const PASSKEY_ASK_EXPIRED = "Your device took too long to respond. Try again.";
 
@@ -80,9 +80,9 @@ export const PASSKEY_UNKNOWN =
   "This passkey no longer works here. Sign in by email, then remove the passkey from your device.";
 
 export const PASSKEY_SIGN_IN_NOT_VERIFIED =
-  "Your device couldn't confirm it's you. Try another device, or sign in by email.";
+  "Your device couldn’t confirm it’s you. Try another device, or sign in by email.";
 
-export const PASSKEY_SIGN_IN_REFUSED = "That passkey didn't work. Try again, or sign in by email.";
+export const PASSKEY_SIGN_IN_REFUSED = "That passkey didn’t work. Try again, or sign in by email.";
 
 const OTHER_WAYS = {
   passkey: "your passkey",
@@ -107,18 +107,18 @@ export const AUTHENTICATOR_CODE_WRONG =
   "That code is incorrect. Enter the code your authenticator app shows now.";
 
 export const PASSKEY_NOT_YOURS =
-  "That passkey isn't linked to your account. Try another way below.";
+  "That passkey isn’t linked to your account. Try another way below.";
 
 export const PASSKEY_CONFIRM_NOT_VERIFIED =
-  "Your device couldn't confirm it's you. Try another way below.";
+  "Your device couldn’t confirm it’s you. Try another way below.";
 
-export const NO_PASSKEY_TO_CONFIRM = "You don't have a passkey. Try another way below.";
+export const NO_PASSKEY_TO_CONFIRM = "You don’t have a passkey. Try another way below.";
 
 export const PASSKEY_CONFIRM_REFUSED =
-  "That passkey didn't work. Try again, or use another way below.";
+  "That passkey didn’t work. Try again, or use another way below.";
 
 export const RESTORE_CODE_WRONG = `That restore code is incorrect or has expired. Check it, or ask ${PRODUCT_NAME} support for a new one.`;
 
-export const SETUP_NOT_GRANTED = "Confirm it's you before you set up a new second factor.";
+export const SETUP_NOT_GRANTED = "Confirm it’s you before you set up a new second factor.";
 
 export const RESTORE_CODE_NEEDED = SAID_OF_SECOND_FACTOR["restore-code-needed"];
