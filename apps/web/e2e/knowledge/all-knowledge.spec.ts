@@ -2,6 +2,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -18,7 +19,7 @@ import {
   skipLinkReachesThePage,
   tabUntilFocused,
 } from "../harness.ts";
-import { listsItsKeystrokes } from "../knowledge.ts";
+import { listsItsKeystrokes, scrolledSideways } from "../knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -33,6 +34,10 @@ const OWNING_NOTHING = "Dilys Pugh";
 const NEW_OWNER = "Rhian Pryce";
 
 const SELECTED = ["Annual leave", "Expense claims", "Fire drills"] as const;
+
+const NARROW = { width: 390, height: 844 } as const;
+
+const WIDE = { width: 1280, height: 720 } as const;
 
 type Reviewed = {
   readonly adminEmail: string;
@@ -71,6 +76,12 @@ const aWorkspaceToReview = async (api: APIRequestContext, name: string): Promise
       { title: "Expense claims", collection: "policy", body: "Claims go in within 30 days." },
       { title: "Sick pay", collection: "policy", body: "Sick pay starts on the first day." },
       { title: "Fire drills", collection: "safety", body: "A fire drill runs each quarter." },
+      {
+        title: "Yard rota",
+        collection: "safety",
+        body: "The yard rota changes each term.",
+        frontmatter: { stale_after: "2025-01-01" },
+      },
     ],
   });
   await seedConceptIndex(api, {
@@ -138,10 +149,11 @@ test.describe("All Knowledge", () => {
     await expect(allKnowledge(page)).toMatchAriaSnapshot(`
       - region "All Knowledge":
         - heading "All Knowledge" [level=2]
-        - status: /\\b64\\b/
+        - status: /\\b65\\b/
         - status
-        - combobox "Filter by Collection"
+        - combobox "Filter by ${WORDS.filters.collection.label}"
         - combobox "Filter by ${WORDS.filters.type.label}"
+        - combobox "Filter by ${WORDS.filters.trust.label}"
         - button "Columns"
         - table:
           - rowgroup:
@@ -150,10 +162,9 @@ test.describe("All Knowledge", () => {
                 - checkbox "Select every concept on this page"
               - columnheader "Title"
               - columnheader "${WORDS.columns.type}"
-              - columnheader "Collection"
-              - columnheader "Trust"
-              - columnheader "Owner"
-              - columnheader "${WORDS.columns.checked}"
+              - columnheader "${WORDS.columns.collection}"
+              - columnheader "${WORDS.columns.trust}"
+              - columnheader "${WORDS.columns.owner}"
         - navigation "${WORDS.pages}"
     `);
     await expect(rowOf(page, "Annual leave")).toContainText(/\d{1,2} \w+ \d{4}/);
@@ -197,13 +208,60 @@ test.describe("All Knowledge", () => {
       await expect(rowOf(page, "Fire drills")).toContainText(NEW_OWNER);
     });
 
+    await test.step("an Admin filters to the out of date concepts and sorts by trust", async () => {
+      await filterOf(page, WORDS.filters.trust.label).click();
+      await page
+        .getByRole("option", { name: WORDS.filters.trust.choices["out-of-date"], exact: true })
+        .click();
+      await expect(page).toHaveURL(/all\.trust=out-of-date/);
+      await expect(rowsOf(page)).toHaveCount(1);
+      await expect(rowOf(page, "Yard rota")).toContainText(
+        WORDS.filters.trust.choices["out-of-date"],
+      );
+      await expect(
+        allKnowledge(page).getByRole("columnheader"),
+        "the table holds a column besides the select-all, title, type, collection, trust and owner",
+      ).toHaveCount(6);
+
+      await allKnowledge(page)
+        .getByRole("button", { name: WORDS.columns.trust, exact: true })
+        .click();
+      await expect(page).toHaveURL(/all\.sort=trust/);
+      await page.reload();
+      await expect(rowOf(page, "Yard rota")).toBeVisible();
+      await expect(
+        allKnowledge(page).getByRole("columnheader", { name: WORDS.columns.trust }),
+      ).toHaveAttribute("aria-sort", "ascending");
+      await expect(filterOf(page, WORDS.filters.trust.label)).toContainText(
+        WORDS.filters.trust.choices["out-of-date"],
+      );
+
+      await page.setViewportSize(NARROW);
+      await expect(
+        allKnowledge(page).getByRole("columnheader", { name: WORDS.columns.trust }),
+      ).toBeVisible();
+      await expect(rowOf(page, "Yard rota")).toContainText(
+        WORDS.filters.trust.choices["out-of-date"],
+      );
+      expect(await scrolledSideways(page), "the narrow page scrolled sideways").toBeLessThanOrEqual(
+        0,
+      );
+      await page.setViewportSize(WIDE);
+
+      await filterOf(page, WORDS.filters.trust.label).click();
+      await page.getByRole("option", { name: WORDS.filters.trust.any }).click();
+      await expect(rowsOf(page)).toHaveCount(FIRST_PAGE);
+    });
+
     await test.step("an Editor who owns a collection sees it first and keeps their filter and sort after opening a concept", async () => {
       await context.clearCookies();
       await signedInAt(page, request, at.owningEditorEmail);
       await page.goto(ALL_KNOWLEDGE);
 
       await expect(rowOf(page, "Sick pay")).toBeVisible();
-      await expect(filterOf(page, "Collection")).toContainText("policy");
+      await expect(filterOf(page, WORDS.filters.collection.label)).toContainText(
+        collectionNameOf("policy"),
+      );
       await expect(rowsOf(page)).toHaveCount(3);
       await expect(titleOf(page, "Fire drills")).toHaveCount(0);
       await expect(allKnowledge(page).getByRole("checkbox")).toHaveCount(0);
@@ -211,7 +269,7 @@ test.describe("All Knowledge", () => {
       await expect(rowOf(page, "Annual leave")).toContainText(NEW_OWNER);
       await passesTheAccessibilityGate();
 
-      await filterOf(page, "Collection").click();
+      await filterOf(page, WORDS.filters.collection.label).click();
       await page.getByRole("option", { name: WORDS.filters.collection.any }).click();
       await expect(titleOf(page, "Fire drills")).toBeVisible();
       await allKnowledge(page).getByRole("button", { name: "Owner", exact: true }).click();
@@ -224,7 +282,9 @@ test.describe("All Knowledge", () => {
 
       await expect(page).toHaveURL(held);
       await expect(titleOf(page, "Fire drills")).toBeVisible();
-      await expect(filterOf(page, "Collection")).toContainText(WORDS.filters.collection.any);
+      await expect(filterOf(page, WORDS.filters.collection.label)).toContainText(
+        WORDS.filters.collection.any,
+      );
       await expect(titleOf(page, "Annual leave")).toBeFocused();
     });
 

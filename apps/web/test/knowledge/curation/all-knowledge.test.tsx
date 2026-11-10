@@ -3,6 +3,8 @@ import { assert, describe, expect, it, vi } from "vitest";
 
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
+import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 import {
   aConceptRow,
   ALL_KNOWLEDGE,
@@ -42,6 +44,10 @@ const THE_LEASE = aConceptRow(4, "Yard lease", { conceptType: "lease", collectio
 const CONCEPTS: readonly ConceptRow[] = [THE_LEAVE, THE_EXPENSES, THE_DRILLS, THE_LEASE];
 
 const SET_OWNER = WORDS.setOwner.action;
+
+const FILTER_BY_COLLECTION = `Filter by ${WORDS.filters.collection.label}`;
+
+const FILTER_BY_TRUST = `Filter by ${WORDS.filters.trust.label}`;
 
 const region = () => within(screen.getByRole("region", { name: "All Knowledge" }));
 
@@ -123,13 +129,13 @@ describe("the All Knowledge page", () => {
     await screen.findByRole("link", { name: "Annual leave" });
     expect(theCount()).toMatch(/^4\b/u);
     expect(cellOf("Annual leave", "Owner")).toBe("Ada");
-    expect(cellOf("Annual leave", WORDS.columns.checked)).toContain("4 March 2026");
-    expect(cellOf("Annual leave", WORDS.columns.checked)).toContain("Rhian Pryce");
+    expect(cellOf("Annual leave", WORDS.columns.trust)).toContain("4 March 2026");
+    expect(cellOf("Annual leave", WORDS.columns.trust)).toContain("Rhian Pryce");
     const ownOwner = cellOf("Expense claims", "Owner");
     expect(ownOwner).toContain("Rhian Pryce");
     expect(ownOwner, "a concept's own owner looks like its collection's").not.toBe("Rhian Pryce");
     expect(
-      cellOf("Expense claims", WORDS.columns.checked),
+      cellOf("Expense claims", WORDS.columns.trust),
       "an unverified concept shows a date",
     ).toMatch(/^\D*\S\D*$/u);
     const unowned = cellOf("Fire drills", "Owner");
@@ -365,6 +371,185 @@ describe("the All Knowledge page for an Admin", () => {
   );
 });
 
+const THE_OUT_OF_DATE = aConceptRow(5, "Yard rota", {
+  trust: { tier: "human-reviewed", status: "out-of-date" },
+  trustWords: "Out of date",
+  checkedBy: "Rhian Pryce",
+  checkedOn: "1 July 2025",
+});
+
+const THE_CHANGED = aConceptRow(6, "Rate card", {
+  trust: { tier: "human-reviewed", status: "changed-since-checked" },
+  trustWords: "Changed since verified",
+  checkedBy: "Rhian Pryce",
+  checkedOn: "2 June 2026",
+});
+
+const THE_DEPRECATED = aConceptRow(7, "Old tariff", {
+  trust: { tier: "unverified", status: "deprecated" },
+  trustWords: "Deprecated",
+});
+
+const THE_MACHINE_CHECKED = aConceptRow(8, "Gate codes", {
+  trust: { tier: "machine-confirmed", status: "current" },
+  trustWords: "Verified automatically",
+  checkedOn: "9 May 2026",
+});
+
+const WORKLIST: readonly ConceptRow[] = [
+  THE_LEAVE,
+  THE_EXPENSES,
+  THE_OUT_OF_DATE,
+  THE_CHANGED,
+  THE_DEPRECATED,
+  THE_MACHINE_CHECKED,
+];
+
+const worklistOpened = async () => {
+  await openAt(
+    ALL_KNOWLEDGE,
+    anAllKnowledgeApi(() => WORKLIST),
+  );
+  await screen.findByRole("link", { name: "Annual leave" });
+};
+
+const headsListed = () =>
+  region()
+    .getAllByRole("columnheader")
+    .map((head) => head.textContent);
+
+const titlesListed = () =>
+  region()
+    .getAllByRole("link")
+    .map((link) => link.textContent);
+
+describe("the All Knowledge page as a worklist", () => {
+  it.each([
+    ["unverified", ["Expense claims"]],
+    ["out-of-date", ["Yard rota"]],
+    ["changed-since-checked", ["Rate card"]],
+    ["deprecated", ["Old tariff"]],
+  ] as const)("lists only the %s concepts", async (trust, titles) => {
+    const router = await openAt(
+      ALL_KNOWLEDGE,
+      anAllKnowledgeApi(() => WORKLIST),
+    );
+    await screen.findByRole("link", { name: "Annual leave" });
+
+    choosing(
+      region().getByRole("combobox", { name: FILTER_BY_TRUST }),
+      WORDS.filters.trust.choices[trust],
+    );
+
+    await waitFor(() => {
+      expect(titlesListed()).toEqual(titles);
+    });
+    expect(lastAsk()?.trust).toBe(trust);
+    expect(router.state.location.search).toMatchObject({ "all.trust": trust });
+    expect(theCount()).toMatch(/^1 matching\b/u);
+  });
+
+  it("offers the four trust words the worklist filters by", async () => {
+    await openAt(
+      ALL_KNOWLEDGE,
+      anAllKnowledgeApi(() => WORKLIST),
+    );
+    await screen.findByRole("link", { name: "Annual leave" });
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      value: () => undefined,
+      configurable: true,
+    });
+
+    fireEvent.keyDown(region().getByRole("combobox", { name: FILTER_BY_TRUST }), { key: "Enter" });
+
+    const offered = (await screen.findAllByRole("option")).map((option) => option.textContent);
+    Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    expect(offered).toEqual([
+      WORDS.filters.trust.any,
+      ...Object.values(WORDS.filters.trust.choices),
+    ]);
+  });
+
+  it("holds the trust filter in the address and clears it", async () => {
+    await openAt(
+      `${ALL_KNOWLEDGE}?all.trust=out-of-date`,
+      anAllKnowledgeApi(() => WORKLIST),
+    );
+
+    await screen.findByRole("link", { name: "Yard rota" });
+    expect(region().getByRole("combobox", { name: FILTER_BY_TRUST }).textContent).toBe(
+      WORDS.filters.trust.choices["out-of-date"],
+    );
+
+    choosing(region().getByRole("combobox", { name: FILTER_BY_TRUST }), WORDS.filters.trust.any);
+
+    await waitFor(() => {
+      expect(titlesListed()).toHaveLength(WORKLIST.length);
+    });
+    expect(lastAsk()?.trust).toBeUndefined();
+  });
+
+  it("offers Clear Filters when no concept shows the trust word", async () => {
+    await openAt(
+      `${ALL_KNOWLEDGE}?all.trust=deprecated`,
+      anAllKnowledgeApi(() => [THE_LEAVE]),
+    );
+
+    fireEvent.click(await region().findByRole("button", { name: CLEAR_WORDS.filters }));
+
+    expect(await region().findByRole("link", { name: "Annual leave" })).toBeDefined();
+    expect(lastAsk()?.trust).toBeUndefined();
+  });
+
+  it("sorts by verification date from the Trust header", async () => {
+    const router = await openAt(
+      ALL_KNOWLEDGE,
+      anAllKnowledgeApi(() => WORKLIST),
+    );
+    await screen.findByRole("link", { name: "Annual leave" });
+
+    fireEvent.click(region().getByRole("button", { name: WORDS.columns.trust }));
+
+    await waitFor(() => {
+      expect(router.state.location.search).toMatchObject({ "all.sort": "trust" });
+    });
+    await waitFor(() => {
+      expect(lastAsk()?.sort).toEqual({ column: "trust", desc: false });
+    });
+    fireEvent.click(region().getByRole("button", { name: WORDS.columns.trust }));
+    await waitFor(() => {
+      expect(lastAsk()?.sort).toEqual({ column: "trust", desc: true });
+    });
+  });
+
+  it("shows each concept's trust and date in one Trust column", async () => {
+    await worklistOpened();
+
+    const heads = headsListed();
+    expect(heads.filter((head) => head.startsWith(WORDS.columns.trust))).toHaveLength(1);
+    expect(heads.some((head) => head.includes("Last verified"))).toBe(false);
+    expect(cellOf("Yard rota", WORDS.columns.trust)).toContain(THE_OUT_OF_DATE.trustWords);
+    expect(cellOf("Yard rota", WORDS.columns.trust)).toContain("1 July 2025");
+    expect(cellOf("Gate codes", WORDS.columns.trust)).toContain("9 May 2026");
+    expect(cellOf("Old tariff", WORDS.columns.trust)).not.toMatch(/\d{4}/u);
+    expect(
+      cellOf("Annual leave", WORDS.columns.trust).match(/4 March 2026/gu),
+      "the date showed twice beside a person's verification",
+    ).toHaveLength(1);
+  });
+
+  it("keeps the Trust column on a narrow screen", async () => {
+    document.documentElement.style.setProperty("--shell-wide", "0");
+    await worklistOpened();
+
+    const heads = headsListed();
+
+    document.documentElement.style.removeProperty("--shell-wide");
+    expect(heads.some((head) => head.startsWith(WORDS.columns.trust))).toBe(true);
+    expect(heads.some((head) => head.startsWith(WORDS.columns.owner))).toBe(false);
+  });
+});
+
 describe("the All Knowledge page for an owner", () => {
   it("opens on the collections an owner holds, with no selection", async () => {
     const api = anAllKnowledgeApi(() => CONCEPTS);
@@ -374,7 +559,7 @@ describe("the All Knowledge page for an owner", () => {
     await screen.findByRole("link", { name: "Annual leave" });
     expect(lastAsk()?.collections).toEqual(["policy", "safety"]);
     expect(region().queryByRole("link", { name: "Yard lease" })).toBeNull();
-    expect(region().getByRole("combobox", { name: "Filter by Collection" }).textContent).toBe(
+    expect(region().getByRole("combobox", { name: FILTER_BY_COLLECTION }).textContent).toBe(
       WORDS.filters.collection.yours,
     );
     expect(region().queryAllByRole("checkbox")).toHaveLength(0);
@@ -389,8 +574,8 @@ describe("the All Knowledge page for an owner", () => {
     await openAt(ALL_KNOWLEDGE, api);
 
     await screen.findByRole("link", { name: "Annual leave" });
-    expect(region().getByRole("combobox", { name: "Filter by Collection" }).textContent).toBe(
-      "policy",
+    expect(region().getByRole("combobox", { name: FILTER_BY_COLLECTION }).textContent).toBe(
+      collectionNameOf("policy"),
     );
   });
 
@@ -401,7 +586,7 @@ describe("the All Knowledge page for an owner", () => {
     await screen.findByRole("link", { name: "Annual leave" });
 
     choosing(
-      region().getByRole("combobox", { name: "Filter by Collection" }),
+      region().getByRole("combobox", { name: FILTER_BY_COLLECTION }),
       WORDS.filters.collection.any,
     );
 
