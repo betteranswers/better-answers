@@ -399,7 +399,7 @@ test.describe("the People group's Members page", () => {
           - status: /\\b3\\b/
           - button ${JSON.stringify(INVITE_A_PERSON.name)}
           - searchbox "Search by name or address"
-          - combobox ${JSON.stringify(filterBy("Role"))}: ${MEMBERS_WORDS.anyRole}
+          - combobox ${JSON.stringify(filterBy("role"))}: ${MEMBERS_WORDS.anyRole}
           - button "Columns"
           - table:
             - caption

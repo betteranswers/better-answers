@@ -31,7 +31,7 @@ const savedHeld = (saved: Saved, name: string): string =>
 
 export const AUDIT_LOG_WORDS = {
   search: "Search by person, group or action",
-  family: "Family",
+  family: "family",
   everyFamily: "All families",
   families: FAMILY_WORDS,
   loading: "Loading the audit log…",

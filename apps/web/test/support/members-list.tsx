@@ -349,7 +349,7 @@ export function MembersList(properties: Asked) {
         }}
         filters={[
           {
-            label: "Role",
+            label: "role",
             value: held.narrowed.role,
             anyLabel: "Any Role",
             choices: ROLES.map((role) => ({ value: role, label: role })),

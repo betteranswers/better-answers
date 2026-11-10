@@ -44,7 +44,7 @@ const chooseFilter = (filter: string, choice: string) => {
 };
 
 const pickRole = (role: string) => {
-  chooseFilter(filterBy("Role"), role);
+  chooseFilter(filterBy("role"), role);
 };
 
 const searchBox = () => screen.getByRole("searchbox", { name: "Search by name or address" });
@@ -262,7 +262,7 @@ describe("the list's empty, loading and failed states", () => {
 
   it("keeps focus in place when Clear Filters was not focused", () => {
     render(<MembersList />);
-    const role = screen.getByRole("combobox", { name: filterBy("Role") });
+    const role = screen.getByRole("combobox", { name: filterBy("role") });
     fireEvent.change(searchBox(), { target: { value: "Zed" } });
     role.focus();
 
@@ -451,7 +451,7 @@ describe("the filter row", () => {
         search={{ label: "Search by address", value: "", onChange: () => undefined }}
         filters={[
           {
-            label: "Role",
+            label: "role",
             value: undefined,
             anyLabel: "Any Role",
             choices: [{ value: "Admin", label: "Admin" }],
@@ -461,7 +461,7 @@ describe("the filter row", () => {
       />,
     );
 
-    expect(screen.getByRole("combobox", { name: filterBy("Role") }).textContent).toBe("Any Role");
+    expect(screen.getByRole("combobox", { name: filterBy("role") }).textContent).toBe("Any Role");
   });
 
   it("distinguishes a choice valued “any” from no filter", () => {
@@ -471,7 +471,7 @@ describe("the filter row", () => {
         search={{ label: "Search by address", value: "", onChange: () => undefined }}
         filters={[
           {
-            label: "Colour",
+            label: "colour",
             value,
             anyLabel: "Every colour",
             choices: [
@@ -484,15 +484,15 @@ describe("the filter row", () => {
       />
     );
     const { rerender } = render(colourOf("any"));
-    const trigger = () => screen.getByRole("combobox", { name: filterBy("Colour") });
+    const trigger = () => screen.getByRole("combobox", { name: filterBy("colour") });
     expect(trigger().textContent).toBe("Any colour at all");
 
     rerender(colourOf(undefined));
     expect(trigger().textContent).toBe("Every colour");
 
-    chooseFilter(filterBy("Colour"), "Any colour at all");
+    chooseFilter(filterBy("colour"), "Any colour at all");
     rerender(colourOf("any"));
-    chooseFilter(filterBy("Colour"), "Every colour");
+    chooseFilter(filterBy("colour"), "Every colour");
     expect(chose).toEqual(["any", undefined]);
   });
 

@@ -199,7 +199,7 @@ function MemberFilters(properties: {
   const { narrowed, searchRef } = properties;
   const groups = useGroups().data ?? [];
   const groupFilter = {
-    label: "Group",
+    label: "group",
     value: narrowed.state.group,
     anyLabel: MEMBERS_WORDS.anyGroup,
     choices: groups.map((group) => ({ value: group.id, label: group.name })),
@@ -218,7 +218,7 @@ function MemberFilters(properties: {
       }}
       filters={[
         {
-          label: "Role",
+          label: "role",
           value: narrowed.state.role,
           anyLabel: MEMBERS_WORDS.anyRole,
           choices: ROLES.map((role) => ({ value: role, label: role })),

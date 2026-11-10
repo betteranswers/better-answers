@@ -21,8 +21,7 @@ export const counted = (count: number, one: string, many: string): string =>
 
 export const CLEAR_WORDS = { search: "Clear search", filters: "Clear filters" } as const;
 
-export const filterBy = (label: string): string =>
-  `Filter by ${label.replace(/^\p{Lu}(?=\p{Ll})/u, (first) => first.toLowerCase())}`;
+export const filterBy = (field: string): string => `Filter by ${field}`;
 
 export const SIGN_OUT = "Sign out";
 

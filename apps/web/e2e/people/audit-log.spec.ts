@@ -35,7 +35,7 @@ const searchBox = (page: Page) =>
   auditLog(page).getByRole("searchbox", { name: "Search by person, group or action" });
 
 const familyFilter = (page: Page) =>
-  auditLog(page).getByRole("combobox", { name: filterBy("Family") });
+  auditLog(page).getByRole("combobox", { name: filterBy(AUDIT_LOG_WORDS.family) });
 
 const pickFamily = async (page: Page, family: string): Promise<void> => {
   await familyFilter(page).click();
