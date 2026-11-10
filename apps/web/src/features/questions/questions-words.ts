@@ -4,8 +4,8 @@ import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import type { AskedRecord, ConceptRead, FlagClosing } from "./questions-api.ts";
 
 const JUDGED_WORDS = {
-  yes: "Yes, it answers the question",
-  no: "No, it does not answer the question",
+  yes: "Yes",
+  no: "No",
 } as const satisfies Readonly<Record<NonNullable<ConceptRead["judged"]>, string>>;
 
 const WHERE_WORDS = {
@@ -16,11 +16,6 @@ const WHERE_WORDS = {
 const CLOSING_WORDS = {
   "fixed-in-the-knowledge": "Fixed in the knowledge",
   "no-fault-in-the-knowledge": "Knowledge was correct",
-} as const satisfies Readonly<Record<FlagClosing, string>>;
-
-export const CLOSE_AS = {
-  "fixed-in-the-knowledge": "Fixed in the Knowledge",
-  "no-fault-in-the-knowledge": "Knowledge Was Correct",
 } as const satisfies Readonly<Record<FlagClosing, string>>;
 
 export const CLOSINGS = [
@@ -34,15 +29,14 @@ const ASKER_WORDS = {
 } as const satisfies Readonly<Record<Exclude<AskedRecord["askedBy"]["kind"], "person">, string>>;
 
 export const QUESTIONS_WORDS = {
-  heading: "Questions Asked",
-  loading: "The questions are still loading.",
+  loading: "Loading questions…",
   none: "No questions yet",
-  selectFirst: "Please select a question first.",
+  selectFirst: "Select a question first.",
   flagged: "Flagged",
-  others: "Other Questions",
-  notAnswered: "Not Answered",
+  others: "Other questions",
+  notAnswered: verdictWords("refuse"),
   noCollection: CONCEPT_WORDS.noCollection,
-  more: "More Questions",
+  more: "Show more questions",
   verdict: verdictWords,
   judge: (state: AskedRecord["judgeState"]): string =>
     state === null ? "Not finished" : JUDGE_WORDS[state],
@@ -52,32 +46,36 @@ export const QUESTIONS_WORDS = {
   closing: CLOSING_WORDS,
   flaggedAs: flaggedWords,
   terms: {
-    askedBy: "Asked By",
+    askedBy: "Asked by",
     asked: "Asked",
     where: "Where",
-    collectionsNamed: "Collections Chosen",
+    collectionsNamed: "Collections chosen",
     verdict: "Verdict",
     judge: "Judge",
     conceptType: "Type",
     collection: "Collection",
     trust: "Trust",
-    judged: "Judge’s Verdict",
+    judged: "Answers the question",
     ...RECORD_WORDS.terms,
-    restedOn: "Cited Concept",
+    restedOn: "Cited concept",
     closed: "Closed",
   },
   noneNamed: "None",
   parts: {
     answer: "Answer",
     concepts: "Concepts",
-    drafted: "Drafted Answer",
+    drafted: "Drafted answer",
     feedback: "Feedback",
   },
   noConcepts: "No concepts you have access to",
   helpful: RECORD_WORDS.markedHelpful,
-  closeTheFlag: "Close This Flag",
+  closeTheFlag: "Close this flag",
   closedSaid: {
-    "fixed-in-the-knowledge": "The flag has been closed as fixed in the knowledge.",
-    "no-fault-in-the-knowledge": "The flag has been closed. The knowledge was correct.",
+    "fixed-in-the-knowledge": "Flag closed as fixed in the knowledge.",
+    "no-fault-in-the-knowledge": "Flag closed. The knowledge was correct.",
   } satisfies Readonly<Record<FlagClosing, string>>,
+} as const;
+
+export const ANSWER_TESTS_WORDS = {
+  empty: "No answer tests yet",
 } as const;

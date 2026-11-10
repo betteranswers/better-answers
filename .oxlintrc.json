@@ -560,6 +560,12 @@
       }
     },
     {
+      "files": ["apps/web/src/features/ask/**", "apps/web/src/features/questions/**"],
+      "rules": {
+        "better-answers/ui-copy-plain": "error"
+      }
+    },
+    {
       "files": ["packages/schema/scripts/roles-surface.ts"],
       "rules": {
         "max-lines-per-function": [

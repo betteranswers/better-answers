@@ -1,5 +1,10 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import type { QuestionVerdict } from "@better-answers/schema";
+
+import { ASK_WORDS } from "@/features/ask/ask-words.ts";
+import { NEW_QUESTION } from "@/shared/navigation.ts";
+
 import { anAddress, provision, seedConcepts } from "./harness.ts";
 
 export const QUESTION = "How do buyers access audit information?";
@@ -48,15 +53,16 @@ export const anAuditWorkspace = async (api: APIRequestContext) => {
   return { workspaceId, adminId: workspace.admin.id, adminEmail };
 };
 
-export const newQuestion = (page: Page) => page.getByRole("region", { name: "New Question" });
+export const newQuestion = (page: Page) => page.getByRole("region", { name: NEW_QUESTION.name });
 
 export const questionBox = (page: Page) =>
-  newQuestion(page).getByRole("textbox", { name: "Question" });
+  newQuestion(page).getByRole("textbox", { name: ASK_WORDS.question });
 
-export const askButton = (page: Page) => newQuestion(page).getByRole("button", { name: "Ask" });
+export const askButton = (page: Page) =>
+  newQuestion(page).getByRole("button", { name: ASK_WORDS.ask });
 
-export const answered = (page: Page, verdict: string) =>
-  page.getByRole("region", { name: verdict, exact: true });
+export const answered = (page: Page, verdict: QuestionVerdict) =>
+  page.getByRole("region", { name: ASK_WORDS.verdict(verdict), exact: true });
 
 export const collectionIn = (result: Locator, collection: string) =>
   result.getByRole("region", { name: collection, exact: true });

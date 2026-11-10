@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { YOUR_QUESTIONS_WORDS } from "@/features/ask/ask-words.ts";
 import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -149,7 +150,7 @@ test.describe("Your questions", () => {
       await page.keyboard.press("Tab");
       await expect(rowsOf(yourQuestions(page)).first()).toBeFocused();
       const more = page
-        .getByRole("navigation", { name: "More Questions" })
+        .getByRole("navigation", { name: YOUR_QUESTIONS_WORDS.more })
         .getByRole("button", { name: "Load More" });
       await tabUntilFocused(page, more, 60);
       await passesTheAccessibilityGate();

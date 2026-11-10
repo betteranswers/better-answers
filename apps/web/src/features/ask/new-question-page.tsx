@@ -178,7 +178,7 @@ export function NewQuestionPage() {
       <PageHead title={NEW_QUESTION.name} />
       <section aria-labelledby={headingId} className="mt-6">
         <h2 id={headingId} className="sr-only">
-          {WORDS.heading}
+          {NEW_QUESTION.name}
         </h2>
         <Card marks className="mt-4">
           <QuestionForm answering={answering} readable={readable} />

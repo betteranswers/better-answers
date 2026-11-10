@@ -329,7 +329,7 @@ function Fitting(properties: {
         >
           <CollapsibleTrigger asChild>
             <Button variant="outline" size="sm" className="justify-self-start">
-              {WORDS.verdictHeading.related}
+              {WORDS.verdict("related")}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3">
@@ -465,7 +465,7 @@ export function AnswerView(properties: {
         aria-busy={drafting ? true : undefined}
         className={cn("mt-8 grid gap-6", sheet && "pr-[var(--container-md)]")}
       >
-        <h2 id={headingId}>{WORDS.verdictHeading[answer.verdict]}</h2>
+        <h2 id={headingId}>{WORDS.verdict(answer.verdict)}</h2>
         <Standing answer={answer} drafting={drafting} />
         <Verdict answer={answer} recordId={recordId} />
         <Unmapped passages={answer.unmappedPassages} />

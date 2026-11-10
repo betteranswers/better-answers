@@ -1,5 +1,7 @@
 import type { APIRequestContext } from "@playwright/test";
 
+import { ASK_WORDS } from "@/features/ask/ask-words.ts";
+import { QUESTIONS_WORDS } from "@/features/questions/questions-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import {
@@ -38,7 +40,7 @@ test("an Admin sees a sentence mid-stream, then flags it", async ({
   await page.goto("/sign-in");
   await signIn(page, request, adminEmail);
   await railOf(page).getByRole("link", { name: "Ask" }).click();
-  const audits = collectionIn(answered(page, "Related Knowledge"), "audits");
+  const audits = collectionIn(answered(page, "related"), "audits");
 
   await test.step("shows the first drafted sentence before the stream ends", async () => {
     await questionBox(page).fill(QUESTION);
@@ -65,13 +67,13 @@ test("an Admin sees a sentence mid-stream, then flags it", async ({
     const flagging = page.getByRole("dialog", { name: `Flag “${DRAFTED}”` });
     await flagging.getByRole("radio", { name: "Wrong" }).check();
     const sending = page.waitForResponse((response) => response.url().includes("ask.giveFeedback"));
-    await flagging.getByRole("button", { name: "Send Flag" }).click();
-    await expect(audits.getByRole("button", { name: "Flagged" })).toBeVisible();
+    await flagging.getByRole("button", { name: ASK_WORDS.sendFlag }).click();
+    await expect(audits.getByRole("button", { name: ASK_WORDS.flagged })).toBeVisible();
     expect((await sending).ok(), "the flag was not stored").toBe(true);
 
     await page.goto(QUESTIONS_ASKED.path);
     await page
-      .getByRole("region", { name: "Flagged" })
+      .getByRole("region", { name: QUESTIONS_WORDS.flagged })
       .getByRole("button", { name: QUESTION })
       .click();
     const record = page.getByRole("dialog", { name: QUESTION });

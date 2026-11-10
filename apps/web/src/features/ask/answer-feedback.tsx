@@ -77,16 +77,12 @@ function FlagForm(properties: {
         <Label htmlFor={`${id}-note`}>{WORDS.note}</Label>
         <Textarea
           id={`${id}-note`}
-          aria-describedby={`${id}-note-help`}
           maxLength={NOTE_MAX}
           value={note}
           onChange={(event) => {
             onDraft({ ...draft, note: event.target.value });
           }}
         />
-        <p id={`${id}-note-help`} className="text-muted-foreground">
-          {WORDS.noteHelp}
-        </p>
       </div>
       <Button type="submit" variant="accent" className="justify-self-start">
         {WORDS.sendFlag}
