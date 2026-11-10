@@ -3,6 +3,7 @@ import { z } from "zod";
 import { boundarySchemas, type NEEDS_REVIEW_REASONS } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../access/index.ts";
+import type { Frontmatter } from "../concepts/index.ts";
 import {
   admit,
   ANY_ROLE,
@@ -15,8 +16,13 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { WITHHELD_SECTIONS } from "./citing.ts";
 import { matchesTheFact } from "./match.ts";
+import {
+  withEvidence,
+  type DetailEvidence,
+  type Evidenced,
+  type EvidenceOf,
+} from "./read/evidence.ts";
 import { renderBrief, type Footnote, type RenderedBrief } from "./renderer.ts";
 import type { GuideLayer, RoleLabel } from "./templates/index.ts";
 import { SECTION_HOME } from "./write-ups.ts";
@@ -208,6 +214,7 @@ type Detail = {
   readonly title: string;
   readonly conceptType: string;
   readonly body: string;
+  readonly evidence: DetailEvidence;
 };
 
 type BriefRead = {
@@ -312,10 +319,13 @@ type CitedRow = Footnote & {
   readonly write_up_id: string;
   readonly concept_type: string;
   readonly body: string;
+  readonly frontmatter: Frontmatter;
 };
 
+type CitedRead = Evidenced<CitedRow>;
+
 const CITED = `
-  SELECT i.write_up_id, i.id AS label, i.iri, c.title, c.concept_type, c.body
+  SELECT i.write_up_id, i.id AS label, i.iri, c.title, c.concept_type, c.body, c.frontmatter
     FROM write_up_include i
     JOIN write_up w ON w.workspace_id = i.workspace_id AND w.id = i.write_up_id
     JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
@@ -358,21 +368,27 @@ const numberedIn = (rows: readonly SectionRow[]): ReadonlyMap<string, string> =>
   return numbers;
 };
 
+type Briefed = SectionRow & { readonly version: number; readonly markdown: string };
+
+const showsBrief = (row: SectionRow): row is Briefed =>
+  row.readable && row.version !== null && row.markdown !== null;
+
 const briefOf = (
   reader: UserPrincipal,
   row: SectionRow,
-  cited: readonly CitedRow[],
+  cited: readonly CitedRead[],
 ): BriefRead | undefined => {
-  if (!row.readable || row.version === null || row.markdown === null) return undefined;
+  if (!showsBrief(row)) return undefined;
   const footnotes = cited.map(({ label, iri, title }) => ({ label, iri, title }));
   const read = {
     version: row.version,
     rendered: renderBrief(row.markdown, footnotes, "page"),
-    detail: cited.map(({ iri, title, concept_type: conceptType, body }) => ({
+    detail: cited.map(({ iri, title, concept_type: conceptType, body, evidence }) => ({
       iri,
       title,
       conceptType,
       body,
+      evidence,
     })),
   };
   return reader.role === "Viewer"
@@ -387,14 +403,17 @@ type GuideHeld = {
   readonly definition: DefinitionRow;
   readonly coverage: Coverage;
   readonly sections: readonly SectionRow[];
-  readonly cited: readonly CitedRow[];
   readonly shapes: readonly FactShapeRow[];
 };
 
-const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): GuideRead => {
-  const { definition, coverage } = held;
+type Shown = readonly {
+  readonly section: Coverage["sections"][number];
+  readonly row: SectionRow;
+}[];
+
+const shownTo = (reader: UserPrincipal, held: GuideHeld): Shown => {
   const rowOf = new Map(held.sections.map((row) => [row.section_id, row]));
-  const ordered = coverage.sections.flatMap((section) => {
+  const ordered = held.coverage.sections.flatMap((section) => {
     const row = rowOf.get(section.sectionId);
     return row === undefined ? [] : [{ section, row }];
   });
@@ -402,10 +421,20 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
     reader,
     ordered.map(({ row }) => row),
   );
-  const shown = ordered.filter(({ row }) => !hidden.has(row.section_id));
+  return ordered.filter(({ row }) => !hidden.has(row.section_id));
+};
+
+const guideFrom = (
+  reader: UserPrincipal,
+  guideId: string,
+  held: GuideHeld,
+  shown: Shown,
+  cited: readonly CitedRead[],
+): GuideRead => {
+  const { definition, coverage } = held;
   const numbers = numberedIn(shown.map(({ row }) => row));
   const shapeOf = new Map(held.shapes.map((shape) => [shape.id, shape]));
-  const citedBy = Map.groupBy(held.cited, (row) => row.write_up_id);
+  const citedBy = Map.groupBy(cited, (row) => row.write_up_id);
   const everyFact = coverage.sections.flatMap((section) => section.facts);
   return {
     guideId,
@@ -417,7 +446,7 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
         : { iri: definition.subject_iri, title: definition.subject_title },
     coverage: { met: metIn(everyFact), of: everyFact.length },
     sections: shown.map(({ section, row }) => {
-      const cited = citedBy.get(row.write_up_id) ?? [];
+      const citing = citedBy.get(row.write_up_id) ?? [];
       return {
         sectionId: row.section_id,
         writeUpId: row.write_up_id,
@@ -438,8 +467,8 @@ const guideFrom = (reader: UserPrincipal, guideId: string, held: GuideHeld): Gui
             return { ...fact, conceptType: shape.concept_type, tags: shape.tags };
           }),
         },
-        brief: briefOf(reader, row, cited),
-        citedIris: cited.map((each) => each.iri),
+        brief: briefOf(reader, row, citing),
+        citedIris: citing.map((each) => each.iri),
       };
     }),
   };
@@ -449,6 +478,7 @@ export const readGuide = async (
   principal: UserPrincipal,
   tx: Tx,
   input: ReadGuideInput,
+  evidenceOf: EvidenceOf,
 ): Promise<Result<GuideRead | undefined, GuideReadRefusal>> => {
   const admitted = admit(readGuideAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
@@ -471,74 +501,10 @@ export const readGuide = async (
   const coverage = await coverageOf(reader, tx, guideId);
   if (!coverage.ok) return err(coverage.error);
   if (coverage.value === undefined) return ok(undefined);
-  return ok(guideFrom(reader, guideId, { ...read.value, coverage: coverage.value }));
-};
-
-type GuideSummary = {
-  readonly guideId: string;
-  readonly guideType: string;
-  readonly collection: string;
-  readonly subject: { readonly iri: string; readonly title: string } | null;
-  readonly sections: number;
-  readonly needsReview: number;
-};
-
-const readGuidesAction = declareAction({
-  admits: ANY_ROLE,
-  input: z.object({}),
-  refuses: ["role-forbids"],
-});
-
-type SummaryRow = {
-  readonly id: string;
-  readonly guide_type: string;
-  readonly collection: string;
-  readonly subject_iri: string | null;
-  readonly subject_title: string | null;
-  readonly sections: number;
-  readonly needs_review: number;
-};
-
-const GUIDES = `${WITHHELD_SECTIONS}
-  SELECT g.id, g.guide_type, g.collection, g.subject_iri, c.title AS subject_title,
-         count(s.id)::int AS sections,
-         count(*) FILTER (WHERE ${readableClause("w", 2)} AND w.needs_review IS NOT NULL)::int
-           AS needs_review
-    FROM guide_definition g
-    LEFT JOIN concept_index c ON c.workspace_id = g.workspace_id AND c.iri = g.subject_iri
-                             AND ${readableClause("c", 2)}
-    LEFT JOIN guide_section s ON s.workspace_id = g.workspace_id AND s.guide_id = g.id
-                             AND ($2 = 'Admin' OR NOT EXISTS (
-                                   SELECT 1 FROM withheld h
-                                    WHERE h.guide_id = s.guide_id AND h.id = s.id))
-    LEFT JOIN write_up w ON w.workspace_id = s.workspace_id AND w.home = '${SECTION_HOME}'
-                        AND w.guide_id = s.guide_id AND w.section_id = s.id
-   WHERE g.workspace_id = $1
-   GROUP BY g.workspace_id, g.id, c.title
-   ORDER BY g.created_at, g.id`;
-
-export const readGuides = async (
-  principal: UserPrincipal,
-  tx: Tx,
-): Promise<Result<readonly GuideSummary[], RefusalOf<typeof readGuidesAction> | Error>> => {
-  const admitted = admit(readGuidesAction, principal, {});
-  if (!admitted.ok) return err(admitted.error);
-  const reader = admitted.value;
-  const read = await attempt(() =>
-    tx.query<SummaryRow>(GUIDES, [reader.workspaceId, ...readableParameters(reader)]),
-  );
-  if (!read.ok) return err(read.error);
-  return ok(
-    read.value.rows.map((row) => ({
-      guideId: row.id,
-      guideType: row.guide_type,
-      collection: row.collection,
-      subject:
-        row.subject_iri === null || row.subject_title === null
-          ? null
-          : { iri: row.subject_iri, title: row.subject_title },
-      sections: row.sections,
-      needsReview: row.needs_review,
-    })),
-  );
+  const held = { ...read.value, coverage: coverage.value };
+  const shown = shownTo(reader, held);
+  const showing = new Set(shown.flatMap(({ row }) => (showsBrief(row) ? [row.write_up_id] : [])));
+  const cited = await withEvidence(read.value.cited, evidenceOf, showing);
+  if (!cited.ok) return err(cited.error);
+  return ok(guideFrom(reader, guideId, held, shown, cited.value));
 };

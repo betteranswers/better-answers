@@ -1,7 +1,7 @@
 import type { ConceptIri } from "@better-answers/schema";
 
-import { readConcept } from "../concepts/index.ts";
-import { guidesCiting } from "../guides/index.ts";
+import { evidenceOf, readConcept } from "../concepts/index.ts";
+import { guidesCiting, type EvidenceOf } from "../guides/index.ts";
 import {
   admit,
   ANY_ROLE,
@@ -14,13 +14,14 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { parseLocator, passageAt } from "../sources/index.ts";
+import { passageAt } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { askInput, openInput, passageViewOf, type AskInput, type OpenInput } from "./boundary.ts";
 import { judgedBy, type JudgeRefusal, type JudgeSteps } from "./judge.ts";
 import {
   answerPlanned,
   ASK_CAPS,
+  evidenceReadsOf,
   type AskCaps,
   type PlannedAnswer,
   type ReadStep,
@@ -130,17 +131,18 @@ const passageOpened = async (
   return ok({ found: true, passage: passageViewOf(passage.value) });
 };
 
+export const evidenceReaderFor = (reader: UserPrincipal, tx: Tx): EvidenceOf => {
+  const reads = evidenceReadsOf(reader, tx);
+  return (frontmatter) => evidenceOf(reader, tx, frontmatter, reads);
+};
+
 const conceptOpened = async (
   reader: UserPrincipal,
   tx: Tx,
   named: ConceptIri,
   now: Date,
 ): Promise<Result<OpenResult>> => {
-  const concept = await readConcept(reader, tx, named, {
-    passageAt: (locator) => passageAt(reader, tx, locator),
-    namesPassage: (locator) => parseLocator(locator).ok,
-    now,
-  });
+  const concept = await readConcept(reader, tx, named, { ...evidenceReadsOf(reader, tx), now });
   if (!concept.ok) return err(concept.error);
   if (concept.value === undefined) return ok({ found: false, iri: named });
   const usedIn = await attempt(async () => ({

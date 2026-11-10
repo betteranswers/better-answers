@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { BUNDLE_MANIFEST_PATH, ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
+import { evidenceReaderFor } from "../../src/answering/index.ts";
 import { withBundleFenceAs } from "../../src/bundle/index.ts";
 import { zipOf, type ZipEntry } from "../../src/concepts/export-zip.ts";
 import {
@@ -131,7 +132,9 @@ const briefSaved = async (
   markdownOf: (labels: readonly string[]) => string,
 ): Promise<Briefed> => {
   const guide = answered(
-    await readingAs(db().runtimePool, writer, (editor, tx) => readGuide(editor, tx, { guideId })),
+    await readingAs(db().runtimePool, writer, (editor, tx) =>
+      readGuide(editor, tx, { guideId }, evidenceReaderFor(editor, tx)),
+    ),
   );
   const section = guide?.sections.find((each) => each.prompt === prompt);
   const labels = section?.brief?.editable?.footnotes.map(({ label }) => label) ?? [];

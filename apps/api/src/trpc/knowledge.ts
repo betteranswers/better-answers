@@ -1,4 +1,11 @@
-import { find, findInput, open, openInput, type OpenResult } from "@better-answers/core/answering";
+import {
+  evidenceReaderFor,
+  find,
+  findInput,
+  open,
+  openInput,
+  type OpenResult,
+} from "@better-answers/core/answering";
 import {
   allKnowledgeInput,
   briefCopy,
@@ -113,7 +120,12 @@ const guideAnswered = async (
   ctx: { readonly principal: UserPrincipal; readonly tx: Tx; readonly clock: Clock },
   asked: GuideAsked,
 ): Promise<Result<GuideAnswered, GuideReadRefusal | typeof NOT_FOUND>> => {
-  const read = await readGuide(ctx.principal, ctx.tx, asked);
+  const read = await readGuide(
+    ctx.principal,
+    ctx.tx,
+    asked,
+    evidenceReaderFor(ctx.principal, ctx.tx),
+  );
   if (!read.ok) return read;
   const guide = read.value;
   if (guide === undefined) return err(NOT_FOUND);

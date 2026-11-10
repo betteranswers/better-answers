@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { readSectionTrusts, trustWords } from "../../src/concepts/index.ts";
+import { evidenceReaderFor } from "../../src/answering/index.ts";
+import {
+  readSectionTrusts,
+  trustWords,
+  writeConcept,
+  type FrontmatterSource,
+} from "../../src/concepts/index.ts";
 import { coverageOf, readGuide, readGuides, type GuideRead } from "../../src/guides/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { EMPLOYERS_LIABILITY } from "../fixtures/northgate-concepts.ts";
+import { ok, type UserPrincipal } from "../../src/kernel/index.ts";
+import { head } from "../../src/store/git/index.ts";
+import { EMPLOYERS_LIABILITY, NORTHGATE, TYPED } from "../fixtures/northgate-concepts.ts";
 import { typedBy } from "../fixtures/northgate.ts";
-import { suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
+import { doorsOf, suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
 import { answered, readingAs } from "../support/suite-postgres.ts";
 import {
   briefCiting,
@@ -28,11 +35,43 @@ const seededOnce = (): Promise<SeededGuide> => (shared ??= freshGuide());
 const guideAs = async (guide: SeededGuide, reader: UserPrincipal): Promise<GuideRead> => {
   const read = answered(
     await readingAs(db().runtimePool, reader, (principal, tx) =>
-      readGuide(principal, tx, { guideId: guide.guideId }),
+      readGuide(principal, tx, { guideId: guide.guideId }, evidenceReaderFor(principal, tx)),
     ),
   );
   if (read === undefined) throw new Error("the guide was not found");
   return read;
+};
+
+const citingSources = async (
+  seeded: SeededGuide,
+  key: "registration",
+  body: string,
+  sources: readonly FrontmatterSource[],
+): Promise<void> => {
+  const concept = TYPED.find((each) => each.key === key);
+  if (concept === undefined) throw new Error(`Northgate types no ${key}`);
+  const { scenario, editor } = seeded.ng;
+  answered(
+    await writeConcept(editor, doorsOf(scenario), {
+      iri: seeded.ng.iri(key),
+      mergeKey: `${concept.conceptType}:${concept.slug}`,
+      path: `knowledge/${NORTHGATE.collection}/${concept.slug}.md`,
+      conceptType: concept.conceptType,
+      title: concept.title,
+      frontmatter: {
+        title: concept.title,
+        type: concept.conceptType,
+        tags: [...concept.tags],
+        sources,
+      },
+      body,
+      message: "Cite the register",
+      author: { name: "Nadia Editor", email: "nadia@northgate.invalid" },
+      expects: { head: await head(editor, scenario.git) },
+      status: "stable",
+      sensitivity: "Internal",
+    }),
+  );
 };
 
 const sectionOf = (guide: GuideRead, prompt: string) => {
@@ -40,6 +79,9 @@ const sectionOf = (guide: GuideRead, prompt: string) => {
   if (section === undefined) throw new Error(`the guide shows no section ${prompt}`);
   return section;
 };
+
+const detailOf = (guide: GuideRead, prompt: string, title: string) =>
+  sectionOf(guide, prompt).brief?.detail.find((each) => each.title === title);
 
 const factStatesOf = (guide: GuideRead, prompt: string) =>
   sectionOf(guide, prompt).coverage.facts.map((fact) => `${fact.name}: ${fact.state}`);
@@ -214,6 +256,23 @@ describe("reading a guide", () => {
     );
   });
 
+  it("reads no sources for a section the reader cannot read", async () => {
+    const seeded = await seededOnce();
+    const asked: unknown[] = [];
+
+    answered(
+      await readingAs(db().runtimePool, seeded.ng.viewer, (principal, tx) =>
+        readGuide(principal, tx, { guideId: seeded.guideId }, (frontmatter) => {
+          asked.push(frontmatter["title"]);
+          return Promise.resolve(ok([]));
+        }),
+      ),
+    );
+
+    expect(asked).toContain("Registered company number");
+    expect(asked).not.toContain("Filed accounts 2024");
+  });
+
   it("gives an Editor the raw Brief and its detail", async () => {
     const { seeded, ids } = await withABrief();
 
@@ -229,6 +288,41 @@ describe("reading a guide", () => {
       "Founded in 2009",
       "Registered office address",
     ]);
+  });
+
+  it("gives a detailed concept the sources its footnotes name", async () => {
+    const seeded = await freshGuide();
+    const withheld = seeded.ng.iri("professionalIndemnity");
+    await citingSources(
+      seeded,
+      "registration",
+      "Northgate is registered in England.[^source-1] Its cover is on file.[^source-2]",
+      [
+        { id: "source-1", resource: "Companies House register", locator: "p.1" },
+        { id: "source-2", resource: withheld },
+      ],
+    );
+
+    const editor = await guideAs(seeded, seeded.ng.editor);
+    const viewer = await guideAs(seeded, seeded.ng.viewer);
+
+    const cited = (reader: GuideRead) =>
+      detailOf(reader, "Company overview", "Registered company number")?.evidence;
+    expect(cited(editor)).toEqual([
+      { id: "source-1", source: "Companies House register", at: "p.1" },
+      { id: "source-2", source: withheld, iri: withheld },
+    ]);
+    expect(cited(viewer)).toEqual([
+      { id: "source-1", source: "Companies House register", at: "p.1" },
+      { id: "source-2", source: "A concept you cannot open" },
+    ]);
+    expect(JSON.stringify(viewer)).not.toContain(withheld);
+  });
+
+  it("gives a detailed concept with no sources no evidence", async () => {
+    const guide = await guideAs(await seededOnce(), (await seededOnce()).ng.editor);
+
+    expect(detailOf(guide, "Company overview", "Staff headcount")?.evidence).toEqual([]);
   });
 
   it("gives a Viewer the rendered Brief alone", async () => {

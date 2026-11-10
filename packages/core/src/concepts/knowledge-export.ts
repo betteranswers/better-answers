@@ -467,7 +467,7 @@ const briefsOf = async (
 const guideRead =
   (guideId: string, at: Date) =>
   async (member: UserPrincipal, tx: Tx): Promise<Result<GuideCarried, ExportRefusal>> => {
-    const read = await readGuide(member, tx, { guideId });
+    const read = await readGuide(member, tx, { guideId }, () => Promise.resolve(ok([])));
     if (!read.ok) return read;
     const guide = read.value;
     if (guide === undefined) return err(NOT_FOUND);
