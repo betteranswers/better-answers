@@ -6,7 +6,7 @@ import {
   detailAt,
   KNOWLEDGE,
   menuGroupIn,
-  pageNamed,
+  pageById,
   placeAt,
   type Area,
   type Page,
@@ -15,11 +15,11 @@ import {
 
 export const BROWSE = menuGroupIn(KNOWLEDGE, "browse");
 
-export const SEARCH_PAGE = pageNamed(BROWSE, "Search");
+export const SEARCH_PAGE = pageById(BROWSE, "search");
 
-export const KNOWLEDGE_BASE_PAGE = pageNamed(BROWSE, "Knowledge Base");
+export const KNOWLEDGE_BASE_PAGE = pageById(BROWSE, "knowledge-base");
 
-export const ALL_KNOWLEDGE_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "All Knowledge");
+export const ALL_KNOWLEDGE_PAGE = pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge");
 
 const OPENED_FROM_PAGES: readonly Page[] = [SEARCH_PAGE, KNOWLEDGE_BASE_PAGE, ALL_KNOWLEDGE_PAGE];
 

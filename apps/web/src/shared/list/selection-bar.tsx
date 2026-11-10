@@ -3,7 +3,7 @@ import { useRef, type ComponentProps, type ReactNode, type RefObject } from "rea
 
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { Button } from "@/shared/ui/button.tsx";
-import { counted } from "@/shared/words.ts";
+import { counted, LIST_WORDS } from "@/shared/words.ts";
 
 type Noun = readonly [one: string, many: string];
 
@@ -68,7 +68,7 @@ export function SelectionBar(properties: {
               aria-keyshortcuts={clearKeystroke?.key}
               onClick={clear}
             >
-              Clear Selection
+              {LIST_WORDS.clearSelection}
             </Button>
           </ToolbarPrimitive.Button>
           {clearKeystroke === undefined ? null : (

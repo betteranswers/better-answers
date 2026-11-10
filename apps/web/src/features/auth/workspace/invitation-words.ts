@@ -5,19 +5,19 @@ export const invitedAs = (inviter: string, role: Role): string =>
   `${inviter} invited you as ${aRole(role)}.`;
 
 export const INVITATION_WORDS = {
-  untitled: "Your Invitation",
-  reading: "Loading the invitation.",
-  heading: (workspace: string) => `Your Invitation to ${workspace}`,
+  untitled: "Your invitation",
+  reading: "Loading the invitation…",
+  heading: (workspace: string) => `Your invitation to ${workspace}`,
   body: (inviter: string, role: Role) => `${invitedAs(inviter, role)} ${ROLE_FOR_A_NEWCOMER[role]}`,
-  join: "Join Workspace",
+  join: "Join workspace",
   joining: "Joining",
-  tryAgain: "Try Again",
+  tryAgain: "Try again",
   readingAgain: "Loading",
 } as const;
 
 export const INVITATION_ACTIONS = {
-  join: "Join the Workspace",
-  readAgain: "Reload the Invitation",
-  anotherAddress: "Sign In with Another Address",
-  yourWorkspaces: "Go to Your Workspaces",
+  join: "Join the workspace",
+  readAgain: "Reload the invitation",
+  anotherAddress: "Sign in with another address",
+  yourWorkspaces: "Go to your workspaces",
 } as const;

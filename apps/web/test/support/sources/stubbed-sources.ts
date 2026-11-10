@@ -2,13 +2,13 @@ import { fireEvent, screen, within } from "@testing-library/react";
 
 import type { GroupOfFindings, ListedConnectedSource } from "@/features/sources/sources-api.ts";
 import { LIST_WORDS, ROW_ACTIONS, SENSITIVITY_PANEL_WORDS } from "@/features/sources/words.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import type { Api } from "@test/stubbed-api.ts";
 import { adaAnAdmin, drawnAt, openAt, read } from "@test/two-workspaces.ts";
 
-const CONNECTED_SOURCES = pageNamed(
+const CONNECTED_SOURCES = pageById(
   menuGroupIn(CONTROL_CENTRE, "sources"),
-  "Connected Sources",
+  "connected-sources",
 ).path;
 
 let minted = 0;
@@ -144,7 +144,9 @@ export const drawSourcesThrough = (api: Api, through: Parameters<typeof drawnAt>
   drawnAt(CONNECTED_SOURCES, api, through);
 
 export const connectedSourcesRegion = (): HTMLElement =>
-  screen.getByRole("region", { name: "Connected Sources" });
+  screen.getByRole("region", {
+    name: pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name,
+  });
 
 export const saidIn = (): HTMLElement | undefined =>
   within(connectedSourcesRegion()).getAllByRole("status").at(-1);

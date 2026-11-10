@@ -1,7 +1,7 @@
 import type { APIRequestContext, BrowserContext, Locator, Page } from "@playwright/test";
 
 import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -17,7 +17,7 @@ import {
 } from "../harness.ts";
 import { refusalAnswering } from "../refused-read.ts";
 
-const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
+const MEMBERS = pageById(menuGroupIn(CONTROL_CENTRE, "people"), "members");
 
 const SWITCHED = { word: "workspace-switched", class: "conflict" } as const;
 

@@ -38,7 +38,7 @@ type CountWords = {
   readonly matching: (count: number, search: string) => string;
 };
 
-export const countOf = (words: CountWords, read: number, narrowed: Narrowed): string =>
-  narrowed.search === ""
-    ? words.counted(read)
-    : words.matching(narrowed.shown.length, narrowed.search);
+export const countOf = (words: CountWords, read: number, narrowed: Narrowed): string => {
+  if (narrowed.search === "") return words.counted(read);
+  return narrowed.shown.length === 0 ? "" : words.matching(narrowed.shown.length, narrowed.search);
+};

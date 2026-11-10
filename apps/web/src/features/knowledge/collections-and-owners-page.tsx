@@ -6,7 +6,7 @@ import { ListRead } from "@/shared/list/list-pages.tsx";
 import { rowInFocus } from "@/shared/list/row-focus.ts";
 import { useRole } from "@/shared/member/member.ts";
 import { ownsNoLonger, useArrivalDecidedAgainOnceUnowned } from "@/shared/member/ownership.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import { Card } from "@/shared/ui/card.tsx";
@@ -21,7 +21,7 @@ import { COLLECTIONS_WORDS as WORDS, SAID_OF_COLLECTIONS } from "./knowledge-wor
 
 const CURATION = menuGroupIn(KNOWLEDGE, "curation");
 
-const COLLECTIONS_AND_OWNERS = pageNamed(CURATION, "Collections and Owners");
+const COLLECTIONS_AND_OWNERS = pageById(CURATION, "collections-and-owners");
 
 const OWNER_KEYSTROKES: readonly Keystroke[] = [KEY.changeOwner, KEY.undo];
 

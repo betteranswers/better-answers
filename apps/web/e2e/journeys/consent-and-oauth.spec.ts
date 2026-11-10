@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 
 import type { Page } from "@playwright/test";
 
+import { DISPLAY_NAME_WORDS } from "@/shared/member/display-name-words.ts";
+
 import { expect, test } from "../browser.ts";
 import {
   anAddress,
@@ -16,7 +18,7 @@ const consentHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Connect Claude" });
 
 const displayNameHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "Your Name" });
+  page.getByRole("heading", { level: 1, name: DISPLAY_NAME_WORDS.heading });
 
 const connectAndGetCallback = async (page: Page): Promise<URL> => {
   await page.getByRole("button", { name: "Connect" }).click();

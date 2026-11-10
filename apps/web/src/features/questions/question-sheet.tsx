@@ -7,7 +7,7 @@ import { questionWords } from "@/shared/answer-words.ts";
 import { keyed } from "@/shared/list/keyed.ts";
 import { RowSheet } from "@/shared/list/row-sheet.tsx";
 import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
-import { detailAt, KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { detailAt, KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { SheetPart } from "@/shared/page/sheet-part.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
@@ -26,7 +26,7 @@ import {
 } from "./questions-api.ts";
 import { CLOSINGS, QUESTIONS_WORDS as WORDS } from "./questions-words.ts";
 
-const SEARCH_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Search");
+const SEARCH_PAGE = pageById(menuGroupIn(KNOWLEDGE, "browse"), "search");
 
 const { outcomeOfFailure } = refusalsOf({});
 

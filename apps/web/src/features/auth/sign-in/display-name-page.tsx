@@ -61,7 +61,7 @@ export function DisplayNamePage() {
           onChange={(event) => setAsked(event.target.value)}
         />
         <Button type="submit" className="mt-4" disabled={setDisplayName.isPending}>
-          {setDisplayName.isPending ? "Saving" : "Save and Continue"}
+          {setDisplayName.isPending ? "Saving" : DISPLAY_NAME_WORDS.save}
         </Button>
       </form>
 

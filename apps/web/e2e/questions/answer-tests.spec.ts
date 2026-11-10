@@ -1,14 +1,14 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { ANSWER_TESTS_WORDS } from "@/features/questions/questions-words.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import { anAddress, provision, signedInAtHome, skipLinkReachesThePage } from "../harness.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-const ANSWER_TESTS = pageNamed(menuGroupIn(CONTROL_CENTRE, "questions"), "Answer Tests");
+const ANSWER_TESTS = pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "answer-tests");
 
 const emptyState = (page: Page) => page.getByText(ANSWER_TESTS_WORDS.empty, { exact: true });
 
@@ -43,7 +43,7 @@ test.describe("the Answer Tests page", () => {
 
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
-        - heading "Answer Tests" [level=1]
+        - heading ${JSON.stringify(pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "answer-tests").name)} [level=1]
     `);
 
     await passesTheAccessibilityGate();

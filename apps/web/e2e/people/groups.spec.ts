@@ -2,7 +2,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { GROUP_WORDS } from "@/features/people/groups/group-words.ts";
 import { GROUPS_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -22,7 +22,7 @@ const LIST_BUDGET_MS = 1000;
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 
-const GROUPS_PAGE = pageNamed(people, "Groups").path;
+const GROUPS_PAGE = pageById(people, "groups").path;
 
 const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 

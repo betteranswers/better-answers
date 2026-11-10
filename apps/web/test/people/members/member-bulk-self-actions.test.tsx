@@ -1,12 +1,13 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
 import {
   BULK_WORDS,
   MEMBER_PAGE_WORDS,
   SELECTED_MEMBERS,
 } from "@/features/people/member-action-words.ts";
-import { HOMES } from "@/shared/navigation.ts";
+import { HOMES, NEW_QUESTION } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure, type Held } from "@test/stubbed-api.ts";
 import {
@@ -130,7 +131,7 @@ describe("bulk actions that include you", () => {
     await editorPickedByKeyboard(within(dialog).getByRole("combobox", { name: "Role" }));
     fireEvent.click(within(dialog).getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
 
-    expect(await screen.findByRole("heading", { level: 1, name: "New Question" })).toBeDefined();
+    expect(await screen.findByRole("heading", { level: 1, name: NEW_QUESTION.name })).toBeDefined();
     expect(router.state.location.pathname).toBe(HOMES.Editor.path);
     expect(screen.getAllByRole("status").some((said) => /\bEditor\b/v.test(said.textContent))).toBe(
       true,
@@ -157,7 +158,9 @@ describe("bulk actions that include you", () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/choose-workspace");
     });
-    expect(await screen.findByRole("heading", { level: 1, name: "Your Workspaces" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: PICKER_WORDS.heading }),
+    ).toBeDefined();
     expect(
       screen.queryByRole("button", { name: NORTHERN.name }),
       "the chooser lists the workspace that was left",
@@ -181,7 +184,7 @@ describe("bulk actions that include you", () => {
 
     await removedThroughTheBar(BULK_WORDS.remove.title(1));
 
-    expect(await screen.findByRole("heading", { level: 1, name: "New Question" })).toBeDefined();
+    expect(await screen.findByRole("heading", { level: 1, name: NEW_QUESTION.name })).toBeDefined();
     expect(router.state.location.pathname).toBe(HOMES.Viewer.path);
     expect(await switcher(HOLME)).toBeDefined();
   });
@@ -195,7 +198,7 @@ describe("bulk actions that include you", () => {
     await removedThroughTheBar(BULK_WORDS.remove.title(1));
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "No Workspace Yet" }),
+      await screen.findByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING }),
     ).toBeDefined();
   });
 });

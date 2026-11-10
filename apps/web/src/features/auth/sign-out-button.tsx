@@ -1,4 +1,5 @@
 import { Button } from "@/shared/ui/button.tsx";
+import { SIGN_OUT } from "@/shared/words.ts";
 
 import { useSignOut } from "./auth-hooks.ts";
 import { Outcome } from "./auth-page.tsx";
@@ -24,7 +25,7 @@ export function SignOutButton(properties: { readonly variant?: "default" | "outl
         aria-disabled={signingOut}
         onClick={signOut}
       >
-        Sign Out
+        {SIGN_OUT}
       </Button>
       <SignOutRefused failure={failure} />
     </>

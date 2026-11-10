@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ASK, detailAt, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { ASK, detailAt, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { openedWhereTheApiNamesNone } from "@test/detail/not-found-detail.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 
@@ -9,7 +9,7 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 placedWithoutMeasuring();
 
 const A_RECORD = detailAt(
-  pageNamed(menuGroupIn(ASK, "ask"), "Your Questions"),
+  pageById(menuGroupIn(ASK, "ask"), "your-questions"),
   "01JXRECRD0000000000000000A",
 );
 

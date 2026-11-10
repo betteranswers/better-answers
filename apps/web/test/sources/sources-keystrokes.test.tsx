@@ -1,6 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
   aConnectedSource,
@@ -17,7 +18,7 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedWithoutMeasuring();
 
-const keystrokesButton = () => screen.getByRole("button", { name: "Keyboard Shortcuts" });
+const keystrokesButton = () => screen.getByRole("button", { name: KEYSTROKE_WORDS.button });
 
 const messagesShown = () =>
   within(connectedSourcesRegion())

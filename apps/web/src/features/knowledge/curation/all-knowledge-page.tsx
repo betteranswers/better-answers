@@ -37,7 +37,8 @@ const failedReadWords = (failure: Error | ApiError) => {
 
 const countOf = (read: AllKnowledge | undefined, narrowed: boolean): string => {
   if (read === undefined) return "";
-  return narrowed ? WORDS.matching(read.total) : WORDS.count(read.total);
+  if (!narrowed) return WORDS.count(read.total);
+  return read.total === 0 ? "" : WORDS.matching(read.total);
 };
 
 function Review(properties: { readonly standing: Standing }) {

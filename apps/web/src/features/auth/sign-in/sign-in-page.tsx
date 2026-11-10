@@ -229,7 +229,7 @@ const emailStepOf = (step: EmailStep): Step => ({
   hint: <p className="mt-2 text-muted-foreground">{step.words.hint}</p>,
   form: (
     <form onSubmit={step.onAsk} className="mt-6">
-      <Label htmlFor={EMAIL_FIELD}>{SIGN_IN_WORDS.emailField}</Label>
+      <Label htmlFor={EMAIL_FIELD}>{SIGN_IN_WORDS.emailAddress}</Label>
       <Input
         id={EMAIL_FIELD}
         name="email"

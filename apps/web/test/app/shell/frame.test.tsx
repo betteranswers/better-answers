@@ -4,18 +4,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
+import { goHome, JUMP_TO as JUMP_TO_WORDS, SKIP_TO_MAIN, UNKNOWN_PAGE } from "@/app/words.ts";
 import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import {
+  AREAS,
+  CONTROL_CENTRE,
   EVERY_AREA,
   HOMES,
   movedWithin,
-  readerOf,
+  NEW_QUESTION,
   pagesOf,
-  AREAS,
-  visibleTo,
-  type Role,
+  readerOf,
   type Page,
+  type Role,
+  visibleTo,
 } from "@/shared/navigation.ts";
 import { openApp } from "@test/open-app.tsx";
 import { answeringAs, withTheApiDown } from "@test/stubbed-api.ts";
@@ -41,12 +45,19 @@ const rail = () => screen.getByRole("navigation", { name: "Areas" });
 
 const menu = () => screen.getByRole("navigation", { name: "Control Centre" });
 
-const JUMP_TO = "Jump To";
+const JUMP_TO = JUMP_TO_WORDS.name;
 
 const namesIn = (region: HTMLElement, role: "link" | "heading" = "link") =>
   within(region)
     .queryAllByRole(role, role === "heading" ? { level: 3 } : {})
     .map((each) => each.textContent);
+
+const controlCentrePage = (group: string, id: string): string => {
+  const pages = CONTROL_CENTRE.menuGroups.find((each) => each.id === group)?.pages ?? [];
+  const page: Page | undefined = pages.find((each) => each.id === id);
+  if (page === undefined) throw new Error(`the Control Centre has no page ${group}/${id}`);
+  return page.name;
+};
 
 describe("the shell's regions", () => {
   it("lists an Admin's areas in the rail", async () => {
@@ -76,7 +87,7 @@ describe("the shell's regions", () => {
     expect(screen.getByRole("main")).toBeDefined();
 
     const first = container.querySelector("a");
-    expect(first).toBe(screen.getByRole("link", { name: "Skip to Main Content" }));
+    expect(first).toBe(screen.getByRole("link", { name: SKIP_TO_MAIN }));
     expect(first?.getAttribute("href")).toBe(`#${screen.getByRole("main").id}`);
   });
 
@@ -91,13 +102,13 @@ describe("the shell's regions", () => {
       "System",
     ]);
     expect(namesIn(menu())).toEqual([
-      "Connected Sources",
-      "Models and Spend",
-      "Questions Asked",
-      "Answer Tests",
+      controlCentrePage("sources", "connected-sources"),
+      controlCentrePage("models", "models-and-spend"),
+      controlCentrePage("questions", "questions-asked"),
+      controlCentrePage("questions", "answer-tests"),
       "Members",
       "Groups",
-      "Audit Log",
+      controlCentrePage("system", "audit-log"),
     ]);
   });
 
@@ -118,7 +129,11 @@ describe("the shell's regions", () => {
     await openAs("Admin", "/models/models-and-spend");
 
     const bar = screen.getByRole("banner");
-    for (const name of ["Control Centre", "Models", "Models and Spend"]) {
+    for (const name of [
+      "Control Centre",
+      "Models",
+      controlCentrePage("models", "models-and-spend"),
+    ]) {
       expect(within(bar).getByText(name, { exact: true })).toBeDefined();
     }
     expect(within(bar).getByRole("button", { name: JUMP_TO })).toBeDefined();
@@ -181,20 +196,22 @@ describe("the shell's regions", () => {
   it("shows Page Not Found for an unknown address", async () => {
     await openApp("/not-a-page");
 
-    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe("Page Not Found");
+    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe(
+      UNKNOWN_PAGE.heading,
+    );
   });
 
   it("links a reader with an unknown role home through /", async () => {
     await openApp("/not-a-page");
 
-    const home = await screen.findByRole("link", { name: "Go to Your Home Page" });
+    const home = await screen.findByRole("link", { name: goHome(undefined) });
     expect(home.getAttribute("href")).toBe("/");
   });
 
   it("shows Page Not Found inside an area, keeping the rail", async () => {
     await openAs("Admin", "/system/not-a-page");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Page Not Found");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_PAGE.heading);
     expect(namesIn(rail())).toEqual(["Ask", "Knowledge", "Inbox", "Control Centre"]);
     expect(screen.getByRole("banner")).toBeDefined();
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
@@ -204,14 +221,14 @@ describe("the shell's regions", () => {
 describe("a page's old address", () => {
   it("matches a missing page for a Viewer without access", async () => {
     const missingPage = await openAs("Viewer", "/people/not-a-page");
-    await screen.findByRole("link", { name: "Go to New Question" });
+    await screen.findByRole("link", { name: goHome(NEW_QUESTION) });
     const missingPageMain = screen.getByRole("main").innerHTML;
     missingPage.unmount();
 
     vi.stubGlobal("fetch", answeringAs("Viewer"));
     const { router } = await openApp("/people/audit-log");
 
-    await screen.findByRole("link", { name: "Go to New Question" });
+    await screen.findByRole("link", { name: goHome(NEW_QUESTION) });
     expect(router.history.location.pathname).toBe("/people/audit-log");
     expect(
       screen.getByRole("main").innerHTML,
@@ -245,7 +262,7 @@ describe("jump to, while the role is unknown", () => {
       (each) => each.textContent,
     );
 
-    expect(actions).toContain("Show This List");
+    expect(actions).toContain(KEYSTROKE_WORDS.showTheList);
     expect(actions).not.toContain(JUMP_TO);
   });
 });

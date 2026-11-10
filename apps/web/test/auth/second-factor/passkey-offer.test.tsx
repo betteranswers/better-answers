@@ -6,6 +6,7 @@ import { Providers } from "@/app/providers.tsx";
 import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
 import { useSignInEmailOtp } from "@/features/auth/auth-hooks.ts";
 import { usePasskeySignIn } from "@/features/auth/passkey-hooks.ts";
+import { SETUP_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
 import { forgetThePasskeyOfferShown } from "@/features/auth/session-memory.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { openApp } from "@test/open-app.tsx";
@@ -69,7 +70,7 @@ afterEach(() => {
   globalThis.history.replaceState(null, "", "/");
 });
 
-const DISMISSAL = { name: "Dismiss Passkey Offer" };
+const DISMISSAL = { name: PASSKEY_WORDS.dismissOffer };
 
 const offer = () => screen.queryByRole("button", DISMISSAL);
 
@@ -163,7 +164,7 @@ describe("the passkey offer", () => {
   it("stays hidden after another page load showed it", async () => {
     adaHoldingNoPasskey();
     const { clients, rendered } = await openAsAda("/account");
-    await screen.findByRole("button", { name: "Add a Passkey" });
+    await screen.findByRole("button", { name: SETUP_WORDS.addPasskey });
     rendered.unmount();
     globalThis.localStorage.setItem(SHOWN_UNDER, "shown");
 

@@ -8,6 +8,7 @@ import {
 } from "@/features/knowledge/curation/curation-state.ts";
 import { CONCEPT_TYPES_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 import { theOneEmptyStatus } from "@test/knowledge/empty-status.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure } from "@test/stubbed-api.ts";
@@ -209,7 +210,7 @@ describe("the Concept Types page", () => {
 
     fireEvent.click(filterButton());
 
-    const clear = await region().findByRole("button", { name: "Clear Filters" });
+    const clear = await region().findByRole("button", { name: CLEAR_WORDS.filters });
     expect(conceptTypesListed()).toEqual([]);
     expect(region().getByText(WORDS.count(0, 1))).toBeDefined();
 

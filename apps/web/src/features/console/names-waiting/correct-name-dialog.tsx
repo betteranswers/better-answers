@@ -1,12 +1,15 @@
 import { useId, useRef, type SubmitEvent } from "react";
 
-import { DISPLAY_NAME_MAX_CHARACTERS } from "@/shared/member/display-name-words.ts";
+import {
+  DISPLAY_NAME_MAX_CHARACTERS,
+  DISPLAY_NAME_WORDS,
+} from "@/shared/member/display-name-words.ts";
 import { MountedActionDialog } from "@/shared/page/action-dialog.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
-import { correctingConsequence, correctWords } from "./correcting-words.ts";
+import { correctWords, replacesWhere } from "./correcting-words.ts";
 import type { Refused } from "./use-correcting.ts";
 
 export function CorrectNameDialog(properties: {
@@ -37,15 +40,15 @@ export function CorrectNameDialog(properties: {
         properties.onFocusBack(saved.current);
       }}
       title={correctWords(name)}
-      consequence={correctingConsequence(name)}
+      consequence={replacesWhere(name)}
       commit={
         <Button type="submit" form={ids.form}>
-          Save Changes
+          Save changes
         </Button>
       }
     >
       <form id={ids.form} onSubmit={submit} className="grid gap-2">
-        <Label htmlFor={ids.field}>Display Name</Label>
+        <Label htmlFor={ids.field}>{DISPLAY_NAME_WORDS.label}</Label>
         <Input
           id={ids.field}
           name="displayName"
@@ -56,7 +59,7 @@ export function CorrectNameDialog(properties: {
           aria-describedby={byTheRule === undefined ? ids.hint : `${ids.hint} ${ids.refused}`}
         />
         <p id={ids.hint} className="text-sm text-muted-foreground">
-          Must be one line of up to {DISPLAY_NAME_MAX_CHARACTERS} characters, with no &lt; or &gt;.
+          One line, up to {DISPLAY_NAME_MAX_CHARACTERS} characters, with no &lt; or &gt;.
         </p>
         {byTheRule === undefined ? null : (
           <p id={ids.refused} className="text-sm">

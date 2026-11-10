@@ -34,7 +34,7 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `editorPickedByKeyboard` | From a role select in focus reading Viewer: open it, one step up to Editor, pick it, and focus is back on the select |
 | `keystrokesListed` | Presses `?` and answers the list of keystrokes once it is open, named for the open page as the navigation list names it |
 | `keyListed` | A keystroke's key among the terms of the open list of keystrokes, which sets each action beside its key |
-| `keystrokesButton` | The one *Keyboard Shortcuts* button, in the page or in a region it is given: at the rail's foot where the layout is wide, in the band where it is narrow, and a page's own outside the shell |
+| `keystrokesButton` | The one *Keyboard shortcuts* button, in the page or in a region it is given: at the rail's foot where the layout is wide, in the band where it is narrow, and a page's own outside the shell |
 | `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later. A key pressed sooner keeps the focus it moved |
 | `clockTheNextKey` | Starts the action's clock in the page: from the next key to the node an XPath names reading a given text. Every `fetch` the page sends after the key is held until then, because an action never waits on a round trip. A request in flight at the key is not held |
 | `clockTheNextDraw` | The same clock with nothing held, for a timed draw that waits on the server, such as jump-to's list |
@@ -99,13 +99,13 @@ Six more play Claude's part in its OAuth flow on the suite's own origin — `app
 
 Three modules hold what several pages' specs and the journeys share.
 
-`apps/web/e2e/asking.ts` is the New Question page's fixtures and locators:
+`apps/web/e2e/asking.ts` is the New question page's fixtures and locators:
 
 | Helper | What it does |
 | --- | --- |
 | `anAuditWorkspace` | A workspace with its Admin and four seeded concepts, one of them unfiled. It answers `workspaceId`, `adminId` and `adminEmail` |
 | `QUESTION`, `POLICY`, `DRAFTED`, `DRAFTING` | The audit question, the policy concept, the drafted sentence, and the drafting script that cites it |
-| `questionBox`, `askButton` | The New Question region's textbox and its *Ask* button |
+| `questionBox`, `askButton` | The New question region's textbox and its *Ask* button |
 | `answered` | A result region by its verdict key, such as `"ok"` or `"related"`, named from `ASK_WORDS.verdict` |
 | `collectionIn` | A collection's region inside a result |
 
@@ -117,7 +117,7 @@ Three modules hold what several pages' specs and the journeys share.
 | `membersRegion`, `outcomeOf` | The Members region, and its second status |
 | `memberRows`, `tickOf`, `selectionAction` | The person rows, a row's *Select* checkbox, and a button of the selection bar |
 | `memberLink`, `thePage`, `openedByName` | A member's link, the main region, and opening a member's page by name until its heading shows |
-| `invitationsRegion`, `invitationRows`, `inviteDialog`, `inviteAction`, `addressField` | The Invitations tab's region and rows, the *Invite a Person* dialog, the button that opens it, and its address field |
+| `invitationsRegion`, `invitationRows`, `inviteDialog`, `inviteAction`, `addressField` | The Invitations tab's region and rows, the *Invite a person* dialog, the button that opens it, and its address field |
 | `personButton`, `sheetOf` | The Everyone page's button for a person, and the sheet it opens |
 | `invitationHeading`, `joinButton`, `nameField`, `invitedAs` | The invitation page's heading, *Join Workspace* button, *Display Name* field, and the paragraph naming the inviter and the role |
 | `anInvitation` | Invites a new address to a workspace by a new inviter and answers the address and the link |

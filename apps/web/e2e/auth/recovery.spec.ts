@@ -4,6 +4,9 @@ import type { Locator } from "@playwright/test";
 
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 
+import { AUTHENTICATOR_WORDS, RECOVERY_CODE_WORDS } from "@/features/auth/account-words.ts";
+import { SETUP_WORDS, USE_CODE } from "@/features/auth/second-factor/second-factor-words.ts";
+
 import { expect, test } from "../browser.ts";
 import { pageHidesRefusalWord, landedAtHome, signIn } from "../harness.ts";
 import { authAnswering } from "../refused-read.ts";
@@ -27,7 +30,7 @@ const codeUsedByKeyboard = async (field: Locator, code: string): Promise<void> =
   await field.fill(code);
   await page.keyboard.press("Tab");
   await expect(
-    page.getByRole("button", { name: "Use Code" }),
+    page.getByRole("button", { name: USE_CODE }),
     "Tab from the field did not reach Use Code",
   ).toBeFocused();
   await page.keyboard.press("Enter");
@@ -40,7 +43,7 @@ test("replaces recovery codes never confirmed as saved at sign-in", async ({
 }) => {
   const { email, key } = await anAdminWithAnAuthenticator(page, request, "none");
   await codeField(page).fill(codeOf(key));
-  await expect(heading(page, "Save Your Recovery Codes")).toBeVisible();
+  await expect(heading(page, RECOVERY_CODE_WORDS.saveHeading)).toBeVisible();
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
   await expect(
     recoveryCodesParagraphs(page),
@@ -52,7 +55,7 @@ test("replaces recovery codes never confirmed as saved at sign-in", async ({
   await page.goto("/sign-in");
   await signIn(page, request, email);
 
-  await expect(heading(page, "Save Your Recovery Codes")).toBeVisible();
+  await expect(heading(page, RECOVERY_CODE_WORDS.saveHeading)).toBeVisible();
   await expect(page).toHaveURL(/\/recovery-codes$/);
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
   const second = await codesListed(page).allInnerTexts();
@@ -65,7 +68,7 @@ test("replaces recovery codes never confirmed as saved at sign-in", async ({
     "the new set does not say it replaces the first",
   ).toHaveCount(2);
   await passesTheAccessibilityGate();
-  await codesTicked(page, "Finish Setup");
+  await codesTicked(page, AUTHENTICATOR_WORDS.finish);
   await landedAtHome(page, "Admin");
 
   await signedInAgain(page, request, email);
@@ -89,5 +92,5 @@ test("replaces recovery codes never confirmed as saved at sign-in", async ({
   const [current] = second;
   assert.ok(current !== undefined, "the second set lists no code");
   await codeUsedByKeyboard(recoveryField(page), current);
-  await expect(heading(page, "Set Up a New Second Factor")).toBeVisible();
+  await expect(heading(page, SETUP_WORDS.newHeading)).toBeVisible();
 });

@@ -9,18 +9,21 @@ import { instantWords } from "@/shared/words.ts";
 import { useEndEverySignInEverywhere, type ListedPerson } from "../people-api.ts";
 import { nameOf } from "../person-words.tsx";
 import { SheetActionButton } from "../sheet-action.tsx";
-import { revocationRefused } from "../words.ts";
+import { PERSON_WORDS, revocationRefused } from "../words.ts";
 
 type Revocation = ReturnType<typeof useEndEverySignInEverywhere>;
 
+const endsWhat = (name: string): string =>
+  `Ends all of ${name}’s sessions and assistant access, in every workspace.`;
+
 const outcomeOf = (revocation: Revocation, name: string): Outcome | undefined => {
   if (revocation.isPending) {
-    return { tone: "said", words: `Signing ${name} out everywhere.` };
+    return { tone: "said", words: `Signing ${name} out everywhere…` };
   }
   if (revocation.isSuccess) {
     return {
       tone: "said",
-      words: `${name} has been signed out everywhere at ${instantWords(revocation.data.revokedAt)}.`,
+      words: `${name} signed out everywhere at ${instantWords(revocation.data.revokedAt)}.`,
     };
   }
   return revocation.isError ? revocationRefused(revocation.error, "action") : undefined;
@@ -42,10 +45,9 @@ export function EndEverySignInEverywhere(properties: {
   };
 
   return (
-    <SheetPart title="Sign Out Everywhere">
+    <SheetPart title={PERSON_WORDS.signOutEverywhere}>
       <p id={consequenceId} className="text-muted-foreground">
-        This signs {name} out on every device and ends every assistant’s access, in every workspace.
-        They can sign in again afterwards.
+        {endsWhat(name)}
       </p>
       <SheetActionButton
         actionRef={actionRef}
@@ -55,7 +57,7 @@ export function EndEverySignInEverywhere(properties: {
           setConfirming(true);
         }}
       >
-        Sign Out Everywhere
+        {PERSON_WORDS.signOutEverywhere}
       </SheetActionButton>
       <OutcomeLine outcome={outcomeOf(revocation, name)} />
 
@@ -68,11 +70,11 @@ export function EndEverySignInEverywhere(properties: {
             actionRef.current?.focus();
           },
         }}
-        title={`Sign Out ${name} Everywhere`}
-        consequence={`This signs ${name} out on every device and ends every assistant’s access, in every workspace. This action cannot be undone.`}
+        title={PERSON_WORDS.signOutTitle(name)}
+        consequence={endsWhat(name)}
         commit={
           <Button variant="destructive" onClick={commit}>
-            Sign Out Everywhere
+            {PERSON_WORDS.signOutEverywhere}
           </Button>
         }
       />

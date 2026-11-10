@@ -2,7 +2,7 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { useArrivalTakenOnceRead, useHidden, VisibleTreeContext } from "@/app/visible-tree.ts";
-import { switchedInAnotherTab } from "@/app/words.ts";
+import { SKIP_TO_MAIN, switchedInAnotherTab } from "@/app/words.ts";
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { saidOfASignOutRefused } from "@/features/auth/refusal-words.ts";
 import {
@@ -181,7 +181,7 @@ export function Frame(properties: {
             href="#page"
             className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-background focus:px-3 focus:py-2 focus:text-foreground"
           >
-            Skip to Main Content
+            {SKIP_TO_MAIN}
           </a>
 
           <Band

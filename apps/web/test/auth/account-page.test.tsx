@@ -3,6 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
+import {
+  ACCOUNT_WORDS,
+  AUTHENTICATOR_WORDS,
+  RECOVERY_CODE_WORDS,
+} from "@/features/auth/account-words.ts";
+import { SETUP_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { THEME_KEPT_UNDER } from "@/shared/theme/theme-switch.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { openApp } from "@test/open-app.tsx";
@@ -111,11 +118,11 @@ const pressGenerateCodes = async () => {
   const clients = createAppClients();
   clients.queryClient.setQueryData(["auth", "session"], SIGNED_IN_AS_ADA);
   await openApp("/account", clients);
-  fireEvent.click(await screen.findByRole("button", { name: "Generate Recovery Codes" }));
+  fireEvent.click(await screen.findByRole("button", { name: RECOVERY_CODE_WORDS.make }));
 };
 
 const signInAlertsWithWords = (): readonly HTMLElement[] =>
-  within(screen.getByRole("region", { name: "Sign-In" }))
+  within(screen.getByRole("region", { name: ACCOUNT_WORDS.signIn }))
     .getAllByRole("alert")
     .filter((alert) => /\S/u.test(alert.textContent));
 
@@ -178,14 +185,14 @@ describe("the Account page's passkeys", () => {
     const said = paragraphsIn("Passkeys");
     expect(said, "the Passkeys section does not explain both states").toHaveLength(2);
     for (const paragraph of said) expect(paragraph.textContent).toMatch(/\S/u);
-    expect(screen.queryByRole("button", { name: "Add a Passkey" })).toBeNull();
+    expect(screen.queryByRole("button", { name: SETUP_WORDS.addPasskey })).toBeNull();
   });
 
   it("offers Add a Passkey in a browser that supports passkeys", async () => {
     withPasskeysHere();
     await accountOpened(NO_SET);
 
-    expect(await screen.findByRole("button", { name: "Add a Passkey" })).toBeDefined();
+    expect(await screen.findByRole("button", { name: SETUP_WORDS.addPasskey })).toBeDefined();
     expect(paragraphsIn("Passkeys"), "the Passkeys section says it cannot add one").toHaveLength(1);
   });
 });
@@ -230,7 +237,7 @@ describe("setting up an authenticator on the Account page", () => {
     );
     await openAsAda("/account");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Set Up an Authenticator" }));
+    fireEvent.click(await screen.findByRole("button", { name: AUTHENTICATOR_WORDS.setUp }));
 
     expect(
       await screen.findByRole("img", { name: "QR code for your authenticator app" }),
@@ -262,7 +269,7 @@ describe("generating recovery codes on the Account page", () => {
 
     await pressGenerateCodes();
 
-    expect(await screen.findByRole("button", { name: "Replace Recovery Codes" })).toBeDefined();
+    expect(await screen.findByRole("button", { name: RECOVERY_CODE_WORDS.replace })).toBeDefined();
     expect(signInAlertsWithWords(), "no alert says why Generate was refused").toHaveLength(1);
   });
 
@@ -327,10 +334,10 @@ describe("finishing a first authenticator on the Account page", () => {
       ]),
     );
     await openAsAda("/account");
-    const setUp = await screen.findByRole("button", { name: "Set Up an Authenticator" });
+    const setUp = await screen.findByRole("button", { name: AUTHENTICATOR_WORDS.setUp });
     fireEvent.click(setUp);
     expect(setUp.getAttribute("aria-expanded")).toBe("true");
-    const field = await screen.findByRole("textbox", { name: "Authenticator Code" });
+    const field = await screen.findByRole("textbox", { name: AUTHENTICATOR_WORDS.codeField });
 
     fireEvent.change(field, { target: { value: "123456" } });
 
@@ -343,15 +350,15 @@ describe("finishing a first authenticator on the Account page", () => {
     });
     await userEvent.keyboard("{Enter}");
     expect(setUp.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("textbox", { name: "Authenticator Code" })).toBeDefined();
+    expect(screen.getByRole("textbox", { name: AUTHENTICATOR_WORDS.codeField })).toBeDefined();
 
     answer.resolve();
 
-    const list = await screen.findByRole("list", { name: "Recovery Codes" });
+    const list = await screen.findByRole("list", { name: RECOVERY_CODE_WORDS.heading });
     expect(within(list).getAllByRole("listitem")).toHaveLength(CODES.length);
     await waitFor(() => {
       expect(document.activeElement).toBe(
-        screen.getByRole("heading", { name: "Save Your Recovery Codes" }),
+        screen.getByRole("heading", { name: RECOVERY_CODE_WORDS.saveHeading }),
       );
     });
   });
@@ -380,14 +387,14 @@ describe("removing and replacing on the Account page", () => {
     fireEvent.click(remove);
 
     const dialog = await screen.findByRole("dialog", {
-      name: "Remove Authenticator",
+      name: AUTHENTICATOR_WORDS.removeTitle,
       description: /\S/,
     });
     expect(timesAsked(asked, "person.removeAuthenticator")).toBe(0);
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
 
-    const setUp = await screen.findByRole("button", { name: "Set Up an Authenticator" });
+    const setUp = await screen.findByRole("button", { name: AUTHENTICATOR_WORDS.setUp });
     expect(timesAsked(asked, "person.removeAuthenticator")).toBe(1);
     expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
     expect(saidOnThePage()).toHaveLength(1);
@@ -409,20 +416,20 @@ describe("removing and replacing on the Account page", () => {
       ]),
     );
     await openAsAda("/account");
-    const replace = await screen.findByRole("button", { name: "Replace Recovery Codes" });
-    expect(screen.queryByRole("list", { name: "Recovery Codes" })).toBeNull();
+    const replace = await screen.findByRole("button", { name: RECOVERY_CODE_WORDS.replace });
+    expect(screen.queryByRole("list", { name: RECOVERY_CODE_WORDS.heading })).toBeNull();
 
     fireEvent.click(replace);
 
     const dialog = await screen.findByRole("dialog", {
-      name: "Replace Recovery Codes",
+      name: RECOVERY_CODE_WORDS.replace,
       description: /\S/,
     });
     expect(timesAsked(asked, "person.replaceRecoveryCodes")).toBe(0);
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Replace" }));
 
-    const list = await screen.findByRole("list", { name: "Recovery Codes" });
+    const list = await screen.findByRole("list", { name: RECOVERY_CODE_WORDS.heading });
     expect(timesAsked(asked, "person.replaceRecoveryCodes")).toBe(1);
     expect(
       within(list)
@@ -430,7 +437,7 @@ describe("removing and replacing on the Account page", () => {
         .map((code) => code.textContent),
     ).toEqual(CODES);
     expect(
-      paragraphsIn("Save Your Recovery Codes"),
+      paragraphsIn(RECOVERY_CODE_WORDS.saveHeading),
       "a replaced set does not say the old codes stopped working",
     ).toHaveLength(2);
     expect(saidOnThePage()).toHaveLength(1);
@@ -474,11 +481,13 @@ describe("the Account page of a member", () => {
     expect(screen.queryByRole("link", { name: "Go to better-answers" })).toBeNull();
 
     fireEvent.keyDown(document.body, { key: "?" });
-    const listed = await screen.findByRole("dialog", { name: "Keyboard Shortcuts on Account" });
+    const listed = await screen.findByRole("dialog", { name: keystrokesOn("Account") });
     fireEvent.keyDown(listed, { key: "Escape" });
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "Keyboard Shortcuts on Account" })).toBeNull();
+      expect(screen.queryByRole("dialog", { name: keystrokesOn("Account") })).toBeNull();
     });
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Keyboard Shortcuts" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: KEYSTROKE_WORDS.button }),
+    );
   });
 });

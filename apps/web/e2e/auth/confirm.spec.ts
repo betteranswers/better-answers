@@ -2,6 +2,9 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor";
 
+import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
+import { CONFIRM_WORDS, SETUP_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
+
 import { expect, test } from "../browser.ts";
 import { landedAtHome, regionShowsNewText, alertShowsWait } from "../harness.ts";
 import { authAnswering } from "../refused-read.ts";
@@ -23,9 +26,9 @@ const MOST_TRIES = 10;
 const READ_BUDGET_MS = 1000;
 
 const passkeyButton = (page: Page) =>
-  page.getByRole("button", { name: "Use Your Passkey", exact: true });
+  page.getByRole("button", { name: CONFIRM_WORDS.passkey, exact: true });
 
-const addAPasskey = (page: Page) => page.getByRole("button", { name: "Add a Passkey" });
+const addAPasskey = (page: Page) => page.getByRole("button", { name: SETUP_WORDS.addPasskey });
 
 const aWrongCode = (right: string, nth = 1): string =>
   String((Number(right) + nth) % 10 ** AUTHENTICATOR_CODE_LENGTH).padStart(
@@ -44,8 +47,8 @@ const anAdminWithBothFactors = async (page: Page, api: APIRequestContext) => {
   await confirmedByCode(page, admin.key);
   await page.goto("/account");
   await addAPasskey(page).click();
-  await page.getByLabel("Passkey Name").fill("Work laptop");
-  await page.getByRole("button", { name: "Add Passkey" }).click();
+  await page.getByLabel(PASSKEY_WORDS.nameField).fill("Work laptop");
+  await page.getByRole("button", { name: PASSKEY_WORDS.addCommit }).click();
   await expect(page.getByRole("listitem", { name: "Work laptop", exact: true })).toBeFocused();
   await expect(page.getByRole("status").filter({ hasText: /\S/ })).toBeVisible();
 

@@ -1,16 +1,19 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
+import { AUTHENTICATOR_WORDS, PASSKEY_WORDS } from "@/features/auth/account-words.ts";
+import { SETUP_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
+
 import { expect, test } from "../browser.ts";
 import { provision, signInByEmail, tabUntilFocused } from "../harness.ts";
 
 const READ_BUDGET_MS = 1000;
 
-const codeField = (page: Page) => page.getByLabel("Authenticator Code");
+const codeField = (page: Page) => page.getByLabel(AUTHENTICATOR_WORDS.codeField);
 
-const passkeyName = (page: Page) => page.getByLabel("Passkey Name");
+const passkeyName = (page: Page) => page.getByLabel(PASSKEY_WORDS.nameField);
 
 const authenticatorInstead = (page: Page) =>
-  page.getByRole("button", { name: "Set Up an Authenticator Instead" });
+  page.getByRole("button", { name: SETUP_WORDS.authenticatorInstead });
 
 const primaries = (page: Page) =>
   page.getByRole("button").and(page.locator('[data-variant="default"]'));
@@ -37,13 +40,13 @@ test("setup shows one primary button for passkey or authenticator", async ({
   expect(elapsed, "the setup page took longer than one second to load").toBeLessThan(
     READ_BUDGET_MS,
   );
-  await expect(primaries(page)).toHaveText(["Add a Passkey"]);
+  await expect(primaries(page)).toHaveText([SETUP_WORDS.addPasskey]);
 
   await tabUntilFocused(page, authenticatorInstead(page));
   await page.keyboard.press("Enter");
 
   await expect(codeField(page)).toBeVisible();
-  await expect(primaries(page)).toHaveText(["Finish Setup"]);
+  await expect(primaries(page)).toHaveText([AUTHENTICATOR_WORDS.finish]);
   await expect(passkeyName(page)).toBeHidden();
   await expect(authenticatorInstead(page)).toBeFocused();
   await passesTheAccessibilityGate();
@@ -51,6 +54,6 @@ test("setup shows one primary button for passkey or authenticator", async ({
   await page.keyboard.press("Enter");
 
   await expect(passkeyName(page)).toBeVisible();
-  await expect(primaries(page)).toHaveText(["Add a Passkey"]);
+  await expect(primaries(page)).toHaveText([SETUP_WORDS.addPasskey]);
   await expect(authenticatorInstead(page)).toBeFocused();
 });

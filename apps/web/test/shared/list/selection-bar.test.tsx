@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { LIST_WORDS } from "@/shared/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { MembersList } from "@test/members-list.tsx";
 
@@ -44,7 +45,7 @@ describe("the selection bar", () => {
     expect(shown).not.toBeNull();
     expect(countsIn(shown)).toEqual(["2"]);
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear Selection" }));
+    fireEvent.click(screen.getByRole("button", { name: LIST_WORDS.clearSelection }));
     expect(queryBar()).toBeNull();
     expect(
       screen.getByRole("checkbox", { name: "Select Ada Lovelace" }).getAttribute("aria-checked"),
@@ -70,7 +71,7 @@ describe("the selection bar", () => {
     render(<MembersList pageSize={2} onAction={(action) => actions.push(action)} />);
 
     select("Cy Twombly");
-    fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
+    fireEvent.click(screen.getByRole("button", { name: LIST_WORDS.nextPage }));
     select("Ed Ruscha");
     fireEvent.click(within(getBar()).getByRole("button", { name: "Change Role" }));
 
@@ -81,7 +82,7 @@ describe("the selection bar", () => {
     render(<MembersList />);
 
     select("Ada Lovelace");
-    const clear = screen.getByRole("button", { name: "Clear Selection" });
+    const clear = screen.getByRole("button", { name: LIST_WORDS.clearSelection });
     expect(clear.getAttribute("aria-keyshortcuts")).toBe("x");
 
     fireEvent.keyDown(document.body, { key: "x" });
@@ -92,7 +93,7 @@ describe("the selection bar", () => {
     render(<MembersList />);
     select("Ada Lovelace");
     const action = within(getBar()).getByRole("button", { name: "Change Role" });
-    const clear = within(getBar()).getByRole("button", { name: "Clear Selection" });
+    const clear = within(getBar()).getByRole("button", { name: LIST_WORDS.clearSelection });
 
     action.focus();
     fireEvent.keyDown(action, { key: "ArrowRight" });
@@ -111,7 +112,7 @@ describe("the selection bar", () => {
     render(<MembersList />);
     select("Ada Lovelace");
 
-    const clear = screen.getByRole("button", { name: "Clear Selection" });
+    const clear = screen.getByRole("button", { name: LIST_WORDS.clearSelection });
     clear.focus();
     fireEvent.click(clear);
     expect(queryBar()).toBeNull();

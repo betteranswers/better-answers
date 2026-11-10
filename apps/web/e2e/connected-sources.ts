@@ -1,6 +1,7 @@
 import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
 import { LIST_WORDS, ROW_ACTIONS } from "@/features/sources/words.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import {
   anAddress,
@@ -10,10 +11,17 @@ import {
   signIn,
 } from "./harness.ts";
 
+const CONNECTED_SOURCES = pageById(
+  menuGroupIn(CONTROL_CENTRE, "sources"),
+  "connected-sources",
+).name;
+
 const controlCentreNav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 
 export const connectedSourcesRegion = (page: Page) =>
-  page.getByRole("region", { name: "Connected Sources" });
+  page.getByRole("region", {
+    name: CONNECTED_SOURCES,
+  });
 
 export const saidIn = (page: Page): Locator =>
   connectedSourcesRegion(page).getByRole("status").last();
@@ -60,8 +68,17 @@ export const anAdminAtSources = async (
         });
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await controlCentreNav(page).getByRole("link", { name: "Connected Sources" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Connected Sources" })).toBeVisible();
+  await controlCentreNav(page)
+    .getByRole("link", {
+      name: CONNECTED_SOURCES,
+    })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: CONNECTED_SOURCES,
+    }),
+  ).toBeVisible();
   return { workspace, seeded };
 };
 

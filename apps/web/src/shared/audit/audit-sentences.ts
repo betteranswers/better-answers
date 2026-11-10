@@ -109,7 +109,7 @@ const SENTENCES = {
   "knowledge.guide.exported": ({ by }) => `${by} exported a snapshot of a guide`,
   "knowledge.guide.included": ({ by, detail }) =>
     `${by} included ${included(detail)} in a section of a guide`,
-  "knowledge.guide.seeded": ({ by }) => `${by} seeded a guide from a template`,
+  "knowledge.guide.seeded": ({ by }) => `${by} started a guide from a template`,
   "knowledge.manifest.written": ({ by }) => `${by} updated the knowledge base’s description`,
   "knowledge.owner.named": ({ by, detail, named }) =>
     "personId" in detail

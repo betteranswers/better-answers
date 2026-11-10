@@ -2,7 +2,7 @@ import type { APIRequestContext } from "@playwright/test";
 
 import { ASK_WORDS } from "@/features/ask/ask-words.ts";
 import { QUESTIONS_WORDS } from "@/features/questions/questions-words.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import {
   anAuditWorkspace,
@@ -18,7 +18,7 @@ import {
 import { expect, test } from "../browser.ts";
 import { railOf, releaseTheModel, scriptAsking, signIn } from "../harness.ts";
 
-const QUESTIONS_ASKED = pageNamed(menuGroupIn(CONTROL_CENTRE, "questions"), "Questions Asked");
+const QUESTIONS_ASKED = pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked");
 
 const aWorkspaceToAsk = async (api: APIRequestContext) => {
   const audits = await anAuditWorkspace(api);

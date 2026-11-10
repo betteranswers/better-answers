@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 
 import { usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { useOpenTab, type PageTab, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 
@@ -12,7 +12,7 @@ import { RequestsTab } from "./requests/requests-tab.tsx";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 
-const THIS_PAGE = pageNamed(people, "Members");
+const THIS_PAGE = pageById(people, "members");
 
 type Tab = PageTab & {
   readonly content: ComponentType;

@@ -1,6 +1,7 @@
 import type { Locator, Page, Response } from "@playwright/test";
 
 import { AUDITED_CATEGORIES, CONNECT_WORDS, PUBLISH_WORDS } from "@/features/sources/words.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -81,9 +82,9 @@ test("an Admin connects a document by keyboard, then publishes it", async ({
   await test.step("an Admin connects a document by keyboard and sees its state go from Received to Indexing to Indexed", async () => {
     await listsNothingConnected(page, () => page.goto("/sources/connected-sources"));
     await expect(connectedSourcesRegion(page)).toMatchAriaSnapshot(`
-      - region "Connected Sources":
+      - region ${JSON.stringify(pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name)}:
         - /children: equal
-        - heading "Connected Sources" [level=2]
+        - heading ${JSON.stringify(pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name)} [level=2]
         - status
         - status
         - button ${JSON.stringify(CONNECT_WORDS.action)}

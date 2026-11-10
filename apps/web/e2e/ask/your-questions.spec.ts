@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { YOUR_QUESTIONS_WORDS } from "@/features/ask/ask-words.ts";
-import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { ASK, menuGroupIn, pageById } from "@/shared/navigation.ts";
+import { LIST_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -25,7 +26,7 @@ const LIST_BUDGET_MS = 1000;
 
 const RECORD_BUDGET_MS = 1000;
 
-const PAGE = pageNamed(menuGroupIn(ASK, "ask"), "Your Questions");
+const PAGE = pageById(menuGroupIn(ASK, "ask"), "your-questions");
 
 const YOUR_QUESTIONS = PAGE.path;
 
@@ -37,7 +38,8 @@ const ANSWERED = "What is the audit log retention period?";
 
 const FLAG_NOTE = "The retention period changed in March.";
 
-const yourQuestions = (page: Page) => page.getByRole("region", { name: "Your Questions" });
+const yourQuestions = (page: Page) =>
+  page.getByRole("region", { name: pageById(menuGroupIn(ASK, "ask"), "your-questions").name });
 
 const rowsOf = (region: Locator) => region.getByRole("listitem").getByRole("link");
 
@@ -151,7 +153,7 @@ test.describe("Your questions", () => {
       await expect(rowsOf(yourQuestions(page)).first()).toBeFocused();
       const more = page
         .getByRole("navigation", { name: YOUR_QUESTIONS_WORDS.more })
-        .getByRole("button", { name: "Load More" });
+        .getByRole("button", { name: LIST_WORDS.loadMore });
       await tabUntilFocused(page, more, 60);
       await passesTheAccessibilityGate();
 
@@ -174,7 +176,7 @@ test.describe("Your questions", () => {
       );
       await expect(page.getByText(FLAG_NOTE)).toBeVisible();
 
-      const crumb = crumbOf(page, "Your Questions");
+      const crumb = crumbOf(page, pageById(menuGroupIn(ASK, "ask"), "your-questions").name);
       await tabUntilFocused(page, crumb);
       await passesTheAccessibilityGate();
 

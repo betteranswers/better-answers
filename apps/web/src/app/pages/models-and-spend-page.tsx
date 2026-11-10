@@ -1,18 +1,19 @@
 import { ModelChoicesCard } from "@/features/model-choices/model-choices-card.tsx";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { useOpenTab, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 
 const models = menuGroupIn(CONTROL_CENTRE, "models");
 
-const THIS_PAGE = pageNamed(models, "Models and Spend");
+const THIS_PAGE = pageById(models, "models-and-spend");
 
 const SPEND = "spend";
 
 export const MODELS_AND_SPEND_TOOLBAR: PageToolbar = {
   tabs: [
-    { id: "model-choices", name: "Model Choices" },
+    { id: "model-choices", name: MODEL_CHOICES_WORDS.heading },
     { id: SPEND, name: "Spend" },
   ],
 };

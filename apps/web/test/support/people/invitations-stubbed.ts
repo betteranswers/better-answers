@@ -10,7 +10,7 @@ import type {
   ListedInvitation,
   SentInvitation,
 } from "@/features/people/invitations/invitations-api.ts";
-import { HOMES } from "@/shared/navigation.ts";
+import { HOMES, INVITE_A_PERSON } from "@/shared/navigation.ts";
 import { server } from "@test/stub-server.ts";
 import type { Api } from "@test/stubbed-api.ts";
 import { ADA, adaAnAdmin, openAt, openTab, read } from "@test/two-workspaces.ts";
@@ -272,7 +272,7 @@ export const selectionStatusText = () => within(selectionBar()).getByRole("statu
 
 export const outcomeIn = () => within(invitationsRegion()).getAllByRole("status")[1];
 
-export const INVITE = "Invite a Person";
+export const INVITE = INVITE_A_PERSON.name;
 
 export const inviteAction = () => screen.getByRole("button", { name: INVITE });
 

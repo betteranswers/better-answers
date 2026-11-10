@@ -2,26 +2,34 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
+import { AUTHENTICATOR_WORDS, RECOVERY_CODE_WORDS } from "@/features/auth/account-words.ts";
+import {
+  CONFIRM_WORDS,
+  RECOVERY_WORDS,
+} from "@/features/auth/second-factor/second-factor-words.ts";
+
 import { expect } from "./browser.ts";
 import { enrolledWith, personMenuOpened, provision, signInByEmail } from "./harness.ts";
 
-const CONFIRM_HEADING = "Confirm It’s You";
+const CONFIRM_HEADING = CONFIRM_WORDS.heading;
 
 export const heading = (page: Page, name: string) => page.getByRole("heading", { level: 1, name });
 
-export const codeField = (page: Page) => page.getByRole("textbox", { name: "Authenticator Code" });
+export const codeField = (page: Page) =>
+  page.getByRole("textbox", { name: AUTHENTICATOR_WORDS.codeField });
 
 export const theRefusal = (page: Page) => page.getByRole("alert").filter({ hasText: /\S/ });
 
 export const codeOf = (key: string): string => authenticatorCodeAt(key, new Date());
 
-export const recoveryField = (page: Page) => page.getByRole("textbox", { name: "Recovery Code" });
+export const recoveryField = (page: Page) =>
+  page.getByRole("textbox", { name: RECOVERY_WORDS.field });
 
 export const codesListed = (page: Page) =>
-  page.getByRole("list", { name: "Recovery Codes" }).getByRole("listitem");
+  page.getByRole("list", { name: RECOVERY_CODE_WORDS.heading }).getByRole("listitem");
 
 export const recoveryCodesParagraphs = (page: Page) =>
-  page.getByRole("region", { name: "Save Your Recovery Codes" }).getByRole("paragraph");
+  page.getByRole("region", { name: RECOVERY_CODE_WORDS.saveHeading }).getByRole("paragraph");
 
 export const codesTicked = async (page: Page, finish: string): Promise<void> => {
   await page.getByRole("checkbox", { name: "I have saved these codes" }).check();

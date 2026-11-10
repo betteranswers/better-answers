@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
 
+import { SIGN_IN_WORDS } from "@/features/auth/sign-in/sign-in-words.ts";
+
 import { expect, test } from "./browser.ts";
 
 const addImageWithoutAltText = (): void => {
@@ -164,7 +166,9 @@ const scrollButtonHalfUnderStickyHeader = (): boolean => {
 
 const openSignInPage = async (page: Page): Promise<void> => {
   await page.goto("/sign-in");
-  await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: SIGN_IN_WORDS.emailStep.nothing.title }),
+  ).toBeVisible();
 };
 
 test("audits a test's last page even without an explicit call", async ({ page }) => {

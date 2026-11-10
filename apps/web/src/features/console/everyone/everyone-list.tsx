@@ -63,17 +63,17 @@ const columnsFor = (actions: PersonActions) =>
   column.columns([
     column.display({
       id: "person",
-      header: "Person",
+      header: WORDS.columns.person,
       cell: ({ row }) => <PersonCell person={row.original} actions={actions} />,
     }),
     column.display({
       id: "workspaces",
-      header: "Workspaces and Roles",
+      header: WORDS.columns.workspacesAndRoles,
       cell: ({ row }) => <WorkspacesAndRoles person={row.original} />,
     }),
     column.accessor("lastSignedInAt", {
-      header: "Last Sign-In",
-      cell: ({ getValue }) => <Instant at={getValue()} none="Never" />,
+      header: WORDS.columns.lastSignIn,
+      cell: ({ getValue }) => <Instant at={getValue()} none={WORDS.never} />,
     }),
   ]);
 
@@ -88,7 +88,8 @@ const readOf = (listed: Listed) => {
 
 const countSaid = (readingAgain: boolean, total: number, search: string): string => {
   if (readingAgain) return WORDS.readingAgain;
-  return search === "" ? WORDS.counted(total) : WORDS.matching(total, search);
+  if (search === "") return WORDS.counted(total);
+  return total === 0 ? "" : WORDS.matching(total, search);
 };
 
 type Opened = { readonly personId: string; readonly at: OpenedAt };

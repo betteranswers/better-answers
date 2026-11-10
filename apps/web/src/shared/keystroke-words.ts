@@ -1,10 +1,10 @@
 export const KEYSTROKE_WORDS = {
-  button: "Keyboard Shortcuts",
+  button: "Keyboard shortcuts",
   where: "Single keys work anywhere except in a field or dialog.",
   turnedOn: "Use single-key shortcuts on this browser",
-  showTheList: "Show This List",
+  showTheList: "Show this list",
   noneOfItsOwn: "This page has no keyboard shortcuts of its own.",
-  thisPage: "This Page",
+  thisPage: "this page",
 } as const;
 
 export const keystrokesOn = (page: string): string => `${KEYSTROKE_WORDS.button} on ${page}`;

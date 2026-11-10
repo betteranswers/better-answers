@@ -7,6 +7,7 @@ import { CONCEPT_IRI_PREFIX } from "@better-answers/schema/concept-file";
 import { MATCHES_A_PAGE, SEARCH_LIST } from "@/features/knowledge/knowledge-state.ts";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import type { Concept } from "@/shared/knowledge/knowledge-reads.ts";
+import { LIST_WORDS } from "@/shared/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { server } from "@test/stub-server.ts";
 import { holdProcedure, type Api } from "@test/stubbed-api.ts";
@@ -302,10 +303,10 @@ export const listsOnly = (title: string) =>
 export const searchAlert = (): HTMLElement | null => within(searchRegion()).queryByRole("alert");
 
 export const loadMore = (): HTMLElement | null =>
-  within(searchRegion()).queryByRole("button", { name: "Load More" });
+  within(searchRegion()).queryByRole("button", { name: LIST_WORDS.loadMore });
 
 export const loadMoreButton = (): HTMLElement =>
-  within(searchRegion()).getByRole("button", { name: "Load More" });
+  within(searchRegion()).getByRole("button", { name: LIST_WORDS.loadMore });
 
 export const retryButton = (): HTMLElement =>
   within(searchRegion()).getByRole("button", { name: "Retry" });

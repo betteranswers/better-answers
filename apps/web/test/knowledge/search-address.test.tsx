@@ -2,7 +2,14 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
-import { HOMES, type Role } from "@/shared/navigation.ts";
+import {
+  HOMES,
+  KNOWLEDGE,
+  menuGroupIn,
+  NEW_QUESTION,
+  pageById,
+  type Role,
+} from "@/shared/navigation.ts";
 import {
   aSearchApi,
   finding,
@@ -109,7 +116,9 @@ describe("the Knowledge Search page", () => {
       api.set("session.member", () => adaAt(role));
       const router = await openAt(HOMES[role].path, api);
       expect(router.state.location.pathname).toBe(HOMES[role].path);
-      expect(await screen.findByRole("heading", { level: 1, name: "New Question" })).toBeDefined();
+      expect(
+        await screen.findByRole("heading", { level: 1, name: NEW_QUESTION.name }),
+      ).toBeDefined();
 
       knowledgeRailPressed();
 
@@ -119,7 +128,11 @@ describe("the Knowledge Search page", () => {
         within(screen.getByRole("navigation", { name: "Knowledge" }))
           .getAllByRole("link")
           .map((link) => link.textContent),
-      ).toEqual(["Search", "Guides", "Knowledge Base"]);
+      ).toEqual([
+        "Search",
+        "Guides",
+        pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name,
+      ]);
       expect(searchStatusText()).toBe("");
       expect(matchRows()).toHaveLength(0);
     });

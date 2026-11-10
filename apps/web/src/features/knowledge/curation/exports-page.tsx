@@ -4,7 +4,7 @@ import { ceilingLiftsIn, refusalOf, type ApiError, type RefusalWord } from "@/sh
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke, usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf, refusedWith } from "@/shared/refusal-outcome.tsx";
@@ -36,7 +36,7 @@ import { bytesOfBase64, MARKDOWN, ZIP } from "./file-bytes.ts";
 
 const CURATION = menuGroupIn(KNOWLEDGE, "curation");
 
-const EXPORTS_PAGE = pageNamed(CURATION, "Exports");
+const EXPORTS_PAGE = pageById(CURATION, "exports");
 
 const LISTED = Object.values(KEY);
 

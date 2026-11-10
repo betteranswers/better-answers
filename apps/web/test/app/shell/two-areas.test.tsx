@@ -12,8 +12,10 @@ import { createAppClients, Providers } from "@/app/providers.tsx";
 import { Frame } from "@/app/shell/frame.tsx";
 import type { IconName } from "@/shared/icon.tsx";
 import type { Page, VisibleTree } from "@/shared/navigation.ts";
+import { ASK, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 const aPage = (name: string, path: Page["path"], icon: IconName): Page => ({
+  id: name.toLowerCase(),
   name,
   path,
   icon,
@@ -21,7 +23,11 @@ const aPage = (name: string, path: Page["path"], icon: IconName): Page => ({
   seenBy: ["Admin"],
 });
 
-const QUESTIONS = aPage("Your Questions", "/first/your-questions", "question");
+const QUESTIONS = aPage(
+  pageById(menuGroupIn(ASK, "ask"), "your-questions").name,
+  "/first/your-questions",
+  "question",
+);
 
 const GUIDES = aPage("Guides", "/second/guides", "guides");
 

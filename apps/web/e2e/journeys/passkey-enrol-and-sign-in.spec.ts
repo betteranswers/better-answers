@@ -1,6 +1,8 @@
 import type { Page } from "@playwright/test";
 
-import { passkeyNameFor } from "@/features/auth/account-words.ts";
+import { passkeyNameFor, PASSKEY_WORDS } from "@/features/auth/account-words.ts";
+import { SETUP_WORDS } from "@/features/auth/second-factor/second-factor-words.ts";
+import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace/workspace-words.ts";
 
 import { expect, test } from "../browser.ts";
 import { emailsSentTo, signedInWithNoWorkspace } from "../harness.ts";
@@ -11,7 +13,7 @@ const accountHeading = (page: Page) => page.getByRole("heading", { level: 1, nam
 const rowOf = (page: Page, name: string) => page.getByRole("listitem", { name, exact: true });
 
 const theNoWorkspacePage = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
+  page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING });
 
 const outcomeOf = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
 
@@ -22,9 +24,9 @@ const suggestedName = (page: Page): Promise<string> =>
 
 const passkeyAdded = async (page: Page): Promise<string> => {
   const name = await suggestedName(page);
-  await page.getByRole("button", { name: "Add a Passkey" }).click();
-  await expect(page.getByLabel("Passkey Name")).toHaveValue(name);
-  await page.getByRole("button", { name: "Add Passkey" }).click();
+  await page.getByRole("button", { name: SETUP_WORDS.addPasskey }).click();
+  await expect(page.getByLabel(PASSKEY_WORDS.nameField)).toHaveValue(name);
+  await page.getByRole("button", { name: PASSKEY_WORDS.addCommit }).click();
   return name;
 };
 

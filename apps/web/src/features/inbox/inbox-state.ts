@@ -3,9 +3,9 @@ import { z } from "zod";
 import { ULID } from "@better-answers/schema/ulid";
 
 import type { Keystroke } from "@/shared/keystrokes.tsx";
-import { INBOX, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { INBOX, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
-export const WAITING_ON_YOU = pageNamed(menuGroupIn(INBOX, "inbox"), "Waiting on You");
+export const WAITING_ON_YOU = pageById(menuGroupIn(INBOX, "inbox"), "waiting-on-you");
 
 export const SUGGESTION_ID = z.string().regex(ULID);
 

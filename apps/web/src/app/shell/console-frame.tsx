@@ -13,7 +13,7 @@ import { Frame } from "./frame.tsx";
 const THE_OPERATORS = visibleTo(OPERATOR_READER, [CONSOLE]);
 
 const BACK_TO_YOUR_WORKSPACES = {
-  name: "Back to Your Workspaces",
+  name: "Back to your workspaces",
   to: "/choose-workspace",
 } as const;
 
@@ -34,7 +34,7 @@ function ConsoleClosed(properties: { readonly standing: ReturnType<typeof useOpe
   if (standing.isPending) {
     return (
       <AuthPage title={CONSOLE.name}>
-        <Outcome tone="said">Checking your access.</Outcome>
+        <Outcome tone="said">Checking your access…</Outcome>
       </AuthPage>
     );
   }
@@ -55,7 +55,7 @@ function ConsoleClosed(properties: { readonly standing: ReturnType<typeof useOpe
             void standing.refetch();
           }}
         >
-          Try Again
+          Try again
         </Button>
         <WaysOut />
       </AuthPage>

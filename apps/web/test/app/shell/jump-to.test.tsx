@@ -7,16 +7,21 @@ import { findWhat, JUMP_TO, searchFor } from "@/app/words.ts";
 import { CONCEPT_TYPES_PAGE } from "@/features/knowledge/curation/curation-state.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import {
+  AREAS,
+  ASK,
   CONSOLE,
   CONTROL_CENTRE,
   HOMES,
+  INBOX,
+  INVITE_A_PERSON,
+  KNOWLEDGE,
   menuGroupIn,
-  pageNamed,
+  NEW_QUESTION,
+  pageById,
   readerOf,
-  AREAS,
-  visibleTo,
-  type Role,
   type Area,
+  type Role,
+  visibleTo,
 } from "@/shared/navigation.ts";
 import { nothingMatches } from "@/shared/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -65,6 +70,7 @@ const STUB: readonly Area[] = [
         name: "Stock",
         pages: [
           {
+            id: "timber",
             name: "Timber",
             path: "/stock/timber",
             icon: "table",
@@ -73,6 +79,7 @@ const STUB: readonly Area[] = [
             actions: [{ name: "Order timber", asks: "order", icon: "invite" }],
           },
           {
+            id: "steel",
             name: "Steel",
             path: "/stock/steel",
             icon: "table",
@@ -81,6 +88,7 @@ const STUB: readonly Area[] = [
             actions: [{ name: "Order steel", asks: "order", icon: "invite" }],
           },
           {
+            id: "deliveries",
             name: "Deliveries",
             path: "/stock/deliveries",
             icon: "log",
@@ -93,7 +101,7 @@ const STUB: readonly Area[] = [
   },
 ];
 
-const INVITE = "Invite a Person";
+const INVITE = INVITE_A_PERSON.name;
 
 describe("what jump-to lists", () => {
   it("lists only a stub tree's built pages and their actions", () => {
@@ -120,7 +128,14 @@ describe("what jump-to lists", () => {
       ["Areas", ["Ask", "Knowledge"]],
       [
         "Pages",
-        ["New Question", "Your Questions", "Connect Claude", "Search", "Guides", "Knowledge Base"],
+        [
+          NEW_QUESTION.name,
+          pageById(menuGroupIn(ASK, "ask"), "your-questions").name,
+          "Connect Claude",
+          "Search",
+          "Guides",
+          pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name,
+        ],
       ],
     ]);
   });
@@ -131,24 +146,24 @@ describe("what jump-to lists", () => {
       [
         "Pages",
         [
-          "New Question",
-          "Your Questions",
+          NEW_QUESTION.name,
+          pageById(menuGroupIn(ASK, "ask"), "your-questions").name,
           "Connect Claude",
           "Search",
           "Guides",
-          "Knowledge Base",
-          "All Knowledge",
+          pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name,
+          pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name,
           CONCEPT_TYPES_PAGE.name,
-          "Collections and Owners",
+          pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").name,
           "Exports",
-          "Waiting on You",
-          "Connected Sources",
-          "Models and Spend",
-          "Questions Asked",
-          "Answer Tests",
+          pageById(menuGroupIn(INBOX, "inbox"), "waiting-on-you").name,
+          pageById(menuGroupIn(CONTROL_CENTRE, "sources"), "connected-sources").name,
+          pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend").name,
+          pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "questions-asked").name,
+          pageById(menuGroupIn(CONTROL_CENTRE, "questions"), "answer-tests").name,
           "Members",
           "Groups",
-          "Audit Log",
+          pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name,
         ],
       ],
       ["Actions", [INVITE]],
@@ -169,7 +184,9 @@ describe("what jump-to lists", () => {
     );
 
     expect(to["Control Centre"]).toBe("/people/members");
-    expect(to["Audit Log"]).toBe("/system/audit-log");
+    expect(to[pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name]).toBe(
+      "/system/audit-log",
+    );
     expect(to[INVITE]).toBe("/people/members?action=invite");
   });
 
@@ -224,7 +241,7 @@ describe("choosing Invite a person in the app", () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
     vi.stubGlobal("ResizeObserver", StubResizeObserver);
     const { router } = await openApp("/people/members?members.role=Editor");
-    await screen.findByRole("button", { name: "Jump To" });
+    await screen.findByRole("button", { name: JUMP_TO.name });
 
     fireEvent.keyDown(document, { key: "k", metaKey: true });
     fireEvent.click(await screen.findByRole("option", { name: new RegExp(INVITE) }));
@@ -236,7 +253,7 @@ describe("choosing Invite a person in the app", () => {
   });
 });
 
-const MODELS_AND_SPEND = pageNamed(menuGroupIn(CONTROL_CENTRE, "models"), "Models and Spend");
+const MODELS_AND_SPEND = pageById(menuGroupIn(CONTROL_CENTRE, "models"), "models-and-spend");
 
 const openJumpTo = async (): Promise<HTMLElement> => {
   fireEvent.keyDown(document, { key: "k", ctrlKey: true });

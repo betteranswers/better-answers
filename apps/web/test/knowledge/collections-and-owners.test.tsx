@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { RHIAN } from "@test/knowledge/all-knowledge-answers.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { server } from "@test/stub-server.ts";
@@ -22,13 +22,18 @@ afterEach(() => {
   Reflect.deleteProperty(Element.prototype, "scrollIntoView");
 });
 
-const PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Collections and Owners").path;
+const PAGE = pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").path;
 
 const POLICY = { collection: "policy", owner: null, overrides: 0, concepts: 3, verified: 1 };
 
 const NAMED = collectionNameOf(POLICY.collection);
 
-const region = () => within(screen.getByRole("region", { name: "Collections and Owners" }));
+const region = () =>
+  within(
+    screen.getByRole("region", {
+      name: pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").name,
+    }),
+  );
 
 const pickerOf = (owner: string) =>
   screen.findByRole("button", { name: WORDS.ownerOf(NAMED, owner) });

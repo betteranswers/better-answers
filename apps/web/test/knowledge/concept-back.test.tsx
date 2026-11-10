@@ -4,8 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import { CONCEPT_IRI_PREFIX } from "@better-answers/schema/concept-file";
 
 import { KNOWLEDGE_BASE_LIST } from "@/features/knowledge/knowledge-state.ts";
-import { ALL_KNOWLEDGE_PAGE, SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import {
+  ALL_KNOWLEDGE_PAGE,
+  KNOWLEDGE_BASE_PAGE,
+  SEARCH_PAGE,
+} from "@/shared/knowledge/concept-address.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import {
   aConceptRow,
   ALL_KNOWLEDGE,
@@ -24,7 +29,7 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedForSearch();
 
-const KNOWLEDGE_BASE = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Knowledge Base").path;
+const KNOWLEDGE_BASE = pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").path;
 
 const OPEN_CONCEPT_TYPE = `${KNOWLEDGE_BASE}?${KNOWLEDGE_BASE_LIST}.collection=company&${KNOWLEDGE_BASE_LIST}.type=lease`;
 
@@ -83,14 +88,18 @@ describe("the concept page's back link", () => {
     const main = within(screen.getByRole("main"));
     expect(main.queryByRole("link", { name: "Back to Search" })).toBeNull();
     expect(
-      inTheBreadcrumb().queryByRole("link", { name: "Knowledge Base" }),
+      inTheBreadcrumb().queryByRole("link", {
+        name: pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name,
+      }),
       "the shell marks another page as the open one",
     ).not.toBeNull();
     expect(markedInTheMenu(), "the menu tells a screen reader the page it draws").toEqual([
-      "Knowledge Base",
+      pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name,
     ]);
 
-    fireEvent.click(main.getByRole("link", { name: "Back to Knowledge Base" }));
+    fireEvent.click(
+      main.getByRole("link", { name: CONCEPT_WORDS.backTo(KNOWLEDGE_BASE_PAGE.name) }),
+    );
 
     await waitFor(() => expect(router.state.location.pathname).toBe(KNOWLEDGE_BASE));
     expect(router.state.location.searchStr).toContain(`${KNOWLEDGE_BASE_LIST}.type=lease`);
@@ -121,11 +130,15 @@ describe("the concept page's back link", () => {
     fireEvent.click(await screen.findByRole("link", { name: "Policy 05" }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "Policy 05" })).toBeDefined();
-    expect(markedInTheMenu()).toEqual(["All Knowledge"]);
+    expect(markedInTheMenu()).toEqual([
+      pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name,
+    ]);
     const main = within(screen.getByRole("main"));
     expect(main.queryByRole("link", { name: "Back to Search" })).toBeNull();
 
-    fireEvent.click(main.getByRole("link", { name: "Back to All Knowledge" }));
+    fireEvent.click(
+      main.getByRole("link", { name: CONCEPT_WORDS.backTo(ALL_KNOWLEDGE_PAGE.name) }),
+    );
 
     await waitFor(() => expect(router.state.location.pathname).toBe(ALL_KNOWLEDGE_PAGE.path));
     expect(router.state.location.search).toMatchObject({

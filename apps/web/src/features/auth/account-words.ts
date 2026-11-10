@@ -5,9 +5,9 @@ import { dayWords, instantWords, PRODUCT_NAME } from "@/shared/words.ts";
 export const ACCOUNT_HEADING = "Account";
 
 export const ACCOUNT_WORDS = {
-  signIn: "Sign-In",
+  signIn: "Sign-in",
   goOn: `Go to ${PRODUCT_NAME}`,
-  tryAgain: "Try Again",
+  tryAgain: "Try again",
   readingAgain: "Loading",
 } as const;
 
@@ -16,32 +16,32 @@ export const THEME_WORDS = {
   device: "System",
   light: "Light",
   dark: "Dark",
-  kept: "Your choice is saved in this browser only.",
+  kept: "Saved in this browser.",
 } as const;
 
-const SET_UP = "Set Up an Authenticator";
+const SET_UP = "Set up an authenticator";
 
-const ADD_A_PASSKEY = "Add a Passkey";
+const ADD_A_PASSKEY = "Add a passkey";
 
 export const ACCOUNT_ACTIONS = {
-  readAgain: "Reload Your Sign-In Methods",
+  readAgain: "Reload your sign-in methods",
   addPasskey: ADD_A_PASSKEY,
   setUp: SET_UP,
-  copyKey: "Copy the Key",
-  copyCodes: "Copy the Codes",
-  download: "Download the Codes",
-  print: "Print the Codes",
+  copyKey: "Copy the key",
+  copyCodes: "Copy the codes",
+  download: "Download the codes",
+  print: "Print the codes",
 } as const;
 
 export const PASSKEY_WORDS = {
   heading: "Passkeys",
   none: "No passkeys yet. Add a passkey to sign in without email.",
-  noWebAuthn: "This browser can’t add a passkey. Please use another browser or device.",
+  noWebAuthn: "This browser can’t add a passkey. Use another browser or device.",
   add: ADD_A_PASSKEY,
-  nameField: "Passkey Name",
-  addCommit: "Add Passkey",
-  waiting: "Waiting for your device.",
-  notAdded: "No passkey was added. Please try again.",
+  nameField: "Passkey name",
+  addCommit: "Add passkey",
+  waiting: "Waiting for your device…",
+  notAdded: "No passkey was added. Try again.",
   unnamed: "Passkey",
   notUsed: "Not used yet",
   rename: "Rename",
@@ -49,11 +49,10 @@ export const PASSKEY_WORDS = {
   saving: "Saving",
   cancel: "Cancel",
   remove: "Remove",
-  removeConsequence:
-    "Are you sure you want to remove this passkey? It will stop working on every device.",
+  removeConsequence: "This permanently removes the passkey from your account.",
   removeCommit: "Remove",
   offer: "Sign in with your fingerprint, face or device PIN instead of email.",
-  dismissOffer: "Dismiss Passkey Offer",
+  dismissOffer: "Dismiss passkey offer",
 } as const;
 
 export const passkeyDates = (createdAt: string, lastUsedAt: string | null): string =>
@@ -61,7 +60,7 @@ export const passkeyDates = (createdAt: string, lastUsedAt: string | null): stri
     lastUsedAt === null ? PASSKEY_WORDS.notUsed : `Last used ${instantWords(lastUsedAt)}`
   }`;
 
-export const removePasskeyTitle = (name: string): string => `Remove Passkey “${name}”`;
+export const removePasskeyTitle = (name: string): string => `Remove passkey “${name}”`;
 
 /** In the order a user agent is read: Edge names Chrome, and Chrome names Safari. */
 const BROWSERS = [
@@ -94,47 +93,45 @@ export const AUTHENTICATOR_WORDS = {
   setUp: SET_UP,
   held: "Your authenticator app is set up.",
   remove: "Remove",
-  making: "Preparing your QR code.",
+  making: "Preparing your QR code…",
   scan: "Scan this QR code with your authenticator app.",
   qrCode: "QR code for your authenticator app",
   orEnterKey: "Or enter this setup key:",
-  copyKey: "Copy Key",
-  keyCopied: "Key copied successfully.",
-  codeField: "Authenticator Code",
+  copyKey: "Copy key",
+  keyCopied: "Key copied.",
+  codeField: "Authenticator code",
   codeHint:
-    "Enter the 6-digit code from your authenticator app. If the code doesn’t work, check that your phone sets its date and time automatically.",
-  finish: "Finish Setup",
-  finishing: "Finishing Setup",
-  startAgain: "Try Again",
-  removeTitle: "Remove Authenticator",
-  removeConsequence:
-    "Are you sure you want to remove your authenticator? It will stop working immediately.",
+    "Enter the 6-digit code from your authenticator app. If it doesn’t work, set your phone’s date and time to automatic.",
+  finish: "Finish setup",
+  finishing: "Finishing setup",
+  startAgain: "Try again",
+  removeTitle: "Remove authenticator",
+  removeConsequence: "Your authenticator’s codes stop working at once.",
   removeCommit: "Remove",
 } as const;
 
 export const RECOVERY_CODE_WORDS = {
-  heading: "Recovery Codes",
-  none: "You don’t have any recovery codes yet.",
-  make: "Generate Recovery Codes",
-  replace: "Replace Recovery Codes",
-  making: "Generating Codes",
-  makingLine: "Generating your recovery codes.",
-  replaceTitle: "Replace Recovery Codes",
-  replaceConsequence:
-    "Are you sure you want to replace your recovery codes? Your current codes will stop working immediately.",
+  heading: "Recovery codes",
+  none: "No recovery codes yet.",
+  make: "Generate recovery codes",
+  replace: "Replace recovery codes",
+  making: "Generating codes",
+  makingLine: "Generating your recovery codes…",
+  replaceTitle: "Replace recovery codes",
+  replaceConsequence: "Your current codes stop working at once.",
   replaceCommit: "Replace",
-  saveHeading: "Save Your Recovery Codes",
+  saveHeading: "Save your recovery codes",
   saveLine:
-    "If you lose access to your passkey or authenticator app, you can sign in with one of these codes. Each code works once, and you won’t see these codes again.",
+    "Each code signs you in once if you lose your passkey or authenticator app. You won’t see these codes again.",
   replacedLine: "Your previous codes no longer work.",
-  list: "Recovery Codes",
-  copy: "Copy Codes",
-  copied: "Codes copied successfully.",
+  list: "Recovery codes",
+  copy: "Copy codes",
+  copied: "Codes copied.",
   download: "Download",
   print: "Print",
   saved: "I have saved these codes",
   done: "Done",
-  finish: "Finish Setup",
+  finish: "Finish setup",
 } as const;
 
 export const codesLeft = (unused: number, madeAt: string): string =>
@@ -143,19 +140,14 @@ export const codesLeft = (unused: number, madeAt: string): string =>
 const noticeTo = (address: string): string => `A confirmation email is on its way to ${address}.`;
 
 export const ACTION_LANDED = {
-  passkeyAdded: (name: string, address: string) =>
-    `Passkey “${name}” has been added successfully. ${noticeTo(address)}`,
-  passkeyRenamed: (name: string) => `Passkey has been renamed to “${name}” successfully.`,
+  passkeyAdded: (name: string, address: string) => `Passkey “${name}” added. ${noticeTo(address)}`,
+  passkeyRenamed: (name: string) => `Passkey renamed to “${name}”.`,
   passkeyRemoved: (name: string, address: string) =>
-    `Passkey “${name}” has been removed successfully. ${noticeTo(address)}`,
-  setUp: (address: string) =>
-    `Your authenticator has been set up successfully. ${noticeTo(address)}`,
-  removed: (address: string) =>
-    `Your authenticator has been removed successfully. ${noticeTo(address)}`,
-  made: (address: string) =>
-    `Your recovery codes have been generated successfully. ${noticeTo(address)}`,
-  replaced: (address: string) =>
-    `Your recovery codes have been replaced successfully. ${noticeTo(address)}`,
+    `Passkey “${name}” removed. ${noticeTo(address)}`,
+  setUp: (address: string) => `Authenticator set up. ${noticeTo(address)}`,
+  removed: (address: string) => `Authenticator removed. ${noticeTo(address)}`,
+  made: (address: string) => `Recovery codes generated. ${noticeTo(address)}`,
+  replaced: (address: string) => `Recovery codes replaced. ${noticeTo(address)}`,
 } as const;
 
 export const RECOVERY_CODES_FILE = `${PRODUCT_NAME}-recovery-codes.txt`;

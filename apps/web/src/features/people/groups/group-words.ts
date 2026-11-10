@@ -7,12 +7,10 @@ export const membersWord = (group: Pick<ListedGroup, "memberCount">): string =>
 
 export const GROUP_WORDS = {
   create: {
-    consequence: "Name the group, then add its members.",
     field: "Name",
     commit: "Create group",
   },
   rename: {
-    consequence: "Enter the group’s new name.",
     commit: "Rename group",
   },
   delete: "Delete group",

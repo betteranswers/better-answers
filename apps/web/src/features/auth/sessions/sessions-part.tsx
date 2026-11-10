@@ -196,7 +196,6 @@ export function SessionsSection() {
         open={confirming}
         onOpenChange={setConfirming}
         title={everywhereTitle(others.length)}
-        consequence={SESSIONS_WORDS.consequence}
         commit={
           <Button variant="destructive" onClick={signOutEverywhereElse}>
             {everywhereCommit(others.length)}

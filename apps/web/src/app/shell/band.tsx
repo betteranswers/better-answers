@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { PRODUCT_NAME } from "@/shared/words.ts";
+import { PRODUCT_NAME, SIGN_OUT } from "@/shared/words.ts";
 
 import { BandBreadcrumb, type Part } from "./breadcrumb.tsx";
 
@@ -83,7 +83,7 @@ function PersonMenu(properties: Pick<BandProperties, "person" | "signingOut" | "
           <Link to="/account">{ACCOUNT_HEADING}</Link>
         </DropdownMenuItem>
         <DropdownMenuItem disabled={properties.signingOut} onSelect={() => properties.onSignOut()}>
-          Sign Out
+          {SIGN_OUT}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -13,7 +13,7 @@ import { FilterRow } from "@/shared/list/filter-row.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { useSearchedList } from "@/shared/list/searched-list.ts";
 import { Address } from "@/shared/member/address.tsx";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
@@ -37,7 +37,7 @@ import { AUDIT_LOG_WORDS as WORDS } from "./audit-log-words.ts";
 
 const system = menuGroupIn(CONTROL_CENTRE, "system");
 
-const THIS_PAGE = pageNamed(system, "Audit Log");
+const THIS_PAGE = pageById(system, "audit-log");
 
 const LISTED = Object.values(KEY);
 

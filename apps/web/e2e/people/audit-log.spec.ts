@@ -2,7 +2,8 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { AUDIT_LOG_KEYSTROKES as KEY } from "@/features/people/audit-log/audit-log-state.ts";
 import { AUDIT_LOG_WORDS } from "@/features/people/audit-log/audit-log-words.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
+import { filterBy } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -21,9 +22,12 @@ const LIST_BUDGET_MS = 1000;
 
 const ONE_LINE_PX = 48;
 
-const AUDIT_LOG_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log").path;
+const AUDIT_LOG_PAGE = pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").path;
 
-const auditLog = (page: Page) => page.getByRole("region", { name: "Audit Log" });
+const auditLog = (page: Page) =>
+  page.getByRole("region", {
+    name: pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name,
+  });
 
 const linesOf = (page: Page): Locator => auditLog(page).getByRole("listitem");
 
@@ -31,7 +35,7 @@ const searchBox = (page: Page) =>
   auditLog(page).getByRole("searchbox", { name: "Search by person, group or action" });
 
 const familyFilter = (page: Page) =>
-  auditLog(page).getByRole("combobox", { name: "Filter by Family" });
+  auditLog(page).getByRole("combobox", { name: filterBy(AUDIT_LOG_WORDS.family) });
 
 const pickFamily = async (page: Page, family: string): Promise<void> => {
   await familyFilter(page).click();
@@ -80,7 +84,7 @@ const anAdminAtTheAuditLog = async (
   await signIn(page, api, adminEmail);
   await page
     .getByRole("navigation", { name: "Control Centre" })
-    .getByRole("link", { name: "Audit Log" })
+    .getByRole("link", { name: pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name })
     .click();
   await expect(page).toHaveURL(new RegExp(`${AUDIT_LOG_PAGE}$`));
   return {
@@ -182,7 +186,10 @@ test.describe("the System group's Audit log page", () => {
 
     await skipLinkReachesThePage(page);
 
-    const keystrokes = await keystrokesListed(page, "Audit Log");
+    const keystrokes = await keystrokesListed(
+      page,
+      pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name,
+    );
     for (const { key } of Object.values(KEY))
       await expect(keyListed(keystrokes, key)).toBeVisible();
     await page.keyboard.press("Escape");

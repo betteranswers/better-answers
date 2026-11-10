@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { HOMES } from "@/shared/navigation.ts";
+import { SIGN_OUT } from "@/shared/words.ts";
 import {
   rateLimitedResponse,
   ADA,
@@ -27,7 +28,7 @@ it("shows the wait and keeps the page on refused sign-out", async () => {
   expect(alert.textContent, "the band alert had text before sign-out").toBe("");
 
   await userEvent.click(band().getByRole("button", { name: ADA.displayName }));
-  await userEvent.click(await screen.findByRole("menuitem", { name: "Sign Out" }));
+  await userEvent.click(await screen.findByRole("menuitem", { name: SIGN_OUT }));
 
   await vi.waitFor(() => expect(alert.textContent).toMatch(/\b2 minutes\b/));
   expect(router.state.location.pathname, "the refused sign-out navigated away").toBe(

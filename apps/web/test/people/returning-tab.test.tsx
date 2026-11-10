@@ -1,8 +1,9 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { INVITATION_WORDS } from "@/features/auth/workspace/invitation-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
-import { CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, HOMES, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure, type Api } from "@test/stubbed-api.ts";
 import {
@@ -29,7 +30,7 @@ placedWithoutMeasuring();
 
 const MEMBERS = HOMES.Admin.path;
 
-const GROUPS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Groups");
+const GROUPS = pageById(menuGroupIn(CONTROL_CENTRE, "people"), "groups");
 
 const GRACES_PAGE = memberPageOf(GRACE.personId);
 
@@ -176,7 +177,7 @@ describe("a tab that switches workspace itself", () => {
     const router = await openAt(MEMBERS, api);
 
     await router.navigate({ href: INVITATION });
-    fireEvent.click(await screen.findByRole("button", { name: "Join Workspace" }));
+    fireEvent.click(await screen.findByRole("button", { name: INVITATION_WORDS.join }));
 
     await landedAtHome(router);
     await waitFor(() => expect(said()).toBe(""));

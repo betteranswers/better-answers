@@ -17,6 +17,7 @@ import { RowMenu } from "@/shared/list/row-menu.tsx";
 import { SelectionAction, SelectionBar } from "@/shared/list/selection-bar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 
 type Member = {
   readonly id: string;
@@ -179,7 +180,7 @@ export const LIST_SAYS = {
   none: "No one belongs to this workspace yet.",
   noneFiltered: "No one matches these filters.",
   noneMatching: (search: string): string => `No one matches “${search}”.`,
-  loading: "The members are still loading.",
+  loading: "Loading members…",
   failed: "The members could not be read.",
 } as const;
 
@@ -202,7 +203,7 @@ const emptyOf = (narrowed: Narrowed, clear: () => void, focusAfterClear: FocusTa
       state={{
         kind: "emptied",
         words,
-        clearWords: "Clear Filters",
+        clearWords: CLEAR_WORDS.filters,
         onClear: clear,
         focusAfterClear,
       }}
@@ -347,7 +348,7 @@ export function MembersList(properties: Asked) {
         }}
         filters={[
           {
-            label: "Role",
+            label: "role",
             value: held.narrowed.role,
             anyLabel: "Any Role",
             choices: ROLES.map((role) => ({ value: role, label: role })),

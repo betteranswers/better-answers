@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MEMBERS_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+import { LIST_WORDS, filterBy } from "@/shared/words.ts";
 import { choosing, placedWithoutMeasuring } from "@test/measuring.ts";
 import {
   joined,
@@ -58,7 +59,7 @@ describe("the Members list's address", () => {
     const router = await openAt(MEMBERS, api);
     await screen.findByRole("link", { name: SAM.displayName });
 
-    picked("Filter by Group", SITE_LEADS.name);
+    picked(filterBy("group"), SITE_LEADS.name);
     await waitFor(() => {
       expect(namesShown()).toEqual([SAM.displayName]);
     });
@@ -66,7 +67,7 @@ describe("the Members list's address", () => {
       listed().getAllByRole("status").at(0)?.textContent,
       "the count did not say one of three match",
     ).toMatch(/\b1\b\D+\b3\b/);
-    picked("Filter by Group", MEMBERS_WORDS.anyGroup);
+    picked(filterBy("group"), MEMBERS_WORDS.anyGroup);
     await waitFor(() => {
       expect(namesShown()).toHaveLength(3);
     });
@@ -92,8 +93,8 @@ describe("the Members list's address", () => {
     const router = await openAt(MEMBERS, apiOf(ADA, ...thirtyEditors));
     await screen.findByRole("link", { name: "Person 01" });
 
-    picked("Filter by Role", "Editor");
-    fireEvent.click(within(pages()).getByRole("button", { name: "Next Page" }));
+    picked(filterBy("role"), "Editor");
+    fireEvent.click(within(pages()).getByRole("button", { name: LIST_WORDS.nextPage }));
     const lastFiveOfThirty = /\b26\D+30\D+30\b/;
     await waitFor(() => {
       expect(namesShown()).toHaveLength(5);
@@ -109,7 +110,7 @@ describe("the Members list's address", () => {
     expect(namesShown()).toHaveLength(5);
     expect(memberLink("Person 26")).toBeDefined();
     expect(within(pages()).getByRole("status").textContent).toMatch(lastFiveOfThirty);
-    expect(listed().getByRole("combobox", { name: "Filter by Role" }).textContent).toBe("Editor");
+    expect(listed().getByRole("combobox", { name: filterBy("role") }).textContent).toBe("Editor");
   });
 });
 

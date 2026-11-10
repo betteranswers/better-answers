@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import { partsOf } from "@/app/shell/breadcrumb.tsx";
 import {
+  AREAS,
   CONSOLE,
+  CONTROL_CENTRE,
+  menuGroupIn,
+  NEW_QUESTION,
+  pageById,
   placeAt,
   readerOf,
-  AREAS,
-  visibleTo,
   type RoleOrOperator,
+  visibleTo,
 } from "@/shared/navigation.ts";
 
 const partsAt = (role: RoleOrOperator, path: string, below?: string) => {
@@ -32,7 +36,7 @@ describe("the band's breadcrumb", () => {
     expect(partsAt("Admin", "/system/audit-log")).toEqual([
       { name: "Control Centre", to: "/people/members" },
       { name: "System", to: "/system/audit-log" },
-      { name: "Audit Log", to: undefined },
+      { name: pageById(menuGroupIn(CONTROL_CENTRE, "system"), "audit-log").name, to: undefined },
     ]);
   });
 
@@ -55,7 +59,7 @@ describe("the band's breadcrumb", () => {
   it("shows Ask and its page, with no group part", () => {
     expect(partsAt("Viewer", "/ask/new-question")).toEqual([
       { name: "Ask", to: "/ask/new-question" },
-      { name: "New Question", to: undefined },
+      { name: NEW_QUESTION.name, to: undefined },
     ]);
   });
 
@@ -63,7 +67,7 @@ describe("the band's breadcrumb", () => {
     expect(partsAt("operator", "/console/people/names-waiting")).toEqual([
       { name: "Console", to: "/console/workspaces/every-workspace" },
       { name: "People", to: "/console/people/everyone" },
-      { name: "Flagged Names", to: undefined },
+      { name: pageById(menuGroupIn(CONSOLE, "people"), "flagged-names").name, to: undefined },
     ]);
   });
 

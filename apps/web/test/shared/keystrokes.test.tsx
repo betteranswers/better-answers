@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { JUMP_TO as JUMP_TO_WORDS } from "@/app/words.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import {
   KeystrokesAction,
   ShellKeystrokes,
@@ -54,7 +55,9 @@ describe("the keystrokes list", () => {
 
     await nextTask();
 
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Keyboard Shortcuts" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: KEYSTROKE_WORDS.button }),
+    );
   });
 
   it("keeps focus where the user moved it before closing", async () => {
@@ -68,7 +71,7 @@ describe("the keystrokes list", () => {
   });
 });
 
-const JUMP_TO: Keystroke = { key: "Ctrl K", action: "Jump To" };
+const JUMP_TO: Keystroke = { key: "Ctrl K", action: JUMP_TO_WORDS.name };
 
 const MEMBERS_KEYSTROKES: readonly Keystroke[] = [
   { key: "/", action: "Search the Members" },
@@ -107,13 +110,13 @@ describe("the shell's keystrokes list", () => {
       </AShell>,
     );
 
-    const list = openListWithQuestionMark("Keyboard Shortcuts on Members");
+    const list = openListWithQuestionMark(keystrokesOn("Members"));
 
     expect(actionsIn(list)).toStrictEqual([
       "Search the Members",
       "Open the Member in Focus",
-      "Show This List",
-      "Jump To",
+      KEYSTROKE_WORDS.showTheList,
+      JUMP_TO_WORDS.name,
     ]);
     expect(list.textContent).not.toContain(KEYSTROKE_WORDS.noneOfItsOwn);
   });
@@ -130,28 +133,32 @@ describe("the shell's keystrokes list", () => {
       </AShell>,
     );
 
-    const list = openListWithQuestionMark("Keyboard Shortcuts on Groups");
+    const list = openListWithQuestionMark(keystrokesOn("Groups"));
 
-    expect(actionsIn(list)).toStrictEqual(["Create a Group", "Show This List", "Jump To"]);
+    expect(actionsIn(list)).toStrictEqual([
+      "Create a Group",
+      KEYSTROKE_WORDS.showTheList,
+      JUMP_TO_WORDS.name,
+    ]);
   });
 
   it("lists only shell keystrokes for a page without any", () => {
     render(<AShell page={undefined} />);
 
-    const list = openListWithQuestionMark("Keyboard Shortcuts on This Page");
+    const list = openListWithQuestionMark(keystrokesOn(KEYSTROKE_WORDS.thisPage));
 
     expect(list.textContent).toContain(KEYSTROKE_WORDS.noneOfItsOwn);
-    expect(actionsIn(list)).toStrictEqual(["Show This List", "Jump To"]);
+    expect(actionsIn(list)).toStrictEqual([KEYSTROKE_WORDS.showTheList, JUMP_TO_WORDS.name]);
   });
 
   it("opens from its button, which declares the `?` shortcut", () => {
     render(<AShell page="Members" />);
 
-    const trigger = screen.getByRole("button", { name: "Keyboard Shortcuts" });
+    const trigger = screen.getByRole("button", { name: KEYSTROKE_WORDS.button });
     expect(trigger.getAttribute("aria-keyshortcuts")).toBe("?");
     fireEvent.click(trigger);
 
-    expect(screen.getByRole("dialog", { name: "Keyboard Shortcuts on Members" })).toHaveProperty(
+    expect(screen.getByRole("dialog", { name: keystrokesOn("Members") })).toHaveProperty(
       "isConnected",
       true,
     );
@@ -178,7 +185,7 @@ describe("the shell's keystrokes list", () => {
 
   it("ignores `?` after single-key shortcuts are turned off", () => {
     render(<AShell page="Members" />);
-    const list = openListWithQuestionMark("Keyboard Shortcuts on Members");
+    const list = openListWithQuestionMark(keystrokesOn("Members"));
 
     fireEvent.click(
       screen.getByRole("checkbox", { name: "Use single-key shortcuts on this browser" }),

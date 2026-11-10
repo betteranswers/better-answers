@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { JUMP_TO } from "@/app/words.ts";
+import { AUTHENTICATOR_WORDS } from "@/features/auth/account-words.ts";
 import { STALE_CONFIRMATION } from "@/features/auth/refusal-words.ts";
 import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
@@ -187,9 +188,12 @@ describe("removing a member after the confirmation expires", () => {
     const dialog = await screen.findByRole("dialog");
     expect(server.asks.filter((ask) => ask.procedure === "members.remove")).toHaveLength(1);
     expect(router.state.location.pathname).toBe("/people/members");
-    fireEvent.change(await within(dialog).findByRole("textbox", { name: "Authenticator Code" }), {
-      target: { value: "123456" },
-    });
+    fireEvent.change(
+      await within(dialog).findByRole("textbox", { name: AUTHENTICATOR_WORDS.codeField }),
+      {
+        target: { value: "123456" },
+      },
+    );
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() =>

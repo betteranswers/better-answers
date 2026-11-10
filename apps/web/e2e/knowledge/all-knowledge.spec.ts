@@ -3,7 +3,9 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
+import { filterBy } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -25,7 +27,7 @@ const LIST_BUDGET_MS = 1000;
 
 const FIRST_PAGE = 50;
 
-const ALL_KNOWLEDGE = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "All Knowledge").path;
+const ALL_KNOWLEDGE = pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").path;
 
 const OWNING_EDITOR = "Ifan Morgan";
 
@@ -101,7 +103,10 @@ const signedInAt = async (page: Page, api: APIRequestContext, email: string): Pr
   await signIn(page, api, email);
 };
 
-const allKnowledge = (page: Page): Locator => page.getByRole("region", { name: "All Knowledge" });
+const allKnowledge = (page: Page): Locator =>
+  page.getByRole("region", {
+    name: pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name,
+  });
 
 const rowsOf = (page: Page): Locator =>
   allKnowledge(page)
@@ -123,7 +128,7 @@ const selectedBar = (page: Page): Locator =>
   allKnowledge(page).getByRole("toolbar", { name: "Selected concepts" });
 
 const filterOf = (page: Page, name: string): Locator =>
-  allKnowledge(page).getByRole("combobox", { name: `Filter by ${name}` });
+  allKnowledge(page).getByRole("combobox", { name: filterBy(name) });
 
 test.describe("All Knowledge", () => {
   test("shows each role only the concepts they can curate", async ({
@@ -147,13 +152,13 @@ test.describe("All Knowledge", () => {
     await expect(page.getByRole("main")).not.toContainText(/bundle/i);
 
     await expect(allKnowledge(page)).toMatchAriaSnapshot(`
-      - region "All Knowledge":
-        - heading "All Knowledge" [level=2]
+      - region ${JSON.stringify(pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name)}:
+        - heading ${JSON.stringify(pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name)} [level=2]
         - status: /\\b65\\b/
         - status
-        - combobox "Filter by ${WORDS.filters.collection.label}"
-        - combobox "Filter by ${WORDS.filters.type.label}"
-        - combobox "Filter by ${WORDS.filters.trust.label}"
+        - combobox ${JSON.stringify(filterBy(WORDS.filters.collection.label))}
+        - combobox ${JSON.stringify(filterBy(WORDS.filters.type.label))}
+        - combobox ${JSON.stringify(filterBy(WORDS.filters.trust.label))}
         - button "Columns"
         - table:
           - rowgroup:
@@ -172,7 +177,12 @@ test.describe("All Knowledge", () => {
 
     await test.step("an Admin selects three rows and sets their owner by keyboard alone", async () => {
       await skipLinkReachesThePage(page);
-      await listsItsKeystrokes(page, "All Knowledge", KEY, [KEY.setOwner.action]);
+      await listsItsKeystrokes(
+        page,
+        pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name,
+        KEY,
+        [KEY.setOwner.action],
+      );
 
       for (const title of SELECTED) {
         await tabUntilFocused(page, titleOf(page, title));
@@ -200,7 +210,9 @@ test.describe("All Knowledge", () => {
       await expect(selectedBar(page)).toBeHidden();
       await expect(allKnowledge(page).getByRole("status").nth(1)).toHaveText(/\S/);
       await expect(
-        allKnowledge(page).getByRole("heading", { name: "All Knowledge" }),
+        allKnowledge(page).getByRole("heading", {
+          name: pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name,
+        }),
       ).toBeFocused();
 
       await page.reload();
@@ -278,7 +290,13 @@ test.describe("All Knowledge", () => {
 
       await titleOf(page, "Annual leave").click();
       await expect(page).not.toHaveURL(held);
-      await page.getByRole("link", { name: "Back to All Knowledge" }).click();
+      await page
+        .getByRole("link", {
+          name: CONCEPT_WORDS.backTo(
+            pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name,
+          ),
+        })
+        .click();
 
       await expect(page).toHaveURL(held);
       await expect(titleOf(page, "Fire drills")).toBeVisible();

@@ -3,14 +3,13 @@ export const REASON_MAX_CHARACTERS = 1_000;
 export const SHORT_NAME_EXAMPLE = "acme-joinery";
 
 export const ASK_TO_JOIN_WORDS = {
-  heading: "Ask to Join a Workspace",
-  shortName: "Workspace Short Name",
+  heading: "Ask to join a workspace",
+  shortName: "Workspace short name",
   forExample: "For example,",
   reason: "Reason",
-  reasonHint: `This will be visible to the workspace’s Admins. Must be ${REASON_MAX_CHARACTERS.toLocaleString("en-GB")} characters or fewer.`,
-  ask: "Ask to Join",
+  reasonHint: `Shown to the workspace’s Admins. Up to ${REASON_MAX_CHARACTERS.toLocaleString("en-GB")} characters.`,
+  ask: "Ask to join",
   asking: "Asking",
-  sent: "Request Sent",
-  whatHappensNext:
-    "If that workspace exists, its Admins will review your request. You’ll get an email if it’s approved.",
+  sent: "Request sent",
+  whatHappensNext: "You’ll get an email if an Admin approves it.",
 } as const;

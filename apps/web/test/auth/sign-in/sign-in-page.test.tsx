@@ -4,6 +4,8 @@ import { afterEach, assert, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
+import { UNKNOWN_PAGE } from "@/app/words.ts";
+import { SIGN_IN_WORDS } from "@/features/auth/sign-in/sign-in-words.ts";
 import { openApp } from "@test/open-app.tsx";
 import { server } from "@test/stub-server.ts";
 import { addressOf } from "@test/stubbed-api.ts";
@@ -47,7 +49,7 @@ const triesLeft = (left: number): RegExp => new RegExp(String.raw`\b${String(lef
 const refusal = () => screen.getByRole("alert").textContent;
 
 const addressTyped = async (): Promise<HTMLInputElement> => {
-  const field = await screen.findByLabelText("Email Address");
+  const field = await screen.findByLabelText(SIGN_IN_WORDS.emailAddress);
   if (!(field instanceof HTMLInputElement)) {
     throw new Error("the Email Address label does not point to an input");
   }
@@ -58,7 +60,7 @@ const addressTyped = async (): Promise<HTMLInputElement> => {
 
 const sendTheFirstCode = async () => {
   await addressTyped();
-  fireEvent.click(screen.getByRole("button", { name: "Send Code" }));
+  fireEvent.click(screen.getByRole("button", { name: SIGN_IN_WORDS.send }));
 };
 
 /** jsdom does not submit a form on Enter, so the test submits the field's form directly. */
@@ -69,7 +71,7 @@ const pressEnterInTheEmailField = async () => {
 };
 
 const codeField = async (): Promise<HTMLInputElement> => {
-  const field = await screen.findByLabelText("Verification Code", { exact: true });
+  const field = await screen.findByLabelText(SIGN_IN_WORDS.codeField, { exact: true });
   if (!(field instanceof HTMLInputElement)) {
     throw new Error("the Verification Code label does not point to an input");
   }
@@ -103,7 +105,7 @@ it("shows a join heading when signing in from an invitation", async () => {
   const router = await openAtTheAddressBar("/invitations/01JINVITED00000000000000A");
 
   expect(
-    await screen.findByRole("heading", { level: 1, name: "Sign In to Join a Workspace" }),
+    await screen.findByRole("heading", { level: 1, name: SIGN_IN_WORDS.emailStep.joining.title }),
   ).toBeDefined();
   expect(router.state.location.pathname).toBe("/sign-in");
   expect(globalThis.location.search).toMatch(/^\?redirect=/);
@@ -115,8 +117,8 @@ it("shows a join heading when signing in from an invitation", async () => {
     inDocumentOrder(
       main.getByRole("heading", { level: 1 }),
       hint,
-      main.getByRole("textbox", { name: "Email Address" }),
-      main.getByRole("button", { name: "Send Code" }),
+      main.getByRole("textbox", { name: SIGN_IN_WORDS.emailAddress }),
+      main.getByRole("button", { name: SIGN_IN_WORDS.send }),
     ),
   ).toBe(true);
 });
@@ -134,14 +136,17 @@ it("shows a Claude heading when signing in to connect Claude", async () => {
   await openAtTheAddressBar(`/sign-in?${carried.toString()}`);
 
   expect(
-    await screen.findByRole("heading", { level: 1, name: "Sign In to Connect Claude" }),
+    await screen.findByRole("heading", {
+      level: 1,
+      name: SIGN_IN_WORDS.emailStep.connecting.title,
+    }),
   ).toBeDefined();
 });
 
 it("announces a sent code in the existing status region", async () => {
   wire({ [SEND]: sent });
   await openApp("/sign-in");
-  expect(await screen.findByRole("heading", { level: 1, name: "Sign In" })).toBeDefined();
+  expect(await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.signIn })).toBeDefined();
 
   const said = screen.getAllByRole("status", { hidden: true });
   const alerts = screen.getAllByRole("alert", { hidden: true });
@@ -184,7 +189,7 @@ it("selects a wrong code and counts the tries left", async () => {
     [0, 6],
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+  fireEvent.click(screen.getByRole("button", { name: UNKNOWN_PAGE.signIn }));
   fireEvent.change(field, { target: { value: "000002" } });
 
   await waitFor(() => expect(refusal()).toMatch(triesLeft(1)));
@@ -200,10 +205,10 @@ it("names the wait after too many code requests", async () => {
   await waitFor(() => expect(refusal()).toMatch(/\b2 minutes\b/));
   expect(asked(SEND)).toBe(1);
   expect(
-    screen.getByRole("heading", { level: 1, name: "Sign In" }),
+    screen.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.signIn }),
     "a refused send left the email step",
   ).toBeDefined();
-  expect(screen.queryByLabelText("Verification Code", { exact: true })).toBeNull();
+  expect(screen.queryByLabelText(SIGN_IN_WORDS.codeField, { exact: true })).toBeNull();
 });
 
 it("an expired code moves focus to Send a New Code", async () => {
@@ -217,7 +222,7 @@ it("an expired code moves focus to Send a New Code", async () => {
 
   await waitFor(() => expect(refusal()).toMatch(/\S/u));
   expect(refusal(), "an expired code still counts tries left").not.toMatch(/\d/u);
-  const another = screen.getByRole("button", { name: "Send a New Code" });
+  const another = screen.getByRole("button", { name: SIGN_IN_WORDS.sendAgain });
   expect(document.activeElement, "Send a New Code does not have focus").toBe(another);
 
   fireEvent.click(another);

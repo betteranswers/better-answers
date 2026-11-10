@@ -3,7 +3,7 @@ import type { BoundFunctions, queries } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CONNECT_ASSISTANT } from "@/app/words.ts";
-import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { ASK, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { clipboardAnswering } from "@test/clipboard-stand-in.ts";
 import { openApp } from "@test/open-app.tsx";
@@ -14,7 +14,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const CONNECT_CLAUDE = pageNamed(menuGroupIn(ASK, "ask"), "Connect Claude");
+const CONNECT_CLAUDE = pageById(menuGroupIn(ASK, "ask"), "connect-claude");
 
 const openConnectClaude = async () => {
   vi.stubGlobal("fetch", answeringAs("Viewer"));
@@ -28,9 +28,7 @@ describe("Ask › Connect Claude", () => {
   it("lists the steps, including Always allow, and the MCP address", async () => {
     const main = await openConnectClaude();
 
-    expect(
-      main.getByRole("heading", { level: 2, name: "Connect Claude as Your Assistant" }),
-    ).toBeDefined();
+    expect(main.getByRole("heading", { level: 2, name: CONNECT_ASSISTANT.heading })).toBeDefined();
     expect(
       steps(main)
         .getAllByRole("listitem")
@@ -45,7 +43,7 @@ describe("Ask › Connect Claude", () => {
     const clipboardWrites = clipboardAnswering(() => Promise.resolve());
     const main = await openConnectClaude();
 
-    fireEvent.click(main.getByRole("button", { name: "Copy Address" }));
+    fireEvent.click(main.getByRole("button", { name: CONNECT_ASSISTANT.copy }));
 
     await vi.waitFor(() => {
       expect(steps(main).getByRole("status").textContent).toBe(CONNECT_ASSISTANT.copied);
@@ -58,7 +56,7 @@ describe("Ask › Connect Claude", () => {
     clipboardAnswering(() => Promise.reject(new Error("refused")));
     const main = await openConnectClaude();
 
-    fireEvent.click(main.getByRole("button", { name: "Copy Address" }));
+    fireEvent.click(main.getByRole("button", { name: CONNECT_ASSISTANT.copy }));
 
     await vi.waitFor(() => {
       expect(steps(main).getByRole("alert").textContent).toBe(STOCK.copy);

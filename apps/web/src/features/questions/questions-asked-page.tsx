@@ -8,7 +8,7 @@ import { useLastRead } from "@/shared/list/last-read.ts";
 import { ListPages, ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { keyedRow, rowInFocus } from "@/shared/list/row-focus.ts";
 import { RowSheetButton } from "@/shared/list/row-sheet.tsx";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
@@ -29,7 +29,7 @@ import { QUESTIONS_WORDS as WORDS } from "./questions-words.ts";
 
 const questions = menuGroupIn(CONTROL_CENTRE, "questions");
 
-const THIS_PAGE = pageNamed(questions, "Questions Asked");
+const THIS_PAGE = pageById(questions, "questions-asked");
 
 const LISTED = Object.values(KEY);
 

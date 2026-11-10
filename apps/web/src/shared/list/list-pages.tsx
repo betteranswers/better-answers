@@ -4,7 +4,7 @@ import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { EmptyAction } from "@/shared/ui/kibo-ui/empty-action.tsx";
 import { PaginationCounter } from "@/shared/ui/kibo-ui/pagination-counter.tsx";
-import { CLEAR_WORDS } from "@/shared/words.ts";
+import { CLEAR_WORDS, LIST_WORDS } from "@/shared/words.ts";
 
 type FocusTarget = RefObject<HTMLElement | null>;
 
@@ -216,7 +216,7 @@ function PageTurns(properties: { readonly pages: Pages }) {
         summary={`Showing ${from}–${to} of ${total}.`}
         counter={`Page ${pageIndex + 1} of ${pageCount}`}
         previous={{
-          label: "Previous Page",
+          label: LIST_WORDS.previousPage,
           disabled: pageIndex === 0,
           keystroke: keystrokes?.previous.key,
           onTurn: () => {
@@ -224,7 +224,7 @@ function PageTurns(properties: { readonly pages: Pages }) {
           },
         }}
         next={{
-          label: "Next Page",
+          label: LIST_WORDS.nextPage,
           disabled: pageIndex >= pageCount - 1,
           keystroke: keystrokes?.next.key,
           onTurn: () => {
@@ -265,7 +265,7 @@ function LoadMore(properties: { readonly more: More }) {
         className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
         onClick={load}
       >
-        {failed === undefined ? "Load More" : "Retry"}
+        {failed === undefined ? LIST_WORDS.loadMore : LIST_WORDS.retry}
       </Button>
       {keystroke === undefined ? null : <MoreOn keystroke={keystroke} onMore={load} />}
     </nav>

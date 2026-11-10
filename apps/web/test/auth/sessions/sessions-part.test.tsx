@@ -2,6 +2,12 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import {
+  SESSIONS_WORDS,
+  everywhereCommit,
+  everywhereTitle,
+  signOutNamed,
+} from "@/features/auth/sessions/sessions-words.ts";
 import { NOTHING_HELD, sessionStanding } from "@test/second-factor-api.ts";
 import { server } from "@test/stub-server.ts";
 import { holdProcedure, type Api } from "@test/stubbed-api.ts";
@@ -78,7 +84,7 @@ const rowNamed = (region: HTMLElement, device: string) =>
   within(region).queryByRole("listitem", { name: `A session on ${device}` });
 
 const signOutButton = (region: HTMLElement, device: string) =>
-  within(region).getByRole("button", { name: `Sign Out of ${device}` });
+  within(region).getByRole("button", { name: signOutNamed(device) });
 
 const said = (region: HTMLElement): string =>
   within(region)
@@ -146,7 +152,7 @@ it("a refused sign-out puts the row back with an alert", async () => {
     expect(alertsIn(region)).toHaveLength(1);
   });
   expect(document.activeElement).toBe(
-    within(row).getByRole("button", { name: "Sign Out of Safari on iOS" }),
+    within(row).getByRole("button", { name: signOutNamed("Safari on iOS") }),
   );
   expect(said(region)).toBe("");
   expect(router.state.location.pathname).toBe("/account");
@@ -159,15 +165,16 @@ it("Sign Out Everywhere Else confirms first, then signs out others", async () =>
   await within(region).findByRole("listitem", { name: "A session on Safari on iOS" });
   expect(within(region).getAllByRole("listitem")).toHaveLength(2);
 
-  fireEvent.click(within(region).getByRole("button", { name: "Sign Out Everywhere Else" }));
+  fireEvent.click(
+    within(region).getByRole("button", { name: SESSIONS_WORDS.signOutEverywhereElse }),
+  );
 
   const dialog = await screen.findByRole("dialog", {
-    name: "Sign Out of 1 Other Session",
-    description: /\S/u,
+    name: everywhereTitle(1),
   });
   expect(server.asks.map((ask) => ask.procedure)).not.toContain("person.signOutOtherSessions");
 
-  fireEvent.click(within(dialog).getByRole("button", { name: "Sign Out 1 Session" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: everywhereCommit(1) }));
 
   await waitFor(() => {
     expect(said(region)).toMatch(/\b1\b/u);

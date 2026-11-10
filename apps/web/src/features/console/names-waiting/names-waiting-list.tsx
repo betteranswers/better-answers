@@ -90,17 +90,17 @@ const columnsFor = (actions: NameActions) =>
   column.columns([
     column.display({
       id: "person",
-      header: "Person",
+      header: WORDS.columns.person,
       cell: ({ row }) => <FlaggedName waiting={row.original} />,
     }),
     column.display({
       id: "flags",
-      header: "Flagged By",
+      header: WORDS.columns.flaggedBy,
       cell: ({ row }) => <Flags waiting={row.original} />,
     }),
     column.display({
       id: "actions",
-      header: "Actions",
+      header: WORDS.columns.actions,
       cell: ({ row }) => <CorrectAction waiting={row.original} actions={actions} />,
     }),
   ]);

@@ -95,7 +95,7 @@ export const BULK_WORDS = {
     action: "Add to group",
     title: (count: number) => `Add ${members(count)} to a group`,
     consequence: (group: string | undefined) =>
-      group === undefined ? "Select a group." : `Each member joins ${group}.`,
+      group === undefined ? undefined : `Each member joins ${group}.`,
     choose: "Select a group",
     pending: (count: number, group: string) => `Adding ${members(count)} to ${group}.`,
     done: (changed: number, group: string, skipped: number) =>

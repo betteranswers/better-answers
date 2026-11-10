@@ -8,7 +8,7 @@ import {
   CONCEPT_TYPES_PAGE,
 } from "@/features/knowledge/curation/curation-state.ts";
 import { EXPORTS_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -31,7 +31,7 @@ const LIST_BUDGET_MS = 1000;
 
 const CURATION = menuGroupIn(KNOWLEDGE, "curation");
 
-const EXPORTS = pageNamed(CURATION, "Exports").path;
+const EXPORTS = pageById(CURATION, "exports").path;
 
 const EDITOR = "Ifan Morgan";
 
@@ -128,15 +128,15 @@ test.describe("Exports", () => {
             - listitem:
               - link "Guides"
             - listitem:
-              - link "Knowledge Base"
+              - link ${JSON.stringify(pageById(menuGroupIn(KNOWLEDGE, "browse"), "knowledge-base").name)}
           - heading "Curation" [level=3]
           - list:
             - listitem:
-              - link "All Knowledge"
+              - link ${JSON.stringify(pageById(menuGroupIn(KNOWLEDGE, "curation"), "all-knowledge").name)}
             - listitem:
               - link "${CONCEPT_TYPES_PAGE.name}"
             - listitem:
-              - link "Collections and Owners"
+              - link ${JSON.stringify(pageById(menuGroupIn(KNOWLEDGE, "curation"), "collections-and-owners").name)}
       `);
       await page.goto(EXPORTS);
       await notFoundOfferingHome(page, "Editor");

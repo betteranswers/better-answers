@@ -40,7 +40,6 @@ export function RenameGroupDialog(properties: {
   return (
     <MountedActionDialog
       title={`Rename ${group.name}`}
-      consequence={GROUP_WORDS.rename.consequence}
       onClose={properties.onClose}
       onFocusBack={properties.onFocusBack}
       commit={

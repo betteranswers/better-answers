@@ -9,7 +9,7 @@ import { rowInFocus } from "@/shared/list/row-focus.ts";
 import { RowMenu } from "@/shared/list/row-menu.tsx";
 import { RowSheetButton } from "@/shared/list/row-sheet.tsx";
 import { useSearchedList } from "@/shared/list/searched-list.ts";
-import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { Card } from "@/shared/ui/card.tsx";
@@ -36,7 +36,7 @@ import { RenameGroupDialog } from "./rename-group-dialog.tsx";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 
-const THIS_PAGE = pageNamed(people, "Groups");
+const THIS_PAGE = pageById(people, "groups");
 
 const LISTED = Object.values(GROUPS_KEYSTROKES);
 

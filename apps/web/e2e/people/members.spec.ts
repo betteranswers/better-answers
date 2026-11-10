@@ -9,6 +9,8 @@ import {
   MEMBERS_WORDS,
 } from "@/features/people/member-action-words.ts";
 import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+import { INVITE_A_PERSON } from "@/shared/navigation.ts";
+import { filterBy } from "@/shared/words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -395,9 +397,9 @@ test.describe("the People group's Members page", () => {
         - region "Members":
           - heading "Members" [level=2]
           - status: /\\b3\\b/
-          - button "Invite a Person"
+          - button ${JSON.stringify(INVITE_A_PERSON.name)}
           - searchbox "Search by name or address"
-          - combobox "Filter by Role": ${MEMBERS_WORDS.anyRole}
+          - combobox ${JSON.stringify(filterBy("role"))}: ${MEMBERS_WORDS.anyRole}
           - button "Columns"
           - table:
             - caption
@@ -898,7 +900,7 @@ test.describe("the People group's Members page", () => {
           - region "Members":
             - heading "Members" [level=2]
             - status: /\\b3\\b/
-            - button "Invite a Person"
+            - button ${JSON.stringify(INVITE_A_PERSON.name)}
             - searchbox "Search by name or address"
     `);
     await expect(

@@ -10,7 +10,21 @@ export const NO_PERSON_IN_FOCUS = selectFirst(SELECT_A_PERSON_FIRST);
 
 export const NO_NAME_IN_FOCUS = selectFirst(SELECT_A_NAME_FIRST);
 
-export const CONSOLE_CLOSED = "Access Denied";
+export const CONSOLE_CLOSED = "Access denied";
+
+export const PERSON_WORDS = {
+  signIn: "Sign-in",
+  signedOutEverywhere: "Signed out everywhere",
+  workspaces: "Workspaces",
+  sessions: "Sessions",
+  assistantAccess: "Assistant access",
+  sessionsAndAccess: "Sessions and assistant access",
+  signOutEverywhere: "Sign out everywhere",
+  signOutTitle: (name: string): string => `Sign ${name} out everywhere`,
+  endedBy: "Ended by",
+  endedIn: "Ended in",
+  moreAbout: (assistant: string): string => `More about ${assistant}’s access`,
+} as const;
 
 export const saidOf = (refusal: Refusal): string =>
   refusalSentence({}, refusal.word, refusal.class);

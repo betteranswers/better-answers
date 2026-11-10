@@ -46,22 +46,22 @@ export const menuGroupIn = <Held extends Area, Id extends MenuGroupOf<Held>["id"
   return group;
 };
 
-export const pageNamed = <Held extends MenuGroup>(
+export const pageById = <Held extends MenuGroup>(
   group: Held,
-  name: Held["pages"][number]["name"],
+  id: Held["pages"][number]["id"],
 ): Page => {
-  const page = group.pages.find((candidate) => candidate.name === name);
-  if (page === undefined) throw new Error(`${group.id} has no page named ${name}`);
+  const page = group.pages.find((candidate) => candidate.id === id);
+  if (page === undefined) throw new Error(`${group.id} has no page ${id}`);
   return page;
 };
 
-export const NEW_QUESTION = pageNamed(menuGroupIn(ASK, "ask"), "New Question");
+export const NEW_QUESTION = pageById(menuGroupIn(ASK, "ask"), "new-question");
 
 export const HOMES = {
-  Admin: pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members"),
+  Admin: pageById(menuGroupIn(CONTROL_CENTRE, "people"), "members"),
   Editor: NEW_QUESTION,
   Viewer: NEW_QUESTION,
-  operator: pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every Workspace"),
+  operator: pageById(menuGroupIn(CONSOLE, "workspaces"), "every-workspace"),
 } as const satisfies { readonly [who in RoleOrOperator]: Page };
 
 export type Reader = {

@@ -1,17 +1,20 @@
 import type { Page } from "@playwright/test";
 
+import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace/workspace-words.ts";
+import { DISPLAY_NAME_WORDS } from "@/shared/member/display-name-words.ts";
+
 import { expect, test } from "../browser.ts";
 import { anAddress, clockTheNextKey, signIn, actionWithinBudget } from "../harness.ts";
 
 const displayNameHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "Your Name" });
+  page.getByRole("heading", { level: 1, name: DISPLAY_NAME_WORDS.heading });
 
 const noWorkspaceHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
+  page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING });
 
-const displayNameField = (page: Page) => page.getByLabel("Display Name");
+const displayNameField = (page: Page) => page.getByLabel(DISPLAY_NAME_WORDS.label);
 
-const saveButton = (page: Page) => page.getByRole("button", { name: "Save and Continue" });
+const saveButton = (page: Page) => page.getByRole("button", { name: DISPLAY_NAME_WORDS.save });
 
 test("asks a new person for a display name first", async ({
   page,
@@ -26,10 +29,10 @@ test("asks a new person for a display name first", async ({
   await expect(displayNameField(page)).toBeFocused();
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading "Your Name" [level=1]
+      - heading ${JSON.stringify(DISPLAY_NAME_WORDS.heading)} [level=1]
       - paragraph
-      - textbox "Display Name"
-      - button "Save and Continue"
+      - textbox ${JSON.stringify(DISPLAY_NAME_WORDS.label)}
+      - button ${JSON.stringify(DISPLAY_NAME_WORDS.save)}
   `);
   await passesTheAccessibilityGate();
   const ring = await displayNameField(page).evaluate(
