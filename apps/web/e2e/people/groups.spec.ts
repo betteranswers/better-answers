@@ -1,5 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { GROUP_WORDS } from "@/features/people/groups/group-words.ts";
 import { GROUPS_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
@@ -38,10 +39,11 @@ const rowOf = (page: Page, name: string): Locator =>
 const groupButton = (page: Page, name: string): Locator =>
   groupsRegion(page).getByRole("button", { name, exact: true });
 
-const createDialog = (page: Page): Locator => page.getByRole("dialog", { name: "Create a Group" });
+const createDialog = (page: Page): Locator =>
+  page.getByRole("dialog", { name: GROUPS_KEYSTROKES.create.action });
 
 const nameField = (page: Page): Locator =>
-  createDialog(page).getByRole("textbox", { name: "New Group Name" });
+  createDialog(page).getByRole("textbox", { name: GROUP_WORDS.create.field });
 
 const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", { name });
 
@@ -125,7 +127,7 @@ test.describe("the People group's Groups page", () => {
         - region "Groups":
           - heading "Groups" [level=2]
           - status: /\\b2\\b/
-          - button "Create a Group"
+          - button ${JSON.stringify(GROUPS_KEYSTROKES.create.action)}
           - status
           - searchbox "Search by name"
           - table:
@@ -178,7 +180,9 @@ test.describe("the People group's Groups page", () => {
       }
       const standing = await onThePage.elementHandles();
 
-      await groupsRegion(page).getByRole("button", { name: "Create a Group" }).click();
+      await groupsRegion(page)
+        .getByRole("button", { name: GROUPS_KEYSTROKES.create.action })
+        .click();
       const inTheDialog = emptyStatusIn(createDialog(page));
       await expect(
         inTheDialog,
@@ -188,7 +192,7 @@ test.describe("the People group's Groups page", () => {
         await expectTakesNoSpace(status);
       }
       await nameField(page).fill("Estimators");
-      await createDialog(page).getByRole("button", { name: "Create Group" }).click();
+      await createDialog(page).getByRole("button", { name: GROUP_WORDS.create.commit }).click();
 
       await expect
         .poll(() => Promise.all(standing.map((status) => status.textContent())), {
@@ -255,10 +259,10 @@ test.describe("the People group's Groups page", () => {
       await expect(groupButton(page, "Site managers")).toBeFocused();
 
       await page.keyboard.press("d");
-      await expect(renamed.getByRole("button", { name: "Delete Group" })).toBeFocused();
+      await expect(renamed.getByRole("button", { name: GROUP_WORDS.delete })).toBeFocused();
       await page.keyboard.press("Enter");
       const confirming = page.getByRole("alertdialog", { name: "Delete Site managers" });
-      await expect(confirming.getByRole("button", { name: "Keep Group" })).toBeFocused();
+      await expect(confirming.getByRole("button", { name: GROUP_WORDS.keep })).toBeFocused();
       await page.keyboard.press("Tab");
       await expect(confirming.getByRole("button", { name: "Delete", exact: true })).toBeFocused();
       await page.keyboard.press("Enter");

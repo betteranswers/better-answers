@@ -214,7 +214,7 @@ function CredentialsRevoker(properties: {
 
 const SENT_TO_THE_OPERATOR: Outcome = {
   tone: "said",
-  words: "The name has been flagged to better-answers support.",
+  words: WORDS.flagged,
 };
 
 function DisplayNameFlag(properties: {
@@ -239,25 +239,21 @@ function DisplayNameFlag(properties: {
   };
 
   return (
-    <SheetPart title="Display Name">
+    <SheetPart title={WORDS.displayName}>
       {member.displayName === "" ? (
         <p className="min-w-0 text-sm text-muted-foreground">
           <Address address={member.address} /> has not set a display name yet.
         </p>
       ) : (
         <>
-          <p className="text-sm">
-            People set their own display name. Flag a name that is inappropriate.
+          <p id={hintId} className="text-sm">
+            {WORDS.flagHint}
           </p>
           <div className="flex flex-col items-start gap-2">
             <Button ref={flagRef} variant="outline" aria-describedby={hintId} onClick={flag}>
               <Icon name="flag" />
-              Flag Name
+              {WORDS.flagName}
             </Button>
-            <p id={hintId} className="text-sm text-muted-foreground">
-              This emails better-answers support, who will correct it. If the name is already
-              flagged, nothing more is sent.
-            </p>
           </div>
           <OutcomeLine outcome={outcome} className="contents" />
         </>

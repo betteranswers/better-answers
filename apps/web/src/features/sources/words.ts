@@ -64,7 +64,7 @@ const AUDIENCE_IN_A_SENTENCE = {
   groups: "named groups",
 } satisfies Record<ListedConnectedSource["audience"], string>;
 
-export const NOTHING_CONNECTED = "No connected sources yet. Connect a document to add one.";
+export const NOTHING_CONNECTED = "No connected sources yet. Connect a document to start.";
 
 export const DESTINATIONS_TERM = "Destinations";
 

@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { JUMP_TO } from "@/app/words.ts";
 import { STALE_CONFIRMATION } from "@/features/auth/refusal-words.ts";
+import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { useRemovalOf, useRemoveMember } from "@/features/people/people-api.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -116,7 +117,7 @@ const recordingFocus = () => {
 
 const removedOnTheirPage = async (): Promise<void> => {
   const removal = within(await screen.findByRole("region", { name: "Removal" }));
-  fireEvent.click(removal.getByRole("button", { name: "Remove Member" }));
+  fireEvent.click(removal.getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }));
   fireEvent.click(removal.getByRole("button", { name: "Remove" }));
 };
 
@@ -153,7 +154,9 @@ describe("removing a member opened from Jump To", () => {
     }
 
     expect(focus.stops).toContain("main");
-    expect(focus.stops, "focus passed through Remove Member").not.toContain("Remove Member");
+    expect(focus.stops, "focus passed through Remove Member").not.toContain(
+      MEMBER_PAGE_WORDS.removeMember,
+    );
   });
 });
 
@@ -178,7 +181,7 @@ describe("removing a member after the confirmation expires", () => {
     await personHeading("Priya Shah");
 
     const removal = () => within(thePage().getByRole("region", { name: "Removal" }));
-    fireEvent.click(removal().getByRole("button", { name: "Remove Member" }));
+    fireEvent.click(removal().getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }));
     fireEvent.click(await waitFor(() => removal().getByRole("button", { name: "Remove" })));
 
     const dialog = await screen.findByRole("dialog");
@@ -196,7 +199,7 @@ describe("removing a member after the confirmation expires", () => {
 
     fireEvent.click(await screen.findByRole("link", { name: "Sam Okoro" }));
     await personHeading("Sam Okoro");
-    fireEvent.click(removal().getByRole("button", { name: "Remove Member" }));
+    fireEvent.click(removal().getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }));
     fireEvent.click(await waitFor(() => removal().getByRole("button", { name: "Remove" })));
 
     await waitFor(() =>

@@ -5,6 +5,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Card, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 
+import { MEMBER_PAGE_WORDS } from "../member-action-words.ts";
 import { useReaderId, useRemovalOf, type ListedMember } from "../people-api.ts";
 import { nameOf } from "../words.tsx";
 
@@ -22,7 +23,6 @@ export function MemberRemoval(properties: {
   const { member, askRef, onRemove } = properties;
   const [asking, setAsking] = useState(false);
   const headingId = useId();
-  const consequenceId = useId();
   const recordId = useId();
   const name = nameOf(member);
   const yourself = useReaderId() === member.personId;
@@ -34,34 +34,24 @@ export function MemberRemoval(properties: {
       <section aria-labelledby={headingId}>
         <CardHeader className="border-b py-2">
           <CardTitle asChild className="max-w-none font-medium">
-            <h3 id={headingId}>Removal</h3>
+            <h3 id={headingId}>{MEMBER_PAGE_WORDS.removal}</h3>
           </CardTitle>
         </CardHeader>
         <Collapsible open={asking} onOpenChange={setAsking} className="grid gap-3 px-4 py-3">
-          <p id={consequenceId} className="text-sm text-muted-foreground">
-            {yourself
-              ? "Removing yourself ends your access to this workspace."
-              : `Removing ${name} ends their access to this workspace.`}
-          </p>
           <CollapsibleTrigger asChild>
-            <Button
-              ref={askRef}
-              variant="outline"
-              className="justify-self-start"
-              aria-describedby={consequenceId}
-            >
-              Remove Member
+            <Button ref={askRef} variant="outline" className="justify-self-start">
+              {MEMBER_PAGE_WORDS.removeMember}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <fieldset className="grid gap-2 border border-border bg-muted p-3">
               <legend ref={focusOnArrival} tabIndex={-1} className="float-left font-medium">
-                Remove {name}
+                {MEMBER_PAGE_WORDS.removeName(name)}
               </legend>
               <p id={recordId} className="text-sm text-muted-foreground">
                 {yourself
-                  ? "Are you sure you want to remove yourself from this workspace? You will be signed out, and any assistant you connected will lose access."
-                  : "Are you sure you want to remove this member from this workspace? They will be signed out, and any assistant they connected will lose access."}
+                  ? MEMBER_PAGE_WORDS.removeConfirmYou
+                  : MEMBER_PAGE_WORDS.removeConfirm(name)}
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -82,7 +72,7 @@ export function MemberRemoval(properties: {
                     askRef.current?.focus();
                   }}
                 >
-                  Keep Member
+                  {MEMBER_PAGE_WORDS.keepMember}
                 </Button>
               </div>
             </fieldset>

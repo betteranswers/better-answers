@@ -7,18 +7,24 @@ export const membersWord = (group: Pick<ListedGroup, "memberCount">): string =>
 
 export const GROUP_WORDS = {
   create: {
-    consequence: "A group controls what its members can see. It doesn't change their role.",
+    consequence: "Name the group, then add its members.",
+    field: "Name",
+    commit: "Create group",
   },
   rename: {
-    consequence: "This will change the group’s name. Members stay in the group.",
+    consequence: "Enter the group’s new name.",
+    commit: "Rename group",
   },
-  created: (name: string): string => `${name} has been created successfully.`,
-  renamed: (was: string, name: string): string =>
-    `${was} has been renamed to ${name} successfully.`,
-  deleted: (name: string): string => `${name} has been deleted successfully.`,
+  delete: "Delete group",
+  keep: "Keep group",
+  created: (name: string): string => `${name} created.`,
+  renamed: (was: string, name: string): string => `${was} renamed to ${name}.`,
+  deleted: (name: string): string => `${name} deleted.`,
+  added: (person: string, group: string): string => `${person} added to ${group}.`,
+  removed: (person: string, group: string): string => `${person} removed from ${group}.`,
 } as const;
 
 export const consequenceOfDeleting = (group: Pick<ListedGroup, "name" | "memberCount">): string =>
   group.memberCount === 0
-    ? `This will permanently delete ${group.name}. This action cannot be undone.`
-    : `This will permanently delete ${group.name} and remove its ${membersWord(group)} from it. This action cannot be undone.`;
+    ? `This permanently deletes ${group.name}.`
+    : `This permanently deletes ${group.name} and removes its ${membersWord(group)} from it.`;

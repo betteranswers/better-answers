@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 
 import type { Locator, Page } from "@playwright/test";
 
+import { INVITE_WORDS } from "@/features/people/invitation-words.ts";
+
 import { expect, test } from "../browser.ts";
 import {
   anAddress,
@@ -88,7 +90,9 @@ test("invited people join, and their Activity shows only the join", async ({
       role,
       "the Role description did not change when the Admin picked Editor",
     ).not.toHaveAccessibleDescription(firstDescription);
-    await inviteDialog(page).getByRole("button", { name: "Send Invitation" }).click();
+    await inviteDialog(page)
+      .getByRole("button", { name: INVITE_WORDS.send(1) })
+      .click();
 
     await expect(inviteDialog(page).getByRole("status").first()).toContainText(address);
     await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeFocused();

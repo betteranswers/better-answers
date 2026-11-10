@@ -50,7 +50,7 @@ describe("an invite's outcome", () => {
     expect(replaced.words).not.toBe(fresh.words);
   });
 
-  it("counts several and names only the ones re-sent", () => {
+  it("counts several and names none of them", () => {
     const { tone, words } = invitedOutcome(
       [invited("ana@example.com", { replaced: true }), invited("ben@example.com")],
       "Admin",
@@ -59,7 +59,7 @@ describe("an invite's outcome", () => {
     expect(tone).toBe("said");
     expect(words).toMatch(/\b2\b/);
     expect(words).toContain("Admin");
-    expect(words).toContain("ana@example.com");
+    expect(words).not.toContain("ana@example.com");
     expect(words).not.toContain("ben@example.com");
     expect(words).toContain(THE_EXPIRY_SHOWN);
   });

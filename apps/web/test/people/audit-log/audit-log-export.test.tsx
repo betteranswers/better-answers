@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { assert, describe, expect, it, vi } from "vitest";
 
+import { AUDIT_LOG_WORDS } from "@/features/people/audit-log/audit-log-words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { holdProcedure } from "@test/stubbed-api.ts";
 import { adaAnAdmin, openAt } from "@test/two-workspaces.ts";
@@ -26,11 +27,11 @@ describe("an audit log export refused twice in a row", () => {
     const [alert] = log.getAllByRole("alert");
     assert(alert !== undefined, "the audit log has no alert region");
 
-    fireEvent.click(log.getByRole("button", { name: "Export Events" }));
+    fireEvent.click(log.getByRole("button", { name: AUDIT_LOG_WORDS.export }));
     await waitFor(() => expect(alert.textContent).toMatch(/\b2\b/));
 
     const second = holdProcedure(api, "members.exportAuditLog", PAST_ITS_CEILING);
-    fireEvent.click(log.getByRole("button", { name: "Export Events" }));
+    fireEvent.click(log.getByRole("button", { name: AUDIT_LOG_WORDS.export }));
     await second.asked;
 
     expect(alert.textContent).toBe("");

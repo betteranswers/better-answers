@@ -301,7 +301,7 @@ function AuditLogRegion() {
   return (
     <section aria-labelledby={headingId} className="mt-6">
       <ListHead
-        heading={WORDS.heading}
+        heading={THIS_PAGE.name}
         headingId={headingId}
         count={
           auditLog.data === undefined

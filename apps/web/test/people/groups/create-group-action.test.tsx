@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { CreateGroupAction } from "@/features/people/groups/create-group-action.tsx";
+import { GROUP_WORDS } from "@/features/people/groups/group-words.ts";
 import { GROUPS_KEYSTROKES } from "@/features/people/people-state.ts";
 import { answeringAs } from "@test/stubbed-api.ts";
 
@@ -11,7 +12,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const NAME = "Create a Group";
+const NAME = GROUPS_KEYSTROKES.create.action;
 
 const refusedOnce = async () => {
   vi.stubGlobal("fetch", answeringAs("Admin"));
@@ -22,7 +23,7 @@ const refusedOnce = async () => {
   );
   fireEvent.click(screen.getByRole("button", { name: NAME }));
   const dialog = await screen.findByRole("dialog", { name: NAME });
-  const field = within(dialog).getByRole("textbox", { name: "New Group Name" });
+  const field = within(dialog).getByRole("textbox", { name: GROUP_WORDS.create.field });
   fireEvent.change(field, { target: { value: "HR team" } });
   fireEvent.submit(field);
   await waitFor(() => expect(within(dialog).getByRole("alert").textContent).not.toBe(""));

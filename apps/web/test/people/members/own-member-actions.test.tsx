@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -72,14 +73,14 @@ describe("a member's own page", () => {
     await openedByName(HEDY.displayName);
     fireEvent.click(thePage().getByRole("radio", { name: "Editor" }));
     const changeHedy = within(thePage().getByRole("region", { name: "Role" })).getByRole("button", {
-      name: "Change Role",
+      name: MEMBER_PAGE_WORDS.changeRole,
     });
     const ofAnother = describingWhoever(changeHedy, HEDY.displayName);
     await backToMembers(router);
     await openedByName(ADA.displayName);
     fireEvent.click(thePage().getByRole("radio", { name: "Editor" }));
     const commit = within(thePage().getByRole("region", { name: "Role" })).getByRole("button", {
-      name: "Change Role",
+      name: MEMBER_PAGE_WORDS.changeRole,
     });
     expect(describing(commit)).toMatch(/\S/);
     expect(
@@ -120,19 +121,14 @@ describe("removing yourself from your member page", () => {
     const router = await openAt(MEMBERS_PAGE, api);
 
     await openedByName(HEDY.displayName);
-    fireEvent.click(removalOf().getByRole("button", { name: "Remove Member" }));
+    fireEvent.click(removalOf().getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }));
     const ofAnother = describingWhoever(
       await waitFor(() => removalOf().getByRole("button", { name: "Remove" })),
       HEDY.displayName,
     );
     await backToMembers(router);
     await openedByName(ADA.displayName);
-    const asked = removalOf().getByRole("button", { name: "Remove Member" });
-    expect(describing(asked)).toMatch(/\S/);
-    expect(
-      describing(asked),
-      "your own removal's description names you in the third person",
-    ).not.toContain(ADA.displayName);
+    const asked = removalOf().getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember });
     fireEvent.click(asked);
     const confirm = await waitFor(() => removalOf().getByRole("button", { name: "Remove" }));
     expect(describing(confirm)).toMatch(/\S/);
@@ -158,7 +154,7 @@ describe("removing yourself from your member page", () => {
     const removal = holdProcedure(api, "members.remove");
     const router = await openAt(memberPageOf(ADA.personId), api);
     await personHeading(ADA.displayName);
-    fireEvent.click(removalOf().getByRole("button", { name: "Remove Member" }));
+    fireEvent.click(removalOf().getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }));
     const confirm = await waitFor(() => removalOf().getByRole("button", { name: "Remove" }));
 
     act(() => {

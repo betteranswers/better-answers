@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { REQUEST_WORDS } from "@/features/people/invitation-words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import type { WaitingRequest } from "@/features/people/requests/requests-api.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -51,11 +52,13 @@ const said = (): HTMLElement => found(region().getAllByRole("status").at(-1));
 
 const alert = (): HTMLElement => found(region().getAllByRole("alert").at(0));
 
-const buttonOf = (action: "Approve" | "Decline", name: string) =>
-  region().getByRole("button", { name: `${action} Request from ${name}` });
+const NAMED = { Approve: REQUEST_WORDS.approveFrom, Decline: REQUEST_WORDS.declineFrom };
+
+const buttonOf = (action: keyof typeof NAMED, name: string) =>
+  region().getByRole("button", { name: NAMED[action](name) });
 
 const approveDialog = (name: string) =>
-  screen.findByRole("dialog", { name: `Approve Request from ${name}` });
+  screen.findByRole("dialog", { name: REQUEST_WORDS.approveFrom(name) });
 
 describe("the People page's Requests tab", () => {
   it("restores a request when the api refuses its decline", async () => {

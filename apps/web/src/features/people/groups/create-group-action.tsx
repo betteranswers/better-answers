@@ -95,7 +95,7 @@ export function CreateGroupAction(properties: {
         <OutcomeLine outcome={refused} className="text-sm" />
         <form onSubmit={submit} className="grid gap-3">
           <div className="grid gap-2">
-            <Label htmlFor={ids.field}>New Group Name</Label>
+            <Label htmlFor={ids.field}>{GROUP_WORDS.create.field}</Label>
             <Input
               ref={fieldRef}
               id={ids.field}
@@ -106,7 +106,7 @@ export function CreateGroupAction(properties: {
             />
           </div>
           <Button type="submit" className="justify-self-start">
-            Create Group
+            {GROUP_WORDS.create.commit}
           </Button>
         </form>
       </DialogContent>

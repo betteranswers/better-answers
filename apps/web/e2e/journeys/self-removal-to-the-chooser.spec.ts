@@ -1,5 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
+import { BULK_WORDS } from "@/features/people/member-action-words.ts";
+
 import { expect, test } from "../browser.ts";
 import {
   addMember,
@@ -22,7 +24,7 @@ const removeSelectedMembers = async (page: Page, dialogName: string): Promise<vo
 
 const removeSelf = async (page: Page): Promise<void> => {
   await tickOf(page, "Test person").check();
-  await removeSelectedMembers(page, "Remove 1 Member");
+  await removeSelectedMembers(page, BULK_WORDS.remove.title(1));
 };
 
 const signInAsOneOfTwoAdmins = async (

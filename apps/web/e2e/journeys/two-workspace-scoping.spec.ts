@@ -1,5 +1,6 @@
 import type { APIRequestContext, BrowserContext, Locator, Page } from "@playwright/test";
 
+import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -107,7 +108,7 @@ test.describe("an action from a tab left in another workspace", () => {
     const elsewhere = await switchedInAnotherTab(context, page, two);
 
     const answered = refusalAnswering(page, "members.remove");
-    await removal.getByRole("button", { name: "Remove Member" }).click();
+    await removal.getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }).click();
     await removal.getByRole("button", { name: "Remove", exact: true }).click();
     expect(await answered).toMatchObject(SWITCHED);
 

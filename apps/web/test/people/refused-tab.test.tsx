@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -64,7 +65,7 @@ const openGracesPage = async (api: Api) => {
 
 const changeGracesRole = () => {
   fireEvent.click(screen.getByRole("radio", { name: "Editor" }));
-  fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
+  fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
 };
 
 const landedInHolme = async () => {
@@ -175,7 +176,7 @@ describe("a tab after the workspace was switched in another tab", () => {
     const member = memberHeldAndCounted(api);
     const blanked = bandBlanksWatched();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign Out of This Workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.signOutHere }));
     await second.asked;
     changeGracesRole();
     await member.asked;
@@ -197,12 +198,12 @@ describe("a tab after the workspace was switched in another tab", () => {
     const blanked = bandBlanksWatched();
 
     // Send these separately, because actions batched in one request get one answer.
-    fireEvent.click(screen.getByRole("button", { name: "Sign Out of This Workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.signOutHere }));
     await ended.asked;
     changeGracesRole();
     await changed.asked;
     const removal = screen.getByRole("region", { name: /^Removal$/ });
-    fireEvent.click(within(removal).getByRole("button", { name: "Remove Member" }));
+    fireEvent.click(within(removal).getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }));
     fireEvent.click(within(removal).getByRole("button", { name: /^Remove$/ }));
     await removed.asked;
     for (const refusal of [changed, ended, removed]) await member.askedAgainOnceSettled(refusal);
@@ -252,7 +253,7 @@ describe("a tab after the workspace was switched in another tab", () => {
     const router = await openGracesPage(api);
     aSwitchInAnotherTab(api, "Admin");
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign Out of This Workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.signOutHere }));
     // Send these separately, because batched actions share one answer and both would be held.
     await second.asked;
     changeGracesRole();

@@ -3,6 +3,7 @@ import { expect } from "vitest";
 import { z } from "zod";
 
 import { createAppClients } from "@/app/providers.tsx";
+import { BULK_WORDS, MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import type { Role } from "@/shared/navigation.ts";
 
 import { drawApp, openApp } from "./open-app.tsx";
@@ -134,9 +135,9 @@ export const switcherDrawn = (workspace = NORTHERN) =>
 export const tickOf = (name: string) => screen.queryByRole("checkbox", { name: `Select ${name}` });
 
 export const changeTheTickedToViewer = async () => {
-  fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
-  const dialog = await screen.findByRole("dialog", { name: "Change Role for 1 Member" });
-  fireEvent.click(within(dialog).getByRole("button", { name: "Change Role" }));
+  fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
+  const dialog = await screen.findByRole("dialog", { name: BULK_WORDS.changeRole.title(1) });
+  fireEvent.click(within(dialog).getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
 };
 
 export const openTab = (name: string) => {

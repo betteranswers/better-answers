@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
@@ -44,7 +45,7 @@ const demotingHerself = async (api: Api, memberAfter: Parameters<Api["set"]>[1])
   });
   const router = await openAt(MEMBER_PAGE, api);
   fireEvent.click(await screen.findByRole("radio", { name: "Editor" }));
-  fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
+  fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
   return router;
 };
 
@@ -66,7 +67,7 @@ describe("changes to your own membership", () => {
     });
     const router = await openAt(MEMBER_PAGE, api);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Remove Member" }));
+    fireEvent.click(await screen.findByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }));
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     await waitFor(() =>

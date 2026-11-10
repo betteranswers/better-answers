@@ -1,6 +1,7 @@
 import { fireEvent, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { INVITATIONS_WORDS } from "@/features/people/invitation-words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
 import {
@@ -54,9 +55,9 @@ describe("the People page's Invitations tab", () => {
     await ticked(offline);
     fireEvent.click(selectionAction("Resend"));
     const unsent = await within(invitationsRegion()).findByRole("region", {
-      name: "Unsent Emails",
+      name: INVITATIONS_WORDS.unsent,
     });
-    const resendName = `Resend Invitation to ${offline}`;
+    const resendName = INVITATIONS_WORDS.resendTo(offline);
     const resend = within(unsent).getByRole("button", { name: resendName });
 
     reachable(offline);
@@ -66,7 +67,7 @@ describe("the People page's Invitations tab", () => {
     });
     expect(within(unsent).getByRole("status").textContent).toContain(offline);
     expect(document.activeElement, "focus did not move to the Unsent Emails heading").toBe(
-      within(unsent).getByRole("heading", { name: "Unsent Emails" }),
+      within(unsent).getByRole("heading", { name: INVITATIONS_WORDS.unsent }),
     );
   });
 

@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { INVITATIONS_WORDS, INVITE_WORDS } from "@/features/people/invitation-words.ts";
+import {
+  BULK_WORDS,
+  MEMBER_PAGE_WORDS,
+  MEMBERS_WORDS,
+} from "@/features/people/member-action-words.ts";
 import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 
 import { expect, test } from "../browser.ts";
@@ -144,7 +150,7 @@ const rolePickerRegion = (page: Page): Locator =>
   thePage(page).getByRole("region", { name: "Role", exact: true });
 
 const changeRoleButton = (page: Page): Locator =>
-  rolePickerRegion(page).getByRole("button", { name: "Change Role" });
+  rolePickerRegion(page).getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole });
 
 const THE_ROLE_HELD = "//section[div[@data-slot='card-header']/h3[normalize-space(.)='Role']]//p";
 
@@ -160,7 +166,7 @@ const accessLine = (term: string): string =>
   `//section[h2='Access']//dt[normalize-space(.)='${term}']/following-sibling::dd[1]`;
 
 const displayNameRegion = (page: Page): Locator =>
-  thePage(page).getByRole("region", { name: "Display Name" });
+  thePage(page).getByRole("region", { name: MEMBER_PAGE_WORDS.displayName });
 
 const backToMembers = async (page: Page): Promise<void> => {
   await page.goBack();
@@ -251,10 +257,10 @@ const namesNoMember = async (page: Page): Promise<void> => {
 const ENDED_AT = /\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}/;
 
 const signOutButton = (page: Page): Locator =>
-  thePage(page).getByRole("button", { name: "Sign Out of This Workspace" });
+  thePage(page).getByRole("button", { name: MEMBER_PAGE_WORDS.signOutHere });
 
 const signOutRegion = (page: Page): Locator =>
-  thePage(page).getByRole("region", { name: "Sign Out of This Workspace" });
+  thePage(page).getByRole("region", { name: MEMBER_PAGE_WORDS.signOutHere });
 
 const removedAtAKey = async (
   page: Page,
@@ -276,7 +282,7 @@ const removedAtAKey = async (
     await page.reload();
     await memberLink(page, name).click();
     await expect(personHeading(page, name)).toBeVisible();
-    await removalOf(page).getByRole("button", { name: "Remove Member" }).click();
+    await removalOf(page).getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }).click();
     await removalOf(page).getByRole("button", { name: "Remove", exact: true }).focus();
     await clockTheNextKey(page, { at: THE_COUNT, reads: String(left) });
     const answered = page.waitForResponse((response) => REMOVAL(new URL(response.url())));
@@ -306,7 +312,7 @@ const endsUnderItsLastLine = async (card: Locator, lastLine: Locator): Promise<v
 };
 
 const changeRoleOpened = async (page: Page, titled: string): Promise<Locator> => {
-  await selectionAction(page, "Change Role").click();
+  await selectionAction(page, MEMBER_PAGE_WORDS.changeRole).click();
   const dialog = page.getByRole("dialog", { name: titled });
   await expect(dialog.getByRole("combobox", { name: "Role" })).toBeFocused();
   return dialog;
@@ -330,7 +336,7 @@ const invitationOutcome = (page: Page): Locator =>
 const THE_INVITATIONS_COUNT = "//section[.//h2[.='Invitations']]//output";
 
 const heldAddresses = (page: Page) =>
-  inviteDialog(page).getByRole("list", { name: "Addresses to Invite" }).getByRole("listitem");
+  inviteDialog(page).getByRole("list", { name: INVITE_WORDS.list }).getByRole("listitem");
 
 test.describe("the People group's Members page", () => {
   test("an Admin manages members and invitations by keyboard, within budget", async ({
@@ -391,7 +397,7 @@ test.describe("the People group's Members page", () => {
           - status: /\\b3\\b/
           - button "Invite a Person"
           - searchbox "Search by name or address"
-          - combobox "Filter by Role": Any Role
+          - combobox "Filter by Role": ${MEMBERS_WORDS.anyRole}
           - button "Columns"
           - table:
             - caption
@@ -445,7 +451,7 @@ test.describe("the People group's Members page", () => {
     await test.step("passes the accessibility gate with a bulk confirmation open", async () => {
       await tickOf(page, "Sam Okoro").check();
       await selectionAction(page, "Remove").click();
-      const confirming = page.getByRole("dialog", { name: "Remove 1 Member" });
+      const confirming = page.getByRole("dialog", { name: BULK_WORDS.remove.title(1) });
       await expect(confirming.getByRole("button", { name: "Remove", exact: true })).toBeVisible();
       await passesTheAccessibilityGate();
 
@@ -502,21 +508,21 @@ test.describe("the People group's Members page", () => {
       ).toHaveCount(1);
       await expect(accessOf(page).getByRole("term")).toHaveText([
         "Joined",
-        "Last Signed Out of This Workspace",
+        MEMBER_PAGE_WORDS.lastSignedOut,
       ]);
 
       await expect(thePage(page)).toMatchAriaSnapshot(`
         - main "Page":
           - heading "Priya Shah" [level=1]
           - paragraph: /@/
-          - navigation "On This Page":
+          - navigation ${JSON.stringify(MEMBER_PAGE_WORDS.sections)}:
             - list:
               - listitem:
                 - link "Access"
               - listitem:
                 - link "Activity"
               - listitem:
-                - link "Remove and Sign Out"
+                - link ${JSON.stringify(MEMBER_PAGE_WORDS.removeAndSignOut)}
           - region "Access":
             - heading "Access" [level=2]
             - term
@@ -529,35 +535,35 @@ test.describe("the People group's Members page", () => {
                 - radio "Admin"
                 - radio "Editor" [checked]
                 - radio "Viewer"
-              - button "Change Role" [disabled]
+              - button ${JSON.stringify(MEMBER_PAGE_WORDS.changeRole)} [disabled]
               - paragraph: /Priya Shah.*Editor/
             - region "Groups":
               - heading "Groups" [level=3]
               - paragraph
               - link "Go to Groups"
-            - region "Display Name":
-              - heading "Display Name" [level=3]
+            - region ${JSON.stringify(MEMBER_PAGE_WORDS.displayName)}:
+              - heading ${JSON.stringify(MEMBER_PAGE_WORDS.displayName)} [level=3]
               - paragraph
-              - button "Flag Name"
+              - button ${JSON.stringify(MEMBER_PAGE_WORDS.flagName)}
               - paragraph
           - region "Activity":
             - heading "Activity" [level=2]
-          - region "Remove and Sign Out":
-            - heading "Remove and Sign Out" [level=2]
-            - region "Sign Out of This Workspace":
-              - heading "Sign Out of This Workspace" [level=3]
-              - button "Sign Out of This Workspace"
+          - region ${JSON.stringify(MEMBER_PAGE_WORDS.removeAndSignOut)}:
+            - heading ${JSON.stringify(MEMBER_PAGE_WORDS.removeAndSignOut)} [level=2]
+            - region ${JSON.stringify(MEMBER_PAGE_WORDS.signOutHere)}:
+              - heading ${JSON.stringify(MEMBER_PAGE_WORDS.signOutHere)} [level=3]
+              - button ${JSON.stringify(MEMBER_PAGE_WORDS.signOutHere)}
               - paragraph: /Priya Shah/
             - region "Removal":
               - heading "Removal" [level=3]
               - paragraph: /Priya Shah/
-              - button "Remove Member"
+              - button ${JSON.stringify(MEMBER_PAGE_WORDS.removeMember)}
       `);
       await passesTheAccessibilityGate();
 
-      await thePage(page).getByRole("link", { name: "Remove and Sign Out" }).click();
+      await thePage(page).getByRole("link", { name: MEMBER_PAGE_WORDS.removeAndSignOut }).click();
       await expect(
-        thePage(page).getByRole("heading", { level: 2, name: "Remove and Sign Out" }),
+        thePage(page).getByRole("heading", { level: 2, name: MEMBER_PAGE_WORDS.removeAndSignOut }),
       ).toBeFocused();
       await expect(page, "the section link changed the page URL").toHaveURL(
         new RegExp(`${memberPageAt(priya.id)}$`),
@@ -573,7 +579,7 @@ test.describe("the People group's Members page", () => {
         "the shell kept its wide band at 320 pixels",
       ).toBeVisible();
 
-      const sections = thePage(page).getByRole("navigation", { name: "On This Page" });
+      const sections = thePage(page).getByRole("navigation", { name: MEMBER_PAGE_WORDS.sections });
       await expect
         .poll(() => roomBetween(personHeading(page, "Priya Shah"), sections), {
           message: "the section nav stacks below the header",
@@ -652,7 +658,9 @@ test.describe("the People group's Members page", () => {
       }
       await keystrokesDismissed(page, onThePage);
       await page.keyboard.press(MEMBER_PAGE_KEYSTROKES.remove.key);
-      await expect(removalOf(page).getByRole("button", { name: "Remove Member" })).toBeFocused();
+      await expect(
+        removalOf(page).getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }),
+      ).toBeFocused();
       await page.keyboard.press(MEMBER_PAGE_KEYSTROKES.changeRole.key);
       await expect(thePage(page).getByRole("radio", { name: "Viewer", exact: true })).toBeFocused();
 
@@ -667,7 +675,7 @@ test.describe("the People group's Members page", () => {
       const revoke = signOutButton(page);
       await revoke.focus();
       await clockTheNextKey(page, {
-        at: accessLine("Last Signed Out of This Workspace"),
+        at: accessLine(MEMBER_PAGE_WORDS.lastSignedOut),
         reads: String(new Date().getFullYear()),
       });
       await page.keyboard.press("Enter");
@@ -781,7 +789,7 @@ test.describe("the People group's Members page", () => {
                 - columnheader "Role"
                 - columnheader "Sent"
                 - columnheader "Expires"
-                - columnheader "Invited By"
+                - columnheader ${JSON.stringify(INVITATIONS_WORDS.invitedBy)}
                 - columnheader "Actions"
             - rowgroup:
               - row /invited-/:
@@ -808,7 +816,9 @@ test.describe("the People group's Members page", () => {
       await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
       await page.keyboard.press(PEOPLE_KEYSTROKES.remove.key);
       const removal = removalOf(page);
-      await expect(removal.getByRole("button", { name: "Remove Member" })).toBeFocused();
+      await expect(
+        removal.getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }),
+      ).toBeFocused();
       await page.keyboard.press("Enter");
       await expect(confirmationOf(page, "Sam Okoro").locator("legend")).toBeFocused();
       await page.keyboard.press("Tab");
@@ -831,11 +841,11 @@ test.describe("the People group's Members page", () => {
       await openedByName(page, "Priya Shah");
       const priyasPage = page.url();
       const removal = removalOf(page);
-      const asked = removal.getByRole("button", { name: "Remove Member" });
+      const asked = removal.getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember });
       await expect(asked).toHaveAccessibleDescription(/Priya Shah/);
       await asked.click();
       await expect(confirmationOf(page, "Priya Shah").locator("legend")).toBeFocused();
-      await removal.getByRole("button", { name: "Keep Member" }).click();
+      await removal.getByRole("button", { name: MEMBER_PAGE_WORDS.keepMember }).click();
       await expect(asked).toBeFocused();
       await expect(asked).toHaveAttribute("aria-expanded", "false");
 
@@ -845,10 +855,10 @@ test.describe("the People group's Members page", () => {
       await expect(removal).toMatchAriaSnapshot(`
         - region "Removal":
           - heading "Removal" [level=3]
-          - button "Remove Member" [expanded]
+          - button ${JSON.stringify(MEMBER_PAGE_WORDS.removeMember)} [expanded]
           - group "Remove Priya Shah":
             - button "Remove"
-            - button "Keep Member"
+            - button ${JSON.stringify(MEMBER_PAGE_WORDS.keepMember)}
       `);
       await passesTheAccessibilityGate();
 
@@ -957,7 +967,7 @@ test.describe("a member's page before any action", () => {
     }
     await endsUnderItsLastLine(
       removalOf(page),
-      removalOf(page).getByRole("button", { name: "Remove Member" }),
+      removalOf(page).getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }),
     );
   });
 });
@@ -966,8 +976,8 @@ test.describe("bulk actions on selected members", () => {
   test("one click selects a member after a bulk role change", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Ribble Joinery");
     await tickOf(page, "Priya Shah").check();
-    const dialog = await changeRoleOpened(page, "Change Role for 1 Member");
-    await dialog.getByRole("button", { name: "Change Role", exact: true }).focus();
+    const dialog = await changeRoleOpened(page, BULK_WORDS.changeRole.title(1));
+    await dialog.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole, exact: true }).focus();
     await page.keyboard.press("Enter");
     await expect(outcomeOf(page), "the message does not say that one member changed").toHaveText(
       /^\D*1\D*$/,
@@ -994,8 +1004,8 @@ test.describe("bulk actions on selected members", () => {
     const answered = Promise.withResolvers<void>();
     await answeredChangedMeanwhile(page, BULK_ROLE_CHANGE, answered.promise);
     await tickOf(page, "Priya Shah").check();
-    const dialog = await changeRoleOpened(page, "Change Role for 1 Member");
-    await dialog.getByRole("button", { name: "Change Role", exact: true }).click();
+    const dialog = await changeRoleOpened(page, BULK_WORDS.changeRole.title(1));
+    await dialog.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole, exact: true }).click();
     await expect(
       outcomeOf(page),
       "the pending change message does not count one member",
@@ -1003,7 +1013,7 @@ test.describe("bulk actions on selected members", () => {
     const saidPending = await outcomeOf(page).innerText();
 
     await tickOf(page, "Sam Okoro").check();
-    const action = selectionAction(page, "Change Role");
+    const action = selectionAction(page, MEMBER_PAGE_WORDS.changeRole);
     await expect(action).toHaveAttribute("aria-disabled", "true");
     await action.focus();
     await page.keyboard.press("Enter");
