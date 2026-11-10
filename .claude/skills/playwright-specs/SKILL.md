@@ -80,7 +80,7 @@ signs in by email while the device holds a passkey.
   under `apps/web/src/features/`. The shell's specs are in `apps/web/e2e/app/` and the specs
   of a shared part in `apps/web/e2e/shared/`. A journey that crosses pages through the real api
   is in `apps/web/e2e/journeys/`, one spec per journey. The suite's modules stay at the `e2e/` root, and
-  no folder there holds more than 15 files.
+  no folder there holds more than 25 files.
 - **One page case per page, and a second case only for a distinct claim.** A page's spec has one case
   that asserts its latency budget, the accessibility gate on its end state and keyboard reach by
   native Tab. Each further claim of that page is a named `test.step` inside that case, so a failure

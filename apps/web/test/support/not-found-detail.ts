@@ -4,7 +4,7 @@ import { expect } from "vitest";
 import { goHome, UNKNOWN_PAGE } from "@/app/words.ts";
 import type { Page } from "@/shared/navigation.ts";
 
-import { adaAnAdmin, aRefusalAnswer, openAt } from "../two-workspaces.ts";
+import { adaAnAdmin, aRefusalAnswer, openAt } from "./two-workspaces.ts";
 
 export const openedWhereTheApiNamesNone = async (path: string, procedure: string) => {
   const api = adaAnAdmin();

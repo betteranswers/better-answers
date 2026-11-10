@@ -12,7 +12,7 @@ import {
   reviewOf,
   rowAction,
   rowOf,
-} from "@test/sources/stubbed-sources.ts";
+} from "@test/stubbed-sources.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

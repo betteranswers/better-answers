@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ASK, detailAt, menuGroupIn, pageById } from "@/shared/navigation.ts";
-import { openedWhereTheApiNamesNone } from "@test/detail/not-found-detail.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { openedWhereTheApiNamesNone } from "@test/not-found-detail.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

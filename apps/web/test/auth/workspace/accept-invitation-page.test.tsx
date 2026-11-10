@@ -8,7 +8,7 @@ import {
 } from "@/features/auth/workspace/invitation-words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
 import { DISPLAY_NAME_WORDS } from "@/shared/member/display-name-words.ts";
-import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/auth/signed-in-without-workspace.ts";
+import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/signed-in-without-workspace.ts";
 import { server, type Asked } from "@test/stub-server.ts";
 import { addressOf, type Api } from "@test/stubbed-api.ts";
 import { aRefusalAnswer, openPageOutsideShell, read } from "@test/two-workspaces.ts";

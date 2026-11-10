@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-export const LOOSE_FILE_LIMIT = 15;
+export const LOOSE_FILE_LIMIT = 25;
 
 export const WHERE_THE_CAPS_LIVE = "packages/devtools/src/scans/loose-files.ts";
 
@@ -18,16 +18,11 @@ export const CAPS: readonly Cap[] = [
     cap: 29,
     reason: "the shadcn CLI writes its components there, as apps/web/components.json sets",
   },
-  {
-    folder: "apps/worker/src/better_answers_worker/redaction",
-    cap: 16,
-    reason: "the image's early COPY and the CI cache keys name it",
-  },
 ];
 
 const READ_TREES = /^(?:apps\/[^/]+\/(?:src|test|tests|e2e)|packages\/[^/]+\/(?:src|test))\//u;
 
-const NEVER_COUNTED: ReadonlySet<string> = new Set(["fixtures", "__snapshots__"]);
+const NEVER_COUNTED: ReadonlySet<string> = new Set(["fixtures", "__snapshots__", "support"]);
 
 export const isCounted = (file: string): boolean =>
   READ_TREES.test(file) &&

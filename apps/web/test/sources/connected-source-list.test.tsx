@@ -3,8 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CONNECT_WORDS, LIST_WORDS, NEEDS_OCR, ROW_ACTIONS } from "@/features/sources/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, NEW_QUESTION, pageById } from "@/shared/navigation.ts";
-import { notFoundLinksHome } from "@test/detail/not-found-detail.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { notFoundLinksHome } from "@test/not-found-detail.ts";
+import { server } from "@test/stub-server.ts";
 import {
   aConnectedSource,
   anAdminWith,
@@ -15,8 +16,7 @@ import {
   openSources,
   press,
   rowOf,
-} from "@test/sources/stubbed-sources.ts";
-import { server } from "@test/stub-server.ts";
+} from "@test/stubbed-sources.ts";
 import { adaAnAdmin, adaAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));

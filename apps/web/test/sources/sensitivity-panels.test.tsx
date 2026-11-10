@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import type { ConnectedSourceWidened } from "@/features/sources/sources-api.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { server, type Asked } from "@test/stub-server.ts";
+import { addressOf, holdProcedure, settlingAfter } from "@test/stubbed-api.ts";
 import {
   aConnectedSource,
   anAdminWith,
@@ -20,9 +22,7 @@ import {
   saidIn,
   thePanelOf,
   connectedSourcesRegion,
-} from "@test/sources/stubbed-sources.ts";
-import { server, type Asked } from "@test/stub-server.ts";
-import { addressOf, holdProcedure, settlingAfter } from "@test/stubbed-api.ts";
+} from "@test/stubbed-sources.ts";
 import {
   aRefusalAnswer,
   read,

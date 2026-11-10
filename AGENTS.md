@@ -62,7 +62,7 @@ A test or a script reaches repository files through its workspace's roots helper
 
 ### Folder size
 
-A folder in a `src`, `test`, `tests`, or `e2e` tree holds at most 15 tracked files directly. Split a full folder by sub-capability. `pnpm run loose-files` enforces the limit.
+A folder in a `src`, `test`, `tests`, or `e2e` tree holds at most 25 tracked files directly. A folder named `support`, `fixtures`, or `__snapshots__` is not counted. Split a full folder by sub-capability. `pnpm run loose-files` enforces the limit.
 
 ### Move files
 

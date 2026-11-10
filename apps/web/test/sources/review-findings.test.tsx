@@ -16,7 +16,7 @@ import {
   rowAction,
   rowOf,
   supplierFormsFindings,
-} from "@test/sources/stubbed-sources.ts";
+} from "@test/stubbed-sources.ts";
 import { read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
