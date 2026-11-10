@@ -30,13 +30,7 @@ import {
   useTickedGroups,
   type TickedGroups,
 } from "./sources-state.ts";
-import {
-  REVIEW_WORDS,
-  ruleWordOf,
-  SENSITIVITY_PANEL_WORDS,
-  spokenWord,
-  SYNC_OF_A_DISMISSAL,
-} from "./words.ts";
+import { REVIEW_WORDS, ruleWordOf, spokenWord, SYNC_OF_A_DISMISSAL } from "./words.ts";
 
 type Settled<Answer> = {
   readonly onSuccess: (answer: Answer) => void;
@@ -273,7 +267,7 @@ function NarrowDocumentsAction(properties: ActionProperties) {
           content={{ onCloseAutoFocus: action.returnFocus }}
           title={REVIEW_WORDS.narrowDocuments.named(documents.length, NARROWEST)}
           consequence={REVIEW_WORDS.narrowDocuments.consequence}
-          commit={<Button onClick={confirm}>{SENSITIVITY_PANEL_WORDS.narrow.commit}</Button>}
+          commit={<Button onClick={confirm}>{REVIEW_WORDS.narrowDocuments.commit}</Button>}
         >
           <ul className="grid gap-1">
             {documents.map(([documentId, title]) => (
@@ -292,9 +286,11 @@ function SyncStatus(properties: { readonly connectedSourceId: string; readonly j
   const sync = connectedSources.data?.find(
     (connectedSource) => connectedSource.connectedSourceId === properties.connectedSourceId,
   )?.lastSync;
-  return SYNC_OF_A_DISMISSAL[
-    sync === undefined || sync === null || sync.jobId < properties.jobId ? "queued" : sync.status
-  ];
+  return REVIEW_WORDS.dismiss.sync(
+    SYNC_OF_A_DISMISSAL[
+      sync === undefined || sync === null || sync.jobId < properties.jobId ? "queued" : sync.status
+    ],
+  );
 }
 
 const isSpecialCategory = (group: GroupOfFindings): boolean => group.specialCategory;
@@ -311,7 +307,7 @@ function DismissAsNotSpecialCategoryAction(properties: ActionProperties) {
       done: (answer) => (
         <>
           {words.done(ticked, answer.documentIds.length)}{" "}
-          <SyncStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />.
+          <SyncStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />
         </>
       ),
       run: (ready, settled) => {

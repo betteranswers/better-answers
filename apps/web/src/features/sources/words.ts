@@ -238,6 +238,7 @@ export const REVIEW_WORDS = {
     named: (documents: number, sensitivity: string): string =>
       `Narrow ${documentsCounted(documents)} to ${sensitivity}`,
     consequence: "You can’t undo this.",
+    commit: "Narrow",
     pending: "Narrowing.",
     done: (documents: number, sensitivity: string, cited: Cited): string =>
       `${documentsCounted(documents)} narrowed to ${sensitivity}. ${citedWords(cited)} that cite them were also updated.`,
@@ -246,10 +247,11 @@ export const REVIEW_WORDS = {
     label: "Dismiss as not special category",
     named: (groups: number): string => `Dismiss ${groupsCounted(groups)} as not special category`,
     consequence:
-      "Documents with no other special category findings go back to their earlier sensitivity after the next sync.",
+      "The findings stay withheld, and documents with no other special category findings go back to their earlier sensitivity after the next sync.",
     pending: "Dismissing.",
     done: (groups: number, documents: number): string =>
-      `${groupsCounted(groups)} dismissed in ${documentsCounted(documents)}. The sync that applies the change`,
+      `${groupsCounted(groups)} dismissed in ${documentsCounted(documents)}.`,
+    sync: (status: string): string => `The sync that applies the change ${status}.`,
   },
 } as const;
 

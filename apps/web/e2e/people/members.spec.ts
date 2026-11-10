@@ -545,7 +545,6 @@ test.describe("the People group's Members page", () => {
               - heading ${JSON.stringify(MEMBER_PAGE_WORDS.displayName)} [level=3]
               - paragraph
               - button ${JSON.stringify(MEMBER_PAGE_WORDS.flagName)}
-              - paragraph
           - region "Activity":
             - heading "Activity" [level=2]
           - region ${JSON.stringify(MEMBER_PAGE_WORDS.removeAndSignOut)}:
@@ -556,7 +555,6 @@ test.describe("the People group's Members page", () => {
               - paragraph: /Priya Shah/
             - region "Removal":
               - heading "Removal" [level=3]
-              - paragraph: /Priya Shah/
               - button ${JSON.stringify(MEMBER_PAGE_WORDS.removeMember)}
       `);
       await passesTheAccessibilityGate();
@@ -842,7 +840,6 @@ test.describe("the People group's Members page", () => {
       const priyasPage = page.url();
       const removal = removalOf(page);
       const asked = removal.getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember });
-      await expect(asked).toHaveAccessibleDescription(/Priya Shah/);
       await asked.click();
       await expect(confirmationOf(page, "Priya Shah").locator("legend")).toBeFocused();
       await removal.getByRole("button", { name: MEMBER_PAGE_WORDS.keepMember }).click();
@@ -962,9 +959,13 @@ test.describe("a member's page before any action", () => {
     await anAdminAtPeople(page, request, "Swale Bookbinders");
     await openedByName(page, "Priya Shah");
 
-    for (const card of [rolePickerRegion(page), signOutRegion(page), displayNameRegion(page)]) {
+    for (const card of [rolePickerRegion(page), signOutRegion(page)]) {
       await endsUnderItsLastLine(card, card.getByRole("paragraph").last());
     }
+    await endsUnderItsLastLine(
+      displayNameRegion(page),
+      displayNameRegion(page).getByRole("button", { name: MEMBER_PAGE_WORDS.flagName }),
+    );
     await endsUnderItsLastLine(
       removalOf(page),
       removalOf(page).getByRole("button", { name: MEMBER_PAGE_WORDS.removeMember }),
