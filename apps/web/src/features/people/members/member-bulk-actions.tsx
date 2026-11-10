@@ -221,7 +221,7 @@ function BulkDialog(properties: {
   readonly actions: Actions;
   readonly action: BulkAction;
   readonly title: string;
-  readonly consequence: string;
+  readonly consequence: string | undefined;
   readonly commit: ReactNode;
   readonly children?: ReactNode;
 }) {

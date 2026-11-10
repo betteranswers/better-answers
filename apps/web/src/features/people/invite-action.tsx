@@ -24,7 +24,6 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -430,7 +429,6 @@ function InviteForm(properties: {
     <>
       <DialogHeader>
         <DialogTitle>{ACTION_NAME}</DialogTitle>
-        <DialogDescription>{INVITE_WORDS.description}</DialogDescription>
       </DialogHeader>
 
       <OutcomeLine outcome={withWaiting(outcome, waiting)} className="text-sm" />
@@ -512,7 +510,7 @@ function InviteAction(properties: { readonly onAnsweredAway: OnAnsweredAway }) {
           {ACTION_NAME}
         </Button>
       </DialogTrigger>
-      <DialogContent className="wrap-anywhere">
+      <DialogContent aria-describedby={undefined} className="wrap-anywhere">
         <InviteForm
           key={invites}
           members={members}

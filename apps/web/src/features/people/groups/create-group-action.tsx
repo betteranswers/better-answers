@@ -6,7 +6,6 @@ import { Button } from "@/shared/ui/button.tsx";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -73,6 +72,7 @@ export function CreateGroupAction(properties: {
         </Button>
       </DialogTrigger>
       <DialogContent
+        aria-describedby={undefined}
         className="wrap-anywhere"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
@@ -90,7 +90,6 @@ export function CreateGroupAction(properties: {
       >
         <DialogHeader>
           <DialogTitle>{CREATE_KEYSTROKE.action}</DialogTitle>
-          <DialogDescription>{GROUP_WORDS.create.consequence}</DialogDescription>
         </DialogHeader>
         <OutcomeLine outcome={refused} className="text-sm" />
         <form onSubmit={submit} className="grid gap-3">
