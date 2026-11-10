@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { WAITING_KEYSTROKES as KEY, WAITING_ON_YOU } from "@/features/inbox/inbox-state.ts";
+import { EDIT_WORDS, WAITING_WORDS } from "@/features/inbox/inbox-words.ts";
 
 import { expect, test } from "../browser.ts";
 import {
@@ -128,7 +129,7 @@ const signedIn = async (page: Page, api: APIRequestContext, email: string): Prom
   await signIn(page, api, email);
 };
 
-const waiting = (page: Page): Locator => page.getByRole("region", { name: "Waiting on You" });
+const waiting = (page: Page): Locator => page.getByRole("region", { name: WAITING_ON_YOU.name });
 
 const rowTitles = (page: Page): Locator => waiting(page).getByRole("heading", { level: 3 });
 
@@ -136,11 +137,11 @@ const rowLink = (page: Page, title: string): Locator =>
   waiting(page).getByRole("link", { name: title, exact: true });
 
 const tickOf = (page: Page, title: string): Locator =>
-  waiting(page).getByRole("checkbox", { name: `Select ${title}` });
+  waiting(page).getByRole("checkbox", { name: WAITING_WORDS.select(title) });
 
 const outcomeLine = (page: Page): Locator => waiting(page).getByRole("status").nth(1);
 
-const OUTCOME_LINE_XPATH = "(//section[.//h2[.='Waiting on You']]//output)[2]";
+const OUTCOME_LINE_XPATH = `(//section[.//h2[.='${WAITING_ON_YOU.name}']]//output)[2]`;
 
 const afterTheApiSucceeds = async (
   page: Page,
@@ -187,9 +188,9 @@ test.describe("Waiting on You", () => {
 
     await test.step("selects two suggestions and accepts both by keyboard alone at 320px", async () => {
       await skipLinkReachesThePage(page);
-      await listsItsKeystrokes(page, "Waiting on You", KEY, [
-        "Select or Clear the Suggestion in Focus",
-        "Accept the Selected Suggestions",
+      await listsItsKeystrokes(page, WAITING_ON_YOU.name, KEY, [
+        KEY.tick.action,
+        KEY.acceptSelected.action,
       ]);
       await tabUntilFocused(page, rowLink(page, LEAVE));
       await page.keyboard.press(KEY.tick.key);
@@ -261,18 +262,24 @@ test.describe("Waiting on You", () => {
         LIST_BUDGET_MS,
       );
 
-      await tabUntilFocused(page, page.getByRole("link", { name: "Back to Waiting on You" }));
+      await tabUntilFocused(page, page.getByRole("link", { name: EDIT_WORDS.back }));
       await page.keyboard.press("Tab");
-      await expect(page.getByRole("button", { name: "Accept", exact: true })).toBeFocused();
+      await expect(
+        page.getByRole("button", { name: EDIT_WORDS.accept, exact: true }),
+      ).toBeFocused();
       await page.keyboard.press("Tab");
-      const decline = page.getByRole("button", { name: "Decline", exact: true });
+      const decline = page.getByRole("button", { name: EDIT_WORDS.decline, exact: true });
       await expect(decline).toBeFocused();
 
       await page.keyboard.press("d");
-      await expect(page.getByRole("textbox", { name: "Reason for Declining" })).toBeFocused();
+      await expect(page.getByRole("textbox", { name: EDIT_WORDS.reason })).toBeFocused();
       await passesTheAccessibilityGate();
 
-      await tabUntilFocused(page, page.getByRole("button", { name: "Cancel", exact: true }), 5);
+      await tabUntilFocused(
+        page,
+        page.getByRole("button", { name: EDIT_WORDS.cancel, exact: true }),
+        5,
+      );
       await page.keyboard.press("Enter");
       await expect(decline).toBeFocused();
     });

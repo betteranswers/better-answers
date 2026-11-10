@@ -10,16 +10,16 @@ export const WAITING_ON_YOU = pageNamed(menuGroupIn(INBOX, "inbox"), "Waiting on
 export const SUGGESTION_ID = z.string().regex(ULID);
 
 export const WAITING_KEYSTROKES = {
-  open: { key: "o", action: "Open the Suggestion in Focus" },
-  tick: { key: "x", action: "Select or Clear the Suggestion in Focus" },
-  acceptSelected: { key: "A", action: "Accept the Selected Suggestions" },
-  clearSelection: { key: "Escape", action: "Clear the Selection" },
+  open: { key: "o", action: "Open the suggestion in focus" },
+  tick: { key: "x", action: "Select or clear the suggestion in focus" },
+  acceptSelected: { key: "A", action: "Accept the selected suggestions" },
+  clearSelection: { key: "Escape", action: "Clear the selection" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const EDIT_KEYSTROKES = {
-  accept: { key: "a", action: "Accept This Suggestion" },
-  decline: { key: "d", action: "Decline This Suggestion" },
-  back: { key: "b", action: "Go Back to Waiting on You" },
+  accept: { key: "a", action: "Accept this suggestion" },
+  decline: { key: "d", action: "Decline this suggestion" },
+  back: { key: "b", action: `Go back to ${WAITING_ON_YOU.name}` },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const shortcutOf = (keystroke: Keystroke): string => `Shift+${keystroke.key}`;

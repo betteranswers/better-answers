@@ -32,7 +32,7 @@ const LISTED = Object.values(KEY);
 
 const NO_ITEMS: readonly WaitingItem[] = [];
 
-const NOTHING_IN_FOCUS = selectFirst(WORDS.selectFirst);
+const NOTHING_IN_FOCUS = selectFirst(WORDS.focusFirst);
 
 const keyOf = (item: WaitingItem): string => item.suggestionId;
 
@@ -129,7 +129,6 @@ function WaitingRow(properties: {
           </RowLink>
         </h3>
         <WaitingFacts item={item} ownerShown={properties.ownerShown} />
-        <p className="mt-2 text-muted-foreground">{WORDS.next}</p>
       </div>
     </li>
   );
@@ -211,7 +210,7 @@ function WaitingRegion() {
         heading={WAITING_ON_YOU.name}
         headingId={headingId}
         headingRef={heading}
-        count={read.data === undefined ? "" : WORDS.count(items.length)}
+        count={items.length === 0 ? "" : WORDS.count(items.length)}
         action={
           items.length === 0 ? undefined : (
             <Button
@@ -228,7 +227,7 @@ function WaitingRegion() {
       <OutcomeLine outcome={outcome} className="mt-2" />
       {accepting.confirming === 0 ? null : (
         <ReuseConfirm
-          said={WORDS.reuse(accepting.confirming)}
+          named={{ said: WORDS.reuse(accepting.confirming) }}
           onConfirm={accepting.confirm}
           onCancel={accepting.cancel}
         />

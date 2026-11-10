@@ -575,6 +575,12 @@
       }
     },
     {
+      "files": ["apps/web/src/features/inbox/**"],
+      "rules": {
+        "better-answers/ui-copy-plain": "error"
+      }
+    },
+    {
       "files": ["packages/schema/scripts/roles-surface.ts"],
       "rules": {
         "max-lines-per-function": [

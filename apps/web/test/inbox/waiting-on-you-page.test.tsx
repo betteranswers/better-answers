@@ -27,9 +27,9 @@ const LEAVE = waitingItem("01JXSGGST0000000000000000A", "Annual leave");
 const CLAIMS = waitingItem("01JXSGGST0000000000000000B", "Expense claims");
 
 const acceptedAlone = async (item: { readonly title: string }) => {
-  fireEvent.click(await screen.findByRole("checkbox", { name: `Select ${item.title}` }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: WAITING_WORDS.select(item.title) }));
   await settlingAfter(() => {
-    fireEvent.click(screen.getByRole("button", { name: "Accept Selected" }));
+    fireEvent.click(screen.getByRole("button", { name: WAITING_WORDS.acceptSelected }));
   });
 };
 
@@ -54,14 +54,16 @@ describe("Waiting on You", () => {
     await openAt(WAITING_ON_YOU.path, api);
 
     for (const title of [LEAVE.title, CLAIMS.title]) {
-      fireEvent.click(await screen.findByRole("checkbox", { name: `Select ${title}` }));
+      fireEvent.click(await screen.findByRole("checkbox", { name: WAITING_WORDS.select(title) }));
     }
-    fireEvent.click(screen.getByRole("button", { name: "Accept Selected" }));
+    fireEvent.click(screen.getByRole("button", { name: WAITING_WORDS.acceptSelected }));
 
     await waitFor(() =>
       expect(mainAlertText(), "no alert named the unconfirmed suggestion").toContain(CLAIMS.title),
     );
-    expect(screen.getAllByRole("checkbox", { name: `Select ${CLAIMS.title}` })).toHaveLength(1);
+    expect(
+      screen.getAllByRole("checkbox", { name: WAITING_WORDS.select(CLAIMS.title) }),
+    ).toHaveLength(1);
   });
 
   it("alerts and keeps the suggestion while an earlier change saves", async () => {
@@ -72,13 +74,17 @@ describe("Waiting on You", () => {
     );
     await openAt(WAITING_ON_YOU.path, api);
 
-    fireEvent.click(await screen.findByRole("checkbox", { name: `Select ${CLAIMS.title}` }));
-    fireEvent.click(screen.getByRole("button", { name: "Accept Selected" }));
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: WAITING_WORDS.select(CLAIMS.title) }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: WAITING_WORDS.acceptSelected }));
 
     await waitFor(() =>
       expect(mainAlertText(), "no alert appeared for the pending save").toMatch(/\S/v),
     );
-    expect(screen.getAllByRole("checkbox", { name: `Select ${CLAIMS.title}` })).toHaveLength(1);
+    expect(
+      screen.getAllByRole("checkbox", { name: WAITING_WORDS.select(CLAIMS.title) }),
+    ).toHaveLength(1);
   });
 
   it("calls an edit orphaned by a retitle changed, not new", async () => {
@@ -87,7 +93,7 @@ describe("Waiting on You", () => {
     api.set("inbox.waiting", () => read({ items: [LEAVE, orphaned] }));
     await openAt(WAITING_ON_YOU.path, api);
 
-    await screen.findByRole("checkbox", { name: `Select ${CLAIMS.title}` });
+    await screen.findByRole("checkbox", { name: WAITING_WORDS.select(CLAIMS.title) });
     const row = (title: string) => within(screen.getByRole("listitem", { name: title }));
 
     expect(row(LEAVE.title).queryByText(WAITING_WORDS.newConcept)).not.toBeNull();
