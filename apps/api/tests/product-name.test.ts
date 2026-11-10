@@ -3,9 +3,12 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { consentPage, REFUSAL_PAGES, refusedPage, signInPage } from "../src/auth/pages.ts";
 import { senderAt } from "../src/product-name.ts";
-import { repositoryRoot } from "./support/roots/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const LOGO = readFileSync(path.join(repositoryRoot, "apps/web/src/styles/logo.svg"), "utf8").trim();
 

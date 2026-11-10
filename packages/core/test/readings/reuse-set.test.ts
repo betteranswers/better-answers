@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { openModelClient } from "@better-answers/core/llm";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { openModelClient } from "../../src/llm/index.ts";
 import {
   clientAnswering,
   decisionCandidatesIn,

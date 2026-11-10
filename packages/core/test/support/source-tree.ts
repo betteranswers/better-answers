@@ -1,7 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
-import { workspaceRoot } from "./roots/roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 const CORE_SRC = path.resolve(workspaceRoot, "src");
 

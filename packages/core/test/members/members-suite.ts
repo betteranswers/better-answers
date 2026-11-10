@@ -1,13 +1,13 @@
-import type { MigratedPostgres } from "@better-answers/schema/testing";
-
-import type { Role, UserPrincipal } from "../../src/kernel/index.ts";
+import type { Role, UserPrincipal } from "@better-answers/core/kernel";
 import {
   folded,
   type Foldable,
   type Folded,
   type Tx,
   withHeldPrincipal,
-} from "../../src/store/postgres/index.ts";
+} from "@better-answers/core/store/postgres";
+import type { MigratedPostgres } from "@better-answers/schema/testing";
+
 import { confirmedSessionFor, endedGrants, type NamedGrants } from "../support/identity-rows.ts";
 import type { ProvisionedWorkspace } from "../support/platform.ts";
 import { seedingWith } from "../support/suite-postgres.ts";

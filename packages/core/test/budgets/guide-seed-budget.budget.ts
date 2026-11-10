@@ -1,6 +1,7 @@
 import { assert, describe, expect, it } from "vitest";
 
-import { coverageOf, seedGuide } from "../../src/guides/index.ts";
+import { coverageOf, seedGuide } from "@better-answers/core/guides";
+
 import { NORTHGATE } from "../fixtures/northgate-concepts.ts";
 import { northgate, type Northgate } from "../fixtures/northgate.ts";
 import { doorsOf, suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";

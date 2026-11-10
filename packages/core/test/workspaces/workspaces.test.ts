@@ -2,26 +2,26 @@ import pg from "pg";
 import { assert, describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
-import { boundarySchemas, ulid } from "@better-answers/schema";
-import { testData } from "@better-answers/schema/testing";
-import { matching } from "@better-answers/schema/testing/matching";
-
-import { STORED_DETAIL_KEYS } from "../../src/audit/index.ts";
+import { STORED_DETAIL_KEYS } from "@better-answers/core/audit";
 import {
   attempt,
   type Claims,
   type OperatorPrincipal,
   type PlatformPrincipal,
   type UserPrincipal,
-} from "../../src/kernel/index.ts";
-import { endEverySignInAndTokenHere } from "../../src/members/index.ts";
+} from "@better-answers/core/kernel";
+import { endEverySignInAndTokenHere } from "@better-answers/core/members";
 import {
   openPostgres,
   type PostgresDoor,
   withOperator,
   withPrincipal,
   withScope,
-} from "../../src/store/postgres/index.ts";
+} from "@better-answers/core/store/postgres";
+import { boundarySchemas, ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
+
 import {
   addMember,
   addPerson,

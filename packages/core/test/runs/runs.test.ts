@@ -1,10 +1,11 @@
 import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import type { PlatformPrincipal, WorkspaceId } from "@better-answers/core/kernel";
+import { folded, withMember, withScope, type Tx } from "@better-answers/core/store/postgres";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import type { PlatformPrincipal, WorkspaceId } from "../../src/kernel/index.ts";
 import {
   bundleHealth,
   endedSyncs,
@@ -15,7 +16,6 @@ import {
   lockSyncIn,
   type SyncScan,
 } from "../../src/runs/index.ts";
-import { folded, withMember, withScope, type Tx } from "../../src/store/postgres/index.ts";
 import { seededBy } from "../fixtures/sourced-concept.ts";
 import { suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { rowsFrom } from "../support/rows.ts";

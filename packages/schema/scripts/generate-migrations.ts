@@ -1,10 +1,13 @@
 import { spawnSync } from "node:child_process";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { journalMetaFolder } from "../src/journal.ts";
 import { migrationsFolder } from "../src/migrations-folder.ts";
-import { workspaceRoot } from "../test/support/roots/roots.ts";
 import { foldSeparators } from "./fold-separators.ts";
 import { restoreFinalNewline } from "./journal-newline.ts";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 const { status, error } = spawnSync(
   "drizzle-kit",

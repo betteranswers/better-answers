@@ -5,19 +5,21 @@ import type pg from "pg";
 import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { matching } from "@better-answers/schema/testing/matching";
-import { connectedSourceIdTakenAgain } from "@better-answers/schema/testing/probes";
-
-import { readableClause, readableParameters } from "../../src/access/index.ts";
-import { STORED_DETAIL_KEYS } from "../../src/audit/index.ts";
-import { ERASURE } from "../../src/erasure/index.ts";
+import { readableClause, readableParameters } from "@better-answers/core/access";
+import { STORED_DETAIL_KEYS } from "@better-answers/core/audit";
+import { ERASURE } from "@better-answers/core/erasure";
 import {
   attempt,
   parse,
   ulid,
   type PlatformPrincipal,
   type UserPrincipal,
-} from "../../src/kernel/index.ts";
+} from "@better-answers/core/kernel";
+import { getObject, listObjects, putObject } from "@better-answers/core/store/objects";
+import { withScope, type Tx } from "@better-answers/core/store/postgres";
+import { matching } from "@better-answers/schema/testing/matching";
+import { connectedSourceIdTakenAgain } from "@better-answers/schema/testing/probes";
+
 import {
   connectUpload,
   connectUploadFields,
@@ -32,8 +34,6 @@ import {
   UPLOAD_BYTE_CAP,
   UPLOAD_SWEEP,
 } from "../../src/sources/index.ts";
-import { getObject, listObjects, putObject } from "../../src/store/objects/index.ts";
-import { withScope, type Tx } from "../../src/store/postgres/index.ts";
 import { contractFixture, mediaTypeOutside } from "../fixtures/contract-fixture.ts";
 import {
   passageUnder,

@@ -2,7 +2,10 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it } from "vitest";
 
+import { actorIdOf, type UserPrincipal } from "@better-answers/core/kernel";
+import { passageAt } from "@better-answers/core/sources";
 import { commit, head } from "@better-answers/core/store/git";
+import type { Tx } from "@better-answers/core/store/postgres";
 import { conceptIriOf, passageLocatorOf, ulid, type ConceptIri } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -21,9 +24,6 @@ import {
   type Frontmatter,
   type SaveConceptInput,
 } from "../../../src/concepts/index.ts";
-import { actorIdOf, type UserPrincipal } from "../../../src/kernel/index.ts";
-import { passageAt } from "../../../src/sources/index.ts";
-import type { Tx } from "../../../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit } from "../../fixtures/bundle.ts";
 import {
   auditEventRowsOf,

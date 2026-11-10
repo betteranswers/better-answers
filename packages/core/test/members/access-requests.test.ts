@@ -4,18 +4,7 @@ import { inspect } from "node:util";
 import pg from "pg";
 import { assert, describe, expect, it } from "vitest";
 
-import { ulid } from "@better-answers/schema";
-import { testData } from "@better-answers/schema/testing";
-import { matching } from "@better-answers/schema/testing/matching";
-
-import { attempt, type Result, type Role, type UserPrincipal } from "../../src/kernel/index.ts";
-import {
-  approveRequest,
-  declineRequest,
-  listWaitingRequests,
-  REQUEST_ROLE_DEFAULT,
-  requestAccess,
-} from "../../src/members/index.ts";
+import { attempt, type Result, type Role, type UserPrincipal } from "@better-answers/core/kernel";
 import {
   folded,
   openPostgres,
@@ -23,8 +12,19 @@ import {
   type Folded,
   type Tx,
   withPrincipal,
-} from "../../src/store/postgres/index.ts";
-import { provisionWorkspace } from "../../src/workspaces/index.ts";
+} from "@better-answers/core/store/postgres";
+import { provisionWorkspace } from "@better-answers/core/workspaces";
+import { ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
+
+import {
+  approveRequest,
+  declineRequest,
+  listWaitingRequests,
+  REQUEST_ROLE_DEFAULT,
+  requestAccess,
+} from "../../src/members/index.ts";
 import { bootstrap, seedPerson } from "../support/platform.ts";
 import {
   asSliceRelative,

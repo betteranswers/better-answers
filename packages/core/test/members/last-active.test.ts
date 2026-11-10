@@ -2,16 +2,17 @@ import pg from "pg";
 import { assert, describe, expect, it } from "vitest";
 
 import {
+  openPostgres,
+  withHeldPrincipal,
+  withPrincipalRead,
+} from "@better-answers/core/store/postgres";
+
+import {
   bulkChangeRole,
   bulkChangeRoleInput,
   removeMember,
   removeMemberInput,
 } from "../../src/members/index.ts";
-import {
-  openPostgres,
-  withHeldPrincipal,
-  withPrincipalRead,
-} from "../../src/store/postgres/index.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "../support/platform.ts";
 import { inputOf } from "../support/suite-input.ts";
 import {

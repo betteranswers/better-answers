@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { ulid } from "@better-answers/schema";
-
 import {
   acceptInvitation,
   bulkChangeRole,
   bulkChangeRoleInput,
   changeRole,
   changeRoleInput,
-} from "../../src/members/index.ts";
+} from "@better-answers/core/members";
+import { ulid } from "@better-answers/schema";
+
 import { removeAuthenticator, removePasskey, setOperatorMark } from "../../src/workspaces/index.ts";
 import { heldAs, membersSuite } from "../members/members-suite.ts";
 import { authenticatorFor, passkeyFor } from "../support/identity-rows.ts";

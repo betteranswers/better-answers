@@ -2,7 +2,8 @@ import { randomBytes } from "node:crypto";
 
 import type pg from "pg";
 
-import { hashOfTyped } from "../../src/workspaces/index.ts";
+import { hashOfTyped } from "@better-answers/core/workspaces";
+
 import { restoreCodeFor } from "./identity-rows.ts";
 
 const RESTORE_CODE_LIFETIME_MS = 24 * 60 * 60_000;

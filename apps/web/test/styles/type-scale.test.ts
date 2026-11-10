@@ -3,7 +3,9 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { workspaceRoot } from "@test/roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 const stylesheets = ["typography.css", "semantic.css"]
   .map((file) => readFileSync(path.join(workspaceRoot, "src/styles", file), "utf8"))

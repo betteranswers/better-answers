@@ -48,7 +48,7 @@ const ZONES = {
   test: {
     reaches: new Set<Zone>(["kernel", "access", "door", "layer", "slice", "catalogue"]),
     clause:
-      "a test imports any file in the directory its folder mirrors, and any other directory only through its index.ts",
+      "a test imports any file in the directory its folder mirrors, and any other directory only as `@better-answers/core/<entry>`",
   },
 } satisfies Record<Zone, { readonly reaches: ReadonlySet<Zone>; readonly clause: string }>;
 
@@ -175,7 +175,12 @@ const targetOf = (pkg: CorePackage, importer: string, specifier: string): string
   return path.join(pkg.root, "src", under.endsWith(".ts") ? under : path.join(under, "index.ts"));
 };
 
-type Edge = { readonly importer: Place; readonly reached: Place; readonly target: string };
+type Edge = {
+  readonly importer: Place;
+  readonly reached: Place;
+  readonly target: string;
+  readonly relative: boolean;
+};
 
 const edgeOf = (pkg: CorePackage, importerFile: string, specifier: string): Edge | undefined => {
   const importer = placeOf(pkg, importerFile);
@@ -186,7 +191,7 @@ const edgeOf = (pkg: CorePackage, importerFile: string, specifier: string): Edge
   if (reached === undefined || reached.dir === importer.dir || reached.dir === importer.mirror) {
     return undefined;
   }
-  return { importer, reached, target };
+  return { importer, reached, target, relative: specifier.startsWith(".") };
 };
 
 export type Finding = {
@@ -196,6 +201,7 @@ export type Finding = {
     | "erasure"
     | "internal"
     | "testInternal"
+    | "testRelativeFace"
     | "transport"
     | "unexported";
   readonly data?: Readonly<Record<string, string>>;
@@ -230,25 +236,26 @@ const erasureFinding = ({ importer, reached }: Edge): Finding | undefined =>
 
 const faceFinding = (
   pkg: CorePackage,
-  { importer, reached, target }: Edge,
+  { importer, reached, target, relative }: Edge,
 ): Finding | undefined => {
   const face = faceOf(pkg, reached);
+  const entry = reached.dir.slice("src/".length);
   if (target !== face) {
     const inside = path.relative(path.dirname(face), target).split(path.sep).join("/");
     if (importer.zone === "test") {
-      const folder = `test/${reached.dir.slice("src/".length)}/`;
-      return { messageId: "testInternal", data: { dir: reached.dir, inside, folder } };
+      const folder = `test/${entry}/`;
+      return { messageId: "testInternal", data: { dir: reached.dir, inside, folder, entry } };
     }
     return {
       messageId: "internal",
       data: { fromDir: importer.dir, from: importer.zone, dir: reached.dir, inside },
     };
   }
-  if (pkg.faces.has(target)) return undefined;
-  return {
-    messageId: "unexported",
-    data: { dir: reached.dir, entry: reached.dir.slice("src/".length) },
-  };
+  if (!pkg.faces.has(target)) return { messageId: "unexported", data: { dir: reached.dir, entry } };
+  if (importer.zone === "test" && relative) {
+    return { messageId: "testRelativeFace", data: { dir: reached.dir, entry } };
+  }
+  return undefined;
 };
 
 const findingOf = (pkg: CorePackage, edge: Edge): Finding | undefined =>
@@ -278,7 +285,9 @@ const MESSAGES = {
   internal:
     "`{{fromDir}}` ({{from}}) may import `{{dir}}` only through its own index.ts, not `{{inside}}`. Export what you need from that index.ts and import it from there.",
   testInternal:
-    "A test may import `{{dir}}` only through its own index.ts, not `{{inside}}`, unless the test is in `{{folder}}`, the folder that mirrors `{{dir}}`. Import from the index.ts, or move the test to `{{folder}}`.",
+    "A test may import `{{dir}}` only through its own index.ts, not `{{inside}}`, unless the test is in `{{folder}}`, the folder that mirrors `{{dir}}`. Import from `@better-answers/core/{{entry}}`, or move the test to `{{folder}}`.",
+  testRelativeFace:
+    "A test outside the mirror folder of `{{dir}}` imports it as `@better-answers/core/{{entry}}`, not by a relative path. Replace the path with `@better-answers/core/{{entry}}`, or run `node scripts/respell-core-imports.mjs` to replace every one.",
   unexported:
     "`{{dir}}/index.ts` is not in the exports map of packages/core. Add `./{{entry}}` to the map, so that sibling slices, transports and tests outside their mirror folder all import the same entry point.",
 } satisfies Record<Finding["messageId"], string>;

@@ -2,13 +2,14 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { pluginConfigFor, readOxlintConfig } from "@better-answers/devtools/oxlint-config";
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { ROOTS_OF } from "../../lint-rules/shared/path-climb.ts";
+import { ROOTS_HELPER } from "../../lint-rules/shared/path-climb.ts";
 
 const RULE = "better-answers/no-path-climb";
 
@@ -45,7 +46,7 @@ describe("the no-path-climb rule", () => {
 
     expect(output).toContain("better-answers(no-path-climb)");
     expect(output).toContain(
-      '`path.resolve(import.meta.dirname, "../../../../deploy/x.sh")` climbs to the root of `apps/api` or above it, so the path breaks when the file moves. Import `repositoryRoot` or `workspaceRoot` from `apps/api/tests/support/roots/roots.ts` and join the path from there.',
+      '`path.resolve(import.meta.dirname, "../../../../deploy/x.sh")` climbs to the root of `apps/api` or above it, so the path breaks when the file moves. Import `rootsOf` from `@better-answers/schema/testing/roots`, take `repositoryRoot` or `workspaceRoot` from `rootsOf(import.meta.url)`, and join the path from there.',
     );
   });
 
@@ -77,6 +78,18 @@ describe("the no-path-climb rule", () => {
     expect(lint.flagged(reading(file, `export const at = ${expression};`))).toEqual([file]);
   });
 
+  it("refuses a toolchain repositoryRoot import and names rootsOf", () => {
+    const file = "apps/api/tests/ops/probe.test.ts";
+    const code =
+      'import { repositoryRoot } from "@better-answers/devtools/paths";\nexport const at = repositoryRoot;';
+    const tree = reading(file, code);
+
+    expect(lint.flagged(tree)).toEqual([file]);
+    expect(lint.output(tree)).toContain(
+      "`apps/api` must take `repositoryRoot` from `rootsOf(import.meta.url)`. Import `rootsOf` from `@better-answers/schema/testing/roots`, not `repositoryRoot` from `@better-answers/devtools/paths`.",
+    );
+  });
+
   it("refuses a climb that lands on the workspace root", () => {
     const file = "apps/api/tests/probe.test.ts";
 
@@ -92,25 +105,16 @@ describe("the no-path-climb rule", () => {
     expect(lint.flagged(reading(file, code))).toEqual([file]);
   });
 
-  it("names the toolchain helper for devtools", () => {
-    const file = "packages/devtools/test/probe.test.ts";
-    const tree = {
-      ...REPOSITORY,
-      "packages/devtools/package.json": "{}\n",
-      [file]: 'export const at = path.join(import.meta.dirname, "../../..");\n',
-    };
+  it.each([
+    ["apps/api/tests/deploy/probe.test.ts", "apps/api"],
+    ["packages/devtools/test/probe.test.ts", "packages/devtools"],
+    ["packages/widgets/test/probe.test.ts", "packages/widgets"],
+  ])("names the same helper in %s", (file, workspace) => {
+    const code = 'export const at = path.join(import.meta.dirname, "../../..");';
+    const tree = { ...reading(file, code), [`${workspace}/package.json`]: "{}\n" };
 
     expect(lint.output(tree)).toContain(
-      '`path.join(import.meta.dirname, "../../..")` climbs to the root of `packages/devtools` or above it, so the path breaks when the file moves. Import `repositoryRoot` from `packages/devtools/src/paths.ts` and join the path from there.',
-    );
-  });
-
-  it("says a workspace without a helper needs one", () => {
-    const file = "packages/widgets/test/probe.test.ts";
-    const code = 'export const at = path.join(import.meta.dirname, "../..");';
-
-    expect(lint.output(reading(file, code))).toContain(
-      '`path.join(import.meta.dirname, "../..")` climbs to the root of `packages/widgets` or above it, so the path breaks when the file moves. `packages/widgets` has no roots helper yet. Add one beside its tests and join the path from there.',
+      `climbs to the root of \`${workspace}\` or above it, so the path breaks when the file moves. Import \`rootsOf\` from \`@better-answers/schema/testing/roots\``,
     );
   });
 });
@@ -150,42 +154,37 @@ describe("the no-path-climb rule accepts", () => {
     expect(lint.flagged(reading(file, code))).toEqual([]);
   });
 
+  it("a repositoryRoot import inside the toolchain", () => {
+    const file = "packages/devtools/test/probe.test.ts";
+    const code =
+      'import { repositoryRoot } from "@better-answers/devtools/paths";\nexport const at = repositoryRoot;';
+    const tree = { ...reading(file, code), "packages/devtools/package.json": "{}\n" };
+
+    expect(lint.flagged(tree)).toEqual([]);
+  });
+
+  it("another toolchain import outside the toolchain", () => {
+    const file = "apps/api/tests/ops/probe.test.ts";
+    const code =
+      'import { workspacePackages } from "@better-answers/devtools/paths";\nexport const at = workspacePackages;';
+
+    expect(lint.flagged(reading(file, code))).toEqual([]);
+  });
+
+  it("a repositoryRoot taken from the roots helper", () => {
+    const file = "apps/api/tests/ops/probe.test.ts";
+    const code =
+      'import { rootsOf } from "@better-answers/schema/testing/roots";\nconst { repositoryRoot } = rootsOf(import.meta.url);\nexport const at = repositoryRoot;';
+
+    expect(lint.flagged(reading(file, code))).toEqual([]);
+  });
+
   it("a file in the repository's own root workspace", () => {
     const file = "scripts/probe.mjs";
     const code = 'export const at = path.resolve(import.meta.dirname, "..");';
 
     expect(lint.flagged(reading(file, code))).toEqual([]);
   });
-});
-
-describe("the no-path-climb rule on the toolchain root", () => {
-  const IMPORT = 'import { repositoryRoot } from "@better-answers/devtools/paths";';
-  const file = "apps/api/tests/ops/probe.test.ts";
-
-  it("sends a workspace to its own roots helper", () => {
-    expect(lint.output(reading(file, `${IMPORT}\nexport const at = repositoryRoot;`))).toContain(
-      "`apps/api` must take `repositoryRoot` from its own roots helper. Import `repositoryRoot` or `workspaceRoot` from `apps/api/tests/support/roots/roots.ts`, not from `@better-answers/devtools/paths`.",
-    );
-  });
-
-  it.each([
-    ["another export of the toolchain module", "workspacePackages", "apps/api"],
-    ["a workspace that has no helper", "repositoryRoot", "packages/widgets"],
-  ])("accepts %s", (_what, name, workspace) => {
-    const probe = `${workspace}/tests/probe.test.ts`;
-    const code = `import { ${name} } from "@better-answers/devtools/paths";\nexport const at = ${name};`;
-
-    expect(lint.flagged(reading(probe, code))).toEqual([]);
-  });
-
-  it.each(["packages/devtools/test/probe.test.ts", "apps/api/tests/support/roots/roots.ts"])(
-    "accepts the helper's own file %s",
-    (probe) => {
-      expect(lint.flagged(reading(probe, `${IMPORT}\nexport const at = repositoryRoot;`))).toEqual(
-        [],
-      );
-    },
-  );
 });
 
 describe("the no-path-climb rule in the real config", () => {
@@ -209,15 +208,17 @@ describe("the no-path-climb rule in the real config", () => {
   });
 
   it("names only helper files the tree holds", () => {
-    const helpers = [...ROOTS_OF.values()];
-    const missing = helpers.flatMap(({ file, exports }) => {
-      const source = readFileSync(path.join(repositoryRoot, file), "utf8");
-      return exports
-        .filter((name) => !new RegExp(`export[^;]*\\b${name}\\b`, "u").test(source))
-        .map((name) => `${file} lacks ${name}`);
-    });
+    const manifest = z
+      .object({ exports: z.record(z.string(), z.string()) })
+      .parse(
+        JSON.parse(readFileSync(path.join(repositoryRoot, "packages/schema/package.json"), "utf8")),
+      );
+    const subpath = ROOTS_HELPER.specifier.replace("@better-answers/schema", ".");
+    const source = readFileSync(path.join(repositoryRoot, ROOTS_HELPER.file), "utf8");
 
-    expect(missing).toEqual([]);
-    expect(helpers).toHaveLength(5);
+    expect(manifest.exports[subpath]).toBe(
+      `./${path.posix.relative("packages/schema", ROOTS_HELPER.file)}`,
+    );
+    expect(source).toContain(`export const ${ROOTS_HELPER.name} =`);
   });
 });

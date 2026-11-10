@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { enqueueJob } from "@better-answers/core/runs";
+import { narrowConnectedSource, narrowConnectedSourceInput } from "@better-answers/core/sources";
 import { head } from "@better-answers/core/store/git";
 import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
 
@@ -11,9 +14,6 @@ import {
   type SuggestionRequest,
   type WriteConceptInput,
 } from "../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { enqueueJob } from "../../src/runs/index.ts";
-import { narrowConnectedSource, narrowConnectedSourceInput } from "../../src/sources/index.ts";
 import { connectedSourceHolding, groupNamed } from "../fixtures/sourced-concept.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { rowsFrom } from "../support/rows.ts";

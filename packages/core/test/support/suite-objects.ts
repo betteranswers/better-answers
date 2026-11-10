@@ -1,6 +1,7 @@
 import { afterAll, beforeAll } from "vitest";
 
-import { closeObjects } from "../../src/store/objects/index.ts";
+import { closeObjects } from "@better-answers/core/store/objects";
+
 import { type ObjectStore, openObjectStore } from "./warm-objects.ts";
 
 export type { ObjectStore };

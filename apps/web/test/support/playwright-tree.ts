@@ -10,7 +10,9 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { workspaceRoot } from "./roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 export const moduleAt = (file: string): string => JSON.stringify(path.join(workspaceRoot, file));
 

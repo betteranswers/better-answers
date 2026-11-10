@@ -25,6 +25,7 @@
     "./parsed-source": "./src/parsed-source.ts",
     "./paths": "./src/paths.ts",
     "./refusal-unions": "./src/scans/refusal-unions.ts",
+    "./respell-core-imports": "./src/moves/respell-core-imports.ts",
     "./review-coverage": "./src/review/review-coverage.ts",
     "./root-commands": "./src/root-config/root-commands.ts",
     "./skill-paths": "./src/scans/skill-paths.ts",

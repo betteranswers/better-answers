@@ -1,5 +1,10 @@
 import { assert, describe, expect, it } from "vitest";
 
+import type { Trust } from "@better-answers/core/concepts";
+import { actorIdOfPerson, type Result, type UserPrincipal } from "@better-answers/core/kernel";
+import { changeRole, changeRoleInput } from "@better-answers/core/members";
+import { openPostgres } from "@better-answers/core/store/postgres";
+import { makeQuestionMonths } from "@better-answers/core/sweeps";
 import {
   boundarySchemas,
   conceptIriOf,
@@ -22,11 +27,6 @@ import {
   type QuestionsAskedInput,
   type YourQuestionsInput,
 } from "../../src/answering/index.ts";
-import type { Trust } from "../../src/concepts/index.ts";
-import { actorIdOfPerson, type Result, type UserPrincipal } from "../../src/kernel/index.ts";
-import { changeRole, changeRoleInput } from "../../src/members/index.ts";
-import { openPostgres } from "../../src/store/postgres/index.ts";
-import { makeQuestionMonths } from "../../src/sweeps/index.ts";
 import { askedAMicrosecondFiner } from "../erasure/question-rows.ts";
 import { principalFor } from "../fixtures/workspace-with-bundle.ts";
 import { heldAs } from "../members/members-suite.ts";

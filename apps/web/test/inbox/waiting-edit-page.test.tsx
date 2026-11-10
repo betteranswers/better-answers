@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { WAITING_ON_YOU } from "@/features/inbox/inbox-state.ts";
 import { EDIT_WORDS, SAID_OF_DECIDING } from "@/features/inbox/inbox-words.ts";
 import { detailAt } from "@/shared/navigation.ts";
-import { openedWhereTheApiNamesNone } from "@test/detail/not-found-detail.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { openedWhereTheApiNamesNone } from "@test/not-found-detail.ts";
 import { aRefusalAnswer, adaAnAdmin, openAt, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));

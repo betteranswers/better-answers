@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import type { PostgresDoor } from "@better-answers/core/store/postgres";
 import type { RecordMapState } from "@better-answers/schema";
 
 import { ANSWER_MEASURES, unmappedPassageRate } from "../../src/answering/index.ts";
-import type { PostgresDoor } from "../../src/store/postgres/index.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "../support/platform.ts";
 import { overriding, postgresForSuite, seedingWith } from "../support/suite-postgres.ts";
 

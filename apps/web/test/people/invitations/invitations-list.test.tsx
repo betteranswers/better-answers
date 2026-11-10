@@ -5,8 +5,8 @@ import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { HOMES, NEW_QUESTION } from "@/shared/navigation.ts";
 import { CLEAR_WORDS } from "@/shared/words.ts";
-import { notFoundLinksHome } from "@test/detail/not-found-detail.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { notFoundLinksHome } from "@test/not-found-detail.ts";
 import {
   actionBesideKey,
   addressField,

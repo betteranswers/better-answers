@@ -63,6 +63,36 @@ describe("the copy-paste gate over a throwaway tree", () => {
     expect(jscpd({ "left.ts": CLONE, "right.ts": NOT_A_CLONE })).toEqual([]);
   });
 
+  it("ignores an import block copied between files", () => {
+    const imports = [
+      'import { alpha, beta, gamma } from "@better-answers/core/kernel";',
+      'import type { Delta } from "@better-answers/core/store/postgres";',
+      'import { epsilon } from "@better-answers/schema";',
+      'import { zeta } from "@better-answers/schema/code-unit";',
+      'import { eta } from "@better-answers/schema/testing/matching";',
+      "import {",
+      "  theta,",
+      "  iota,",
+      '} from "../support/platform.ts";',
+      'import "./side-effect.ts";',
+      "",
+    ].join("\n");
+
+    expect(
+      jscpd({
+        "left.ts": `export const left = 1;\n${imports}export const leftUsed = 1;\n`,
+        "right.ts": `export const right = 2;\n${imports}export const rightUsed = 2;\n`,
+      }),
+    ).toEqual([]);
+  });
+
+  it("still reports a clone that follows the same imports", () => {
+    const imports = 'import { alpha } from "@better-answers/core/kernel";\n';
+    const clones = jscpd({ "left.ts": `${imports}${CLONE}`, "right.ts": `${imports}${CLONE}` });
+
+    expect(clones).toHaveLength(1);
+  });
+
   it("names a Python clone as it names a TypeScript one", () => {
     const python = [
       "def shape(value: str) -> str:",

@@ -2,17 +2,17 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it, vi } from "vitest";
 
-import { ulid } from "@better-answers/schema";
-import { matching } from "@better-answers/schema/testing/matching";
-
-import type { OperatorPrincipal } from "../../src/kernel/index.ts";
+import type { OperatorPrincipal } from "@better-answers/core/kernel";
 import {
   removeMember,
   removeMemberInput,
   endEverySignInAndTokenHere,
   endEverySignInAndTokenHereInput,
-} from "../../src/members/index.ts";
-import { openPostgres } from "../../src/store/postgres/index.ts";
+} from "@better-answers/core/members";
+import { openPostgres } from "@better-answers/core/store/postgres";
+import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
+
 import {
   addMember,
   inspectPerson,

@@ -34,6 +34,8 @@ afterAll(() => {
 const filesIn = (folder: string, count: number): readonly string[] =>
   Array.from({ length: count }, (_, index) => `${folder}/file-${String(index)}.ts`);
 
+const CAP = LOOSE_FILE_LIMIT + 5;
+
 const probeCap = (cap: number): readonly Cap[] => [
   { folder: PROBE, cap, reason: "a tool writes there" },
 ];
@@ -53,6 +55,8 @@ describe("the files the gate counts", () => {
     ["packages/core/e2e/page.spec.ts", false],
     ["apps/web/test/fixtures/page.html", false],
     ["apps/web/test/fixtures/deep/page.html", false],
+    ["apps/web/test/support/stub-server.ts", false],
+    ["apps/web/test/support/jsdom/layout.ts", false],
     ["apps/web/src/app/__snapshots__/page.snap", false],
     ["apps/api/package.json", false],
     ["apps/api/lifts/better-auth/index.ts", false],
@@ -78,21 +82,24 @@ describe("a folder with no cap", () => {
     const [report, ...rest] = findings(filesIn(PROBE, LOOSE_FILE_LIMIT + 1));
 
     expect(rest).toEqual([]);
-    expect(report).toContain(`${PROBE} has 16 files`);
-    expect(report).toContain("limit is 15");
+    expect(report).toContain(`${PROBE} has ${String(LOOSE_FILE_LIMIT + 1)} files`);
+    expect(report).toContain(`limit is ${String(LOOSE_FILE_LIMIT)}`);
     expect(report).toContain("Move files into subfolders by capability");
   });
 
   it("fails each folder over the limit, in order", () => {
-    const files = [...filesIn("packages/probe/test", 16), ...filesIn(PROBE, 17)];
+    const files = [
+      ...filesIn("packages/probe/test", LOOSE_FILE_LIMIT + 1),
+      ...filesIn(PROBE, LOOSE_FILE_LIMIT + 2),
+    ];
 
     expect(findings(files)).toEqual([
-      expect.stringContaining("packages/probe/src has 17 files"),
-      expect.stringContaining("packages/probe/test has 16 files"),
+      expect.stringContaining(`packages/probe/src has ${String(LOOSE_FILE_LIMIT + 2)} files`),
+      expect.stringContaining(`packages/probe/test has ${String(LOOSE_FILE_LIMIT + 1)} files`),
     ]);
   });
 
-  it.each(["fixtures", "__snapshots__"])("ignores a %s folder", (name) => {
+  it.each(["fixtures", "__snapshots__", "support"])("ignores a %s folder", (name) => {
     expect(findings(filesIn(`packages/probe/test/${name}`, 40))).toEqual([]);
   });
 
@@ -103,44 +110,48 @@ describe("a folder with no cap", () => {
 
 describe("a folder with a cap", () => {
   it("passes at its cap", () => {
-    expect(findings(filesIn(PROBE, 20), probeCap(20))).toEqual([]);
+    expect(findings(filesIn(PROBE, CAP), probeCap(CAP))).toEqual([]);
   });
 
   it("fails one file over, naming folder, count, cap and fix", () => {
-    const [report, ...rest] = findings(filesIn(PROBE, 21), probeCap(20));
+    const [report, ...rest] = findings(filesIn(PROBE, CAP + 1), probeCap(CAP));
 
     expect(rest).toEqual([]);
-    expect(report).toContain(`${PROBE} has 21 files`);
-    expect(report).toContain(`cap in ${WHERE_THE_CAPS_LIVE} is 20`);
+    expect(report).toContain(`${PROBE} has ${String(CAP + 1)} files`);
+    expect(report).toContain(`cap in ${WHERE_THE_CAPS_LIVE} is ${String(CAP)}`);
     expect(report).toContain("because a tool writes there");
-    expect(report).toContain("Raise the cap to 21 in the same change");
+    expect(report).toContain(`Raise the cap to ${String(CAP + 1)} in the same change`);
     expect(report).not.toContain("Move files into subfolders");
   });
 
   it("fails as stale once the folder holds fewer", () => {
-    const [report, ...rest] = findings(filesIn(PROBE, 19), probeCap(20));
+    const [report, ...rest] = findings(filesIn(PROBE, CAP - 1), probeCap(CAP));
 
     expect(rest).toEqual([]);
-    expect(report).toContain(`${PROBE} has 19 files, fewer than its cap of 20`);
-    expect(report).toContain("Lower the cap to 19");
+    expect(report).toContain(
+      `${PROBE} has ${String(CAP - 1)} files, fewer than its cap of ${String(CAP)}`,
+    );
+    expect(report).toContain(`Lower the cap to ${String(CAP - 1)}`);
   });
 
   it("fails as stale at the limit, asking to delete", () => {
-    const [report, ...rest] = findings(filesIn(PROBE, LOOSE_FILE_LIMIT), probeCap(20));
+    const [report, ...rest] = findings(filesIn(PROBE, LOOSE_FILE_LIMIT), probeCap(CAP));
 
     expect(rest).toEqual([]);
-    expect(report).toContain("has 15 files, within the limit of 15");
+    expect(report).toContain(
+      `has ${String(LOOSE_FILE_LIMIT)} files, within the limit of ${String(LOOSE_FILE_LIMIT)}`,
+    );
     expect(report).toContain("Delete the entry");
   });
 
   it("fails as stale under the limit", () => {
-    expect(findings(filesIn(PROBE, 10), probeCap(20))).toEqual([
-      expect.stringContaining("has 10 files, within the limit of 15"),
+    expect(findings(filesIn(PROBE, 10), probeCap(CAP))).toEqual([
+      expect.stringContaining(`has 10 files, within the limit of ${String(LOOSE_FILE_LIMIT)}`),
     ]);
   });
 
   it("fails as stale once the folder is gone", () => {
-    const [report, ...rest] = findings(filesIn("packages/probe/test", 3), probeCap(20));
+    const [report, ...rest] = findings(filesIn("packages/probe/test", 3), probeCap(CAP));
 
     expect(rest).toEqual([]);
     expect(report).toContain("has no tracked files");
@@ -148,7 +159,7 @@ describe("a folder with a cap", () => {
   });
 
   it("fails as stale when only a fixtures folder holds files", () => {
-    expect(findings(filesIn(`${PROBE}/fixtures`, 25), probeCap(20))).toEqual([
+    expect(findings(filesIn(`${PROBE}/fixtures`, CAP + 5), probeCap(CAP))).toEqual([
       expect.stringContaining("has no tracked files"),
     ]);
   });
@@ -173,11 +184,8 @@ describe("the table of caps", () => {
     expect(CAPS.filter(({ reason }) => reason.trim() === "")).toEqual([]);
   });
 
-  it("caps only the two folders a tool writes into", () => {
-    expect(folders).toEqual([
-      "apps/web/src/shared/ui",
-      "apps/worker/src/better_answers_worker/redaction",
-    ]);
+  it("caps only the folder a tool writes into", () => {
+    expect(folders).toEqual(["apps/web/src/shared/ui"]);
   });
 });
 
@@ -201,54 +209,61 @@ const capOf = (folder: string): Cap => {
   return found;
 };
 
-const REDACTION = capOf("apps/worker/src/better_answers_worker/redaction");
+const SHARED_UI = capOf("apps/web/src/shared/ui");
 
 describe("the gate over a throwaway repository", () => {
   it("fails a folder over the limit, naming it", () => {
-    const ran = spawned(repositoryOf(filesIn(PROBE, 16)));
+    const ran = spawned(repositoryOf(filesIn(PROBE, LOOSE_FILE_LIMIT + 1)));
 
     expect(ran.status).toBe(1);
     expect(
-      linesOf(ran.stdout).filter((line) => line.startsWith(`${PROBE} has 16 files`)),
+      linesOf(ran.stdout).filter((line) =>
+        line.startsWith(`${PROBE} has ${String(LOOSE_FILE_LIMIT + 1)} files`),
+      ),
     ).toHaveLength(1);
   });
 
-  it("fails a folder over its cap", () => {
-    const ran = spawned(repositoryOf(filesIn(REDACTION.folder, REDACTION.cap + 1)));
+  it("tells a pinned folder over its cap to raise it", () => {
+    const ran = spawned(repositoryOf(filesIn(SHARED_UI.folder, SHARED_UI.cap + 1)));
 
     expect(ran.status).toBe(1);
     expect(ran.stdout).toContain(
-      `${REDACTION.folder} has ${String(REDACTION.cap + 1)} files directly inside it. Its cap in ${WHERE_THE_CAPS_LIVE} is ${String(REDACTION.cap)}.`,
+      `${SHARED_UI.folder} has ${String(SHARED_UI.cap + 1)} files directly inside it. Its cap in ${WHERE_THE_CAPS_LIVE} is ${String(SHARED_UI.cap)}.`,
+    );
+    expect(ran.stdout).toContain("because the shadcn CLI writes its components there");
+    expect(ran.stdout).toContain(
+      `Raise the cap to ${String(SHARED_UI.cap + 1)} in the same change`,
     );
   });
 
-  it("tells a pinned folder over its cap to raise it", () => {
-    const ran = spawned(repositoryOf(filesIn("apps/web/src/shared/ui", 30)));
-
-    expect(ran.status).toBe(1);
-    expect(ran.stdout).toContain("apps/web/src/shared/ui has 30 files directly inside it");
-    expect(ran.stdout).toContain("because the shadcn CLI writes its components there");
-    expect(ran.stdout).toContain("Raise the cap to 30 in the same change");
-  });
-
   it("fails a cap its folder has fallen below", () => {
-    const ran = spawned(repositoryOf(filesIn("apps/web/src/shared/ui", 20)));
+    const held = LOOSE_FILE_LIMIT + 2;
+    const ran = spawned(repositoryOf(filesIn(SHARED_UI.folder, held)));
 
     expect(ran.status).toBe(1);
-    expect(ran.stdout).toContain("apps/web/src/shared/ui has 20 files, fewer than its cap of 29");
-    expect(ran.stdout).toContain("Lower the cap to 20");
+    expect(ran.stdout).toContain(
+      `${SHARED_UI.folder} has ${String(held)} files, fewer than its cap of ${String(SHARED_UI.cap)}`,
+    );
+    expect(ran.stdout).toContain(`Lower the cap to ${String(held)}`);
   });
 
   it("fails a cap whose folder is within the limit", () => {
-    const ran = spawned(repositoryOf(filesIn(REDACTION.folder, 14)));
+    const ran = spawned(repositoryOf(filesIn(SHARED_UI.folder, LOOSE_FILE_LIMIT - 1)));
 
     expect(ran.status).toBe(1);
-    expect(ran.stdout).toContain(`${REDACTION.folder} has 14 files, within the limit`);
+    expect(ran.stdout).toContain(
+      `${SHARED_UI.folder} has ${String(LOOSE_FILE_LIMIT - 1)} files, within the limit`,
+    );
     expect(ran.stdout).toContain("Delete the entry");
   });
 
   it("reads tracked files only", () => {
-    const ran = spawned(repositoryOf(filesIn(PROBE, 15), filesIn(PROBE, 20).slice(15)));
+    const ran = spawned(
+      repositoryOf(
+        filesIn(PROBE, LOOSE_FILE_LIMIT),
+        filesIn(PROBE, LOOSE_FILE_LIMIT + 5).slice(LOOSE_FILE_LIMIT),
+      ),
+    );
 
     expect(ran.stdout).not.toContain(PROBE);
   });
@@ -260,7 +275,7 @@ describe("the gate over a throwaway repository", () => {
   });
 
   it("does not count a tracked file deleted from disk", () => {
-    const root = repositoryOf(filesIn(PROBE, 16));
+    const root = repositoryOf(filesIn(PROBE, LOOSE_FILE_LIMIT + 1));
     rmSync(path.join(root, PROBE, "file-0.ts"));
 
     expect(spawned(root).stdout).not.toContain(PROBE);
@@ -287,7 +302,7 @@ describe("the gate over this repository", () => {
   it("passes with no oversized folder and no stale cap", () => {
     const ran = spawned(repositoryRoot);
 
-    expect(ran.stdout).toMatch(/^all \d+ folders checked hold 15 tracked files or fewer/u);
+    expect(ran.stdout).toMatch(/^all \d+ folders checked hold 25 tracked files or fewer/u);
     expect(ran.status).toBe(0);
   });
 });

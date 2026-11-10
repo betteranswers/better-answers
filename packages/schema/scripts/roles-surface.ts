@@ -2,11 +2,14 @@ import path from "node:path";
 
 import type pg from "pg";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { byCodeUnit } from "../src/code-unit.ts";
 import { listed } from "../src/column-helpers.ts";
 import { DEFINER_REACH_NOTE } from "../src/definer-reach.ts";
 import { testData } from "../test/support/factory.ts";
-import { workspaceRoot } from "../test/support/roots/roots.ts";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 export const rolesSurfacePath = path.resolve(workspaceRoot, "roles-surface.json");
 

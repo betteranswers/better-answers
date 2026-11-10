@@ -2,10 +2,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { describe, expect, it, vi } from "vitest";
 
+import type { UserPrincipal } from "@better-answers/core/kernel";
 import { head } from "@better-answers/core/store/git";
 
 import { includeAvailable } from "../../src/guides/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { bundleHistory } from "../fixtures/bundle.ts";
 import { EMPLOYERS_LIABILITY, type Concept } from "../fixtures/northgate-concepts.ts";
 import { typedBy } from "../fixtures/northgate.ts";

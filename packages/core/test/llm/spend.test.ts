@@ -1,7 +1,10 @@
 import { assert, describe, expect, it } from "vitest";
 
-import { openRecord } from "../../src/answering/index.ts";
-import type { PlatformPrincipal, UserPrincipal } from "../../src/kernel/index.ts";
+import { openRecord } from "@better-answers/core/answering";
+import type { PlatformPrincipal, UserPrincipal } from "@better-answers/core/kernel";
+import { openPostgres } from "@better-answers/core/store/postgres";
+import { setModelPrice, setSpendingLimit } from "@better-answers/core/workspaces";
+
 import {
   RESERVATION_LIFETIME_MS,
   reserveSpend,
@@ -10,8 +13,6 @@ import {
   type CallSize,
   type CallSpent,
 } from "../../src/llm/index.ts";
-import { openPostgres } from "../../src/store/postgres/index.ts";
-import { setModelPrice, setSpendingLimit } from "../../src/workspaces/index.ts";
 import { principalFor } from "../fixtures/workspace-with-bundle.ts";
 import { provisionedWorkspace } from "../support/platform.ts";
 import { rowsFrom } from "../support/rows.ts";

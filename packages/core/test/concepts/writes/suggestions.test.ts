@@ -3,12 +3,14 @@ import { inspect } from "node:util";
 import pg from "pg";
 import { assert, describe, expect, it } from "vitest";
 
+import { open } from "@better-answers/core/answering";
+import type { Result, UserPrincipal } from "@better-answers/core/kernel";
+import { openPostgres } from "@better-answers/core/store/postgres";
 import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
 import { foldConceptType } from "@better-answers/schema/concept-type";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { open } from "../../../src/answering/index.ts";
 import {
   acceptSuggestions,
   conceptByIri,
@@ -27,8 +29,6 @@ import {
   type SuggestionSetSubmitted,
   type WriteConceptInput,
 } from "../../../src/concepts/index.ts";
-import type { Result, UserPrincipal } from "../../../src/kernel/index.ts";
-import { openPostgres } from "../../../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit } from "../../fixtures/bundle.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "../../fixtures/workspace-with-bundle.ts";
 import { documentLanded } from "../../support/suite-documents.ts";

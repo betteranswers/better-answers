@@ -5,8 +5,9 @@ import { describe, expect, it } from "vitest";
 
 import { readOxlintConfig } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
-import { repositoryRoot } from "../support/roots/roots.ts";
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const RULE = "node/no-process-env";
 const SEVERITY = "error";

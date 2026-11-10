@@ -14,8 +14,8 @@ import {
   openMigratedPostgres,
   testData,
 } from "@better-answers/schema/testing";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
-import { repositoryRoot } from "../support/roots/roots.ts";
 import {
   fileFromTheWorkspace,
   IMAGE_PROBE_ALLOWANCE,
@@ -26,6 +26,8 @@ import {
   startTheImage,
   THE_HOST,
 } from "./image-probe.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");

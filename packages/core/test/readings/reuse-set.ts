@@ -2,14 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
-import {
-  CANDIDATE_VERDICTS,
-  DECISION_THRESHOLD,
-  type CandidateVerdict,
-} from "@better-answers/schema";
-import type { MigratedPostgres } from "@better-answers/schema/testing";
-
-import type { PlatformPrincipal, Result, UserPrincipal } from "../../src/kernel/index.ts";
+import type { PlatformPrincipal, Result, UserPrincipal } from "@better-answers/core/kernel";
 import {
   openModelKeySetting,
   storeDecisionThreshold,
@@ -17,14 +10,21 @@ import {
   type ModelClient,
   type ModelOutcome,
   type ModelToCall,
-} from "../../src/llm/index.ts";
-import { openPostgres } from "../../src/store/postgres/index.ts";
+} from "@better-answers/core/llm";
+import { openPostgres } from "@better-answers/core/store/postgres";
 import {
   setModelChoice,
   setModelKey,
   setModelPrice,
   setSpendingLimit,
-} from "../../src/workspaces/index.ts";
+} from "@better-answers/core/workspaces";
+import {
+  CANDIDATE_VERDICTS,
+  DECISION_THRESHOLD,
+  type CandidateVerdict,
+} from "@better-answers/schema";
+import type { MigratedPostgres } from "@better-answers/schema/testing";
+
 import { asked, conceptSeeded, SUITE_ENVELOPE_KEY, type Told } from "../answering/asking.ts";
 import { readAs } from "../answering/recall.ts";
 import { principalFor } from "../fixtures/workspace-with-bundle.ts";

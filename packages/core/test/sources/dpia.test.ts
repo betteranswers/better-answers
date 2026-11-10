@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { parse } from "@better-answers/core/kernel";
 import { CONTENT_HASH } from "@better-answers/schema";
 
-import { parse } from "../../src/kernel/index.ts";
 import {
   dpiaInputFor,
   dpiaReadInput,

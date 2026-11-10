@@ -1,14 +1,18 @@
 import { assert, describe, expect, it } from "vitest";
 
-import { writeConcept } from "../../src/concepts/index.ts";
+import { writeConcept } from "@better-answers/core/concepts";
+import { getObject } from "@better-answers/core/store/objects";
+import {
+  endEverySignInAndToken,
+  endEverySignInAndTokenInput,
+} from "@better-answers/core/workspaces";
+
 import {
   ERASURE,
   rehearseErasure,
   seedSyntheticSubject,
   type ErasureRehearsed,
 } from "../../src/erasure/index.ts";
-import { getObject } from "../../src/store/objects/index.ts";
-import { endEverySignInAndToken, endEverySignInAndTokenInput } from "../../src/workspaces/index.ts";
 import { bundleHistory, everyObjectOf, fileAtCommit } from "../fixtures/bundle.ts";
 import { auditEventRowsOf } from "../fixtures/sourced-concept.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";

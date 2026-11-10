@@ -2,10 +2,10 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it } from "vitest";
 
+import type { Result, Role } from "@better-answers/core/kernel";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import type { Result, Role } from "../../src/kernel/index.ts";
 import { listMembers } from "../../src/members/index.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "../support/platform.ts";
 import {

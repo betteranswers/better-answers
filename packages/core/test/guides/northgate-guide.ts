@@ -1,7 +1,7 @@
+import type { UserPrincipal } from "@better-answers/core/kernel";
 import type { MigratedPostgres } from "@better-answers/schema/testing";
 
 import { saveBrief, seedGuide } from "../../src/guides/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { northgate, type Northgate } from "../fixtures/northgate.ts";
 import { doorsOf, principalFor, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { answered } from "../support/suite-postgres.ts";

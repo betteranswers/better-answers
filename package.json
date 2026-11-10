@@ -39,6 +39,7 @@
     "skills-update": "AI_AGENT=claude npx --yes skills@1.7.6 update -p -y && node scripts/skill-paths.mjs --write",
     "test-folders": "node scripts/test-folders.mjs",
     "move-files": "node scripts/move-files.mjs",
+    "respell-core-imports": "node scripts/respell-core-imports.mjs",
     "table-ownership-scan": "node scripts/table-ownership-scan.mjs packages/core/src apps/api/src",
     "auth-seam-scan": "node scripts/auth-seam-scan.mjs apps/web/tsconfig.json apps/web/src/features/auth/auth-hooks.ts",
     "port-scan": "python3 packages/devtools/python/port_scan.py apps/worker/src",

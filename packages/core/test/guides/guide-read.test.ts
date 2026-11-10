@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { evidenceReaderFor } from "../../src/answering/index.ts";
+import { evidenceReaderFor } from "@better-answers/core/answering";
 import {
   readSectionTrusts,
   trustWords,
   writeConcept,
   type FrontmatterSource,
-} from "../../src/concepts/index.ts";
+} from "@better-answers/core/concepts";
+import { ok, type UserPrincipal } from "@better-answers/core/kernel";
+import { head } from "@better-answers/core/store/git";
+
 import { coverageOf, readGuide, readGuides, type GuideRead } from "../../src/guides/index.ts";
-import { ok, type UserPrincipal } from "../../src/kernel/index.ts";
-import { head } from "../../src/store/git/index.ts";
 import { EMPLOYERS_LIABILITY, NORTHGATE, TYPED } from "../fixtures/northgate-concepts.ts";
 import { typedBy } from "../fixtures/northgate.ts";
 import { doorsOf, suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";

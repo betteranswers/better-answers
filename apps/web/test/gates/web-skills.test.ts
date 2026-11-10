@@ -5,8 +5,11 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { EVERY_AREA, pagesOf } from "@/shared/navigation.ts";
-import { repositoryRoot } from "@test/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const verifyDirectory = ".claude/skills/verify";
 const specsDirectory = ".claude/skills/playwright-specs";

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { ok, type Result, type UserPrincipal } from "@better-answers/core/kernel";
 import { MARK_THE_MATCH_LEAKPROOF } from "@better-answers/schema";
 import { UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 
-import { ok, type Result, type UserPrincipal } from "../../src/kernel/index.ts";
 import {
   findPassages,
   findPassagesWithOpening,

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
+import type { Result, Role, UserPrincipal } from "@better-answers/core/kernel";
+import type { PostgresDoor, Tx } from "@better-answers/core/store/postgres";
 import { AUDIENCE_GROUPS } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import type { Result, Role, UserPrincipal } from "../../../src/kernel/index.ts";
 import {
   changeRole,
   changeRoleInput,
@@ -13,7 +14,6 @@ import {
   exportAuditLogInput,
   type AuditExport,
 } from "../../../src/members/index.ts";
-import type { PostgresDoor, Tx } from "../../../src/store/postgres/index.ts";
 import { confirmedSessionFor } from "../../support/identity-rows.ts";
 import {
   provisionedWorkspace,

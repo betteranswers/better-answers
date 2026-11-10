@@ -3,6 +3,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { declaredTableNames } from "../scripts/worker-view.ts";
 import {
   CROSS_OWNER_TABLE_ACCESS,
@@ -12,7 +14,8 @@ import {
   OWNERS_OUTSIDE_CORE,
   TABLE_OWNERS,
 } from "../src/index.ts";
-import { repositoryRoot } from "./support/roots/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const REPO_ROOT = pathToFileURL(`${repositoryRoot}/`);
 

@@ -4,8 +4,11 @@ import { promisify } from "node:util";
 
 import { z } from "zod";
 
-import { workspaceRoot } from "../roots/roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import type { WarmPostgres } from "../warm-postgres.ts";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 export const run = promisify(execFile);
 

@@ -2,11 +2,12 @@ import { inspect } from "node:util";
 
 import { assert, beforeAll, describe, expect, it } from "vitest";
 
+import { open, renderOpen } from "@better-answers/core/answering";
+import type { UserPrincipal } from "@better-answers/core/kernel";
 import { head } from "@better-answers/core/store/git";
 import { ids, passageLocatorOf, ulid, type ConceptIri } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { open, renderOpen } from "../../../src/answering/index.ts";
 import {
   importBundle,
   parseConceptFile,
@@ -20,7 +21,6 @@ import {
   type MapNotAnalysedLine,
   type WriteConceptInput,
 } from "../../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../../src/kernel/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit, holdMainRef } from "../../fixtures/bundle.ts";
 import {
   doorsOf,

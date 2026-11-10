@@ -1,6 +1,13 @@
 import pg from "pg";
 import { describe, expect, it } from "vitest";
 
+import {
+  FENCE_HOLDERS_PER_POOL,
+  openPostgres,
+  tryWorkspaceFence,
+  withIdentityRead,
+  withWorkspaceFence,
+} from "@better-answers/core/store/postgres";
 import { ulid } from "@better-answers/schema";
 
 import {
@@ -11,13 +18,6 @@ import {
   type WriteConceptInput,
   type WriteManifestInput,
 } from "../../src/concepts/index.ts";
-import {
-  FENCE_HOLDERS_PER_POOL,
-  openPostgres,
-  tryWorkspaceFence,
-  withIdentityRead,
-  withWorkspaceFence,
-} from "../../src/store/postgres/index.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { bootstrap } from "../support/platform.ts";
 import { statementsWaitingOnALock, until } from "../support/suite-postgres.ts";

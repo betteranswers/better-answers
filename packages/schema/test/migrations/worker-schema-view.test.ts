@@ -3,6 +3,8 @@ import path from "node:path";
 
 import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import {
   assertNoUndeclaredTables,
   introspect,
@@ -10,8 +12,9 @@ import {
 } from "../../scripts/worker-view.ts";
 import { journalEntries, journalEntriesOf, lastMigration } from "../../src/journal.ts";
 import type { MigratedPostgres } from "../support/harness.ts";
-import { repositoryRoot } from "../support/roots/roots.ts";
 import { openMigratedPostgres } from "../support/warm-postgres.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const viewPath = path.resolve(
   repositoryRoot,

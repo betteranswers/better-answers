@@ -12,9 +12,11 @@ import {
   stubsOnPath,
   worktreeUnder,
 } from "@better-answers/devtools/worktree-hooks";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import { freePort, type Held, heldPort, released } from "../support/loopback-port.ts";
-import { repositoryRoot } from "../support/roots/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const helper = path.resolve(repositoryRoot, "deploy/browse-production.sh");
 

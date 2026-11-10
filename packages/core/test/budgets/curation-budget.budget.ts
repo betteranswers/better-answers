@@ -6,8 +6,9 @@ import {
   exportBundleSnapshot,
   readAllKnowledge,
   readConceptTypes,
-} from "../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
+} from "@better-answers/core/concepts";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+
 import { seedWideKnowledge } from "../fixtures/concept-shelf.ts";
 import { wideBundle } from "../fixtures/indexed-bundle.ts";
 import { suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";

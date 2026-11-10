@@ -3,7 +3,9 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { repositoryRoot } from "../support/roots/roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const AMBIENT_CLOCK_READ = /\bnew\s+Date\s*\(\s*\)|\bDate\s*\.\s*now\s*\(\s*\)/g;
 

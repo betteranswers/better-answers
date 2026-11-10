@@ -1,10 +1,13 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { lastMigration } from "../src/journal.ts";
 import { startMigratedPostgres } from "../test/support/harness.ts";
-import { repositoryRoot } from "../test/support/roots/roots.ts";
 import { assertNoUndeclaredTables, introspect, renderWorkerSchemaView } from "./worker-view.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const viewPath = path.join(repositoryRoot, "apps/worker/src/better_answers_worker/schema_view.py");
 

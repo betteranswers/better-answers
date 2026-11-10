@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import type { Role, UserPrincipal } from "@better-answers/core/kernel";
+import { type Tx, withPrincipal } from "@better-answers/core/store/postgres";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import type { Role, UserPrincipal } from "../../src/kernel/index.ts";
 import {
   endEverySignInAndTokenHere,
   endEverySignInAndTokenHereInput,
 } from "../../src/members/index.ts";
-import { type Tx, withPrincipal } from "../../src/store/postgres/index.ts";
 import { endedGrants } from "../support/identity-rows.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "../support/platform.ts";
 import { inputOf } from "../support/suite-input.ts";

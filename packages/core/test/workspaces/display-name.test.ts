@@ -1,14 +1,14 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { ulid } from "@better-answers/schema";
-import { matching } from "@better-answers/schema/testing/matching";
-
 import type {
   OperatorPrincipal,
   PlatformPrincipal,
   UserPrincipal,
-} from "../../src/kernel/index.ts";
-import { openPostgres } from "../../src/store/postgres/index.ts";
+} from "@better-answers/core/kernel";
+import { openPostgres } from "@better-answers/core/store/postgres";
+import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
+
 import {
   applyDisplayNameRule,
   correctDisplayName,

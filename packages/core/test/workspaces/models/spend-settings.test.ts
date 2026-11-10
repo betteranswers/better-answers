@@ -1,9 +1,9 @@
 import { assert, describe, expect, it } from "vitest";
 
+import type { PlatformPrincipal } from "@better-answers/core/kernel";
+import { openPostgres } from "@better-answers/core/store/postgres";
 import { ulid } from "@better-answers/schema";
 
-import type { PlatformPrincipal } from "../../../src/kernel/index.ts";
-import { openPostgres } from "../../../src/store/postgres/index.ts";
 import {
   setDecisionThreshold,
   setModelPrice,

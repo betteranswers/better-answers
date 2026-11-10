@@ -6,6 +6,8 @@ import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import type pg from "pg";
 import { assert, describe, expect, it } from "vitest";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import {
   anyWordMatch,
   corpusCounts,
@@ -24,7 +26,8 @@ import {
   refusesEach,
   UNMARK_THE_MATCH,
 } from "../support/probes.ts";
-import { repositoryRoot } from "../support/roots/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const db = postgresForSuite();
 

@@ -3,8 +3,11 @@ import path from "node:path";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { logger } from "../src/logger.ts";
-import { repositoryRoot } from "./support/roots/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const port = Number(process.argv[2]);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {

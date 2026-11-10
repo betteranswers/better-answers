@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CONNECT_WORDS } from "@/features/sources/words.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
-import { anAdminWith, openSources, press } from "@test/sources/stubbed-sources.ts";
+import { anAdminWith, openSources, press } from "@test/stubbed-sources.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

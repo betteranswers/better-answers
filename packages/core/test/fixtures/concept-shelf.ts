@@ -1,5 +1,6 @@
 import type pg from "pg";
 
+import type { Role, UserPrincipal } from "@better-answers/core/kernel";
 import {
   AUDIENCE_GROUPS,
   CONCEPT_DRAFT_STATUS,
@@ -9,7 +10,6 @@ import {
 } from "@better-answers/schema";
 import type { MigratedPostgres, TestData } from "@better-answers/schema/testing";
 
-import type { Role, UserPrincipal } from "../../src/kernel/index.ts";
 import { seedingWith } from "../support/suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 

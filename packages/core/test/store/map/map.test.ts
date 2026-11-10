@@ -1,6 +1,8 @@
 import type { QueryResultRow } from "pg";
 import { describe, expect, it } from "vitest";
 
+import { readConcept } from "@better-answers/core/concepts";
+import { parseLocator, passageAt } from "@better-answers/core/sources";
 import {
   MAP_WALK_DEPTH,
   walkConceptsFromEntries,
@@ -22,8 +24,6 @@ import {
 } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 
-import { readConcept } from "../../../src/concepts/index.ts";
-import { parseLocator, passageAt } from "../../../src/sources/index.ts";
 import { planned, type Planned } from "../../support/planned.ts";
 import {
   answered,

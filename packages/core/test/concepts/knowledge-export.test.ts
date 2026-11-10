@@ -7,11 +7,15 @@ import { promisify } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
+import { evidenceReaderFor } from "@better-answers/core/answering";
+import { withBundleFenceAs } from "@better-answers/core/bundle";
+import { readGuide, saveBrief, seedGuide } from "@better-answers/core/guides";
+import type { PlatformPrincipal, Role, UserPrincipal } from "@better-answers/core/kernel";
+import { rewriteHistory } from "@better-answers/core/store/git";
+import { withScope } from "@better-answers/core/store/postgres";
 import { BUNDLE_MANIFEST_PATH, ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { evidenceReaderFor } from "../../src/answering/index.ts";
-import { withBundleFenceAs } from "../../src/bundle/index.ts";
 import { zipOf, type ZipEntry } from "../../src/concepts/export-zip.ts";
 import {
   exportBundleSnapshot,
@@ -20,10 +24,6 @@ import {
   exportRecords,
   moveBundleCommits,
 } from "../../src/concepts/index.ts";
-import { readGuide, saveBrief, seedGuide } from "../../src/guides/index.ts";
-import type { PlatformPrincipal, Role, UserPrincipal } from "../../src/kernel/index.ts";
-import { rewriteHistory } from "../../src/store/git/index.ts";
-import { withScope } from "../../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit, treeCommitted } from "../fixtures/bundle.ts";
 import { shelveOne } from "../fixtures/concept-shelf.ts";
 import { bundleIndexed, type BundleIndexed } from "../fixtures/indexed-bundle.ts";

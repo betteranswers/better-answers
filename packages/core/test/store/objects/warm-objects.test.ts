@@ -8,8 +8,9 @@ import { promisify } from "node:util";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { describe, expect, it } from "vitest";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { closeObjects, type ObjectDoor, openObjects } from "../../../src/store/objects/index.ts";
-import { workspaceRoot } from "../../support/roots/roots.ts";
 import { objectStoreForSuite } from "../../support/suite-objects.ts";
 import {
   asksForAStore,
@@ -17,6 +18,8 @@ import {
   type ObjectStore,
   openObjectStore,
 } from "../../support/warm-objects.ts";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 const run = promisify(execFile);
 const warmObjectsModule = fileURLToPath(new URL("../../support/warm-objects.ts", import.meta.url));

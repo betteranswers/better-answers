@@ -5,10 +5,11 @@ import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { ASK_CAPS } from "../../src/answering/index.ts";
 import { visibilitySuite } from "../fixtures/sourced-concept.ts";
 import { theReuseSet } from "../readings/reuse-set.ts";
-import { repositoryRoot } from "../support/roots/roots.ts";
 import {
   answersOf,
   bothSetsOf,
@@ -23,6 +24,8 @@ import {
   type RecallAnswer,
   type RecallQuestion,
 } from "./recall.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const suite = visibilitySuite();
 const { db } = suite;

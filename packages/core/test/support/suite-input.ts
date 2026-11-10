@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import { parse } from "../../src/kernel/index.ts";
+import { parse } from "@better-answers/core/kernel";
 
 export const inputOf = <Schema extends z.ZodType>(
   schema: Schema,

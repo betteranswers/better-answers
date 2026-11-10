@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace/workspace-words.ts";
 import { memberPageOf } from "@/features/people/members/members-address.ts";
 import { HOMES, NEW_QUESTION } from "@/shared/navigation.ts";
-import { notFoundLinksHome } from "@test/detail/not-found-detail.ts";
 import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { notFoundLinksHome } from "@test/not-found-detail.ts";
 import {
   anAdminOver,
   changeRoleButton,

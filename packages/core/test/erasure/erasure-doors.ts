@@ -1,5 +1,6 @@
+import type { ObjectDoor } from "@better-answers/core/store/objects";
+
 import type { ErasureDoors, ErasureLog } from "../../src/erasure/index.ts";
-import type { ObjectDoor } from "../../src/store/objects/index.ts";
 import type { Scenario } from "../fixtures/workspace-with-bundle.ts";
 
 export const erasureDoorsFor = (

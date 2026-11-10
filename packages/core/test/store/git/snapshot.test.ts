@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import type { UserPrincipal } from "@better-answers/core/kernel";
 import { boundarySchemas, ulid } from "@better-answers/schema";
 
-import type { UserPrincipal } from "../../../src/kernel/index.ts";
 import { bundleSnapshot, initRepository, type GitDoor } from "../../../src/store/git/index.ts";
 import { bundlesForSuite, treeCommitted } from "../../fixtures/bundle.ts";
 import { gitStarts } from "./git-starts.ts";

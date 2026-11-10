@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { actorIdOfPerson, type UserPrincipal } from "@better-answers/core/kernel";
+import { withMember } from "@better-answers/core/store/postgres";
 import type { ConceptIri } from "@better-answers/schema";
 
 import { open } from "../../src/answering/index.ts";
-import { actorIdOfPerson, type UserPrincipal } from "../../src/kernel/index.ts";
-import { withMember } from "../../src/store/postgres/index.ts";
 import { joinedAs, shelve } from "../fixtures/concept-shelf.ts";
 import { writeUpIncluding } from "../fixtures/sourced-concept.ts";
 import { principalFor } from "../fixtures/workspace-with-bundle.ts";

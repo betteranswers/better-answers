@@ -6,30 +6,22 @@ import {
   importsToolchainRoot,
   placementOfFile,
   reachesRoot,
-  ROOTS_OF,
+  ROOTS_HELPER,
   TOOLCHAIN_PATHS,
   TOOLCHAIN_WORKSPACE,
 } from "../shared/path-climb.ts";
-import type { RootsHelper } from "../shared/path-climb.ts";
 
 const MOST_WRITTEN = 60;
-
-const named = (helper: RootsHelper): string =>
-  helper.exports.map((name) => `\`${name}\``).join(" or ");
 
 export const noPathClimbRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description:
-        "A path built from a file's location does not climb to its workspace root or above it. The root comes from the workspace's roots helper.",
+      description: `A path built from a file's location does not climb to its workspace root or above it. The root comes from \`${ROOTS_HELPER.name}(import.meta.url)\`.`,
     },
     messages: {
-      climbs:
-        "`{{written}}` climbs to the root of `{{workspace}}` or above it, so the path breaks when the file moves. Import {{exports}} from `{{file}}` and join the path from there.",
-      climbsWithoutHelper:
-        "`{{written}}` climbs to the root of `{{workspace}}` or above it, so the path breaks when the file moves. `{{workspace}}` has no roots helper yet. Add one beside its tests and join the path from there.",
-      importsToolchainRoot: `\`{{workspace}}\` must take \`repositoryRoot\` from its own roots helper. Import {{exports}} from \`{{file}}\`, not from \`${TOOLCHAIN_PATHS}\`.`,
+      climbs: `\`{{written}}\` climbs to the root of \`{{workspace}}\` or above it, so the path breaks when the file moves. Import \`${ROOTS_HELPER.name}\` from \`${ROOTS_HELPER.specifier}\`, take \`repositoryRoot\` or \`workspaceRoot\` from \`${ROOTS_HELPER.name}(import.meta.url)\`, and join the path from there.`,
+      importsToolchainRoot: `\`{{workspace}}\` must take \`repositoryRoot\` from \`${ROOTS_HELPER.name}(import.meta.url)\`. Import \`${ROOTS_HELPER.name}\` from \`${ROOTS_HELPER.specifier}\`, not \`repositoryRoot\` from \`${TOOLCHAIN_PATHS}\`.`,
     },
   },
   createOnce(context) {
@@ -44,28 +36,20 @@ export const noPathClimbRule = defineRule({
       if (placed === null) return;
       const depth = climb.fromCwd ? 0 : placed.depth;
       if (!reachesRoot(depth, climb.rise, climb.written)) return;
-      const helper = ROOTS_OF.get(placed.workspace);
-      const data = { written: textOf(node), workspace: placed.workspace };
-      if (helper === undefined) {
-        context.report({ node, messageId: "climbsWithoutHelper", data });
-        return;
-      }
       context.report({
         node,
         messageId: "climbs",
-        data: { ...data, exports: named(helper), file: helper.file },
+        data: { written: textOf(node), workspace: placed.workspace },
       });
     };
     const checkImport = (node: ESTree.ImportDeclaration): void => {
       if (!importsToolchainRoot(node)) return;
       const placed = placementOfFile(context.filename);
-      const helper = placed === null ? undefined : ROOTS_OF.get(placed.workspace);
-      if (placed === null || helper === undefined) return;
-      if (placed.workspace === TOOLCHAIN_WORKSPACE || placed.file === helper.file) return;
+      if (placed === null || placed.workspace === TOOLCHAIN_WORKSPACE) return;
       context.report({
         node,
         messageId: "importsToolchainRoot",
-        data: { workspace: placed.workspace, exports: named(helper), file: helper.file },
+        data: { workspace: placed.workspace },
       });
     };
     return {

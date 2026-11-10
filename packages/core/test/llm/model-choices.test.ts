@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { attempt, type Claims } from "@better-answers/core/kernel";
+import { folded, openPostgres, withPrincipal } from "@better-answers/core/store/postgres";
 import {
   CONFIGURED_MODEL_CHOICES,
   LISTED_MODEL_CHOICES,
@@ -7,9 +9,7 @@ import {
 } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { attempt, type Claims } from "../../src/kernel/index.ts";
 import { listModelChoices, LLM_PURPOSES } from "../../src/llm/index.ts";
-import { folded, openPostgres, withPrincipal } from "../../src/store/postgres/index.ts";
 import { postgresForSuite } from "../support/suite-postgres.ts";
 
 const db = postgresForSuite();

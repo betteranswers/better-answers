@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { withMember, type PostgresDoor } from "@better-answers/core/store/postgres";
 import { conceptIriOf, ulid, WELL_FORMED_ULID, type ConceptIri } from "@better-answers/schema";
 
 import { allKnowledgeInput, readAllKnowledge, readConceptTypes } from "../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { withMember, type PostgresDoor } from "../../src/store/postgres/index.ts";
 import {
   joinedAs,
   seedWideKnowledge,

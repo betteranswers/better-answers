@@ -20,8 +20,9 @@ import {
   type PlannedLint,
   type Tree,
 } from "@better-answers/devtools/throwaway-tree";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
-import { repositoryRoot } from "../support/roots/roots.ts";
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 const RULE = "better-answers/import-direction";
 const CORE = "packages/core";
@@ -131,6 +132,8 @@ beforeAll(spawn.run);
 
 const INTERNAL = "only through its own index.ts";
 
+const RELATIVE_FACE = "not by a relative path";
+
 const REFUSED: Readonly<Record<string, readonly (readonly [string, string, string])[]>> = {
   "packages/core must stay transport-agnostic": [
     ["a slice importing hono", SLICE, "hono"],
@@ -197,6 +200,27 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
     ["a test reaching another slice's unmapped face", MIRRORED, "../../src/sources/index.ts"],
     ["a self-reference to an unmapped entry", SLICE, "@better-answers/core/sources"],
   ],
+  [RELATIVE_FACE]: [
+    ["a test importing a slice's face by path", TEST, "../src/concepts/index.ts"],
+    ["a test importing kernel's face by path", TEST, "../src/kernel/index.ts"],
+    ["a test importing erasure by path", TEST, "../src/erasure/index.ts"],
+    ["a test importing the catalogue by path", TEST, "../src/refusals/index.ts"],
+    ["a test importing a face by its directory", MIRRORED, "../../src/guides"],
+    ["a test importing another slice's face by path", MIRRORED, "../../src/guides/index.ts"],
+    ["a test importing a door's face by path", MIRRORED, "../../src/store/postgres/index.ts"],
+    [
+      "a nested test importing another slice's face",
+      MIRRORED_NESTED,
+      "../../../src/guides/index.ts",
+    ],
+    ["a gate importing a slice's face by path", GATE, "../../src/concepts/index.ts"],
+    ["a helper importing a slice's face by path", SUPPORT, "../../src/concepts/index.ts"],
+    [
+      "a nested helper importing another slice's face",
+      NESTED_HELPER,
+      "../../../src/guides/index.ts",
+    ],
+  ],
   "only a test may import it": [
     ["a slice importing erasure's face", SLICE, "../erasure/index.ts"],
     ["a slice importing erasure by its directory", SLICE, "../erasure"],
@@ -257,6 +281,7 @@ const BRIDGED: readonly (readonly [string, string, string])[] = [
   ["an internal finding", SLICE, "../guides/renderer.ts"],
   ["a test-internal finding", ELSEWHERE, "../../src/concepts/file.ts"],
   ["an unexported finding", SLICE, "../store/objects/index.ts"],
+  ["a test-relative-face finding", TEST, "../src/concepts/index.ts"],
 ];
 
 describe("the rule flags a forbidden import and states its clause", () => {
@@ -272,8 +297,18 @@ describe("the rule flags a forbidden import and states its clause", () => {
     const message = statedBy(ELSEWHERE, "../../src/concepts/file.ts");
 
     expect(message).toContain("not `file.ts`");
-    expect(message).toContain("Import from the index.ts, or move the test to `test/concepts/`");
+    expect(message).toContain(
+      "Import from `@better-answers/core/concepts`, or move the test to `test/concepts/`",
+    );
     expect(message).toContain("mirrors `src/concepts`");
+  });
+
+  it("names the package spelling for a relative face", () => {
+    const message = statedBy(MIRRORED, "../../src/store/postgres/index.ts");
+
+    expect(message).toContain("imports it as `@better-answers/core/store/postgres`");
+    expect(message).toContain("`src/store/postgres`");
+    expect(message).toContain("run `node scripts/respell-core-imports.mjs`");
   });
 
   it("tells a door's test to move to its mirror folder", () => {
@@ -360,11 +395,11 @@ describe("the rule allows each import the ADR permits", () => {
     ["audit importing kernel", AUDIT, "../kernel/index.ts"],
     ["audit importing access", AUDIT, "../access/index.ts"],
     ["llm importing a door by self-reference", LLM, "@better-answers/core/store/postgres"],
-    ["a test importing a slice's face", TEST, "../src/concepts/index.ts"],
-    ["a test importing kernel's face", TEST, "../src/kernel/index.ts"],
+    ["a test importing a slice's face", TEST, "@better-answers/core/concepts"],
+    ["a test importing kernel's face", TEST, "@better-answers/core/kernel"],
     ["a test importing a door's face by self-reference", TEST, "@better-answers/core/store/map"],
-    ["a test importing erasure", TEST, "../src/erasure/index.ts"],
-    ["a test importing the catalogue", TEST, "../src/refusals/index.ts"],
+    ["a test importing erasure", TEST, "@better-answers/core/erasure"],
+    ["a test importing the catalogue", TEST, "@better-answers/core/refusals"],
     ["the catalogue importing kernel's face", CATALOGUE, "../kernel/index.ts"],
     ["the catalogue importing a slice's face", CATALOGUE, "../concepts/index.ts"],
     ["the catalogue importing erasure's face", CATALOGUE, "../erasure/index.ts"],
@@ -391,8 +426,8 @@ describe("the rule allows each import the ADR permits", () => {
       "../../src/sources/index.ts",
     ],
     ["a test importing its own directory by its path", MIRRORED_UNMAPPED, "../../src/sources"],
-    ["a test importing another slice's face", MIRRORED, "../../src/guides/index.ts"],
-    ["a test importing a door's face", MIRRORED, "../../src/store/postgres/index.ts"],
+    ["a test importing another slice's face", MIRRORED, "@better-answers/core/guides"],
+    ["a test importing a door's face", MIRRORED, "@better-answers/core/store/postgres"],
     ["a test importing its own sibling", TEST, "./suite-postgres.ts"],
     ["a test importing a helper from the support folder", MIRRORED, "../support/seed.ts"],
     ["a test importing the devtools runner", TEST, "@better-answers/devtools/throwaway-tree"],

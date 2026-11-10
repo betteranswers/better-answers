@@ -1,24 +1,24 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { matching } from "@better-answers/schema/testing/matching";
-
 import type {
   OperatorPrincipal,
   PlatformPrincipal,
   Role,
   UserPrincipal,
-} from "../../src/kernel/index.ts";
+} from "@better-answers/core/kernel";
+import { openPostgres, type Tx } from "@better-answers/core/store/postgres";
+import {
+  correctDisplayName,
+  correctDisplayNameInput,
+  setDisplayName,
+} from "@better-answers/core/workspaces";
+import { matching } from "@better-answers/schema/testing/matching";
+
 import {
   flagDisplayName,
   flagDisplayNameInput,
   listNamesWaiting,
 } from "../../src/members/index.ts";
-import { openPostgres, type Tx } from "../../src/store/postgres/index.ts";
-import {
-  correctDisplayName,
-  correctDisplayNameInput,
-  setDisplayName,
-} from "../../src/workspaces/index.ts";
 import {
   asTheOperator,
   bootstrap,

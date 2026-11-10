@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import type { Tx } from "@better-answers/core/store/postgres";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { changeRole, changeRoleInput, listMembers } from "../../src/members/index.ts";
-import type { Tx } from "../../src/store/postgres/index.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "../support/platform.ts";
 import { inputOf } from "../support/suite-input.ts";
 import {

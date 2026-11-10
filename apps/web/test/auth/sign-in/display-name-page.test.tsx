@@ -6,7 +6,7 @@ import {
   DISPLAY_NAME_MAX_CHARACTERS,
   DISPLAY_NAME_WORDS,
 } from "@/shared/member/display-name-words.ts";
-import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/auth/signed-in-without-workspace.ts";
+import { aPersonNamedWithNoWorkspace, signedInAs } from "@test/signed-in-without-workspace.ts";
 import { server } from "@test/stub-server.ts";
 import { aRefusalAnswer, openPageOutsideShell, read } from "@test/two-workspaces.ts";
 

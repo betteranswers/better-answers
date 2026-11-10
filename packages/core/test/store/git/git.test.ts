@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
+import type { ActorId, PlatformPrincipal, UserPrincipal } from "@better-answers/core/kernel";
 import {
   ANY_HEAD,
   commit,
@@ -22,7 +23,6 @@ import {
 import { boundarySchemas, ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import type { ActorId, PlatformPrincipal, UserPrincipal } from "../../../src/kernel/index.ts";
 import {
   bundleHistory,
   bundlesForSuite,

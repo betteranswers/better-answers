@@ -1,6 +1,15 @@
 import pg from "pg";
 import { afterAll, afterEach, beforeAll, beforeEach, expect } from "vitest";
 
+import type { Result, UserPrincipal } from "@better-answers/core/kernel";
+import {
+  folded,
+  openPostgres,
+  withPrincipal,
+  type Foldable,
+  type Folded,
+  type Tx,
+} from "@better-answers/core/store/postgres";
 import { ulid } from "@better-answers/schema";
 import {
   endPool,
@@ -9,16 +18,6 @@ import {
   type MigratedPostgres,
   type TestData,
 } from "@better-answers/schema/testing";
-
-import type { Result, UserPrincipal } from "../../src/kernel/index.ts";
-import {
-  folded,
-  openPostgres,
-  withPrincipal,
-  type Foldable,
-  type Folded,
-  type Tx,
-} from "../../src/store/postgres/index.ts";
 
 export const postgresForSuite = (): (() => MigratedPostgres) => {
   let db: MigratedPostgres | undefined;

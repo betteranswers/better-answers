@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { ASK_CAPS } from "../../src/answering/index.ts";
+import { ASK_CAPS } from "@better-answers/core/answering";
+
 import {
   answersOf,
   bothSetsOf,

@@ -1,12 +1,14 @@
 import { assert, describe, expect, it } from "vitest";
 import type { z } from "zod";
 
+import { STORED_DETAIL_KEYS } from "@better-answers/core/audit";
+import { parse, type Result, type Role, type UserPrincipal } from "@better-answers/core/kernel";
+import type { Foldable, Folded, Tx } from "@better-answers/core/store/postgres";
+import { recordSignIn } from "@better-answers/core/workspaces";
 import { AUDIENCE_GROUPS, CONCEPT_DRAFT_STATUS, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { STORED_DETAIL_KEYS } from "../../../src/audit/index.ts";
-import { parse, type Result, type Role, type UserPrincipal } from "../../../src/kernel/index.ts";
 import {
   addToGroup,
   changeRole,
@@ -19,8 +21,6 @@ import {
   renameGroup,
   type SearchedAuditLogPage,
 } from "../../../src/members/index.ts";
-import type { Foldable, Folded, Tx } from "../../../src/store/postgres/index.ts";
-import { recordSignIn } from "../../../src/workspaces/index.ts";
 import { confirmedSessionFor } from "../../support/identity-rows.ts";
 import {
   bootstrap,

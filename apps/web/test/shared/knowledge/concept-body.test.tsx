@@ -7,11 +7,13 @@ import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { replaceMarkers } from "@better-answers/schema/brief-marker";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import { CitedBrief, ConceptBody } from "@/shared/knowledge/concept-body.tsx";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { openPages } from "@test/address-router.tsx";
-import { repositoryRoot } from "@test/roots.ts";
+
+const { repositoryRoot } = rootsOf(import.meta.url);
 
 afterEach(cleanup);
 

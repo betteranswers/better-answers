@@ -1,8 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { erasureMapOf, subjectNamedBy, subjectRequestFor } from "../../src/erasure/index.ts";
-import { footnotesOf } from "../../src/guides/index.ts";
-import { withScope } from "../../src/store/postgres/index.ts";
+import { erasureMapOf, subjectNamedBy, subjectRequestFor } from "@better-answers/core/erasure";
+import { footnotesOf } from "@better-answers/core/guides";
+import { withScope } from "@better-answers/core/store/postgres";
+
 import { suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { percentile, recordFigures } from "../support/figures.ts";
 import { bootstrap } from "../support/platform.ts";

@@ -1,6 +1,27 @@
 import type pg from "pg";
 import type { z } from "zod";
 
+import type {
+  PlatformPrincipal,
+  PrincipalRefusal,
+  Result,
+  UserPrincipal,
+} from "@better-answers/core/kernel";
+import {
+  openCredentials,
+  openModelKeySetting,
+  type Credentials,
+  type LlmPurpose,
+  type ModelClient,
+  type StreamModel,
+} from "@better-answers/core/llm";
+import {
+  openPostgres,
+  withMember,
+  withMemberUnheld,
+  type Tx,
+} from "@better-answers/core/store/postgres";
+import { setModelKey, setModelPrice, setSpendingLimit } from "@better-answers/core/workspaces";
 import {
   CONCEPT_DRAFT_STATUS,
   ids,
@@ -23,27 +44,6 @@ import {
   type AskSteps,
   type DraftSteps,
 } from "../../src/answering/index.ts";
-import type {
-  PlatformPrincipal,
-  PrincipalRefusal,
-  Result,
-  UserPrincipal,
-} from "../../src/kernel/index.ts";
-import {
-  openCredentials,
-  openModelKeySetting,
-  type Credentials,
-  type LlmPurpose,
-  type ModelClient,
-  type StreamModel,
-} from "../../src/llm/index.ts";
-import {
-  openPostgres,
-  withMember,
-  withMemberUnheld,
-  type Tx,
-} from "../../src/store/postgres/index.ts";
-import { setModelKey, setModelPrice, setSpendingLimit } from "../../src/workspaces/index.ts";
 import { conceptCiting, type SourcedConcept } from "../fixtures/sourced-concept.ts";
 import { principalFor, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { bootstrap, provisionedWorkspace } from "../support/platform.ts";

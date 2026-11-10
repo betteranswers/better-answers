@@ -1,11 +1,11 @@
 import { assert, describe, expect, it } from "vitest";
 
+import { ok } from "@better-answers/core/kernel";
 import { conceptIriOf, WELL_FORMED_ULID } from "@better-answers/schema";
 
 import { ASK_CAPS, type ReturnedConcept } from "../../src/answering/index.ts";
 import { judgedBy } from "../../src/answering/judge.ts";
 import type { AnswerPlan } from "../../src/answering/plan.ts";
-import { ok } from "../../src/kernel/index.ts";
 import { A_CANDIDATE, clientAnswering, judgeReplyTo } from "../support/judge-wire.ts";
 
 const CLAUDE_CODE_INLINE_RESULT_CHARACTERS = 50_000;

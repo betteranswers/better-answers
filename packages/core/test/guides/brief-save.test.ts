@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import type { UserPrincipal } from "@better-answers/core/kernel";
 import { head } from "@better-answers/core/store/git";
 
-import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { suiteWithBundles } from "../fixtures/workspace-with-bundle.ts";
 import { answered } from "../support/suite-postgres.ts";
 import {

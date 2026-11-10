@@ -1,8 +1,8 @@
 import { readdir, rm } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import type { PlatformPrincipal } from "../../src/kernel/index.ts";
-import { openGit, withRepositoryLockAs } from "../../src/store/git/index.ts";
+import type { PlatformPrincipal } from "@better-answers/core/kernel";
+import { openGit, withRepositoryLockAs } from "@better-answers/core/store/git";
 
 const ACTIONS_GONE_TIMEOUT_MS = 30_000;
 

@@ -4,7 +4,9 @@ import { pathToFileURL } from "node:url";
 
 import { z } from "zod";
 
-import { workspaceRoot } from "../support/roots/roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 const manifestShape = z.object({ exports: z.record(z.string(), z.string()) });
 

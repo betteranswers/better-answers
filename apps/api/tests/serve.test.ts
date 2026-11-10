@@ -2,8 +2,11 @@ import { execFile } from "node:child_process";
 
 import { expect, it } from "vitest";
 
+import { rootsOf } from "@better-answers/schema/testing/roots";
+
 import { heldPort, released } from "./support/loopback-port.ts";
-import { workspaceRoot } from "./support/roots/roots.ts";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 /** Shorter than the harness start-up, so only a server that binds its port first exits in time. */
 const BEFORE_START_UP_MS = 3000;

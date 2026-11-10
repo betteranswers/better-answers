@@ -5,13 +5,15 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { facesAdmittingNobody } from "@better-answers/devtools/face-admission";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
-import { workspaceRoot } from "../support/roots/roots.ts";
 import {
   asSliceRelative,
   coreSourceFiles,
   sourceTreeIsInstrumented,
 } from "../support/source-tree.ts";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 const HOLDS_NO_ACTION = ["access", "kernel", "refusals", "store"];
 

@@ -1,7 +1,8 @@
 import { assert, describe, expect, it } from "vitest";
 
-import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { runsOfSubject, runsOfSubjectInput } from "../../src/runs/index.ts";
+import type { UserPrincipal } from "@better-answers/core/kernel";
+import { runsOfSubject, runsOfSubjectInput } from "@better-answers/core/runs";
+
 import { listConnectedSources } from "../../src/sources/index.ts";
 import { passageUnder, seededBy } from "../fixtures/sourced-concept.ts";
 import { suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";

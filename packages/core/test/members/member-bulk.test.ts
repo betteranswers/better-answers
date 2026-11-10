@@ -2,11 +2,12 @@ import { inspect } from "node:util";
 
 import { assert, describe, expect, it } from "vitest";
 
+import { parse, type Result, type UserPrincipal } from "@better-answers/core/kernel";
+import type { Tx } from "@better-answers/core/store/postgres";
 import { ulid } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { parse, type Result, type UserPrincipal } from "../../src/kernel/index.ts";
 import {
   bulkAddToGroup,
   bulkAddToGroupInput,
@@ -21,7 +22,6 @@ import {
   type BulkOutcome,
   type BulkRemoveMembersRefusal,
 } from "../../src/members/index.ts";
-import type { Tx } from "../../src/store/postgres/index.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "../support/platform.ts";
 import { inputOf } from "../support/suite-input.ts";
 import {

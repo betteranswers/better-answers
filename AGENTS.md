@@ -58,11 +58,11 @@ Such a folder is `support/` or `fixtures/` for helpers, `gates/` at the test roo
 
 ### Paths to repository files
 
-A test or a script reaches repository files through its workspace's roots helper, never by climbing with `..`. `pnpm run lint` and `pnpm run climb-scan` name the helper in each error. Production source under `src/` and code at the repository root, such as `scripts/`, are exempt.
+A test or a script reaches repository files through a roots helper, never by climbing with `..`. In TypeScript the helper is `rootsOf(import.meta.url)` from `@better-answers/schema/testing/roots`, which returns `repositoryRoot` and `workspaceRoot`. In Python it is `roots.py` in `apps/worker/tests/support/` or in `packages/devtools/python/`. `pnpm run lint` and `pnpm run climb-scan` name the helper in each error. Production source under `src/` and code at the repository root, such as `scripts/`, are exempt.
 
 ### Folder size
 
-A folder in a `src`, `test`, `tests`, or `e2e` tree holds at most 15 tracked files directly. Split a full folder by sub-capability. `pnpm run loose-files` enforces the limit.
+A folder in a `src`, `test`, `tests`, or `e2e` tree holds at most 25 tracked files directly. A folder named `support`, `fixtures`, or `__snapshots__` is not counted. Split a full folder by sub-capability. `pnpm run loose-files` enforces the limit.
 
 ### Move files
 
@@ -85,7 +85,7 @@ If the script stops before it prints its report, run it again with the same tabl
 ### Test at the lowest layer that can see the claim
 
 - Test a pure function in-process, and import its module by path.
-- In `packages/core`, a test imports any module of the folder it mirrors, and any other folder only through that folder's `index.ts`. The `import-direction` lint enforces this.
+- In `packages/core`, a test imports any module of the folder it mirrors by relative path, and any other folder only as `@better-answers/core/<folder>`, its entry in the package's `exports` map. The `import-direction` lint enforces this, and `node scripts/respell-core-imports.mjs` rewrites the relative paths it refuses.
 - Test a transport through its interface. In `apps/api`, call `server.request(...)`. In `apps/worker`, call the job or the module entry point.
 - Test the behaviour of a page on a single screen with a component test that uses Testing Library.
 

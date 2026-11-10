@@ -1,5 +1,8 @@
 import { assert, describe, expect, it } from "vitest";
 
+import { err, type UserPrincipal } from "@better-answers/core/kernel";
+import { parseLocator, passageAt } from "@better-answers/core/sources";
+import type { Tx } from "@better-answers/core/store/postgres";
 import { citedSourcesOf, conceptIriOf, ids, ulid, type ConceptIri } from "@better-answers/schema";
 import { linksAndMarksOf } from "@better-answers/schema/concept-file";
 
@@ -9,9 +12,6 @@ import {
   type FrontmatterValue,
   type WriteConceptInput,
 } from "../../../src/concepts/index.ts";
-import { err, type UserPrincipal } from "../../../src/kernel/index.ts";
-import { parseLocator, passageAt } from "../../../src/sources/index.ts";
-import type { Tx } from "../../../src/store/postgres/index.ts";
 import {
   conceptCiting,
   connectedSourceHolding,

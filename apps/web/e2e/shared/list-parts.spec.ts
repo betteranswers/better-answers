@@ -3,11 +3,13 @@ import { pathToFileURL } from "node:url";
 
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { workspaceRoot } from "@test/roots.ts";
+import { rootsOf } from "@better-answers/schema/testing/roots";
 
 import { expect, test } from "../browser.ts";
 import { bundledHarness, harnessDrawn } from "../drawn-parts.ts";
 import { tabUntilFocused } from "../harness.ts";
+
+const { workspaceRoot } = rootsOf(import.meta.url);
 
 const LIST_BUDGET_MS = 1000;
 
