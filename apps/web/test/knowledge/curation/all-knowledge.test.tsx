@@ -213,6 +213,8 @@ describe("the All Knowledge page", () => {
 
     const clear = await region().findByRole("button", { name: CLEAR_WORDS.filters });
     expect(region().queryAllByRole("link")).toHaveLength(0);
+    expect(region().getByText(WORDS.noneMatch)).toBeDefined();
+    expect(region().queryByText(WORDS.matching(0)), "no match also counts 0").toBeNull();
 
     fireEvent.click(clear);
 

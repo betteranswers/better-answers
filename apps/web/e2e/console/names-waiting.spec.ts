@@ -149,7 +149,10 @@ test.describe("the console's Flagged Names page", () => {
       await expect(waitingRowOf(page, name)).toBeVisible();
 
       await waitingSearch(page).fill(`nobody ${tag}`);
-      await expect(waitingCount(page)).toHaveText(/\b0\b/);
+      await expect(waitingCount(page)).toHaveText("");
+      await expect(namesWaiting(page)).toContainText(
+        NAMES_WAITING_WORDS.noneMatch(`nobody ${tag}`),
+      );
       await expect(waitingRows(page)).toHaveCount(1);
       await expect(waitingRows(page).getByRole("button")).toHaveText([CLEAR_WORDS.search]);
       const narrowed = await waitingCount(page).innerText();

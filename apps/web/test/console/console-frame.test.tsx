@@ -10,7 +10,7 @@ import {
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { useAsking } from "@/features/console/everyone/everyone-search.tsx";
-import { WORKSPACES_WORDS } from "@/features/console/list-words.ts";
+import { NAMES_WAITING_WORDS, WORKSPACES_WORDS } from "@/features/console/list-words.ts";
 import { correctWords } from "@/features/console/names-waiting/correcting-words.ts";
 import {
   NAMES_WAITING_KEYSTROKES,
@@ -333,7 +333,8 @@ describe("the console's lists", () => {
     expect(countIn(list).textContent).toMatch(/\b1\b.*NORTH/);
 
     searchFor(list, WORKSPACES_LIST.search, "nowhere");
-    expect(countIn(list).textContent).toMatch(/\b0\b.*nowhere/);
+    expect(countIn(list).textContent, "a search that matches nothing still counts 0").toBe("");
+    expect(within(list).getByText(WORKSPACES_WORDS.noneMatch("nowhere"))).toBeDefined();
     fireEvent.click(within(list).getByRole("button", { name: CLEAR_WORDS.search }));
     expect(rowsOf(list)).toHaveLength(2);
     expect(countIn(list).textContent).toMatch(/\b2\b/);
@@ -388,7 +389,8 @@ describe("the console's lists", () => {
     expect(countIn(list).textContent).toMatch(/\b1\b.*dales/);
 
     searchFor(list, NAMES_WAITING_LIST.search, "nobody");
-    expect(countIn(list).textContent).toMatch(/\b0\b.*nobody/);
+    expect(countIn(list).textContent, "a search that matches no one still counts 0").toBe("");
+    expect(within(list).getByText(NAMES_WAITING_WORDS.noneMatch("nobody"))).toBeDefined();
     expect(within(list).getByRole("button", { name: CLEAR_WORDS.search })).toBeDefined();
   });
 

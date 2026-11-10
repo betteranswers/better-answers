@@ -88,7 +88,8 @@ const readOf = (listed: Listed) => {
 
 const countSaid = (readingAgain: boolean, total: number, search: string): string => {
   if (readingAgain) return WORDS.readingAgain;
-  return search === "" ? WORDS.counted(total) : WORDS.matching(total, search);
+  if (search === "") return WORDS.counted(total);
+  return total === 0 ? "" : WORDS.matching(total, search);
 };
 
 type Opened = { readonly personId: string; readonly at: OpenedAt };
