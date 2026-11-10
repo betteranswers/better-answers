@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { foldConceptType } from "../../src/bundle/index.ts";
+import { foldConceptType } from "../../src/knowledge/concept-type.ts";
 
 it.each([
   ["policy", "Policy"],

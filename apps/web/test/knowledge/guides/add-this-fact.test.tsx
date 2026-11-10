@@ -5,6 +5,7 @@ import { EDITOR_WORDS } from "@/features/knowledge/editing/editor-words.ts";
 import { GUIDE_WORDS } from "@/features/knowledge/guides/guide-words.ts";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
 import { aNewConceptApi } from "@test/knowledge/concept-editing-answers.ts";
+import { conceptTypeShown } from "@test/knowledge/concept-type-picker.ts";
 import {
   A_GUIDE_PAGE,
   aFact,
@@ -35,7 +36,7 @@ const field = (name: string) => screen.getByRole<HTMLInputElement>("textbox", { 
 const prefilled = async () => {
   await screen.findByRole("heading", { level: 3, name: EDITOR_WORDS.headingNew });
   expect(field("Title").value).toBe(LIABILITY_TITLE);
-  expect(field(EDITOR_WORDS.conceptType).value).toBe("Insurance policy");
+  expect(conceptTypeShown()).toBe("Insurance policy");
   expect(field("Tags").value).toBe("employers-liability");
   expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "Collection" }).value).toBe(
     "northgate",

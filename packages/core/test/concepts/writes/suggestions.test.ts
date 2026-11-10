@@ -4,6 +4,7 @@ import pg from "pg";
 import { assert, describe, expect, it } from "vitest";
 
 import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
+import { foldConceptType } from "@better-answers/schema/concept-type";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -13,7 +14,6 @@ import {
   conceptByIri,
   contentHashOf,
   declineSuggestion,
-  foldConceptType,
   mergeKeyOf,
   parseConceptFile,
   submitSuggestionSet,

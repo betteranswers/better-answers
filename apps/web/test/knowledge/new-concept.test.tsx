@@ -15,6 +15,12 @@ import {
   savesAsked,
   suggested,
 } from "@test/knowledge/concept-editing-answers.ts";
+import {
+  addedAType,
+  choseAType,
+  conceptTypeShown,
+  withATypePicker,
+} from "@test/knowledge/concept-type-picker.ts";
 import { finding, openedSearch, placedForSearch, typed } from "@test/knowledge/search-answers.ts";
 import { settlingAfter, type Api } from "@test/stubbed-api.ts";
 import { read } from "@test/two-workspaces.ts";
@@ -24,6 +30,8 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 await import("@/features/knowledge/editing/concept-session.tsx");
 
 placedForSearch();
+
+withATypePicker();
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -68,9 +76,6 @@ const firstLate = (late: Promise<unknown>, afterwards: unknown) => {
     return reads === 1 ? late : afterwards;
   };
 };
-
-const conceptTypeField = () =>
-  screen.getByRole<HTMLInputElement>("textbox", { name: EDITOR_WORDS.conceptType });
 
 const titleField = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Title" });
 
@@ -119,12 +124,12 @@ describe("typing a new concept from Search", () => {
     api.set(SAVE, committed);
     const router = await openedForANewConcept({}, api);
 
-    typedInto(conceptTypeField(), "Policy");
+    await choseAType("Policy");
     chose("policies");
 
     await savesAs(EDITOR_WORDS.save);
     expect(leaveAsked()).toBeNull();
-    expect(conceptTypeField().value).toBe("Policy");
+    expect(conceptTypeShown()).toBe("Policy");
     expect(router.state.location.searchStr).toContain("knowledge.collection=policies");
     expect(
       screen.getByRole("button", { name: EDITOR_WORDS.save }).getAttribute("aria-disabled"),
@@ -140,7 +145,7 @@ describe("typing a new concept from Search", () => {
   it("asks nothing when a typed form is closed", async () => {
     const router = await openedForANewConcept({ collection: "policies" });
 
-    typedInto(conceptTypeField(), "Policy");
+    await choseAType("Policy");
     pressed(EDITOR_WORDS.close);
 
     await newConceptClosed();
@@ -154,7 +159,7 @@ describe("typing a new concept from Search", () => {
     const offer = await searchWithNoMatch("Cyber Essentials Plus certificate");
     fireEvent.click(offer);
     await newConceptHeading();
-    typedInto(conceptTypeField(), "Certification");
+    await addedAType("Certification");
     typedInto(titleField(), "Cyber Essentials Plus");
 
     pressed(EDITOR_WORDS.close);
@@ -162,7 +167,7 @@ describe("typing a new concept from Search", () => {
     fireEvent.click(await screen.findByRole("button", { name: NEW_CONCEPT_OFFER }));
 
     await newConceptHeading();
-    expect(conceptTypeField().value).toBe("Certification");
+    expect(conceptTypeShown()).toBe("Certification");
     expect(titleField().value).toBe("Cyber Essentials Plus");
   });
 

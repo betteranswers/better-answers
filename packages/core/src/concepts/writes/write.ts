@@ -8,10 +8,11 @@ import {
   conceptIriOf,
   type ConceptIri,
 } from "@better-answers/schema";
+import { foldConceptType } from "@better-answers/schema/concept-type";
 
 import { widens, type Visibility } from "../../access/index.ts";
 import { action, declareActions, record } from "../../audit/index.ts";
-import { commitAndLandAsMember, foldConceptType, withBundleWrite } from "../../bundle/index.ts";
+import { commitAndLandAsMember, withBundleWrite } from "../../bundle/index.ts";
 import {
   actorIdOf,
   admit,

@@ -1,4 +1,5 @@
-import { foldConceptType } from "../../bundle/index.ts";
+import { foldConceptType } from "@better-answers/schema/concept-type";
+
 import { mergeKeyOf, type Held } from "../import/landing.ts";
 
 export const mergeKeyMovedBy = (

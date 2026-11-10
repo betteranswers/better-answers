@@ -27,6 +27,7 @@ import {
   type Mode,
   type Open,
 } from "./concept-editing.ts";
+import { ConceptTypeField } from "./concept-type-field.tsx";
 import { EDITOR_WORDS as WORDS } from "./editor-words.ts";
 import { losesMarkdown } from "./markdown-round-trip.ts";
 import { SourcesField } from "./sources-field.tsx";
@@ -54,10 +55,15 @@ export type EditorEvents = {
 
 export type Leaving = { readonly proceed: () => void; readonly reset: () => void };
 
+export type Choices = {
+  readonly collections: readonly string[];
+  readonly conceptTypes: readonly string[] | undefined;
+};
+
 export type EditorProps = {
   readonly shown: EditorShown;
   readonly target: EditTarget;
-  readonly collections: readonly string[];
+  readonly choices: Choices;
   readonly generation: number;
   readonly headingRef: RefObject<HTMLHeadingElement | null>;
   readonly leaving: Leaving | undefined;
@@ -81,6 +87,12 @@ const reviewOf = (open: Open, target: EditTarget): string | undefined => {
 
 const IN_A_TEXT_FIELD = 'input, textarea, [contenteditable="true"], [role="textbox"]';
 
+const escapeLeavesTheField = (event: KeyboardEvent<HTMLElement>): boolean =>
+  event.key === "Escape" &&
+  !event.defaultPrevented &&
+  event.target instanceof Element &&
+  event.target.matches(IN_A_TEXT_FIELD);
+
 function Warning(properties: { readonly words: string }) {
   return (
     <div className="mt-4 flex items-start gap-3">
@@ -98,21 +110,19 @@ function Warning(properties: { readonly words: string }) {
   );
 }
 
-type TextKey = "title" | "conceptType" | "description" | "tags";
+type TextKey = "title" | "description" | "tags";
 
 type TextFieldShown = {
-  readonly key: TextKey;
   readonly label: string;
   readonly hint?: string;
   readonly multiline?: boolean;
 };
 
-const TEXT_FIELDS: readonly TextFieldShown[] = [
-  { key: "title", label: WORDS.title },
-  { key: "conceptType", label: WORDS.conceptType },
-  { key: "description", label: WORDS.description, multiline: true },
-  { key: "tags", label: WORDS.tags, hint: WORDS.tagsHint },
-];
+const TEXT_FIELDS = {
+  title: { label: WORDS.title },
+  description: { label: WORDS.description, multiline: true },
+  tags: { label: WORDS.tags, hint: WORDS.tagsHint },
+} satisfies Readonly<Record<TextKey, TextFieldShown>>;
 
 function TextField(properties: {
   readonly shown: TextFieldShown;
@@ -398,17 +408,23 @@ export function ConceptEditor(properties: EditorProps) {
     headingRef.current?.focus();
   }, [headingRef]);
 
+  const text = (key: TextKey) => (
+    <TextField
+      shown={TEXT_FIELDS[key]}
+      value={open.draft[key]}
+      locked={locked}
+      onChange={(value) => {
+        events.edit({ [key]: value });
+      }}
+    />
+  );
+
   const onKeys = (event: KeyboardEvent<HTMLElement>) => {
-    const { target: pressedIn } = event;
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       event.stopPropagation();
       events.save();
-    } else if (
-      event.key === "Escape" &&
-      pressedIn instanceof Element &&
-      pressedIn.matches(IN_A_TEXT_FIELD)
-    ) {
+    } else if (escapeLeavesTheField(event)) {
       event.preventDefault();
       event.stopPropagation();
       event.currentTarget
@@ -431,21 +447,21 @@ export function ConceptEditor(properties: EditorProps) {
       >
         {headingOf(open, target)}
       </h3>
-      {TEXT_FIELDS.map((field) => (
-        <TextField
-          key={field.key}
-          shown={field}
-          value={open.draft[field.key]}
-          locked={locked}
-          onChange={(value) => {
-            events.edit({ [field.key]: value });
-          }}
-        />
-      ))}
+      {text("title")}
+      <ConceptTypeField
+        value={open.draft.conceptType}
+        conceptTypes={properties.choices.conceptTypes}
+        locked={locked}
+        onChoose={(conceptType) => {
+          events.edit({ conceptType });
+        }}
+      />
+      {text("description")}
+      {text("tags")}
       {target.kind === "new" ? (
         <CollectionField
           collection={target.collection}
-          collections={properties.collections}
+          collections={properties.choices.collections}
           locked={locked}
           onChoose={events.collection}
         />

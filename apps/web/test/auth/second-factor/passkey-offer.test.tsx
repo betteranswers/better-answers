@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Providers } from "@/app/providers.tsx";
+import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
 import { useSignInEmailOtp } from "@/features/auth/auth-hooks.ts";
 import { usePasskeySignIn } from "@/features/auth/passkey-hooks.ts";
 import { forgetThePasskeyOfferShown } from "@/features/auth/session-memory.ts";
@@ -126,6 +127,17 @@ const refuseStorage = (): void => {
 };
 
 describe("the passkey offer", () => {
+  it("sits under the page title, inside the page", async () => {
+    await loadedOnTheOffer();
+
+    const title = await screen.findByRole("heading", { level: 1 });
+    const offerRegion = within(screen.getByRole("main")).getByRole("region", {
+      name: PASSKEY_WORDS.heading,
+    });
+
+    expect(title.compareDocumentPosition(offerRegion)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it("shows on the first page and on no later page", async () => {
     const { router } = await loadedOnTheOffer();
 

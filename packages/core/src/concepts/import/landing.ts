@@ -15,6 +15,7 @@ import {
   VERIFICATION_ERASURE_ORIGIN,
   VERIFICATION_CITATION_FIX_ORIGIN,
 } from "@better-answers/schema";
+import { foldConceptType } from "@better-answers/schema/concept-type";
 
 import {
   readableParameters,
@@ -22,7 +23,7 @@ import {
   visibilityOf,
   type Visibility,
 } from "../../access/index.ts";
-import { foldConceptType, landBundleCommit } from "../../bundle/index.ts";
+import { landBundleCommit } from "../../bundle/index.ts";
 import { flagWriteUpsCiting, recomputeWriteUpsIncluding } from "../../guides/index.ts";
 import type { ActorId, PlatformPrincipal, Principal } from "../../kernel/index.ts";
 import { fileAt, type Committed, type GitDoor } from "../../store/git/index.ts";

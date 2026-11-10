@@ -14,10 +14,10 @@ import {
 } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { uriDecoded } from "@better-answers/schema/concept-file";
+import { foldConceptType } from "@better-answers/schema/concept-type";
 import { SCHEMED } from "@better-answers/schema/scan";
 
 import { action, declareActions, record } from "../../audit/index.ts";
-import { foldConceptType } from "../../bundle/index.ts";
 import {
   err,
   isPortablePath,

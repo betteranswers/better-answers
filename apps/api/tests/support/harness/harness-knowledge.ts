@@ -6,7 +6,6 @@ import { z } from "zod";
 
 import { TRUST_TIERS } from "@better-answers/core/answering";
 import {
-  foldConceptType,
   mergeKeyOf,
   nameOwner,
   nameOwnerInput,
@@ -39,6 +38,7 @@ import {
   conceptFrontmatter,
   SENSITIVITIES,
 } from "@better-answers/schema";
+import { foldConceptType } from "@better-answers/schema/concept-type";
 import { conceptIndexRows, testData } from "@better-answers/schema/testing";
 
 import { inOneTransaction, seedPassages } from "./harness-sources.ts";

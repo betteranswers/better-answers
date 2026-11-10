@@ -13,8 +13,9 @@ import {
   SUGGESTION_EDIT_KIND,
   type ConceptIri,
 } from "@better-answers/schema";
+import { foldConceptType } from "@better-answers/schema/concept-type";
 
-import { authorOf, foldConceptType } from "../../bundle/index.ts";
+import { authorOf } from "../../bundle/index.ts";
 import {
   admit,
   ANY_ROLE,

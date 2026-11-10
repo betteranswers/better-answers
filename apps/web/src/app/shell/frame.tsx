@@ -32,6 +32,7 @@ import {
 import type { Outcome } from "@/shared/outcome.tsx";
 import { BreadcrumbLastPartSlot } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHeadSlot } from "@/shared/page/page-head.tsx";
+import { NoticeSlotChoice, type NoticeClaim } from "@/shared/page/page-notice.tsx";
 import { isFilled, type PageTab, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 import { useWideLayout } from "@/shared/page/wide-layout.ts";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
@@ -302,16 +303,12 @@ function ToolbarAndPage(properties: {
 }) {
   const { region } = properties;
   const [headSlot, holdHeadSlot] = useState<HTMLElement | null>(null);
+  const [noticeSlot, holdNoticeSlot] = useState<HTMLElement | null>(null);
+  const [claim, claimNotice] = useState<NoticeClaim | null>(null);
+  const noticeAt = claim === "held" ? null : (claim ?? noticeSlot);
 
   return (
     <PageTabsRoot tabs={region?.toolbar.tabs} picked={properties.picked}>
-      <PasskeyOffer
-        place={properties.offerPlace}
-        onDismissed={() => {
-          document.getElementById(PAGE)?.focus();
-        }}
-      />
-
       <GridPattern>
         <main
           id={PAGE}
@@ -322,11 +319,24 @@ function ToolbarAndPage(properties: {
           <div data-page-content className="max-w-page">
             <HomeLine />
             <div ref={holdHeadSlot} />
+            <div
+              ref={holdNoticeSlot}
+              className="[body:has([data-beside-page])_&]:pr-[var(--container-md)]"
+            />
+            <PasskeyOffer
+              place={properties.offerPlace}
+              into={noticeAt}
+              onDismissed={() => {
+                document.getElementById(PAGE)?.focus();
+              }}
+            />
             {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
             <PageHeadSlot value={headSlot}>
-              <PagePanel>
-                {properties.handed === undefined ? <Outlet /> : properties.handed.draw}
-              </PagePanel>
+              <NoticeSlotChoice value={claimNotice}>
+                <PagePanel>
+                  {properties.handed === undefined ? <Outlet /> : properties.handed.draw}
+                </PagePanel>
+              </NoticeSlotChoice>
             </PageHeadSlot>
           </div>
         </main>

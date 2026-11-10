@@ -32,6 +32,7 @@ import { keyed } from "@/shared/list/keyed.ts";
 import { ListState, RecordLoading } from "@/shared/list/list-pages.tsx";
 import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
+import { NoticeBelowTheTitle, NoticeHeld } from "@/shared/page/page-notice.tsx";
 import { useRoomBeside } from "@/shared/page/wide-layout.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -130,7 +131,9 @@ function Header(properties: {
     <>
       <PageHead title={titleOf(frontmatter)} headingRef={heading} inPlace />
       {description === undefined ? null : (
-        <p className="mt-1.5 text-muted-foreground [font-size:var(--text-lg)]">{description}</p>
+        <p className="mt-1.5 text-pretty text-muted-foreground [font-size:var(--text-lg)]">
+          {description}
+        </p>
       )}
       <div className="mt-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-border pb-5">
         <TypeLine
@@ -168,6 +171,7 @@ function Header(properties: {
           ))}
         </ul>
       )}
+      <NoticeBelowTheTitle />
     </>
   );
 }
@@ -426,7 +430,14 @@ function ConceptUnread(properties: {
   readonly heading: Heading;
 }) {
   const { concept } = properties;
-  if (concept.error === null) return <RecordLoading words={WORDS.loading} />;
+  if (concept.error === null) {
+    return (
+      <>
+        <NoticeHeld />
+        <RecordLoading words={WORDS.loading} />
+      </>
+    );
+  }
   if (namesNothing(concept.error)) return <NoSuchConcept />;
   return (
     <ListState

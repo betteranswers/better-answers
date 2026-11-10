@@ -1,10 +1,10 @@
-import type { ChainedCommands, Editor, Extensions } from "@tiptap/core";
-import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
+import type { Editor, Extensions } from "@tiptap/core";
+import { EditorContent, useEditor } from "@tiptap/react";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils.ts";
-import { Button } from "@/shared/ui/button.tsx";
 
+import { FormattingToolbar } from "./formatting-toolbar.tsx";
 import { endingOf, MARKDOWN_EXTENSIONS, markdownOf } from "./markdown-round-trip.ts";
 
 export type BodyField = {
@@ -19,23 +19,6 @@ export type VisualOptions = {
   readonly autofocus?: boolean | undefined;
   readonly beside?: ((editor: Editor) => ReactNode) | undefined;
 };
-
-type Control = {
-  readonly name: string;
-  readonly active: string;
-  readonly apply: (chain: ChainedCommands) => ChainedCommands;
-};
-
-const CONTROLS: readonly Control[] = [
-  { name: "Bold", active: "bold", apply: (chain) => chain.toggleBold() },
-  { name: "Italic", active: "italic", apply: (chain) => chain.toggleItalic() },
-  { name: "Heading", active: "heading", apply: (chain) => chain.toggleHeading({ level: 2 }) },
-  { name: "Bulleted list", active: "bulletList", apply: (chain) => chain.toggleBulletList() },
-  { name: "Numbered list", active: "orderedList", apply: (chain) => chain.toggleOrderedList() },
-  { name: "Quote", active: "blockquote", apply: (chain) => chain.toggleBlockquote() },
-];
-
-const FORMATTING = "Formatting";
 
 const FIELD = cn(
   "border border-input bg-background",
@@ -81,33 +64,9 @@ export function VisualBody(properties: BodyField & VisualOptions) {
     },
   });
 
-  const pressed = useEditorState({
-    editor,
-    selector: ({ editor: current }) => CONTROLS.map((control) => current.isActive(control.active)),
-  });
-
   return (
     <div className="space-y-2">
-      <div role="toolbar" aria-label={FORMATTING} className="flex flex-wrap gap-1">
-        {CONTROLS.map((control, index) => (
-          <Button
-            key={control.name}
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-pressed={pressed[index] ?? false}
-            className="aria-pressed:border-[var(--border-strong)] aria-pressed:bg-accent aria-pressed:font-semibold"
-            onMouseDown={(event) => {
-              event.preventDefault();
-            }}
-            onClick={() => {
-              control.apply(editor.chain().focus()).run();
-            }}
-          >
-            {control.name}
-          </Button>
-        ))}
-      </div>
+      <FormattingToolbar editor={editor} />
       {beside?.(editor)}
       <EditorContent editor={editor} className={FIELD} />
     </div>
