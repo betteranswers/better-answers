@@ -616,6 +616,11 @@ const briefDrawn = (joined: string) => {
   return drawn;
 };
 
+const LISTED = {
+  idOf: (number: number) => `entry-${String(number)}`,
+  named: CONCEPT_WORDS.sourceNamed,
+};
+
 describe("a Brief's body", () => {
   it.each(SPELLINGS)("draws only its placed citation beside %s", (_, forged) => {
     const joined = joinedOf(forged);
@@ -623,5 +628,36 @@ describe("a Brief's body", () => {
     expect(Object.fromEntries(joined.map((text) => [text, briefDrawn(text)]))).toEqual(
       Object.fromEntries(joined.map((text) => [text, { marks: ["[1]"], footnotes: 0 }])),
     );
+  });
+
+  it("links each number to its entry in the list", async () => {
+    await openPages(
+      {
+        "/": () => (
+          <article>
+            <CitedBrief
+              parts={[
+                { kind: "text", markdown: "Racked" },
+                { kind: "citation", number: 1 },
+                { kind: "text", markdown: " by row." },
+              ]}
+              evidence={[{ id: "1", source: "Racking plan" }]}
+              sources={LISTED}
+            />
+            <ol>
+              <li id={LISTED.idOf(1)} tabIndex={-1}>
+                Racking plan
+              </li>
+            </ol>
+          </article>
+        ),
+      },
+      ["/"],
+    );
+
+    const number = screen.getByRole("link", { name: LISTED.named(1, "Racking plan") });
+    expect(number.getAttribute("href")).toBe(`#${LISTED.idOf(1)}`);
+    fireEvent.click(number);
+    expect(document.activeElement?.id).toBe(LISTED.idOf(1));
   });
 });

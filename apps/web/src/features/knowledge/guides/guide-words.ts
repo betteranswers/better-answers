@@ -36,6 +36,7 @@ export const GUIDE_WORDS = {
   withheld: "You can’t read the text of this section.",
   noBrief: "No Brief yet.",
   footnotes: "Footnotes",
+  footnoteNamed: (number: number, title: string): string => `Footnote ${String(number)}: ${title}`,
   showDetail: "Show detail",
   hideDetail: "Hide detail",
   detailOf: (number: string): string => `Detail of section ${number}`,
@@ -74,7 +75,7 @@ export const BRIEF_WORDS = {
   placing: "Add a footnote",
   footnote: "Footnote: ",
   notPlaced: "not cited yet",
-  saving: "Saving the Brief.",
+  saving: "Saving the Brief…",
   saved: (version: number): string => `Brief saved as version ${String(version)}.`,
   unchanged: (version: number): string =>
     `No changes to save. Version ${String(version)} is the latest.`,

@@ -36,7 +36,7 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
-const LABEL = "Brief of section 1";
+const LABEL = BRIEF_WORDS.label("1");
 
 const INCLUDES = [{ label: AN_INCLUDE_ID, iri: RACKING_IRI, title: RACKING_TITLE }];
 

@@ -49,6 +49,12 @@ export type MarkOpening = {
   readonly inline: ReactNode;
 };
 
+/** Where a body's numbers link: the list beside it that names each source. */
+export type SourceList = {
+  readonly idOf: (number: number) => string;
+  readonly named: (number: number, label: string) => string;
+};
+
 /** A concept body cut where each of its marks stands, so the page reads no mark from its text. */
 const partsOf = (body: string, evidence: readonly Evidence[]): readonly BodyPart[] => {
   const { marks } = linksAndMarksOf(
@@ -84,6 +90,7 @@ type Cited = {
 type Drawing = {
   readonly cited: readonly Cited[];
   readonly inlineUnder: number | undefined;
+  readonly linked: boolean;
 };
 
 const text = (value: string): Child => ({ type: "text", value });
@@ -94,11 +101,14 @@ const MARK = "button";
 
 const SLOT = "aside";
 
+const SOURCE = "cite";
+
 const markOf = (drawing: Drawing, mark: number, inLink: boolean): readonly Child[] => {
   const cited = drawing.cited[mark];
   if (cited === undefined) return [];
-  if (cited.opens && !inLink) {
-    return [{ type: "element", tagName: MARK, properties: { dataMark: mark }, children: [] }];
+  if (!inLink && (cited.opens || drawing.linked)) {
+    const tagName = cited.opens ? MARK : SOURCE;
+    return [{ type: "element", tagName, properties: { dataMark: mark }, children: [] }];
   }
   return [{ type: "element", tagName: "sup", properties: {}, children: [text(placeOf(cited))] }];
 };
@@ -202,6 +212,7 @@ type Held = {
   readonly pages: ReadonlyMap<string, string>;
   readonly idOf: (mark: number) => string;
   readonly opening: MarkOpening | undefined;
+  readonly sources: SourceList | undefined;
   readonly headingsFrom: number;
   readonly footnotesId: string;
 };
@@ -253,8 +264,28 @@ const jumpWithinThePage = (event: MouseEvent<HTMLAnchorElement>): void => {
   event.preventDefault();
   const id = decodeURIComponent(new URL(event.currentTarget.href).hash.slice(1));
   const landing = document.getElementById(id);
-  (landing?.matches("a") === true ? landing : landing?.querySelector("a"))?.focus();
+  (landing?.matches("a") === true ? landing : (landing?.querySelector("a") ?? landing))?.focus();
 };
+
+function SourceLink(properties: ComponentProps<"cite"> & ExtraProps) {
+  const held = useContext(Body);
+  const cited = held?.cited[Number(properties.node?.properties["dataMark"])];
+  const sources = held?.sources;
+  if (cited === undefined || sources === undefined) return null;
+  const number = cited.source + 1;
+  return (
+    <sup>
+      <a
+        href={`#${sources.idOf(number)}`}
+        aria-label={sources.named(number, cited.label)}
+        className={LINK}
+        onClick={jumpWithinThePage}
+      >
+        {placeOf(cited)}
+      </a>
+    </sup>
+  );
+}
 
 const pageOf = (held: Held | undefined, href: string): string | undefined =>
   held?.pages.get(uriDecoded(href)) ?? conceptPageOf(href);
@@ -327,6 +358,7 @@ const COMPONENTS: Components = {
   img: AltText,
   [MARK]: Mark,
   [SLOT]: InlinePanel,
+  [SOURCE]: SourceLink,
   h1: headingAt(1),
   h2: headingAt(2),
   h3: headingAt(3),
@@ -359,6 +391,7 @@ type BodyProperties = {
   readonly bodyLinks?: readonly AnsweredLink[];
   readonly opening?: MarkOpening;
   readonly headingsFrom?: number;
+  readonly sources?: SourceList;
 };
 
 const citedIn = (
@@ -384,7 +417,7 @@ function CitedBody(
     readonly handlers: Handlers;
   },
 ) {
-  const { parts, evidence, bodyLinks, opening, headingsFrom = 2 } = properties;
+  const { parts, evidence, bodyLinks, opening, sources, headingsFrom = 2 } = properties;
   const baseId = fragmentSafe(useId());
 
   const cited = useMemo(() => citedMarkdownOf(parts), [parts]);
@@ -397,16 +430,18 @@ function CitedBody(
       cited: citedIn(parts, evidence, opening),
       idOf: (mark) => `${baseId}-mark-${String(mark)}`,
       opening,
+      sources,
       headingsFrom,
       footnotesId: `${baseId}-footnotes`,
     }),
-    [pages, parts, evidence, opening, headingsFrom, baseId],
+    [pages, parts, evidence, opening, sources, headingsFrom, baseId],
   );
 
   const opened = held.cited.findIndex((_, mark) => opening?.openerId === held.idOf(mark));
   const drawing: Drawing = {
     cited: held.cited,
     inlineUnder: opened === -1 || opening?.inline == null ? undefined : opened,
+    linked: sources !== undefined,
   };
 
   return (
@@ -447,7 +482,7 @@ const BRIEF_HANDLERS: Handlers = {
 };
 
 export function CitedBrief(
-  properties: Pick<BodyProperties, "evidence" | "headingsFrom"> & {
+  properties: Pick<BodyProperties, "evidence" | "headingsFrom" | "sources"> & {
     readonly parts: readonly BodyPart[];
   },
 ) {
