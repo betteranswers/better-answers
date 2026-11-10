@@ -179,20 +179,26 @@ describe("reading a guide", () => {
     ).toEqual(direct?.sections.map((section) => section.facts));
   });
 
-  it("counts a hidden section toward coverage", async () => {
+  it("counts only the sections a reader can see", async () => {
     const seeded = await freshGuide();
     await db().pool.query(
-      "UPDATE guide_section SET hidden = true WHERE guide_id = $1 AND prompt = 'Security testing'",
+      "UPDATE guide_section SET hidden = true WHERE guide_id = $1 AND prompt = 'Information security'",
       [seeded.guideId],
     );
 
-    const editor = await guideAs(seeded, seeded.ng.editor);
-    const admin = await guideAs(seeded, seeded.ng.admin);
+    const readers = [seeded.ng.viewer, seeded.ng.editor, seeded.ng.admin];
+    const guides = await Promise.all(readers.map((reader) => guideAs(seeded, reader)));
+    const summed = (guide: GuideRead) => {
+      const shown = guide.sections.map((section) => section.coverage);
+      return {
+        met: shown.reduce((sum, each) => sum + each.met, 0),
+        of: shown.reduce((sum, each) => sum + each.of, 0),
+      };
+    };
 
-    expect(editor.coverage).toEqual({ met: 20, of: 21 });
-    expect(admin.coverage).toEqual({ met: 20, of: 21 });
-    expect(editor.sections).toHaveLength(7);
-    expect(admin.sections).toHaveLength(8);
+    expect(guides.map((guide) => guide.coverage)).toEqual(guides.map(summed));
+    expect(guides.map((guide) => guide.sections.length)).toEqual([6, 6, 8]);
+    expect(guides[2]?.coverage).toEqual({ met: 20, of: 21 });
   });
 
   it("never shows a hidden section to a reader", async () => {
