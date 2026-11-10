@@ -778,14 +778,23 @@ describe("the test inventory a move holds", () => {
     expect(read(root, CORE_SOURCE)).toBe("export const thing = 1;\n");
   });
 
-  it("undoes a killed run's part-done move, then moves", () => {
-    const ONE = "export const one = 1; // packages/core/src/one.ts\n";
+  const ONE = "export const one = 1; // packages/core/src/one.ts\n";
+
+  const killedRunOf = () => {
     const root = coreRepositoryOf({
       "packages/core/src/one.ts": ONE,
       "packages/core/src/other.ts": "export const other = 2;\n",
       "docs/note.md": "packages/core/src/one.ts\n",
     });
     const bin = path.join(scratch, `stopping-git-${String(counter)}`);
+    const tablePath = path.join(scratch, `killed-${String(counter)}.tsv`);
+    writeFileSync(
+      tablePath,
+      `${tableOf([
+        ["packages/core/src/one.ts", "packages/core/src/group/one.ts"],
+        ["packages/core/src/other.ts", "packages/core/src/group/other.ts"],
+      ])}\n`,
+    );
     const runWithGitThatStopsAt = (moving: string, then: string) => {
       writeUnder(
         bin,
@@ -804,14 +813,12 @@ describe("the test inventory a move holds", () => {
         env: { ...process.env, PATH: `${bin}:${String(process.env["PATH"])}` },
       });
     };
-    const table = tableOf([
-      ["packages/core/src/one.ts", "packages/core/src/group/one.ts"],
-      ["packages/core/src/other.ts", "packages/core/src/group/other.ts"],
-    ]);
-    const tablePath = path.join(scratch, `killed-${String(counter)}.tsv`);
-    writeFileSync(tablePath, `${table}\n`);
-
     const killed = runWithGitThatStopsAt("packages/core/src/other.ts", "kill -9 $PPID");
+    return { root, tablePath, killed, runWithGitThatStopsAt };
+  };
+
+  it("undoes a killed run's part-done move, then moves", () => {
+    const { root, tablePath, killed, runWithGitThatStopsAt } = killedRunOf();
 
     expect(killed.signal).toBe("SIGKILL");
     expect(status(root)).toContain(
@@ -848,6 +855,29 @@ describe("the test inventory a move holds", () => {
         "R  packages/core/src/other.ts -> packages/core/src/group/other.ts",
       ].sort(),
     );
+  });
+
+  it("keeps the journal when a moved file's old path returns", () => {
+    const { root, tablePath, killed } = killedRunOf();
+    const journal = path.join(
+      gitIn(root, "rev-parse", "--absolute-git-dir").trim(),
+      "move-files-journal.json",
+    );
+
+    expect(killed.signal).toBe("SIGKILL");
+
+    gitIn(root, "checkout", "HEAD", "--", "packages/core/src/one.ts");
+    const treeOf = (): readonly string[] => [status(root), gitIn(root, "diff")];
+    const before = treeOf();
+
+    const rerun = spawnSync(process.execPath, [SCRIPT, tablePath], { cwd: root, encoding: "utf8" });
+
+    expect(rerun.status).toBe(1);
+    expect(rerun.stderr).toContain(
+      "packages/core/src/one.ts and packages/core/src/group/one.ts both exist",
+    );
+    expect(existsSync(journal)).toBe(true);
+    expect(treeOf()).toStrictEqual(before);
   });
 
   it("moves nothing when the tree changes while it lists", () => {
