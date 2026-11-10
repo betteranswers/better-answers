@@ -1,8 +1,11 @@
 const VOWEL = /[aeiouy]/iu;
 
-const ASCII_WORD = /^[a-z0-9]*[a-z][a-z0-9]*$/iu;
+const ASCII_WORD = /^[a-z0-9]+$/iu;
 
-const isAnAcronym = (word: string): boolean => ASCII_WORD.test(word) && !VOWEL.test(word);
+const LETTER = /[a-z]/iu;
+
+const isAnAcronym = (word: string): boolean =>
+  ASCII_WORD.test(word) && LETTER.test(word) && !VOWEL.test(word);
 
 const wordShown = (word: string): string => (isAnAcronym(word) ? word.toUpperCase() : word);
 
