@@ -554,28 +554,7 @@
       }
     },
     {
-      "files": [
-        "apps/web/src/features/knowledge/**",
-        "apps/web/src/shared/knowledge/**",
-        "apps/web/src/features/ask/**",
-        "apps/web/src/features/questions/**"
-      ],
-      "rules": {
-        "better-answers/ui-copy-plain": "error"
-      }
-    },
-    {
-      "files": [
-        "apps/web/src/features/sources/**",
-        "apps/web/src/features/model-choices/**",
-        "apps/web/src/features/people/**"
-      ],
-      "rules": {
-        "better-answers/ui-copy-plain": "error"
-      }
-    },
-    {
-      "files": ["apps/web/src/features/inbox/**"],
+      "files": ["apps/web/src/**"],
       "rules": {
         "better-answers/ui-copy-plain": "error"
       }
