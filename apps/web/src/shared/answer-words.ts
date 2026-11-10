@@ -22,7 +22,7 @@ export const REASON_WORDS = {
   wrong: "Wrong",
   "out-of-date": "Out of date",
   incomplete: "Incomplete",
-  "should-not-have-shown": "Shouldn't have been shown",
+  "should-not-have-shown": "Shouldn’t have been shown",
 } as const satisfies Readonly<Record<FlagReason, string>>;
 
 export const flaggedWords = (reason: FlagReason | null): string =>

@@ -21,7 +21,7 @@ export const SAID_OF_ACCEPTING = {
     "This invitation has expired. Ask the person who invited you for a new one.",
   "invitation-for-another-address":
     "This invitation was sent to a different email address. Sign in with that address to accept it.",
-  "already-a-member": "You're already a member of this workspace.",
+  "already-a-member": "You’re already a member of this workspace.",
   "no-display-name": "Enter a display name.",
   malformed: INVITATION_LINK_INVALID,
 } satisfies OwnSentences;
@@ -42,10 +42,10 @@ export const codeWrong = (triesLeft: number): string =>
   triesLeft === 0 ? CODE_SPENT : `That code is incorrect. ${triesNamed(triesLeft)} left.`;
 
 export const noLongerAMember = (workspace: string): string =>
-  `You're no longer a member of ${workspace}.`;
+  `You’re no longer a member of ${workspace}.`;
 
 export const noLongerAMemberOf = (workspace: string): string =>
-  `You're no longer a member of ${workspace}.`;
+  `You’re no longer a member of ${workspace}.`;
 
 export const SOLE_PICK_REFUSED = "Something went wrong. Reload the page.";
 

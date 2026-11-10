@@ -221,7 +221,7 @@ function BulkDialog(properties: {
   readonly actions: Actions;
   readonly action: BulkAction;
   readonly title: string;
-  readonly consequence: string | undefined;
+  readonly consequence?: string;
   readonly commit: ReactNode;
   readonly children?: ReactNode;
 }) {
@@ -350,7 +350,6 @@ function AddToGroupDialog(properties: { readonly actions: Actions }) {
       actions={actions}
       action="group"
       title={BULK_WORDS.addToGroup.title(count)}
-      consequence={BULK_WORDS.addToGroup.consequence(chosen?.name)}
       commit={
         <Button disabled={chosen === undefined} onClick={commit}>
           {BULK_WORDS.addToGroup.action}

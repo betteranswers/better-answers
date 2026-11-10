@@ -3,12 +3,12 @@ import { minutesUntil } from "@/shared/words.ts";
 
 export const STOCK = {
   session: "Your session has expired. Sign in again.",
-  permission: "You don't have permission to do this.",
+  permission: "You don’t have permission to do this.",
   gone: "This is no longer available. Reload the page.",
   invalid: "Check your entries and try again.",
-  unavailable: "This action isn't available.",
+  unavailable: "This action isn’t available.",
   changed: "This has changed since you opened it. Reload the page.",
-  notYet: "This can't be done yet.",
+  notYet: "This can’t be done yet.",
   general: "Something went wrong. Try again.",
   tryAgain: "We couldn’t process your request. Try again.",
   unconfirmed: "We couldn’t confirm that. Reload the page to check.",
