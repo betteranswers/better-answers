@@ -5,7 +5,7 @@ import { UNKNOWN_PAGE } from "@/app/words.ts";
 import { ALL_KNOWLEDGE_KEYSTROKES as KEY } from "@/features/knowledge/curation/curation-state.ts";
 import { ALL_KNOWLEDGE_WORDS as WORDS } from "@/features/knowledge/curation/curation-words.ts";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
-import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import { CONCEPT_WORDS, EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { KNOWLEDGE, menuGroupIn, pageById } from "@/shared/navigation.ts";
 import { CLEAR_WORDS, filterBy } from "@/shared/words.ts";
 import {
@@ -147,11 +147,11 @@ describe("the All Knowledge page", () => {
       "an unverified concept shows a date",
     ).toMatch(/^\D*\S\D*$/u);
     const unowned = cellOf("Fire drills", "Owner");
-    expect(unowned, "a concept with no owner shows an empty cell").toMatch(/\S/u);
-    expect(unowned, "a concept with no owner names a person").not.toMatch(/Ada|Rhian/u);
-    expect(cellOf("Yard lease", "Collection"), "a concept with no collection shows none").toMatch(
-      /\S/u,
-    );
+    expect(unowned, "a concept with no owner shows its empty word").toBe(EMPTY_WORDS.owner);
+    expect(
+      cellOf("Yard lease", "Collection"),
+      "a concept with no collection shows its empty word",
+    ).toBe(EMPTY_WORDS.collection);
   });
 
   it("sorts and filters by what the address holds", async () => {

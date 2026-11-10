@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenConceptType } from "@/features/knowledge/knowledge-state.ts";
 import { initiallyExpanded, KnowledgeTree, toggled } from "@/features/knowledge/knowledge-tree.tsx";
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 afterEach(cleanup);
 
@@ -65,9 +66,9 @@ describe("the knowledge tree", () => {
     pressed("ArrowDown");
     expect(focused()).toBe(collectionItem("product"));
     pressed("ArrowDown");
-    expect(focused()).toBe(item("No collection"));
+    expect(focused()).toBe(item(EMPTY_WORDS.collection));
     pressed("ArrowDown");
-    expect(focused(), "Down moved focus past the last item").toBe(item("No collection"));
+    expect(focused(), "Down moved focus past the last item").toBe(item(EMPTY_WORDS.collection));
     pressed("ArrowUp");
     expect(focused()).toBe(collectionItem("product"));
     expect(collectionItem("product").tabIndex).toBe(0);

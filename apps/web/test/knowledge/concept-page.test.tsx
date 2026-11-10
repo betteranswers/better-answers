@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PASSKEY_WORDS } from "@/features/auth/account-words.ts";
 import { forgetThePasskeyOfferShown } from "@/features/auth/session-memory.ts";
 import { SEARCH_PAGE } from "@/shared/knowledge/concept-address.ts";
-import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import { CONCEPT_WORDS, EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { detailAt } from "@/shared/navigation.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { clipboardAnswering } from "@test/clipboard-stand-in.ts";
@@ -78,7 +78,9 @@ describe("the concept page", () => {
     const article = await opened({ collection: null });
 
     expect(article.getByText(CONCEPT_WORDS.type).nextElementSibling?.textContent).toBe("Sector");
-    expect(article.getByText("Collection").nextElementSibling?.textContent).toBe("No collection");
+    expect(article.getByText(CONCEPT_WORDS.collection).nextElementSibling?.textContent).toBe(
+      EMPTY_WORDS.collection,
+    );
   });
 });
 
@@ -170,6 +172,24 @@ describe("the sources of the concept page", () => {
         .getAllByRole("listitem")
         .map((line) => line.textContent),
     ).toEqual(["[1]SCP tender 2025.pdfp.4", "[2]Working Together to Safeguard Children 2023ch.2"]);
+  });
+
+  it("counts the sources once, in the Sources heading", async () => {
+    const article = await opened({ evidence: SOURCES });
+
+    const block = within(article.getByRole("complementary", { name: "About this concept" }));
+    expect(article.getByRole("heading", { name: "Sources 2" })).toBeDefined();
+    expect(block.queryByText(CONCEPT_WORDS.sources, { selector: "dt" })).toBeNull();
+  });
+
+  it("says none in the title block when nothing is cited", async () => {
+    const article = await opened({ evidence: [] });
+
+    const block = within(article.getByRole("complementary", { name: "About this concept" }));
+    expect(article.queryByRole("heading", { name: /Sources/u })).toBeNull();
+    expect(
+      block.getByText(CONCEPT_WORDS.sources, { selector: "dt" }).nextElementSibling?.textContent,
+    ).toBe(EMPTY_WORDS.count);
   });
 
   it("shows no access line when every source is included", async () => {

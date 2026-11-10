@@ -3,13 +3,12 @@ import type { ReactNode } from "react";
 import { Icon } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { keyed } from "@/shared/list/keyed.ts";
-import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { dayWords } from "@/shared/words.ts";
 
 import { collectionNameOf } from "./collection-name.ts";
 import { generatedOf, otherFieldsOf, staleAfterOf } from "./concept-frontmatter.ts";
-import { CONCEPT_WORDS } from "./concept-words.ts";
+import { CONCEPT_WORDS, EMPTY_WORDS } from "./concept-words.ts";
 import type { Concept } from "./knowledge-reads.ts";
 import { markOf, TONE_CLASSES, TrustMark } from "./trust-mark.tsx";
 
@@ -17,14 +16,12 @@ const WORDS = CONCEPT_WORDS.titleBlock;
 
 type Verification = Concept["verifications"][number];
 
-type Reach = { readonly sources: () => void };
-
 type Row = {
   readonly label: string;
   readonly span: "full" | "half";
   readonly tint?: (concept: Concept) => string;
   /** Null leaves the row out. */
-  readonly value: (concept: Concept, reach: Reach) => ReactNode;
+  readonly value: (concept: Concept) => ReactNode;
 };
 
 const MONO = "font-mono [font-size:var(--text-sm)]";
@@ -74,7 +71,7 @@ const ROWS: readonly Row[] = [
     span: "half",
     value: ({ frontmatter }) => {
       const generated = generatedOf(frontmatter);
-      if (generated === undefined) return <Quiet>{WORDS.notRecorded}</Quiet>;
+      if (generated === undefined) return <Quiet>{EMPTY_WORDS.unrecorded}</Quiet>;
       const byAPerson = generated.by.startsWith("human:");
       return (
         <>
@@ -89,9 +86,10 @@ const ROWS: readonly Row[] = [
   {
     label: WORDS.checkedBy,
     span: "half",
-    value: ({ verifications }) => {
+    value: ({ trust, verifications }) => {
+      if (trust.status === "current") return null;
       const [latest] = verifications;
-      if (latest === undefined) return <Quiet>{WORDS.notCheckedYet}</Quiet>;
+      if (latest === undefined) return <Quiet>{EMPTY_WORDS.verification}</Quiet>;
       return (
         <>
           <span className="wrap-anywhere">{checkerOf(latest)}</span>
@@ -105,7 +103,7 @@ const ROWS: readonly Row[] = [
     span: "full",
     value: ({ verifications }) => {
       const earlier = verifications.slice(1);
-      if (earlier.length === 0) return <Quiet>{WORDS.noEarlierChecks}</Quiet>;
+      if (earlier.length === 0) return null;
       return (
         <ul className="grid gap-1">
           {keyed(earlier, ({ at, actor }) => `${actor}:${at}`).map(({ key, item }) => (
@@ -121,16 +119,11 @@ const ROWS: readonly Row[] = [
     },
   },
   {
-    label: WORDS.status,
-    span: "half",
-    value: ({ trust }) => (trust.status === "current" ? null : WORDS.statuses[trust.status]),
-  },
-  {
     label: WORDS.reviewBy,
     span: "half",
     value: ({ frontmatter, trust }) => {
       const staleAfter = staleAfterOf(frontmatter);
-      if (staleAfter === undefined) return <Quiet>{WORDS.notSet}</Quiet>;
+      if (staleAfter === undefined) return <Quiet>{EMPTY_WORDS.unrecorded}</Quiet>;
       return (
         <span
           className={cn(MONO, trust.status === "out-of-date" && "text-[var(--trust-stale-fg)]")}
@@ -144,7 +137,7 @@ const ROWS: readonly Row[] = [
     label: WORDS.owner,
     span: "half",
     value: ({ owner, collection }) => {
-      if (owner === null) return <Quiet>{WORDS.noOwner}</Quiet>;
+      if (owner === null) return <Quiet>{EMPTY_WORDS.owner}</Quiet>;
       return (
         <>
           <span className="wrap-anywhere">{owner.name}</span>
@@ -158,25 +151,13 @@ const ROWS: readonly Row[] = [
   {
     label: CONCEPT_WORDS.sources,
     span: "half",
-    value: ({ evidence }, reach) =>
-      evidence.length === 0 ? (
-        0
-      ) : (
-        <Button
-          type="button"
-          variant="link"
-          aria-label={WORDS.goToSources(evidence.length)}
-          className="h-auto px-0 py-0 underline"
-          onClick={reach.sources}
-        >
-          {evidence.length}
-        </Button>
-      ),
+    value: ({ evidence }) => (evidence.length === 0 ? <Quiet>{EMPTY_WORDS.count}</Quiet> : null),
   },
   {
     label: WORDS.usedIn,
     span: "full",
-    value: ({ usedIn }) => WORDS.used(usedIn.guides, usedIn.answers),
+    value: ({ usedIn }) =>
+      WORDS.used(usedIn.guides, usedIn.answers) ?? <Quiet>{EMPTY_WORDS.count}</Quiet>,
   },
   {
     label: WORDS.otherFields,
@@ -213,16 +194,21 @@ type Column = "left" | "right" | "both";
 
 type Placed = { readonly row: Row; readonly value: ReactNode; readonly column: Column };
 
-/** A half row takes the left column, the next half row the right, and a full row closes the pair. */
-const cellsOf = (concept: Concept, reach: Reach): readonly Placed[] => {
+/** A half row takes the left column and the next half row the right. A half row with no partner takes both. */
+const cellsOf = (concept: Concept): readonly Placed[] => {
   let waiting = false;
-  return ROWS.flatMap((row) => {
-    const value = row.value(concept, reach);
+  const placed = ROWS.flatMap((row) => {
+    const value = row.value(concept);
     if (value === null) return [];
-    const column = row.span === "full" ? "both" : waiting ? "right" : "left";
+    const column: Column = row.span === "full" ? "both" : waiting ? "right" : "left";
     waiting = column === "left";
     return [{ row, value, column }];
   });
+  return placed.map((cell, at) =>
+    cell.column === "left" && placed[at + 1]?.column !== "right"
+      ? { ...cell, column: "both" }
+      : cell,
+  );
 };
 
 function Cell(properties: {
@@ -257,13 +243,9 @@ function Cell(properties: {
   );
 }
 
-export function TitleBlock(properties: {
-  readonly concept: Concept;
-  readonly onGoToSources: () => void;
-  readonly className?: string;
-}) {
+export function TitleBlock(properties: { readonly concept: Concept; readonly className?: string }) {
   const { concept } = properties;
-  const cells = cellsOf(concept, { sources: properties.onGoToSources });
+  const cells = cellsOf(concept);
 
   return (
     <Card

@@ -2,6 +2,7 @@ import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-tab
 import { createContext, useContext } from "react";
 
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
+import { EMPTY_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { GridTable } from "@/shared/list/grid-table.tsx";
 import { ListState } from "@/shared/list/list-pages.tsx";
 import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
@@ -29,7 +30,7 @@ function OwnerCell(properties: { readonly owned: CollectionOwned }) {
   return (
     <div className="grid max-w-64 min-w-36 gap-1">
       {naming === undefined ? (
-        <span>{owned.owner === null ? WORDS.noOwner : nameOf(owned.owner)}</span>
+        <span>{owned.owner === null ? EMPTY_WORDS.owner : nameOf(owned.owner)}</span>
       ) : (
         <OwnerPicker
           owned={owned}

@@ -387,13 +387,11 @@ test.describe("the concept page", () => {
         .getByRole("complementary", { name: "About this concept" })
         .locator(`xpath=.//dt[normalize-space()="${label}"]/following-sibling::dd[1]`);
     await expect(rowOf("Trust")).toContainText(`Verified by ${workspace.admin.name}`);
-    await expect(rowOf(CONCEPT_WORDS.titleBlock.checkedBy)).toContainText(workspace.admin.name);
     await expect(rowOf("Owner")).toContainText("Ifan Morgan");
     await expect(rowOf("Owner")).toContainText(
       CONCEPT_WORDS.titleBlock.ownerOf(collectionNameOf(CONTRACTS)),
     );
     await expect(rowOf("Review by")).toHaveText("1 March 2027");
-    await expect(rowOf("Sources")).toHaveText("1");
     await expect(page.getByText(/details from the file/iu)).toHaveCount(0);
     await passesTheAccessibilityGate();
   });
