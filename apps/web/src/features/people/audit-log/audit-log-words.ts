@@ -34,7 +34,7 @@ export const AUDIT_LOG_WORDS = {
   family: "Family",
   everyFamily: "All families",
   families: FAMILY_WORDS,
-  loading: "The audit log is still loading.",
+  loading: "Loading the audit log…",
   none: "No events yet",
   noneNarrowed: (asked: Asked): string =>
     asked.search === ""

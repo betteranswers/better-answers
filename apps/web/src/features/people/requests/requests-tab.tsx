@@ -35,7 +35,7 @@ const REQUESTS_HEADING = "Requests";
 
 const SEARCH_LABEL = "Search by name or address";
 
-const LOADING = "The requests are still loading.";
+const LOADING = "Loading requests…";
 
 const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.request);
 
@@ -87,7 +87,6 @@ function RequestsList(properties: {
   const [approving, setApproving] = useState<WaitingRequest>();
   const searchRef = useRef<HTMLInputElement>(null);
   const openedFrom = useRef<HTMLElement | null>(null);
-  const consequenceId = useId();
   const approve = useApproveRequest();
   const decline = useDeclineRequest();
 
@@ -179,12 +178,7 @@ function RequestsList(properties: {
           failed={(failure) => outcomeOfRequestFailure(failure, "read").words}
           focusAfterRetry={searchRef}
         >
-          <p id={consequenceId} className="px-3 pt-3 text-muted-foreground">
-            {REQUEST_WORDS.lead}
-          </p>
-          <RequestsActionsContext
-            value={{ consequenceId, onApprove: toApprove, onDecline: declined }}
-          >
+          <RequestsActionsContext value={{ onApprove: toApprove, onDecline: declined }}>
             <GridTable
               table={table}
               caption="Requests to join this workspace."

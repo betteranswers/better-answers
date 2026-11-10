@@ -9,7 +9,7 @@ export const MODEL_CHOICES_WORDS = {
   provider: "Provider",
   model: "Model",
   fixed: "Fixed",
-  loading: "The model choices are still loading.",
+  loading: "Loading model choices…",
   failed: "The model choices didn’t load. Reload the page.",
 } as const;
 

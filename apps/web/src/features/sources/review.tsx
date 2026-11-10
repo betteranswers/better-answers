@@ -84,7 +84,7 @@ function PreviewPassages(properties: {
 
   return (
     <div aria-live="polite" className="mt-2">
-      {said.isPending && properties.open ? <p>The passages are still loading.</p> : null}
+      {said.isPending && properties.open ? <p>Loading passages…</p> : null}
       {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
       {preview.data?.length === 0 ? <p>{REVIEW_WORDS.noPassages}</p> : null}
       {preview.data === undefined || preview.data.length === 0 ? null : (
@@ -206,7 +206,7 @@ export function Review(properties: { readonly connectedSource: ListedConnectedSo
       </h4>
 
       <div aria-live="polite" className="mt-4">
-        {said.isPending ? <p>The findings are still loading.</p> : null}
+        {said.isPending ? <p>Loading findings…</p> : null}
         {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
         {findings.data?.length === 0 ? <p>{NOTHING_FOUND[connectedSource.state]}</p> : null}
       </div>

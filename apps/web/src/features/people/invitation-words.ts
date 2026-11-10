@@ -23,7 +23,7 @@ const outcomeOfSending = (
 
 export const approvedOutcome = (sent: SentInvitation): Outcome =>
   outcomeOfSending(sent, {
-    went: `Request approved. ${sent.address} is invited as ${aRole(sent.role)} until ${dayWords(sent.expiresAt)}.`,
+    went: `${sent.address} invited as ${aRole(sent.role)}. The invitation expires on ${dayWords(sent.expiresAt)}.`,
     didNotGo: `Request approved, but the email to ${sent.address} wasn’t sent. Resend it from the Invitations tab.`,
   });
 
@@ -38,8 +38,8 @@ const addressesOf = (sent: readonly SentInvitation[]): string =>
 
 const unsentSaid = (unsent: readonly SentInvitation[]): string =>
   unsent.length === 1
-    ? `Resend the unsent email to ${addressesOf(unsent)} below.`
-    : `Resend the unsent emails to ${addressesOf(unsent)} below.`;
+    ? `The email to ${addressesOf(unsent)} wasn’t sent. Resend it below.`
+    : `The emails to ${addressesOf(unsent)} weren’t sent. Resend them below.`;
 
 const lastsUntil = (sent: readonly SentInvitation[]): string => {
   const [first] = sent;
@@ -105,7 +105,7 @@ export const INVITATIONS_WORDS = {
   selected: "Selected invitations",
   everyOnThePage: "Select every invitation on this page",
   pages: "Pages of invitations",
-  loading: "The invitations are still loading.",
+  loading: "Loading invitations…",
   caption: "Invitations to this workspace.",
   noneIn: {
     waiting: EMPTY_LINES.invitations,
@@ -160,7 +160,6 @@ export const INVITE_WORDS = {
 } as const;
 
 export const REQUEST_WORDS = {
-  lead: "Approving a request sends the person an invitation.",
   approving: (name: string, role: string): string =>
     `Approving the request from ${name} as ${role}.`,
   declined: (name: string): string => `Request from ${name} declined.`,

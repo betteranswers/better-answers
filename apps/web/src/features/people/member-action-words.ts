@@ -13,9 +13,9 @@ export const NO_LONGER_LISTED = "A member no longer listed";
 export const homeNowSaid = (role: Role): string =>
   `You are now ${aRole(role)}. This is your home page.`;
 
-export const MEMBERS_LOADING = "The members are still loading.";
+export const MEMBERS_LOADING = "Loading members…";
 
-export const GROUPS_LOADING = "The groups are still loading.";
+export const GROUPS_LOADING = "Loading groups…";
 
 export const MEMBER_PAGE_WORDS = {
   sections: "On this page",
@@ -36,7 +36,7 @@ export const MEMBER_PAGE_WORDS = {
   signOutHintForYou: " You will be signed out too.",
   signedOut: (name: string) =>
     `${name} is signed out of this workspace, and their assistants’ access has ended.`,
-  loading: "The member is still loading.",
+  loading: "Loading the member…",
   noSuchMember: "Member not found",
   toMembers: "Go to Members",
   removing: (name: string) => `Removing ${name} from this workspace.`,
@@ -64,7 +64,7 @@ export const MEMBERS_WORDS = {
 } as const;
 
 export const ACTIVITY_WORDS = {
-  loading: "The activity is still loading.",
+  loading: "Loading activity…",
   none: (name: string) => `No activity for ${name} yet`,
   older: "Older activity",
   direction: {
@@ -95,7 +95,7 @@ export const BULK_WORDS = {
     action: "Add to group",
     title: (count: number) => `Add ${members(count)} to a group`,
     consequence: (group: string | undefined) =>
-      group === undefined ? "Choose a group." : `Each member joins ${group}.`,
+      group === undefined ? "Select a group." : `Each member joins ${group}.`,
     choose: "Select a group",
     pending: (count: number, group: string) => `Adding ${members(count)} to ${group}.`,
     done: (changed: number, group: string, skipped: number) =>
@@ -112,6 +112,6 @@ export const BULK_WORDS = {
   },
   refused: (count: number) => `No changes were made. There was a problem with ${members(count)}:`,
   stillGoing: "Wait for the previous action to finish.",
-  roleLoading: "Your role is still loading. Try again in a moment.",
+  roleLoading: "Loading your role. Try again in a moment.",
   tooMany: (most: number) => `You can select up to ${members(most)} at a time.`,
 } as const;

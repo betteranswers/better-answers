@@ -247,7 +247,7 @@ export const REVIEW_WORDS = {
     label: "Dismiss as not special category",
     named: (groups: number): string => `Dismiss ${groupsCounted(groups)} as not special category`,
     consequence:
-      "The findings stay withheld, and documents with no other special category findings go back to their earlier sensitivity after the next sync.",
+      "Documents with no other special category findings go back to their earlier sensitivity after the next sync.",
     pending: "Dismissing.",
     done: (groups: number, documents: number): string =>
       `${groupsCounted(groups)} dismissed in ${documentsCounted(documents)}.`,

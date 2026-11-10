@@ -196,7 +196,7 @@ function ListStatus(properties: {
   const said = useReadSaid(connectedSources);
   return (
     <div aria-live="polite" className="mt-2">
-      {said.isPending ? <p>The connected sources are still loading.</p> : null}
+      {said.isPending ? <p>Loading connected sources…</p> : null}
       {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
       {connectedSources.data?.length === 0 ? <EmptyState line={NOTHING_CONNECTED} /> : null}
     </div>

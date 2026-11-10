@@ -15,7 +15,6 @@ export const requestsFeatures = tableFeatures({});
 const column = createColumnHelper<typeof requestsFeatures, WaitingRequest>();
 
 type RequestActions = {
-  readonly consequenceId: string;
   readonly onApprove: (request: WaitingRequest) => void;
   readonly onDecline: (request: WaitingRequest) => void;
 };
@@ -47,7 +46,6 @@ function Decisions(properties: { readonly request: WaitingRequest }) {
         variant="outline"
         aria-haspopup="dialog"
         aria-label={REQUEST_WORDS.approveFrom(name)}
-        aria-describedby={actions?.consequenceId}
         aria-keyshortcuts={KEY.approve.key}
         onClick={() => {
           actions?.onApprove(request);
@@ -59,7 +57,6 @@ function Decisions(properties: { readonly request: WaitingRequest }) {
         size="sm"
         variant="ghost"
         aria-label={REQUEST_WORDS.declineFrom(name)}
-        aria-describedby={actions?.consequenceId}
         aria-keyshortcuts={KEY.decline.key}
         onClick={() => {
           actions?.onDecline(request);
