@@ -14,9 +14,7 @@ export const CONSOLE_CLOSED = "Access denied";
 
 export const PERSON_WORDS = {
   signIn: "Sign-in",
-  lastSignIn: "Last sign-in",
   signedOutEverywhere: "Signed out everywhere",
-  never: "Never",
   workspaces: "Workspaces",
   sessions: "Sessions",
   assistantAccess: "Assistant access",

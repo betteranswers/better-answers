@@ -12,6 +12,7 @@ import { counted } from "@/shared/words.ts";
 
 import { CorrectDisplayName } from "../correct-display-name.tsx";
 import { Facts } from "../facts.tsx";
+import { EVERYONE_WORDS } from "../list-words.ts";
 import type { FreshAction } from "../people-address.ts";
 import {
   useInspected,
@@ -249,11 +250,11 @@ export function PersonSheet(properties: {
         </SheetPart>
         <SheetPart title={PERSON_WORDS.signIn}>
           <Facts>
-            <SummaryRow term={PERSON_WORDS.lastSignIn}>
-              <Instant at={person.lastSignedInAt} none={PERSON_WORDS.never} />
+            <SummaryRow term={EVERYONE_WORDS.columns.lastSignIn}>
+              <Instant at={person.lastSignedInAt} none={EVERYONE_WORDS.never} />
             </SummaryRow>
             <SummaryRow term={PERSON_WORDS.signedOutEverywhere}>
-              <Instant at={person.credentialsRevokedAt} none={PERSON_WORDS.never} />
+              <Instant at={person.credentialsRevokedAt} none={EVERYONE_WORDS.never} />
             </SummaryRow>
           </Facts>
         </SheetPart>

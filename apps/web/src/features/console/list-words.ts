@@ -11,10 +11,12 @@ const NAMES: Noun = ["name", "names"];
 
 const WORKSPACES: Noun = ["workspace", "workspaces"];
 
+const PERSON = "Person";
+
 export const EVERYONE_WORDS = {
   heading: "Everyone",
   columns: {
-    person: "Person",
+    person: PERSON,
     workspacesAndRoles: "Workspaces and roles",
     lastSignIn: "Last sign-in",
   },
@@ -36,7 +38,7 @@ const namesCounted = (count: number): string =>
 
 export const NAMES_WAITING_WORDS = {
   heading: "Flagged Names",
-  columns: { person: "Person", flaggedBy: "Flagged by", actions: "Actions" },
+  columns: { person: PERSON, flaggedBy: "Flagged by", actions: "Actions" },
   search: "Search by name or workspace",
   caption: "Display names waiting to be corrected.",
   loading: "Loading names…",
