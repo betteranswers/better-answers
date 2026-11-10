@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { COLLECTIONS_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
@@ -46,6 +46,9 @@ const cellsOf = (collection: string) => {
     .map((cell) => cell.textContent);
 };
 
+const collectionsAsks = (): number =>
+  server.asks.filter((ask) => ask.procedure === "knowledge.collections").length;
+
 const namingAsks = () =>
   server.asks.filter((ask) => ask.procedure === "knowledge.nameOwner").map((ask) => ask.input);
 
@@ -55,6 +58,25 @@ const aCollectionsApi = () => {
   api.set("knowledge.collections", () => read({ collections: [POLICY] }));
   api.set("knowledge.nameOwner", () => read({ auditEventId: "01JEVENT", personId: null }));
   return api;
+};
+
+const SAFETY = { collection: "safety", owner: null, overrides: 0, concepts: 1, verified: 0 };
+
+const pickerNamed = (collection: string) =>
+  screen.findByRole("button", {
+    name: WORDS.ownerOf(collectionNameOf(collection), WORDS.noOwner),
+  });
+
+const chosenFor = async (collection: string, person: string) => {
+  fireEvent.click(await pickerNamed(collection));
+  await choosing(person);
+};
+
+const alertedIn = (collection: string): boolean => {
+  const row = region().getByRole("row", { name: new RegExp(collectionNameOf(collection), "u") });
+  return within(row)
+    .getAllByRole("alert")
+    .some((alert) => /\S/u.test(alert.textContent));
 };
 
 const ownedByRhian = () => {
@@ -137,19 +159,24 @@ describe("the Collections and Owners page", () => {
     expect(screen.queryByRole("button", { name: WORDS.undo })).toBeNull();
   });
 
-  it("finds a person by a part of the name", async () => {
+  it("filters people by name and resets after a choice", async () => {
     await openAt(PAGE, aCollectionsApi());
 
     fireEvent.click(await pickerOf(WORDS.noOwner));
     fireEvent.change(await screen.findByPlaceholderText(WORDS.searchPeople), {
       target: { value: "pryce" },
     });
-
     await waitFor(() => {
       expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
         RHIAN.displayName,
       ]);
     });
+    await choosing(RHIAN.displayName);
+    fireEvent.click(await pickerOf(WORDS.noOwner));
+
+    const offered = await screen.findAllByRole("option");
+    expect(offered.map((option) => option.textContent)).toContain(ADA.displayName);
+    expect(screen.getByPlaceholderText(WORDS.searchPeople)).toHaveProperty("value", "");
   });
 
   it("alerts beside the picker on a refusal", async () => {
@@ -157,20 +184,61 @@ describe("the Collections and Owners page", () => {
     api.set("knowledge.nameOwner", () => aRefusalAnswer("no-such-member", "precondition", 412));
     await openAt(PAGE, api);
 
-    fireEvent.click(await pickerOf(WORDS.noOwner));
-    await choosing(RHIAN.displayName);
+    await chosenFor(POLICY.collection, RHIAN.displayName);
 
     await waitFor(() => {
-      const row = region().getByRole("row", { name: new RegExp(NAMED, "u") });
-      expect(
-        within(row)
-          .getAllByRole("alert")
-          .some((alert) => /\S/u.test(alert.textContent)),
-        "the refused naming raised no alert in its row",
-      ).toBe(true);
+      expect(alertedIn(POLICY.collection), "the refused naming raised no alert in its row").toBe(
+        true,
+      );
     });
     expect(screen.queryByRole("button", { name: WORDS.undo })).toBeNull();
     expect(await pickerOf(WORDS.noOwner)).toBeDefined();
+  });
+
+  it("keeps each collection's refusal beside its own picker", async () => {
+    const api = aCollectionsApi();
+    api.set("knowledge.collections", () => read({ collections: [POLICY, SAFETY] }));
+    api.set("knowledge.nameOwner", () => aRefusalAnswer("no-such-member", "precondition", 412));
+    await openAt(PAGE, api);
+
+    await chosenFor(POLICY.collection, RHIAN.displayName);
+    await chosenFor(SAFETY.collection, RHIAN.displayName);
+
+    await waitFor(() => {
+      expect(alertedIn(POLICY.collection), "the refusal beside the first picker was lost").toBe(
+        true,
+      );
+      expect(alertedIn(SAFETY.collection)).toBe(true);
+    });
+  });
+
+  it("keeps Undo on the newest change", async () => {
+    const api = aCollectionsApi();
+    api.set("knowledge.collections", () => read({ collections: [POLICY, SAFETY] }));
+    const slowest = Promise.withResolvers<unknown>();
+    const saved = read({ auditEventId: "01JEVENT", personId: null });
+    const answers: unknown[] = [slowest.promise, saved];
+    api.set("knowledge.nameOwner", () => answers.shift());
+    await openAt(PAGE, api);
+
+    await chosenFor(POLICY.collection, RHIAN.displayName);
+    await chosenFor(SAFETY.collection, RHIAN.displayName);
+    await screen.findByRole("button", { name: WORDS.undo });
+    const readsBefore = collectionsAsks();
+    slowest.resolve(saved);
+    await waitFor(() => {
+      expect(collectionsAsks()).toBeGreaterThan(readsBefore);
+    });
+    await act(async () => {
+      await new Promise((done) => {
+        setTimeout(done);
+      });
+    });
+    fireEvent.keyDown(document.body, { key: "u" });
+
+    await waitFor(() => {
+      expect(namingAsks().at(-1)).toEqual({ collection: SAFETY.collection, personId: null });
+    });
   });
 
   it("undoes the last owner change by its keystroke", async () => {

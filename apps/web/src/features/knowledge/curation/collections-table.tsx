@@ -39,7 +39,7 @@ function OwnerCell(properties: { readonly owned: CollectionOwned }) {
         />
       )}
       <div role="alert" className="empty:hidden">
-        {naming?.refused?.collection === owned.collection ? naming.refused.words : null}
+        {naming?.refusalOf(owned.collection)}
       </div>
       {owned.overrides === 0 ? null : (
         <span className="text-xs text-muted-foreground">{WORDS.ownOwners(owned.overrides)}</span>

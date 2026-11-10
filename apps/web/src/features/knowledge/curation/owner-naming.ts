@@ -12,28 +12,41 @@ const { outcomeOfFailure } = refusalsOf(SAID_OF_COLLECTIONS);
 
 export const nameOf = (owner: Owner): string => (owner.name === "" ? WORDS.unnamed : owner.name);
 
-type Refused = { readonly collection: string; readonly words: ReactNode };
-
 export type Naming = {
   readonly choices: readonly Owner[];
-  readonly refused: Refused | undefined;
+  readonly refusalOf: (collection: string) => ReactNode;
   readonly save: (owned: CollectionOwned, chosen: Owner | null) => void;
 };
+
+const NO_REFUSALS: ReadonlyMap<string, ReactNode> = new Map();
 
 export const useOwnerNaming = (choices: readonly Owner[]) => {
   const naming = useNameOwner();
   const [notice, setNotice] = useState<UndoNotice>();
-  const [refused, setRefused] = useState<Refused>();
-  const told = useRef(0);
+  const [refusals, setRefusals] = useState(NO_REFUSALS);
+  const started = useRef(0);
+  const shown = useRef(0);
+
+  const refused = (collection: string, words: ReactNode) => {
+    setRefusals((held) => {
+      const next = new Map(held);
+      if (words === undefined) next.delete(collection);
+      else next.set(collection, words);
+      return next;
+    });
+  };
 
   const name = (collection: string, chosen: Owner | null, before: Owner | null | undefined) => {
-    setRefused(undefined);
+    started.current += 1;
+    const sequence = started.current;
+    refused(collection, undefined);
     void naming.mutateAsync({ collection, personId: chosen?.id ?? null }).then(
       () => {
-        told.current += 1;
+        if (sequence < shown.current) return;
+        shown.current = sequence;
         const named = collectionNameOf(collection);
         setNotice({
-          id: told.current,
+          id: sequence,
           words: chosen === null ? WORDS.cleared(named) : WORDS.named(nameOf(chosen), named),
           undo:
             before === undefined
@@ -48,7 +61,7 @@ export const useOwnerNaming = (choices: readonly Owner[]) => {
         });
       },
       (failure: Error | ApiError) => {
-        setRefused({ collection, words: outcomeOfFailure(failure, "action").words });
+        refused(collection, outcomeOfFailure(failure, "action").words);
       },
     );
   };
@@ -56,7 +69,7 @@ export const useOwnerNaming = (choices: readonly Owner[]) => {
   return {
     naming: {
       choices,
-      refused,
+      refusalOf: (collection) => refusals.get(collection),
       save: (owned, chosen) => {
         name(owned.collection, chosen, owned.owner);
       },

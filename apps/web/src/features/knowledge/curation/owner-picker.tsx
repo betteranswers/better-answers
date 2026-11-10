@@ -1,4 +1,5 @@
 import { CheckIcon } from "lucide-react";
+import { useState } from "react";
 
 import { collectionNameOf } from "@/shared/knowledge/collection-name.ts";
 import {
@@ -42,6 +43,7 @@ export function OwnerPicker(properties: {
     ...people.map((person) => ({ value: person.id, label: nameOf(person) })),
   ];
   const held = items.find((item) => item.value === current);
+  const [search, setSearch] = useState("");
 
   return (
     <Combobox
@@ -52,6 +54,9 @@ export function OwnerPicker(properties: {
         if (picked === current) return;
         onPick(people.find((person) => person.id === picked) ?? null);
       }}
+      onOpenChange={(open) => {
+        if (!open) setSearch("");
+      }}
     >
       <ComboboxTrigger
         id={pickerIdOf(owned.collection)}
@@ -60,6 +65,8 @@ export function OwnerPicker(properties: {
       />
       <ComboboxContent filter={byName} popoverOptions={{ align: "start" }} className="min-w-56">
         <ComboboxInput
+          value={search}
+          onValueChange={setSearch}
           placeholder={WORDS.searchPeople}
           className="focus-visible:shadow-[inset_0_-2px_0_var(--accent-600)]!"
         />
