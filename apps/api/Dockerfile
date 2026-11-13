@@ -9,7 +9,7 @@
 # The base is Debian, not Alpine, because the lockfile's platform binaries and this tier's tests
 # resolve against glibc. It is Debian 13 because Debian 12 has moved to its long-term-support
 # team, which patches fewer packages.
-FROM node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c AS base
+FROM node:24.22.3-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0 AS base
 
 # `corepack install` reads the pnpm version from the root manifest's `packageManager` field, so
 # this file does not pin pnpm. The cache is world-readable because the runtime runs as `node`.
