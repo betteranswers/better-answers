@@ -6,16 +6,16 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     # The runtime image is Distroless and has no git binary, so the worker reads its bare
     # repositories through this pure-Python git library.
-    "dulwich==1.2.17",
-    "psycopg[binary]==3.3.6",
+    "dulwich==1.2.21",
+    "psycopg[binary]==3.3.9",
     "structlog>=26.1.0",
     # Presidio releases these two packages together, so they carry the same pin.
-    "presidio-analyzer[gliner]==2.2.364",
-    "presidio-anonymizer==2.2.364",
+    "presidio-analyzer[gliner]==2.2.366",
+    "presidio-anonymizer==2.2.366",
     # Pinned here as well as through the `gliner` extra above. The extra's range would let
     # GLiNER move under the recall that the redaction fixture proves.
-    "gliner==0.2.29",
-    "spacy==3.8.16",
+    "gliner==0.2.30",
+    "spacy==3.8.18",
     # Explosion publishes this pipeline as a GitHub release asset, not on PyPI. The URL under
     # `tool.uv.sources` is its pin, and the lock records its hash.
     "en-core-web-sm",
@@ -26,11 +26,11 @@ dependencies = [
     # bump the pin, run the engine through a proxy that logs each host it requests, and confirm
     # that it requests none. Then rerun `tests/pipeline/test_pipeline_engine_environment.py` and
     # `test_the_image_and_deploy_unit_refuse_the_engines_gateway_call` in `tests/test_image.py`.
-    "cocoindex==1.0.25",
+    "cocoindex==1.2.0",
     # Pinned here rather than through the cocoindex `postgres` extra, whose floor would let the
     # driver move. The pipeline's pool connection init is what enforces row-level security.
     "asyncpg==0.32.0",
-    "boto3==1.43.115",
+    "boto3==1.44.2",
     # When you bump either converter, rerun
     # `test_both_converters_hold_on_the_image_under_the_engines_runtime` in `tests/test_image.py`.
     "firecrawl-anydoc==0.2.4",
@@ -62,7 +62,7 @@ dev = [
     # same version, and so that Renovate's pep621 manager updates them.
     "actionlint-py==1.7.12.25",
     "shellcheck-py==0.11.0.1",
-    "zizmor==1.31.1",
+    "zizmor==1.32.0",
 ]
 
 # uv uses its built-in backend only when its own version is inside this range. Keep the range
